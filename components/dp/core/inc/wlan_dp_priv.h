@@ -570,6 +570,8 @@ struct fse_cache_flush_history {
  * @fst_update_work: FST CMEM update work
  * @fst_update_wq: FST CMEM update workqueue
  * @fst_update_list: List to post event to CMEM update work
+ * @last_update_time_ns: last update time in nanoseconds
+ * @update_count: counter used to limit the number of fst updates per second
  * @meta_counter:
  * @cmem_ba:
  * @dp_rx_sw_ft_lock: SW FST lock
@@ -607,6 +609,8 @@ struct dp_rx_fst {
 	qdf_work_t fst_update_work;
 	qdf_workqueue_t *fst_update_wq;
 	qdf_list_t fst_update_list;
+	uint64_t last_update_time_ns;
+	uint32_t update_count;
 	uint32_t meta_counter;
 	uint32_t cmem_ba;
 	qdf_spinlock_t dp_rx_sw_ft_lock[MAX_REO_DEST_RINGS];

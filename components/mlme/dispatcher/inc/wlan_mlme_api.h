@@ -5349,4 +5349,68 @@ wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
  * Return: beacon interval
  */
 uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
+
+/** wlan_mlme_get_p2p_go_cancel_one_shot_noa() - Get P2P GO one-shot NoA
+ * cancellation configuration
+ * @psoc: pointer to psoc object
+ *
+ * This function retrieves the configuration setting that controls whether
+ * P2P Group Owner (GO) should cancel one-shot Notice of Absence (NoA)
+ * when there is active traffic. When enabled, the GO can dynamically
+ * cancel a scheduled one-shot NoA period to maintain better throughput
+ * and reduce latency during active data transmission.
+ *
+ * Return: true if one-shot NoA cancellation is enabled, false otherwise
+ */
+bool wlan_mlme_get_p2p_go_cancel_one_shot_noa(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_p2p_go_cancel_one_shot_noa() - Set P2P GO one-shot NoA
+ * cancellation configuration
+ * @psoc: pointer to psoc object
+ * @value: true to enable one-shot NoA cancellation, false to disable
+ *
+ * This function configures whether P2P Group Owner (GO) should cancel
+ * one-shot Notice of Absence (NoA) when there is active traffic. When
+ * enabled, the GO can dynamically cancel a scheduled one-shot NoA period
+ * to maintain better throughput and reduce latency during active data
+ * transmission.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS wlan_mlme_set_p2p_go_cancel_one_shot_noa(struct wlan_objmgr_psoc *psoc,
+						    bool value);
+
+/**
+ * wlan_mlme_get_p2p_gc_keep_awake_during_noa() - Get P2P GC keep-awake
+ * during NoA configuration
+ * @psoc: pointer to psoc object
+ *
+ * This function retrieves the configuration setting that controls whether
+ * P2P Group Client (GC) should remain awake during Notice of Absence (NoA)
+ * periods announced by the Group Owner. When enabled, the GC will not enter
+ * power save mode during NoA periods, allowing it to receive frames from
+ * other devices and maintain better connectivity, though at the cost of
+ * increased power consumption.
+ *
+ * Return: true if GC keep-awake during NoA is enabled, false otherwise
+ */
+bool wlan_mlme_get_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_p2p_gc_keep_awake_during_noa() - Set P2P GC keep-awake
+ * during NoA configuration
+ * @psoc: pointer to psoc object
+ * @value: true to keep GC awake during NoA, false to allow power save
+ *
+ * This function configures whether P2P Group Client (GC) should remain
+ * awake during Notice of Absence (NoA) periods announced by the Group
+ * Owner. When enabled, the GC will not enter power save mode during NoA
+ * periods, allowing it to receive frames from other devices and maintain
+ * better connectivity, though at the cost of increased power consumption.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
+						      bool value);
 #endif /* _WLAN_MLME_API_H_ */

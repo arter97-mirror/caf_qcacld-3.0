@@ -38,6 +38,8 @@
 #include "wlan_mlme_api.h"
 #include "osif_vdev_mgr_util.h"
 #include "wlan_hdd_main.h"
+#include "wlan_hdd_p2p.h"
+#include "wma_api.h"
 
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
@@ -102,6 +104,17 @@ p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG] = {.type = NLA_U8,},
 };
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+const struct nla_policy
+p2p_noa_attr_policy[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA] = {.type = NLA_U8},
+
+};
 
 #define DST_MAC_ADDRESS_OFFSET 4
 #define MGMT_FRAME_MATCH_LEN 6
@@ -987,3 +1000,196 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 	return ret;
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * osif_p2p_set_noa_cancel_config() - Set NoA cancellation configuration
+ * @adapter: HDD adapter
+ * @tb: Parsed netlink attributes
+ * @attr_id: Attribute ID to process
+ * @device_mode: Expected device mode for this attribute
+ * @feature_name: Feature name for logging
+ * @mlme_setter: MLME configuration setter function
+ * @mlme_getter: MLME configuration getter function
+ *
+ * This helper function handles setting NoA cancellation configuration with
+ * proper validation.
+ *
+ * Return: 0 on success, -ENOENT if attribute not present,
+ *         negative errno on error
+ */
+static int
+osif_p2p_set_noa_cancel_config(struct hdd_adapter *adapter,
+			       struct nlattr **tb,
+			       enum qca_wlan_vendor_attr_p2p_set_noa attr_id,
+			       enum QDF_OPMODE device_mode,
+			       const char *feature_name,
+			       QDF_STATUS (*mlme_setter)(struct wlan_objmgr_psoc *, bool),
+			       bool (*mlme_getter)(struct wlan_objmgr_psoc *))
+{
+	uint8_t val;
+	int ret;
+	bool old_value = false;
+
+	/* Check if this attribute applies to current device mode */
+	if (adapter->device_mode != device_mode || !tb[attr_id])
+		return -EINVAL;
+
+	val = nla_get_u8(tb[attr_id]);
+
+	/* Validate input: must be 0 or 1 */
+	if (val > 1) {
+		hdd_err("Invalid value %d for %s, must be 0 or 1",
+			val, feature_name);
+		return -EINVAL;
+	}
+
+	if (mlme_getter)
+		old_value = mlme_getter(adapter->hdd_ctx->psoc);
+	hdd_debug("Setting %s to %d, old %d", feature_name, val, old_value);
+
+	/* Send command to firmware */
+	ret = wma_cli_set_command(adapter->deflink->vdev_id,
+				  wmi_vdev_param_set_go_cancel_noa,
+				  val, VDEV_CMD);
+	if (ret) {
+		hdd_err("Failed to set %s param, ret=%d", feature_name, ret);
+		return ret;
+	}
+
+	/* Store configuration in MLME */
+	if (mlme_setter)
+		if (QDF_IS_STATUS_ERROR(mlme_setter(adapter->hdd_ctx->psoc, val))) {
+			hdd_err("Failed to set %s config", feature_name);
+			return -EINVAL;
+		}
+
+	return 0;
+}
+
+/**
+ * osif_p2p_noa_cancel() - Handle P2P NoA cancellation commands
+ * @adapter: HDD adapter
+ * @data: Pointer to vendor command data
+ * @data_len: Length of vendor command data
+ *
+ * This function handles P2P NoA cancellation features:
+ * - P2P GC keep awake during one-shot NoA: When enabled, P2P GC will
+ *   remain awake during firmware-initiated one-shot NoA periods instead
+ *   of entering power save. This improves performance in MCC scenarios.
+ * - P2P GO cancel one-shot NoA: When enabled, P2P GO will automatically
+ *   cancel firmware-initiated one-shot NoA schedules when no P2P clients
+ *   are in power save mode.
+ *
+ * Return: 0 on success, -ENOENT if no cancellation attributes present,
+ *         negative errno on error
+ */
+int osif_p2p_noa_cancel(struct hdd_adapter *adapter, const void *data,
+			int data_len)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1];
+	int ret = -EINVAL;
+	bool is_cancel_noa_supported;
+
+	/* Parse and fetch NOA params */
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX,
+				    data, data_len, p2p_noa_attr_policy)) {
+		osif_debug("Invalid P2P NOA vendor command attributes");
+		return -EINVAL;
+	}
+
+	/* Check if any NoA cancellation attributes are present */
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA] &&
+	    !tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA])
+		return -ENOENT;
+
+	/* Validate firmware support */
+	is_cancel_noa_supported =
+		ucfg_p2p_is_fw_cancel_one_shot_noa_supported(
+			adapter->hdd_ctx->psoc);
+	if (!is_cancel_noa_supported) {
+		hdd_err("NoA cancellation not supported by firmware");
+		return -EOPNOTSUPP;
+	}
+
+	/* Validate device mode before processing */
+	if (adapter->device_mode != QDF_P2P_CLIENT_MODE &&
+	    adapter->device_mode != QDF_P2P_GO_MODE) {
+		hdd_err("Invalid device mode %d for NoA cancellation",
+			adapter->device_mode);
+		return -EINVAL;
+	}
+
+	/* Both attributes cannot be set together */
+	if (tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA] &&
+	    tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA]) {
+		hdd_err("Both GO and GC NoA cancel attributes cannot be set together");
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+	/* Handle P2P GC keep awake during one-shot NoA */
+		ret = osif_p2p_set_noa_cancel_config(adapter, tb,
+			QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA,
+			QDF_P2P_CLIENT_MODE,
+			"P2P GC keep awake during NoA",
+			ucfg_mlme_set_p2p_gc_keep_awake_during_noa,
+			ucfg_mlme_get_p2p_gc_keep_awake_during_noa);
+	} else if (adapter->device_mode == QDF_P2P_GO_MODE) {
+		/* Handle P2P GO cancel one-shot NoA */
+		ret = osif_p2p_set_noa_cancel_config(adapter, tb,
+			QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA,
+			QDF_P2P_GO_MODE,
+			"P2P GO cancel one-shot NoA",
+			ucfg_mlme_set_p2p_go_cancel_one_shot_noa,
+			ucfg_mlme_get_p2p_go_cancel_one_shot_noa);
+	}
+
+	return ret;
+}
+
+int osif_p2p_parse_noa_params(struct hdd_adapter *adapter,
+			      struct p2p_ps_config *noa, const void *data,
+			      int data_len)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1];
+	int ret = 0;
+	int count, duration = 0, interval = 0, start = 0;
+
+	/* Parse and fetch NOA params*/
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX,
+				    data, data_len, p2p_noa_attr_policy)) {
+		osif_debug("Invalid P2P NOA vendor command attributes");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT]) {
+		osif_debug("Invalid P2P NOA Count Attribute");
+		return -EINVAL;
+	}
+	count = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT]);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION]) {
+		osif_debug("Invalid P2P NOA Duration Attribute");
+		return -EINVAL;
+	}
+	duration = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION]);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL]) {
+		osif_debug("Invalid P2P NOA Interval Attribute");
+		return -EINVAL;
+	}
+	interval = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START])
+		start = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START]);
+
+	osif_debug("P2P_SET GO noa: count=%d interval=%d duration=%d start=%d",
+		   count, interval, duration, start);
+
+	noa->count = count;
+	noa->duration = duration;
+	noa->interval = interval;
+	noa->start = start;
+
+	return ret;
+}

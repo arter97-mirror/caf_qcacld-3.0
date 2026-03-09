@@ -4894,9 +4894,9 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 							      NULL);
 
 	if (!is_dbs) {
-		if (!sta_count)
+		/* Always fetch new freq if STA or LL SAP is present. */
+		if (!sta_count && !policy_mgr_get_ll_lt_sap_freq(psoc))
 			return;
-
 		/* Fetch new freq using PCL */
 	}
 

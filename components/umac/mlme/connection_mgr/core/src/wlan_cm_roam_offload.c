@@ -4831,7 +4831,8 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 		* In this case host should send RSO STOP with scan mode = 0
 		* to allow FW to move into RSO STOP state
 		*/
-		status = cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_ABORT,
+		status = cm_roam_stop_req(psoc, vdev_id,
+					  REASON_ROAM_SYNCH_FAILED,
 					  NULL, false);
 		if (QDF_IS_STATUS_ERROR(status))
 			mlme_err("ROAM: Unable to process RSO STOP req");
@@ -5187,14 +5188,6 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	if ((requested_state != WLAN_ROAM_DEINIT &&
 	     requested_state != WLAN_ROAM_RSO_STOPPED) && !is_up) {
 		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
-			   requested_state);
-		goto end;
-	}
-
-	if (requested_state == WLAN_ROAM_RSO_ENABLED &&
-	    (policy_mgr_is_chan_switch_in_progress(psoc) ||
-	     policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))) {
-		mlme_debug("ROAM: roam state(%d) change requested when a concurrent SAP is in MCC or CSA is in progress",
 			   requested_state);
 		goto end;
 	}
@@ -6963,6 +6956,7 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 		       struct cm_roam_req *roam_req,
 		       struct roam_invoke_req *roam_invoke_req)
 {
+	QDF_STATUS status;
 	struct scan_filter *filter;
 	qdf_list_t *candidate_list;
 	uint32_t num_bss = 0;
@@ -7007,30 +7001,46 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_EMPTY;
 	}
 
-	qdf_list_peek_front(candidate_list, &cur_node);
+	status = qdf_list_peek_front(candidate_list, &cur_node);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_debug(CM_PREFIX_FMT "Failed to get node from list",
+			   CM_PREFIX_REF(roam_req->req.vdev_id,
+					 roam_req->cm_id));
+		goto purge_list;
+	}
+
 	candidate = qdf_container_of(cur_node,
-				     struct scan_cache_node,
-				     node);
+				     struct scan_cache_node, node);
+
+	if (util_is_scan_entry_non_tx_bssid(candidate->entry)) {
+		mlme_debug(CM_PREFIX_FMT "Drop scan entry for non-Tx BSSID",
+			   CM_PREFIX_REF(roam_req->req.vdev_id,
+					 roam_req->cm_id));
+		status = QDF_STATUS_E_EMPTY;
+		goto purge_list;
+	}
 
 	roam_invoke_req->frame_len = candidate->entry->raw_frame.len;
-
-	if (!roam_invoke_req->frame_len)
-		return QDF_STATUS_E_INVAL;
+	if (!roam_invoke_req->frame_len) {
+		status = QDF_STATUS_E_INVAL;
+		goto purge_list;
+	}
 
 	roam_invoke_req->frame_buf = qdf_mem_malloc(roam_invoke_req->frame_len);
-
 	if (!roam_invoke_req->frame_buf) {
 		roam_invoke_req->frame_len = 0;
-		return QDF_STATUS_E_NOMEM;
+		status = QDF_STATUS_E_NOMEM;
+		goto purge_list;
 	}
 
 	qdf_mem_copy(roam_invoke_req->frame_buf,
 		     candidate->entry->raw_frame.ptr,
 		     roam_invoke_req->frame_len);
 
+purge_list:
 	wlan_scan_purge_results(candidate_list);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 #if (defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_ROAM_OFFLOAD))
