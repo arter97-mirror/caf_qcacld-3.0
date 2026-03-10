@@ -15140,7 +15140,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	uint8_t num_sta_prof = 0, total_sta_prof;
 	struct wlan_mlo_ie *mlo_ie;
 	struct wlan_mlo_sta_profile *sta_prof;
-	struct qdf_mac_addr *mld_addr;
+	struct qdf_mac_addr *mld_addr = NULL;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	tSirMacRateSet b_rates;
 	tSirMacRateSet e_rates;
