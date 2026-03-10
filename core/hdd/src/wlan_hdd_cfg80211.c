@@ -22478,6 +22478,54 @@ void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw)
 
 #if defined(CFG80211_EXTERNAL_DH_UPDATE_SUPPORT) || \
 (LINUX_VERSION_CODE > KERNEL_VERSION(5, 2, 0))
+
+#ifdef CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
+static void
+hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
+			    struct cfg80211_update_owe_info *owe_info,
+			    uint8_t *peer_mac)
+{
+	bool is_mlo_vdev;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t *peer_mld_addr;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter,
+					   WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev)
+		return;
+
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
+	if (!is_mlo_vdev) {
+		owe_info->assoc_link_id = -1;
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+		return;
+	}
+
+	owe_info->assoc_link_id = wlan_vdev_get_link_id(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+	peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+					   peer_mac, WLAN_HDD_ID_OBJ_MGR);
+	if (!peer) {
+		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac));
+		return;
+	}
+
+	peer_mld_addr = wlan_peer_mlme_get_mldaddr(peer);
+	qdf_mem_copy(&owe_info->peer_mld_addr[0], peer_mld_addr, ETH_ALEN);
+	wlan_objmgr_peer_release_ref(peer, WLAN_HDD_ID_OBJ_MGR);
+}
+#else
+static void
+hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
+			    struct cfg80211_update_owe_info *owe_info,
+			    uint8_t *peer_mac)
+{
+}
+#endif
+
 void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
 				    uint8_t sta_addr[],
 				    uint8_t *owe_ie,
@@ -22492,6 +22540,7 @@ void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
 	qdf_mem_copy(owe_info.peer, sta_addr, ETH_ALEN);
 	owe_info.ie = owe_ie;
 	owe_info.ie_len = owe_ie_len;
+	hdd_ml_sap_owe_fill_ml_info(adapter, &owe_info, sta_addr);
 
 	cfg80211_update_owe_info_event(dev, &owe_info, GFP_KERNEL);
 

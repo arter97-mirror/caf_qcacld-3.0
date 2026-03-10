@@ -3056,6 +3056,12 @@ cppflags-y += -DCONFIG_PLD_SNOC_ICNSS
 endif
 endif
 
+found = $(shell if grep -qF "bool mlo_params_valid;" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
+endif
+
+
 cppflags-$(CONFIG_PLD_SNOC_ICNSS_FLAG) += -DCONFIG_PLD_SNOC_ICNSS
 cppflags-$(CONFIG_ICNSS2_HELIUM) += -DCONFIG_PLD_SNOC_ICNSS2
 
