@@ -782,9 +782,34 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 			ch_width = chan_info.ch_width;
 			rssi = WLAN_INVALID_RSSI_VALUE;
 		} else {
+			enum phy_ch_width bss_op_res_ch_width;
+			QDF_STATUS status;
+
 			chan_freq = conn_info->chan_freq;
 			ch_width = conn_info->ch_width;
 			rssi = conn_info->signal;
+
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_CM_ID);
+			if (vdev) {
+				status =
+				ucfg_mlme_vdev_get_bss_oper_ch_width_res(
+							vdev,
+							&bss_op_res_ch_width);
+				if (QDF_IS_STATUS_SUCCESS(status) &&
+				    bss_op_res_ch_width != CH_WIDTH_INVALID &&
+				    wlan_reg_get_bw_value(ch_width) >
+				    wlan_reg_get_bw_value(
+					    bss_op_res_ch_width)) {
+					hdd_debug("Oper res BW %d for link_id %d",
+						  bss_op_res_ch_width,
+						  conn_info->ieee_link_id);
+					ch_width = bss_op_res_ch_width;
+				}
+				hdd_objmgr_put_vdev_by_user(vdev,
+							    WLAN_OSIF_CM_ID);
+				vdev = NULL;
+			}
 		}
 
 		len = scnprintf(buf + length, buf_avail_len - length,
@@ -1131,4 +1156,3 @@ void hdd_sysfs_connect_info_interface_destroy(struct hdd_adapter *adapter)
 {
 	device_remove_file(&adapter->dev->dev, &dev_attr_connect_info);
 }
-
