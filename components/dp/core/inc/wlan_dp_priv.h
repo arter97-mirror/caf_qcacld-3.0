@@ -41,6 +41,9 @@
 #include "wlan_dp_wfds.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_resource_mgr.h"
+#include <linux/cpufreq.h>
+#include <linux/pm_qos.h>
+
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -1068,6 +1071,8 @@ struct wlan_dp_stc;
  * @rsrc_mgr_ctx: DP resource manager context reference
  * @monitor_flag: Monitor interface flags configured when add Mon interface
  * @rx_thread_cpu_mask: current affinity mask for RX threads
+ * @cpufreq_pol: Array of CPU frequency policy pointers for all CPUs
+ * @freq_qos_max_req: Array of frequency QoS request structures for all CPUs
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1201,6 +1206,9 @@ struct wlan_dp_psoc_context {
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 	uint32_t monitor_flag;
 	qdf_cpu_mask rx_thread_cpu_mask;
+
+	struct cpufreq_policy *cpufreq_pol[NR_CPUS];
+	struct freq_qos_request freq_qos_max_req[NR_CPUS];
 };
 
 /**

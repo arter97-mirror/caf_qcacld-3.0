@@ -1658,6 +1658,94 @@ bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
 #endif
 
 /**
+ * dp_set_cpu_high_clock() - Control CPU frequency scaling for fast throughput
+ * @dp_ctx: DP context pointer
+ * @high_req: Flag to enable (1) or disable (0) high frequency request
+ *
+ * This function manages CPU frequency QoS requests to optimize performance
+ * during fast throughput scenarios. When high_req is true, it adds frequency
+ * QoS requests to set all possible CPUs to their maximum frequency. When
+ * high_req is false, it removes the frequency QoS requests allowing CPUs
+ * to scale down based on system load.
+ *
+ * The function iterates through all possible CPUs and:
+ * - For fast_req=1: Adds FREQ_QOS_MIN requests at maximum frequency
+ * - For fast_req=0: Removes existing frequency QoS requests
+ *
+ * This is typically called during throughput level transitions (e.g., when
+ * transitioning to/from TPUT_LEVEL_FAST) to ensure adequate CPU performance
+ * for high bandwidth data processing.
+ *
+ * Return: None
+ */
+void dp_set_cpu_high_clock(struct wlan_dp_psoc_context *dp_ctx, int high_req)
+{
+	int ret;
+	unsigned int max;
+	unsigned int min;
+	unsigned int req;
+	int cpu;
+
+	if (!dp_ctx) {
+		dp_err("dp_ctx is NULL");
+		return;
+	}
+
+	/*
+	 * Apply frequency request for all possible CPUs across all clusters.
+	 */
+	for_each_cpu(cpu, cpu_possible_mask) {
+		if (high_req) {
+			/* Skip if request is already active for this CPU */
+			if (freq_qos_request_active(
+				&dp_ctx->freq_qos_max_req[cpu]))
+				continue;
+
+			dp_ctx->cpufreq_pol[cpu] = cpufreq_cpu_get(cpu);
+			if (!dp_ctx->cpufreq_pol[cpu])
+				continue;
+
+			max = dp_ctx->cpufreq_pol[cpu]->max;
+			min = dp_ctx->cpufreq_pol[cpu]->min;
+			req = max;
+
+			ret = freq_qos_add_request(
+					&dp_ctx->cpufreq_pol[cpu]->constraints,
+					&dp_ctx->freq_qos_max_req[cpu],
+					FREQ_QOS_MIN, req);
+			if (ret < 0) {
+				dp_err("Failed to add freq QoS request for CPU %d: %d",
+				       cpu, ret);
+				cpufreq_cpu_put(dp_ctx->cpufreq_pol[cpu]);
+				dp_ctx->cpufreq_pol[cpu] = NULL;
+			} else {
+				dp_info("CPU %d freq QoS request added: %u MHz",
+					cpu, req / 1000);
+			}
+		} else {
+			/* Skip if request is not active for this CPU */
+			if (!freq_qos_request_active(
+				&dp_ctx->freq_qos_max_req[cpu]))
+				continue;
+
+			ret = freq_qos_remove_request(
+				&dp_ctx->freq_qos_max_req[cpu]);
+			if (ret < 0) {
+				dp_err("Failed to remove freq QoS request for CPU %d: %d",
+				       cpu, ret);
+			} else {
+				dp_info("CPU %d freq QoS request removed", cpu);
+			}
+
+			if (dp_ctx->cpufreq_pol[cpu]) {
+				cpufreq_cpu_put(dp_ctx->cpufreq_pol[cpu]);
+				dp_ctx->cpufreq_pol[cpu] = NULL;
+			}
+		}
+	}
+}
+
+/**
  * dp_pld_request_bus_bandwidth() - Function to control bus bandwidth
  * @dp_ctx: handle to DP context
  * @tx_packets: transmit packet count received in BW interval
@@ -1759,6 +1847,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	/* PCIe LP voting for FAST throughput transitions */
 	if (tput_level >= TPUT_LEVEL_FAST &&
 	    prev_tput_level < TPUT_LEVEL_FAST) {
+		dp_set_cpu_high_clock(dp_ctx, true);
 		/* Vote for PCIe LP prevent when transitioning to FAST TPUT */
 		if (hif_prevent_link_low_power_states(hif_ctx))
 			dp_info("Failed to prevent PCIe link low power states");
@@ -1766,6 +1855,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 			dp_info("PCIe LP prevent vote applied for FAST TPUT");
 	} else if (tput_level < TPUT_LEVEL_FAST &&
 		   prev_tput_level >= TPUT_LEVEL_FAST) {
+		dp_set_cpu_high_clock(dp_ctx, false);
 		/* Remove PCIe LP vote when transitioning below FAST TPUT */
 		hif_allow_link_low_power_states(hif_ctx);
 		dp_info("PCIe LP vote removed for below FAST TPUT");
