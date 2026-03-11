@@ -14995,9 +14995,11 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	*p_ml_ie++ = mlo_ie->common_info_length;
 	len_remaining--;
 
-	qdf_mem_copy(p_ml_ie, mld_addr, QDF_MAC_ADDR_SIZE);
-	p_ml_ie += QDF_MAC_ADDR_SIZE;
-	len_remaining -= QDF_MAC_ADDR_SIZE;
+	if (mlo_ie->mld_mac_address_present) {
+		qdf_mem_copy(p_ml_ie, mld_addr, QDF_MAC_ADDR_SIZE);
+		p_ml_ie += QDF_MAC_ADDR_SIZE;
+		len_remaining -= QDF_MAC_ADDR_SIZE;
+	}
 
 	if (mlo_ie->eml_capab_present) {
 		QDF_SET_BITS(*(uint16_t *)p_ml_ie,
