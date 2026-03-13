@@ -3339,7 +3339,11 @@ endif
 
 
 ifeq ($(CONFIG_CNSS_FIG), y)
+ifeq ($(CONFIG_CNSS_FIG_V2), y)
+TARGET_INC +=	-I$(WLAN_FW_API)/hw/fig/v2/
+else
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/fig/v1/
+endif
 else
 ifeq ($(CONFIG_CNSS_PEACH), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/peach/v1/
