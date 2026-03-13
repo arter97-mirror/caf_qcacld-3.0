@@ -2928,8 +2928,8 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 		bcn_info.ecsa_count_offset = bcn->ecsa_count_offset;
 		qdf_spin_unlock_bh(&bcn->lock);
 
-		wma_err_rl("Update beacon template for vdev %d due to TBTT offset update",
-			   if_id);
+		wma_debug_rl("Update beacon template for vdev %d due to TBTT offset update",
+			     if_id);
 		/* Update beacon template in firmware */
 		wma_unified_bcn_tmpl_send(wma, if_id, &bcn_info, 0);
 	}

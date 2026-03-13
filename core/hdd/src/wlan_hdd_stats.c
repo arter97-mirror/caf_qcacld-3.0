@@ -7502,12 +7502,12 @@ void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 
 	txrx_stats->rx_rate.rate_flags = flags;
 
-	hdd_info("rx: mode %d nss %d mcs %d rate_flags %x flags %x",
-		 txrx_stats->rx_rate.mode,
-		 txrx_stats->rx_rate.nss,
-		 txrx_stats->rx_rate.mcs,
-		 txrx_stats->rx_rate.rate_flags,
-		 flags);
+	hdd_debug("rx: mode %d nss %d mcs %d rate_flags %x flags %x",
+		  txrx_stats->rx_rate.mode,
+		  txrx_stats->rx_rate.nss,
+		  txrx_stats->rx_rate.mcs,
+		  txrx_stats->rx_rate.rate_flags,
+		  flags);
 }
 
 /**
