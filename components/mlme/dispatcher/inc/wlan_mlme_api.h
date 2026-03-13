@@ -1124,7 +1124,7 @@ QDF_STATUS wlan_mlme_get_go_force_11n_for_11ac(struct wlan_objmgr_psoc
 					       *psoc, bool *value);
 
 /**
- * wlan_mlme_is_go_11ac_override() - Override 11ac bandwdith for P2P GO
+ * wlan_mlme_is_go_11ac_override() - Override 11ac bandwidth for P2P GO
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -1134,7 +1134,7 @@ QDF_STATUS wlan_mlme_is_go_11ac_override(struct wlan_objmgr_psoc *psoc,
 					 bool *value);
 
 /**
- * wlan_mlme_is_sap_11ac_override() - Override 11ac bandwdith for SAP
+ * wlan_mlme_is_sap_11ac_override() - Override 11ac bandwidth for SAP
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -1144,7 +1144,7 @@ QDF_STATUS wlan_mlme_is_sap_11ac_override(struct wlan_objmgr_psoc *psoc,
 					  bool *value);
 
 /**
- * wlan_mlme_set_go_11ac_override() - set override 11ac bandwdith for P2P GO
+ * wlan_mlme_set_go_11ac_override() - set override 11ac bandwidth for P2P GO
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -1154,7 +1154,7 @@ QDF_STATUS wlan_mlme_set_go_11ac_override(struct wlan_objmgr_psoc *psoc,
 					  bool value);
 
 /**
- * wlan_mlme_set_sap_11ac_override() - set override 11ac bandwdith for SAP
+ * wlan_mlme_set_sap_11ac_override() - set override 11ac bandwidth for SAP
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
  *
@@ -3832,7 +3832,7 @@ wlan_mlme_get_mgmt_6ghz_rate_support(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 wlan_mlme_get_status_ring_buffer(struct wlan_objmgr_psoc *psoc,
-				 bool *enable_ring_buffer);
+				 uint32_t *enable_ring_buffer);
 
 /**
  * wlan_mlme_get_peer_unmap_conf() - Indicate if peer unmap confirmation
