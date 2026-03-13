@@ -3013,8 +3013,11 @@ QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 		int errno = qdf_iommu_domain_get_attr(domain,
 						      QDF_DOMAIN_ATTR_S1_BYPASS,
 						      &attr);
-
-		wlan_smmu_enabled = !errno && !attr;
+		/* Fall back to PLD check in -ENOTSUPP case */
+		if (errno == -ENOTSUPP)
+			wlan_smmu_enabled = pld_smmu_s1_enabled(osdev->dev);
+		else
+			wlan_smmu_enabled = !errno && !attr;
 	} else {
 		cds_info("No SMMU mapping present");
 		wlan_smmu_enabled = false;

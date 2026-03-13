@@ -11408,8 +11408,13 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 	/* ch_params.mhz_freq_seg1 would be 0 only if the
 	 * session->ch_center_freq_seg1 is invalid/disabled. Downgrade the bw
 	 * to 160 MHz as 320 MHz can't be a valid bw for such channel.
+	 * 320 mhz sap need downgrade to 160 mhz if it cause sbs or dbs.
 	 */
-	if (!ch_params.mhz_freq_seg1 &&
+	if ((!ch_params.mhz_freq_seg1 || (LIM_IS_AP_ROLE(session) &&
+	     policy_mgr_is_conn_lead_to_bw_downgrade(mac->psoc,
+						     session->vdev_id,
+						     session->curr_op_freq,
+						     session->ch_width))) &&
 	    ch_params.ch_width == CH_WIDTH_320MHZ) {
 		pe_debug("Downgrade ch_width to 160MHz");
 		ch_params.ch_width = CH_WIDTH_160MHZ;
@@ -11489,13 +11494,6 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 
 		wlan_mlme_set_ap_oper_ch_width(session->vdev,
 					       session->ch_width);
-		if (session->ch_width == CH_WIDTH_320MHZ &&
-		    policy_mgr_is_conn_lead_to_bw_downgrade(mac->psoc,
-							    session->vdev_id,
-							    session->curr_op_freq,
-							    session->ch_width))
-			wlan_mlme_set_ap_oper_ch_width(session->vdev,
-						       CH_WIDTH_160MHZ);
 	}
 
 	return QDF_STATUS_SUCCESS;

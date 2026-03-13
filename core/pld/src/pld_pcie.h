@@ -206,6 +206,12 @@ static inline void *pld_pcie_smmu_get_domain(struct device *dev)
 {
 	return NULL;
 }
+
+static inline bool
+pld_pcie_smmu_s1_enabled(struct device *dev)
+{
+	return false;
+}
 #else
 static inline void *pld_pcie_smmu_get_mapping(struct device *dev)
 {
@@ -720,6 +726,12 @@ pld_pcie_get_dump_inprogress(struct device *dev, uint8_t *val)
 static inline void *pld_pcie_smmu_get_domain(struct device *dev)
 {
 	return cnss_smmu_get_domain(dev);
+}
+
+static inline bool
+pld_pcie_smmu_s1_enabled(struct device *dev)
+{
+	return cnss_smmu_s1_enabled(dev);
 }
 #else
 static inline void *pld_pcie_smmu_get_mapping(struct device *dev)
