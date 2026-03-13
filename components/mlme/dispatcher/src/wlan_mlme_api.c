@@ -8099,8 +8099,6 @@ wlan_mlme_get_ch_width_from_phymode(enum wlan_phymode phy_mode)
 	else
 		ch_width = CH_WIDTH_20MHZ;
 
-	mlme_legacy_debug("phymode: %d, ch_width: %d ", phy_mode, ch_width);
-
 	return ch_width;
 }
 

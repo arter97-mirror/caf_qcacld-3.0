@@ -1045,6 +1045,26 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD && WLAN_FEATURE_11BE_MLO */
 
+/**
+ * lim_cm_update_gen_link_probe_resp_rnr() - Update the RNR fields of generated
+ * link probe response.
+ * @gen_link: Pointer to generated probe response
+ * @reporting_bssid: BSSID of reporting BSSID
+ * @reporting_chan_num: Chan num (index) of reporting link
+ * @reporting_op_class: Operating class of reporting link
+ * @reporting_link_id: Link ID of reporting link
+ *
+ * Wrapper API which updates the generated link's RNR by replacing generated
+ * BSS's params with reporting link params in RNR.
+ *
+ * Returns: void
+ */
+void lim_cm_update_gen_link_probe_resp_rnr(struct element_info *gen_link,
+					   struct qdf_mac_addr *reporting_bssid,
+					   uint8_t reporting_chan_num,
+					   uint8_t reporting_op_class,
+					   uint8_t reporting_link_id);
+
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * lim_update_cuflag_bpcc_each_link() - Update cu flag and bpcc from

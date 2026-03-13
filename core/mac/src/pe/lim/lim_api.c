@@ -4601,35 +4601,12 @@ static uint8_t *lim_find_ie(uint8_t eid, uint8_t *ies, int32_t len)
 	return NULL;
 }
 
-static uint8_t lim_get_op_class(struct mac_context *mac_ctx,
-				struct pe_session *session)
-{
-	uint8_t ch_offset;
-
-	if (session->ch_width == CH_WIDTH_80MHZ) {
-		ch_offset = BW80;
-	} else {
-		switch (session->htSecondaryChannelOffset) {
-		case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
-			ch_offset = BW40_HIGH_PRIMARY;
-			break;
-		case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
-			ch_offset = BW40_LOW_PRIMARY;
-			break;
-		default:
-			ch_offset = BW20;
-			break;
-		}
-	}
-
-	return lim_op_class_from_bandwidth(mac_ctx, session->curr_op_freq,
-					   session->ch_width, ch_offset);
-}
-
-static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
-					    struct pe_session *session_entry,
-					    struct mlo_link_info *link_info,
-					    uint8_t *rnr)
+static void lim_derive_link_specific_rnr_ie(uint8_t *rnr,
+					    struct qdf_mac_addr *reported_bssid,
+					    struct qdf_mac_addr *reporting_bssid,
+					    uint8_t reporting_chan_num,
+					    uint8_t reporting_op_class,
+					    uint8_t reporting_link_id)
 {
 	struct neighbor_ap_info_field *neighbor_ap_info;
 	uint8_t tbtt_type, tbtt_len, tbtt_count;
@@ -4637,16 +4614,10 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 	uint8_t bssid_pos;
 	uint8_t mld_pos;
 	struct qdf_mac_addr *rnr_bssid = NULL;
-	struct qdf_mac_addr assoc_link_addr;
 	uint8_t *data, *rnr_end;
 	bool is_found = false;
 	struct rnr_mld_info *mld_param;
 	uint8_t *op_class, *chan_num;
-	qdf_freq_t chan_freq = 0;
-	struct wlan_objmgr_pdev *pdev;
-
-	qdf_mem_copy(&assoc_link_addr, session_entry->bssId,
-		     QDF_MAC_ADDR_SIZE);
 
 	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;
 	data = rnr + PAYLOAD_START_POS;
@@ -4679,43 +4650,42 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 		if (!rnr_bssid)
 			continue;
 
-		if (!qdf_mem_cmp(rnr_bssid->bytes, link_info->link_addr.bytes,
+		if (!qdf_mem_cmp(rnr_bssid->bytes, reported_bssid->bytes,
 				 QDF_MAC_ADDR_SIZE))
 			is_found = true;
-
-		pdev = wlan_vdev_get_pdev(session_entry->vdev);
-		chan_freq = session_entry->curr_op_freq;
 
 		data += sizeof(struct tbtt_information_header);
 		op_class = data;
 
 		if (is_found)
-			*op_class = lim_get_op_class(mac_ctx, session_entry);
+			*op_class = reporting_op_class;
 
 		data += sizeof(uint8_t);
 		chan_num = data;
 
 		if (is_found)
-			*chan_num = wlan_reg_freq_to_chan(pdev, chan_freq);
+			*chan_num = reporting_chan_num;
 
 		data += sizeof(uint8_t);
 		for (i = 0; i < tbtt_count + 1; i++) {
-			if (bssid_pos != 0 && is_found &&
+			if (!is_found)
+				goto next;
+
+			if (bssid_pos != 0 &&
 			    (data + bssid_pos +
 			     QDF_MAC_ADDR_SIZE <= rnr_end))
 				qdf_mem_copy(data + bssid_pos,
-					     assoc_link_addr.bytes,
+					     reporting_bssid->bytes,
 					     QDF_MAC_ADDR_SIZE);
 
-			if (mld_pos != 0 && is_found &&
+			if (mld_pos != 0 &&
 			    (data + mld_pos +
 			     sizeof(struct rnr_mld_info) <= rnr_end)) {
 				mld_param =
 					(struct rnr_mld_info *)(data + mld_pos);
-				mld_param->link_id = wlan_vdev_get_link_id(
-							session_entry->vdev);
+				mld_param->link_id = reporting_link_id;
 			}
-
+next:
 			data += tbtt_len;
 		}
 
@@ -4724,19 +4694,24 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 	}
 }
 
-static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
-					 struct pe_session *session_entry,
-					 struct mlo_link_info *link_info,
-					 struct element_info link_probe_rsp)
+static void lim_gen_link_specific_rnr_ie(struct element_info *link_probe_rsp,
+					 struct qdf_mac_addr *reporting_bssid,
+					 uint8_t reporting_chan_num,
+					 uint8_t reporting_op_class,
+					 uint8_t reporting_link_id)
 {
 	uint8_t *new_rnr_ie = NULL;
 	uint8_t *pos, *ie = NULL;
 	uint32_t ie_len;
 	uint8_t *temp_rnr_ie = NULL;
+	struct wlan_frame_hdr *hdr =
+			(struct wlan_frame_hdr *)link_probe_rsp->ptr;
+	struct qdf_mac_addr *reported_bssid =
+			(struct qdf_mac_addr *)hdr->i_addr3;
 
-	ie = link_probe_rsp.ptr + sizeof(struct wlan_frame_hdr) +
+	ie = link_probe_rsp->ptr + sizeof(struct wlan_frame_hdr) +
 	      WLAN_PROBE_RESP_IES_OFFSET;
-	ie_len = link_probe_rsp.len - sizeof(struct wlan_frame_hdr) -
+	ie_len = link_probe_rsp->len - sizeof(struct wlan_frame_hdr) -
 		 WLAN_PROBE_RESP_IES_OFFSET;
 
 	pos = ie;
@@ -4768,8 +4743,11 @@ static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
 				   new_rnr_ie, new_rnr_ie[TAG_LEN_POS] +
 				   MIN_IE_LEN);
 
-		lim_derive_link_specific_rnr_ie(mac_ctx, session_entry,
-						link_info, new_rnr_ie);
+		lim_derive_link_specific_rnr_ie(new_rnr_ie, reported_bssid,
+						reporting_bssid,
+						reporting_chan_num,
+						reporting_op_class,
+						reporting_link_id);
 
 		if (qdf_mem_cmp(temp_rnr_ie, new_rnr_ie,
 				new_rnr_ie[TAG_LEN_POS] + MIN_IE_LEN)) {
@@ -4784,6 +4762,22 @@ static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
 		qdf_mem_free(temp_rnr_ie);
 		pos = new_rnr_ie + new_rnr_ie[TAG_LEN_POS] + MIN_IE_LEN;
 	}
+}
+
+void lim_cm_update_gen_link_probe_resp_rnr(struct element_info *gen_link,
+					   struct qdf_mac_addr *reporting_bssid,
+					   uint8_t reporting_chan_num,
+					   uint8_t reporting_op_class,
+					   uint8_t reporting_link_id)
+{
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac)
+		return;
+
+	lim_gen_link_specific_rnr_ie(gen_link, reporting_bssid,
+				     reporting_chan_num, reporting_op_class,
+				     reporting_link_id);
 }
 
 static inline void fill_crypto_filter_params(struct scan_filter *filter,
@@ -5017,6 +5011,11 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 
 	if (session_entry->lim_join_req->is_ml_probe_req_sent &&
 	    rcvd_probe_resp->mlo_ie.mlo_ie_present) {
+		struct qdf_mac_addr *reporting_bssid =
+			(struct qdf_mac_addr *)session_entry->bssId;
+		uint8_t reporting_chan_num, reporting_op_class;
+		uint8_t reporting_link_id;
+
 		session_entry->lim_join_req->is_ml_probe_req_sent = false;
 
 		partner_info = &session_entry->lim_join_req->partner_info;
@@ -5028,6 +5027,14 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 		status = lim_validate_probe_rsp_link_info(session_entry,
 							  probe_rsp,
 							  probe_rsp_len);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto end;
+
+		status = wlan_scan_fetch_chan_linkid_params_for_rnr(mac_ctx->pdev,
+								    reporting_bssid,
+								    &reporting_chan_num,
+								    &reporting_op_class,
+								    &reporting_link_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto end;
 
@@ -5085,8 +5092,11 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 
 			link_info = &partner_info->partner_link_info[idx];
 
-			lim_gen_link_specific_rnr_ie(mac_ctx, session_entry,
-						     link_info, link_probe_rsp);
+			lim_gen_link_specific_rnr_ie(&link_probe_rsp,
+						     reporting_bssid,
+						     reporting_chan_num,
+						     reporting_op_class,
+						     reporting_link_id);
 
 			pe_debug("MLO:link probe rsp size:%u orig probe rsp:%u",
 				 link_probe_rsp.len, probe_rsp_len);
@@ -5181,6 +5191,9 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	struct wlan_country_ie *cc_ie;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct pe_session *partner_session;
+	struct qdf_mac_addr *reporting_bssid;
+	uint8_t reporting_chan_num, reporting_op_class, reporting_link_id;
+
 
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
@@ -5221,6 +5234,15 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 		pe_err("Per STA profile parsing failed");
 		return status;
 	}
+
+	reporting_bssid = (struct qdf_mac_addr *)session->bssId;
+	status = wlan_scan_fetch_chan_linkid_params_for_rnr(mac_ctx->pdev,
+							    reporting_bssid,
+							    &reporting_chan_num,
+							    &reporting_op_class,
+							    &reporting_link_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	link_probe_rsp.ptr = qdf_mem_malloc(probe_rsp_len);
 	if (!link_probe_rsp.ptr)
@@ -5273,8 +5295,10 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 
 		link_info = &partner_info.partner_link_info[i];
 
-		lim_gen_link_specific_rnr_ie(mac_ctx, session,
-					     link_info, link_probe_rsp);
+		lim_gen_link_specific_rnr_ie(&link_probe_rsp, reporting_bssid,
+					     reporting_chan_num,
+					     reporting_op_class,
+					     reporting_link_id);
 
 		lim_add_bcn_probe(mac_ctx->pdev, link_probe_rsp.ptr,
 				  link_probe_rsp.len,

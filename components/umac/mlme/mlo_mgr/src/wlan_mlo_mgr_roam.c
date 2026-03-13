@@ -33,6 +33,8 @@
 #include <utils_mlo.h>
 #include <wlan_mlo_mgr_peer.h>
 #include "wlan_mlo_link_force.h"
+#include "wlan_scan_api.h"
+#include "lim_api.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
@@ -1778,8 +1780,11 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 	struct mlo_partner_info ml_partner_info = {0};
 	struct element_info rcvd_probe_rsp, gen_probe_rsp = {0, NULL};
 	struct roam_scan_candidate_frame entry = {0};
-	struct qdf_mac_addr self_link_addr;
+	struct qdf_mac_addr self_link_addr, *reporting_bssid;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_frame_hdr *reporting_hdr;
+	uint8_t reporting_chan_num, reporting_op_class, reporting_link_id;
 
 	/* Add the received scan entry as it is */
 	wlan_cm_add_frame_to_scan_db(psoc, rcvd_frame);
@@ -1789,6 +1794,9 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 		mlme_err("No IEs in probe rsp");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	reporting_hdr = (struct wlan_frame_hdr *)rcvd_frame->frame;
+	reporting_bssid = (struct qdf_mac_addr *)reporting_hdr->i_addr3;
 
 	status = util_find_mlie(rcvd_frame->frame + ies_offset,
 				rcvd_frame->frame_length - ies_offset,
@@ -1821,11 +1829,22 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(self_link_addr.bytes,
 		     wlan_vdev_mlme_get_macaddr(vdev),
 		     QDF_MAC_ADDR_SIZE);
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	status = wlan_scan_fetch_chan_linkid_params_for_rnr(pdev,
+							    reporting_bssid,
+							    &reporting_chan_num,
+							    &reporting_op_class,
+							    &reporting_link_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return status;
+	}
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	rcvd_probe_rsp.ptr = rcvd_frame->frame + WLAN_MAC_HDR_LEN_3A;
 	rcvd_probe_rsp.len = rcvd_frame->frame_length - WLAN_MAC_HDR_LEN_3A;
-
 	for (idx = 0; idx < ml_partner_info.num_partner_links; idx++) {
 		link_id = ml_partner_info.partner_link_info[idx].link_id;
 		status = util_gen_link_probe_rsp(rcvd_probe_rsp.ptr,
@@ -1841,6 +1860,12 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			status = QDF_STATUS_E_FAILURE;
 			goto done;
 		}
+
+		lim_cm_update_gen_link_probe_resp_rnr(&gen_probe_rsp,
+						      reporting_bssid,
+						      reporting_chan_num,
+						      reporting_op_class,
+						      reporting_link_id);
 
 		mlme_debug("MLO: link probe rsp size:%u orig probe rsp :%u",
 			   gen_probe_rsp.len, rcvd_probe_rsp.len);
