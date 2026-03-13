@@ -115,6 +115,9 @@
 
 #define MAX_HE_MCS_IDX 13
 
+#define HT_MCS_PER_STREAM 8
+#define MAX_HT_NSS 4
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -8313,6 +8316,8 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 			       struct wlan_hdd_link_info *link_info)
 {
 	uint8_t preamble = link_info->hdd_stats.class_a_stat.tx_preamble;
+	uint8_t mcs = link_info->hdd_stats.class_a_stat.tx_mcs_index;
+	uint8_t nss = link_info->hdd_stats.class_a_stat.tx_nss;
 
 	sinfo->txrate.nss = link_info->hdd_stats.class_a_stat.tx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
@@ -8336,7 +8341,19 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 
 	wlan_hdd_refill_os_rateflags(&sinfo->txrate, preamble);
 
-	sinfo->txrate.mcs = link_info->hdd_stats.class_a_stat.tx_mcs_index;
+	if (sinfo->txrate.flags & RATE_INFO_FLAGS_MCS) {
+		if (nss == 0 || nss > MAX_HT_NSS) {
+			hdd_err("Invalid NSS %d for HT mode", nss);
+			sinfo->txrate.mcs = 0;
+		} else if (mcs > MAX_HT_MCS_INDEX) {
+			hdd_err("Invalid per-stream MCS %d for HT mode", mcs);
+			sinfo->txrate.mcs = 0;
+		} else {
+			sinfo->txrate.mcs = (nss - 1) * HT_MCS_PER_STREAM + mcs;
+		}
+	} else {
+		sinfo->txrate.mcs = mcs;
+	}
 
 	wlan_hdd_refill_os_bw(&sinfo->txrate,
 			      link_info->hdd_stats.class_a_stat.tx_bw);
@@ -8348,11 +8365,12 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 	if (link_info->hdd_stats.class_a_stat.tx_gi == TXRATE_GI_0_4_US)
 		sinfo->txrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
 
-	hdd_debug("sgi=%d, preamble=%d, bw=%d, mcs=%d, nss=%d, rate_flag=0x%x",
+	hdd_debug("sgi=%d, preamble=%d, bw=%d, mcs=%d, nss=%d, sinfo->mcs=%d, rate_flag=0x%x",
 		  link_info->hdd_stats.class_a_stat.tx_gi, preamble,
 		  link_info->hdd_stats.class_a_stat.tx_bw,
 		  link_info->hdd_stats.class_a_stat.tx_mcs_index,
 		  link_info->hdd_stats.class_a_stat.tx_nss,
+		  sinfo->txrate.mcs,
 		  sinfo->txrate.flags);
 }
 
