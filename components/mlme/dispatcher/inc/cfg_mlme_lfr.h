@@ -3214,9 +3214,14 @@ enum roam_bg_scan {
  * @Default: 0
  *
  * This ini is used to enable/disable the feature of seamless roaming
- * for STA mode.
+ * for STA mode if ipa enabled.
  * 0 - To disable the sta seamless roaming
  * 1 - To enable the sta seamless roaming
+ *
+ * For some STA roaming scenario which external APs work in the same
+ * gateway, the seamless roaming can be enabled that do not need to
+ * make the ipa cleanup and re-setup, and make the data transfer low
+ * latency during during roaming.
  *
  * Related: None.
  *
