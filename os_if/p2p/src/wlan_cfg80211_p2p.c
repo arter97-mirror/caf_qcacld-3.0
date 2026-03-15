@@ -279,11 +279,19 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 
 	osif_debug("send indication to %s interface", wdev->netdev->name);
 	is_success = tx_cnf->status ? false : true;
+#ifdef CFG80211_PROP_MULTI_LINK_SUPPORT
+	cfg80211_mgmt_tx_status(
+		wdev,
+		tx_cnf->action_cookie,
+		tx_cnf->buf, tx_cnf->buf_len,
+		is_success, -1, GFP_KERNEL);
+#else
 	cfg80211_mgmt_tx_status(
 		wdev,
 		tx_cnf->action_cookie,
 		tx_cnf->buf, tx_cnf->buf_len,
 		is_success, GFP_KERNEL);
+#endif
 fail:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 }
