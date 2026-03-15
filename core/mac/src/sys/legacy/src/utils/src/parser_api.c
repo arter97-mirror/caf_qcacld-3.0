@@ -8597,8 +8597,6 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 {
 	uint8_t *ppet;
 	uint32_t value = 0;
-	enum phy_ch_width max_ch_width;
-
 	he_cap->present = 1;
 
 	if (!session) {
@@ -8616,10 +8614,8 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		 */
 		if (session->opmode == QDF_STA_MODE ||
 		    session->opmode == QDF_P2P_CLIENT_MODE) {
-			max_ch_width = wlan_mlme_get_max_bw();
-			if ((ch_width == CH_WIDTH_80MHZ) &&
-			    (max_ch_width >= CH_WIDTH_160MHZ))
-				ch_width = CH_WIDTH_160MHZ;
+			ch_width = wlan_get_bw_for_mcs_set(ch_width,
+							MLME_DOT11_MODE_11AX);
 		}
 	}
 

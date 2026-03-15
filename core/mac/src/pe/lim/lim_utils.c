@@ -6299,35 +6299,32 @@ end:
 enum phy_ch_width
 lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
 		       struct pe_session *session,
-		       enum phy_ch_width ch_width)
+		       enum phy_ch_width ch_width,
+		       enum mlme_dot11_mode dot11_mode)
 {
-	enum phy_ch_width bw, max_ch_width;
+	enum phy_ch_width bw = ch_width;
 
-	if (!session || !mac_ctx)
-		return ch_width;
+	if (!session || !mac_ctx) {
+		pe_err("Invalid session or mac context");
+		return bw;
+	}
 
-	bw = ch_width;
-	max_ch_width = wlan_mlme_get_max_bw();
 	/*
-	 * If the session is in STA or P2P Client mode, and the current channel
-	 * width is 80 MHz, while the maximum supported channel width is
-	 * greater than 160 MHz, then upgrade the channel width to 160 MHz in
-	 * case the AP or P2P GO also upgrades to 160 MHz.
-	 *
-	 * If the session is in SAP or P2P GO mode and a DFS No-Wait operation
-	 * is in progress, then populate the EHT MCS set based on the session's
-	 * current channel width.
+	 * For STA/P2P Client: Use dot11_mode to determine the maximum MCS
+	 * bandwidth. This allows firmware to be populated with the highest
+	 * possible MCS rates, enabling future bandwidth upgrades.
+	 * For SAP/P2P GO: Return current bandwidth as-is since bandwidth
+	 * upgrades are AP-driven and not applicable here.
 	 */
-	if ((session->opmode == QDF_STA_MODE ||
-	     session->opmode == QDF_P2P_CLIENT_MODE) &&
-	     (ch_width == CH_WIDTH_80MHZ) &&
-	     (max_ch_width >= CH_WIDTH_160MHZ)) {
-		bw = CH_WIDTH_160MHZ;
+	if (session->opmode == QDF_STA_MODE ||
+	    session->opmode == QDF_P2P_CLIENT_MODE) {
+		bw = wlan_get_bw_for_mcs_set(ch_width, dot11_mode);
 	} else if ((session->opmode == QDF_SAP_MODE ||
 		    session->opmode == QDF_P2P_GO_MODE) &&
 		   (ch_width != session->ch_width) &&
 		   wlan_is_dnw_in_progress(mac_ctx->pdev,
 					   session->vdev_id)) {
+		/* For DFS No-Wait, use session bandwidth */
 		bw = session->ch_width;
 	}
 
@@ -8639,8 +8636,14 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (!IS_DOT11_MODE_HE(session_entry->dot11mode)) {
+		pe_debug("HE is not set in session");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
-					  session_entry->ch_width);
+					  session_entry->ch_width,
+					  MLME_DOT11_MODE_11AX);
 	pe_debug("session chan width: %d", ch_width);
 	pe_debug("PEER: lt 80: rx 0x%04x tx 0x%04x, 160: rx 0x%04x tx 0x%04x, 80+80: rx 0x%04x tx 0x%04x",
 		peer_he_caps->rx_he_mcs_map_lt_80,
@@ -8996,9 +8999,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 	}
 
 	self_eht_cap = is_2g ? &mac_ctx->eht_cap_2g : &mac_ctx->eht_cap_5g;
-	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry, ch_width);
-	pe_debug("bw is %d", ch_width);
-
+	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry, ch_width,
+					  MLME_DOT11_MODE_11BE);
 	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
 		lim_populate_eht_320_mcs_set(mac_ctx, rates,

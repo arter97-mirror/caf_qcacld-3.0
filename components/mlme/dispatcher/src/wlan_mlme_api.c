@@ -1585,6 +1585,43 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 }
 #endif
 
+enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
+					  enum mlme_dot11_mode dot11_mode)
+{
+	enum phy_ch_width mcs_bw, max_ch_width;
+	enum phy_ch_width dot_11_bw = CH_WIDTH_20MHZ;
+
+	/* Validate input parameters */
+	if (dot11_mode >= MLME_DOT11_MODE_MAX) {
+		mlme_legacy_err("Invalid dot11_mode: %d", dot11_mode);
+		return ch_width;
+	}
+
+	/* Determine maximum bandwidth supported by the 802.11 mode */
+	if (IS_DOT11_MODE_EHT(dot11_mode))
+		dot_11_bw = CH_WIDTH_320MHZ;
+	else if (IS_DOT11_MODE_HE(dot11_mode) || IS_DOT11_MODE_VHT(dot11_mode))
+		dot_11_bw = CH_WIDTH_160MHZ;
+	else if (IS_DOT11_MODE_HT(dot11_mode))
+		dot_11_bw = CH_WIDTH_40MHZ;
+
+	/* Get the maximum bandwidth supported by hardware */
+	max_ch_width = wlan_mlme_get_max_bw();
+
+	/* Take minimum of hardware capability and mode capability */
+	mcs_bw = QDF_MIN(max_ch_width, dot_11_bw);
+
+	/*
+	 * If current channel width is 40MHz or higher, and the MCS bandwidth
+	 * is greater than current width, upgrade to MCS bandwidth to allow
+	 * for future bandwidth upgrades (e.g., 80MHz -> 160MHz)
+	 */
+	if (ch_width >= CH_WIDTH_40MHZ && mcs_bw > ch_width)
+		ch_width = mcs_bw;
+
+	return ch_width;
+}
+
 QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 				      enum phy_ch_width *ch_width,
 				      enum wlan_phymode *phy_mode)

@@ -1183,16 +1183,17 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
  * @mac_ctx: Pointer to mac context
  * @session: Pointer to session entry
  * @ch_width: Input channel width
+ * @dot11_mode: Dot11 mode of the connection
  *
  * This function gets channel width for populate mcs set. This is for channel
  * width upgrade.
  *
  * Return: Updated channel width
  */
-enum phy_ch_width
-lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
-		       struct pe_session *session,
-		       enum phy_ch_width ch_width);
+enum phy_ch_width lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
+					 struct pe_session *session,
+					 enum phy_ch_width ch_width,
+					 enum mlme_dot11_mode dot11_mode);
 
 /**
  * lim_update_connect_rsn_ie() - Update the connection RSN IE

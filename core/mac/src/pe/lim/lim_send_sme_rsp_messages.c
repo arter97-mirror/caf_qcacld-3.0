@@ -2094,12 +2094,14 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 		}
 		assoc_ch_width =
 			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
-		max_ch_width = wlan_mlme_get_max_bw();
-		if (assoc_ch_width == CH_WIDTH_80MHZ &&
-		    ch_params.ch_width == CH_WIDTH_160MHZ &&
-		    max_ch_width >= CH_WIDTH_160MHZ) {
-			pe_debug("BW upgrade %d->%d",
-				 assoc_ch_width,
+
+		max_ch_width = wlan_get_bw_for_mcs_set(assoc_ch_width,
+						session_entry->dot11mode);
+
+		/* Allow CSA if it represents a bandwidth upgrade */
+		if (assoc_ch_width < ch_params.ch_width &&
+		    max_ch_width >= ch_params.ch_width) {
+			pe_debug("BW upgrade %d->%d", assoc_ch_width,
 				 ch_params.ch_width);
 		} else {
 			pe_debug("Ignore CSA, no change in ch, bw and puncture");

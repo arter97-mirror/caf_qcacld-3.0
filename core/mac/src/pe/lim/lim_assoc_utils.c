@@ -1287,7 +1287,8 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 
 	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
-					  session_entry->ch_width);
+					  session_entry->ch_width,
+					  MLME_DOT11_MODE_11AC);
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 
 	rates->vhtRxMCSMap = (uint16_t)(vht_cap_info->rx_mcs_map |
