@@ -5689,6 +5689,31 @@ static inline void wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static inline void wlan_hdd_set_smd_feature(struct wlan_objmgr_psoc *psoc,
+					    uint8_t *feature_flags)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle)
+		return;
+
+	if (!wmi_service_enabled(wmi_handle,
+				 wmi_service_smd_bss_transition_support))
+		return;
+
+	hdd_debug("SMD client support enabled");
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SMD_CLIENT);
+}
+#else
+static inline void wlan_hdd_set_smd_feature(struct wlan_objmgr_psoc *psoc,
+					    uint8_t *feature_flags)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 #if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
 static inline bool wlan_hdd_check_probe_peer_feature(struct wlan_objmgr_psoc
 						     *psoc)
@@ -5880,6 +5905,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_pcc_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(hdd_ctx->config,
 							      feature_flags);
+	wlan_hdd_set_smd_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
