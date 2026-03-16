@@ -1312,6 +1312,26 @@ struct dhcp_server {
 #define CFG_LINK_STATE_CACHE_EXPIRY_ALL
 #endif /* WLAN_FEATURE_11BE_MLO */
 
+/*
+ * <ini>
+ * gEnablePrimaryStaMloCap - Enable/Disable primary STA MLO capability
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable primary STA MLO capability.
+ *
+ * Supported Feature: MLO
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_PRIMARY_STA_MLO_CAP CFG_INI_BOOL( \
+			"gEnablePrimaryStaMloCap", \
+			1, \
+			"Enable/Disable primary STA MLO capability")
+
 /**
  * enum host_log_level - Debug verbose level imposed by user
  * @HOST_LOG_LEVEL_NONE: no trace will be logged.
@@ -1813,6 +1833,7 @@ enum host_log_level {
 	CFG_CPU_CXPC_THRESHOLD_ALL \
 	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
 	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
+	CFG(CFG_ENABLE_PRIMARY_STA_MLO_CAP) \
 	CFG(CFG_ENABLE_SMEM_MAILBOX) \
 	CFG(CFG_SAP_STA_NDP_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
