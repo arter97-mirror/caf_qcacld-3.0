@@ -2207,6 +2207,12 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					     csa_params->csa_chan_freq,
 					     0, &ch_params,
 					     REG_CURRENT_PWR_MODE);
+	if (csa_params->new_ch_width > ch_params.ch_width) {
+		pe_debug("CSA BW downgrade: requested %d -> regulatory max %d",
+			 csa_params->new_ch_width, ch_params.ch_width);
+		csa_params->new_ch_width = ch_params.ch_width;
+	}
+
 	lim_set_chan_sw_puncture(lim_ch_switch, &ch_params);
 
 	qdf_mem_zero(&ch_params, sizeof(struct ch_params));
