@@ -9684,7 +9684,7 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 				wlan_vdev_get_psoc(session->vdev), &data);
 	/* Allow BW upgrade for DFS No Wait case */
 	if (QDF_IS_STATUS_SUCCESS(status) &&
-	    !lim_is_valid_dnw(session, session->ch_width, new_ch_width))
+	    !lim_is_valid_dnw(session, data.new_bw, new_ch_width))
 		updated_bw = data.new_bw;
 
 	pe_debug("Peer: " QDF_MAC_ADDR_FMT " dot11 max bw %d, peer updated bw %d, new target bw %d",
