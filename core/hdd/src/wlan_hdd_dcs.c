@@ -252,6 +252,82 @@ hdd_dcs_select_random_chan(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+/**
+ * hdd_dcs_cwim_switch_channel() - handle CW interference mitigation for SAP
+ * @hdd_ctx: hdd context
+ * @param: dcs param (mac_id / vdev_id / interference_type)
+ *
+ * Picks a target channel via wlansap_dcs_get_cwim_target_freq() (PCL-for-SCC
+ * + ACS-range filter, excluding the FW-reported interfered channel). If that
+ * yields no channel, or only the current channel, the SAP simply stays on
+ * its current channel — no ACS, no SAP stop.
+ * If any STA/CLI interface is operating on same mac, do not change SAP
+ * channel for CW interference.
+ *
+ * Return: None
+ */
+#ifdef WLAN_DCS_CWIM_ENABLE
+static void hdd_dcs_cwim_switch_channel(struct hdd_context *hdd_ctx,
+					struct dcs_param *param)
+{
+	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_ap_ctx *ap_ctx;
+	struct sap_context *sap_ctx;
+	uint32_t count, index;
+	uint32_t tgt_freq;
+	enum phy_ch_width tgt_width;
+	QDF_STATUS switch_status;
+
+	if (policy_mgr_is_force_scc(hdd_ctx->psoc) &&
+	    policy_mgr_is_sta_gc_active_on_mac(hdd_ctx->psoc, param->mac_id)) {
+		hdd_debug("sta present on mac %d", param->mac_id);
+		return;
+	}
+	count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list,
+						   param->mac_id);
+	for (index = 0; index < count; index++) {
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx, list[index]);
+		if (!link_info) {
+			hdd_err("vdev_id %u does not exist with host",
+				list[index]);
+			continue;
+		}
+
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+		if (!WLAN_REG_IS_5GHZ_CH_FREQ(ap_ctx->operating_chan_freq)) {
+			hdd_debug("vdev %u not on 5 GHz (freq %u), skip cwim mitigation",
+				  list[index], ap_ctx->operating_chan_freq);
+			continue;
+		}
+
+		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+		tgt_freq = wlansap_dcs_get_cwim_target_freq(sap_ctx, &tgt_width);
+		if (tgt_freq == ap_ctx->operating_chan_freq) {
+			hdd_debug("vdev %u: no alternate channel available, stay on current channel %u",
+				  list[index], ap_ctx->operating_chan_freq);
+			continue;
+		}
+
+		hdd_debug("vdev %u: cwim switch -> %u, width %u",
+			  list[index], tgt_freq, tgt_width);
+		switch_status = ucfg_dcs_switch_chan(link_info->vdev, tgt_freq,
+						     tgt_width);
+		if (QDF_IS_STATUS_ERROR(switch_status)) {
+			hdd_err("CWIM channel switch failed for vdev %u, target %u, status %d",
+				list[index], tgt_freq, switch_status);
+			continue;
+		}
+	}
+}
+#else
+static inline void hdd_dcs_cwim_switch_channel(struct hdd_context *hdd_ctx,
+					       struct dcs_param *param)
+{
+	hdd_debug("CW interference mitigation is not supported");
+}
+#endif
+
 #ifdef WLAN_FEATURE_LL_LT_SAP
 /**
  * ll_lt_sap_acs_complete_bearer_switch_req_cb() - Callback function, which will
@@ -459,11 +535,8 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
 	uint32_t index;
 	QDF_STATUS status;
 
-	/*
-	 * so far CAP_DCS_CWIM interference mitigation is not supported
-	 */
 	if (param->interference_type == WLAN_HOST_DCS_CWIM) {
-		hdd_debug("CW interference mitigation is not supported");
+		hdd_dcs_cwim_switch_channel(hdd_ctx, param);
 		return;
 	}
 
