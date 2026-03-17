@@ -14180,13 +14180,13 @@ static int hdd_set_dfs_owner_disable(struct wlan_hdd_link_info *link_info,
  * hdd_get_dfs_owner_disable() - Get DFS owner disable
  * @link_info: Link info pointer in HDD adapter
  * @skb: skb buffer
- * @attr: pointer to nla attr
+ * @id: Request attribute ID
  *
  * Return: 0 on success, negative on failure
  */
 static int hdd_get_dfs_owner_disable(struct wlan_hdd_link_info *link_info,
 				     struct sk_buff *skb,
-				     const struct nlattr *attr)
+				     uint32_t id)
 {
 	bool dfs_master_capability = true;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
@@ -15099,13 +15099,13 @@ static const struct independent_setters independent_setters[] = {
  * hdd_get_elna_bypass() - Get eLNA bypass
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_elna_bypass(struct wlan_hdd_link_info *link_info,
 			       struct sk_buff *skb,
-			       const struct nlattr *attr)
+			       uint32_t id)
 {
 	int ret;
 	struct wlan_objmgr_vdev *vdev;
@@ -15114,7 +15114,7 @@ static int hdd_get_elna_bypass(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return -EINVAL;
 
-	ret = os_if_fwol_get_elna_bypass(vdev, skb, attr);
+	ret = os_if_fwol_get_elna_bypass(vdev, skb, id);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_FWOL_NB_ID);
 
@@ -15126,14 +15126,13 @@ static int hdd_get_elna_bypass(struct wlan_hdd_link_info *link_info,
  * hdd_get_roam_reason_vsie_status() - Get roam_reason_vsie
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static int hdd_get_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
-					   struct sk_buff *skb,
-					   const struct nlattr *attr)
+					   struct sk_buff *skb, uint32_t id)
 {
 	uint8_t roam_reason_vsie_enabled;
 	struct hdd_context *hdd_ctx = NULL;
@@ -15160,7 +15159,7 @@ static int hdd_get_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
 #else
 static inline int
 hdd_get_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
-				struct sk_buff *skb, const struct nlattr *attr)
+				struct sk_buff *skb, uint32_t id)
 {
 	return -EINVAL;
 }
@@ -15168,7 +15167,7 @@ hdd_get_roam_reason_vsie_status(struct wlan_hdd_link_info *link_info,
 
 static int hdd_vendor_attr_ldpc_get(struct wlan_hdd_link_info *link_info,
 				    struct sk_buff *skb,
-				    const struct nlattr *attr)
+				    uint32_t id)
 {
 	int ldpc, ret;
 
@@ -15190,7 +15189,7 @@ static int hdd_vendor_attr_ldpc_get(struct wlan_hdd_link_info *link_info,
 
 static int hdd_vendor_attr_tx_stbc_get(struct wlan_hdd_link_info *link_info,
 				       struct sk_buff *skb,
-				       const struct nlattr *attr)
+				       uint32_t id)
 {
 	int tx_stbc;
 	int ret;
@@ -15213,7 +15212,7 @@ static int hdd_vendor_attr_tx_stbc_get(struct wlan_hdd_link_info *link_info,
 
 static int hdd_vendor_attr_rx_stbc_get(struct wlan_hdd_link_info *link_info,
 				       struct sk_buff *skb,
-				       const struct nlattr *attr)
+				       uint32_t id)
 {
 	int rx_stbc;
 	int ret;
@@ -15238,12 +15237,12 @@ static int hdd_vendor_attr_rx_stbc_get(struct wlan_hdd_link_info *link_info,
  * hdd_get_tx_ampdu() - Get TX AMPDU
  * @link_info: Link info in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_tx_ampdu(struct wlan_hdd_link_info *link_info,
-			    struct sk_buff *skb, const struct nlattr *attr)
+			    struct sk_buff *skb, uint32_t id)
 {
 	int value;
 
@@ -15267,12 +15266,12 @@ static int hdd_get_tx_ampdu(struct wlan_hdd_link_info *link_info,
  * hdd_get_rx_ampdu() - Get RX AMPDU
  * @link_info: Link info in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_rx_ampdu(struct wlan_hdd_link_info *link_info,
-			    struct sk_buff *skb, const struct nlattr *attr)
+			    struct sk_buff *skb, uint32_t id)
 {
 	int value;
 
@@ -15296,12 +15295,12 @@ static int hdd_get_rx_ampdu(struct wlan_hdd_link_info *link_info,
  * hdd_get_tx_amsdu() - Get TX AMSDU
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_tx_amsdu(struct wlan_hdd_link_info *link_info,
-			    struct sk_buff *skb, const struct nlattr *attr)
+			    struct sk_buff *skb, uint32_t id)
 {
 	int value;
 
@@ -15325,12 +15324,12 @@ static int hdd_get_tx_amsdu(struct wlan_hdd_link_info *link_info,
  * hdd_get_rx_amsdu() - Get RX AMSDU
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
-			    struct sk_buff *skb, const struct nlattr *attr)
+			    struct sk_buff *skb, uint32_t id)
 {
 	int value;
 
@@ -15354,12 +15353,12 @@ static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
  * hdd_get_channel_width() - Get channel width
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
-				 struct sk_buff *skb, const struct nlattr *attr)
+				 struct sk_buff *skb, uint32_t id)
 {
 	uint8_t chn_width, nl80211_chwidth;
 	struct wlan_channel *bss_chan;
@@ -15450,13 +15449,12 @@ static uint8_t hdd_get_ch_width_for_standby_link(
  * hdd_get_mlo_max_band_info() - Get channel width
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
-				     struct sk_buff *skb,
-				     const struct nlattr *attr)
+				     struct sk_buff *skb, uint32_t id)
 {
 	enum phy_ch_width chwidth;
 	struct nlattr *mlo_bd = NULL;
@@ -15569,9 +15567,9 @@ end:
 	return ret;
 }
 #else
-static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
-				     struct sk_buff *skb,
-				     const struct nlattr *attr)
+static inline int
+hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
+			  struct sk_buff *skb, uint32_t id)
 {
 	return 0;
 }
@@ -15581,12 +15579,12 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
  * hdd_get_dynamic_bw() - Get dynamic bandwidth disabled / enabled
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_dynamic_bw(struct wlan_hdd_link_info *link_info,
-			      struct sk_buff *skb, const struct nlattr *attr)
+			      struct sk_buff *skb, uint32_t id)
 {
 	int enable;
 
@@ -15611,12 +15609,12 @@ static int hdd_get_dynamic_bw(struct wlan_hdd_link_info *link_info,
  * the adapter
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_nss_config(struct wlan_hdd_link_info *link_info,
-			      struct sk_buff *skb, const struct nlattr *attr)
+			      struct sk_buff *skb, uint32_t id)
 {
 	uint8_t nss;
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -15656,13 +15654,12 @@ static int hdd_get_nss_config(struct wlan_hdd_link_info *link_info,
  * the adapter
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_num_tx_chains_config(struct wlan_hdd_link_info *link_info,
-					struct sk_buff *skb,
-					const struct nlattr *attr)
+					struct sk_buff *skb, uint32_t id)
 {
 	uint8_t tx_chains;
 	QDF_STATUS status;
@@ -15693,12 +15690,12 @@ static int hdd_get_num_tx_chains_config(struct wlan_hdd_link_info *link_info,
  * the adapter
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_tx_nss_config(struct wlan_hdd_link_info *link_info,
-				 struct sk_buff *skb, const struct nlattr *attr)
+				 struct sk_buff *skb, uint32_t id)
 {
 	uint8_t tx_nss;
 	QDF_STATUS status;
@@ -15728,13 +15725,13 @@ static int hdd_get_tx_nss_config(struct wlan_hdd_link_info *link_info,
  * the adapter
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_num_rx_chains_config(struct wlan_hdd_link_info *link_info,
 					struct sk_buff *skb,
-					const struct nlattr *attr)
+					uint32_t id)
 {
 	uint8_t rx_chains;
 	QDF_STATUS status;
@@ -15765,12 +15762,12 @@ static int hdd_get_num_rx_chains_config(struct wlan_hdd_link_info *link_info,
  * the adapter
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_rx_nss_config(struct wlan_hdd_link_info *link_info,
-				 struct sk_buff *skb, const struct nlattr *attr)
+				 struct sk_buff *skb, uint32_t id)
 {
 	uint8_t rx_nss;
 	QDF_STATUS status;
@@ -15799,13 +15796,12 @@ static int hdd_get_rx_nss_config(struct wlan_hdd_link_info *link_info,
  * hdd_get_listen_interval_config() - Get listen interval from driver
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_listen_interval_config(struct wlan_hdd_link_info *link_info,
-					  struct sk_buff *skb,
-					  const struct nlattr *attr)
+					  struct sk_buff *skb, uint32_t id)
 {
 	uint32_t listen_interval = 0;
 	QDF_STATUS status;
@@ -15845,13 +15841,13 @@ static int hdd_get_listen_interval_config(struct wlan_hdd_link_info *link_info,
  * supported by the adapter
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_optimized_power_config(struct wlan_hdd_link_info *link_info,
 					  struct sk_buff *skb,
-					  const struct nlattr *attr)
+					  uint32_t id)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint8_t optimized_power_cfg;
@@ -15877,13 +15873,13 @@ static int hdd_get_optimized_power_config(struct wlan_hdd_link_info *link_info,
  * hdd_get_sta_keepalive_interval() - Get keep alive interval
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 static int hdd_get_sta_keepalive_interval(struct wlan_hdd_link_info *link_info,
 					  struct sk_buff *skb,
-					  const struct nlattr *attr)
+					  uint32_t id)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -15924,11 +15920,180 @@ static int hdd_get_sta_keepalive_interval(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
+
+/* UP date this to SAP mode as well, to fetch the limits */
+static QDF_STATUS
+hdd_fill_nss_chains_limits(struct wlan_hdd_link_info *link_info,
+			   struct wlan_mlme_nss_chains *nss_chains_limits)
+{
+	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct wlan_hdd_link_info *iter_info;
+	uint8_t def_tx_cap_nss, def_rx_cap_nss, def_tx_op_nss, def_rx_op_nss;
+	uint8_t iter_tx_cap_nss, iter_rx_cap_nss;
+	uint8_t iter_tx_op_nss, iter_rx_op_nss;
+	qdf_freq_t def_freq, iter_freq;
+	enum nss_chains_band_info def_band, iter_band;
+	struct wlan_mlme_nss_chains *ini_limits;
+
+	ini_limits = ucfg_mlme_get_ini_vdev_config(link_info->vdev);
+	if (!ini_limits) {
+		hdd_debug("Failed to get INI config for VDEV %d",
+			  link_info->vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	def_freq = wlan_get_operation_chan_freq(link_info->vdev);
+	if (!def_freq) {
+		hdd_debug("Invalid freq for %d", link_info->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_vdev_mlme_get_bss_nss_params(link_info->vdev,
+						   &def_tx_cap_nss,
+						   &def_rx_cap_nss,
+						   &def_tx_op_nss,
+						   &def_rx_op_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Failed to fetch NSS for %d", link_info->vdev_id);
+		return status;
+	}
+
+	qdf_mem_copy(nss_chains_limits->num_tx_chains,
+		     ini_limits->num_tx_chains,
+		     sizeof(nss_chains_limits->num_tx_chains));
+	qdf_mem_copy(nss_chains_limits->num_rx_chains,
+		     ini_limits->num_rx_chains,
+		     sizeof(nss_chains_limits->num_rx_chains));
+
+	def_band = wlan_reg_is_24ghz_ch_freq(def_freq) ? NSS_CHAINS_BAND_2GHZ :
+		   NSS_CHAINS_BAND_5GHZ;
+	iter_band = (def_band == NSS_CHAINS_BAND_2GHZ) ? NSS_CHAINS_BAND_5GHZ :
+		    NSS_CHAINS_BAND_2GHZ;
+
+	nss_chains_limits->tx_nss[def_band] = def_tx_cap_nss;
+	nss_chains_limits->rx_nss[def_band] = def_rx_cap_nss;
+	nss_chains_limits->tx_nss[iter_band] = def_tx_cap_nss;
+	nss_chains_limits->rx_nss[iter_band] = def_rx_cap_nss;
+
+	hdd_adapter_for_each_active_link_info(adapter, iter_info) {
+		if (WLAN_HDD_IS_DEFLINK(iter_info))
+			continue;
+
+		/* This will be critical section during link switch */
+		iter_freq = wlan_get_operation_chan_freq(iter_info->vdev);
+		if (!iter_freq)
+			continue;
+
+		iter_band = wlan_reg_is_24ghz_ch_freq(iter_freq) ?
+			    NSS_CHAINS_BAND_2GHZ :
+			    NSS_CHAINS_BAND_5GHZ;
+
+		status = wlan_vdev_mlme_get_bss_nss_params(iter_info->vdev,
+							   &iter_tx_cap_nss,
+							   &iter_rx_cap_nss,
+							   &iter_tx_op_nss,
+							   &iter_rx_op_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_debug("Failed to fetch NSS for %d",
+				  iter_info->vdev_id);
+			return status;
+		}
+
+		nss_chains_limits->tx_nss[iter_band] = iter_tx_cap_nss;
+		nss_chains_limits->rx_nss[iter_band] = iter_rx_cap_nss;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static int hdd_get_nss_chains_config(struct wlan_hdd_link_info *link_info,
+				     struct sk_buff *skb,
+				     uint32_t id)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct wlan_mlme_nss_chains limits = {0};
+	struct wlan_mlme_nss_chains *dyn;
+	QDF_STATUS status;
+	uint8_t value = 0;
+	enum nss_chains_band_info band;
+
+	if (!hdd_cm_is_vdev_connected(link_info)) {
+		hdd_err("Not in connected state");
+		return -EINVAL;
+	}
+
+	if (!hdd_ctx->dynamic_nss_chains_support) {
+		hdd_err("Dynamic nss chain update is not supported");
+		return -EOPNOTSUPP;
+	}
+
+	status = hdd_fill_nss_chains_limits(link_info, &limits);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to fill limits");
+		return -EINVAL;
+	}
+
+	dyn = ucfg_mlme_get_dynamic_vdev_config(link_info->vdev);
+	if (!dyn) {
+		hdd_err("Failed to get dynamic config");
+		return -EINVAL;
+	}
+
+	switch (id) {
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		value = QDF_MIN(limits.tx_nss[band], dyn->tx_nss[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		value = QDF_MIN(limits.rx_nss[band], dyn->rx_nss[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		value = QDF_MIN(limits.tx_nss[band], dyn->tx_nss[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		value = QDF_MIN(limits.rx_nss[band], dyn->rx_nss[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		value = QDF_MIN(limits.num_tx_chains[band],
+				dyn->num_tx_chains[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		value = QDF_MIN(limits.num_rx_chains[band],
+				dyn->num_rx_chains[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		value = QDF_MIN(limits.num_tx_chains[band],
+				dyn->num_tx_chains[band]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		value = QDF_MIN(limits.num_rx_chains[band],
+				dyn->num_rx_chains[band]);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(skb, id, value)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * typedef config_getter_fn - get configuration handler
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: The nl80211 attribute being applied
+ * @id: Request attribute ID
  *
  * Defines the signature of functions in the attribute vtable
  *
@@ -15936,7 +16101,7 @@ static int hdd_get_sta_keepalive_interval(struct wlan_hdd_link_info *link_info,
  */
 typedef int (*config_getter_fn)(struct wlan_hdd_link_info *link_info,
 				struct sk_buff *skb,
-				const struct nlattr *attr);
+				uint32_t id);
 
 /**
  * struct config_getters
@@ -16017,6 +16182,30 @@ static const struct config_getters config_getters[] = {
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE,
 	 sizeof(uint8_t),
 	 hdd_get_dfs_owner_disable},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ,
+	 sizeof(uint8_t),
+	 hdd_get_nss_chains_config},
 };
 
 /**
@@ -16067,7 +16256,7 @@ static int hdd_get_configuration(struct wlan_hdd_link_info *link_info,
 		hdd_debug("Get wifi configuration %d", id);
 
 		cb = config_getters[i].cb;
-		errno = cb(link_info, skb, attr);
+		errno = cb(link_info, skb, id);
 		if (errno)
 			break;
 	}
@@ -16256,92 +16445,6 @@ invalid:
 	}
 
 	return WLAN_VENDOR_NSS_CHAIN_REQ_INVALID;
-}
-
-/* UP date this to SAP mode as well, to fetch the limits */
-static QDF_STATUS
-hdd_fill_nss_chains_limits(struct wlan_hdd_link_info *link_info,
-			   struct wlan_mlme_nss_chains *nss_chains_limits)
-{
-	QDF_STATUS status;
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct wlan_hdd_link_info *iter_info;
-	uint8_t def_tx_cap_nss, def_rx_cap_nss, def_tx_op_nss, def_rx_op_nss;
-	uint8_t iter_tx_cap_nss, iter_rx_cap_nss;
-	uint8_t iter_tx_op_nss, iter_rx_op_nss;
-	qdf_freq_t def_freq, iter_freq;
-	enum nss_chains_band_info def_band, iter_band;
-	struct wlan_mlme_nss_chains *ini_limits;
-
-	ini_limits = ucfg_mlme_get_ini_vdev_config(link_info->vdev);
-	if (!ini_limits) {
-		hdd_debug("Failed to get INI config for VDEV %d",
-			  link_info->vdev_id);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	def_freq = wlan_get_operation_chan_freq(link_info->vdev);
-	if (!def_freq) {
-		hdd_debug("Invalid freq for %d", link_info->vdev_id);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	status = wlan_vdev_mlme_get_bss_nss_params(link_info->vdev,
-						   &def_tx_cap_nss,
-						   &def_rx_cap_nss,
-						   &def_tx_op_nss,
-						   &def_rx_op_nss);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("Failed to fetch NSS for %d", link_info->vdev_id);
-		return status;
-	}
-
-	qdf_mem_copy(nss_chains_limits->num_tx_chains,
-		     ini_limits->num_tx_chains,
-		     sizeof(nss_chains_limits->num_tx_chains));
-	qdf_mem_copy(nss_chains_limits->num_rx_chains,
-		     ini_limits->num_rx_chains,
-		     sizeof(nss_chains_limits->num_rx_chains));
-
-	def_band = wlan_reg_is_24ghz_ch_freq(def_freq) ? NSS_CHAINS_BAND_2GHZ :
-		   NSS_CHAINS_BAND_5GHZ;
-	iter_band = (def_band == NSS_CHAINS_BAND_2GHZ) ? NSS_CHAINS_BAND_5GHZ :
-		    NSS_CHAINS_BAND_2GHZ;
-
-	nss_chains_limits->tx_nss[def_band] = def_tx_cap_nss;
-	nss_chains_limits->rx_nss[def_band] = def_rx_cap_nss;
-	nss_chains_limits->tx_nss[iter_band] = def_tx_cap_nss;
-	nss_chains_limits->rx_nss[iter_band] = def_rx_cap_nss;
-
-	hdd_adapter_for_each_active_link_info(adapter, iter_info) {
-		if (WLAN_HDD_IS_DEFLINK(iter_info))
-			continue;
-
-		/* This will be critical section during link switch */
-		iter_freq = wlan_get_operation_chan_freq(iter_info->vdev);
-		if (!iter_freq)
-			continue;
-
-		iter_band = wlan_reg_is_24ghz_ch_freq(iter_freq) ?
-			    NSS_CHAINS_BAND_2GHZ :
-			    NSS_CHAINS_BAND_5GHZ;
-
-		status = wlan_vdev_mlme_get_bss_nss_params(iter_info->vdev,
-							   &iter_tx_cap_nss,
-							   &iter_rx_cap_nss,
-							   &iter_tx_op_nss,
-							   &iter_rx_op_nss);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_debug("Failed to fetch NSS for %d",
-				  iter_info->vdev_id);
-			return status;
-		}
-
-		nss_chains_limits->tx_nss[iter_band] = iter_tx_cap_nss;
-		nss_chains_limits->rx_nss[iter_band] = iter_rx_cap_nss;
-	}
-
-	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS

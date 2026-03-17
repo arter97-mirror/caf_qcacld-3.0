@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -81,8 +81,7 @@ os_if_fwol_get_elna_bypass_callback(void *context,
 }
 
 int os_if_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
-			       struct sk_buff *skb,
-			       const struct nlattr *attr)
+			       struct sk_buff *skb, uint32_t id)
 {
 	struct get_elna_bypass_request req;
 	void *cookie;

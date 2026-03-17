@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,13 +44,12 @@ int os_if_fwol_set_elna_bypass(struct wlan_objmgr_vdev *vdev,
  * os_if_fwol_get_elna_bypass() - Get eLNA bypass
  * @vdev: Pointer to vdev
  * @skb: sk buffer to hold nl80211 attributes
- * @attr: Pointer to struct nlattr
+ * @id: Request attribute ID
  *
  * Return: 0 on success; error number otherwise
  */
 int os_if_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
-			       struct sk_buff *skb,
-			       const struct nlattr *attr);
+			       struct sk_buff *skb, uint32_t id);
 #else
 static inline int os_if_fwol_set_elna_bypass(struct wlan_objmgr_vdev *vdev,
 					     const struct nlattr *attr)
@@ -60,9 +59,9 @@ static inline int os_if_fwol_set_elna_bypass(struct wlan_objmgr_vdev *vdev,
 
 static inline int os_if_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
 					     struct sk_buff *skb,
-					     const struct nlattr *attr)
+					     uint32_t id)
 {
-	return 0;
+	return -ENOTSUPP;
 }
 #endif /* WLAN_FEATURE_ELNA */
 
