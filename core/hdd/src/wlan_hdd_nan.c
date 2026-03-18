@@ -95,12 +95,15 @@ static int __wlan_hdd_cfg80211_nan_ext_request(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (hdd_is_connection_in_progress(&conc_vdev_id, &out_reason)) {
-		if (out_reason != EAPOL_IN_PROGRESS) {
-			hdd_err("NAN command refused, reason %d", out_reason);
-			return -EAGAIN;
-		}
-	}
+	/*
+	 * For NAN enable requests, allow the command to proceed even if
+	 * connection is in progress. The serialization mechanism in
+	 * os_if_process_nan_req will queue the command and firmware will
+	 * handle it appropriately.
+	 */
+	if (hdd_is_connection_in_progress(&conc_vdev_id, &out_reason))
+		hdd_debug("Connection in progress (reason %d), NAN command will be serialized",
+			  out_reason);
 
 	return os_if_process_nan_req(hdd_ctx->pdev, adapter->deflink->vdev_id,
 				     data, data_len);

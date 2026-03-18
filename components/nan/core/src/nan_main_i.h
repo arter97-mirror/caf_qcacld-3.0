@@ -240,6 +240,28 @@ struct nan_peer_priv_obj {
 };
 
 /**
+ * struct nan_ser_enable_req - Serialization request structure for NAN enable
+ * @psoc: psoc object
+ * @social_chan_2g_freq: Social channel in 2G band
+ * @social_chan_5g_freq: Social channel in 5G band
+ * @pdev: PDEV object
+ * @request_data_len: Length of request data
+ * @rtt_cap: RTT capability
+ * @disable_6g_nan: Disable 6G NAN flag
+ * @request_data_copy: Deep copy of request data
+ */
+struct nan_ser_enable_req {
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t social_chan_2g_freq;
+	uint32_t social_chan_5g_freq;
+	struct wlan_objmgr_pdev *pdev;
+	uint16_t request_data_len;
+	uint32_t rtt_cap;
+	bool disable_6g_nan;
+	uint8_t *request_data_copy;
+};
+
+/**
  * nan_release_cmd: frees resources for NAN command.
  * @in_req: pointer to msg buffer to be freed
  * @req_type: type of request
@@ -578,6 +600,18 @@ QDF_STATUS nan_get_disable_req_info(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id);
+/**
+ * nan_ser_enable_req() - Serialize NAN enable request
+ * @vdev_id: VDEV ID
+ * @nan_req: NAN enable request
+ *
+ * This function serializes the NAN enable request to ensure proper
+ * sequencing with other commands.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_ser_enable_req(uint8_t vdev_id,
+			      struct nan_enable_req *nan_req);
 
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 /**
