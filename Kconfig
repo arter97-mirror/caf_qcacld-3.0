@@ -3079,4 +3079,8 @@ config HIF_LARGE_CE_RING_HISTORY
 	int "Enable HIF_LARGE_CE_RING_HISTORY"
 	default 8192
 endif
+config WLAN_TAS_SYSFS
+	bool "Enable TAS sysfs"
+	default n
+
 endif # QCA_CLD_WLAN
