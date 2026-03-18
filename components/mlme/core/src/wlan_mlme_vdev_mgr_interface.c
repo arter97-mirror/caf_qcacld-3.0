@@ -2037,7 +2037,7 @@ static QDF_STATUS mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 	status = wma_mon_mlme_vdev_down_send(vdev_mlme, data_len, data);
 
 	if (QDF_IS_STATUS_ERROR(status) &&
-	    wlan_vdev_mlme_get_opmode(vdev_mlme->vdev))
+	    wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_PASSTHRU_MODE)
 		mon_mlme_vdev_stop_resp(vdev_mlme, NULL);
 
 	return status;

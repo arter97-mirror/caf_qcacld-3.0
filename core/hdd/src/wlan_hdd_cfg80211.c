@@ -97,9 +97,7 @@
 #include "wlan_hdd_disa.h"
 #include "wlan_osif_request_manager.h"
 #include "wlan_hdd_he.h"
-#ifdef FEATURE_WLAN_APF
 #include "wlan_hdd_apf.h"
-#endif
 #include "wlan_hdd_fw_state.h"
 #include "wlan_hdd_mpta_helper.h"
 
@@ -159,7 +157,6 @@
 #include <ol_defines.h>
 #include "wlan_hdd_btc_chain_mode.h"
 #include "os_if_nan.h"
-#include "wlan_hdd_apf.h"
 #include "wlan_hdd_cfr.h"
 #include "wlan_hdd_ioctl.h"
 #include "wlan_cm_roam_ucfg_api.h"
@@ -18404,6 +18401,9 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 			reason_code = WLAN_LOG_REASON_DUMP_IN_PROGRESS;
 		else
 			reason_code = WLAN_LOG_REASON_CODE_UNUSED;
+
+		if (reason_code == WLAN_LOG_REASON_DUMP_IN_PROGRESS)
+			hdd_apf_dump_history(hdd_ctx);
 
 		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
 				WLAN_LOG_INDICATOR_FRAMEWORK,

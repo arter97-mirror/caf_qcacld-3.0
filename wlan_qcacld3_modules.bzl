@@ -73,10 +73,17 @@ _target_chipset_map = {
     "chora": [
 	"wcn7750",
 	"wcn6450",
-    ]
+    ],
+    "shikra":[
+            "wlan",
+    ],
+    "hamoa_la": [
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
+    "wlan"   : "ADRASTEA",
     "kiwi-v2": "BERYLLIUM",
     "peach": "BERYLLIUM",
     "peach-v2": "BERYLLIUM",
@@ -93,6 +100,8 @@ _chipset_hw_map = {
 }
 
 _chipset_header_map = {
+    "wlan" : [
+    ],
     "peach-v2": [
         "api/hw/peach/v2",
         "cmn/hal/wifi3.0/peach",
@@ -144,6 +153,8 @@ _chipset_header_map = {
 }
 
 _hw_header_map = {
+    "ADRASTEA" : [
+    ],
     "BORON": [
 	"cmn/hal/wifi3.0/be",
 	"cmn/hal/wifi3.0/bn",
@@ -439,6 +450,7 @@ _fixed_ipaths = [
     "os_if/twt/inc",
     "os_if/telemetry/inc",
     "uapi/linux",
+    "cmn/hif/src/snoc",
 ]
 
 # paths where include files are private in src folders
@@ -1405,6 +1417,7 @@ _conditional_srcs = {
     "CONFIG_PLD_SNOC_ICNSS_FLAG": {
         True: [
             "core/pld/src/pld_snoc.c",
+            "cmn/hif/src/snoc/if_snoc.c",
         ],
     },
     "CONFIG_POWER_MANAGEMENT_OFFLOAD": {
@@ -2705,7 +2718,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    if target == "sdxkova":
+    if target == "sdxkova" or target == "shikra":
         out = "wlan.ko"
     elif target == "sa510m":
         out = "{}.ko".format(chipset)
@@ -2715,7 +2728,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "wlan":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
@@ -2747,7 +2760,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2837,7 +2850,7 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    if target != "sdxkova" and target != "alor-le":
+    if target != "sdxkova" and target != "alor-le" and target != "shikra":
         copy_to_dist_dir(
             name = "{}_all_modules_dist".format(tv),
             data = dataList,

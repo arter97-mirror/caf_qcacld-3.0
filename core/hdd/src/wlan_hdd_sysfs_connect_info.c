@@ -186,6 +186,8 @@ wlan_hdd_add_vht_cap_info(struct hdd_connection_info *conn_info,
 	return length;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
+	defined(WLAN_FEATURE_11AX)
 /**
  * wlan_hdd_add_he_cap_info() - Populate HE info
  * @conn_info: station connection information
@@ -238,6 +240,14 @@ wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
 	length = ret;
 	return length;
 }
+#else
+static inline ssize_t
+wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
+			 uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
+}
+#endif
 
 /**
  * hdd_auth_type_str() - Get string for enum csr auth type

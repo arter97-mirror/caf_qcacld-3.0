@@ -3,14 +3,16 @@ targets = [
     "autoghgvm",
     "autogvm",
     "canoe",
+    "chora",
     "gen3auto",
+    "hamoa",
     "neo-la",
-    "sun",
-    "vienna",
     "pineapple",
     "seraph",
-    "hamoa",
-    "chora",
+    "shikra",
+    "sun",
+    "vienna",
+    "hamoa_la",
 ]
 
 la_variants = [
@@ -54,6 +56,7 @@ vm_target_bases = [
     "canoe",
     "hamoa",
     "chora",
+    "hamoa_la",
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]

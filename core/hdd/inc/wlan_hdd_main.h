@@ -144,7 +144,13 @@
  * @buf_len: Length of the read memory requested
  * @offset: APF work memory offset to fetch from
  * @lock: APF Context lock
+ * @apf_inst_pool: Pointers to stored instructions
+ * @apf_inst_total_len: Total expected length for each slot
+ * @apf_inst_curr_len: Current accumulated length for each slot
+ * @apf_inst_index: Index of the current active slot (circular buffer)
+ * @apf_inst_timestamp: Timestamp when instruction was stored (microseconds)
  */
+#define APF_HISTORY_LEN 5
 struct hdd_apf_context {
 	unsigned int magic;
 	qdf_event_t qdf_apf_event;
@@ -154,6 +160,11 @@ struct hdd_apf_context {
 	uint32_t buf_len;
 	uint32_t offset;
 	qdf_spinlock_t lock;
+	uint8_t *apf_inst_pool[APF_HISTORY_LEN];
+	uint32_t apf_inst_total_len[APF_HISTORY_LEN];
+	uint32_t apf_inst_curr_len[APF_HISTORY_LEN];
+	uint8_t apf_inst_index;
+	uint64_t apf_inst_timestamp[APF_HISTORY_LEN];
 };
 #endif /* FEATURE_WLAN_APF */
 
@@ -589,6 +600,7 @@ typedef enum {
 	NET_DEV_HOLD_LOCAL_PKT_CAPTURE = 65,
 	NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE = 66,
 	NET_DEV_HOLD_SYSFS_APFMODE_STORE = 67,
+	NET_DEV_HOLD_APF_INSTRUCTION = 69,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX

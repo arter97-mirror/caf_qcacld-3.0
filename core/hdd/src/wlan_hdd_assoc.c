@@ -93,6 +93,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_hdd_apf.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -3509,6 +3510,17 @@ void hdd_roam_profile_init(struct wlan_hdd_link_info *link_info)
  */
 static void hdd_cm_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
 {
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (hdd_ctx) {
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+						      wlan_vdev_get_id(vdev));
+		if (link_info)
+			hdd_apf_reset_history(link_info->adapter);
+	}
+
 	mlo_roam_connect_complete(vdev);
 }
 #else
