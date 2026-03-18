@@ -61,6 +61,7 @@
 #include "wlan_ll_sap_api.h"
 #include <wlan_dnw_api.h>
 #include <wlan_dcs_ucfg_api.h>
+#include "wlan_nan_api.h"
 
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
@@ -4686,7 +4687,27 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		}
 	} else if (sap_ctx->acs_cfg &&
 			sap_ctx->acs_cfg->master_ch_avoid_updated) {
+		qdf_freq_t nan_freq;
+
 		sap_ctx->acs_cfg->master_ch_avoid_updated = false;
+
+		/* Check if NAN interface is present and avoid switching
+		 * if current SAP freq is same as NAN freq
+		 */
+		if (wlan_nan_is_sta_sap_nan_allowed(mac->psoc) &&
+		    policy_mgr_mode_specific_connection_count(mac->psoc,
+							      PM_NAN_DISC_MODE,
+							      NULL)) {
+			nan_freq = wlan_nan_sap_override_freq(mac->psoc,
+							      sap_ctx->vdev_id,
+							      sap_ctx->chan_freq);
+			if (nan_freq == sap_ctx->chan_freq) {
+				sap_debug("Skip CSA: SAP freq %d same as NAN freq",
+					  sap_ctx->chan_freq);
+				return sap_ctx->chan_freq;
+			}
+		}
+
 		/*
 		 * We are sure the ch avoid event has mark safe for
 		 * 5 GHz channels in master channel.
