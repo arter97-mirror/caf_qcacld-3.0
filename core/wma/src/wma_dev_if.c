@@ -3164,6 +3164,14 @@ wma_vdev_unified_disconnect_rsp_handler(
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
 
+	status = target_if_vdev_mgr_unified_disconnect_timer_stop(psoc,
+								rsp->vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("vdev:%d failed to stop unified disconnect timer",
+			rsp->vdev_id);
+		return status;
+	}
+
 	del_resp = qdf_mem_malloc(sizeof(*del_resp));
 	if (!del_resp)
 		return QDF_STATUS_E_NOMEM;
