@@ -17201,6 +17201,27 @@ static inline void hdd_txrx_populate_cds_config(struct cds_config_info
 }
 #endif
 
+#ifdef FEATURE_SNR_STATS
+/**
+ * hdd_update_cds_config_snr_stats() - Update CDS config with SNR stats setting
+ * @hdd_ctx: HDD Context
+ * @cds_cfg: pointer to CDS config info
+ *
+ * Return: None
+ */
+static void hdd_update_cds_config_snr_stats(struct hdd_context *hdd_ctx,
+					    struct cds_config_info *cds_cfg)
+{
+	cds_cfg->enable_snr_stats_report =
+		ucfg_cp_stats_is_snr_stats_report_cfg_enable(hdd_ctx->psoc);
+}
+#else
+static void hdd_update_cds_config_snr_stats(struct hdd_context *hdd_ctx,
+					    struct cds_config_info *cds_cfg)
+{
+}
+#endif /* FEATURE_SNR_STATS */
+
 /**
  * hdd_update_cds_config() - API to update cds configuration parameters
  * @hdd_ctx: HDD Context
@@ -17294,6 +17315,7 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 	cds_cfg->enable_bcn_rssi_history_report =
 		ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(
 								hdd_ctx->psoc);
+	hdd_update_cds_config_snr_stats(hdd_ctx, cds_cfg);
 	cds_init_ini_config(cds_cfg);
 	return 0;
 

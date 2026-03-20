@@ -659,6 +659,29 @@ static void wma_set_epm_feature(tp_wma_handle wma_handle,
 }
 #endif
 
+#ifdef FEATURE_SNR_STATS
+/**
+ * wma_set_default_tgt_config_snr_stats() - Set SNR stats config in tgt_cfg
+ * @tgt_cfg: Resource config given to target
+ * @cds_cfg: cds configuration
+ *
+ * Return: none
+ */
+static void wma_set_default_tgt_config_snr_stats(
+				target_resource_config *tgt_cfg,
+				struct cds_config_info *cds_cfg)
+{
+	tgt_cfg->enable_snr_stats_report =
+			cds_cfg->enable_snr_stats_report;
+}
+#else
+static void wma_set_default_tgt_config_snr_stats(
+				target_resource_config *tgt_cfg,
+				struct cds_config_info *cds_cfg)
+{
+}
+#endif /* FEATURE_SNR_STATS */
+
 /**
  * wma_set_default_tgt_config() - set default tgt config
  * @wma_handle: wma handle
@@ -782,6 +805,7 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 
 	tgt_cfg->enable_bcn_rssi_history_report =
 			cds_cfg->enable_bcn_rssi_history_report;
+	wma_set_default_tgt_config_snr_stats(tgt_cfg, cds_cfg);
 }
 
 /**

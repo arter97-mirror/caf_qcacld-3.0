@@ -102,6 +102,7 @@ struct wlan_cds_feature_set {
  * @get_wifi_features: Get wifi features from fw
  * @is_pm_fw_debug_enable: flag to check FW debug is enabled or not
  * @enable_bcn_rssi_history_report: beacon rssi history report config
+ * @enable_snr_stats_report: snr stats report config
  */
 
 struct cds_config_info {
@@ -140,5 +141,8 @@ struct cds_config_info {
 #endif
 	bool is_pm_fw_debug_enable;
 	bool enable_bcn_rssi_history_report;
+#ifdef FEATURE_SNR_STATS
+	bool enable_snr_stats_report;
+#endif /* FEATURE_SNR_STATS */
 };
 #endif /* !defined( __CDS_CONFIG_H ) */
