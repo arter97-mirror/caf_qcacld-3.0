@@ -3120,6 +3120,32 @@ struct wifi_host_link_stats {
 	uint32_t mpdu_rx_driver_rcvd;
 };
 
+/* Maximum number of IPI SNR histogram bins supported */
+#define WLAN_SNR_STATS_MAX_BINS  32
+
+/**
+ * struct wifi_snr_stats - IPI SNR distribution statistics
+ * @valid: true if IPI TLV was present in WMI event
+ * @meas_dur_us: measurement duration in microseconds
+ * @snr_lower_bound: lower bound of SNR range in dB (snr_config bits[7:0])
+ * @snr_upper_bound: upper bound of SNR range in dB (snr_config bits[15:8])
+ * @snr_step: step size in dB per bin (snr_config bits[23:16])
+ * @num_bins: total number of bins (snr_config bits[31:24])
+ * @bin_data: SNR sample counts per bin; num_bins elements valid.
+ *            bin_data[0]: samples with SNR < snr_lower_bound;
+ *            bin_data[1..num_bins-2]: samples in each step-sized range;
+ *            bin_data[num_bins-1]: samples with SNR >= snr_upper_bound
+ */
+struct wifi_snr_stats {
+	bool valid;
+	uint32_t meas_dur_us;
+	uint32_t snr_lower_bound;
+	uint32_t snr_upper_bound;
+	uint32_t snr_step;
+	uint32_t num_bins;
+	uint32_t bin_data[WLAN_SNR_STATS_MAX_BINS];
+};
+
 /**
  * struct wifi_interface_stats - Interface statistics
  * @info: struct containing the current state of the interface
@@ -3134,6 +3160,7 @@ struct wifi_host_link_stats {
  * @powersave_stats: powersave statistics
  * @vdev_id: vdev id
  * @host_link_stats: host side per link statistics
+ * @snr_stats: IPI SNR distribution statistics
  *
  * Statistics corresponding to 2nd most LSB in wifi statistics bitmap
  * for getting statistics
@@ -3151,6 +3178,9 @@ struct wifi_interface_stats {
 	wmi_iface_powersave_stats powersave_stats;
 	uint8_t vdev_id;
 	struct wifi_host_link_stats host_link_stats;
+#ifdef FEATURE_SNR_STATS
+	struct wifi_snr_stats snr_stats;
+#endif /* FEATURE_SNR_STATS */
 };
 
 /**

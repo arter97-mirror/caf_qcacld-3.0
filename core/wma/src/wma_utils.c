@@ -69,6 +69,9 @@
 #include <cdp_txrx_host_stats.h>
 #include "wlan_mlme_ucfg_api.h"
 #include <wlan_cp_stats_mc_tgt_api.h>
+#ifdef FEATURE_SNR_STATS
+#include "wlan_cp_stats_utils_api.h"
+#endif /* FEATURE_SNR_STATS */
 #include "wma_eht.h"
 #include <target_if_spatial_reuse.h>
 #include "wlan_dp_ucfg_api.h"
@@ -3329,6 +3332,109 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef FEATURE_SNR_STATS
+/**
+ * wma_parse_snr_stats() - parse IPI SNR distribution stats from WMI TLV
+ * @ipi_tlv: pointer to wmi_iface_ipi_stats TLV
+ * @snr_histogram: pointer to snr_histogram array
+ * @num_snr_histogram: number of elements in snr_histogram array
+ * @snr_stats: output wifi_snr_stats structure to fill
+ *
+ * Decodes the snr_config bit fields and copies bin data into snr_stats.
+ * On success, snr_stats->valid is set to true.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+static QDF_STATUS wma_parse_snr_stats(wmi_iface_ipi_stats *ipi_tlv,
+				      uint32_t *snr_histogram,
+				      uint32_t num_snr_histogram,
+				      struct wifi_snr_stats *snr_stats)
+{
+	uint32_t num_bins, i;
+	char snr_buf[256];
+	uint32_t snr_buf_len = 0;
+	uint32_t print_bins;
+
+	if (!ipi_tlv || !snr_stats) {
+		wma_err("Invalid parameters: ipi_tlv=%pK snr_stats=%pK",
+			ipi_tlv, snr_stats);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	snr_stats->meas_dur_us = ipi_tlv->meas_dur_us;
+	snr_stats->snr_lower_bound =
+		WMI_IPI_STATS_SNR_LOWER_BOUND_GET(ipi_tlv->snr_config);
+	snr_stats->snr_upper_bound =
+		WMI_IPI_STATS_SNR_UPPER_BOUND_GET(ipi_tlv->snr_config);
+	snr_stats->snr_step =
+		WMI_IPI_STATS_SNR_STEP_GET(ipi_tlv->snr_config);
+	num_bins = WMI_IPI_STATS_SNR_NUM_BINS_GET(ipi_tlv->snr_config);
+	snr_stats->num_bins = num_bins;
+
+	if (num_bins == 0 || num_bins > WLAN_SNR_STATS_MAX_BINS) {
+		wma_err("Invalid IPI num_bins: %u (max %u)",
+			num_bins, WLAN_SNR_STATS_MAX_BINS);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!snr_histogram || num_snr_histogram < num_bins) {
+		wma_err("IPI snr_histogram too short: %u elements for %u bins",
+			num_snr_histogram, num_bins);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	print_bins = (num_bins > 15) ? 15 : num_bins;
+	for (i = 0; i < num_bins; i++) {
+		snr_stats->bin_data[i] = snr_histogram[i];
+		if (i < print_bins)
+			snr_buf_len += qdf_scnprintf(snr_buf + snr_buf_len,
+						     sizeof(snr_buf) - snr_buf_len,
+						     "%u ", snr_histogram[i]);
+	}
+
+	snr_stats->valid = true;
+
+	wma_debug("SNR histogram: meas=%u us, snr=[%u,%u) step=%u bins=%u",
+		  snr_stats->meas_dur_us, snr_stats->snr_lower_bound,
+		  snr_stats->snr_upper_bound, snr_stats->snr_step,
+		  snr_stats->num_bins);
+	wma_debug("SNR histogram[0-%u]: %s", print_bins - 1, snr_buf);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wma_update_iface_snr_stats() - parse and store IPI SNR stats into iface_stat
+ * @wma_handle: wma handle
+ * @param_tlvs: WMI iface link stats event TLVs
+ * @iface_stat: output wifi_interface_stats structure to fill
+ *
+ * Checks service bit and INI config, then calls wma_parse_snr_stats() to
+ * decode the IPI TLV and populate iface_stat->snr_stats.
+ */
+static void wma_update_iface_snr_stats(
+		tp_wma_handle wma_handle,
+		WMI_IFACE_LINK_STATS_EVENTID_param_tlvs *param_tlvs,
+		struct wifi_interface_stats *iface_stat)
+{
+	if (param_tlvs->iface_ipi_stats &&
+	    wlan_cp_stats_is_snr_stats_report_cfg_enable(wma_handle->psoc) &&
+	    wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_idle_power_indicate_support))
+		wma_parse_snr_stats(param_tlvs->iface_ipi_stats,
+				    param_tlvs->snr_histogram,
+				    param_tlvs->num_snr_histogram,
+				    &iface_stat->snr_stats);
+}
+#else
+static inline void wma_update_iface_snr_stats(
+		tp_wma_handle wma_handle,
+		WMI_IFACE_LINK_STATS_EVENTID_param_tlvs *param_tlvs,
+		struct wifi_interface_stats *iface_stat)
+{
+}
+#endif /* FEATURE_SNR_STATS */
+
 /**
  * wma_unified_link_iface_stats_event_handler() - link iface stats event handler
  * @handle: wma handle
@@ -3487,6 +3593,8 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 	powersave_stats = param_tlvs->iface_powersave_stats;
 	if (powersave_stats)
 		iface_stat->powersave_stats = *powersave_stats;
+
+	wma_update_iface_snr_stats(wma_handle, param_tlvs, iface_stat);
 
 	/* Copying vdev_id info into the iface_stat for MLO*/
 	iface_stat->vdev_id = fixed_param->vdev_id;
