@@ -1478,6 +1478,92 @@ static bool put_host_link_stats(struct wifi_host_link_stats *stats,
 	return true;
 }
 
+#ifdef FEATURE_SNR_STATS
+/**
+ * put_wifi_snr_stats() - Pack IPI SNR distribution stats into NL attributes
+ * @if_stat: wifi_interface_stats
+ * @vendor_event: SKB to pack into
+ *
+ * Packs IPI stats as a nested NL attribute under
+ * QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_SNR. Skipped gracefully when
+ * snr_stats->valid is false (firmware sent no IPI TLV).
+ *
+ * Return: true on success, false on failure
+ */
+static bool put_wifi_snr_stats(struct wifi_interface_stats *if_stat,
+			       struct sk_buff *vendor_event)
+{
+	struct nlattr *ipi_attr;
+	struct wifi_snr_stats *snr_stats;
+
+	if (!if_stat || !vendor_event)
+		return false;
+
+	snr_stats = &if_stat->snr_stats;
+	/* Skip gracefully if no IPI data was received from firmware */
+	if (!snr_stats->valid)
+		return true;
+
+	if (snr_stats->num_bins == 0 || snr_stats->meas_dur_us == 0) {
+		hdd_debug("IPI stats empty (bins=%u meas=%u us), skipping",
+			  snr_stats->num_bins, snr_stats->meas_dur_us);
+		return true;
+	}
+
+	ipi_attr = nla_nest_start(vendor_event,
+				  QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_SNR);
+	if (!ipi_attr) {
+		hdd_err("Failed to create IPI nested attribute");
+		return false;
+	}
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_MEAS_DUR_US,
+			snr_stats->meas_dur_us) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_LOWER_BOUND,
+			snr_stats->snr_lower_bound) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_UPPER_BOUND,
+			snr_stats->snr_upper_bound) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_STEP,
+			snr_stats->snr_step) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_BIN_COUNT,
+			snr_stats->num_bins)) {
+		hdd_err("Failed to put IPI config attributes");
+		nla_nest_cancel(vendor_event, ipi_attr);
+		return false;
+	}
+
+	/* Pack bin data as NLA_BINARY (num_bins * sizeof(u32) bytes) */
+	if (nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_BIN_DATA,
+		    snr_stats->num_bins * sizeof(uint32_t),
+		    snr_stats->bin_data)) {
+		hdd_err("Failed to put IPI BIN_DATA (%u bins)",
+			snr_stats->num_bins);
+		nla_nest_cancel(vendor_event, ipi_attr);
+		return false;
+	}
+
+	nla_nest_end(vendor_event, ipi_attr);
+
+	hdd_debug("IPI packed: meas=%u us, snr=[%u,%u) step=%u bins=%u",
+		  snr_stats->meas_dur_us, snr_stats->snr_lower_bound,
+		  snr_stats->snr_upper_bound, snr_stats->snr_step,
+		  snr_stats->num_bins);
+	return true;
+}
+#else
+static bool put_wifi_snr_stats(struct wifi_interface_stats *if_stat,
+			       struct sk_buff *vendor_event)
+{
+	return true;
+}
+#endif
+
 /**
  * put_wifi_iface_stats() - put wifi interface stats
  * @if_stat: Pointer to interface stats context
@@ -1597,6 +1683,10 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 		hdd_err("QCA_WLAN_VENDOR_ATTR put powersave_stat fail");
 		return false;
 	}
+
+	/* Pack IPI SNR distribution stats */
+	if (!put_wifi_snr_stats(if_stat, vendor_event))
+		hdd_debug_rl("Failed to pack IPI stats");
 
 	return true;
 }
@@ -2164,6 +2254,27 @@ exit:
 	wlan_cfg80211_vendor_free_skb(skb);
 }
 
+#ifdef FEATURE_SNR_STATS
+/**
+ * hdd_clear_snr_stats_valid() - Clear SNR stats valid flag for cumulative stats
+ * @if_stat: Pointer to interface stats
+ *
+ * IPI SNR stats are per-channel and cannot be aggregated across MLO links.
+ * Clear valid flag so put_wifi_iface_stats() skips IPI for the cumulative
+ * interface stats entry.
+ *
+ * Return: None
+ */
+static void hdd_clear_snr_stats_valid(struct wifi_interface_stats *if_stat)
+{
+	if_stat->snr_stats.valid = false;
+}
+#else
+static void hdd_clear_snr_stats_valid(struct wifi_interface_stats *if_stat)
+{
+}
+#endif
+
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 /**
  * wlan_hdd_get_iface_stats() - Get ll_iface stats info from link_info
@@ -2330,6 +2441,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("mlo_iface_stats: failed to get bss peer_mld_mac");
 
+	hdd_clear_snr_stats_valid(&cumulative_if_stat);
+
 	if (!put_wifi_iface_stats(&cumulative_if_stat, num_links, skb,
 				  ml_adapter->deflink)) {
 		hdd_err("put_wifi_iface_stats fail");
@@ -2468,6 +2581,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 					       &cumulative_if_stat.info.bssid);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("mlo_iface_stats: failed to get bss peer_mld_mac");
+
+	hdd_clear_snr_stats_valid(&cumulative_if_stat);
 
 	if (!put_wifi_iface_stats(&cumulative_if_stat, num_links, skb,
 				  adapter->deflink)) {
