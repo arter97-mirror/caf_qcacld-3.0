@@ -62,6 +62,7 @@
 #include "wlan_cp_stats_ucfg_api.h"
 #include "wma_api.h"
 #include "wlan_hdd_packet_filter_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 #define MAX_ROAM_COUNT_VALUE (999)
 
@@ -1814,7 +1815,9 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_cm_update_rssi_snr_by_bssid(link_info);
 
-	hdd_add_beacon_filter(hdd_ctx, link_info->vdev_id);
+	if (!mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc,
+						       link_info->vdev))
+		hdd_add_beacon_filter(hdd_ctx, link_info->vdev_id);
 
 	adapter->wapi_info.is_wapi_sta = hdd_cm_is_wapi_sta(
 						sta_ctx->conn_info.auth_type);
@@ -2156,7 +2159,8 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	ucfg_dp_periodic_sta_stats_start(vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev))
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+	    !mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc, vdev))
 		hdd_send_ps_config_to_fw(adapter);
 	hdd_configure_wow_commands(vdev, hdd_ctx);
 	hdd_clear_disconnect_receive(adapter);

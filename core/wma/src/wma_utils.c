@@ -74,6 +74,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "cfg_hif.h"
 #include "wlan_pmo_wow.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 /* MCS Based rate table */
 /* HT MCS parameters with Nss = 1 */
@@ -4908,7 +4909,9 @@ QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	wma_set_vdev_mgmt_rate(wma, vdev_id);
-	if (iface->beacon_filter_enabled)
+	if (iface->beacon_filter_enabled &&
+	    !mlo_mgr_optimized_link_switch_in_progress(wma->psoc,
+						       vdev_mlme->vdev))
 		wma_add_beacon_filter(wma, &iface->beacon_filter);
 
 	return QDF_STATUS_SUCCESS;

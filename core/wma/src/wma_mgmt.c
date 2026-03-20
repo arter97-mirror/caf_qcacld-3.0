@@ -950,7 +950,9 @@ void wma_set_sta_keep_alive(tp_wma_handle wma, uint8_t vdev_id,
 	if (destmac)
 		qdf_mem_copy(params.destmac, destmac, QDF_MAC_ADDR_SIZE);
 
-	wmi_unified_set_sta_keep_alive_cmd(wma->wmi_handle, &params);
+	if (intr && !mlo_mgr_optimized_link_switch_in_progress(wma->psoc,
+							       intr->vdev))
+		wmi_unified_set_sta_keep_alive_cmd(wma->wmi_handle, &params);
 }
 
 /*

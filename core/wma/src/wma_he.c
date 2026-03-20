@@ -27,6 +27,7 @@
 #include "wmi_unified_api.h"
 #include "cds_utils.h"
 #include "wma_internal.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 /**
  * wma_he_ppet_merge() - Merge PPET8 and PPET16 for a given ru and nss
@@ -1306,6 +1307,14 @@ void wma_vdev_set_he_config(tp_wma_handle wma, uint8_t vdev_id,
 {
 	QDF_STATUS ret;
 	int8_t pd_min, pd_max, sec_ch_ed, tx_pwr;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (mlo_mgr_optimized_link_switch_in_progress(wma->psoc, vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		return;
+	}
 
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
 				 wmi_vdev_param_obsspd, add_bss->he_sta_obsspd);
@@ -1317,6 +1326,7 @@ void wma_vdev_set_he_config(tp_wma_handle wma, uint8_t vdev_id,
 	tx_pwr = (add_bss->he_sta_obsspd & 0xff000000) >> 24;
 	wma_debug("HE_STA_OBSSPD: PD_MIN: %d PD_MAX: %d SEC_CH_ED: %d TX_PWR: %d",
 		  pd_min, pd_max, sec_ch_ed, tx_pwr);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 }
 
 QDF_STATUS wma_update_he_ops_ie(tp_wma_handle wma, uint8_t vdev_id,

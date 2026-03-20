@@ -11943,6 +11943,10 @@ void lim_send_obss_color_collision_cfg(struct mac_context *mac_ctx,
 		return;
 	}
 
+	if (mlo_mgr_optimized_link_switch_in_progress(mac_ctx->psoc,
+						      session->vdev))
+		return;
+
 	if (!session->he_capable ||
 	    !session->is_session_obss_color_collision_det_enabled) {
 		pe_debug("%d: obss color det not enabled, he_cap:%d, sup:%d:%d",

@@ -6667,8 +6667,11 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 
 	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
 	sme_vdev_set_data_tx_callback(vdev);
-	ucfg_pmo_del_wow_pattern(vdev);
-	ucfg_pmo_register_wow_default_patterns(vdev);
+
+	if (!mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc, vdev)) {
+		ucfg_pmo_del_wow_pattern(vdev);
+		ucfg_pmo_register_wow_default_patterns(vdev);
+	}
 
 release_ref:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
@@ -18578,8 +18581,8 @@ static void hdd_v2_flow_pool_unmap(int vdev_id)
 	}
 
 	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
-		hdd_info("vdev:%d Link switch is ongoing do not invoke flow pool unmap",
-			 vdev_id);
+		hdd_debug("vdev:%d Link switch is ongoing do not invoke flow pool unmap",
+			  vdev_id);
 		goto release_ref;
 	}
 

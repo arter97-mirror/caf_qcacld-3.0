@@ -102,7 +102,7 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 
 	/* Currently only 1 ll_lt_sap is supported */
 	if (!ll_lt_sap_cnt) {
-		policy_mgr_info("Get ll lt sap vdev from vdev list, as its not yet added in connection table");
+		policy_mgr_debug("Get ll lt sap vdev from vdev list, as its not yet added in connection table");
 		/*
 		 * FW can send req before LL SAP entry is added in table,
 		 * so get active ll SAP vdev from_vdev_list.

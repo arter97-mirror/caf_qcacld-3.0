@@ -4087,35 +4087,43 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 		}
 	}
 
-	qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
-	status = wma_set_tx_rx_aggr_size(vdev_id, qos_aggr->tx_aggregation_size,
-					 qos_aggr->rx_aggregation_size,
-					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("failed to set aggregation sizes(status = %d)", status);
-
-	if (mac_ctx->is_usr_cfg_amsdu_enabled) {
-		status = wlan_mlme_get_max_amsdu_num(wma->psoc, &amsdu_val);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("failed to get amsdu aggr.size(status = %d)",
+	if (!mlo_mgr_optimized_link_switch_in_progress(wma->psoc,
+						       vdev)) {
+		qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
+		status = wma_set_tx_rx_aggr_size(
+					vdev_id,
+					qos_aggr->tx_aggregation_size,
+					qos_aggr->rx_aggregation_size,
+					WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("failed to set aggregation sizes(status = %d)",
 				status);
-		} else {
-			status = wma_set_tx_rx_aggr_size(
-					vdev_id, amsdu_val, amsdu_val,
-					WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
-			if (QDF_IS_STATUS_ERROR(status))
-				wma_err("failed to set amsdu aggr.size(status = %d)",
-					status);
-		}
-	}
 
-	if (mlme_obj->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
-		status = wma_set_tx_rx_aggr_size_per_ac(wma, vdev_id, qos_aggr,
+		if (mac_ctx->is_usr_cfg_amsdu_enabled) {
+			status = wlan_mlme_get_max_amsdu_num(wma->psoc,
+							     &amsdu_val);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				wma_err("failed to get amsdu aggr.size(status = %d)",
+					status);
+			} else {
+				status = wma_set_tx_rx_aggr_size(
+						vdev_id, amsdu_val, amsdu_val,
+						WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
+				if (QDF_IS_STATUS_ERROR(status))
+					wma_err("failed to set amsdu aggr.size(status = %d)",
+						status);
+			}
+		}
+
+		if (mlme_obj->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
+			status = wma_set_tx_rx_aggr_size_per_ac(
+					wma, vdev_id, qos_aggr,
 					WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
 
-		if (QDF_IS_STATUS_ERROR(status))
-			wma_err("failed to set aggr size per ac(status = %d)",
-				status);
+			if (QDF_IS_STATUS_ERROR(status))
+				wma_err("failed to set aggr size per ac(status = %d)",
+					status);
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -5093,7 +5101,8 @@ QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
 	}
 
 	iface->rmfEnabled = add_bss->rmfEnabled;
-	if (add_bss->rmfEnabled)
+	if (add_bss->rmfEnabled &&
+	    !mlo_mgr_optimized_link_switch_in_progress(wma->psoc, iface->vdev))
 		wma_set_mgmt_frame_protection(wma);
 
 	return status;
@@ -6302,25 +6311,30 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 		wma_err("Failed to bss params");
 	}
 
-	params->csaOffloadEnable = 0;
-	if (wmi_service_enabled(wma->wmi_handle,
-				   wmi_service_csa_offload)) {
-		params->csaOffloadEnable = 1;
+	if (!mlo_mgr_optimized_link_switch_in_progress(wma->psoc,
+						       iface->vdev)) {
+		wma_send_bss_color_change_enable(wma, params);
+		params->csaOffloadEnable = 0;
+		if (wmi_service_enabled(wma->wmi_handle,
+					wmi_service_csa_offload)) {
+			params->csaOffloadEnable = 1;
 		if (wma_unified_csa_offload_enable(wma, params->smesessionId) <
-		    0) {
+		    0)
 			wma_err("Unable to enable CSA offload for vdev_id:%d",
 				params->smesessionId);
 		}
-	}
 
-	if (wmi_service_enabled(wma->wmi_handle,
+		if (wmi_service_enabled(
+				wma->wmi_handle,
 				wmi_service_filter_ipsec_natkeepalive)) {
-		if (wmi_unified_nat_keepalive_en_cmd(wma->wmi_handle,
-						     params->smesessionId)) {
-			wma_err("Unable to enable NAT keepalive for vdev_id:%d",
-				params->smesessionId);
+			if (wmi_unified_nat_keepalive_en_cmd(
+							wma->wmi_handle,
+							params->smesessionId))
+				wma_err("Unable to enable NAT keepalive for vdev_id:%d",
+					params->smesessionId);
 		}
 	}
+
 	qdf_atomic_set(&iface->bss_status, WMA_BSS_STATUS_STARTED);
 	/* Sta is now associated, configure various params */
 
@@ -6341,8 +6355,6 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 				smps_param);
 		}
 	}
-
-	wma_send_bss_color_change_enable(wma, params);
 
 	/* Partial AID match power save, enable when SU bformee */
 	if (params->enableVhtpAid && params->vhtTxBFCapable)
