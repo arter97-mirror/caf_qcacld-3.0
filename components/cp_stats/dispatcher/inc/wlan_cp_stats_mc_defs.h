@@ -248,8 +248,9 @@ struct medium_assess_data {
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
- *     station stats/mib stats/peer stats/coex policy stats request when
- *     response comes and congestion notification callback.
+ *     station stats/mib stats/peer stats/coex policy stats/
+ *     power datapath stats request when response comes and congestion
+ *     notification callback.
  * @vdev_id: vdev_id of request
  * @pdev_id: pdev_id of request
  * @peer_mac_addr: peer mac address
@@ -284,6 +285,11 @@ struct request_info {
 #ifdef WLAN_FEATURE_QSH_SCAN
 		void (*get_qsh_stats_cb)(struct qsh_stats_event *ev,
 					 void *cookie);
+#endif
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+		void (*get_power_stats_cb)(
+			struct cp_stats_power_datapath_info *ev,
+			void *cookie);
 #endif
 	} u;
 	uint32_t vdev_id;
@@ -443,7 +449,7 @@ struct cp_stats_power_info {
 };
 
 /**
- * struct cp_stats_tx_rate_info - CP stats TX rate information
+ * struct cp_stats_tx_rate_info - CP stats TX rate info
  * @core_index: Core index
  * @rate_index: Rate index
  * @band: Band (2.4GHz/5GHz/6GHz)
@@ -463,25 +469,49 @@ struct cp_stats_tx_rate_info {
 };
 
 /**
+ * struct cp_stats_rx_rate_info - CP stats RX rate info
+ * @core_index: Core index
+ * @rate_index: Rate index
+ * @band: Band (2.4GHz/5GHz/6GHz)
+ * @bw: Bandwidth
+ * @nss: Number of spatial streams
+ * @count: Packet count
+ */
+struct cp_stats_rx_rate_info {
+	uint32_t core_index;
+	uint32_t rate_index;
+	uint32_t band;
+	uint32_t bw;
+	uint32_t nss;
+	uint32_t count;
+};
+
+/**
  * struct cp_stats_power_datapath_info - CP stats power and datapath info
  * @status: Status from firmware (0 = success, non-zero = error)
  * @stats_type_bitmap: Stats type bitmap indicating which stats are included
  * @num_power_stats: Number of power stats entries (num_cores)
  * @num_tx_rate_stats: Number of TX rate stats entries
+ * @num_rx_rate_stats: Number of RX rate stats entries
  * @power_stats: Power statistics array (dynamically allocated)
  * @power_stats_valid: Indicates if power_stats is valid
  * @tx_rate_stats: TX rate statistics array (dynamically allocated)
  * @tx_rate_stats_valid: Indicates if tx_rate_stats is valid
+ * @rx_rate_stats: RX rate statistics array (dynamically allocated)
+ * @rx_rate_stats_valid: Indicates if rx_rate_stats is valid
  */
 struct cp_stats_power_datapath_info {
 	uint32_t status;
 	uint32_t stats_type_bitmap;
 	uint32_t num_power_stats;
 	uint32_t num_tx_rate_stats;
+	uint32_t num_rx_rate_stats;
 	struct cp_stats_power_info *power_stats;
 	bool power_stats_valid;
 	struct cp_stats_tx_rate_info *tx_rate_stats;
 	bool tx_rate_stats_valid;
+	struct cp_stats_rx_rate_info *rx_rate_stats;
+	bool rx_rate_stats_valid;
 };
 #endif
 

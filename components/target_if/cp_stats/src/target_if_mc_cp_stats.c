@@ -1323,6 +1323,8 @@ target_if_mc_cp_stats_power_datapath_stats_event_handler(
 	}
 
 	status = rx_ops->process_power_datapath_stats_event(psoc, &ev);
+	if (QDF_IS_STATUS_ERROR(status))
+		cp_stats_err("process event failed");
 
 end:
 	/* Free allocated memory for power stats array */
@@ -1335,6 +1337,12 @@ end:
 	if (ev.tx_rate_stats) {
 		qdf_mem_free(ev.tx_rate_stats);
 		ev.tx_rate_stats = NULL;
+	}
+
+	/* Free allocated memory for RX rate stats array */
+	if (ev.rx_rate_stats) {
+		qdf_mem_free(ev.rx_rate_stats);
+		ev.rx_rate_stats = NULL;
 	}
 
 	return qdf_status_to_os_return(status);

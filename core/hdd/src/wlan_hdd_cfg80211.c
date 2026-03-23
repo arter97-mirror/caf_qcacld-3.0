@@ -236,6 +236,10 @@
 #include "wlan_hdd_dcs.h"
 #include <wlan_mlo_mgr_public_api.h>
 #include <wlan_tdls_api.h>
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+#include "android_vendor.h"
+#include <wlan_cp_stats_mc_ucfg_api.h>
+#endif
 
 #ifdef WLAN_FEATURE_NAN
 #include "wlan_nan_api.h"
@@ -276,6 +280,28 @@
  * Android CTS verifier needs atleast this much wait time (in msec)
  */
 #define MAX_REMAIN_ON_CHANNEL_DURATION (2000)
+
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * POWER_STATS_MAX_SKB_SIZE - Maximum SKB size for power stats response
+ */
+#define POWER_STATS_MAX_SKB_SIZE 8192
+
+/**
+ * POWER_STATS_TIMEOUT - Timeout for firmware response (milliseconds)
+ */
+#define POWER_STATS_TIMEOUT 300
+
+/* Power datapath operation type */
+#define POWER_DP_OPERATION_RETRIEVE  2
+
+/* Power datapath stats type bitmask */
+#define POWER_DP_STATS_TYPE_ALL 0x03
+
+/* Power datapath core index */
+#define POWER_DP_CORE_INDEX_ALL 0xFF
+
+#endif /* WLAN_FEATURE_POWER_STATISTICS */
 
 #define HDD2GHZCHAN(freq, chan, flag)   {     \
 		.band = HDD_NL80211_BAND_2GHZ, \
@@ -26152,6 +26178,621 @@ static int wlan_hdd_cfg80211_qsh_get_stats(struct wiphy *wiphy,
 }
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * pack_rx_rate_stats_struct() - Pack RX rate stats with Flexible Array Member
+ * @skb: sk_buff to pack data into
+ * @cp_stats: CP stats data from firmware
+ *
+ * Handles wifi_rx_rate_stats which has FAM (rates[]).
+ * RX rate stats from firmware are a flat array with core_index field.
+ * This function groups them by core and sends one wifi_rx_rate_stats struct
+ * per core.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int pack_rx_rate_stats_struct(
+	struct sk_buff *skb,
+	struct cp_stats_power_datapath_info *cp_stats)
+{
+	uint8_t *buf, *ptr;
+	wifi_rx_rate_stats *rx_stats;
+	size_t total_size, core_size;
+	uint8_t current_core;
+	int i, rate_idx, total_rates;
+	int ret;
+
+	/* Validate RX rate stats are present */
+	if (!cp_stats->rx_rate_stats_valid || !cp_stats->rx_rate_stats) {
+		hdd_debug("RX rate stats not valid");
+		return 0;  /* Not an error, just no data */
+	}
+
+	/* Calculate total buffer size across all cores */
+	total_size = 0;
+	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	     current_core++) {
+		total_rates = 0;
+		for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
+			if (cp_stats->rx_rate_stats[i].core_index ==
+			    current_core)
+				total_rates++;
+		}
+		if (total_rates > 0)
+			total_size += sizeof(wifi_rx_rate_stats) +
+				      (sizeof(wifi_rate_info) * total_rates);
+	}
+
+	if (total_size == 0)
+		return 0;
+
+	/* Allocate single buffer for all cores */
+	buf = qdf_mem_malloc(total_size);
+	if (!buf) {
+		hdd_err("Failed to allocate RX rate stats buffer");
+		return -ENOMEM;
+	}
+
+	/* Fill each core's data sequentially */
+	ptr = buf;
+	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	     current_core++) {
+		total_rates = 0;
+		for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
+			if (cp_stats->rx_rate_stats[i].core_index ==
+			    current_core)
+				total_rates++;
+		}
+
+		if (total_rates == 0)
+			continue;
+
+		rx_stats = (wifi_rx_rate_stats *)ptr;
+		rx_stats->core_index = current_core;
+		rx_stats->num_rates = total_rates;
+
+		rate_idx = 0;
+		for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
+			if (cp_stats->rx_rate_stats[i].core_index !=
+			    current_core)
+				continue;
+
+			rx_stats->rates[rate_idx].rate_index =
+				cp_stats->rx_rate_stats[i].rate_index;
+			rx_stats->rates[rate_idx].band =
+				cp_stats->rx_rate_stats[i].band;
+			rx_stats->rates[rate_idx].bw =
+				cp_stats->rx_rate_stats[i].bw;
+			rx_stats->rates[rate_idx].nss =
+				cp_stats->rx_rate_stats[i].nss;
+			rx_stats->rates[rate_idx].count =
+				cp_stats->rx_rate_stats[i].count;
+			rate_idx++;
+		}
+
+		core_size = sizeof(wifi_rx_rate_stats) +
+			    (sizeof(wifi_rate_info) * total_rates);
+		ptr += core_size;
+
+		hdd_debug("Packed RX rate stats for core %d: %d rates",
+			  current_core, total_rates);
+	}
+
+	/* Put all cores' RX rate stats as a single binary blob */
+	ret = nla_put(skb, POWER_STATS_ATTRIBUTE_RX_RATE_INFO,
+		      total_size, buf);
+	qdf_mem_free(buf);
+
+	if (ret)
+		hdd_err("Failed to put RX rate stats: %d", ret);
+
+	return ret;
+}
+
+/**
+ * pack_tx_rate_stats_struct() - Pack TX rate stats with Flexible Array Member
+ * @skb: sk_buff to pack data into
+ * @cp_stats: CP stats data from firmware
+ *
+ * Handles wifi_tx_rate_stats which has FAM (rates[]).
+ * TX rate stats from firmware are a flat array with core_index field.
+ * This function groups them by core and sends one wifi_tx_rate_stats struct
+ * per core.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int pack_tx_rate_stats_struct(
+	struct sk_buff *skb,
+	struct cp_stats_power_datapath_info *cp_stats)
+{
+	uint8_t *buf, *ptr;
+	wifi_tx_rate_stats *tx_stats;
+	size_t total_size, core_size;
+	uint8_t current_core;
+	int i, rate_idx, total_rates;
+	int ret;
+
+	/* Validate TX rate stats are present */
+	if (!cp_stats->tx_rate_stats_valid || !cp_stats->tx_rate_stats) {
+		hdd_debug("TX rate stats not valid");
+		return 0;  /* Not an error, just no data */
+	}
+
+	/* Calculate total buffer size across all cores */
+	total_size = 0;
+	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	     current_core++) {
+		total_rates = 0;
+		for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
+			if (cp_stats->tx_rate_stats[i].core_index ==
+			    current_core)
+				total_rates++;
+		}
+		if (total_rates > 0)
+			total_size += sizeof(wifi_tx_rate_stats) +
+				      (sizeof(wifi_rate_info) * total_rates);
+	}
+
+	if (total_size == 0)
+		return 0;
+
+	/* Allocate single buffer for all cores */
+	buf = qdf_mem_malloc(total_size);
+	if (!buf) {
+		hdd_err("Failed to allocate TX rate stats buffer");
+		return -ENOMEM;
+	}
+
+	/* Fill each core's data sequentially */
+	ptr = buf;
+	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	     current_core++) {
+		total_rates = 0;
+		for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
+			if (cp_stats->tx_rate_stats[i].core_index ==
+			    current_core)
+				total_rates++;
+		}
+
+		if (total_rates == 0)
+			continue;
+
+		tx_stats = (wifi_tx_rate_stats *)ptr;
+		tx_stats->core_index = current_core;
+		tx_stats->num_rates = total_rates;
+
+		rate_idx = 0;
+		for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
+			if (cp_stats->tx_rate_stats[i].core_index !=
+			    current_core)
+				continue;
+
+			tx_stats->rates[rate_idx].rate_index =
+				cp_stats->tx_rate_stats[i].rate_index;
+			tx_stats->rates[rate_idx].band =
+				cp_stats->tx_rate_stats[i].band;
+			tx_stats->rates[rate_idx].bw =
+				cp_stats->tx_rate_stats[i].bw;
+			tx_stats->rates[rate_idx].nss =
+				cp_stats->tx_rate_stats[i].nss;
+			tx_stats->rates[rate_idx].count =
+				cp_stats->tx_rate_stats[i].count;
+			rate_idx++;
+		}
+
+		core_size = sizeof(wifi_tx_rate_stats) +
+			    (sizeof(wifi_rate_info) * total_rates);
+		ptr += core_size;
+
+		hdd_debug("Packed TX rate stats for core %d: %d rates",
+			  current_core, total_rates);
+	}
+
+	/* Put all cores' TX rate stats as a single binary blob */
+	ret = nla_put(skb, POWER_STATS_ATTRIBUTE_TX_RATE_INFO,
+		      total_size, buf);
+	qdf_mem_free(buf);
+
+	if (ret)
+		hdd_err("Failed to put TX rate stats: %d", ret);
+
+	return ret;
+}
+
+/**
+ * pack_power_stats_struct_based() - Pack power stats as binary structs
+ * @skb: sk_buff to pack data into
+ * @cp_stats: CP stats data from firmware
+ *
+ * Fills customer's struct definitions and sends as binary blobs.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int pack_power_stats_struct_based(
+	struct sk_buff *skb,
+	struct cp_stats_power_datapath_info *cp_stats)
+{
+	wifi_core_radio_stats radio_stats[POWER_STATS_MAX_NUM_CORES];
+	wifi_chip_power_state chip_stats[POWER_STATS_MAX_NUM_CORES];
+	int ret, i;
+
+	/* Validate power stats are present */
+	if (!cp_stats->power_stats_valid || !cp_stats->power_stats) {
+		hdd_err("Power stats not valid");
+		return -EINVAL;
+	}
+
+	/* Validate num_power_stats */
+	if (cp_stats->num_power_stats > POWER_STATS_MAX_NUM_CORES) {
+		hdd_err("Invalid num_power_stats: %d",
+			cp_stats->num_power_stats);
+		return -EINVAL;
+	}
+
+	/* Put num cores */
+	ret = nla_put_u32(skb, POWER_STATS_ATTRIBUTE_NUM_WIFI_CORE,
+			  cp_stats->num_power_stats);
+	if (ret) {
+		hdd_err("Failed to put num_cores: %d", ret);
+		return ret;
+	}
+
+	/* Fill and pack radio stats per core */
+	qdf_mem_zero(radio_stats, sizeof(radio_stats));
+	for (i = 0; i < cp_stats->num_power_stats; i++) {
+		radio_stats[i].core_index =
+			cp_stats->power_stats[i].core_index;
+		radio_stats[i].radio_on_time =
+			cp_stats->power_stats[i].radio_on_time;
+		radio_stats[i].tx_time =
+			cp_stats->power_stats[i].tx_time;
+		radio_stats[i].rx_time =
+			cp_stats->power_stats[i].rx_time;
+		radio_stats[i].rx_listening_levels_num = 0;
+		/* rx_listening_time_per_levels already zeroed */
+	}
+
+	/* Put all cores' radio stats as a single binary blob */
+	ret = nla_put(skb, POWER_STATS_ATTRIBUTE_RADIO_STATS,
+		      sizeof(wifi_core_radio_stats) * cp_stats->num_power_stats,
+		      radio_stats);
+	if (ret) {
+		hdd_err("Failed to put radio_stats: %d", ret);
+		return ret;
+	}
+
+	/* Pack TX rate stats */
+	ret = pack_tx_rate_stats_struct(skb, cp_stats);
+	if (ret) {
+		hdd_err("Failed to pack TX rate stats");
+		return ret;
+	}
+
+	/* Pack RX rate stats */
+	ret = pack_rx_rate_stats_struct(skb, cp_stats);
+	if (ret) {
+		hdd_err("Failed to pack RX rate stats");
+		return ret;
+	}
+
+	/* Fill chip power stats per core */
+	qdf_mem_zero(chip_stats, sizeof(chip_stats));
+	for (i = 0; i < cp_stats->num_power_stats; i++) {
+		chip_stats[i].wlan_pwr_on_time =
+			cp_stats->power_stats[i].wlan_pwr_on_time;
+		chip_stats[i].sleep_levels_num =
+			cp_stats->power_stats[i].sleep_levels_num;
+
+		if (chip_stats[i].sleep_levels_num >
+		    POWER_STATS_MAX_NUM_SLEEP_LEVELS) {
+			hdd_warn("core[%d] Truncating sleep_levels_num from %d to %d",
+				 i, chip_stats[i].sleep_levels_num,
+				 POWER_STATS_MAX_NUM_SLEEP_LEVELS);
+			chip_stats[i].sleep_levels_num =
+				POWER_STATS_MAX_NUM_SLEEP_LEVELS;
+		}
+
+		qdf_mem_copy(chip_stats[i].sleep_time_per_levels,
+			     cp_stats->power_stats[i].sleep_time_per_levels,
+			     sizeof(__u32) * chip_stats[i].sleep_levels_num);
+	}
+
+	/* Put chip power stats as binary blob (all cores) */
+	ret = nla_put(skb, POWER_STATS_ATTRIBUTE_CHIP_POWER_STATS,
+		      sizeof(wifi_chip_power_state) * cp_stats->num_power_stats,
+		      chip_stats);
+	if (ret) {
+		hdd_err("Failed to put chip_power_stats: %d", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * struct power_stats_priv - Private data for power stats osif_request
+ * @stats: deep copy of the power datapath stats event
+ */
+struct power_stats_priv {
+	struct cp_stats_power_datapath_info stats;
+};
+
+/**
+ * power_stats_dealloc() - Dealloc callback for power stats osif_request
+ * @priv: pointer to power_stats_priv
+ *
+ * Frees dynamically allocated arrays inside the stats copy.
+ */
+static void power_stats_dealloc(void *priv)
+{
+	struct power_stats_priv *ps_priv = priv;
+
+	qdf_mem_free(ps_priv->stats.power_stats);
+	ps_priv->stats.power_stats = NULL;
+	qdf_mem_free(ps_priv->stats.tx_rate_stats);
+	ps_priv->stats.tx_rate_stats = NULL;
+	qdf_mem_free(ps_priv->stats.rx_rate_stats);
+	ps_priv->stats.rx_rate_stats = NULL;
+}
+
+/**
+ * power_stats_cb() - Callback invoked when power stats event arrives
+ * @event: power datapath stats from firmware
+ * @cookie: osif_request cookie
+ *
+ * Deep-copies the event data into the osif_request private area and
+ * signals the waiting thread.
+ */
+static void power_stats_cb(struct cp_stats_power_datapath_info *event,
+			   void *cookie)
+{
+	struct osif_request *request;
+	struct power_stats_priv *priv;
+	size_t sz;
+
+	request = osif_request_get(cookie);
+	if (!request) {
+		hdd_err("Obsolete power stats request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+
+	/* Shallow copy first, then fix up pointers */
+	priv->stats = *event;
+
+	/* Deep-copy power_stats array */
+	if (event->power_stats && event->num_power_stats > 0) {
+		sz = sizeof(*event->power_stats) * event->num_power_stats;
+		priv->stats.power_stats = qdf_mem_malloc(sz);
+		if (priv->stats.power_stats)
+			qdf_mem_copy(priv->stats.power_stats,
+				     event->power_stats, sz);
+		else
+			priv->stats.num_power_stats = 0;
+	} else {
+		priv->stats.power_stats = NULL;
+	}
+
+	/* Deep-copy tx_rate_stats array */
+	if (event->tx_rate_stats && event->num_tx_rate_stats > 0) {
+		sz = sizeof(*event->tx_rate_stats) * event->num_tx_rate_stats;
+		priv->stats.tx_rate_stats = qdf_mem_malloc(sz);
+		if (priv->stats.tx_rate_stats)
+			qdf_mem_copy(priv->stats.tx_rate_stats,
+				     event->tx_rate_stats, sz);
+		else
+			priv->stats.num_tx_rate_stats = 0;
+	} else {
+		priv->stats.tx_rate_stats = NULL;
+	}
+
+	/* Deep-copy rx_rate_stats array */
+	if (event->rx_rate_stats && event->num_rx_rate_stats > 0) {
+		sz = sizeof(*event->rx_rate_stats) * event->num_rx_rate_stats;
+		priv->stats.rx_rate_stats = qdf_mem_malloc(sz);
+		if (priv->stats.rx_rate_stats)
+			qdf_mem_copy(priv->stats.rx_rate_stats,
+				     event->rx_rate_stats, sz);
+		else
+			priv->stats.num_rx_rate_stats = 0;
+	} else {
+		priv->stats.rx_rate_stats = NULL;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+/**
+ * __wlan_hdd_cfg80211_get_power_stats() - Get power stats from firmware
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data (unused)
+ * @data_len: vendor command data length (unused)
+ *
+ * This is the main vendor command handler that:
+ * 1. Requests power stats from firmware via
+ *    wlan_cp_stats_get_power_datapath_info()
+ * 2. Waits for firmware response with timeout
+ * 3. Packs stats into customer's binary struct format
+ * 4. Sends response back to userspace
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int __wlan_hdd_cfg80211_get_power_stats(
+	struct wiphy *wiphy,
+	struct wireless_dev *wdev,
+	const void *data,
+	int data_len)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct sk_buff *skb = NULL;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
+	struct request_info info = {0};
+	struct osif_request *request;
+	struct power_stats_priv *priv;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = POWER_STATS_TIMEOUT,
+		.dealloc = power_stats_dealloc,
+	};
+	void *cookie;
+	int ret;
+	QDF_STATUS status;
+
+	hdd_enter();
+
+	/* Validate HDD context */
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	/* Validate wdev and netdev */
+	if (!wdev || !wdev->netdev) {
+		hdd_err("Invalid wdev or netdev");
+		return -EINVAL;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+
+	/* Validate adapter */
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+
+	/* Get vdev from adapter */
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CP_STATS_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_err("Failed to get pdev");
+		ret = -EINVAL;
+		goto release_vdev;
+	}
+
+	/* Allocate osif_request to track this async operation */
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Failed to allocate osif_request");
+		ret = -ENOMEM;
+		goto release_vdev;
+	}
+	cookie = osif_request_cookie(request);
+
+	/* Set callback and cookie in request_info for event handler */
+	info.cookie = cookie;
+	info.u.get_power_stats_cb = power_stats_cb;
+	info.vdev_id = wlan_vdev_get_id(vdev);
+	info.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	info.power_dp_operation = POWER_DP_OPERATION_RETRIEVE;
+	info.power_dp_stats_type = POWER_DP_STATS_TYPE_ALL;
+	info.power_dp_core_index = POWER_DP_CORE_INDEX_ALL;
+
+	hdd_debug("Requesting power stats from firmware");
+	status =
+	ucfg_send_power_datapath_stats_request(vdev,
+					       TYPE_POWER_DATAPATH_STATS,
+					       &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send power stats request: %d", status);
+		ret = -EIO;
+		goto put_request;
+	}
+
+	/* Wait for firmware response (osif_request handles timeout) */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		hdd_err("Timeout waiting for power stats response");
+		goto put_request;
+	}
+
+	priv = osif_request_priv(request);
+
+	/* Validate firmware provided stats */
+	if (!priv->stats.power_stats_valid ||
+	    !priv->stats.tx_rate_stats_valid ||
+	    !priv->stats.rx_rate_stats_valid) {
+		hdd_err("Firmware did not provide valid power stats");
+		ret = -EINVAL;
+		goto put_request;
+	}
+
+	hdd_debug("Received power stats: num_cores=%d, num_tx_rates=%d, num_rx_rates=%d",
+		  priv->stats.num_power_stats, priv->stats.num_tx_rate_stats,
+		  priv->stats.num_rx_rate_stats);
+
+	/* Allocate SKB for response */
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
+						  POWER_STATS_MAX_SKB_SIZE);
+	if (!skb) {
+		hdd_err("Failed to allocate SKB");
+		ret = -ENOMEM;
+		goto put_request;
+	}
+
+	/* Pack stats into customer's binary struct format */
+	ret = pack_power_stats_struct_based(skb, &priv->stats);
+	if (ret) {
+		hdd_err("Failed to pack power stats: %d", ret);
+		kfree_skb(skb);
+		goto put_request;
+	}
+
+	/* Send response to userspace */
+	ret = cfg80211_vendor_cmd_reply(skb);
+	if (ret)
+		hdd_err("Failed to send vendor command reply: %d", ret);
+
+put_request:
+	osif_request_put(request);
+release_vdev:
+	/* Release vdev reference */
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CP_STATS_ID);
+
+	hdd_exit();
+	return ret;
+}
+
+/* wlan_hdd_cfg80211_get_power_stats() - Wrapper with SSR protection
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data
+ * @data_len: vendor command data length
+ *
+ * Wrapper function that provides SSR protection around the main handler.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wlan_hdd_cfg80211_get_power_stats(
+	struct wiphy *wiphy,
+	struct wireless_dev *wdev,
+	const void *data,
+	int data_len)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_power_stats(wiphy, wdev,
+						    data, data_len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
+}
+#endif /* WLAN_FEATURE_POWER_STATISTICS */
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -26180,6 +26821,17 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
 			 WIPHY_VENDOR_CMD_NEED_NETDEV | WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_stats_ext_request,
+		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
+	},
+#endif
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+	{
+		.info.vendor_id = ANDROID_OUI,
+		.info.subcmd = ANDROID_NL80211_SUBCMD_GET_PWRSTATS,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_get_power_stats,
 		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
 	},
 #endif

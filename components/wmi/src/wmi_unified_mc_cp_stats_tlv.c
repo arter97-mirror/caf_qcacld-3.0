@@ -584,7 +584,7 @@ extract_big_data_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 #ifdef WLAN_FEATURE_POWER_STATISTICS
 /* Maximum entries based on hardware constraints */
 #define WMI_MAX_POWER_STATS_ENTRIES     10  /* Max pdevs + buffer */
-#define WMI_MAX_TX_RATE_STATS_ENTRIES   20  /* Max rates + buffer */
+#define WMI_MAX_TX_RATE_STATS_ENTRIES   50  /* Max rates + buffer */
 
 /**
  * extract_power_datapath_stats_event_tlv() - Extract power/datapath stats event
@@ -607,6 +607,7 @@ extract_power_datapath_stats_event_tlv(
 	wmi_pdev_power_datapath_stats_event_fixed_param *ev;
 	wmi_pdev_power_stats_info *power_stats_tlv;
 	wmi_pdev_tx_rate_info *tx_rate_stats_tlv;
+	uint32_t tx_idx = 0, rx_idx = 0;
 	uint32_t i;
 
 	if (!evt_buf || !event) {
@@ -692,7 +693,9 @@ extract_power_datapath_stats_event_tlv(
 		wmi_debug("No power stats in event");
 	}
 
-	/* Extract tx rate stats if present */
+	/* Extract tx/rx rate stats - FW sends RX stats with
+	 * retry_count=0xFFFFFFFF
+	 */
 	tx_rate_stats_tlv = param_buf->tx_rate_stats;
 	if (param_buf->num_tx_rate_stats > WMI_MAX_TX_RATE_STATS_ENTRIES) {
 		wmi_err("num_tx_rate_stats too large: %u (max: %u)",
@@ -706,55 +709,127 @@ extract_power_datapath_stats_event_tlv(
 			event->power_stats_valid = false;
 		}
 		event->num_tx_rate_stats = 0;
+		event->num_rx_rate_stats = 0;
 		event->tx_rate_stats_valid = false;
+		event->tx_rate_stats = NULL;
+		event->rx_rate_stats_valid = false;
+		event->rx_rate_stats = NULL;
 		return QDF_STATUS_E_INVAL;
 	}
-	event->num_tx_rate_stats = param_buf->num_tx_rate_stats;
 
 	if (tx_rate_stats_tlv && param_buf->num_tx_rate_stats > 0) {
-		event->tx_rate_stats =
-			qdf_mem_malloc(sizeof(struct cp_stats_tx_rate_info) *
-				       param_buf->num_tx_rate_stats);
+		/* Count TX vs RX entries */
+		for (i = 0; i < param_buf->num_tx_rate_stats; i++) {
+			if (tx_rate_stats_tlv[i].tx_retry_count == 0xFFFFFFFF)
+				rx_idx++;  /* RX stats - FW workaround */
+			else
+				tx_idx++;  /* TX stats */
+		}
 
-		if (!event->tx_rate_stats) {
-			wmi_err("Failed to allocate memory for tx rate stats");
-			/* Complete cleanup with proper state reset */
+		wmi_debug("Counted %u tx and %u rx rate stats entries",
+			  tx_idx, rx_idx);
+
+		/* Allocate exact sizes needed */
+		if (tx_idx > 0) {
+			event->tx_rate_stats =
+			qdf_mem_malloc(sizeof(struct cp_stats_tx_rate_info) *
+					       tx_idx);
+		}
+
+		if (rx_idx > 0) {
+			event->rx_rate_stats =
+			qdf_mem_malloc(sizeof(struct cp_stats_rx_rate_info) *
+					       rx_idx);
+		}
+
+		/* Check if any allocation failed */
+		if ((tx_idx > 0 && !event->tx_rate_stats) ||
+		    (rx_idx > 0 && !event->rx_rate_stats)) {
+			wmi_err("Failed to allocate memory for rate stats (tx_count=%u, rx_count=%u)",
+				tx_idx, rx_idx);
+
+			/* Cleanup all allocated memory */
+			if (event->tx_rate_stats) {
+				qdf_mem_free(event->tx_rate_stats);
+				event->tx_rate_stats = NULL;
+			}
+			if (event->rx_rate_stats) {
+				qdf_mem_free(event->rx_rate_stats);
+				event->rx_rate_stats = NULL;
+			}
 			if (event->power_stats) {
 				qdf_mem_free(event->power_stats);
 				event->power_stats = NULL;
 				event->num_power_stats = 0;
 				event->power_stats_valid = false;
 			}
+
 			event->num_tx_rate_stats = 0;
+			event->num_rx_rate_stats = 0;
 			event->tx_rate_stats_valid = false;
 			event->tx_rate_stats = NULL;
+			event->rx_rate_stats_valid = false;
+			event->rx_rate_stats = NULL;
 			return QDF_STATUS_E_NOMEM;
 		}
 
+		/* Copy stats into tx or rx rate stats based on
+		 * retry count
+		 */
+		tx_idx = 0;
+		rx_idx = 0;
 		for (i = 0; i < param_buf->num_tx_rate_stats; i++) {
-			event->tx_rate_stats[i].core_index =
-				tx_rate_stats_tlv[i].core_index;
-			event->tx_rate_stats[i].rate_index =
-				tx_rate_stats_tlv[i].rate_index;
-			event->tx_rate_stats[i].band =
-				tx_rate_stats_tlv[i].band;
-			event->tx_rate_stats[i].bw =
-				tx_rate_stats_tlv[i].bw;
-			event->tx_rate_stats[i].nss =
-				tx_rate_stats_tlv[i].nss;
-			event->tx_rate_stats[i].count =
-				tx_rate_stats_tlv[i].count;
-			event->tx_rate_stats[i].tx_retry_count =
-				tx_rate_stats_tlv[i].tx_retry_count;
+			if (tx_rate_stats_tlv[i].tx_retry_count == 0xFFFFFFFF) {
+				/* RX stats - FW workaround */
+				event->rx_rate_stats[rx_idx].core_index =
+					tx_rate_stats_tlv[i].core_index;
+				event->rx_rate_stats[rx_idx].rate_index =
+					tx_rate_stats_tlv[i].rate_index;
+				event->rx_rate_stats[rx_idx].band =
+					tx_rate_stats_tlv[i].band;
+				event->rx_rate_stats[rx_idx].bw =
+					tx_rate_stats_tlv[i].bw;
+				event->rx_rate_stats[rx_idx].nss =
+					tx_rate_stats_tlv[i].nss;
+				event->rx_rate_stats[rx_idx].count =
+					tx_rate_stats_tlv[i].count;
+				rx_idx++;
+			} else {
+				/* TX stats */
+				event->tx_rate_stats[tx_idx].core_index =
+					tx_rate_stats_tlv[i].core_index;
+				event->tx_rate_stats[tx_idx].rate_index =
+					tx_rate_stats_tlv[i].rate_index;
+				event->tx_rate_stats[tx_idx].band =
+					tx_rate_stats_tlv[i].band;
+				event->tx_rate_stats[tx_idx].bw =
+					tx_rate_stats_tlv[i].bw;
+				event->tx_rate_stats[tx_idx].nss =
+					tx_rate_stats_tlv[i].nss;
+				event->tx_rate_stats[tx_idx].count =
+					tx_rate_stats_tlv[i].count;
+				event->tx_rate_stats[tx_idx].tx_retry_count =
+					tx_rate_stats_tlv[i].tx_retry_count;
+				tx_idx++;
+			}
 		}
 
-		event->tx_rate_stats_valid = true;
-		wmi_debug("Extracted %d tx rate stats entries",
-			  param_buf->num_tx_rate_stats);
+		/* Set actual counts */
+		event->num_tx_rate_stats = tx_idx;
+		event->num_rx_rate_stats = rx_idx;
+		event->tx_rate_stats_valid = (tx_idx > 0) ? true : false;
+		event->rx_rate_stats_valid = (rx_idx > 0) ? true : false;
+
+		wmi_debug("Extracted %d tx and %d rx rate stats entries",
+			  tx_idx, rx_idx);
 	} else {
 		event->tx_rate_stats = NULL;
+		event->rx_rate_stats = NULL;
+		event->num_tx_rate_stats = 0;
+		event->num_rx_rate_stats = 0;
 		event->tx_rate_stats_valid = false;
-		wmi_debug("No tx rate stats in event");
+		event->rx_rate_stats_valid = false;
+		wmi_debug("No rate stats in event");
 	}
 
 	return QDF_STATUS_SUCCESS;
