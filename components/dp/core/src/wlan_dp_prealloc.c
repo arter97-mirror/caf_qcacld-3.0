@@ -41,10 +41,6 @@
 #ifdef WLAN_DP_FEATURE_STC
 #include "wlan_dp_stc.h"
 #endif
-#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
-#include "pld_common.h"
-#endif
-
 #ifdef CONFIG_BORON
 #define REO_GET_QUEUE_STATS_STATUS_SZ 0
 #else
@@ -492,10 +488,6 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	 TX_DIRECT_LINK_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
 	{QDF_DP_RX_DIRECT_LINK_CE_BUF_TYPE, DIRECT_LINK_CE_RX_BUF_SIZE,
 	 RX_DIRECT_LINK_CE_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
-#endif
-#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
-	{QDF_DP_RX_IPA_MAP_REFCNT_TYPE, sizeof(struct dp_rx_pp_ipa_map_cntr),
-	 0, 0, CACHEABLE, { 0 } },
 #endif
 };
 
@@ -1214,50 +1206,6 @@ static inline uint32_t dp_get_tqm2sw_comp_srng_entrysize(void)
 }
 #endif
 
-#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
-static bool
-dp_prealloc_rx_iova_refcnt_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-					struct dp_multi_page_prealloc *mp)
-{
-	size_t rx_buf_size;
-	bool rx_pp_enable = 0;
-	bool rx_pp_prealloc_en = false;
-	uint32_t rx_pool_size;
-
-	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_enable, &rx_buf_size,
-			       &rx_pool_size, &rx_pp_prealloc_en);
-
-	return rx_pp_enable;
-}
-
-static void dp_prealloc_update_rx_iova_refcnt_elems(uint32_t *num_elements)
-{
-	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	uint64_t iova_addr;
-	uint64_t iova_size;
-
-	*num_elements = 0;
-
-	if (!qdf_ctx ||
-	    pld_get_iova_info(qdf_ctx->dev, &iova_addr, &iova_size))
-		return;
-
-	*num_elements = iova_size / PAGE_SIZE;
-}
-#else
-static inline bool
-dp_prealloc_rx_iova_refcnt_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-					struct dp_multi_page_prealloc *mp)
-{
-	return false;
-}
-
-static inline void
-dp_prealloc_update_rx_iova_refcnt_elems(uint32_t *num_elements)
-{
-}
-#endif
-
 /**
  * dp_update_mem_size_by_ring_type() - Update srng memory size based
  *  on ring type and the corresponding ini configuration
@@ -1360,9 +1308,6 @@ dp_update_num_elements_by_desc_type(struct wlan_dp_prealloc_cfg *cfg,
 	case QDF_DP_RX_HW_CC_SPT_PAGE_TYPE:
 		*num_elements = (cfg->num_rx_sw_desc * sizeof(uint64_t)) /
 			qdf_page_size;
-		return;
-	case QDF_DP_RX_IPA_MAP_REFCNT_TYPE:
-		dp_prealloc_update_rx_iova_refcnt_elems(num_elements);
 		return;
 	default:
 		return;
@@ -1524,10 +1469,6 @@ QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_multi_page_allocs); i++) {
 		mp = &g_dp_multi_page_allocs[i];
-
-		if (mp->desc_type == QDF_DP_RX_IPA_MAP_REFCNT_TYPE &&
-		    !dp_prealloc_rx_iova_refcnt_mem_required(ctrl_psoc, mp))
-			continue;
 
 		mp->in_use = false;
 		dp_update_num_elements_by_desc_type(&cfg, mp->desc_type,
