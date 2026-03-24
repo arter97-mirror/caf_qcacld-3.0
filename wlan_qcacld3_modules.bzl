@@ -111,6 +111,7 @@ _chipset_hw_map = {
     "qca6574": "ROME",
     "qca6574au-3": "ROME-SDIO",
     "adrastea" : "ADRASTEA",
+    "wcn8750" : "BORON",
 }
 
 _chipset_header_map = {
@@ -169,6 +170,10 @@ _chipset_header_map = {
     "qca6574au-3": [
     ],
     "adrastea" : [
+    ],
+    "wcn8750" : [
+	"api/hw/wcn8750/v1",
+	"cmn/hal/wifi3.0/wcn8750",
     ],
 }
 
@@ -915,6 +920,13 @@ _conditional_srcs = {
             "cmn/hif/src/qcc2072def.c",
         ],
     },
+    "CONFIG_WCN8750_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/wcn8750/hal_wcn8750.c",
+            "cmn/hif/src/wcn8750def.c",
+        ],
+    },
+
     "CONFIG_CP_STATS": {
         True: [
             "cmn/target_if/cp_stats/src/target_if_cp_stats.c",
@@ -2841,7 +2853,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "adrastea":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "adrastea" or chipset == "wcn8750":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]

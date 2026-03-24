@@ -2549,6 +2549,14 @@ config WCN7750_HEADERS_DEF
 	bool "Enable WCN7750_HEADERS_DEF"
 	default n
 
+config WCN8750_HEADERS_DEF
+        bool "Enable WCN8750_HEADERS_DEF"
+        default n
+
+config CNSS_WCN8750
+        bool "Enable CNSS_WCN8750"
+        default n
+
 config QCA_WIFI_WCN7750
 	bool "Enable QCA_WIFI_WCN7750"
 	default n
@@ -2902,7 +2910,7 @@ config ROME_IF
 	default ipci
 endif
 
-if CNSS_WCN7750
+if CNSS_WCN7750 || CNSS_WCN8750
 config ROME_IF
 	string "Enable ROME_IF"
 	default ipci
