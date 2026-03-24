@@ -4631,7 +4631,7 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 
 	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;
 	data = rnr + PAYLOAD_START_POS;
-	while (data < rnr_end) {
+	while ((data + sizeof(struct neighbor_ap_info_field)) < rnr_end) {
 		neighbor_ap_info = (struct neighbor_ap_info_field *)data;
 		tbtt_count = neighbor_ap_info->tbtt_header.tbtt_info_count;
 		tbtt_len = neighbor_ap_info->tbtt_header.tbtt_info_length;
