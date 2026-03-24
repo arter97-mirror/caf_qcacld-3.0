@@ -13033,6 +13033,86 @@ bool policy_mgr_is_force_scc(struct wlan_objmgr_psoc *psoc)
 		QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND));
 }
 
+bool policy_mgr_is_sap_target_freq_mcc_with_sta(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						qdf_freq_t ch_freq)
+{
+	enum policy_mgr_con_mode vdev_mode;
+	uint8_t sta_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t sta_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t sta_cnt, idx;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc))
+		return false;
+
+	if (wlan_nan_is_disc_active(psoc))
+		return false;
+
+	if (!policy_mgr_is_force_scc(psoc))
+		return false;
+
+	vdev_mode = policy_mgr_get_mode_by_vdev_id(psoc, vdev_id);
+	if (vdev_mode != PM_SAP_MODE && vdev_mode != PM_P2P_GO_MODE)
+		return false;
+
+	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, sta_freq_list,
+							 sta_id_list,
+							 PM_STA_MODE);
+	if (sta_cnt >= MAX_NUMBER_OF_CONC_CONNECTIONS) {
+		policy_mgr_debug("sta count %d", sta_cnt);
+		return false;
+	}
+
+	if (!sta_cnt)
+		return false;
+
+	if (policy_mgr_is_current_hwmode_dbs(psoc)) {
+		for (idx = 0; idx < sta_cnt; idx++) {
+			if (sta_freq_list[idx] == ch_freq)
+				return false;
+
+			if (policy_mgr_2_freq_same_mac_in_dbs(
+						psoc,
+						sta_freq_list[idx],
+						ch_freq)) {
+				policy_mgr_debug("%d(sta) and %d is MCC in dbs",
+						 sta_freq_list[idx], ch_freq);
+				return true;
+			}
+		}
+	} else if (policy_mgr_is_current_hwmode_sbs(psoc)) {
+		for (idx = 0; idx < sta_cnt; idx++) {
+			if (sta_freq_list[idx] == ch_freq)
+				return false;
+
+			if (policy_mgr_2_freq_same_mac_in_sbs(
+						psoc,
+						sta_freq_list[idx],
+						ch_freq)) {
+				policy_mgr_debug("%d(sta) and %d is MCC in sbs",
+						 sta_freq_list[idx], ch_freq);
+				return true;
+			}
+		}
+	} else {
+		for (idx = 0; idx < sta_cnt; idx++) {
+			if (sta_freq_list[idx] == ch_freq)
+				return false;
+
+			if (policy_mgr_2_freq_always_on_same_mac(
+						psoc,
+						sta_freq_list[idx],
+						ch_freq)) {
+				policy_mgr_debug("%d(sta) and %d is MCC in smm",
+						 sta_freq_list[idx], ch_freq);
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 					   uint8_t vdev_id, qdf_freq_t ch_freq)
 {

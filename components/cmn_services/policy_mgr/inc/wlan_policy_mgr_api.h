@@ -4681,6 +4681,23 @@ void policy_mgr_check_and_stop_opportunistic_timer(
 void policy_mgr_set_weight_of_disabled_inactive_channels_to_zero(
 		struct wlan_objmgr_psoc *psoc, uint32_t *pcl,
 		uint32_t *len, uint8_t *weight_list, uint32_t weight_len);
+
+/**
+ * policy_mgr_is_sap_target_freq_mcc_with_sta() - check if SAP/GO channel switch
+ * target frequency is MCC with any existing STA
+ * @psoc: pointer to soc
+ * @vdev_id: SAP/GO vdev id
+ * @ch_freq: SAP/GO channel switch target channel frequency
+ * This function is called after CSA before vdev restart when channel switch,
+ * it will abort channel switch if MCC condition meet.
+ *
+ * Return: true if SAP/GO channel switch target channel is MCC with any STA,
+ * otherwise false
+ */
+bool policy_mgr_is_sap_target_freq_mcc_with_sta(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						qdf_freq_t ch_freq);
+
 /**
  * policy_mgr_is_sap_allowed_on_dfs_freq() - check if sap allowed on dfs freq
  * @pdev: id of objmgr pdev

@@ -10461,9 +10461,12 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 	 */
 
 	if (LIM_IS_AP_ROLE(session_entry) &&
-	    !policy_mgr_is_sap_allowed_on_dfs_freq(mac_ctx->pdev,
-						   ch_change_req->vdev_id,
-						   target_freq)) {
+	    (!policy_mgr_is_sap_allowed_on_dfs_freq(mac_ctx->pdev,
+						    ch_change_req->vdev_id,
+						    target_freq) ||
+	     policy_mgr_is_sap_target_freq_mcc_with_sta(mac_ctx->psoc,
+							ch_change_req->vdev_id,
+							target_freq))) {
 		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
 		return;
 	} else if (session_entry->curr_op_freq == target_freq &&
