@@ -7795,6 +7795,16 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_5g.rx_he_mcs_map_lt_80;
 
+		*(uint16_t *)he_config->tx_he_mcs_map_160 =
+			*(uint16_t *)mac->he_cap_5g.tx_he_mcs_map_160;
+		*(uint16_t *)he_config->rx_he_mcs_map_160 =
+			*(uint16_t *)mac->he_cap_5g.rx_he_mcs_map_160;
+
+		*(uint16_t *)he_config->tx_he_mcs_map_80_80 =
+			*(uint16_t *)mac->he_cap_5g.tx_he_mcs_map_80_80;
+		*(uint16_t *)he_config->rx_he_mcs_map_80_80 =
+			*(uint16_t *)mac->he_cap_5g.rx_he_mcs_map_80_80;
+
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
 		he_config->max_ampdu_len_exp_ext =

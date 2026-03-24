@@ -1272,12 +1272,26 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(mlme_obj->cfg.he_caps.he_ppet_5g, wma_cfg->ppet_5g,
 		     HE_MAX_PPET_SIZE);
 
+	mlme_he_cap->tx_he_mcs_map_lt_80 = he_cap->tx_he_mcs_map_lt_80;
+	mlme_he_cap->rx_he_mcs_map_lt_80 = he_cap->rx_he_mcs_map_lt_80;
+
+	*(uint16_t *)mlme_he_cap->tx_he_mcs_map_160 =
+			*(uint16_t *)he_cap->tx_he_mcs_map_160;
+	*(uint16_t *)mlme_he_cap->rx_he_mcs_map_160 =
+			*(uint16_t *)he_cap->rx_he_mcs_map_160;
+
+	*(uint16_t *)mlme_he_cap->tx_he_mcs_map_80_80 =
+			*(uint16_t *)he_cap->tx_he_mcs_map_80_80;
+	*(uint16_t *)mlme_he_cap->rx_he_mcs_map_80_80 =
+			*(uint16_t *)he_cap->rx_he_mcs_map_80_80;
+
 	mlme_obj->cfg.he_caps.he_cap_orig = *mlme_he_cap;
 	/* Take intersection of host and FW capabilities */
 	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_2g &=
 						  wma_cfg->he_mcs_12_13_supp_2g;
 	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_5g &=
 						  wma_cfg->he_mcs_12_13_supp_5g;
+
 	mlme_debug("mcs_12_13 2G: %x 5G: %x FW_cap: 2G: %x 5G: %x",
 		   mlme_obj->cfg.he_caps.he_mcs_12_13_supp_2g,
 		   mlme_obj->cfg.he_caps.he_mcs_12_13_supp_5g,
