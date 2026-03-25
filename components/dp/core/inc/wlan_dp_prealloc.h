@@ -152,11 +152,13 @@ void dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned);
  * dp_prealloc_get_page_pool() - get page pool from pre-alloc pool
  * @type: page pool type whether tx or rx page pool
  * @pool_size: requested page pool size
+ * @pp_track_id: Pool track id pointer to track in-flight buffers
  *
  * Return: pointer to dp_page_pool_t on success or NULL on failure
  */
 struct dp_page_pool_t*
-dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size);
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
+			  int *pp_track_id);
 
 /**
  * dp_prealloc_put_page_pool() - put page pool reference back to pre-alloc pool
