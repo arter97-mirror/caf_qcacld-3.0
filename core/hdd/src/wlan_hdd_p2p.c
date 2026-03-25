@@ -204,8 +204,14 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
 	if (policy_mgr_is_sta_mon_concurrency(psoc) &&
-	    !hdd_lpc_is_work_scheduled(hdd_ctx))
+	    !hdd_lpc_is_work_scheduled(hdd_ctx)) {
 		return -EINVAL;
+	} else if (policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							     PM_PASSTHRU_MODE,
+							     NULL)) {
+		hdd_err("Passthru mode active - rejecting roc req");
+		return -EINVAL;
+	}
 
 	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
@@ -649,42 +655,52 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command)
 	}
 	hdd_debug("P2P_SET GO noa: count=%d interval=%d duration=%d start=%d",
 		  count, interval, duration, start);
-	duration = MS_TO_TU_MUS(duration);
-	interval = MS_TO_TU_MUS(interval);
+
+	noa.count = count;
+	noa.duration = duration;
+	noa.interval = interval;
+	noa.start = start;
+	ret = hdd_set_p2p_noa_fill_params(adapter, &noa);
+
+	if (!ret)
+		return wlan_hdd_set_power_save(adapter, &noa);
+
+	return ret;
+}
+
+int hdd_set_p2p_noa_fill_params(struct hdd_adapter *adapter,
+				struct p2p_ps_config *noa)
+{
+	noa->duration = MS_TO_TU_MUS(noa->duration);
+	noa->interval = MS_TO_TU_MUS(noa->interval);
 	/* PS Selection
 	 * Periodic noa (2)
 	 * Single NOA   (4)
 	 */
-	noa.opp_ps = 0;
-	noa.ct_window = 0;
-	if (count == 1) {
-		if (duration > interval)
-			duration = interval;
-		noa.duration = 0;
-		noa.single_noa_duration = duration;
-		noa.ps_selection = P2P_POWER_SAVE_TYPE_SINGLE_NOA;
+	noa->opp_ps = 0;
+	noa->ct_window = 0;
+	if (noa->count == 1) {
+		if (noa->duration > noa->interval)
+			noa->duration = noa->interval;
+		noa->duration = 0;
+		noa->single_noa_duration = noa->duration;
+		noa->ps_selection = P2P_POWER_SAVE_TYPE_SINGLE_NOA;
 	} else {
-		if (count && (duration >= interval)) {
+		if (noa->count && noa->duration >= noa->interval) {
 			hdd_err("Duration should be less than interval");
 			return -EINVAL;
 		}
-		noa.duration = duration;
-		noa.single_noa_duration = 0;
-		noa.ps_selection = P2P_POWER_SAVE_TYPE_PERIODIC_NOA;
+		noa->single_noa_duration = 0;
+		noa->ps_selection = P2P_POWER_SAVE_TYPE_PERIODIC_NOA;
 	}
 
-	noa.start = start;
-	noa.interval = interval;
-	noa.count = count;
-	noa.vdev_id = adapter->deflink->vdev_id;
+	noa->vdev_id = adapter->deflink->vdev_id;
 
-	hdd_debug("P2P_PS_ATTR:opp ps %d ct window %d count %d interval %d "
-		  "duration %d start %d single noa duration %d "
-		  "ps selection %x", noa.opp_ps, noa.ct_window, noa.count,
-		  noa.interval, noa.duration, noa.start,
-		  noa.single_noa_duration, noa.ps_selection);
-
-	return wlan_hdd_set_power_save(adapter, &noa);
+	hdd_debug("P2P_PS_ATTR:opp ps %d ct window %d count %d interval %d duration %d start %d single noa duration %d ps selection %x",
+		  noa->opp_ps, noa->ct_window, noa->count, noa->interval,
+		  noa->duration, noa->start, noa->single_noa_duration,
+		  noa->ps_selection);
+	return 0;
 }
 
 /**
@@ -2219,3 +2235,74 @@ int wlan_hdd_cfg80211_p2p_parse_wfd_params(struct wiphy *wiphy,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 #endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
+
+/**
+ * __wlan_hdd_cfg80211_p2p_parse_noa_params - This function parses P2P NOA
+ * params
+ * @wiphy: pointer to wiphy structure
+ * @wdev: pointer to wireless device
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+static int __wlan_hdd_cfg80211_p2p_parse_noa_params(struct wiphy *wiphy,
+						    struct wireless_dev *wdev,
+						    const void *data,
+						    int data_len)
+{
+	int ret;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct p2p_ps_config noa = {0};
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err_rl("Command not allowed in FTM/Monitor mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(adapter->hdd_ctx);
+	if (ret)
+		return ret;
+
+	/* Try to handle NoA cancellation first */
+	ret = osif_p2p_noa_cancel(adapter, data, data_len);
+	if (!ret || ret != -ENOENT) {
+		/* NOA cancel and NoA start attributes won't come together */
+		return ret;
+	}
+
+	/* No cancellation attributes found, proceed with regular NoA parsing */
+	if (adapter->device_mode != QDF_P2P_GO_MODE) {
+		hdd_err_rl("Device is not GO");
+		return -EPERM;
+	}
+
+	ret = osif_p2p_parse_noa_params(adapter, &noa, data, data_len);
+	if (ret)
+		return ret;
+
+	ret = hdd_set_p2p_noa_fill_params(adapter, &noa);
+	if (ret)
+		return ret;
+
+	return wlan_hdd_set_power_save(adapter, &noa);
+}
+
+int wlan_hdd_cfg80211_p2p_parse_noa_params(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data, int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_p2p_parse_noa_params(wiphy, wdev, data,
+							 data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}

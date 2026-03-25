@@ -3503,6 +3503,28 @@ lim_skip_tpc_update_for_sta(struct mac_context *mac,
 			    struct pe_session *sta_session,
 			    struct pe_session *sap_session);
 
+/**
+ * lim_get_6g_power_type_with_bw() - Get the best 6 GHz power type for given
+ *                                   bandwidth
+ * @mac: Pointer to MAC context
+ * @session: Pointer to PE session
+ * @chan_freq: Channel frequency in MHz
+ * @power_type_6g: Pointer to store the best 6 GHz power type
+ *
+ * This function determines the best 6 GHz power type (LPI/SP/VLP) based on
+ * the session's channel width and center frequency. For 320 MHz bandwidth,
+ * it uses the center frequency from ch_center_freq_seg1. The function calls
+ * the regulatory module to get the best power type considering the AP's
+ * defined power type and current bandwidth.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS lim_get_6g_power_type_with_bw(
+	struct mac_context *mac,
+	struct pe_session *session,
+	qdf_freq_t chan_freq,
+	enum reg_6g_ap_type *power_type_6g);
+
 #ifdef FEATURE_WLAN_GC_SKIP_JOIN
 static inline bool
 lim_connect_skip_join_for_gc(struct pe_session *pe_session)

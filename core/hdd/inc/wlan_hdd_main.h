@@ -144,7 +144,13 @@
  * @buf_len: Length of the read memory requested
  * @offset: APF work memory offset to fetch from
  * @lock: APF Context lock
+ * @apf_inst_pool: Pointers to stored instructions
+ * @apf_inst_total_len: Total expected length for each slot
+ * @apf_inst_curr_len: Current accumulated length for each slot
+ * @apf_inst_index: Index of the current active slot (circular buffer)
+ * @apf_inst_timestamp: Timestamp when instruction was stored (microseconds)
  */
+#define APF_HISTORY_LEN 5
 struct hdd_apf_context {
 	unsigned int magic;
 	qdf_event_t qdf_apf_event;
@@ -154,6 +160,11 @@ struct hdd_apf_context {
 	uint32_t buf_len;
 	uint32_t offset;
 	qdf_spinlock_t lock;
+	uint8_t *apf_inst_pool[APF_HISTORY_LEN];
+	uint32_t apf_inst_total_len[APF_HISTORY_LEN];
+	uint32_t apf_inst_curr_len[APF_HISTORY_LEN];
+	uint8_t apf_inst_index;
+	uint64_t apf_inst_timestamp[APF_HISTORY_LEN];
 };
 #endif /* FEATURE_WLAN_APF */
 
@@ -589,6 +600,7 @@ typedef enum {
 	NET_DEV_HOLD_LOCAL_PKT_CAPTURE = 65,
 	NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE = 66,
 	NET_DEV_HOLD_SYSFS_APFMODE_STORE = 67,
+	NET_DEV_HOLD_APF_INSTRUCTION = 69,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -3257,6 +3269,22 @@ struct wlan_hdd_link_info *
 hdd_get_link_info_by_link_addr(struct hdd_context *hdd_ctx,
 			       struct qdf_mac_addr *link_addr);
 
+/**
+ * hdd_get_link_info_by_mac_and_vdev_for_adapter() - Get link info by MAC and vdev ID
+ * @adapter: adapter reference
+ * @mac_addr: MAC address to match
+ * @vdev_id: Vdev ID to match
+ *
+ * Find link_info that matches both MAC address and vdev_id.
+ * This is more robust than matching MAC address alone.
+ *
+ * Return: Pointer to link_info on success, NULL on failure
+ */
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_mac_and_vdev_for_adapter(struct hdd_adapter *adapter,
+					      struct qdf_mac_addr *mac_addr,
+					      uint8_t vdev_id);
+
 struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
 
@@ -5796,7 +5824,8 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 /**
  * hdd_roam_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
  * mac addr update due to roaming.
- * @vdev: vdev pointer
+ * @primary_vdev: VDEV undergoing roaming
+ * @vdev_id: vdev ID for which the HDD MAC address needs to be updated
  * @old_self_mac: Current self link mac of VDEV
  * @new_self_mac: New self link mac of VDEV
  *
@@ -5806,7 +5835,8 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *primary_vdev,
+					 uint8_t vdev_id,
 					 struct qdf_mac_addr *old_self_mac,
 					 struct qdf_mac_addr *new_self_mac);
 
@@ -5846,8 +5876,7 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
 
 QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info,
-					bool is_roam);
+					struct wlan_hdd_link_info *new_link_info);
 #else
 static inline struct wlan_hdd_link_info *
 hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
@@ -5858,8 +5887,7 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
 
 static inline QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info,
-					bool is_roam)
+					struct wlan_hdd_link_info *new_link_info)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -7927,14 +7927,14 @@ void sme_get_command_q_status(mac_handle_t mac_handle)
 
 	mac = MAC_CONTEXT(mac_handle);
 
-	sme_debug("smeCmdPendingList has %d commands",
+	sme_debug("Ser has %d pending commands",
 		  wlan_serialization_get_pending_list_count(mac->psoc, false));
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac->psoc,
 								 false);
 	if (cmd)
 		sme_debug("Active commaned is %d cmd id %d source %d",
 			  cmd->cmd_type, cmd->cmd_id, cmd->source);
-	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
+	if (!csr_is_sme_umac_ser_cmd_type(cmd))
 		return;
 
 	pTempCmd = cmd->umac_cmd;
@@ -13203,23 +13203,32 @@ uint32_t sme_get_wni_dot11_mode(mac_handle_t mac_handle)
 }
 
 /**
- * sme_create_mon_session() - post message to create PE session for monitormode
- * operation
+ * sme_create_pe_session() - post message to create PE session
  * @mac_handle: Opaque handle to the global MAC context
  * @bssid: pointer to bssid
  * @vdev_id: sme session id
+ * @op_mode: operating mode
  *
  * Return: QDF_STATUS_SUCCESS on success, non-zero error code on failure.
  */
-QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bss_id,
-				  uint8_t vdev_id)
+QDF_STATUS sme_create_pe_session(mac_handle_t mac_handle, uint8_t *bss_id,
+				 uint8_t vdev_id, enum QDF_OPMODE op_mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct sir_create_session *msg;
 
 	msg = qdf_mem_malloc(sizeof(*msg));
 	if (msg) {
-		msg->type = eWNI_SME_MON_INIT_SESSION;
+		if (op_mode == QDF_MONITOR_MODE) {
+			msg->type = eWNI_SME_MON_INIT_SESSION;
+		} else if (op_mode == QDF_PASSTHRU_MODE) {
+			msg->type = eWNI_SME_PASSTHRU_INIT_SESSION;
+		} else {
+			sme_err("op_mode:%d not supported", op_mode);
+			qdf_mem_free(msg);
+			return status;
+		}
+
 		msg->vdev_id = vdev_id;
 		msg->msg_len = sizeof(*msg);
 		qdf_mem_copy(msg->bss_id.bytes, bss_id, QDF_MAC_ADDR_SIZE);
@@ -13228,14 +13237,24 @@ QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bss_id,
 	return status;
 }
 
-QDF_STATUS sme_delete_mon_session(mac_handle_t mac_handle, uint8_t vdev_id)
+QDF_STATUS sme_delete_pe_session(mac_handle_t mac_handle, uint8_t vdev_id,
+				 enum QDF_OPMODE op_mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct sir_delete_session *msg;
 
 	msg = qdf_mem_malloc(sizeof(*msg));
 	if (msg) {
-		msg->type = eWNI_SME_MON_DEINIT_SESSION;
+		if (op_mode == QDF_MONITOR_MODE) {
+			msg->type = eWNI_SME_MON_DEINIT_SESSION;
+		} else if (op_mode == QDF_PASSTHRU_MODE) {
+			msg->type = eWNI_SME_PASSTHRU_DEINIT_SESSION;
+		} else {
+			sme_err("op_mode:%d not supported", op_mode);
+			qdf_mem_free(msg);
+			return status;
+		}
+
 		msg->vdev_id = vdev_id;
 		msg->msg_len = sizeof(*msg);
 		status = umac_send_mb_message_to_mac(msg);
@@ -17279,10 +17298,74 @@ QDF_STATUS sme_get_ani_level(mac_handle_t mac_handle, uint32_t *freqs,
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
+static inline
+void sme_set_monitor_mode_cb(struct mac_context *mac,
+			     void (*monitor_mode_cb)(uint8_t vdev_id,
+						     bool is_up))
+{
+	mac->sme.monitor_mode_cb = monitor_mode_cb;
+}
 
-QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id,
-							   bool is_up))
+static inline
+void sme_invoke_monitor_mode_cb(struct mac_context *mac, uint8_t vdev_id,
+				bool is_up)
+{
+	if (mac->sme.monitor_mode_cb)
+		mac->sme.monitor_mode_cb(vdev_id, is_up);
+}
+
+#else
+static inline
+void sme_set_monitor_mode_cb(struct mac_context *mac,
+			     void (*monitor_mode_cb)(uint8_t vdev_id,
+						     bool is_up))
+{
+}
+
+static inline
+void sme_invoke_monitor_mode_cb(struct mac_context *mac, uint8_t vdev_id,
+				bool is_up)
+{
+}
+#endif
+
+#ifdef DRIVER_PASSTHRU_MODE
+static inline
+void sme_set_passthrough_mode_cb(struct mac_context *mac,
+				 void (*passthrough_mode_cb)(uint8_t vdev_id,
+							     bool is_up))
+{
+	mac->sme.passthrough_mode_cb = passthrough_mode_cb;
+}
+
+static inline
+void sme_invoke_passthrough_mode_cb(struct mac_context *mac, uint8_t vdev_id,
+				    bool is_up)
+{
+	if (mac->sme.passthrough_mode_cb)
+		mac->sme.passthrough_mode_cb(vdev_id, is_up);
+}
+#else
+static inline
+void sme_set_passthrough_mode_cb(struct mac_context *mac,
+				 void (*passthrough_mode_cb)(uint8_t vdev_id,
+							     bool is_up))
+{
+}
+
+static inline
+void sme_invoke_passthrough_mode_cb(struct mac_context *mac, uint8_t vdev_id,
+				    bool is_up)
+{
+}
+#endif
+
+#if defined(FEATURE_MONITOR_MODE_SUPPORT) || defined(DRIVER_PASSTHRU_MODE)
+QDF_STATUS sme_set_op_mode_cb(mac_handle_t mac_handle,
+			      void (*monitor_mode_cb)(uint8_t vdev_id,
+						      bool is_up),
+			      void (*passthrough_mode_cb)(uint8_t vdev_id,
+							  bool is_up))
 {
 	QDF_STATUS qdf_status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -17292,7 +17375,9 @@ QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
 		sme_err("Failed to acquire sme lock; status: %d", qdf_status);
 		return qdf_status;
 	}
-	mac->sme.monitor_mode_cb = monitor_mode_cb;
+
+	sme_set_monitor_mode_cb(mac, monitor_mode_cb);
+	sme_set_passthrough_mode_cb(mac, passthrough_mode_cb);
 	sme_release_global_lock(&mac->sme);
 
 	return qdf_status;
@@ -17302,17 +17387,22 @@ QDF_STATUS sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up)
 {
 	mac_handle_t mac_handle;
 	struct mac_context *mac;
+	enum QDF_OPMODE op_mode;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	if (!mac_handle)
 		return QDF_STATUS_E_INVAL;
 
 	mac = MAC_CONTEXT(mac_handle);
+	op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
 
-	if (mac->sme.monitor_mode_cb)
-		mac->sme.monitor_mode_cb(vdev_id, is_up);
-	else {
-		sme_warn_rl("monitor_mode_cb is not registered");
+	if (op_mode == QDF_MONITOR_MODE) {
+		sme_invoke_monitor_mode_cb(mac, vdev_id, is_up);
+	} else if (op_mode == QDF_PASSTHRU_MODE) {
+		sme_invoke_passthrough_mode_cb(mac, vdev_id, is_up);
+	} else {
+		sme_warn_rl("no callback registered for mode:%d",
+			    op_mode);
 		return QDF_STATUS_E_FAILURE;
 	}
 

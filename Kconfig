@@ -1444,7 +1444,7 @@ config WLAN_FASTPATH
 	bool "Enable fastpath for datapackets"
 	default n
 
-config WLAN_FASTPATH_NON_RHINE
+config WLAN_FASTPATH_AND_NOT_RHINE
 	bool "Enable fastpath for non-Rhine chipsets"
 	depends on WLAN_FASTPATH && !RHINE
 	default y if WLAN_FASTPATH && !RHINE
@@ -2247,7 +2247,7 @@ config DYNAMIC_DEBUG
 	default n
 
 config CONFIG_WLAN_DUMP_IN_PROGRESS
-	bool "enable WLAN_DUMP_IN_PROGRESS"
+	bool "enable CONFIG_WLAN_DUMP_IN_PROGRESS"
 	default n
 
 config WLAN_CHIPSET_STATS
@@ -2995,4 +2995,84 @@ config QCACLD_FEATURE_COEX_CONFIG
 config IPA_P2P_SUPPORT
 	bool "support p2p when IPA is enabled"
 	default n
+
+config DRIVER_PASSTHRU_MODE
+	bool "Enable Driver Passthrough mode"
+	default n
+
+config ICNSS2_MODULE
+	bool "Enable ICNSS2 module"
+	default n
+
+config ICNSS2_HELIUM
+	bool "Enable ICNSS2 feature for Helium"
+	default n
+
+if ICNSS2_HELIUM
+config ROME_IF
+	string "Enable ROME_IF"
+	default snoc
+endif
+
+config PLD_SNOC_ICNSS_FLAG
+	bool "Enable pld snoc ICNSS flag"
+	default n
+
+config QCACLD_FEATURE_METERING
+	bool "Enable QCACLD_FEATURE_METERING"
+	default n
+
+config WLAN_SYNC_TSF
+	bool "Enable QCOM sync multi devices tsf feature"
+	default n
+
+config MPC_UT_FRAMEWORK
+	bool "Enable Unit test framework for multiport concurrency"
+	default n
+
+config BUILD_DEBUG_VERSION
+	bool "Enable build debug version"
+	default n
+
+config BUILD_DIAG_VERSION
+	bool "Enable build diag version"
+	default n
+
+config HIF_SNOC
+	bool "Enable hif snoc feature"
+	default n
+
+config PKTLOG_LEGACY
+	bool "Enable legacy packet log support"
+	default n
+
+config MCL
+	bool "Enable MCL"
+	default n
+
+config FEATURE_BLACKLIST_MGR
+	bool "Enable blacklist manager"
+	default n
+
+config INTERFACE_MGR
+	bool "Enable INTERFACE_MGR"
+	default n
+
+config ENABLE_LOW_POWER_MODE
+	bool "Enable ENABLE_LOW_POWER_MODE"
+	default n
+
+config CNSS_ADRASTEA
+	bool "Enable CNSS_ADRASTEA"
+	default n
+
+config FEATURE_ENABLE_CE_DP_IRQ_AFFINE
+	bool "Enable FEATURE_ENABLE_CE_DP_IRQ_AFFINE"
+	default n
+
+if CNSS_ADRASTEA
+config HIF_LARGE_CE_RING_HISTORY
+	int "Enable HIF_LARGE_CE_RING_HISTORY"
+	default 8192
+endif
 endif # QCA_CLD_WLAN

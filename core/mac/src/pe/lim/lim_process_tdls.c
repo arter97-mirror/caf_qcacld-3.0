@@ -3622,18 +3622,35 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 		 * not wide band supported
 		 */
 		if (!wide_band_peer ||
-		    wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		    wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
+		    wlan_reg_is_dfs_for_freq(mac->pdev,
+					     pe_session->curr_op_freq)) {
 			lim_tdls_fill_session_vht_width(pe_session, sta);
 		} else {
-			if (pVhtCaps->supportedChannelWidthSet >=
-			    VHT_CAP_NO_160M_SUPP)
-				sta->vhtSupportedChannelWidthSet =
-						WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+			uint8_t peer_vht_width;
 
-			if (wlan_reg_is_dfs_for_freq(mac->pdev,
-						    pe_session->curr_op_freq)) {
-				lim_tdls_fill_session_vht_width(pe_session,
-								sta);
+			peer_vht_width = pVhtCaps->supportedChannelWidthSet;
+			if (peer_vht_width > VHT_CAP_160_AND_80P80_SUPP) {
+				pe_debug("Invalid peer VHT width: %d, treating as 80MHz",
+					 peer_vht_width);
+				peer_vht_width = VHT_CAP_NO_160M_SUPP;
+			}
+
+			switch (pe_session->ch_width) {
+			case CH_WIDTH_80MHZ:
+			case CH_WIDTH_80P80MHZ:
+				sta->vhtSupportedChannelWidthSet =
+					WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+				break;
+			case CH_WIDTH_160MHZ:
+				if (peer_vht_width >= VHT_CAP_160_SUPP)
+					sta->vhtSupportedChannelWidthSet =
+					WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+				break;
+			default:
+				sta->vhtSupportedChannelWidthSet =
+					WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+				break;
 			}
 		}
 

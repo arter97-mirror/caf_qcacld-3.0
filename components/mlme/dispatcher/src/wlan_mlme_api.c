@@ -9701,3 +9701,54 @@ uint32_t wlan_get_fw_cck_cap(struct wlan_objmgr_psoc *psoc)
 	return target_if_fw_cck_support(psoc);
 }
 
+bool wlan_mlme_get_p2p_go_cancel_one_shot_noa(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.p2p.p2p_go_cancel_one_shot_noa;
+}
+
+QDF_STATUS wlan_mlme_set_p2p_go_cancel_one_shot_noa(struct wlan_objmgr_psoc *psoc,
+						    bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.p2p.p2p_go_cancel_one_shot_noa = value;
+	mlme_debug("Set P2P GO cancel one-shot NoA: %d", value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool wlan_mlme_get_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.p2p.p2p_gc_keep_awake_during_noa;
+}
+
+QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
+						      bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.p2p.p2p_gc_keep_awake_during_noa = value;
+	mlme_debug("Set P2P GC keep-awake during NoA: %d", value);
+
+	return QDF_STATUS_SUCCESS;
+}

@@ -51,6 +51,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "qdf_ssr_driver_dump.h"
 #include "wlan_hdd_ioctl.h"
+#include "wlan_hdd_wondertap.h"
 
 #ifdef MODULE
 #ifdef WLAN_WEAR_CHIPSET
@@ -829,6 +830,7 @@ static int __hdd_soc_probe(struct device *dev,
 
 	hdd_set_sar_init_index(hdd_ctx);
 	hdd_soc_load_unlock(dev);
+	wlan_hdd_wondertap_register_ops(dev);
 
 	return 0;
 
@@ -1023,6 +1025,7 @@ static void __hdd_soc_remove(struct device *dev)
 	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
+	wlan_hdd_wondertap_unregister_ops(dev, true);
 	qdf_rtpm_sync_resume();
 	cds_set_driver_loaded(false);
 	cds_set_unload_in_progress(true);

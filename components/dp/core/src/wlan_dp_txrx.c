@@ -772,6 +772,89 @@ drop_pkt_accounting:
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
+{
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+	struct dp_tx_rx_stats *stats;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	int cpu = qdf_get_smp_processor_id();
+
+	stats = &dp_intf->dp_stats.tx_rx_stats;
+	++stats->per_cpu[cpu].tx_called;
+	stats->cont_txtimeout_cnt = 0;
+
+	if (qdf_unlikely(cds_is_driver_transitioning())) {
+		dp_err_rl("driver is transitioning, drop pkt");
+		goto drop_pkt;
+	}
+
+	if (qdf_unlikely(dp_ctx->is_suspend)) {
+		dp_err_rl("Device is system suspended, drop pkt");
+		goto drop_pkt;
+	}
+
+	/*
+	 * Add SKB to internal tracking table before further processing
+	 * in WLAN driver.
+	 */
+	qdf_net_buf_debug_acquire_skb(nbuf, __FILE__, __LINE__);
+
+	qdf_net_stats_add_tx_bytes(&dp_intf->stats, qdf_nbuf_len(nbuf));
+	qdf_net_stats_add_tx_pkts(&dp_intf->stats, 1);
+	dp_ctx->no_tx_offload_pkt_cnt++;
+
+	QDF_NBUF_CB_TX_PACKET_TRACK(nbuf) = QDF_NBUF_TX_PKT_DATA_TRACK;
+	QDF_NBUF_UPDATE_TX_PKT_COUNT(nbuf, QDF_NBUF_TX_PKT_DP);
+
+	qdf_dp_trace_set_track(nbuf, QDF_TX);
+
+	DPTRACE(qdf_dp_trace(nbuf, QDF_DP_TRACE_TX_PACKET_PTR_RECORD,
+			     QDF_TRACE_DEFAULT_PDEV_ID,
+			     qdf_nbuf_data_addr(nbuf),
+			     sizeof(qdf_nbuf_data(nbuf)),
+			     QDF_TX));
+
+	if (dp_nbuf_nontso_linearize(nbuf) != QDF_STATUS_SUCCESS) {
+		dp_err_rl(" nbuf %pK linearize failed. drop the pkt", nbuf);
+		goto drop_pkt_and_release_nbuf;
+	}
+
+	/*
+	 * If a transmit function is not registered, drop packet
+	 */
+	if (!dp_intf->txrx_ops.tx.tx) {
+		dp_err_rl("TX function not registered by the data path");
+		goto drop_pkt_and_release_nbuf;
+	}
+
+	QDF_NBUF_CB_TX_VDEV_CTX(nbuf) = dp_link->link_id;
+
+	if (dp_intf->txrx_ops.tx.tx(soc, dp_link->link_id, nbuf)) {
+		dp_debug_rl("Failed to send packet from adapter %u",
+			    dp_link->link_id);
+		goto drop_pkt_and_release_nbuf;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+drop_pkt_and_release_nbuf:
+	qdf_net_buf_debug_release_skb(nbuf);
+drop_pkt:
+	qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
+			      QDF_DP_TRACE_DROP_PACKET_RECORD, 0,
+			      QDF_TX);
+	qdf_nbuf_kfree(nbuf);
+
+	/* Eliminate drop_pkt_accounting section */
+	qdf_net_stats_inc_tx_dropped(&dp_intf->stats);
+	++stats->per_cpu[cpu].tx_dropped;
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* DRIVER_PASSTHRU_MODE */
+
 void dp_tx_timeout(struct wlan_dp_intf *dp_intf)
 {
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -2011,3 +2094,98 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS wlan_dp_rx_deliver_to_stack_passthru(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+
+	dp_intf->dp_stats.tx_rx_stats.rx_non_aggregated++;
+
+	return dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf, DP_NBUF_PUSH_NAPI);
+}
+
+QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_nbuf)
+{
+	struct wlan_dp_intf *dp_intf = NULL;
+	struct wlan_dp_link *dp_link = NULL;
+	struct wlan_dp_psoc_context *dp_ctx = NULL;
+	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+	qdf_nbuf_t nbuf = NULL;
+	qdf_nbuf_t next = NULL;
+	unsigned int cpu_index;
+	struct dp_tx_rx_stats *stats;
+
+	/* Sanity check on inputs */
+	if (qdf_unlikely((!dp_link_context) || (!rx_nbuf))) {
+		dp_err_rl("Null params being passed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_link = (struct wlan_dp_link *)dp_link_context;
+	dp_intf = dp_link->dp_intf;
+	dp_ctx = dp_intf->dp_ctx;
+
+	cpu_index = qdf_get_cpu();
+	stats = &dp_intf->dp_stats.tx_rx_stats;
+
+	next = rx_nbuf;
+
+	while (next) {
+		nbuf = next;
+		next = qdf_nbuf_next(nbuf);
+		qdf_nbuf_set_next(nbuf, NULL);
+
+		wlan_dp_pkt_add_timestamp(dp_intf, QDF_PKT_RX_DRIVER_EXIT,
+					  nbuf);
+
+		qdf_dp_trace_log_pkt(dp_link->link_id, nbuf, QDF_RX,
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     dp_intf->device_mode);
+
+		DPTRACE(qdf_dp_trace(nbuf,
+				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     qdf_nbuf_data_addr(nbuf),
+				     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
+
+		DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
+					      QDF_DP_TRACE_RX_PACKET_RECORD,
+					      0, QDF_RX));
+
+		if (dp_rx_pkt_tracepoints_enabled())
+			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
+
+		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
+		qdf_nbuf_set_protocol(nbuf, htons(ETH_P_802_2));
+		qdf_nbuf_set_mac_header(nbuf, 0);
+		++stats->per_cpu[cpu_index].rx_packets;
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
+		/* count aggregated RX frame into stats */
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats,
+					  qdf_nbuf_get_gso_segs(nbuf));
+		qdf_net_stats_add_rx_bytes(&dp_intf->stats,
+					   qdf_nbuf_len(nbuf));
+
+		cds_host_diag_log_work(&dp_ctx->rx_wake_lock,
+				       dp_ctx->dp_cfg.rx_wakelock_timeout,
+				       WIFI_POWER_EVENT_WAKELOCK_HOLD_RX);
+		qdf_wake_lock_timeout_acquire(&dp_ctx->rx_wake_lock,
+					dp_ctx->dp_cfg.rx_wakelock_timeout);
+
+		/* Remove SKB from internal tracking table before submitting
+		 * it to stack
+		 */
+		qdf_net_buf_debug_release_skb(nbuf);
+
+		qdf_status = wlan_dp_rx_deliver_to_stack_passthru(dp_intf,
+								  nbuf);
+
+		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+			++stats->per_cpu[cpu_index].rx_delivered;
+		else
+			++stats->per_cpu[cpu_index].rx_refused;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* DRIVER_PASSTHRU_MODE */

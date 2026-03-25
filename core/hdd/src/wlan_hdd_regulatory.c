@@ -959,6 +959,13 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 
 	hdd_debug("change band to %u", band_bitmap);
 
+	if (!(band_bitmap & BIT(REG_BAND_2G)) &&
+	    ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
+		hdd_err("NAN is enabled. Failed to set the band bitmap value to %u",
+			band_bitmap);
+		return -EINVAL;
+	}
+
 	if (ucfg_reg_get_band(hdd_ctx->pdev, &current_band) !=
 	    QDF_STATUS_SUCCESS) {
 		hdd_debug("Failed to get current band config");
@@ -992,13 +999,6 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 	if (QDF_IS_STATUS_ERROR(ucfg_reg_set_band(hdd_ctx->pdev,
 						  band_bitmap))) {
 		hdd_err("Failed to set the band bitmap value to %u",
-			band_bitmap);
-		return -EINVAL;
-	}
-
-	if (!(band_bitmap & BIT(REG_BAND_2G)) &&
-	    ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
-		hdd_err("NAN is enabled. Failed to set the band bitmap value to %u",
 			band_bitmap);
 		return -EINVAL;
 	}

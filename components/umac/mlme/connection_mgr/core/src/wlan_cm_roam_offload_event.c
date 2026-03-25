@@ -663,5 +663,7 @@ QDF_STATUS cm_roam_abort_event(struct wlan_objmgr_vdev *vdev)
 				    REASON_DRIVER_DISABLED);
 	}
 
+	mlme_cm_osif_reset_scan_reject_params(vdev);
+
 	return QDF_STATUS_SUCCESS;
 }

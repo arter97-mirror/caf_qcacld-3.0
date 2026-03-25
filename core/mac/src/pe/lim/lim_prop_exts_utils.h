@@ -60,17 +60,20 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 #ifdef WLAN_FEATURE_11BE
 /**
  * lim_extract_eht_op() - Extract EHT operation IE into session
+ * @mac: mac context
  * @session: Pointer to pe_session
  * @beacon_struct: Pointer to extracted beacon/probe response of the
  * AP
  *
  * Return: None
  */
-void lim_extract_eht_op(struct pe_session *session,
+void lim_extract_eht_op(struct mac_context *mac,
+			struct pe_session *session,
 			tSirProbeRespBeacon *beacon_struct);
 #else
 static inline void
-lim_extract_eht_op(struct pe_session *session,
+lim_extract_eht_op(struct mac_context *mac,
+		   struct pe_session *session,
 		   tSirProbeRespBeacon *beacon_struct)
 {}
 #endif

@@ -524,7 +524,6 @@ eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(enum hdd_dot11_mode dot11Mode)
 QDF_STATUS hdd_set_idle_ps_config(struct hdd_context *hdd_ctx, bool val)
 {
 	QDF_STATUS status;
-	void *hif_ctx;
 
 	hdd_debug("Enter Val %d", val);
 
@@ -537,12 +536,6 @@ QDF_STATUS hdd_set_idle_ps_config(struct hdd_context *hdd_ctx, bool val)
 		hdd_nofl_debug("Already in the requested power state:%d", val);
 		return QDF_STATUS_SUCCESS;
 	}
-
-	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx)
-		return QDF_STATUS_E_INVAL;
-
-	hdd_set_hif_init_phase(hif_ctx, false);
 
 	status = sme_set_idle_powersave_config(val);
 	if (QDF_STATUS_SUCCESS != status) {

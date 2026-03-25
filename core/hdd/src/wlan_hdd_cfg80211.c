@@ -97,9 +97,7 @@
 #include "wlan_hdd_disa.h"
 #include "wlan_osif_request_manager.h"
 #include "wlan_hdd_he.h"
-#ifdef FEATURE_WLAN_APF
 #include "wlan_hdd_apf.h"
-#endif
 #include "wlan_hdd_fw_state.h"
 #include "wlan_hdd_mpta_helper.h"
 
@@ -159,7 +157,6 @@
 #include <ol_defines.h>
 #include "wlan_hdd_btc_chain_mode.h"
 #include "os_if_nan.h"
-#include "wlan_hdd_apf.h"
 #include "wlan_hdd_cfr.h"
 #include "wlan_hdd_ioctl.h"
 #include "wlan_cm_roam_ucfg_api.h"
@@ -5401,6 +5398,20 @@ static inline void wlan_hdd_set_wfd_r2_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+static inline void wlan_hdd_set_cancel_noa_feature(struct wlan_objmgr_psoc *psoc,
+						   uint8_t *feature_flags)
+{
+	if (!ucfg_p2p_is_fw_cancel_one_shot_noa_supported(psoc)) {
+		hdd_debug("cancel one shot noa feature is not supported by FW");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GO_CANCEL_ONE_SHOT_NOA);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA);
+}
+
 #ifdef FEATURE_WLAN_SUPPORT_PCC
 static inline void wlan_hdd_set_pcc_feature(struct wlan_objmgr_psoc *psoc,
 					    uint8_t *feature_flags)
@@ -5588,6 +5599,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_cancel_noa_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_pcc_feature(hdd_ctx->psoc, feature_flags);
 
@@ -9701,6 +9713,8 @@ wlan_hdd_wifi_test_config_policy[
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_RTWT_SUPPORT] = {
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_BTM_RECOMM_MULTI_AP_SUPPORT] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA] = {
 			.type = NLA_U8},
 };
 
@@ -18074,6 +18088,30 @@ BTM_REQ_RESP_DONE:
 		}
 	}
 
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("STA 20Mhz only support: %d for vdev:%d", cfg_val, link_info->vdev_id);
+		if (cfg_val) {
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+			if (vdev) {
+				status =
+					wlan_vdev_mlme_set_sta_in_20mhz(
+								vdev,
+								true);
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				ret_val = qdf_status_to_os_return(status);
+			} else {
+				ret_val = qdf_status_to_os_return(
+							QDF_STATUS_E_INVAL);
+			}
+
+			if (ret_val)
+				hdd_err("Failed to set STA 20 MHz only support");
+		}
+	}
+
 	if (update_sme_cfg)
 		sme_update_config(mac_handle, sme_config);
 
@@ -18363,6 +18401,9 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 			reason_code = WLAN_LOG_REASON_DUMP_IN_PROGRESS;
 		else
 			reason_code = WLAN_LOG_REASON_CODE_UNUSED;
+
+		if (reason_code == WLAN_LOG_REASON_DUMP_IN_PROGRESS)
+			hdd_apf_dump_history(hdd_ctx);
 
 		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
 				WLAN_LOG_INDICATOR_FRAMEWORK,
@@ -25138,6 +25179,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 
 	FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
 	FEATURE_P2P_SET_MODE_VENDOR_COMMANDS
+	FEATURE_P2P_SET_NOA_VENDOR_COMMANDS
 
 	FEATURE_SAP_COND_CHAN_SWITCH_VENDOR_COMMANDS
 	{
@@ -33161,16 +33203,20 @@ __wlan_hdd_cfg80211_update_connect_params(struct wiphy *wiphy,
 	mac_handle = hdd_ctx->mac_handle;
 
 	if (changed & UPDATE_ASSOC_IE) {
-		assoc_ie.len = req->ie_len;
-		assoc_ie.ptr = (uint8_t *)req->ie;
-		/*
-		 * Update this assoc IE received from user space to
-		 * umac. RSO command will pick up the assoc
-		 * IEs to be sent to firmware from the umac.
-		 */
-		ucfg_cm_update_session_assoc_ie(hdd_ctx->psoc,
+		if (!hdd_cm_is_vdev_roaming(adapter->deflink)) {
+			assoc_ie.len = req->ie_len;
+			assoc_ie.ptr = (uint8_t *)req->ie;
+			/*
+			 * Update this assoc IE received from user space to
+			 * umac. RSO command will pick up the assoc
+			 * IEs to be sent to firmware from the umac.
+			 */
+			ucfg_cm_update_session_assoc_ie(
+						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
 						&assoc_ie);
+		} else
+			hdd_debug("skip assoc ie during roam");
 	}
 
 	if ((changed & UPDATE_FILS_ERP_INFO) ||

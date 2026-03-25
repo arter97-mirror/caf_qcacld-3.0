@@ -659,3 +659,15 @@ bool  target_if_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
 	return wmi_service_enabled(wmi_handle, wmi_service_pcc_mode);
 }
 #endif /* FEATURE_WLAN_SUPPORT_PCC */
+
+bool target_if_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle, wmi_service_p2p_cancel_one_shot_noa_support);
+}

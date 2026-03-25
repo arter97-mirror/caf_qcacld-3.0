@@ -46,7 +46,8 @@ _target_chipset_map = {
         "peach-v2",
         "kiwi-v2",
         "wcn7750",
-	"wcn6450",
+        "wcn6450",
+        "adrastea",
     ],
     "alor-le": [
         "wcn7750",
@@ -71,12 +72,19 @@ _target_chipset_map = {
         "kiwi-v2",
     ],
     "chora": [
-	"wcn7750",
-	"wcn6450",
-    ]
+        "wcn7750",
+        "wcn6450",
+    ],
+    "shikra":[
+            "wlan",
+    ],
+    "hamoa_la": [
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
+    "wlan"   : "ADRASTEA",
     "kiwi-v2": "BERYLLIUM",
     "peach": "BERYLLIUM",
     "peach-v2": "BERYLLIUM",
@@ -90,9 +98,12 @@ _chipset_hw_map = {
     "fig": "BORON",
     "wcn7760": "BERYLLIUM",
     "qca6574": "ROME",
+    "adrastea" : "ADRASTEA",
 }
 
 _chipset_header_map = {
+    "wlan" : [
+    ],
     "peach-v2": [
         "api/hw/peach/v2",
         "cmn/hal/wifi3.0/peach",
@@ -141,6 +152,8 @@ _chipset_header_map = {
     ],
     "qca6574": [
     ],
+    "adrastea" : [
+    ],
 }
 
 _hw_header_map = {
@@ -163,6 +176,8 @@ _hw_header_map = {
     "HELIUMPLUS": [
     ],
     "ROME": [
+    ],
+    "ADRASTEA" : [
     ],
 }
 
@@ -439,6 +454,7 @@ _fixed_ipaths = [
     "os_if/twt/inc",
     "os_if/telemetry/inc",
     "uapi/linux",
+    "cmn/hif/src/snoc",
 ]
 
 # paths where include files are private in src folders
@@ -1405,6 +1421,7 @@ _conditional_srcs = {
     "CONFIG_PLD_SNOC_ICNSS_FLAG": {
         True: [
             "core/pld/src/pld_snoc.c",
+            "cmn/hif/src/snoc/if_snoc.c",
         ],
     },
     "CONFIG_POWER_MANAGEMENT_OFFLOAD": {
@@ -2686,6 +2703,14 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = "cat $(SRCS) > $@",
     )
     native.genrule(
+        name = "configs/{}_defconfig_generate_defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
         name = "configs/{}_defconfig_generate_debug-defconfig".format(tvc),
         outs = ["configs/{}_defconfig.generated_debug-defconfig".format(tvc)],
         srcs = [
@@ -2697,7 +2722,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    if target == "sdxkova":
+    if target == "sdxkova" or target == "shikra":
         out = "wlan.ko"
     elif target == "sa510m":
         out = "{}.ko".format(chipset)
@@ -2707,7 +2732,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "wlan" or chipset == "adrastea":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
@@ -2739,7 +2764,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2758,6 +2783,36 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
+    deps = deps + select({
+        ":wonder_enabled": [
+	    # Add dependency of wonder here
+        ],
+        "//conditions:default": [],
+    })
+
+    wonder_srcs = "wonder_srcs_{}".format(tvc)
+    native.filegroup(
+        name = wonder_srcs,
+        srcs = select({
+            ":wonder_enabled": [
+                "core/hdd/src/wlan_hdd_wondertap.c",
+            ],
+            "//conditions:default": ["core/hdd/inc/wlan_hdd_wondertap.h"],
+        }),
+        visibility = ["//visibility:private"],
+    )
+
+    combined_conditional_srcs = dict(_conditional_srcs)
+    wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
+    existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
+    existing_true_list = existing_inner.get(True, [])
+    existing_true_list = existing_true_list + [
+            ":{}".format(wonder_srcs),
+    ]
+    existing_inner = dict(existing_inner)
+    existing_inner[True] = existing_true_list
+    combined_conditional_srcs[wonder_kcfg_key] = existing_inner
+
     print("name=", name)
     print("hw=", hw)
     print("ipaths=", ipaths)
@@ -2775,7 +2830,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
-        conditional_srcs = _conditional_srcs,
+        conditional_srcs = combined_conditional_srcs,
         copts = copts,
         out = out,
         kernel_build = kernel_build,
@@ -2799,7 +2854,7 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    if target != "sdxkova" and target != "alor-le":
+    if target != "sdxkova" and target != "alor-le" and target != "shikra":
         copy_to_dist_dir(
             name = "{}_all_modules_dist".format(tv),
             data = dataList,

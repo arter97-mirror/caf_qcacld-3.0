@@ -1500,6 +1500,65 @@ static void dp_fisa_rx_fst_del_queue(struct dp_rx_fst *fisa_hdl,
 	}
 }
 
+/* time in ns */
+#define FST_UPDATE_MON_TIME 1000000000
+#define MAX_ALLOWED_FST_UPDATE_PER_SEC 64
+#define MAX_ALLOWED_FST_UPDATE_PENDING 256
+
+static inline bool
+dp_fisa_rx_skip_fst_update(struct dp_rx_fst *fisa_hdl)
+{
+	uint64_t curr_time_ns;
+
+	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+	curr_time_ns = qdf_sched_clock();
+	if ((curr_time_ns - fisa_hdl->last_update_time_ns) >
+	    FST_UPDATE_MON_TIME) {
+		fisa_hdl->last_update_time_ns = curr_time_ns;
+		fisa_hdl->update_count = 0;
+	}
+
+	if (fisa_hdl->update_count >= MAX_ALLOWED_FST_UPDATE_PER_SEC ||
+	    (qdf_list_size(&fisa_hdl->fst_update_list) >=
+	     MAX_ALLOWED_FST_UPDATE_PENDING)) {
+		qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+		dp_debug_rl("Skip fst update update_cnt:%d list_size:%d",
+			    fisa_hdl->update_count,
+			    qdf_list_size(&fisa_hdl->fst_update_list));
+		return true;
+	}
+
+	fisa_hdl->update_count++;
+	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+	return false;
+}
+
+static inline struct dp_fisa_rx_sw_ft *
+dp_fisa_find_flow_in_sw_ft(struct dp_rx_fst *fisa_hdl, uint32_t flow_hash,
+			   struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+	uint32_t hashed_flow_idx = flow_hash & fisa_hdl->hash_mask;
+	uint32_t max_skid_length = fisa_hdl->max_skid_length;
+	uint32_t skid_count = 0;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+
+	do {
+		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
+					fisa_hdl->base)[hashed_flow_idx]);
+		if (sw_ft_entry->is_populated &&
+		    sw_ft_entry->flow_hash == flow_hash &&
+		    is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
+				 flow_tuple_info))
+			return sw_ft_entry;
+
+		hashed_flow_idx++;
+		hashed_flow_idx &= fisa_hdl->hash_mask;
+		skid_count++;
+	} while (skid_count <= max_skid_length);
+
+	return NULL;
+}
+
 /**
  * dp_fisa_rx_queue_fst_update_work() - Queue FST update work
  * @fisa_hdl: Handle to FISA context
@@ -1518,7 +1577,6 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(nbuf);
 	struct dp_fisa_rx_fst_update_elem *elem;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-	uint32_t hashed_flow_idx;
 	uint32_t reo_dest_indication;
 	bool found;
 	struct hal_proto_params proto_params;
@@ -1541,18 +1599,18 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	if (found)
 		return NULL;
 
-	hashed_flow_idx = flow_idx & fisa_hdl->hash_mask;
-	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
-				fisa_hdl->base)[hashed_flow_idx]);
-
 	wlan_dp_get_flow_tuple_from_nbuf(fisa_hdl->dp_ctx, &flow_tuple_info,
 					 nbuf, rx_tlv_hdr);
 	if (flow_tuple_info.bypass_fisa)
 		return NULL;
 
-	if (sw_ft_entry->is_populated && is_same_flow(
-			&sw_ft_entry->rx_flow_tuple_info, &flow_tuple_info))
+	sw_ft_entry = dp_fisa_find_flow_in_sw_ft(fisa_hdl, flow_idx,
+						 &flow_tuple_info);
+	if (sw_ft_entry)
 		return sw_ft_entry;
+
+	if (dp_fisa_rx_skip_fst_update(fisa_hdl))
+		return NULL;
 
 	elem = qdf_mem_malloc(sizeof(*elem));
 	if (!elem) {

@@ -1960,6 +1960,9 @@ bool policy_mgr_is_unsafe_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	bool allowed = false;
 
+	if (policy_mgr_is_safe_channel(psoc, sap_freq))
+		return true;
+
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_LEGACY_MAC_ID);
 	if (!vdev) {
@@ -1972,8 +1975,7 @@ bool policy_mgr_is_unsafe_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	 * configures the corresponding bit in ini coex_unsafe_chan_nb_user_prefer.
 	 */
 	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
-	     wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(psoc)) ||
-	    policy_mgr_is_safe_channel(psoc, sap_freq)) {
+	     wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(psoc))) {
 		allowed = true;
 		goto done;
 	}
@@ -2667,8 +2669,10 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	/* if user configured frequency is not valid
 	 * frequency, remain on the same frequency and do not restart the SAP
 	 */
-	if (!policy_mgr_is_safe_channel(pm_ctx->psoc, user_config_freq))
+	if (!policy_mgr_is_unsafe_freq_allowed(psoc, sap_info->vdev_id,
+					       user_config_freq))
 		goto vdev_release;
+
 	sap_freq = user_config_freq;
 
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
@@ -4106,7 +4110,8 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	if (cc_count == 1 && !is_acs_mode &&
 	    target_psoc_get_sap_coex_fixed_chan_cap(
 			wlan_psoc_get_tgt_if_handle(psoc)) &&
-	    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[0])) {
+	    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[0]) &&
+	    !policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc)) {
 		policy_mgr_debug("Avoid channel switch as it's allowed to operate on unsafe channel: %d",
 				 op_ch_freq_list[0]);
 		return;

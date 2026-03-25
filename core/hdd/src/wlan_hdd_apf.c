@@ -27,6 +27,7 @@
 #include "osif_sync.h"
 #include "qca_vendor.h"
 #include "wlan_osif_request_manager.h"
+#include "wlan_logging_sock_svc.h"
 
 /*
  * define short names for the global vendor params
@@ -67,14 +68,151 @@ void hdd_apf_context_init(struct hdd_adapter *adapter)
 	qdf_event_create(&adapter->apf_context.qdf_apf_event);
 	qdf_spinlock_create(&adapter->apf_context.lock);
 	adapter->apf_context.apf_enabled = true;
+	qdf_mem_zero(adapter->apf_context.apf_inst_pool,
+		     sizeof(adapter->apf_context.apf_inst_pool));
+	qdf_mem_zero(adapter->apf_context.apf_inst_total_len,
+		     sizeof(adapter->apf_context.apf_inst_total_len));
+	qdf_mem_zero(adapter->apf_context.apf_inst_curr_len,
+		     sizeof(adapter->apf_context.apf_inst_curr_len));
+	qdf_mem_zero(adapter->apf_context.apf_inst_timestamp,
+		     sizeof(adapter->apf_context.apf_inst_timestamp));
+	adapter->apf_context.apf_inst_index = 0;
 }
 
 void hdd_apf_context_destroy(struct hdd_adapter *adapter)
 {
+	int i;
+
 	qdf_event_destroy(&adapter->apf_context.qdf_apf_event);
 	qdf_spinlock_destroy(&adapter->apf_context.lock);
+
+	for (i = 0; i < APF_HISTORY_LEN; i++) {
+		if (adapter->apf_context.apf_inst_pool[i]) {
+			qdf_mem_free(adapter->apf_context.apf_inst_pool[i]);
+			adapter->apf_context.apf_inst_pool[i] = NULL;
+		}
+	}
+
 	qdf_mem_zero(&adapter->apf_context,
 		     sizeof(struct hdd_apf_context));
+}
+
+void hdd_apf_reset_history(struct hdd_adapter *adapter)
+{
+	struct hdd_apf_context *context = &adapter->apf_context;
+	int i;
+
+	hdd_enter();
+	qdf_spin_lock_bh(&context->lock);
+	for (i = 0; i < APF_HISTORY_LEN; i++) {
+		if (context->apf_inst_pool[i]) {
+			qdf_mem_free(context->apf_inst_pool[i]);
+			context->apf_inst_pool[i] = NULL;
+		}
+		context->apf_inst_total_len[i] = 0;
+		context->apf_inst_curr_len[i] = 0;
+	}
+	context->apf_inst_index = 0;
+	qdf_spin_unlock_bh(&context->lock);
+	hdd_exit();
+}
+
+/**
+ * hdd_prepare_apf_log_buffer() - Prepare APF log buffer with timestamp
+ * @context: APF context
+ * @idx: Index in the history array
+ * @out_buf: Output buffer to store formatted data
+ * @out_len: Pointer to store the output length
+ *
+ * This function formats the APF instruction data as:
+ * [8 bytes: timestamp][2 bytes: length][N bytes: instruction data]
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int hdd_prepare_apf_log_buffer(struct hdd_apf_context *context,
+				      int idx, uint8_t *out_buf,
+				      uint32_t *out_len)
+{
+	uint64_t timestamp;
+	uint16_t inst_len;
+	uint32_t total_len;
+	uint32_t header_size;
+	uint8_t *ptr = out_buf;
+
+	if (!context->apf_inst_pool[idx] ||
+	    context->apf_inst_curr_len[idx] != context->apf_inst_total_len[idx])
+		return -EINVAL;
+
+	inst_len = (uint16_t)context->apf_inst_total_len[idx];
+	timestamp = context->apf_inst_timestamp[idx];
+
+	/* Calculate header size: timestamp + length field */
+	header_size = sizeof(timestamp) + sizeof(inst_len);
+
+	/* Validate instruction length doesn't exceed storage capacity */
+	if (inst_len > MAX_APF_MEMORY_LEN)
+		return -EINVAL;
+
+	total_len = header_size + inst_len;
+
+	qdf_mem_copy(ptr, &timestamp, sizeof(timestamp));
+	ptr += sizeof(timestamp);
+
+	qdf_mem_copy(ptr, &inst_len, sizeof(inst_len));
+	ptr += sizeof(inst_len);
+
+	qdf_mem_copy(ptr, context->apf_inst_pool[idx], inst_len);
+
+	*out_len = total_len;
+	return 0;
+}
+
+void hdd_apf_dump_history(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct hdd_apf_context *context;
+	int i, start_idx, ret;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_APF_INSTRUCTION;
+	uint8_t *temp_buf;
+	uint32_t buf_len;
+	uint32_t buf_size;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode != QDF_STA_MODE &&
+		    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		/* Allocate buffer for: max instruction + timestamp + length field */
+		buf_size = MAX_APF_MEMORY_LEN + sizeof(uint64_t) + sizeof(uint16_t);
+		temp_buf = qdf_mem_malloc(buf_size);
+		if (!temp_buf) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		context = &adapter->apf_context;
+		qdf_spin_lock_bh(&context->lock);
+		start_idx = context->apf_inst_index;
+		qdf_spin_unlock_bh(&context->lock);
+
+		/* Start from the oldest entry */
+		for (i = 0; i < APF_HISTORY_LEN; i++) {
+			int idx = (start_idx + i) % APF_HISTORY_LEN;
+
+			qdf_spin_lock_bh(&context->lock);
+			ret = hdd_prepare_apf_log_buffer(context, idx,
+							 temp_buf, &buf_len);
+			qdf_spin_unlock_bh(&context->lock);
+
+			if (!ret)
+				wlan_log_apf_to_user(temp_buf, buf_len);
+		}
+		qdf_mem_free(temp_buf);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
 }
 
 struct apf_offload_priv {
@@ -210,6 +348,74 @@ cleanup:
 	return ret;
 }
 
+static void hdd_apf_store_instruction(struct hdd_adapter *adapter,
+				      struct sir_apf_set_offload *apf_set_offload)
+{
+	struct hdd_apf_context *context = &adapter->apf_context;
+	uint8_t idx;
+	int prog_len = apf_set_offload->current_length;
+
+	/* Sanity check for negative length */
+	if (prog_len < 0) {
+		hdd_err("Invalid program length: %d", prog_len);
+		return;
+	}
+
+	qdf_spin_lock_bh(&context->lock);
+	idx = context->apf_inst_index;
+
+	/* New instruction stream? */
+	if (context->apf_inst_curr_len[idx] == 0 ||
+	    (context->apf_inst_curr_len[idx] ==
+	     context->apf_inst_total_len[idx] &&
+	     context->apf_inst_total_len[idx] > 0)) {
+		/* Free old if exists */
+		if (context->apf_inst_pool[idx]) {
+			qdf_mem_free(context->apf_inst_pool[idx]);
+			context->apf_inst_pool[idx] = NULL;
+		}
+
+		context->apf_inst_pool[idx] = qdf_mem_malloc(apf_set_offload->total_length);
+		if (context->apf_inst_pool[idx]) {
+			context->apf_inst_total_len[idx] = apf_set_offload->total_length;
+		} else {
+			hdd_err("APF Malloc failed for len: %d", apf_set_offload->total_length);
+			/* Ensure total_len is 0 so we don't try to use this slot */
+			context->apf_inst_total_len[idx] = 0;
+		}
+		context->apf_inst_curr_len[idx] = 0;
+		context->apf_inst_timestamp[idx] = 0;
+	}
+
+	if (context->apf_inst_pool[idx] &&
+	    (context->apf_inst_total_len[idx] == apf_set_offload->total_length) &&
+	    (apf_set_offload->current_offset + prog_len <= context->apf_inst_total_len[idx])) {
+
+		qdf_mem_copy(context->apf_inst_pool[idx] + apf_set_offload->current_offset,
+			     apf_set_offload->program, prog_len);
+
+		if (apf_set_offload->current_offset + prog_len >
+		    context->apf_inst_curr_len[idx])
+			context->apf_inst_curr_len[idx] =
+				apf_set_offload->current_offset + prog_len;
+
+		/* Check if complete */
+		if (context->apf_inst_curr_len[idx] == context->apf_inst_total_len[idx]) {
+			/* Capture timestamp when instruction is complete */
+			context->apf_inst_timestamp[idx] = qdf_get_time_of_the_day_us();
+
+			/* Move to next slot */
+			context->apf_inst_index = (idx + 1) % APF_HISTORY_LEN;
+		}
+	} else {
+		hdd_err("APF History Store Failed: idx=%d pool=%pK total=%d/%d off=%d len=%d",
+			idx, context->apf_inst_pool[idx],
+			context->apf_inst_total_len[idx], apf_set_offload->total_length,
+			apf_set_offload->current_offset, prog_len);
+	}
+	qdf_spin_unlock_bh(&context->lock);
+}
+
 /**
  * hdd_set_reset_apf_offload - Post set/reset apf to SME
  * @hdd_ctx: Hdd context
@@ -245,6 +451,13 @@ static int hdd_set_reset_apf_offload(struct hdd_context *hdd_ctx,
 	if (!apf_set_offload.total_length) {
 		hdd_debug("APF reset packet");
 		goto post_sme;
+	}
+
+	if (apf_set_offload.total_length > MAX_APF_MEMORY_LEN) {
+		hdd_err("APF total length %d exceeds max %d",
+			apf_set_offload.total_length, MAX_APF_MEMORY_LEN);
+		ret = -EINVAL;
+		goto fail;
 	}
 
 	/* Parse and fetch apf program */
@@ -295,6 +508,11 @@ post_sme:
 		ret = -EINVAL;
 		goto fail;
 	}
+
+	/* Store instructions in history only if SME is successful */
+	if (apf_set_offload.total_length)
+		hdd_apf_store_instruction(adapter, &apf_set_offload);
+
 	hdd_exit();
 
 fail:
@@ -726,4 +944,3 @@ wlan_hdd_cfg80211_apf_offload(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	return errno;
 }
-

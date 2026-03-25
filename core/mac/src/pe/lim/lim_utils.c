@@ -3837,6 +3837,12 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 {
 	uint8_t cb_mode = mac->roam.configParam.channelBondingMode5GHz;
 
+	if (LIM_IS_STA_ROLE(session) &&
+	    wlan_vdev_mlme_get_sta_in_20mhz(session->vdev)) {
+		pe_debug_rl("vdev %d force 20 Mhz", session->vdev_id);
+		return WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+	}
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 		if (wlan_cm_get_force_20mhz_in_24ghz(session->vdev)) {
 			cb_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
@@ -5825,12 +5831,27 @@ void lim_set_stads_rtt_cap(tpDphHashNode sta_ds, struct s_ext_cap *ext_cap,
 #ifdef WLAN_SUPPORT_TWT
 void lim_set_peer_twt_cap(struct pe_session *session, struct s_ext_cap *ext_cap)
 {
+	struct wlan_objmgr_psoc *psoc;
+	bool twt_ht_vht_sup = false;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc)
+		return;
+
 	if (session->enable_session_twt_support) {
-		session->peer_twt_requestor = ext_cap->twt_requestor_support;
+		wlan_twt_cfg_get_req_support_for_ht_vht(psoc, &twt_ht_vht_sup);
+		if (session->dot11mode < MLME_DOT11_MODE_11AX &&
+		    !twt_ht_vht_sup)
+			session->peer_twt_requestor = 0;
+		else
+			session->peer_twt_requestor =
+					ext_cap->twt_requestor_support;
+
 		session->peer_twt_responder = ext_cap->twt_responder_support;
 	}
 
-	pe_debug("Ext Cap peer TWT requestor: %d, responder: %d, enable_twt %d",
+	pe_debug("Dot11mode: %d, Ext Cap peer TWT requestor: %d, responder: %d, enable_twt %d",
+		 session->dot11mode,
 		 ext_cap->twt_requestor_support,
 		 ext_cap->twt_responder_support,
 		 session->enable_session_twt_support);
@@ -5965,6 +5986,12 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 {
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg;
 	tSirVhtMcsInfo *vht_mcs;
+	union {
+		uint16_t		       u_value;
+		tSirMacVHTRxSupDataRateInfo    vht_rx_supp_rate;
+		tSirMacVHTTxSupDataRateInfo    vht_tx_supp_rate;
+	} u_vht_data_rate_info;
+
 	struct wlan_objmgr_vdev *vdev =
 			wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							     vdev_id,
@@ -5985,16 +6012,19 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 	/* Populate VHT MCS Information */
 	vht_mcs->txMcsMap |=
 		VHT_DISABLE_MCS_OVER_NSS(nss_chains_ini_cfg->tx_nss[band]);
-	vht_mcs->txHighest =
+	u_vht_data_rate_info.u_value = vht_mcs->txHighest;
+	u_vht_data_rate_info.vht_tx_supp_rate.txSupDataRate =
 		VHT_GET_DATARATE_FOR_NSS_AND_GI(nss_chains_ini_cfg->tx_nss[band],
 						true);
+	vht_mcs->txHighest = u_vht_data_rate_info.u_value;
 
-	/* Populate VHT MCS Information */
 	vht_mcs->rxMcsMap |=
 		VHT_DISABLE_MCS_OVER_NSS(nss_chains_ini_cfg->rx_nss[band]);
-	vht_mcs->rxHighest =
+	u_vht_data_rate_info.u_value = vht_mcs->rxHighest;
+	u_vht_data_rate_info.vht_rx_supp_rate.rxSupDataRate =
 		VHT_GET_DATARATE_FOR_NSS_AND_GI(nss_chains_ini_cfg->rx_nss[band],
 						true);
+	vht_mcs->rxHighest = u_vht_data_rate_info.u_value;
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -11507,6 +11537,39 @@ void lim_overwrite_sta_puncture(struct pe_session *session,
 #else
 #endif
 
+static inline QDF_STATUS
+lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
+				      struct pe_session *session)
+{
+	struct vdev_type_nss *vdev_type_nss;
+	enum QDF_OPMODE opmode;
+	enum bss_type bss_type = eSIR_DONOT_USE_BSS_TYPE;
+
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session->vdev_id);
+	if (opmode == QDF_PASSTHRU_MODE)
+		bss_type = eSIR_PASSTHRU_MODE;
+
+	pe_debug("opmode %d bss_type %d", opmode, bss_type);
+	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
+		vdev_type_nss = &mac_ctx->vdev_type_nss_5g;
+	} else {
+		vdev_type_nss = &mac_ctx->vdev_type_nss_2g;
+	}
+
+	switch (bss_type) {
+	case eSIR_PASSTHRU_MODE:
+		/* Use STA mode NSS config for PASSTHRU */
+		session->vdev_nss = vdev_type_nss->sta;
+		break;
+	default:
+		/* not used anywhere...used in scan function */
+		break;
+	}
+
+	session->nss = session->vdev_nss;
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 					  struct pe_session *session)
 {
@@ -11590,6 +11653,9 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 	session->ch_width = ch_params.ch_width;
 	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
 	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
+
+	if (LIM_IS_PASSTHRU_ROLE(session))
+		lim_fill_session_nss_params_on_create(mac, session);
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!mlme_obj) {
@@ -12163,6 +12229,29 @@ lim_cleanup_power_change(struct mac_context *mac_ctx,
 	wlan_set_tpc_update_required_for_sta(sap_session->vdev, false);
 }
 
+QDF_STATUS lim_get_6g_power_type_with_bw(
+	struct mac_context *mac,
+	struct pe_session *session,
+	qdf_freq_t chan_freq,
+	enum reg_6g_ap_type *power_type_6g)
+{
+	qdf_freq_t center_320 = 0;
+
+	if (session->ch_center_freq_seg1 &&
+	    session->ch_width == CH_WIDTH_320MHZ)
+		center_320 = wlan_reg_chan_band_to_freq(
+			mac->pdev, session->ch_center_freq_seg1,
+			BIT(REG_BAND_6G));
+
+	return wlan_reg_get_best_6g_power_type_for_bw(
+		mac->psoc, mac->pdev,
+		power_type_6g,
+		session->ap_defined_power_type_6g,
+		chan_freq,
+		center_320,
+		session->ch_width);
+}
+
 void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 {
@@ -12187,11 +12276,11 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
 		goto set_tpc;
 
-	status = wlan_reg_get_best_6g_power_type(
-					mac_ctx->psoc, mac_ctx->pdev,
-					&power_type_6g,
-					session->ap_defined_power_type_6g,
-					session->curr_op_freq);
+	status = lim_get_6g_power_type_with_bw(
+					mac_ctx,
+					session,
+					session->curr_op_freq,
+					&power_type_6g);
 	if ((QDF_IS_STATUS_ERROR(status))) {
 		if (lim_is_sb_disconnect_allowed(session)) {
 			pe_err("No power type found for connection frequency, trigger DISCONNECT");
@@ -12245,12 +12334,11 @@ lim_recompute_sta_cli_tpc(struct mac_context *mac,
 		 !wlan_reg_is_indoor_ap_detected(mac->pdev))
 		session->ap_defined_power_type_6g = REG_VERY_LOW_POWER_AP;
 
-	status = wlan_reg_get_best_6g_power_type(
-				mac->psoc, mac->pdev,
-				&power_type_6g,
-				session->ap_defined_power_type_6g,
-				session->curr_op_freq);
-
+	status = lim_get_6g_power_type_with_bw(
+					mac,
+					session,
+					session->curr_op_freq,
+					&power_type_6g);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 

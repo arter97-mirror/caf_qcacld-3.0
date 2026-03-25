@@ -3615,7 +3615,8 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 {
 	struct scheduler_msg message = {0};
 
-	if (session->bssType != eSIR_MONITOR_MODE)
+	if (!(session->bssType == eSIR_MONITOR_MODE ||
+	      session->bssType == eSIR_PASSTHRU_MODE))
 		return;
 
 	if (QDF_IS_STATUS_ERROR(status)) {

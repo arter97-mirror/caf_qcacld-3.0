@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,6 +36,7 @@
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_hdd_dcs.h"
 #include <cfg_mlme_vht_caps.h>
+#include "wlan_ll_sap_api.h"
 
 /**
  * hdd_green_ap_check_enable() - to check whether to enable green ap or not
@@ -296,6 +297,9 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 				hdd_ctx->psoc,
 				mac_id,
 				vdev_id, lp_flags);
+
+	if (lp_flags == QCA_WLAN_DOZED_AP_ENABLE)
+		wlan_ll_sap_set_cur_freq_unused_cu(hdd_ctx->psoc, vdev_id, 0);
 
 	len = NLMSG_HDRLEN;
 	/*QCA_WLAN_VENDOR_ATTR_DOZED_AP_COOKIE*/

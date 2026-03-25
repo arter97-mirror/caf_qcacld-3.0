@@ -60,6 +60,7 @@ first_connection_pcl_table[PM_MAX_NUM_OF_MODE]
 	[PM_P2P_GO_MODE] = {PM_5G,   PM_5G,   PM_5G  },
 	[PM_NAN_DISC_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
+	[PM_PASSTHRU_MODE] = {PM_NONE, PM_NONE, PM_NONE},
 };
 
 pm_dbs_pcl_second_connection_table_type
@@ -2526,6 +2527,11 @@ enum policy_mgr_one_connection_mode
 			index = PM_NAN_DISC_24_2x2;
 	} else if (PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) {
 		index = PM_LL_LT_SAP_5_2x2;
+	} else if (PM_PASSTHRU_MODE == pm_conc_connection_list[0].mode) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pm_conc_connection_list[0].freq))
+			index = PM_PASSTHRU_24_1x1_2x2;
+		else
+			index = PM_PASSTHRU_5_1x1_2x2;
 	}
 
 	policy_mgr_debug("mode:%d freq:%d chain:%d index:%d",

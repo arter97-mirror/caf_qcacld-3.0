@@ -97,6 +97,20 @@ struct hdd_context;
 netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /**
+ * hdd_hard_start_xmit_passthru() - Transmit a frame in passthrough mode
+ * @skb: pointer to OS packet
+ * @dev: pointer to net_device structure
+ *
+ * Function for raw packet transmission without WMM admission control.
+ * This version directly passes the packet to Transport Layer without
+ * checking for FTM mode, getting AC/user priority, or WMM admission control.
+ *
+ * Return: Always returns NETDEV_TX_OK
+ */
+netdev_tx_t hdd_hard_start_xmit_passthru(struct sk_buff *skb,
+					 struct net_device *dev);
+
+/**
  * hdd_tx_timeout() - Wrapper function to protect __hdd_tx_timeout from SSR
  * @dev: pointer to net_device structure
  * @txqueue: tx queue

@@ -1160,6 +1160,7 @@ QDF_STATUS wma_handle_channel_switch_resp(tp_wma_handle wma,
 	/* Indicate channel switch failure to LIM */
 	if (QDF_IS_STATUS_ERROR(rsp->status) &&
 	    (iface->type == WMI_VDEV_TYPE_MONITOR ||
+	     iface->type == WMI_VDEV_TYPE_WIFI_PASSTHRU ||
 	     wma_is_vdev_in_ap_mode(wma, rsp->vdev_id) ||
 	     mlme_is_chan_switch_in_progress(iface->vdev))) {
 		mlme_set_chan_switch_in_progress(iface->vdev, false);
@@ -1469,6 +1470,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 
 	if (mlme_is_chan_switch_in_progress(iface->vdev) ||
 	    iface->type == WMI_VDEV_TYPE_MONITOR ||
+	    iface->type == WMI_VDEV_TYPE_WIFI_PASSTHRU ||
 	    (iface->type == WMI_VDEV_TYPE_STA &&
 	     (assoc_type == VDEV_ASSOC || assoc_type == VDEV_REASSOC))) {
 		status = wma_handle_channel_switch_resp(wma,
@@ -3444,6 +3446,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	case WMI_VDEV_TYPE_NAN:
 	case WMI_VDEV_TYPE_OCB:
 	case WMI_VDEV_TYPE_MONITOR:
+	case WMI_VDEV_TYPE_WIFI_PASSTHRU:
 		status = ucfg_get_enable_sifs_burst(wma_handle->psoc,
 						    &enable_sifs_burst);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -4574,7 +4577,7 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	if (intr[vdev_id].type == WMI_VDEV_TYPE_STA &&
 	    WLAN_REG_IS_5GHZ_CH_FREQ(vdev->vdev_mlme.bss_chan->ch_freq)) {
 		edca_txop_duration_us =
-		    wlan_mlme_get_edca_txop_duration_ms(mac_ctx->psoc) * 1024;
+		    wlan_mlme_get_edca_txop_duration_ms(mac_ctx->psoc) * 1000;
 
 		ret = mlme_check_index_setparam(
 					setparam,

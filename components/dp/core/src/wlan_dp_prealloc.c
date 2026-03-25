@@ -370,7 +370,11 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
+#ifndef WLAN_SOFTUMAC_SUPPORT
 #define NUM_HW_LINK_DESCS (32 * 1024)
+#else
+#define NUM_HW_LINK_DESCS (32 * 64)
+#endif
 
 /* Size in bytes of HW LINK DESC */
 #define HW_LINK_DESC_SIZE 128
@@ -519,21 +523,22 @@ static struct dp_consistent_prealloc_unaligned
 
 static struct dp_page_pool_t g_dp_rx_pp_allocs[] = {
 	/* Keep RX AUX pool always at the top */
-	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PP_AUX_POOL_SIZE, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PP_AUX_POOL_SIZE, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
 };
 
 static struct dp_page_pool_t g_dp_tx_pp_allocs[] = {
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
 };
 
 struct dp_page_pool_t*
-dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
+			  int *pp_track_id)
 {
 	struct dp_page_pool_t *base_pp;
 	struct dp_page_pool_t *pp_t;
@@ -564,6 +569,9 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 		if (type == pp_t->type && !pp_t->in_use &&
 		    pool_size == pp_t->pool_size) {
 			pp_t->in_use = true;
+			if (pp_track_id)
+				*pp_track_id = pp_t->pp_track_id;
+
 			dp_info("get page pool %d type %d size %d success",
 				i, type, pp_t->pool_size);
 			return pp_t;
@@ -653,7 +661,8 @@ out_put_page:
 static qdf_page_pool_t
 dp_prealloc_page_pool_create(qdf_device_t osdev, uint32_t pool_size,
 			     size_t buf_size, size_t *page_size,
-			     size_t *pp_size, qdf_dma_dir_t dir)
+			     size_t *pp_size, qdf_dma_dir_t dir,
+			     int *pp_track_id)
 {
 	qdf_page_pool_t pp;
 	size_t bufs_per_page;
@@ -666,7 +675,8 @@ alloc_page_pool:
 	if (pool_size % bufs_per_page)
 		*pp_size = (*pp_size + 1);
 
-	pp = qdf_page_pool_create(osdev, *pp_size, *page_size, dir);
+	pp = qdf_page_pool_create(osdev, *pp_size,
+				  *page_size, dir, pp_track_id);
 	if (!pp) {
 		dp_err("Failed to create page pool");
 		return NULL;
@@ -718,7 +728,9 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	size_t rx_buf_size = 0;
 	uint32_t rx_pool_size;
 	bool rx_pp_en = false;
+	bool rx_pp_prealloc_en = false;
 	bool tx_pp_en = false;
+	bool tx_pp_prealloc_en = false;
 	bool dyn_rx_buf_alloc = false;
 	int base_pool_size;
 	int max_rx_pp_alloc;
@@ -729,8 +741,8 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 		return;
 
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_en, &rx_buf_size,
-			       &rx_pool_size);
-	if (!rx_pp_en)
+			       &rx_pool_size, &rx_pp_prealloc_en);
+	if (!rx_pp_en || !rx_pp_prealloc_en)
 		goto tx_pp_alloc;
 
 	dyn_rx_buf_alloc = dp_prealloc_is_dynamic_rsc_mgmt_enabled(ctrl_psoc);
@@ -775,7 +787,8 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 							rx_buf_size,
 							&pp_t->page_size,
 							&pp_t->pp_size,
-							QDF_DMA_FROM_DEVICE);
+							QDF_DMA_FROM_DEVICE,
+							&pp_t->pp_track_id);
 		if (pp_t->pp) {
 			dp_info("RX page pool %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
 				i, pp_t->pool_size, pp_t->pp_size,
@@ -789,8 +802,8 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	}
 
 tx_pp_alloc:
-	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en);
-	if (!tx_pp_en)
+	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en, &tx_pp_prealloc_en);
+	if (!tx_pp_en || !tx_pp_prealloc_en)
 		return;
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_tx_pp_allocs); i++) {
@@ -806,7 +819,8 @@ tx_pp_alloc:
 							DP_TX_PAGE_POOL_BUFSIZE,
 							&pp_t->page_size,
 							&pp_t->pp_size,
-							QDF_DMA_BIDIRECTIONAL);
+							QDF_DMA_BIDIRECTIONAL,
+							NULL);
 		if (pp_t->pp) {
 			dp_info("TX page pool %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
 				i, pp_t->pool_size, pp_t->pp_size,
@@ -1086,10 +1100,11 @@ dp_prealloc_rx_iova_refcnt_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 {
 	size_t rx_buf_size;
 	bool rx_pp_enable = 0;
+	bool rx_pp_prealloc_en = false;
 	uint32_t rx_pool_size;
 
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_enable, &rx_buf_size,
-			       &rx_pool_size);
+			       &rx_pool_size, &rx_pp_prealloc_en);
 
 	return rx_pp_enable;
 }

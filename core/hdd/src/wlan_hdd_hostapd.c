@@ -1733,7 +1733,7 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode)
 	case MODE_11AC_VHT20_2G:
 	case MODE_11AC_VHT40_2G:
 	case MODE_11AC_VHT80_2G:
-#ifdef CONFIG_160MHZ_SUPPORT
+#if CONFIG_160MHZ_SUPPORT
 	case MODE_11AC_VHT80_80:
 	case MODE_11AC_VHT160:
 #endif
@@ -2847,7 +2847,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		 * set this event at the very end because once this events
 		 * get set, caller thread is waiting to do further processing.
 		 * so once this event gets set, current worker thread might get
-		 * pre-empted by caller thread.
+		 * preempted by caller thread.
 		 */
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -3656,7 +3656,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			}
 		}
 
-		/* Check any SAP need restart, if initiater was not LL SAP */
+		/* Check any SAP need restart, if initiator was not LL SAP */
 		if (sap_ctx->csa_reason != CSA_REASON_LL_LT_SAP_EVENT &&
 		    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						  link_info->vdev_id))
@@ -7543,6 +7543,27 @@ hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
 }
 #endif
 
+/*
+ * wlan_hdd_get_twt_responder_value() - Get TWT responder value from config
+ * @config: Pointer to sap_config structure
+ *
+ * Encapsulates the feature macro check to avoid using feature macros
+ * inside functions.
+ *
+ * Return: TWT responder value (true/false)
+ */
+#if defined(WLAN_SUPPORT_TWT)
+static inline bool wlan_hdd_get_twt_responder_value(struct sap_config *config)
+{
+	return config->cfg80211_twt_responder;
+}
+#else
+static inline bool wlan_hdd_get_twt_responder_value(struct sap_config *config)
+{
+	return false;
+}
+#endif
+
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
  * @link_info: Link info pointer in HDD adapter
@@ -7596,6 +7617,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	struct hdd_ap_ctx *ap_ctx;
 	enum policy_mgr_con_mode pm_con_mode;
 	struct qdf_mac_addr *link_mac;
+	bool twt_resp = false;
 
 	hdd_enter();
 
@@ -8167,6 +8189,12 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	updated_phy_mode = wlan_reg_get_max_phymode(hdd_ctx->pdev, reg_phy_mode,
 						    config->chan_freq);
 	config->SapHw_mode = csr_convert_from_reg_phy_mode(updated_phy_mode);
+
+	twt_resp = wlan_hdd_get_twt_responder_value(config);
+	wlan_hdd_configure_twt_responder(hdd_ctx, twt_resp,
+					 adapter->deflink->vdev_id,
+					 config->SapHw_mode);
+
 	if (config->sap_orig_hw_mode != config->SapHw_mode)
 		hdd_info("Vdev %d orig phymode %d new phymode %d",
 			 link_info->vdev_id, config->sap_orig_hw_mode,
@@ -9114,18 +9142,46 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/*
+ * wlan_hdd_set_twt_responder_from_params() - Set TWT responder from
+ * cfg80211_ap_settings
+ * @config: sap_config
+ * @params: cfg80211_ap_settings
+ *
+ * Return: None
+ */
+#if defined(WLAN_SUPPORT_TWT)
+static void
+wlan_hdd_set_twt_responder_from_params(
+				struct sap_config *config,
+				const struct cfg80211_ap_settings *params)
+{
+	if (params)
+		config->cfg80211_twt_responder = params->twt_responder;
+}
+#else
+static void
+wlan_hdd_set_twt_responder_from_params(
+				struct sap_config *config,
+				const struct cfg80211_ap_settings *params)
+{
+}
+#endif
+
 #if defined(WLAN_SUPPORT_TWT) && \
 	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
 	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
 #ifdef WLAN_TWT_CONV_SUPPORTED
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				      bool twt_responder, uint8_t vdev_id)
+				      bool twt_responder, uint8_t vdev_id,
+				      eCsrPhyMode sap_hw_mode)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
 	enum QDF_OPMODE mode;
 	uint8_t twt_res_cfg;
 	bool twt_rsp_disable_svc;
+	bool twt_ht_vht_sup = false, ll_lt_sap;
 
 	/* This is a temporary fix to disable twt_responder for sap
 	 * interface. Later the changes will come to enable/disable
@@ -9144,10 +9200,10 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(hdd_ctx->psoc,
 						    &twt_rsp_disable_svc);
 
+	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id);
 	if (!twt_rsp_disable_svc &&
 	    !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-	    mode == QDF_SAP_MODE &&
-	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id))
+	    mode == QDF_SAP_MODE && !ll_lt_sap)
 		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, false);
 
 	ucfg_twt_cfg_get_responder(hdd_ctx->psoc, &twt_res_cfg);
@@ -9156,14 +9212,24 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	if (!twt_res_svc_cap || !enable_twt ||
-	    (!twt_responder && !twt_rsp_disable_svc))
+	ucfg_twt_get_responder_support_for_ht_vht_mode(hdd_ctx->psoc,
+						       &twt_ht_vht_sup);
+	/* Only disable TWT globally when per-vdev support is not available
+	 * With per-vdev support, individual vdevs can be controlled separately
+	 * without affecting other vdevs (e.g., XPAN TWT functionality)
+	 */
+	if (!twt_rsp_disable_svc &&
+	    (!twt_res_svc_cap || !enable_twt || !twt_responder ||
+	     (!ll_lt_sap && sap_hw_mode < eCSR_DOT11_MODE_11ax &&
+	      !twt_ht_vht_sup)))
 		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, 0);
 
 	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
 		  twt_responder, enable_twt, twt_res_cfg);
 	if (enable_twt && twt_res_cfg &&
-	    (twt_responder || twt_rsp_disable_svc)) {
+	    (twt_responder || twt_rsp_disable_svc) &&
+	    (ll_lt_sap || sap_hw_mode >= eCSR_DOT11_MODE_11ax ||
+	     twt_ht_vht_sup)) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
@@ -9174,7 +9240,9 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	if (!twt_rsp_disable_svc)
 		return;
 
-	if (twt_responder)
+	if (twt_responder &&
+	    (ll_lt_sap || sap_hw_mode >= eCSR_DOT11_MODE_11ax ||
+	     twt_ht_vht_sup))
 		osif_twt_send_responder_disable_per_vdev(hdd_ctx->psoc, vdev_id,
 							 mode, twt_res_cfg);
 	else
@@ -9182,25 +9250,15 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 							 vdev_id);
 }
 
-static void
-wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
-			      struct cfg80211_ap_settings *params)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	adapter->deflink->session.ap.sap_config.cfg80211_twt_responder =
-							params->twt_responder;
-	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder,
-					 adapter->deflink->vdev_id);
-}
-
 #else
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				      bool twt_responder, uint8_t vdev_id)
+				      bool twt_responder, uint8_t vdev_id,
+				      eCsrPhyMode sap_hw_mode)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
 	enum QDF_OPMODE mode;
+	bool twt_ht_vht_sup = false;
 
 	mode = wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id);
 	if (mode == QDF_P2P_GO_MODE &&
@@ -9216,7 +9274,13 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 				    QDF_MIN(twt_res_svc_cap,
 					    (enable_twt && twt_responder)));
 	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
-	if (enable_twt && twt_responder) {
+	ucfg_twt_get_responder_support_for_ht_vht_mode(hdd_ctx->psoc,
+						       &twt_ht_vht_sup);
+
+	if (enable_twt && twt_responder &&
+	    (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id) ||
+	     sap_hw_mode >= eCSR_DOT11_MODE_11ax ||
+	     twt_ht_vht_sup)) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
@@ -9224,26 +9288,11 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	}
 }
 
-static void
-wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
-			      struct cfg80211_ap_settings *params)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	adapter->deflink->session.ap.sap_config.cfg80211_twt_responder =
-							params->twt_responder;
-	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder,
-					 adapter->deflink->vdev_id);
-}
 #endif
 #else
-static inline void
-wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
-			      struct cfg80211_ap_settings *params)
-{}
-
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				      bool twt_responder, uint8_t vdev_id)
+				      bool twt_responder, uint8_t vdev_id,
+				      eCsrPhyMode sap_hw_mode)
 {}
 #endif
 
@@ -9498,7 +9547,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 		if (channel_width != HW_MODE_20_MHZ) {
-			hdd_err("Hostapd (20+ MHz) conflits with config.ini (sub 20 MHz)");
+			hdd_err("Hostapd (20+ MHz) conflicts with config.ini (sub 20 MHz)");
 			return -EINVAL;
 		}
 		if (cds_is_5_mhz_enabled())
@@ -9703,11 +9752,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		sap_config->ch_width_orig =
 					hdd_map_nl_chan_width(chandef->width);
 
-		/*
-		 * Enable/disable TWT responder based on
-		 * the twt_responder flag
-		 */
-		wlan_hdd_update_twt_responder(adapter, params);
+	wlan_hdd_set_twt_responder_from_params(sap_config, params);
 
 		/* Enable/disable non-srg obss pd spatial reuse */
 		hdd_update_he_obss_pd(link_info, params);

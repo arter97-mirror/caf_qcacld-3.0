@@ -612,6 +612,12 @@ pld_pcie_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {
 	return -EINVAL;
 }
+
+static inline
+int pld_pcie_set_vendor_wonder_priv_data(const void *priv_data)
+{
+	return -EINVAL;
+}
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 int pld_pcie_set_wfc_mode(struct device *dev,
@@ -1183,6 +1189,12 @@ static inline int
 pld_pcie_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {
 	return cnss_pci_get_iova_info(dev, addr, size);
+}
+
+static inline
+int pld_pcie_set_vendor_wonder_priv_data(const void *priv_data)
+{
+	return cnss_set_vendor_wonder_priv_data(priv_data);
 }
 #endif
 #endif

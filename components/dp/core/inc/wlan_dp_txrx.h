@@ -205,6 +205,72 @@ dp_softap_rx_packet_cbk(void *intf_ctx, qdf_nbuf_t rx_buf);
 QDF_STATUS
 dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf);
 
+#if defined(DRIVER_PASSTHRU_MODE)
+/**
+ * dp_start_xmit_passthru() - Transmit function for passthrough mode
+ * @dp_link: DP link handle
+ * @nbuf: network buffer to transmit
+ *
+ * This function is based on dp_start_xmit() but simplified for
+ * passthrough mode:
+ * - Does not set FLAGS_NOTIFY in qdf_nbuf->cb{}
+ * - Does not get pkt_type and eliminates pkt_type comparison logic
+ * - Uses empty functions for timestamp and connectivity stats
+ * - Uses simplified MAC address retrieval for passthrough mode only
+ * - Does not call dp_get_tx_resource()
+ * - Does not check for qdf_nbuf_ipa_owned_get()
+ * - Does not check for TSO or EAPOL
+ * - Eliminates dp_nbuf_nontso_linearize code block
+ * - Does not call dp_fix_broadcast_eapol()
+ * - Eliminates drop_pkt_accounting section
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_FAILURE on failure
+ */
+QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link,
+				  qdf_nbuf_t nbuf);
+
+/**
+ * dp_rx_packet_cbk_passthru() - Receive packet handler
+ * @dp_link_context: pointer to DP link context
+ * @rx_buf: pointer to rx qdf_nbuf
+ *
+ * Receive callback registered with data path.  DP will call this to notify
+ * when one or more packets were received for a registered
+ * STA.
+ *
+ * Return: QDF_STATUS_E_FAILURE if any errors encountered,
+ *	   QDF_STATUS_SUCCESS otherwise
+ */
+QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_buf);
+
+/**
+ * wlan_dp_rx_deliver_to_stack_passthru() - DP helper function to deliver RX
+ *  pkts to stack.
+ * @dp_intf: pointer to DP interface context
+ * @nbuf: pointer to nbuf
+ *
+ * The function calls the appropriate stack function to push to the stack
+ *
+ * Return: QDF_STATUS_E_FAILURE if any errors encountered,
+ *	   QDF_STATUS_SUCCESS otherwise
+ */
+QDF_STATUS wlan_dp_rx_deliver_to_stack_passthru(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf);
+#else
+static inline
+QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link,
+				  qdf_nbuf_t nbuf)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_buf)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* DP_PASSTHRU_MODE */
+
 /**
  * dp_tx_timeout() - DP Tx timeout API
  * @dp_intf: Data path interface pointer

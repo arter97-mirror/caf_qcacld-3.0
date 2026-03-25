@@ -518,12 +518,14 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx,
  * @hdd_ctx: Pointer to hdd context
  * @twt_responder: twt responder configure value
  * @vdev_id: Vdev id
+ * @sap_hw_mode: sap hardware mode
  *
  * Return: none
  */
 void
 wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				 bool twt_responder, uint8_t vdev_id);
+				 bool twt_responder, uint8_t vdev_id,
+				 eCsrPhyMode sap_hw_mode);
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /**

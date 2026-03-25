@@ -26,6 +26,7 @@
 
 #include "wlan_p2p_cfg_api.h"
 #include <qdf_types.h>
+#include "wlan_p2p_tgt_api.h"
 
 struct wlan_objmgr_psoc;
 struct p2p_roc_req;
@@ -738,4 +739,11 @@ bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS
 ucfg_p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val);
+
+static inline
+bool ucfg_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_p2p_is_fw_cancel_one_shot_noa_supported(psoc);
+}
+
 #endif /* _WLAN_P2P_UCFG_API_H_ */

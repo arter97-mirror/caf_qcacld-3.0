@@ -708,6 +708,37 @@ netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 	return NETDEV_TX_OK;
 }
 
+#if defined(DRIVER_PASSTHRU_MODE)
+netdev_tx_t hdd_hard_start_xmit_passthru(struct sk_buff *skb,
+					 struct net_device *dev)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	QDF_STATUS status;
+
+	if (adapter->device_mode != QDF_PASSTHRU_MODE) {
+		hdd_err("Unsupported Device Mode %d", adapter->device_mode);
+		qdf_assert(0);
+	}
+
+	qdf_mem_zero(skb->cb, sizeof(skb->cb));
+
+	/*
+	 * vdev in link_info is directly dereferenced because this is per
+	 * packet path, hdd_get_vdev_by_user() usage will be very costly
+	 * as it involves lock access.
+	 * Expectation here is vdev will be present during TX/RX processing
+	 * and also DP internally maintaining vdev ref count
+	 */
+	status = ucfg_dp_start_xmit((qdf_nbuf_t)skb, adapter->deflink->vdev);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		netif_trans_update(dev);
+		wlan_hdd_sar_unsolicited_timer_start(adapter->hdd_ctx);
+	}
+
+	return NETDEV_TX_OK;
+}
+#endif /* DRIVER_PASSTHRU_MODE */
+
 /**
  * __hdd_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
@@ -1614,9 +1645,10 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 		return qdf_status;
 	}
 
-	qdf_status = sme_create_mon_session(hdd_ctx->mac_handle,
-					    sta_desc.peer_addr.bytes,
-					    link_info->vdev_id);
+	qdf_status = sme_create_pe_session(hdd_ctx->mac_handle,
+					   sta_desc.peer_addr.bytes,
+					   link_info->vdev_id,
+					   QDF_MONITOR_MODE);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		hdd_err("sme_create_mon_session() failed to register. Status= %d [0x%08X]",
 			qdf_status, qdf_status);

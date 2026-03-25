@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -555,11 +555,11 @@ static QDF_STATUS lim_fill_session_power_info(
 		    wlan_reg_is_indoor_ap_detected(mac->pdev))
 			ft_session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
 
-		status = wlan_reg_get_best_6g_power_type(
-				mac->psoc, mac->pdev,
-				&power_type_6g,
-				ft_session->ap_defined_power_type_6g,
-				pbssDescription->chan_freq);
+		status = lim_get_6g_power_type_with_bw(
+						mac,
+						ft_session,
+						pbssDescription->chan_freq,
+						&power_type_6g);
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
 

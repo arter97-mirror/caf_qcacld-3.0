@@ -212,6 +212,36 @@ mlo_roam_abort_req(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * mlo_mgr_get_link_info_by_vdev_id() - Get link_info by vdev_id
+ * and mac addr
+ * @mlo_dev_ctx: MLO device context
+ * @vdev_id: Vdev ID to fetch mac addr
+ *
+ * Helper function to get link_info by vdev_id and mac addr.
+ *
+ * Return: Pointer to link_info, NULL on failure
+ */
+static struct mlo_link_info *
+mlo_mgr_get_link_info_by_vdev_id(struct wlan_mlo_dev_context *mlo_dev_ctx,
+				 uint8_t vdev_id)
+{
+	uint8_t i;
+	struct mlo_link_info *link_info;
+
+	/*
+	 * Note: If the @vdev_id argument equals WLAN_INVALID_VDEV_ID more than
+	 * one entry in link may match based on the number of VDEVs and links
+	 */
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &mlo_dev_ctx->link_ctx->links_info[i];
+		if (link_info->vdev_id == vdev_id)
+			return link_info;
+	}
+
+	return NULL;
+}
+
+/**
  * mlo_roam_update_all_vdev_macaddr() - Update all mlo vdev mac addr when
  * ROAM SYNCH event is received from firmware
  * @psoc: Pointer to soc
@@ -225,76 +255,98 @@ mlo_roam_abort_req(struct wlan_objmgr_psoc *psoc,
  *
  * Return: void
  */
-static void
+static QDF_STATUS
 mlo_roam_update_all_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
 				 struct roam_offload_synch_ind *sync_ind)
 {
-	struct wlan_objmgr_vdev *vdev;
-	struct qdf_mac_addr *old_self_mac, *new_self_mac;
-	uint8_t *self_mac;
+	struct qdf_mac_addr old_self_mac, *new_self_mac;
 	uint8_t i, link_vdev_id, roamed_vdev_id;
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct wlan_objmgr_vdev *roamed_vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_info *link_info;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	QDF_STATUS (*cb)(struct wlan_objmgr_vdev *vdev,
+			 uint8_t vdev_id,
 			 struct qdf_mac_addr *old_self_mac,
 			 struct qdf_mac_addr *new_self_mac);
 	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
-	if (!g_mlo_ctx) {
-		mlo_err("Invalid mlo ctx");
-		return;
+	if (!g_mlo_ctx || !g_mlo_ctx->osif_ops ||
+	    !g_mlo_ctx->osif_ops->mlo_roam_osif_update_mac_addr) {
+		mlo_err("Invalid global mlo ctx or osif_ops or callback");
+		return QDF_STATUS_E_INVAL;
 	}
 
-	/* Update the link address received from fw to vdev */
+	cb = g_mlo_ctx->osif_ops->mlo_roam_osif_update_mac_addr;
+
 	roamed_vdev_id = sync_ind->roamed_vdev_id;
+	roamed_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							   roamed_vdev_id,
+							   WLAN_MLO_MGR_ID);
+	if (!roamed_vdev) {
+		mlo_err("Failed to get roamed vdev %d", roamed_vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_dev_ctx = roamed_vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_ctx) {
+		mlo_err("Invalid mlo_dev_ctx for vdev %d", roamed_vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto rel_ref;
+	}
+
 	for (i = 0; i < sync_ind->num_setup_links; i++) {
-		link_vdev_id = sync_ind->ml_link[i].vdev_id;
-		if (link_vdev_id == INVALID_VDEV_ID)
-			continue;
 		new_self_mac = &sync_ind->ml_link[i].self_link_addr;
 		if (qdf_is_macaddr_zero(new_self_mac) ||
 		    qdf_is_macaddr_broadcast(new_self_mac))
 			continue;
 
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-							    link_vdev_id,
-							    WLAN_MLO_MGR_ID);
-		if (!vdev) {
-			mlo_err("Invalid vdev %d", link_vdev_id);
+		link_vdev_id = sync_ind->ml_link[i].vdev_id;
+		link_info = mlo_mgr_get_link_info_by_vdev_id(mlo_dev_ctx,
+							     link_vdev_id);
+		if (!link_info) {
+			mlo_err("Failed to get link_info for vdev %d",
+				link_vdev_id);
 			continue;
 		}
 
-		/* self link address of assoc vdev shouldn't be changed */
-		if (link_vdev_id  == roamed_vdev_id)
-			goto rel_ref;
+		if (qdf_is_macaddr_equal(&link_info->link_addr, new_self_mac))
+			continue;
 
-		self_mac = wlan_vdev_mlme_get_linkaddr(vdev);
-		old_self_mac = (struct qdf_mac_addr *)self_mac;
-		if (qdf_is_macaddr_equal(new_self_mac, old_self_mac))
-			goto rel_ref;
+		/* Save old MAC address before updating */
+		qdf_copy_macaddr(&old_self_mac, &link_info->link_addr);
 
-		cb = g_mlo_ctx->osif_ops->mlo_roam_osif_update_mac_addr;
-		status = cb(vdev, old_self_mac, new_self_mac);
-		if (QDF_IS_STATUS_ERROR(status))
-			mlo_err("vdev id %d failed to change self mac "
-				QDF_MAC_ADDR_FMT " to "
-				QDF_MAC_ADDR_FMT, link_vdev_id,
-				QDF_MAC_ADDR_REF(old_self_mac->bytes),
-				QDF_MAC_ADDR_REF(new_self_mac->bytes));
-		wlan_vdev_mlme_set_linkaddr(vdev, new_self_mac->bytes);
+		status = cb(roamed_vdev, link_vdev_id,
+			    &link_info->link_addr, new_self_mac);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("OSIF callback failed for vdev %d, status %d",
+				link_info->vdev_id, status);
+			goto rel_ref;
+		}
+		/* Update link_info with new MAC address */
+		qdf_copy_macaddr(&link_info->link_addr, new_self_mac);
+		mlo_debug("Updated vdev %d MAC from "
+			  QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
+			  link_info->vdev_id,
+			  QDF_MAC_ADDR_REF(old_self_mac.bytes),
+			  QDF_MAC_ADDR_REF(new_self_mac->bytes));
+	}
 
 rel_ref:
-		wlan_vdev_mlme_set_macaddr(vdev, new_self_mac->bytes);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-	}
+	wlan_objmgr_vdev_release_ref(roamed_vdev, WLAN_MLO_MGR_ID);
+
+	return status;
 }
 
-static void mlo_roam_update_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
-					 struct roam_offload_synch_ind *sync_ind,
-					 uint8_t vdev_id,
-					 bool is_non_ml_connection)
+static QDF_STATUS
+mlo_roam_update_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
+			     struct roam_offload_synch_ind *sync_ind,
+			     uint8_t vdev_id,
+			     bool is_non_ml_connection)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct qdf_mac_addr *mld_mac;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (is_non_ml_connection) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
@@ -302,7 +354,7 @@ static void mlo_roam_update_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
 							    WLAN_MLO_MGR_ID);
 		if (!vdev) {
 			mlo_err("VDEV is null");
-			return;
+			return QDF_STATUS_E_INVAL;
 		}
 		mld_mac = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 		if (!qdf_is_macaddr_zero(mld_mac))
@@ -312,10 +364,12 @@ static void mlo_roam_update_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
 			   QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)));
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 
-		return;
+		return QDF_STATUS_SUCCESS;
 	}
 
-	mlo_roam_update_all_vdev_macaddr(psoc, sync_ind);
+	status = mlo_roam_update_all_vdev_macaddr(psoc, sync_ind);
+
+	return status;
 }
 
 QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -349,7 +403,11 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
 	}
 
-	mlo_roam_update_vdev_macaddr(psoc, sync_ind, vdev_id, is_non_mlo_ap);
+	status = mlo_roam_update_vdev_macaddr(psoc, sync_ind,
+					      vdev_id, is_non_mlo_ap);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
 	ml_nlink_conn_change_notify(
 		psoc, vdev_id, ml_nlink_roam_sync_start_evt, NULL);
 

@@ -1408,6 +1408,41 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS ucfg_dp_passthrough_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
+{
+	struct ol_txrx_ops txrx_ops;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	/* Register the vdev transmit and receive functions */
+	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
+
+	txrx_ops.rx.rx = dp_rx_packet_cbk_passthru;
+	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
+	if (!(txrx_ops.tx.tx && cdp_vdev)) {
+		dp_err("vdev register fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
+	dp_intf->txrx_ops = txrx_ops;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 					    struct ol_txrx_ops *txrx_ops)
 {
@@ -1505,7 +1540,10 @@ QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 	 */
 	tx_dp_link = dp_intf->def_link;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_start_xmit(tx_dp_link, nbuf);
+	if (qdf_likely(wlan_vdev_mlme_get_opmode(vdev) != QDF_PASSTHRU_MODE))
+		status = dp_start_xmit(tx_dp_link, nbuf);
+	else
+		status = dp_start_xmit_passthru(tx_dp_link, nbuf);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;

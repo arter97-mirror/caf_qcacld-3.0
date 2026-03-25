@@ -702,10 +702,11 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		    wlan_reg_is_indoor_ap_detected(mac_ctx->pdev))
 			session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
 
-		status = wlan_reg_get_best_6g_power_type(
-				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
-				session->ap_defined_power_type_6g,
-				bcn->chan_freq);
+		status = lim_get_6g_power_type_with_bw(
+						mac_ctx,
+						session,
+						bcn->chan_freq,
+						&pwr_type_6g);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 
