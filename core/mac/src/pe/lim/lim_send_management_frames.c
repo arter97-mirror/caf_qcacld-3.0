@@ -3219,6 +3219,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *fils_hlp_ie = NULL;
 	struct cm_roam_values_copy mdie_cfg = {0};
 	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
+	bool eht_capable = false;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3560,9 +3561,11 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	} else {
 		wlan_cm_set_assoc_btm_cap(pe_session->vdev, false);
 	}
-
-	if (QDF_STATUS_SUCCESS != lim_strip_supp_op_class_update_struct(mac_ctx,
-			add_ie, &add_ie_len, &frm->SuppOperatingClasses))
+	eht_capable = lim_is_session_eht_capable(pe_session);
+	if (QDF_STATUS_SUCCESS !=
+			lim_strip_supp_op_class_update_struct(
+				mac_ctx, add_ie, &add_ie_len,
+				&frm->SuppOperatingClasses, eht_capable))
 		pe_debug("Unable to Stripoff supp op classes IE from Assoc Req");
 
 	if (lim_is_fils_connection(pe_session)) {
