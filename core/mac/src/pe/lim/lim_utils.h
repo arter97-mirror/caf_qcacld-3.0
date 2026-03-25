@@ -1320,6 +1320,7 @@ lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
  * @addn_ie: Additional IE buffer
  * @addn_ielen: Length of additional IE
  * @dst: Supp operating class IE structure to be updated
+ * @eht_capable: eht capable or not
  *
  * This function is used to strip supp op class IE from IE buffer and
  * update the passed structure.
@@ -1328,7 +1329,7 @@ lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS lim_strip_supp_op_class_update_struct(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
-		tDot11fIESuppOperatingClasses *dst);
+		tDot11fIESuppOperatingClasses *dst, bool eht_capable);
 
 uint8_t lim_get_80Mhz_center_channel(uint8_t primary_channel);
 void lim_update_obss_scanparams(struct pe_session *session,

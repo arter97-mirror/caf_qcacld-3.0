@@ -6543,12 +6543,37 @@ void lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *
 	}
 }
 
+/**
+ * lim_shift_arr_index(): move element of provided index to last
+ * @arr: elements
+ * @curr_index: index of element that will be moved to last
+ * @arr_len: total no of elements
+ *
+ * Return: NA
+ */
+static void
+lim_shift_arr_index(uint8_t *arr, uint8_t curr_index, uint8_t arr_len)
+{
+	uint8_t i;
+
+	/** element to remove is already at last index in array **/
+	if (curr_index == arr_len - 1)
+		return;
+
+	for (i = curr_index; i < arr_len - 1; i++)
+		arr[i] = arr[i+1];
+
+	return;
+}
+
 QDF_STATUS lim_strip_supp_op_class_update_struct(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
-		tDot11fIESuppOperatingClasses *dst)
+		tDot11fIESuppOperatingClasses *dst, bool eht_capable)
 {
 	uint8_t extracted_buff[DOT11F_IE_SUPPOPERATINGCLASSES_MAX_LEN + 2];
 	QDF_STATUS status;
+	uint8_t *class;
+	uint8_t i;
 
 	qdf_mem_zero((uint8_t *)&extracted_buff[0],
 		    DOT11F_IE_SUPPOPERATINGCLASSES_MAX_LEN + 2);
@@ -6569,6 +6594,19 @@ QDF_STATUS lim_strip_supp_op_class_update_struct(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/* Remove op class 137 if connection is not EHT */
+	if (!eht_capable) {
+		class = &extracted_buff[2];
+		for(i = 0; i < (uint8_t)extracted_buff[1]; i++) {
+			if (*(class + i) == 137) {
+				lim_shift_arr_index(class, i,
+						    extracted_buff[1]);
+				extracted_buff[1] =
+						(uint8_t)extracted_buff[1] -1;
+				break;
+			}
+		}
+	}
 	/* update the extracted supp op class to struct*/
 	if (DOT11F_PARSE_SUCCESS != dot11f_unpack_ie_supp_operating_classes(
 	    mac_ctx, &extracted_buff[2], extracted_buff[1], dst, false)) {
