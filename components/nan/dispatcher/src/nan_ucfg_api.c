@@ -1494,12 +1494,6 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 
 	ucfg_nan_cleanup_all_ndps(psoc);
 
-	status = nan_wait_for_peer_migration_complete(psoc, vdev_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed waiting for peer migration : %u", status);
-		return status;
-	}
-
 	nan_req = qdf_mem_malloc(sizeof(*nan_req) + data_len);
 	if (!nan_req)
 		return -ENOMEM;
@@ -1515,6 +1509,12 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 
 	if (!ucfg_nan_is_vdev_creation_allowed(psoc))
 		goto nan_disable;
+
+	status = nan_wait_for_peer_migration_complete(psoc, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed waiting for peer migration : %u", status);
+		goto end;
+	}
 
 	if (cds_is_driver_recovering()) {
 		/* only delete the object manager peer */

@@ -264,6 +264,11 @@ nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
+	if (!nan_is_pairing_allowed(psoc)) {
+		nan_debug("NAN pairing is not allowed");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
 		nan_err("vdev is null");
