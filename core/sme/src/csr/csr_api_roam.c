@@ -4120,6 +4120,8 @@ QDF_STATUS csr_roam_prepare_bss_config(struct mac_context *mac,
 			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_PSK);
 		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_RSN_8021X_SHA256)
 			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256);
+                if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_RSN)
+			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_IEEE8021X);
 		wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT,
 			   set_val);
 	} else
