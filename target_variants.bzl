@@ -37,6 +37,7 @@ le_32_targets = [
 le_variants = [
     # keep sorted
     "perf-defconfig",
+    "defconfig",
 ]
 
 le_32_variants = [

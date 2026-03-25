@@ -67,11 +67,13 @@ _target_chipset_map = {
         "qca6490",
         "qca6490_cnss2",
         "kiwi-v2",
+        "kiwi-v2_cnss2",
     ],
 }
 
 _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
+    "kiwi-v2_cnss2": "BERYLLIUM",
     "peach": "BERYLLIUM",
     "peach-v2": "BERYLLIUM",
     "qca6750": "MOSELLE",
@@ -101,6 +103,10 @@ _chipset_header_map = {
         "cmn/hal/wifi3.0/fig",
     ],
     "kiwi-v2": [
+        "api/hw/kiwi/v2",
+        "cmn/hal/wifi3.0/kiwi",
+    ],
+    "kiwi-v2_cnss2": [
         "api/hw/kiwi/v2",
         "cmn/hal/wifi3.0/kiwi",
     ],
@@ -2722,6 +2728,14 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     native.genrule(
         name = "configs/{}_defconfig_generate_perf-defconfig".format(tvc),
         outs = ["configs/{}_defconfig.generated_perf-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_defconfig".format(tvc)],
         srcs = [
             "configs/{}_gki_{}_defconfig".format(target, chipset),
         ],
