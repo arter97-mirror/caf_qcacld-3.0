@@ -7714,14 +7714,14 @@ void sme_get_command_q_status(mac_handle_t mac_handle)
 
 	mac = MAC_CONTEXT(mac_handle);
 
-	sme_debug("smeCmdPendingList has %d commands",
+	sme_debug("Ser has %d pending commands",
 		  wlan_serialization_get_pending_list_count(mac->psoc, false));
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac->psoc,
 								 false);
 	if (cmd)
 		sme_debug("Active commaned is %d cmd id %d source %d",
 			  cmd->cmd_type, cmd->cmd_id, cmd->source);
-	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
+	if (!csr_is_sme_umac_ser_cmd_type(cmd))
 		return;
 
 	pTempCmd = cmd->umac_cmd;
