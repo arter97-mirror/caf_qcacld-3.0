@@ -2082,6 +2082,7 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 {
 	enum phy_ch_width max_ch_width, assoc_ch_width;
 	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_objmgr_pdev *pdev;
 
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
@@ -2095,8 +2096,14 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 		assoc_ch_width =
 			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
 
+		pdev = wlan_vdev_get_pdev(session_entry->vdev);
+		if (!pdev) {
+			pe_err("null pdev");
+			return false;
+		}
 		max_ch_width = wlan_get_bw_for_mcs_set(assoc_ch_width,
-						session_entry->dot11mode);
+						session_entry->dot11mode, pdev,
+						lim_ch_switch->sw_target_freq);
 
 		/* Allow CSA if it represents a bandwidth upgrade */
 		if (assoc_ch_width < ch_params.ch_width &&

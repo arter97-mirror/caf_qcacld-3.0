@@ -1586,10 +1586,13 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 #endif
 
 enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
-					  enum mlme_dot11_mode dot11_mode)
+					  enum mlme_dot11_mode dot11_mode,
+					  struct wlan_objmgr_pdev *pdev,
+					  uint32_t freq)
 {
 	enum phy_ch_width mcs_bw, max_ch_width;
 	enum phy_ch_width dot_11_bw = CH_WIDTH_20MHZ;
+	struct ch_params ch_params = {0};
 
 	/* Validate input parameters */
 	if (dot11_mode >= MLME_DOT11_MODE_MAX) {
@@ -1618,6 +1621,13 @@ enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
 	 */
 	if (ch_width >= CH_WIDTH_40MHZ && mcs_bw > ch_width)
 		ch_width = mcs_bw;
+
+	ch_params.ch_width = ch_width;
+	wlan_reg_set_channel_params_for_pwrmode(pdev, freq,
+						0, &ch_params,
+						REG_CURRENT_PWR_MODE);
+	/* Take minimum bandwidth supported in current reg domain */
+	ch_width = QDF_MIN(ch_width, ch_params.ch_width);
 
 	return ch_width;
 }

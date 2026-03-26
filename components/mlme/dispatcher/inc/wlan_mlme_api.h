@@ -5536,6 +5536,8 @@ enum phy_ch_width wlan_mlme_get_max_bw(void);
  * wlan_get_bw_for_mcs_set() - Get bandwidth for MCS set configuration
  * @ch_width: Current channel width
  * @dot11_mode: 802.11 mode (HT/VHT/HE/EHT)
+ * @pdev: pdev pointer
+ * @freq: channel frequency
  *
  * This API determines the appropriate bandwidth for MCS rate configuration
  * by considering the current channel width, maximum supported bandwidth,
@@ -5545,7 +5547,9 @@ enum phy_ch_width wlan_mlme_get_max_bw(void);
  * Return: Channel width to use for MCS rate configuration
  */
 enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
-					  enum mlme_dot11_mode dot11_mode);
+					  enum mlme_dot11_mode dot11_mode,
+					  struct wlan_objmgr_pdev *pdev,
+					  uint32_t freq);
 
 /**
  * wlan_mlme_get_sta_ch_width() - Get current operating
