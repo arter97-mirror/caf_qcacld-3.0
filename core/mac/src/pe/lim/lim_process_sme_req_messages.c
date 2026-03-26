@@ -80,6 +80,7 @@
 #endif
 #include <wlan_ll_sap_api.h>
 #include <wlan_dnw_api.h>
+#include "wlan_mlo_mgr_link_switch.h"
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
