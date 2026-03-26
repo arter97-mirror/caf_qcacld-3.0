@@ -3867,6 +3867,67 @@ static int hdd_get_acs_evt_data_len(struct sap_config *sap_cfg)
 	return len;
 }
 
+#define REDUCE_POWER_SCAN_MODE_DISABLE 0
+#define REDUCE_POWER_SCAN_MODE_ENABLE 1
+/**
+ * hdd_set_reduce_power_scan_mode() - Set reduce power scan mode to allow
+ * lower level to optimize power consumption for given interface.
+ * @adapter: HDD adapter pointer
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_reduce_power_scan_mode(struct hdd_adapter *adapter,
+					  const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = NULL;
+	QDF_STATUS status;
+	bool scan_mode;
+	uint8_t cfg_val;
+	uint32_t param_val;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	cfg_val = nla_get_u8(attr);
+
+	status = ucfg_mlme_get_reduce_power_scan_mode(hdd_ctx->psoc,
+						      &scan_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("get scan only mode failed");
+		return -EINVAL;
+	}
+
+	if (!scan_mode) {
+		hdd_debug("Set Reduced Scan mode is not supported");
+		return -EOPNOTSUPP;
+	}
+	hdd_debug("vdev_id %d scan_mode %d cfg_val %d",
+		  adapter->vdev_id, scan_mode, cfg_val);
+
+	switch (cfg_val) {
+	case REDUCE_POWER_SCAN_MODE_DISABLE:
+		param_val = REDUCE_POWER_SCAN_MODE_DISABLE;
+		break;
+	case REDUCE_POWER_SCAN_MODE_ENABLE:
+		param_val = REDUCE_POWER_SCAN_MODE_ENABLE;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (scan_mode) {
+		if (wma_send_reduce_pwr_scan_mode(
+				hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id,
+				param_val)) {
+			hdd_err("Set Scan only mode failed");
+			return -EINVAL;
+		}
+	} else {
+		hdd_debug("enable_reduce_pwr_mode INI is not enabled");
+		return -EINVAL;
+	}
+	return 0;
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * wlan_hdd_acs_get_puncture_bitmap() - get puncture_bitmap for acs result
@@ -7666,6 +7727,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL] = {
 		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_REDUCED_POWER_SCAN_MODE] = {
+		.type = NLA_U8},
 };
 
 static const struct nla_policy
@@ -10221,6 +10284,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_wfc_state},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL,
 	 hdd_vdev_set_sta_keep_alive_interval},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_REDUCED_POWER_SCAN_MODE,
+	 hdd_set_reduce_power_scan_mode},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -17230,7 +17295,7 @@ static int wlan_hdd_cfg80211_get_usable_channel(struct wiphy *wiphy,
 						int data_len)
 {
 	hdd_debug("get usable channel feature not supported");
-	return -EPERM;
+	return -EOPNOTSUPP;
 }
 #endif
 
@@ -17875,6 +17940,311 @@ static int wlan_hdd_cfg80211_get_radar_history(struct wiphy *wiphy,
 #define FEATURE_RADAR_HISTORY_VENDOR_COMMANDS
 #endif
 
+const struct nla_policy wlan_hdd_tpc_backoff_config_policy[CONFIG_MAX + 1] = {
+	[RATE_TYPE] = {.type = NLA_U8},
+	[RATE_VALUE] = {.type = NLA_U8},
+	[RATE_POWER_VALUE] = {.type = NLA_U8}
+};
+
+const struct nla_policy wlan_hdd_tpc_backoff_band_chain_policy[CHAIN_MAX + 1] = {
+	[CHAIN_INDEX] = {.type = NLA_U8},
+	[CHAIN_RATE_CONFIG] = {.type = NLA_NESTED}
+};
+
+const struct nla_policy wlan_hdd_tpc_backoff_band_policy[BAND_MAX + 1] = {
+	[BAND_INDEX] = {.type = NLA_U8},
+	[BAND_CHAIN_CONFIG] = {.type = NLA_NESTED}
+};
+
+const struct nla_policy wlan_hdd_tpc_backoff_policy[ADJUST_TX_POWER_MAX + 1] = {
+	[BAND_CONFIG] = {.type = NLA_NESTED}
+};
+
+static uint8_t wlan_hdd_rate_value_to_rate_index(uint8_t rate_type,
+						 uint8_t band_index,
+						 uint8_t rate_value)
+{
+	if (rate_type == RATE_TYPE_LEGACY) {
+		if (band_index == NL80211_BAND_2GHZ) {
+			if (rate_value == RATE_1)
+				return 0;
+			else if (rate_value == RATE_2)
+				return 1;
+			else if (rate_value == RATE_5_5)
+				return 2;
+			else if (rate_value == RATE_11)
+				return 3;
+			else if (rate_value == RATE_6)
+				return 18;
+			else if (rate_value == RATE_9)
+				return 19;
+			else if (rate_value == RATE_12)
+				return 20;
+			else if (rate_value == RATE_18)
+				return 21;
+			else if (rate_value == RATE_24)
+				return 22;
+			else if (rate_value == RATE_36)
+				return 23;
+			else if (rate_value == RATE_48)
+				return 24;
+			else if (rate_value == RATE_54)
+				return 25;
+		} else if (band_index == NL80211_BAND_5GHZ ||
+			   band_index == NL80211_BAND_6GHZ) {
+			if (rate_value == RATE_6)
+				return 0;
+			else if (rate_value == RATE_9)
+				return 1;
+			else if (rate_value == RATE_12)
+				return 2;
+			else if (rate_value == RATE_18)
+				return 3;
+			else if (rate_value == RATE_24)
+				return 4;
+			else if (rate_value == RATE_36)
+				return 5;
+			else if (rate_value == RATE_48)
+				return 6;
+			else if (rate_value == RATE_54)
+				return 7;
+		}
+	} else if (rate_type == RATE_TYPE_MCS) {
+		if (band_index == NL80211_BAND_2GHZ) {
+			if (rate_value > RATE_MCS13)
+				return INVALID_RATE;
+			return rate_value + NUM_LEGACY_RATES_2G;
+		} else if (band_index == NL80211_BAND_5GHZ ||
+			   band_index == NL80211_BAND_6GHZ) {
+			return rate_value + NUM_LEGACY_RATES_5G_6G;
+		}
+	}
+
+	hdd_warn("Invalid rate type/value");
+
+	return INVALID_RATE;
+}
+
+/**
+ * __wlan_hdd_cfg80211_tpc_backoff () - tpc backoff config
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int __wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data,
+					   int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = wdev->netdev;
+	struct nlattr *tb[ADJUST_TX_POWER_MAX + 1];
+	struct nlattr *tb2[BAND_MAX + 1], *cur_attr1;
+	struct nlattr *tb3[CHAIN_MAX + 1], *cur_attr2;
+	struct nlattr *tb4[CONFIG_MAX + 1], *cur_attr3;
+	uint8_t band_index;
+	uint8_t chain_index;
+	uint8_t rate_index;
+	uint8_t tpc_backoff;
+	uint8_t rate_type;
+	uint8_t rate_value;
+	int i = 0, j = 0, k = 0, rem1, rem2, rem3, txpower_index = 0;
+	int max_chain_itr, max_mcs_itr, ret = -EINVAL;
+	struct tx_power_per_mcs_rate *txpower_adjust_params;
+	QDF_STATUS status;
+
+	hdd_enter_dev(dev);
+	if (!hdd_ctx->pdev)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb, ADJUST_TX_POWER_MAX, data, data_len,
+				    wlan_hdd_tpc_backoff_policy)) {
+		hdd_err("nla_parse failed for QCA_NL80211_VENDOR_SUBCMD_ADJUST_TX_POWER data");
+		return -EINVAL;
+	}
+
+	if (!tb[BAND_CONFIG]) {
+		hdd_err("Attribute BAND_CONFIG is not present");
+		return -EINVAL;
+	}
+
+	txpower_adjust_params = qdf_mem_malloc(sizeof(*txpower_adjust_params));
+	if (!txpower_adjust_params)
+		return -ENOMEM;
+
+	nla_for_each_nested(cur_attr1, tb[BAND_CONFIG], rem1) {
+		if (i == WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_BAND_NUM) {
+			hdd_warn("All Valid Band Index Parsed");
+			break;
+		}
+
+		if (wlan_cfg80211_nla_parse_nested(
+					    tb2, BAND_MAX, cur_attr1,
+					    wlan_hdd_tpc_backoff_band_policy)) {
+			hdd_err("nla_parse failed for BAND_CONFIG attribute");
+			goto fail;
+		}
+
+		if (!tb2[BAND_INDEX] || !tb2[BAND_CHAIN_CONFIG]) {
+			hdd_err("Attribute BAND_INDEX or BAND_CHAIN_CONFIG is not present");
+			goto fail;
+		}
+
+		band_index = nla_get_u8(tb2[BAND_INDEX]);
+
+		if (band_index != NL80211_BAND_2GHZ &&
+		    band_index != NL80211_BAND_5GHZ &&
+		    band_index != NL80211_BAND_6GHZ) {
+			hdd_warn("Invalid Band Index");
+			continue;
+		}
+
+		/* 2G Band */
+		if (band_index == NL80211_BAND_2GHZ) {
+			max_chain_itr =
+				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_2G_CHAIN_NUM;
+			max_mcs_itr =
+				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_2G_RATE_NUM +
+				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_2G_RATE_NUM_EXT;
+		} else { /* 5G/6G Band */
+			max_chain_itr =
+				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_5G_6G_CHAIN_NUM;
+			max_mcs_itr =
+				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_5G_6G_RATE_NUM;
+		}
+
+		j = 0;
+		nla_for_each_nested(cur_attr2, tb2[BAND_CHAIN_CONFIG], rem2) {
+			if (j == max_chain_itr) {
+				hdd_warn("All Valid Chain Index Parsed");
+				break;
+			}
+
+			if (wlan_cfg80211_nla_parse_nested(
+				      tb3, CHAIN_MAX, cur_attr2,
+				      wlan_hdd_tpc_backoff_band_chain_policy)) {
+				hdd_err("nla_parse failed for BAND_CHAIN_CONFIG attribute");
+				goto fail;
+			}
+
+			if (!tb3[CHAIN_INDEX] || !tb3[CHAIN_RATE_CONFIG]) {
+				hdd_err("Attribute CHAIN_INDEX or CHAIN_RATE_CONFIG is not present");
+				goto fail;
+			}
+
+			chain_index = nla_get_u8(tb3[CHAIN_INDEX]);
+
+			if (chain_index >= max_chain_itr) {
+				hdd_warn("Invalid Chain Index");
+				continue;
+			}
+
+			k = 0;
+			nla_for_each_nested(cur_attr3, tb3[CHAIN_RATE_CONFIG],
+					    rem3) {
+				if (k == max_mcs_itr) {
+					hdd_warn("All Valid MCS Index Parsed");
+					break;
+				}
+
+				if (wlan_cfg80211_nla_parse_nested(
+					  tb4, CONFIG_MAX, cur_attr3,
+					  wlan_hdd_tpc_backoff_config_policy)) {
+					hdd_err("nla_parse failed for CHAIN_RATE_CONFIG attribute");
+					goto fail;
+				}
+
+				if (!tb4[RATE_TYPE] || !tb4[RATE_VALUE] ||
+				    !tb4[RATE_POWER_VALUE]) {
+					hdd_err("Attribute RATE_TYPE or RATE_VALUE or RATE_POWER_VALUE is not present");
+					goto fail;
+				}
+
+				rate_value = nla_get_u8(tb4[RATE_VALUE]);
+				rate_type = nla_get_u8(tb4[RATE_TYPE]);
+				rate_index = wlan_hdd_rate_value_to_rate_index(
+								   rate_type,
+								   band_index,
+								   rate_value);
+				if (rate_index == INVALID_RATE)
+					continue;
+
+				tpc_backoff = nla_get_u8(tb4[RATE_POWER_VALUE]);
+
+				if (rate_index >= max_mcs_itr) {
+					hdd_warn("Invalid MCS Index");
+					continue;
+				}
+
+				hdd_debug("Band: %d Chain: %d rate_index: %d tpc_backoff: %d rate_type: %d",
+					  band_index, chain_index, rate_index,
+					  tpc_backoff, rate_type);
+
+				if (band_index == NL80211_BAND_2GHZ) {
+					txpower_adjust_params->
+					bitmap_of_2G_band[chain_index]
+						|= 1 << rate_index;
+				} else if (band_index == NL80211_BAND_5GHZ) {
+					txpower_adjust_params->
+					bitmap_of_5G_band[chain_index]
+						|= 1 << rate_index;
+				} else if (band_index == NL80211_BAND_6GHZ) {
+					txpower_adjust_params->
+					bitmap_of_6G_band[chain_index]
+						|= 1 << rate_index;
+				}
+
+				txpower_adjust_params->
+					txpower_array[txpower_index] =
+								tpc_backoff;
+				txpower_index++;
+				k++;
+			}
+			j++;
+		}
+		i++;
+	}
+
+	txpower_adjust_params->txpower_array_len = txpower_index;
+	txpower_adjust_params->pdev_id =
+			(uint32_t)wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
+
+	status = sme_set_tx_power_per_mcs(hdd_ctx->mac_handle,
+					  txpower_adjust_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set tx power per mcs");
+		goto fail;
+	}
+
+	return 0;
+
+fail:
+	qdf_mem_free(txpower_adjust_params);
+	return ret;
+}
+
+static int wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 const void *data,
+					 int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_tpc_backoff(wiphy, wdev, data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -18158,6 +18528,17 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_LFR_SUBNET_DETECT_VENDOR_COMMANDS
 
 	FEATURE_TX_POWER_VENDOR_COMMANDS
+
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_ADJUST_TX_POWER,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_tpc_backoff,
+		vendor_command_policy(wlan_hdd_tpc_backoff_policy,
+				      ADJUST_TX_POWER_MAX)
+	},
 
 	FEATURE_APF_OFFLOAD_VENDOR_COMMANDS
 
@@ -23680,7 +24061,7 @@ int wlan_hdd_change_hw_mode_for_given_chnl(struct hdd_adapter *adapter,
  * Return: 0 success or error code on failure.
  */
 static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
-				       struct cfg80211_chan_def *chandef)
+					  struct cfg80211_chan_def *chandef)
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter;
@@ -23825,7 +24206,23 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	return 0;
 }
 
-/**
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+/*
+ * wlan_hdd_cfg80211_set_mon_ch() - Set monitor mode capture channel
+ * @wiphy: Handle to struct wiphy to get handle to module context.
+ * @dev: Pointer to network device
+ * @chandef: Contains information about the capture channel to be set.
+ *
+ * This interface is called if and only if monitor mode interface alone is
+ * active.
+ *
+ * Return: 0 success or error code on failure.
+ */
+static int wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
+					struct net_device *dev,
+					struct cfg80211_chan_def *chandef)
+#else
+/*
  * wlan_hdd_cfg80211_set_mon_ch() - Set monitor mode capture channel
  * @wiphy: Handle to struct wiphy to get handle to module context.
  * @chandef: Contains information about the capture channel to be set.
@@ -23836,7 +24233,8 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
  * Return: 0 success or error code on failure.
  */
 static int wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
-				       struct cfg80211_chan_def *chandef)
+					struct cfg80211_chan_def *chandef)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -24551,12 +24949,22 @@ hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
 	wlan_objmgr_peer_release_ref(peer, WLAN_HDD_ID_OBJ_MGR);
 }
 #else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
+static void
+hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
+			    struct cfg80211_update_owe_info *owe_info,
+			    uint8_t *peer_mac)
+{
+	owe_info->assoc_link_id = -1;
+}
+#else
 static void
 hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
 			    struct cfg80211_update_owe_info *owe_info,
 			    uint8_t *peer_mac)
 {
 }
+#endif
 #endif
 
 void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3113,6 +3113,9 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *event_param;
 	WOW_EVENT_INFO_fixed_param *wake_info;
 
+	if (!wma || !wma->psoc)
+		return -EINVAL;
+
 	event_param = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *)event;
 	if (!event_param) {
 		wma_err("Wake event data is null");
@@ -4876,6 +4879,27 @@ QDF_STATUS wma_set_sar_limit(WMA_HANDLE handle,
 	return ret;
 }
 
+QDF_STATUS wma_set_tx_power_per_mcs(
+			   WMA_HANDLE handle,
+			   struct tx_power_per_mcs_rate *txpower_adjust_params)
+{
+	int ret;
+	tp_wma_handle wma = (tp_wma_handle) handle;
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	ret = wmi_unified_send_tx_power_per_mcs_cmd(wmi_handle,
+						    txpower_adjust_params);
+
+	return ret;
+}
+
 QDF_STATUS wma_send_coex_config_cmd(WMA_HANDLE wma_handle,
 				    struct coex_config_params *coex_cfg_params)
 {
@@ -5487,16 +5511,15 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 	}
 	crypto_key = wlan_crypto_get_key(vdev, key_index);
 
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	if (!crypto_key) {
 		wma_debug("crypto_key not found");
-		return;
+		goto err;
 	}
 
 	if (pairwise) {
 		key_info_uc = qdf_mem_malloc(sizeof(*key_info_uc));
 		if (!key_info_uc)
-			return;
+			goto err;
 		key_info_uc->vdev_id = vdev_id;
 		key_info_uc->status = QDF_STATUS_SUCCESS;
 		key_info_uc->key[0].keyLength = crypto_key->keylen;
@@ -5504,11 +5527,11 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_STAKEY_RSP,
 					   key_info_uc, 0);
-		wlan_release_peer_key_wakelock(wma->pdev, crypto_key->macaddr);
+		wlan_release_peer_key_wakelock(vdev, crypto_key->macaddr);
 	} else {
 		key_info_mc = qdf_mem_malloc(sizeof(*key_info_mc));
 		if (!key_info_mc)
-			return;
+			goto err;
 		key_info_mc->vdev_id = vdev_id;
 		key_info_mc->status = QDF_STATUS_SUCCESS;
 		key_info_mc->key[0].keyLength = crypto_key->keylen;
@@ -5517,6 +5540,9 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 		wma_send_msg_high_priority(wma, WMA_SET_BSSKEY_RSP,
 					   key_info_mc, 0);
 	}
+
+err:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 }
 
 void wma_set_peer_ucast_cipher(uint8_t *mac_addr, int32_t uc_cipher,

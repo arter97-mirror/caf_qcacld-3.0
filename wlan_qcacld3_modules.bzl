@@ -16,6 +16,7 @@ _target_chipset_map = {
                 "adrastea",
         ],
         "parrot":[
+                "qca6490",
                 "qca6750",
                 "adrastea",
         ],
@@ -24,6 +25,12 @@ _target_chipset_map = {
                 "qca6750",
                 "wlan",
         ],
+	"bengal":[
+		"wlan",
+	],
+	"malabar":[
+		"adrastea",
+	]
 }
 
 _chipset_hw_map = {
@@ -1884,6 +1891,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_thermal_cfg.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_BITRATES": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_bitrates.c",
+        ],
+    },
     "CONFIG_WLAN_TRACEPOINTS": {
         True: [
             "cmn/qdf/linux/src/qdf_tracepoint.c",
@@ -2063,7 +2075,12 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+    if target == "monaco" or target == "blair" or target == "bengal":
+        out = "wlan.ko"
+    else:
+        out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+
+
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
@@ -2079,7 +2096,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
-    if chipset == "qca6750" or chipset == "wlan":
+    if chipset == "qca6750" or chipset == "wlan" or chipset == "adrastea":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
@@ -2095,7 +2112,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "lahaina":
+    if target != "lahaina" and target != "parrot" and target != "malabar":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2147,7 +2164,7 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    if target == "blair" or target == "monaco":
+    if target == "bilair" or target == "monaco" or target == "bengal":
         return
     copy_to_dist_dir(
         name = "{}_all_modules_dist".format(tv),
