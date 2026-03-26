@@ -472,7 +472,7 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
 	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
 	 0, NON_CACHEABLE, { 0 } },
-#if !defined(QCA_WIFI_WCN7750)
+#if !defined(QCA_WIFI_WCN7750) && !defined(QCA_WIFI_WCN8750)
 	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
 	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
 	 0, NON_CACHEABLE, { 0 } },

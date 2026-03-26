@@ -3263,6 +3263,7 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 		   params->target_type == TARGET_TYPE_MANGO ||
 		   params->target_type == TARGET_TYPE_PEACH ||
 		   params->target_type == TARGET_TYPE_WCN7750 ||
+		   params->target_type == TARGET_TYPE_WCN8750 ||
 		   params->target_type == TARGET_TYPE_QCC2072 ||
 		   params->target_type == TARGET_TYPE_FIG) {
 		cdp_params.device_id = BERYLLIUM_DP;

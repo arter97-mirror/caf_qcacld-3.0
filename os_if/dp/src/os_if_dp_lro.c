@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,7 +32,8 @@
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
     defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_WCN6450) || \
-    defined(QCA_WIFI_WCN7750) || defined(QCA_WIFI_QCC2072)
+    defined(QCA_WIFI_WCN7750) || defined(QCA_WIFI_QCC2072) || \
+    defined(QCA_WIFI_WCN8750)
 #ifdef WLAN_FEATURE_LRO_CTX_IN_CB
 static qdf_lro_ctx_t osif_dp_get_lro_ctx(struct sk_buff *skb)
 {

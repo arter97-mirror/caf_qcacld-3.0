@@ -37,7 +37,8 @@
 #define RESOURCE_LVL_2_TPUT_MBPS  5900
 
 #if defined(QCA_WIFI_WCN7750) || defined(QCA_WIFI_QCA6750) || \
-	defined(QCA_WIFI_WCN6450) || defined(QCA_WIFI_QCC2072)
+	defined(QCA_WIFI_WCN6450) || defined(QCA_WIFI_QCC2072) || \
+	defined(QCA_WIFI_WCN8750)
 #define MAX_MAC_RESOURCES 1
 /*RX buffers required in different resource levels*/
 #define RESOURCE_LVL_1_RX_BUFFERS (6 * 1024)
