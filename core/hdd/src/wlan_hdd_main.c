@@ -10791,6 +10791,38 @@ static void hdd_reset_ies_on_sap_stop(struct wlan_hdd_link_info *link_info)
 	wlan_hdd_reset_prob_rspies(link_info);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * wlan_hdd_nan_is_standard_mode() - check whether NAN standard mode is
+ * supported by FW or not.
+ * @adapter: pointer to adapter object
+ *
+ * Return: true if NAN standard mode supported by FW otherwise false
+ */
+static bool wlan_hdd_nan_is_standard_mode(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD ctx is null");
+		return false;
+	}
+
+	if (adapter->device_mode != QDF_NAN_DISC_MODE)
+		return false;
+
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
+		return false;
+
+	return true;
+}
+#else
+static inline bool wlan_hdd_nan_is_standard_mode(struct hdd_adapter *adapter)
+{
+	return false;
+}
+#endif
+
 static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -10832,7 +10864,9 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	}
 
 	hdd_adapter_deregister_fc(adapter);
-	hdd_cancel_ip_notifier_work(adapter);
+
+	if (!wlan_hdd_nan_is_standard_mode(adapter))
+		hdd_cancel_ip_notifier_work(adapter);
 }
 
 static int
@@ -11118,9 +11152,12 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	hdd_flush_scan_block_work(adapter);
 	wlan_hdd_cfg80211_scan_block(adapter);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
-	wlan_hdd_netif_queue_control(adapter,
-				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-				     WLAN_CONTROL_PATH);
+
+	if (!wlan_hdd_nan_is_standard_mode(adapter))
+		wlan_hdd_netif_queue_control(
+					adapter,
+					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+					WLAN_CONTROL_PATH);
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
