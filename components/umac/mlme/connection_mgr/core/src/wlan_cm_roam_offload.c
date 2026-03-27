@@ -4893,7 +4893,6 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		rso_command = ROAM_SCAN_OFFLOAD_UPDATE_CFG;
 		break;
 	case WLAN_ROAM_SYNCH_IN_PROG:
 		if (reason == REASON_ROAM_ABORT) {
