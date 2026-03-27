@@ -373,6 +373,10 @@
 #define WLAN_FEATURE_FILS_SK (1)
 #endif
 
+#ifdef CONFIG_WLAN_FEATURE_FILS_SAP
+#define WLAN_FEATURE_FILS_SK_SAP (1)
+#endif
+
 #ifdef CONFIG_CP_STATS
 #define WLAN_SUPPORT_INFRA_CTRL_PATH_STATS (1)
 #endif

@@ -1636,6 +1636,10 @@ config WLAN_FEATURE_FILS
 	bool "Enable FILS feature"
 	default n
 
+config WLAN_FEATURE_FILS_SAP
+	bool "Enable FILS SAP feature"
+	default n
+
 config WLAN_FEATURE_FIPS
 	bool "Enable FIPS certification feature"
 	default n
