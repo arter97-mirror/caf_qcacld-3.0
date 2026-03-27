@@ -35,7 +35,7 @@
 #define WLAN_DP_SPM_S_TBL_RETIRE_TIME_DELTA_NS (200 * QDF_NSEC_PER_MSEC)
 #define WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT 0
 #define WLAN_DP_SPM_NUM_FLOW_ENTRIES_MASK 0xFF
-#define WLAN_DP_SPM_SKID_MAX 4
+#define WLAN_DP_SPM_SKID_MAX 8
 
 /* No packets received for this flow in last 2 seconds, window did not move*/
 #define WLAN_DP_SPM_MAX_LAST_WIN_START_NS (2 * QDF_NSEC_PER_SEC)

@@ -840,6 +840,13 @@ dp_spm_flow_retire_nolock(struct wlan_dp_spm_intf_context *spm_intf,
 		return NULL;
 
 	flow_rec = &dp_ctx->gl_flow_recs[flow_idx];
+
+	/* Skip unpopulated flows during normal retirement to prevent
+	 * unnecessary processing of empty flow entries
+	 */
+	if (!flow_rec->is_populated)
+		return NULL;
+
 	flow_evict_success_code = wlan_dp_spm_flow_evict_check(flow_rec);
 
 	if (clear_table || flow_evict_success_code) {
