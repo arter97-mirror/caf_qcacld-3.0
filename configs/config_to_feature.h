@@ -3409,4 +3409,8 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define WLAN_TAS_SYSFS (1)
 #endif
 
+#ifdef CONFIG_WLAN_FEATURE_SNR_STATS
+#define FEATURE_SNR_STATS (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */
