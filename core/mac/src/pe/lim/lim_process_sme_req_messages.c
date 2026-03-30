@@ -9859,6 +9859,8 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	struct scheduler_msg msg_return = {0};
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
+	struct vdev_mlme_obj *mlme_obj;
+	struct wlan_channel *des_chan;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9875,6 +9877,18 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 
 	if (session->opmode != QDF_SAP_MODE) {
 		pe_err("Invalid opmode %d", session->opmode);
+		goto fail;
+	}
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		goto fail;
+	}
+
+	des_chan = mlme_obj->vdev->vdev_mlme.des_chan;
+	if (!des_chan) {
+		pe_err("des_chan is NULL");
 		goto fail;
 	}
 
@@ -9895,6 +9909,27 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 						ch_params.center_freq_seg0;
 	session->gLimChannelSwitch.ch_center_freq_seg1 =
 						ch_params.center_freq_seg1;
+
+	des_chan->ch_freq = session->curr_op_freq;
+	des_chan->ch_width = ch_params.ch_width;
+	des_chan->ch_freq_seg1 = ch_params.center_freq_seg0;
+	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
+	des_chan->ch_ieee = wlan_reg_freq_to_chan(mac_ctx->pdev,
+						  des_chan->ch_freq);
+	lim_update_des_chan_puncture(des_chan, &ch_params);
+
+	if (lim_set_ch_phy_mode(session->vdev, session->dot11mode)) {
+		pe_err("Failed to set channel phy mode");
+		goto fail;
+	}
+
+	if (wlan_vdev_mlme_is_active(mlme_obj->vdev) ==
+				     QDF_STATUS_SUCCESS)
+		qdf_mem_copy(mlme_obj->vdev->vdev_mlme.bss_chan,
+			     des_chan, sizeof(struct wlan_channel));
+	else
+		pe_err("vdev %d not active, skipping bss_chan update",
+		       vdev_id);
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
 
