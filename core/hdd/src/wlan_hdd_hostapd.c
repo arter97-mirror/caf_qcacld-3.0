@@ -3657,6 +3657,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		 */
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
+		polic_mgr_send_pcl_to_fw(hdd_ctx->psoc, adapter->device_mode);
 		wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE,
 					   true);
 
