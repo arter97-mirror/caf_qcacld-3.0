@@ -1928,7 +1928,7 @@ wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
 release_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
 	if (ret)
-		wlan_cfg80211_reset_cfr(pcfr, 0);
+		wlan_cfg80211_stop_enh_cfr_v3(vdev, 0);
 	return ret;
 }
 
