@@ -382,14 +382,29 @@ hdd_cfr_nl_put_vendor_info(struct sk_buff *vendor_event,
 	return 0;
 }
 
+/* Maximum payload size (bytes) for QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA
+ * in a single netlink vendor event.  If the CFR data exceeds this limit the
+ * driver bifurcates it across multiple events using the
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN /
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET /
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG attributes.
+ */
+#define HDD_CFR_MAX_NL_DATA_LEN (32 * 1024)
+
 void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
 				   struct cfr_enhanced_event_data event_data,
 				   const void *data, uint32_t data_len)
 {
 	uint32_t len;
+	uint32_t offset = 0;
+	uint32_t chunk_len;
+	uint32_t bifurcate_overhead = 0;
 	struct sk_buff *vendor_event;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_hdd_link_info *link_info;
+	bool bifurcate = (data_len > HDD_CFR_MAX_NL_DATA_LEN);
+	bool is_last_frag;
+	bool first_frag = true;
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		cfr_err("HDD context is NULL");
@@ -402,39 +417,113 @@ void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
 		return;
 	}
 
-	len = hdd_get_cfr_nl_event_len(event_data, data_len);
-	cfr_debug("vdev id %d data_len %d total_len %d",
-		  vdev_id, data_len, len);
-	len = nla_total_size(len + NLMSG_HDRLEN);
+	cfr_debug("vdev id %d data_len %d bifurcate %d",
+		  vdev_id, data_len, bifurcate);
 
-	vendor_event = wlan_cfg80211_vendor_event_alloc(
+	/* When bifurcating, every fragment carries TOTAL_LEN (u32) and
+	 * OFFSET (u32); the final fragment additionally carries the
+	 * IS_LAST_FRAG flag. Account for the worst case (all three) on
+	 * every fragment so sizing is uniform.
+	 */
+	if (bifurcate)
+		bifurcate_overhead =
+			nla_total_size(sizeof(uint32_t)) + /* TOTAL_LEN */
+			nla_total_size(sizeof(uint32_t)) + /* OFFSET */
+			nla_total_size(0);                 /* IS_LAST_FRAG */
+
+	do {
+		chunk_len = data_len - offset;
+		if (chunk_len > HDD_CFR_MAX_NL_DATA_LEN)
+			chunk_len = HDD_CFR_MAX_NL_DATA_LEN;
+
+		is_last_frag = ((offset + chunk_len) >= data_len);
+
+		/* The first fragment carries all metadata (common/phy/vendor)
+		 * plus its data chunk; subsequent fragments carry only the data
+		 * chunk. hdd_get_cfr_nl_event_len(event_data, 0) returns the
+		 * metadata overhead alone, to which the properly-sized data
+		 * attribute is added explicitly so both branches size the
+		 * RESP_DATA attribute on the same basis.
+		 */
+		if (first_frag)
+			len = hdd_get_cfr_nl_event_len(event_data, 0) +
+			      nla_total_size(chunk_len);
+		else
+			len = nla_total_size(chunk_len);
+
+		len += bifurcate_overhead;
+
+		len = nla_total_size(len + NLMSG_HDRLEN);
+
+		vendor_event = wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
 			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
 			qdf_mem_malloc_flags());
 
-	if (!vendor_event) {
-		cfr_err("alloc failed vdev id %d, total_len %d",
-			vdev_id, len);
-		return;
-	}
+		if (!vendor_event) {
+			cfr_err("alloc failed vdev id %d, offset %d, total_len %d",
+				vdev_id, offset, len);
+			goto abort;
+		}
 
-	if (hdd_cfr_nl_put_common_info(vendor_event, &event_data) ||
-	    hdd_cfr_nl_put_phy_info(vendor_event, &event_data) ||
-	    hdd_cfr_nl_put_vendor_info(vendor_event, &event_data))
-		goto free_skb;
+		/* Common/phy/vendor metadata only in the first fragment */
+		if (first_frag &&
+		    (hdd_cfr_nl_put_common_info(vendor_event, &event_data) ||
+		     hdd_cfr_nl_put_phy_info(vendor_event, &event_data) ||
+		     hdd_cfr_nl_put_vendor_info(vendor_event, &event_data))) {
+			cfr_err("CFR metadata put fails, offset %d", offset);
+			goto free_skb;
+		}
 
-	if (nla_put(vendor_event,
-		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
-		    data_len, data)) {
-		cfr_err("CFR event put fails");
-		goto free_skb;
-	}
+		if (nla_put(vendor_event,
+			    QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
+			    chunk_len, (const uint8_t *)data + offset)) {
+			cfr_err("CFR data put fails, offset %d", offset);
+			goto free_skb;
+		}
 
-	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
+		if (bifurcate) {
+			if (nla_put_u32(
+				vendor_event,
+				QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN,
+				data_len) ||
+			    nla_put_u32(
+				vendor_event,
+				QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET,
+				offset)) {
+				cfr_err("bifurcation attr put fails, offset %d",
+					offset);
+				goto free_skb;
+			}
+			if (is_last_frag &&
+			    nla_put_flag(
+				vendor_event,
+				QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG)) {
+				cfr_err("IS_LAST_FRAG attr put fails, offset %d",
+					offset);
+				goto free_skb;
+			}
+		}
+
+		wlan_cfg80211_vendor_event(vendor_event,
+					   qdf_mem_malloc_flags());
+		offset += chunk_len;
+		first_frag = false;
+	} while (offset < data_len);
+
 	return;
 
 free_skb:
 	wlan_cfg80211_vendor_free_skb(vendor_event);
+abort:
+	/* Already-sent fragments cannot be recalled. If we abort mid-stream
+	 * the final IS_LAST_FRAG never arrives, so userspace must discard the
+	 * incomplete report (e.g. on reassembly timeout). Log the offset to
+	 * make such an aborted capture diagnosable.
+	 */
+	if (!first_frag)
+		cfr_err("CFR bifurcation aborted at offset %d of %d; userspace will discard incomplete report",
+			offset, data_len);
 }
 
 void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id)
