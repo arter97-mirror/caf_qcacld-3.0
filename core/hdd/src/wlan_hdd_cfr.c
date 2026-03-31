@@ -2248,6 +2248,19 @@ wlan_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1];
 	uint8_t version = 0;
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = wiphy_priv(wiphy);
+
+	if (!hdd_ctx->pdev) {
+		hdd_err("pdev is null");
+		return -EINVAL;
+	}
+
+	if (ucfg_cfr_is_ini_disabled(hdd_ctx->pdev)) {
+		hdd_err("CFR is disabled via INI for this pdev");
+		return -EINVAL;
+	}
 
 	if (wlan_cfg80211_nla_parse(
 			tb,
