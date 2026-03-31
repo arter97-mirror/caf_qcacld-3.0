@@ -1609,19 +1609,28 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_objmgr_vdev *vdev;
 	struct qdf_mac_addr *mac;
+	bool eht_capab = false;
 
-	mac = hdd_adapter_get_link_mac_addr(link_info);
-	if (!mac) {
-		hdd_err("Invalid MAC address for monitor link");
+	if (!link_info)
 		return QDF_STATUS_E_INVAL;
-	}
-	/* self peer address extraction */
-	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, mac->bytes);
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return QDF_STATUS_E_INVAL;
+	}
+
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (eht_capab && !qdf_is_macaddr_zero(&link_info->link_addr)) {
+		WLAN_ADDR_COPY(sta_desc.peer_addr.bytes,
+			       link_info->link_addr.bytes);
+	} else {
+		mac = hdd_adapter_get_link_mac_addr(link_info);
+		if (!mac) {
+			hdd_err("Invalid MAC address for monitor link");
+			return QDF_STATUS_E_INVAL;
+		}
+		WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, mac->bytes);
 	}
 
 	qdf_status = ucfg_dp_mon_register_txrx_ops(vdev);
