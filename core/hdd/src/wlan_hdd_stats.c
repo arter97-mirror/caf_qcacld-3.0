@@ -5779,6 +5779,7 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	int ret_val;
 	QDF_STATUS status;
+	QDF_STATUS rtpm_get_status;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct cdp_txrx_stats_req txrx_req = {0};
@@ -5796,6 +5797,7 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 
 	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
+	rtpm_get_status = hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_OSIF);
 	/**
 	 * HTT_DBG_EXT_STATS_PDEV_RX
 	 */
@@ -5826,6 +5828,8 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 		hdd_err_rl("Failed to get fw stats: %u", status);
 		ret_val = -EINVAL;
 	}
+	if (QDF_IS_STATUS_SUCCESS(rtpm_get_status))
+		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_OSIF);
 
 	return ret_val;
 }

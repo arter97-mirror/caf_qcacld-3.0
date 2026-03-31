@@ -562,6 +562,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 		return -ENOMEM;
 	}
 
+	hif_rtpm_register(HIF_RTPM_ID_OSIF, NULL);
 	ret = hdd_init_cds_hif_context(hif_ctx);
 	if (ret) {
 		hdd_err("Failed to set global HIF CDS Context err: %d", ret);
@@ -640,6 +641,7 @@ void hdd_hif_close(struct hdd_context *hdd_ctx, void *hif_ctx)
 	hdd_napi_destroy(true);
 
 	hdd_deinit_cds_hif_context();
+	hif_rtpm_deregister(HIF_RTPM_ID_OSIF);
 	hif_close(hif_ctx);
 
 	ucfg_pmo_psoc_set_hif_handle(hdd_ctx->psoc, NULL);
