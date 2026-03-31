@@ -891,6 +891,16 @@ void dot11f_unpack_ff_vendor_oui(tpAniSirGlobal pCtx,
 
 #define SigFfvendor_oui (0x0028)
 
+void dot11f_unpack_ff_Type(tpAniSirGlobal pCtx,
+			   uint8_t *pBuf,
+			   tDot11fFfType *pDst)
+{
+	pDst->type = *pBuf;
+	(void)pCtx;
+} /* End dot11f_unpack_ff_Type. */
+
+#define SigFfType (0x0029)
+
 uint32_t dot11f_unpack_tlv_authorized_ma_cs(tpAniSirGlobal pCtx,
 					  uint8_t *pBuf,
 					  uint16_t tlvlen,
@@ -11587,6 +11597,64 @@ uint32_t dot11f_unpack_ie_sec_chan_offset_ele(tpAniSirGlobal pCtx,
 #define SigIesec_chan_offset_ele (0x00aa)
 
 
+uint32_t dot11f_unpack_ie_smd_bss_trans_params(tpAniSirGlobal pCtx,
+					       uint8_t *pBuf,
+					       uint8_t ielen,
+					       tDot11fIEsmd_bss_trans_params *pDst,
+					       bool append_ie)
+{
+	uint32_t status = DOT11F_PARSE_SUCCESS;
+	(void) pBuf; (void)ielen; /* Shutup the compiler */
+	if (pDst->present)
+		return DOT11F_DUPLICATE_IE;
+	pDst->present = 1;
+	pDst->num_data = (uint8_t)(ielen);
+	DOT11F_MEMCPY(pCtx, pDst->data, pBuf, (ielen));
+	(void)pCtx;
+	return status;
+} /* End dot11f_unpack_ie_smd_bss_trans_params. */
+
+uint32_t dot11f_get_packed_ie_smd_bss_trans_params(tpAniSirGlobal pCtx,
+						   tDot11fIEsmd_bss_trans_params *pSrc,
+						   uint32_t *pnNeeded)
+{
+	*pnNeeded += 1 + pSrc->num_data;
+	return DOT11F_PARSE_SUCCESS;
+} /* End dot11f_get_packed_ie_smd_bss_trans_params. */
+
+uint32_t dot11f_pack_ie_smd_bss_trans_params(tpAniSirGlobal pCtx,
+					     tDot11fIEsmd_bss_trans_params *pSrc,
+					     uint8_t *pBuf,
+					     uint32_t nBuf,
+					     uint32_t *pnConsumed)
+{
+	uint8_t *pIeLen = 0;
+	uint32_t nConsumedOnEntry = *pnConsumed;
+	uint32_t nNeeded = 0U;
+
+	nNeeded += pSrc->num_data;
+	while (pSrc->present) {
+		if (nNeeded > nBuf)
+			return DOT11F_BUFFER_OVERFLOW;
+		*pBuf = 255;
+		++pBuf; ++(*pnConsumed);
+		pIeLen = pBuf;
+		++pBuf; ++(*pnConsumed);
+		*pBuf = 0x9B;
+		++pBuf; ++(*pnConsumed);
+		DOT11F_MEMCPY(pCtx, pBuf, &(pSrc->data), pSrc->num_data);
+		*pnConsumed += pSrc->num_data;
+		break;
+	}
+	(void)pCtx;
+	if (pIeLen)
+		*pIeLen = *pnConsumed - nConsumedOnEntry - 2;
+	return DOT11F_PARSE_SUCCESS;
+} /* End dot11f_pack_ie_smd_bss_trans_params. */
+
+#define SigIesmd_bss_trans_params (0x00ab)
+
+
 uint32_t dot11f_unpack_ie_spatial_reuse(tpAniSirGlobal pCtx,
 					 uint8_t *pBuf,
 					 uint8_t ielen,
@@ -11665,7 +11733,7 @@ uint32_t dot11f_unpack_ie_spatial_reuse(tpAniSirGlobal pCtx,
 	return status;
 } /* End dot11f_unpack_ie_spatial_reuse. */
 
-#define SigIespatial_reuse (0x00ab)
+#define SigIespatial_reuse (0x00ac)
 
 
 uint32_t dot11f_unpack_ie_t2lm_ie(tpAniSirGlobal pCtx,
@@ -11685,7 +11753,7 @@ uint32_t dot11f_unpack_ie_t2lm_ie(tpAniSirGlobal pCtx,
 	return status;
 } /* End dot11f_unpack_ie_t2lm_ie. */
 
-#define SigIet2lm_ie (0x00ac)
+#define SigIet2lm_ie (0x00ad)
 
 
 uint32_t dot11f_unpack_ie_uhr_cap(tpAniSirGlobal pCtx,
@@ -11710,7 +11778,7 @@ uint32_t dot11f_unpack_ie_uhr_cap(tpAniSirGlobal pCtx,
 	return status;
 } /* End dot11f_unpack_ie_uhr_cap. */
 
-#define SigIeuhr_cap (0x00ad)
+#define SigIeuhr_cap (0x00ae)
 
 
 uint32_t dot11f_unpack_ie_uhr_op(tpAniSirGlobal pCtx,
@@ -11734,7 +11802,7 @@ uint32_t dot11f_unpack_ie_uhr_op(tpAniSirGlobal pCtx,
 	return status;
 } /* End dot11f_unpack_ie_uhr_op. */
 
-#define SigIeuhr_op (0x00ae)
+#define SigIeuhr_op (0x00af)
 
 
 static const tFFDefn FFS_vendor_vht_ie[] = {
@@ -11783,7 +11851,7 @@ uint32_t dot11f_unpack_ie_vendor_vht_ie(tpAniSirGlobal pCtx,
 	return status;
 } /* End dot11f_unpack_ie_vendor_vht_ie. */
 
-#define SigIevendor_vht_ie (0x00af)
+#define SigIevendor_vht_ie (0x00b0)
 
 
 static const tFFDefn FFS_AddTSRequest[] = {
@@ -15728,6 +15796,46 @@ uint32_t dot11f_unpack_t2lm_teardown(tpAniSirGlobal pCtx,
 
 } /* End dot11f_unpack_t2lm_teardown. */
 
+static const tFFDefn FFS_uhr_link_reconfig_req[] = {
+	{ "Category", offsetof(tDot11fuhr_link_reconfig_req, Category),
+	SigFfCategory, DOT11F_FF_CATEGORY_LEN, },
+	{ "Action", offsetof(tDot11fuhr_link_reconfig_req, Action), SigFfAction,
+	DOT11F_FF_ACTION_LEN, },
+	{ "DialogToken", offsetof(tDot11fuhr_link_reconfig_req, DialogToken),
+	SigFfDialogToken, DOT11F_FF_DIALOGTOKEN_LEN, },
+	{ "Type", offsetof(tDot11fuhr_link_reconfig_req, Type), SigFfType,
+	DOT11F_FF_TYPE_LEN, },
+	{ NULL, 0, 0, 0,},
+};
+
+static const tIEDefn IES_uhr_link_reconfig_req[] = {
+	{ offsetof(tDot11fuhr_link_reconfig_req, mlo_ie),
+	offsetof(tDot11fIEmlo_ie, present), 0, "mlo_ie", 0, 11, 257, SigIemlo_ie,
+	{0, 0, 0, 0, 0}, 0, DOT11F_EID_MLO_IE, 107, 1, },
+	{ offsetof(tDot11fuhr_link_reconfig_req, oci), offsetof(tDot11fIEoci,
+	present), 0, "oci", 0, 5, 5, SigIeoci, {0, 0, 0, 0, 0},
+	0, DOT11F_EID_OCI, 54, 0, },
+	{ offsetof(tDot11fuhr_link_reconfig_req, smd_bss_trans_params),
+	offsetof(tDot11fIEsmd_bss_trans_params, present), 0,
+	"smd_bss_trans_params", 0, 3, 258, SigIesmd_bss_trans_params,
+	{0, 0, 0, 0, 0}, 0, DOT11F_EID_SMD_BSS_TRANS_PARAMS, 155, 0, },
+	{0, 0, 0, NULL, 0, 0, 0, 0, {0, 0, 0, 0, 0}, 0, 0xff, 0, },};
+
+uint32_t dot11f_unpack_uhr_link_reconfig_req(tpAniSirGlobal pCtx,
+		uint8_t *pBuf, uint32_t nBuf,
+		tDot11fuhr_link_reconfig_req *pFrm, bool append_ie)
+{
+	uint32_t i = 0;
+	uint32_t status = 0;
+	status = unpack_core(pCtx, pBuf, nBuf,
+		      FFS_uhr_link_reconfig_req, IES_uhr_link_reconfig_req,
+		      (uint8_t *)pFrm, sizeof(*pFrm), append_ie);
+
+	(void)i;
+	return status;
+
+} /* End dot11f_unpack_uhr_link_reconfig_req. */
+
 static const tFFDefn FFS_vendor_action_frame[] = {
 	{ "Category", offsetof(tDot11fvendor_action_frame, Category),
 	SigFfCategory, DOT11F_FF_CATEGORY_LEN, },
@@ -15948,6 +16056,11 @@ static uint32_t unpack_core(tpAniSirGlobal pCtx,
 		case SigFfTxPower:
 			dot11f_unpack_ff_tx_power(pCtx,
 			    pBufRemaining, (tDot11fFfTxPower *)
+			    (pFrm + pFf->offset));
+			break;
+		case SigFfType:
+			dot11f_unpack_ff_Type(pCtx,
+			    pBufRemaining, (tDot11fFfType *)
 			    (pFrm + pFf->offset));
 			break;
 		case SigFfVhtMembershipStatusArray:
@@ -17805,6 +17918,16 @@ static uint32_t unpack_core(tpAniSirGlobal pCtx,
 						    (tDot11fIEsec_chan_offset_ele *)
 						    (pFrm + pIe->offset +
 						    sizeof(tDot11fIEsec_chan_offset_ele) *
+						    countOffset),
+						    append_ie);
+					break;
+				case SigIesmd_bss_trans_params:
+					status |=
+						dot11f_unpack_ie_smd_bss_trans_params(
+						    pCtx, pBufRemaining, len,
+						    (tDot11fIEsmd_bss_trans_params *)
+						    (pFrm + pIe->offset +
+						    sizeof(tDot11fIEsmd_bss_trans_params) *
 						    countOffset),
 						    append_ie);
 					break;
@@ -20244,6 +20367,16 @@ uint32_t dot11f_get_packed_t2lm_teardownSize(tpAniSirGlobal pCtx,
 	return status;
 } /* End dot11f_get_packed_t2lm_teardownSize. */
 
+uint32_t dot11f_get_packed_uhr_link_reconfig_reqSize(tpAniSirGlobal pCtx,
+	tDot11fuhr_link_reconfig_req *pFrm, uint32_t *pnNeeded)
+{
+	uint32_t status = 0;
+	*pnNeeded = 4;
+	status = get_packed_size_core(pCtx, (uint8_t *)pFrm, pnNeeded,
+				      IES_uhr_link_reconfig_req);
+	return status;
+} /* End dot11f_get_packed_uhr_link_reconfig_reqSize. */
+
 uint32_t dot11f_get_packed_vendor_action_frameSize(tpAniSirGlobal pCtx,
 	tDot11fvendor_action_frame *pFrm, uint32_t *pnNeeded)
 {
@@ -21615,6 +21748,15 @@ static uint32_t get_packed_size_core(tpAniSirGlobal pCtx,
 					  (pFrm + pIe->offset + offset * i))->
 					  present;
 					break;
+				case SigIesmd_bss_trans_params:
+					offset = sizeof(tDot11fIEsmd_bss_trans_params);
+					byteCount = ((tDot11fIEsmd_bss_trans_params *)
+					  (pFrm + pIe->offset + offset * i))->
+					  num_data;
+					pIePresent = ((tDot11fIEsmd_bss_trans_params *)
+					  (pFrm + pIe->offset + offset * i))->
+					  present;
+					break;
 				case SigIespatial_reuse:
 					offset = sizeof(tDot11fIEspatial_reuse);
 					status |=
@@ -22275,6 +22417,14 @@ void dot11f_pack_ff_tx_power(tpAniSirGlobal pCtx,
 	*pBuf = pSrc->txPower;
 	(void)pCtx;
 } /* End dot11f_pack_ff_tx_power. */
+
+void dot11f_pack_ff_Type(tpAniSirGlobal pCtx,
+			 tDot11fFfType *pSrc,
+			 uint8_t *pBuf)
+{
+	*pBuf = pSrc->type;
+	(void)pCtx;
+} /* End dot11f_pack_ff_Type. */
 
 void dot11f_pack_ff_vht_membership_status_array(tpAniSirGlobal pCtx,
 					     tDot11fFfVhtMembershipStatusArray *pSrc,
@@ -33980,6 +34130,21 @@ uint32_t dot11f_pack_t2lm_teardown(tpAniSirGlobal pCtx,
 
 } /* End dot11f_unpack_t2lm_teardown. */
 
+uint32_t dot11f_pack_uhr_link_reconfig_req(tpAniSirGlobal pCtx,
+	tDot11fuhr_link_reconfig_req *pFrm,
+	uint8_t *pBuf, uint32_t nBuf, uint32_t *pnConsumed)
+{
+	uint32_t i = 0;
+	uint32_t status = 0;
+	(void)i;
+	*pnConsumed = 0U;
+	status = pack_core(pCtx, (uint8_t *)pFrm, pBuf, nBuf, pnConsumed,
+			   FFS_uhr_link_reconfig_req, IES_uhr_link_reconfig_req);
+
+	return status;
+
+} /* End dot11f_pack_uhr_link_reconfig_req. */
+
 uint32_t dot11f_pack_vendor_action_frame(tpAniSirGlobal pCtx,
 	tDot11fvendor_action_frame *pFrm,
 	uint8_t *pBuf, uint32_t nBuf, uint32_t *pnConsumed)
@@ -34168,6 +34333,11 @@ static uint32_t pack_core(tpAniSirGlobal pCtx,
 		case SigFfTxPower:
 			dot11f_pack_ff_tx_power(
 				pCtx, (tDot11fFfTxPower *)
+				(pSrc + pFf->offset), pBufRemaining);
+			break;
+		case SigFfType:
+			dot11f_pack_ff_Type(
+				pCtx, (tDot11fFfType *)
 				(pSrc + pFf->offset), pBufRemaining);
 			break;
 		case SigFfVhtMembershipStatusArray:
@@ -35618,6 +35788,14 @@ static uint32_t pack_core(tpAniSirGlobal pCtx,
 				pCtx, (tDot11fIEsec_chan_offset_ele *)
 				(pSrc + pIe->offset +
 				sizeof(tDot11fIEsec_chan_offset_ele) * i),
+				pBufRemaining, nBufRemaining, &len);
+			break;
+			case SigIesmd_bss_trans_params:
+			status |=
+				dot11f_pack_ie_smd_bss_trans_params(
+				pCtx, (tDot11fIEsmd_bss_trans_params *)
+				(pSrc + pIe->offset +
+				sizeof(tDot11fIEsmd_bss_trans_params) * i),
 				pBufRemaining, nBufRemaining, &len);
 			break;
 			case SigIespatial_reuse:

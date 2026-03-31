@@ -709,6 +709,16 @@ void dot11f_unpack_ff_vendor_oui(tpAniSirGlobal, uint8_t *,
 void dot11f_pack_ff_vendor_oui(tpAniSirGlobal, tDot11fFfvendor_oui *,
 			       uint8_t *);
 
+typedef struct sDot11fFfType {
+	uint8_t type;
+} tDot11fFfType;
+
+#define DOT11F_FF_TYPE_LEN (1)
+
+void dot11f_unpack_ff_Type(tpAniSirGlobal, uint8_t *, tDot11fFfType *);
+
+void dot11f_pack_ff_Type(tpAniSirGlobal, tDot11fFfType *, uint8_t *);
+
 /*********************************************************************
  * TLVs                                                              *
  ********************************************************************/
@@ -6260,6 +6270,45 @@ uint32_t dot11f_pack_ie_MSCSEXTOpaque(
 uint32_t dot11f_get_packed_ie_MSCSEXTOpaque(
 	tpAniSirGlobal,
 	tDot11fIEMSCSEXTOpaque *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+typedef struct sDot11fIEsmd_bss_trans_params {
+	uint8_t             present;
+	uint8_t             num_data;
+	uint8_t             data[256];
+} tDot11fIEsmd_bss_trans_params;
+
+#define DOT11F_EID_SMD_BSS_TRANS_PARAMS (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_SMD_BSS_TRANS_PARAMS_MIN_LEN (1)
+
+#define DOT11F_IE_SMD_BSS_TRANS_PARAMS_MAX_LEN (256)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_smd_bss_trans_params(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEsmd_bss_trans_params*,
+	bool);
+
+uint32_t dot11f_pack_ie_smd_bss_trans_params(
+	tpAniSirGlobal,
+	tDot11fIEsmd_bss_trans_params *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_smd_bss_trans_params(
+	tpAniSirGlobal,
+	tDot11fIEsmd_bss_trans_params *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -13523,13 +13572,43 @@ uint32_t dot11f_get_packed_t2lm_teardownSize(tpAniSirGlobal pCtx,
 } /* End extern "C". */
 #endif /* C++ */
 
+typedef struct sDot11fuhr_link_reconfig_req{
+	tDot11fFfCategory                    Category;
+	tDot11fFfAction                      Action;
+	tDot11fFfDialogToken                 DialogToken;
+	tDot11fFfType                        Type;
+	tDot11fIEmlo_ie                      mlo_ie;
+	tDot11fIEoci                         oci;
+	tDot11fIEsmd_bss_trans_params        smd_bss_trans_params;
+} tDot11fuhr_link_reconfig_req;
+
+#define DOT11F_UHR_LINK_RECONFIG_REQ (63)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+
+uint32_t dot11f_unpack_uhr_link_reconfig_req(tpAniSirGlobal pCtx,
+	uint8_t *pBuf, uint32_t nBuf,
+	tDot11fuhr_link_reconfig_req * pFrm, bool append_ie);
+uint32_t dot11f_pack_uhr_link_reconfig_req(tpAniSirGlobal pCtx,
+	tDot11fuhr_link_reconfig_req *pFrm, uint8_t *pBuf,
+	uint32_t nBuf, uint32_t *pnConsumed);
+uint32_t dot11f_get_packed_uhr_link_reconfig_reqSize(tpAniSirGlobal pCtx,
+	tDot11fuhr_link_reconfig_req *pFrm,
+	uint32_t *pnNeeded);
+
+#ifdef __cplusplus
+} /* End extern "C". */
+#endif /* C++ */
+
 typedef struct sDot11fvendor_action_frame{
 	tDot11fFfCategory                     Category;
 	tDot11fFfvendor_oui                   vendor_oui;
 	tDot11fFfvendor_action_subtype        vendor_action_subtype;
 } tDot11fvendor_action_frame;
 
-#define DOT11F_VENDOR_ACTION_FRAME (63)
+#define DOT11F_VENDOR_ACTION_FRAME (64)
 
 #ifdef __cplusplus
 extern "C" {
