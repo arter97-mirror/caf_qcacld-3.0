@@ -2845,6 +2845,7 @@ static void csr_update_key_mgmt_crypto_param(struct wlan_objmgr_vdev *vdev,
 {
 	int32_t key_mgmt = 0;
 	int32_t neg_akm;
+	int32_t ap_akm;
 
 	neg_akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (neg_akm < 0) {
@@ -2852,8 +2853,15 @@ static void csr_update_key_mgmt_crypto_param(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	SET_PARAM(neg_akm,
+	SET_PARAM(ap_akm,
 		  wlan_crypto_rsn_suite_to_keymgmt(ap_rsn.akm_suite[0]));
+
+	/* Intersect crypto AKM and candidate AP's AKM */
+	neg_akm &= ap_akm;
+	if (neg_akm <= 0) {
+		sme_err("Invalid AKM suite after intersection with AP's AKM");
+		return;
+	}
 
 	/*
 	 * As there can be multiple AKM present select the most secured AKM
@@ -2919,6 +2927,7 @@ static void csr_update_ucast_cipher_crypto_param(struct wlan_objmgr_vdev *vdev,
 {
 	int32_t ucastcipherset = 0;
 	int32_t neg_ucastcipher;
+	int32_t ap_ucastcipher;
 
 	neg_ucastcipher = wlan_crypto_get_param(vdev,
 						WLAN_CRYPTO_PARAM_UCAST_CIPHER);
@@ -2927,8 +2936,15 @@ static void csr_update_ucast_cipher_crypto_param(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	SET_PARAM(neg_ucastcipher,
+	SET_PARAM(ap_ucastcipher,
 		  wlan_crypto_rsn_suite_to_cipher(ap_rsn.pwise_cipher_suites[0]));
+
+	/* Intersect crypto cipherset and candidate AP's cipherset */
+	neg_ucastcipher &= ap_ucastcipher;
+	if (neg_ucastcipher <= 0) {
+		sme_err("Invalid unicast cipherset after Intersection with AP's UC");
+		return;
+	}
 
 	/*
 	 * As there can be multiple ucastcipher present select the most secured
