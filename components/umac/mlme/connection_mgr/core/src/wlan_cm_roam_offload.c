@@ -1533,6 +1533,12 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	params->rssi_thresh_offset_5g =
 		rso_cfg->cfg_param.rssi_thresh_offset_5g;
+
+	params->rssi_thresh_5ghz =
+		rso_cfg->cfg_param.neighbor_lookup_threshold_5ghz * (-1);
+
+	params->rssi_thresh_6ghz =
+		rso_cfg->cfg_param.neighbor_lookup_threshold_6ghz * (-1);
 }
 
 /**
@@ -5834,6 +5840,9 @@ static const char *cm_get_config_item_string(uint8_t reason)
 	CASE_RETURN_STRING(REASON_ROAM_RESCAN_RSSI_DIFF_CHANGED);
 	CASE_RETURN_STRING(REASON_ROAM_BMISS_FIRST_BCNT_CHANGED);
 	CASE_RETURN_STRING(REASON_ROAM_BMISS_FINAL_BCNT_CHANGED);
+	CASE_RETURN_STRING(REASON_LOOKUP_THRESH_2P4GHZ_CHANGED);
+	CASE_RETURN_STRING(REASON_LOOKUP_THRESH_5GHZ_CHANGED);
+	CASE_RETURN_STRING(REASON_LOOKUP_THRESH_6GHZ_CHANGED);
 	default:
 		return "unknown";
 	}
@@ -5870,6 +5879,8 @@ QDF_STATUS cm_neighbor_roam_update_config(struct wlan_objmgr_pdev *pdev,
 		old_value = cfg_params->neighbor_lookup_threshold;
 		cfg_params->neighbor_lookup_threshold = value;
 		cfg_params->next_rssi_threshold = value;
+		cfg_params->neighbor_lookup_threshold_5ghz = value;
+		cfg_params->neighbor_lookup_threshold_6ghz = value;
 		break;
 	case REASON_OPPORTUNISTIC_THRESH_DIFF_CHANGED:
 		old_value = cfg_params->opportunistic_threshold_diff;
@@ -5887,6 +5898,18 @@ QDF_STATUS cm_neighbor_roam_update_config(struct wlan_objmgr_pdev *pdev,
 	case REASON_ROAM_BMISS_FINAL_BCNT_CHANGED:
 		old_value = cfg_params->roam_bmiss_final_cnt;
 		cfg_params->roam_bmiss_final_cnt = value;
+		break;
+	case REASON_LOOKUP_THRESH_2P4GHZ_CHANGED:
+		old_value = cfg_params->neighbor_lookup_threshold;
+		cfg_params->neighbor_lookup_threshold = value;
+		break;
+	case REASON_LOOKUP_THRESH_5GHZ_CHANGED:
+		old_value = cfg_params->neighbor_lookup_threshold_5ghz;
+		cfg_params->neighbor_lookup_threshold_5ghz = value;
+		break;
+	case REASON_LOOKUP_THRESH_6GHZ_CHANGED:
+		old_value = cfg_params->neighbor_lookup_threshold_6ghz;
+		cfg_params->neighbor_lookup_threshold_6ghz = value;
 		break;
 	default:
 		mlme_debug("Unknown update cfg reason");
@@ -5958,6 +5981,10 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
+	cfg_params->neighbor_lookup_threshold_5ghz =
+		mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold_5ghz;
+	cfg_params->neighbor_lookup_threshold_6ghz =
+		mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold_6ghz;
 	wlan_mlme_reinit_real_time_roam_parms(vdev);
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;

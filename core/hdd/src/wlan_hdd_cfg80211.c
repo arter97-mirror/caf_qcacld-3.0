@@ -6476,6 +6476,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U32},
 	[QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD] = {
 			.type = NLA_U32},
+	[QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS] = {
+			.type = NLA_NESTED},
 };
 
 /**
@@ -7179,6 +7181,77 @@ hdd_send_reconnect_disallow_period_to_sme(struct hdd_context *hdd_ctx,
 }
 
 /**
+ * hdd_parse_per_band_rssi_thresholds() - Parse per-band RSSI threshold
+ * @hdd_ctx: HDD context
+ * @vdev_id: VDEV ID
+ * @attr: Nested attribute containing single band threshold
+ *
+ * This function parses the nested attribute containing a single band's
+ * low RSSI threshold and configures it via SME API.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_* on failure
+ */
+static QDF_STATUS
+hdd_parse_per_band_rssi_thresholds(struct hdd_context *hdd_ctx, uint8_t vdev_id,
+				   struct nlattr *attr)
+{
+	struct nlattr *curr_attr;
+	int32_t threshold, rem;
+	uint8_t band;
+	QDF_STATUS status;
+	bool threshold_set = false;
+
+	if (!attr) {
+		hdd_err("Per-band threshold attribute is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	nla_for_each_nested(curr_attr, attr, rem) {
+		band = nla_type(curr_attr);
+		if (band != NL80211_BAND_2GHZ && band != NL80211_BAND_5GHZ &&
+		    band != NL80211_BAND_6GHZ) {
+			hdd_err("Invalid band %d", band);
+			continue;
+		}
+
+		if (nla_len(curr_attr) != sizeof(int32_t)) {
+			hdd_err("Invalid attribute length %d for band %d",
+				nla_len(curr_attr), band);
+			continue;
+		}
+
+		threshold = nla_get_s32(curr_attr);
+		hdd_debug("Setting rssi threshold: band=%d, threshold=%d dBm",
+			  band, threshold);
+
+		if (threshold > 0 || threshold < -128) {
+			hdd_err("Invalid threshold %d for band %d", threshold,
+				band);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		status = sme_set_neighbor_lookup_rssi_threshold_band(
+				hdd_ctx->mac_handle, vdev_id,
+				(uint8_t)((-1) * threshold), band);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to set threshold for band %d: %d", band,
+				status);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		threshold_set = true;
+	}
+
+	if (!threshold_set) {
+		hdd_err("No valid band threshold found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
  * @tb: List of attributes carrying roam subcmd data
@@ -7728,6 +7801,17 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		is_rso_update_required = true;
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to set reconnect_disallow_period");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS];
+	if (attr && !roam_control_enable) {
+		status = hdd_parse_per_band_rssi_thresholds(hdd_ctx, vdev_id,
+							    attr);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to parse per-band RSSI thresholds");
+			return qdf_status_to_os_return(status);
+		}
+		is_rso_update_required = true;
 	}
 
 	/* send RSO update if required */

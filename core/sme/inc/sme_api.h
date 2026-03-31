@@ -1565,6 +1565,24 @@ QDF_STATUS sme_get_roam_scan_channel_list(mac_handle_t mac_handle,
 					  uint8_t *pNumChannels,
 					  uint8_t sessionId);
 
+/**
+ * sme_set_neighbor_lookup_rssi_threshold_band() - Set band-specific neighbor
+ * lookup RSSI threshold
+ * @mac_handle: MAC handle
+ * @vdev_id: vdev ID
+ * @threshold: RSSI threshold value (positive, e.g., 70 for -70dBm)
+ * @band: Band
+ *
+ * This function sets the neighbor lookup RSSI threshold for a specific band.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_set_neighbor_lookup_rssi_threshold_band(mac_handle_t mac_handle,
+					    uint8_t vdev_id,
+					    uint8_t threshold,
+					    uint8_t band);
+
 bool sme_is_feature_supported_by_fw(enum cap_bitmap feature);
 
 QDF_STATUS sme_set_phy_mode(mac_handle_t mac_handle, eCsrPhyMode phyMode);

@@ -1998,6 +1998,11 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 	cfg_params->bg_rssi_threshold =
 		mlme_obj->cfg.lfr.bg_rssi_threshold;
 
+	cfg_params->neighbor_lookup_threshold_5ghz =
+		mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold_5ghz;
+	cfg_params->neighbor_lookup_threshold_6ghz =
+		mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold_6ghz;
+
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 	rso_cfg->is_disable_btm = false;

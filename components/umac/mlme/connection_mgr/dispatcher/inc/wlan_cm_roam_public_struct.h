@@ -95,6 +95,9 @@
 #define REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE   55
 #define REASON_VDEV_RESTART_FROM_HOST               56
 #define REASON_AGGRESSIVE_ROAM_ENABLED              57
+#define REASON_LOOKUP_THRESH_2P4GHZ_CHANGED         58
+#define REASON_LOOKUP_THRESH_5GHZ_CHANGED           59
+#define REASON_LOOKUP_THRESH_6GHZ_CHANGED           60
 
 #define FILS_MAX_KEYNAME_NAI_LENGTH WLAN_CM_FILS_MAX_KEYNAME_NAI_LENGTH
 #define WLAN_FILS_MAX_REALM_LEN WLAN_CM_FILS_MAX_REALM_LEN
@@ -381,6 +384,8 @@ struct rso_chan_info {
  * candidate AP's roam score to start roaming.
  * @reconnect_disallow_period: duration after which STA is allowed
  * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
+ * @neighbor_lookup_threshold_5ghz: low rssi roaming threshold for 5Ghz band
+ * @neighbor_lookup_threshold_6ghz: low rssi roaming threshold for 6Ghz band
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -420,6 +425,8 @@ struct rso_cfg_params {
 	uint8_t roam_rssi_delta_6ghz_to_non_6ghz;
 	uint32_t min_roam_score_delta;
 	uint32_t reconnect_disallow_period;
+	uint8_t neighbor_lookup_threshold_5ghz;
+	uint8_t neighbor_lookup_threshold_6ghz;
 };
 
 /**
@@ -888,6 +895,8 @@ struct rso_config_params {
  * @ROAM_CONFIG_RT_PARAMS_ENABLED: Roam config RT params enabled
  * @MIN_ROAM_SCORE_DELTA: Min roam score delta value
  * @RECONNECT_DISALLOW_PERIOD: Reconnect disallow period value.
+ * @NEIGHBOUR_LOOKUP_THRESHOLD_5GHZ: lookup threshold for 5ghz band
+ * @NEIGHBOUR_LOOKUP_THRESHOLD_6GHZ: lookup threshold for 6ghz band
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -936,6 +945,8 @@ enum roam_cfg_param {
 	ROAM_CONFIG_RT_PARAMS_ENABLED,
 	MIN_ROAM_SCORE_DELTA,
 	RECONNECT_DISALLOW_PERIOD,
+	NEIGHBOUR_LOOKUP_THRESHOLD_5GHZ,
+	NEIGHBOUR_LOOKUP_THRESHOLD_6GHZ,
 };
 
 /**
@@ -1998,6 +2009,8 @@ enum wlan_roam_offload_scan_rssi_flags {
  * @flags: Flags for roam scan RSSI threshold params
  * @bg_roam_scan_flag: To set bg_roam_scan flag
  *		       WMI_ROAM_BG_SCAN_FLAGS_2G_TO_5G_ONLY
+ * @rssi_thresh_5ghz: rssi threshold for 5Ghz band
+ * @rssi_thresh_6ghz: rssi threshold for 6Ghz band
  */
 struct wlan_roam_offload_scan_rssi_params {
 	int8_t rssi_thresh;
@@ -2031,6 +2044,8 @@ struct wlan_roam_offload_scan_rssi_params {
 	uint32_t rx_data_inactivity_time;
 	uint32_t flags;
 	bool bg_roam_scan_flag;
+	int8_t rssi_thresh_5ghz;
+	int8_t rssi_thresh_6ghz;
 };
 
 /**

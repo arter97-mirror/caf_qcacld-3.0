@@ -8015,6 +8015,62 @@ QDF_STATUS sme_get_roam_scan_channel_list(mac_handle_t mac_handle,
 	return status;
 }
 
+QDF_STATUS
+sme_set_neighbor_lookup_rssi_threshold_band(mac_handle_t mac_handle,
+					    uint8_t vdev_id,
+					    uint8_t threshold,
+					    uint8_t band)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+	QDF_STATUS status;
+	uint8_t reason;
+
+	if (vdev_id >= WLAN_MAX_VDEVS) {
+		sme_err("Invalid vdev_id: %u", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id,
+					    ROAM_CONFIG_ENABLE, &src_config);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Failed to get NCHO mode status: %d", status);
+		return status;
+	}
+
+	if (src_config.bool_value) {
+		sme_err("Set roam trigger per band not allowed in NCHO mode");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (band) {
+	case 0:
+		reason = REASON_LOOKUP_THRESH_2P4GHZ_CHANGED;
+		break;
+	case 1:
+		reason = REASON_LOOKUP_THRESH_5GHZ_CHANGED;
+		break;
+	case 3:
+		reason = REASON_LOOKUP_THRESH_6GHZ_CHANGED;
+		break;
+	default:
+		sme_err("Invalid band: %u", band);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = cm_neighbor_roam_update_config(mac->pdev, vdev_id, threshold,
+						reason);
+
+	sme_release_global_lock(&mac->sme);
+
+	return status;
+}
+
 /**
  * sme_is_feature_supported_by_fw() - check if feature is supported by FW
  * @feature: enum value of requested feature.
