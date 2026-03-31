@@ -1001,8 +1001,12 @@ enum wlan_epcs_frame {
  * @Max: 2
  * @Default: 2
  *
- * This ini is used to enable Ring Buffer
+ * This ini is used to enable/disable/set Ring Buffer verbose level.
  *
+ * 0 : Completely disable logging in ring buffers for cnss_diag.
+ * 1 : Enable Complete logging in ring buffers.
+ * 2 : Only enable logging in cnss_diag if
+ *     wifi_verbose_log_level > WLAN_LOG_LEVEL_NORMAL
  * Related: None
  *
  * Supported Feature: STA/SAP
