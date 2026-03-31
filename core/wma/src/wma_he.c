@@ -231,7 +231,7 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 		WMI_HECAP_MAC_PUNCSOUNDING_GET(mac_cap[1]);
 	he_cap->ht_vht_trg_frm_rx_supp =
 		WMI_HECAP_MAC_HTVHTTRIGRX_GET(mac_cap[1]);
-	*mcs_12_13_supp = WMI_GET_BITS(mac_cap[1], 16, 16);
+	*mcs_12_13_supp |= WMI_GET_BITS(mac_cap[1], 16, 16);
 	/* HE PHY capabilities */
 	chan_width = WMI_HECAP_PHY_CBW_GET(phy_cap);
 	he_cap->chan_width_0 = HE_CH_WIDTH_GET_BIT(chan_width, 0);
