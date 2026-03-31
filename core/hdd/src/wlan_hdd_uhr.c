@@ -34,7 +34,7 @@
 #include "wlan_cmn_ieee80211.h"
 #include "wlan_psoc_mlme_api.h"
 
-#if defined(WLAN_FEATURE_11BN)
+#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
 void hdd_update_tgt_uhr_cap(struct hdd_context *hdd_ctx,
 			    struct wma_tgt_cfg *cfg)
 {

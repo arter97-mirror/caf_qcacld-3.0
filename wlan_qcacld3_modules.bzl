@@ -2755,6 +2755,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/uapi/linux/nl80211.h",
             "flag": "NL80211_EXT_FEATURE_PROBE_AP_SUPPORT",
         },
+	{
+            "pattern": "ieee80211_sta_uhr_cap",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_FEATURE_11BN_SUPPORT",
+        },
     ]
 
     cmd = 'touch "$@"\n'

@@ -31,7 +31,7 @@ struct wma_tgt_cfg;
 struct hdd_beacon_data;
 struct sap_config;
 
-#if defined(WLAN_FEATURE_11BN)
+#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
 /**
  * hdd_update_tgt_uhr_cap() - Update UHR related capabilities
  * @hdd_ctx: HDD context
