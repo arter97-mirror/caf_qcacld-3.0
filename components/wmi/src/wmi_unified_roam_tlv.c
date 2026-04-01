@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2947,6 +2947,15 @@ extract_btm_denylist_event(wmi_unified_t wmi_handle,
 		roam_denylist->reject_reason =
 				wmi_get_reject_reason(src_list->reason);
 		roam_denylist->source = src_list->source;
+		if (src_list->ml_failed_link_combo_count >
+		    WMI_MAX_FAILED_LINK_COMBO_COUNT) {
+			wmi_err("link_count size %d exceeds max combo_count size %d",
+				src_list->ml_failed_link_combo_count,
+				WMI_MAX_FAILED_LINK_COMBO_COUNT);
+			qdf_mem_free(dst_list);
+
+			return QDF_STATUS_E_INVAL;
+		}
 		roam_update_mlo_bl_info(roam_denylist, src_list);
 		roam_denylist++;
 		src_list++;
