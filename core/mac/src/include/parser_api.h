@@ -2361,4 +2361,27 @@ sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * populate_smd_bss_transition_params() - Populate SMD BSS Transition Params IE
+ * @session: PE session
+ * @req: Link reconfiguration request
+ * @ie_buf: Buffer to write IE
+ * @ie_len: Length of IE written
+ *
+ * This function populates the SMD BSS Transition Parameters element
+ * for ST Preparation Request (Type=0) as defined in IEEE 802.11bn
+ * Section 9.4.2.357
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+populate_smd_bss_transition_params(
+	struct pe_session *session,
+	struct mlo_link_recfg_state_req *req,
+	uint8_t *ie_buf,
+	uint16_t *ie_len);
+
+#endif /*WLAN_FEATURE_11BN_SMD*/
 #endif /* __PARSE_H__ */

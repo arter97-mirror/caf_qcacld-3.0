@@ -15727,6 +15727,101 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * populate_smd_bss_transition_params() - Populate SMD BSS Transition Params IE
+ * @session: PE session
+ * @req: Link reconfiguration request - Caller must populate:
+ *       - ctx_notransfer_flags: Context no-transfer flags
+ *         Set SMD_BSS_TRANS_ST_CONTROL_DL_SN_NO_TRANSFER to
+ *         request no DL SN transfer
+ *         Set SMD_BSS_TRANS_ST_CONTROL_UL_SN_NO_TRANSFER to
+ *         request no UL SN transfer
+ *         Set to 0 to request both DL and UL SN transfer (default)
+ *       - scs_list_present: Set to true if SCS list is present
+ *       - num_scs_ids: Number of SCS IDs in scs_ids array (0 to MAX_SCS_IDS)
+ *       - scs_ids[]: Array of SCS IDs to include in the IE
+ *         (if scs_list_present is true)
+ * @ie_buf: Buffer to write IE
+ * @ie_len: Length of IE written
+ *
+ * This function populates the SMD BSS Transition Parameters element
+ * for ST Preparation Request (Type=0) as defined in IEEE 802.11bn
+ * Section 9.4.2.357 draft 1.4
+ *
+ * Format for ST Prep Request:
+ * - Element ID (1 octet): WLAN_ELEMID_SMD_BSS_TRANSITION_PARAMS
+ * - Length (1 octet): Length of following fields
+ * - ST control (1 octet): DL/UL SN transfer and SCS list flags
+ * - Listen Interval (2 octets): From session
+ * - SCS List (variable, optional): Prioritized SCS IDs
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+populate_smd_bss_transition_params(
+	struct pe_session *session,
+	struct mlo_link_recfg_state_req *req,
+	uint8_t *ie_buf,
+	uint16_t *ie_len)
+{
+	uint8_t *ptr = ie_buf;
+	uint8_t st_control = 0;
+	uint16_t listen_interval;
+	uint8_t presence_bitmap = 0;
+	uint8_t i;
+
+	if (!session || !req || !ie_buf || !ie_len) {
+		pe_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Element ID - Extension Element */
+	*ptr++ = WLAN_ELEMID_EXTN_ELEM;
+
+	/* Length (will be filled at end) */
+	uint8_t *len_ptr = ptr++;
+	uint8_t *start_ptr = ptr;
+
+	/* Element ID Extension */
+	*ptr++ = WLAN_ELEMIDEXT_SMD_BSS_TRANSITION_PARAMS;
+
+	/* ST control field (1 octet)
+	 * Bits:
+	 *  B0: Request DL SN Not Transferred
+	 *  B1: Request UL SN Not Transferred
+	 *  B2: SCS list present -> use SMD_BSS_TRANS_PARAMS_SCS_LIST_PRESENT
+	 *  B3-B7: Reserved
+	 */
+	st_control = req->ctx_notransfer_flags;
+
+	*ptr++ = st_control;
+
+	/* Listen Interval (2 octets, little endian) */
+	/* Use default listen interval value */
+	listen_interval = 10;  /* Default value */
+	*ptr++ = (listen_interval & 0xFF);
+	*ptr++ = ((listen_interval >> 8) & 0xFF);
+
+	/* SCS List */
+	if (req->scs_list_present && req->num_scs_ids > 0) {
+		uint8_t count = QDF_MIN(req->num_scs_ids,
+					MAX_SCS_IDS);
+		for (i = 0; i < count; i++)
+			*ptr++ = req->scs_ids[i];
+	}
+
+	/* Fill in length */
+	*len_ptr = (ptr - start_ptr);
+	*ie_len = (ptr - ie_buf);
+
+	pe_debug("SMD BSS Transition Params IE: len=%d, st_control=0x%x, listen_interval=%d, scs_present=%d",
+		 *ie_len, st_control, listen_interval, req->scs_list_present);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			      struct pe_session *pe_session,
 			      struct mlo_link_recfg_state_req *req)
