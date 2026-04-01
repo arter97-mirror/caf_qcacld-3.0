@@ -870,17 +870,6 @@ void lim_update_session_uhr_capable(struct pe_session *session, bool val)
 }
 
 /**
- * lim_is_session_uhr_capable() - Check if session is UHR capable
- * @session: PE session entry
- *
- * Return: true if session is UHR capable, false otherwise
- */
-static bool lim_is_session_uhr_capable(struct pe_session *session)
-{
-	return session->uhr_capable;
-}
-
-/**
  * lim_copy_bss_uhr_cap() - Copy UHR capability to session
  * @session: PE session entry
  *

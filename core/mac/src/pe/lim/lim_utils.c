@@ -9599,7 +9599,8 @@ void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,
 
 	qdf_mem_copy(&add_sta_params->uhr_config, &session->uhr_config,
 		     sizeof(add_sta_params->uhr_config));
-	/* TODO: Copy UHR OP */
+	qdf_mem_copy(&add_sta_params->uhr_op_ie, &session->uhr_op_ie,
+		     sizeof(add_sta_params->uhr_op_ie));
 }
 
 QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,

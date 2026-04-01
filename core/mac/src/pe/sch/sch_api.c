@@ -1050,8 +1050,8 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 				pe_session, uhr_cap_ie_len,
 				prb_rsp_ie_ptr + prb_rsp_ie_len);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("assemble uhr op ie error");
-			uhr_op_ie_len = 0;
+			pe_debug("assemble uhr cap ie error");
+			uhr_cap_ie_len = 0;
 		}
 		prb_rsp_ie_len += uhr_cap_ie_len;
 	}

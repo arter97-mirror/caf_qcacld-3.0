@@ -16202,21 +16202,18 @@ populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 	p_uhr_ie = uhr_op_ie->data;
 	len_remaining = sizeof(uhr_op_ie->data);
 
-	/* ---- Element header ---- */
-	if (len_remaining < 3)
+	/* Validate minimum buffer size */
+	if (len_remaining < (3 + WLAN_UHR_OP_PARAM_LEN +
+	    WLAN_UHR_BASIC_MCS_NSS_SET_LEN)) {
+		pe_err("Insufficient buffer size for UHR Op IE");
 		return 0;
+	}
 
-	/* Element ID (Extension IE) */
-	*p_uhr_ie++ = WLAN_ELEMID_EXTN_ELEM;  /* 1 byte */
-	len_remaining--;
-
-	/* Length (to be back-filled later) */
-	*p_uhr_ie++ = 0x00;                    /* 1 byte placeholder */
-	len_remaining--;
-
-	/* Element ID Extension for UHR Operation IE */
-	*p_uhr_ie++ = WLAN_EXTN_ELEMID_UHROP;  /* 1 byte */
-	len_remaining--;
+	/* Element header */
+	*p_uhr_ie++ = WLAN_ELEMID_EXTN_ELEM;
+	*p_uhr_ie++ = 0x00; /* Length placeholder */
+	*p_uhr_ie++ = WLAN_EXTN_ELEMID_UHROP;
+	len_remaining -= 3;
 
 	/* ---- UHR Operation Parameters (2 octets) ----
 	 * B0:  DPS enabled
@@ -16240,6 +16237,7 @@ populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 
 	if (len_remaining < 2)
 		goto finalize;
+
 	qdf_mem_copy(p_uhr_ie, control, sizeof(control));
 	p_uhr_ie += sizeof(control);
 	len_remaining -= sizeof(control);
@@ -16412,9 +16410,12 @@ populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 finalize:
 	/* Finalize IE length fields */
 	uhr_op_ie->num_data = (uint16_t)(p_uhr_ie - uhr_op_ie->data);
-	if (uhr_op_ie->num_data >= 2) {
+	if (uhr_op_ie->num_data > 2) {
 		/* Length excludes Element ID and Length fields */
 		uhr_op_ie->data[1] = (uint8_t)(uhr_op_ie->num_data - 2);
+	} else {
+		/* Invalid IE, reset */
+		uhr_op_ie->num_data = 0;
 	}
 
 	session->uhr_op_ie_len = uhr_op_ie->num_data;

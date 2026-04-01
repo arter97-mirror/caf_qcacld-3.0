@@ -2749,8 +2749,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 				pe_session, uhr_cap_ie_len,
 				frame + sizeof(tSirMacMgmtHdr) + payload);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_debug("assemble uhr op ie error");
-			uhr_op_ie_len = 0;
+			pe_debug("assemble uhr cap ie error");
+			uhr_cap_ie_len = 0;
 		}
 		payload += uhr_cap_ie_len;
 	}
