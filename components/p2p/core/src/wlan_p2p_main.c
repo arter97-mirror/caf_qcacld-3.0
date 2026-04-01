@@ -1669,6 +1669,12 @@ QDF_STATUS p2p_process_noa(struct p2p_noa_event *noa_event)
 
 	p2p_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(vdev,
 			WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj) {
+		p2p_err("p2p_vdev_obj is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto fail;
+	}
+
 	if (!(p2p_vdev_obj->noa_info)) {
 		p2p_vdev_obj->noa_info =
 			qdf_mem_malloc(sizeof(struct p2p_noa_info));
