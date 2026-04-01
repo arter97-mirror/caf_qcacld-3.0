@@ -3013,4 +3013,8 @@ config TARGET_DUMP_FOR_NON_QC_PLATFORM
 	bool "dump control when msm subsystem is not defined"
 	default n
 
+config DT_CPU_MASK_DP_INTR
+	bool "Enable DT_CPU_MASK_DP_INTR"
+	default n
+
 endif # QCA_CLD_WLAN
