@@ -697,9 +697,10 @@ wlan_cfg_tcp_mem_param_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
 	return !!cfg_get(psoc, CFG_DP_TCP_MEM_PARAM_CTRL);
 }
 
-void wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_dp_psoc_context *dp_ctx,
-				   struct wlan_tcp_mem_param *data)
+static void
+wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_dp_psoc_context *dp_ctx,
+			      struct wlan_tcp_mem_param *data)
 {
 	struct wlan_dp_psoc_callbacks *dp_ops;
 	int radio;
@@ -731,9 +732,10 @@ void wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
 				     sizeof(struct wlan_tcp_mem_param));
 }
 #else
-void wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_dp_psoc_context *dp_ctx,
-				   struct wlan_tcp_mem_param *data)
+static void
+wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_dp_psoc_context *dp_ctx,
+			      struct wlan_tcp_mem_param *data)
 {
 }
 
@@ -1678,7 +1680,8 @@ bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
  *
  * Return: None
  */
-void dp_set_cpu_high_clock(struct wlan_dp_psoc_context *dp_ctx, int high_req)
+static void
+dp_set_cpu_high_clock(struct wlan_dp_psoc_context *dp_ctx, int high_req)
 {
 	int ret;
 	unsigned int max;

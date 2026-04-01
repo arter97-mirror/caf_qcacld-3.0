@@ -15,6 +15,7 @@
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_ctrl.h>
 #include "cfg_ucfg_api.h"
+#include <wlan_dp_api.h>
 
 #define WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS 2
 
