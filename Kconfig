@@ -2549,6 +2549,18 @@ config QCA_WIFI_WCN7750
 	bool "Enable QCA_WIFI_WCN7750"
 	default n
 
+config CNSS_WCN8750
+	bool "Enable CNSS_WCN8750"
+	default n
+
+config WCN8750_HEADERS_DEF
+	bool "Enable WCN8750_HEADERS_DEF"
+	default n
+
+config QCA_WIFI_WCN8750
+	bool "Enable QCA_WIFI_WCN8750"
+	default n
+
 config WLAN_DP_DYNAMIC_RESOURCE_MGMT
 	bool "Enable WLAN_DP_DYNAMIC_RESOURCE_MGMT"
 	default n
@@ -2923,6 +2935,45 @@ config WLAN_UMAC_MLO_MAX_DEV
     int "Enable WLAN_UMAC_MLO_MAX_DEV"
     default 3
 endif
+
+if CNSS_WCN8750
+config ROME_IF
+	string "Enable ROME_IF"
+	default ipci
+
+config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
+    int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+	default 1
+
+config CFG_BMISS_OFFLOAD_MAX_VDEV
+    int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+	default 4
+
+config CFG_MAX_STA_VDEVS
+    int "Enable CFG_MAX_STA_VDEVS"
+	default 4
+
+config DP_RX_BUFFER_POOL_ALLOC_THRES
+    int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+    default 5
+
+config DP_RX_BUFFER_POOL_SIZE
+    int "Enable DP_RX_BUFFER_POOL_SIZE"
+    default 128
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+    int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+    default 2048
+
+config DP_RX_REFILL_THRD_THRESHOLD
+    int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+    default 512
+
+config WLAN_UMAC_MLO_MAX_DEV
+    int "Enable WLAN_UMAC_MLO_MAX_DEV"
+    default 3
+endif
+
 
 if QCA6490_HEADERS_DEF
 config CHIP_VERSION
