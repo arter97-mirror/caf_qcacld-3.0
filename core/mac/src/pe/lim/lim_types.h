@@ -246,6 +246,40 @@ typedef struct sLimMlmAssocInd {
 #endif
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * struct lim_intersected_link_caps - Intersected capabilities for SMD link
+ * @valid: Whether this structure contains valid data
+ * @ext_cap: Extended capabilities (intersected)
+ * @ht_caps: HT capabilities (intersected)
+ * @vht_caps: VHT capabilities (intersected)
+ * @he_caps: HE capabilities (intersected)
+ * @he_6ghz_band_cap: HE 6GHz band capabilities (intersected)
+ * @eht_caps: EHT capabilities (intersected)
+ * @supp_rates: Supported rates
+ * @ext_supp_rates: Extended supported rates
+ * @wmm_info: WMM info
+ * @wmm_caps: WMM capabilities
+ * @cap_tx_nss: Capability TX NSS
+ * @cap_rx_nss: Capability RX NSS
+ */
+struct lim_intersected_link_caps {
+	bool valid;
+	tDot11fIEExtCap ext_cap;
+	tDot11fIEHTCaps ht_caps;
+	tDot11fIEVHTCaps vht_caps;
+	tDot11fIEhe_cap he_caps;
+	tDot11fIEhe_6ghz_band_cap he_6ghz_band_cap;
+	tDot11fIEeht_cap eht_caps;
+	tDot11fIESuppRates supp_rates;
+	tDot11fIEExtSuppRates ext_supp_rates;
+	tDot11fIEWMMInfoStation wmm_info;
+	tDot11fIEWMMCaps wmm_caps;
+	uint8_t cap_tx_nss;
+	uint8_t cap_rx_nss;
+};
+#endif
+
 typedef struct sLimMlmReassocReq {
 	tSirMacAddr peerMacAddr;
 	uint16_t capabilityInfo;
@@ -1750,6 +1784,22 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 {
 	return QDF_STATUS_SUCCESS;
 }
+#endif
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_send_uhr_link_recfg_st_prep_req_frame() - Send UHR Link Reconfiguration
+ * ST Preparation Request frame
+ * @vdev_id: vdev id
+ * @peer_mac: Peer mac addr
+ * @req: Link reconfig request
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_uhr_link_recfg_st_prep_req_frame(uint8_t vdev_id,
+					  uint8_t *peer_mac,
+					  struct mlo_link_recfg_state_req *req);
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO

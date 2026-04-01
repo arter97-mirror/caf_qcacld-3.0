@@ -71,6 +71,7 @@
 #include "wlan_mgmt_txrx_tgt_api.h"
 #include "utils_parser.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_mlo_link_recfg.h"
 
 /**
  *

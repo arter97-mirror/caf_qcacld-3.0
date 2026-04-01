@@ -54,6 +54,7 @@
 #include "lim_types.h"
 #include "wlan_utility.h"
 #include "wlan_mlme_api.h"
+#include "wlan_mlme_ucfg_api.h"
 #include "wlan_reg_services_api.h"
 #include "wma.h"
 #include "../../core/src/vdev_mgr_ops.h"
@@ -6165,5 +6166,299 @@ void lim_clear_log_instance_id(struct pe_session *session)
 	}
 
 	mlme_reset_log_instance_id(session->vdev);
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_intersect_sta_ap_capabilities_smd() - Intersect STA and AP
+ * capabilities for SMD
+ * @mac_ctx: MAC context
+ * @pe_session: PE session
+ * @scan_entry: Scan cache entry for target AP
+ * @link_caps: Output structure for intersected capabilities
+ * @chan_freq: Channel frequency for the link
+ *
+ * This function extracts capabilities from the scan entry's IEs and
+ * intersects them with our own capabilities to produce mutually
+ * supported capabilities for SMD roaming.
+ * Similar to lim_update_mlo_mgr_info() in the association path.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_intersect_sta_ap_capabilities_smd(
+				struct mac_context *mac_ctx,
+				struct pe_session *pe_session,
+				struct scan_cache_entry *scan_entry,
+				struct lim_intersected_link_caps *link_caps,
+				qdf_freq_t chan_freq)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	struct sir_dot11f_nss_info nss_ies = {0};
+	uint8_t cap_tx_nss = 0, cap_rx_nss = 0;
+	uint8_t hw_tx_nss = 0, hw_rx_nss = 0;
+	bool use_cur_mode = true;
+	tDot11fBeaconIEs *bcn_ies;
+	bool is_2g;
+	uint8_t wme_enabled, wsm_enabled;
+	tSirMacRateSet b_rates = {0};
+	tSirMacRateSet e_rates = {0};
+	struct bss_description *bss_desc = NULL;
+	uint16_t bss_len;
+
+	if (!mac_ctx || !pe_session || !scan_entry || !link_caps) {
+		pe_err("SMD: NULL pointer passed");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_mem_zero(link_caps, sizeof(*link_caps));
+
+	vdev = pe_session->vdev;
+	if (!vdev) {
+		pe_err("SMD: vdev is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		pe_err("SMD: psoc is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/* Allocate and fill bss_description from scan_entry */
+	bss_len = offsetof(struct bss_description, ieFields[0]) +
+		  util_scan_entry_ie_len(scan_entry);
+	bss_desc = qdf_mem_malloc(bss_len);
+	if (!bss_desc) {
+		pe_err("SMD: Failed to allocate bss_desc");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
+						    scan_entry);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("SMD: Failed to fill BSS desc");
+		qdf_mem_free(bss_desc);
+		return status;
+	}
+
+	bcn_ies = &bss_desc->bcn_ies;
+	is_2g = WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq);
+
+	/* Step 1: Parse AP capabilities from beacon/probe response
+	 * using scan entry
+	 */
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, bcn_ies, MLME_DOT11_MODE_11BE);
+
+	/* Step 2: Get STA's own capabilities */
+	status = mlme_get_vdev_nss_by_freq_from_dyn(vdev, chan_freq,
+						    &cap_tx_nss, &cap_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("SMD: Failed to get vdev NSS, status=%d", status);
+		cap_tx_nss = 1;
+		cap_rx_nss = 1;
+	}
+
+	/* Step 3: Consider current hardware mode constraints */
+	if (use_cur_mode) {
+		status = policy_mgr_curr_hwmode_fetch_chains_for_freq(
+								psoc,
+								chan_freq,
+								&hw_tx_nss,
+								&hw_rx_nss);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			cap_tx_nss = QDF_MIN(cap_tx_nss, hw_tx_nss);
+			cap_rx_nss = QDF_MIN(cap_rx_nss, hw_rx_nss);
+		}
+	}
+
+	/* Step 4: THE INTERSECTION - Take minimum of STA and AP capabilities */
+	/* STA TX vs AP RX */
+	cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies.cap_rx_nss);
+	/* STA RX vs AP TX */
+	cap_rx_nss = QDF_MIN(cap_rx_nss, nss_ies.cap_tx_nss);
+
+	/* Step 5: Store the intersected NSS values */
+	link_caps->cap_tx_nss = cap_tx_nss;
+	link_caps->cap_rx_nss = cap_rx_nss;
+
+	/* Parse and intersect Extended Capabilities */
+	if (bcn_ies->ExtCap.present) {
+		/* Get our own ext caps */
+		populate_dot11f_ext_cap(mac_ctx, true, &link_caps->ext_cap,
+					wlan_vdev_get_id(vdev));
+
+		/* Intersect: bitwise AND for each byte */
+		for (uint8_t i = 0;
+		     i < link_caps->ext_cap.num_bytes &&
+		     i < bcn_ies->ExtCap.num_bytes;
+		     i++) {
+			link_caps->ext_cap.bytes[i] &= bcn_ies->ExtCap.bytes[i];
+		}
+		/* Truncate to smaller size */
+		if (bcn_ies->ExtCap.num_bytes < link_caps->ext_cap.num_bytes)
+			link_caps->ext_cap.num_bytes =
+						bcn_ies->ExtCap.num_bytes;
+	}
+
+	/* Parse and intersect HT Capabilities (not for 6GHz) */
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq) && bcn_ies->HTCaps.present) {
+		uint8_t cb_mode;
+
+		/* Get our own HT caps */
+		cb_mode = lim_get_cb_mode_for_freq(mac_ctx, pe_session,
+						   chan_freq);
+		populate_dot11f_ht_caps(mac_ctx, NULL, &link_caps->ht_caps);
+
+		if (!cb_mode) {
+			link_caps->ht_caps.supportedChannelWidthSet = 0;
+			link_caps->ht_caps.shortGI40MHz = 0;
+		}
+
+		/* Intersect channel width */
+		link_caps->ht_caps.supportedChannelWidthSet = QDF_MIN(
+			link_caps->ht_caps.supportedChannelWidthSet,
+			bcn_ies->HTCaps.supportedChannelWidthSet);
+
+		/* Intersect short GI */
+		link_caps->ht_caps.shortGI20MHz &= bcn_ies->HTCaps.shortGI20MHz;
+		link_caps->ht_caps.shortGI40MHz &= bcn_ies->HTCaps.shortGI40MHz;
+
+		/* Intersect MCS set using intersected NSS */
+		wlan_mlme_set_ht_mcsset_for_nss(psoc, &link_caps->ht_caps, NULL,
+						link_caps->cap_tx_nss,
+						link_caps->cap_rx_nss);
+	}
+
+	/* Parse and intersect VHT Capabilities (not for 6GHz) */
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq) &&
+	    pe_session->vhtCapability &&
+	    (bcn_ies->VHTCaps.present ||
+	     bcn_ies->vendor_vht_ie.VHTCaps.present)) {
+		tDot11fIEVHTCaps *peer_vht_caps;
+
+		if (bcn_ies->VHTCaps.present)
+			peer_vht_caps = &bcn_ies->VHTCaps;
+		else
+			peer_vht_caps = &bcn_ies->vendor_vht_ie.VHTCaps;
+
+		/* Get our own VHT caps */
+		populate_dot11f_vht_caps(mac_ctx, NULL, &link_caps->vht_caps);
+
+		/* Intersect channel width */
+		link_caps->vht_caps.supportedChannelWidthSet = QDF_MIN(
+			link_caps->vht_caps.supportedChannelWidthSet,
+			peer_vht_caps->supportedChannelWidthSet);
+	}
+
+	/* Parse and intersect HE Capabilities */
+	if (lim_is_session_he_capable(pe_session) && bcn_ies->he_cap.present) {
+		/* Get our own HE caps */
+		populate_dot11f_he_caps_by_band(mac_ctx, is_2g,
+						&link_caps->he_caps,
+						pe_session->vdev_id);
+
+		/* Set HE MCS using intersected NSS */
+		wlan_mlme_set_he_mcsset_for_nss(mac_ctx->mlme_cfg,
+						&link_caps->he_caps,
+						link_caps->cap_tx_nss,
+						link_caps->cap_rx_nss);
+
+		/* Handle PPET if present */
+		if (link_caps->he_caps.ppet_present &&
+		    bcn_ies->he_cap.ppet_present) {
+			/* Keep our PPET for now */
+		} else {
+			link_caps->he_caps.ppet_present = 0;
+			link_caps->he_caps.ppet.ppe_threshold.num_ppe_th = 0;
+		}
+
+		/* Parse HE 6GHz Band Capabilities (only for 6GHz) */
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq) &&
+		    bcn_ies->he_6ghz_band_cap.present) {
+			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
+					&link_caps->he_6ghz_band_cap);
+
+			/* Intersect min MPDU start spacing (take max) */
+			link_caps->he_6ghz_band_cap.min_mpdu_start_spacing =
+				QDF_MAX(link_caps->he_6ghz_band_cap
+						.min_mpdu_start_spacing,
+					bcn_ies->he_6ghz_band_cap
+						.min_mpdu_start_spacing);
+		}
+	}
+
+	/* Parse and intersect EHT Capabilities */
+	if (lim_is_session_eht_capable(pe_session) &&
+	    bcn_ies->eht_cap.present) {
+		/* Get our own EHT caps */
+		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g,
+						 &link_caps->eht_caps, NULL);
+
+		/* Set EHT MCS using intersected NSS */
+		wlan_mlme_set_eht_mcsset_for_nss(&link_caps->eht_caps,
+						 link_caps->cap_tx_nss,
+						 link_caps->cap_rx_nss);
+
+		/* Disable 320MHz for non-6GHz */
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+			link_caps->eht_caps.support_320mhz_6ghz = 0;
+	}
+
+	/* Populate supported rates */
+	if (is_2g) {
+		wlan_populate_basic_rates(&b_rates, false, true);
+		wlan_populate_basic_rates(&e_rates, true, false);
+	} else {
+		wlan_populate_basic_rates(&b_rates, true, true);
+	}
+
+	if (b_rates.numRates) {
+		link_caps->supp_rates.num_rates = b_rates.numRates;
+		qdf_mem_copy(link_caps->supp_rates.rates, b_rates.rate,
+			     b_rates.numRates);
+		link_caps->supp_rates.present = 1;
+	}
+
+	if (e_rates.numRates) {
+		link_caps->ext_supp_rates.num_rates = e_rates.numRates;
+		qdf_mem_copy(link_caps->ext_supp_rates.rates, e_rates.rate,
+			     e_rates.numRates);
+		link_caps->ext_supp_rates.present = 1;
+	}
+
+	/* Populate WMM info/caps */
+	wme_enabled = (pe_session->limWmeEnabled) &&
+		      LIM_BSS_CAPS_GET(WME, pe_session->limCurrentBssQosCaps);
+	wsm_enabled = (pe_session->limWsmEnabled) && wme_enabled &&
+		      LIM_BSS_CAPS_GET(WSM, pe_session->limCurrentBssQosCaps);
+
+	if (wme_enabled) {
+		populate_dot11f_wmm_info_station_per_session(
+							mac_ctx,
+							pe_session,
+							&link_caps->wmm_info);
+		if (wsm_enabled)
+			populate_dot11f_wmm_caps(&link_caps->wmm_caps);
+	}
+
+	link_caps->valid = true;
+
+	pe_debug("SMD: Intersected caps for freq %d: ext_cap=%d ht=%d vht=%d he=%d he_6g=%d eht=%d cap_tx_nss=%d cap_rx_nss=%d",
+		 chan_freq,
+		 link_caps->ext_cap.present,
+		 link_caps->ht_caps.present,
+		 link_caps->vht_caps.present,
+		 link_caps->he_caps.present,
+		 link_caps->he_6ghz_band_cap.present,
+		 link_caps->eht_caps.present,
+		 link_caps->cap_tx_nss,
+		 link_caps->cap_rx_nss);
+
+	qdf_mem_free(bss_desc);
+	return QDF_STATUS_SUCCESS;
 }
 #endif

@@ -555,4 +555,26 @@ void
 lim_update_add_sta_cck_5g_support(struct mac_context *mac_ctx,
 				  tAddStaParams *add_sta, tpSirAssocRsp assoc_rsp,
 				  struct pe_session *session_entry);
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_intersect_sta_ap_capabilities_smd() - Intersect STA and AP
+ * capabilities for SMD
+ * @mac_ctx: MAC context
+ * @pe_session: PE session
+ * @scan_entry: Scan cache entry for target AP
+ * @link_caps: Output structure for intersected capabilities
+ * @chan_freq: Channel frequency for the link
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_intersect_sta_ap_capabilities_smd(
+				struct mac_context *mac_ctx,
+				struct pe_session *pe_session,
+				struct scan_cache_entry *scan_entry,
+				struct lim_intersected_link_caps *link_caps,
+				qdf_freq_t chan_freq);
+#endif
+
 #endif /* __LIM_ASSOC_UTILS_H */
