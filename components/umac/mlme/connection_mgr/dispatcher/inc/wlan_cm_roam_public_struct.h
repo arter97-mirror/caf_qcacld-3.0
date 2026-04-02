@@ -3257,7 +3257,9 @@ struct roam_offload_synch_ind {
 #ifdef WLAN_FEATURE_11BN_SMD
 	uint8_t num_vdev_repurpose_req;
 	struct smd_vdev_repurpose_req vdev_repurpose_req[WLAN_MAX_ML_BSS_LINKS];
-#endif
+	uint32_t smd_kdk_len;
+	uint8_t smd_kdk[MAX_PMK_LEN];
+#endif /* WLAN_FEATURE_11BN_SMD */
 };
 
 /**

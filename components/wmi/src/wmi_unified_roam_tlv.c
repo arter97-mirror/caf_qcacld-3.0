@@ -2651,6 +2651,31 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static void
+wmi_fill_roam_sync_smd_kdk(struct roam_offload_synch_ind *roam_sync_ind,
+			   wmi_key_material_ext *key_ext)
+{
+	uint32_t smd_kdk_len = key_ext->smd_kdk_len;
+
+	if (smd_kdk_len > 0 && smd_kdk_len <= WMI_MAX_SMD_KDK_LEN) {
+		roam_sync_ind->smd_kdk_len = smd_kdk_len;
+		qdf_mem_copy(roam_sync_ind->smd_kdk,
+			     key_ext->smd_kdk_buffer,
+			     smd_kdk_len);
+		wmi_debug("ROAM_SYNC: Extracted SMD_KDK len=%d", smd_kdk_len);
+	} else {
+		roam_sync_ind->smd_kdk_len = 0;
+	}
+}
+#else
+static inline void
+wmi_fill_roam_sync_smd_kdk(struct roam_offload_synch_ind *roam_sync_ind,
+			   wmi_key_material_ext *key_ext)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 static QDF_STATUS
 wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 			  struct wlan_objmgr_vdev *vdev,
@@ -2774,6 +2799,8 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		qdf_mem_copy(roam_sync_ind->replay_ctr,
 			     (key_ext->key_buffer + kek_len + kck_len),
 			     REPLAY_CTR_LEN);
+
+		wmi_fill_roam_sync_smd_kdk(roam_sync_ind, key_ext);
 	}
 
 	wmi_debug("ROAM_SYNC kek_len %d kck_len %d",

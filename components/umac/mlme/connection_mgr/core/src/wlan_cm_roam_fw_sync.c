@@ -774,6 +774,24 @@ cm_fill_num_roam_links_info(struct wlan_roam_sync_info *roam_info,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static inline void
+cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
+		     struct roam_offload_synch_ind *roam_synch_data)
+{
+	roaming_info->smd_kdk_len = roam_synch_data->smd_kdk_len;
+	if (roaming_info->smd_kdk_len)
+		qdf_mem_copy(roaming_info->smd_kdk, roam_synch_data->smd_kdk,
+			     roaming_info->smd_kdk_len);
+}
+#else
+static inline void
+cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
+		     struct roam_offload_synch_ind *roam_synch_data)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 static QDF_STATUS
 cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 		  struct roam_offload_synch_ind *roam_synch_data,
@@ -857,6 +875,7 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	roaming_info->update_erp_next_seq_num =
 			roam_synch_data->update_erp_next_seq_num;
 	roaming_info->next_erp_seq_num = roam_synch_data->next_erp_seq_num;
+	cm_fill_roam_smd_kdk(roaming_info, roam_synch_data);
 
 	cm_fils_update_erp_seq_num(vdev, roaming_info->next_erp_seq_num, cm_id);
 	cm_update_assoc_btm_cap(vdev, rsp);
