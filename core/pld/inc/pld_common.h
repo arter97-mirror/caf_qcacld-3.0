@@ -115,13 +115,13 @@ enum pld_bus_type {
  * @PLD_BUS_WIDTH_LOW: vote for low bus bandwidth
  * @PLD_BUS_WIDTH_MEDIUM: vote for medium bus bandwidth
  * @PLD_BUS_WIDTH_HIGH: vote for high bus bandwidth
- * @PLD_BUS_WIDTH_MID_HIGH: vote for mid high bus bandwidth
  * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
  * @PLD_BUS_WIDTH_ULTRA_HIGH: vote for ultra high bus bandwidth
  * @PLD_BUS_WIDTH_SUPER_HIGH: vote for super high bus bandwidth
+ * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
+ * @PLD_BUS_WIDTH_MID_HIGH: vote for mid high bus bandwidth
  * @PLD_BUS_WIDTH_FAST: vote for fast bus bandwidth
  * @PLD_BUS_WIDTH_SUPER_FAST: vote for super fast bus bandwidth
- * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
  */
 enum pld_bus_width_type {
 	PLD_BUS_WIDTH_NONE,
@@ -132,10 +132,10 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_VERY_HIGH,
 	PLD_BUS_WIDTH_ULTRA_HIGH,
 	PLD_BUS_WIDTH_SUPER_HIGH,
-	PLD_BUS_WIDTH_FAST,
-	PLD_BUS_WIDTH_SUPER_FAST,
 	PLD_BUS_WIDTH_LOW_LATENCY,
 	PLD_BUS_WIDTH_MID_HIGH,
+	PLD_BUS_WIDTH_FAST,
+	PLD_BUS_WIDTH_SUPER_FAST,
 };
 
 #define PLD_MAX_FILE_NAME NAME_MAX
