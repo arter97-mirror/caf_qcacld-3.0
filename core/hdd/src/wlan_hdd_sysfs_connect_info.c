@@ -597,6 +597,37 @@ uint8_t *hdd_dot11_mode_str(uint32_t dot11mode)
 	return "UNKNOWN";
 }
 
+static enum phy_ch_width
+wlan_hdd_fetch_connect_info_oper_ch_width(struct wlan_hdd_link_info *link_info,
+					  enum phy_ch_width cnx_ch_width)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width bss_op_res_ch_width = CH_WIDTH_INVALID;
+	enum phy_ch_width oper_ch_width = cnx_ch_width;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
+	if (!vdev)
+		return oper_ch_width;
+
+	status = ucfg_mlme_vdev_get_bss_oper_ch_width_res(vdev,
+							  &bss_op_res_ch_width);
+	if (QDF_IS_STATUS_ERROR(status) ||
+	    bss_op_res_ch_width == CH_WIDTH_INVALID)
+		goto exit;
+
+	if (wlan_reg_get_bw_value(cnx_ch_width) >
+	    wlan_reg_get_bw_value(bss_op_res_ch_width)) {
+		oper_ch_width = bss_op_res_ch_width;
+		hdd_debug("oper res BW %d for vdev_id %d",
+			  bss_op_res_ch_width, wlan_vdev_get_id(vdev));
+	}
+
+exit:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+	return oper_ch_width;
+}
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 static
 uint8_t *hdd_curr_hw_mode_str(uint8_t curr_hw_mode)
@@ -653,7 +684,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	uint8_t curr_hw_mode;
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t chan_freq;
-	enum phy_ch_width ch_width;
+	enum phy_ch_width ch_width, oper_ch_width;
 	struct wlan_channel chan_info;
 	int8_t rssi;
 
@@ -785,16 +816,21 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 
 			chan_freq = chan_info.ch_freq;
 			ch_width = chan_info.ch_width;
+			oper_ch_width = ch_width;
 			rssi = WLAN_INVALID_RSSI_VALUE;
 		} else {
 			chan_freq = conn_info->chan_freq;
 			ch_width = conn_info->ch_width;
+			oper_ch_width =
+				wlan_hdd_fetch_connect_info_oper_ch_width(link_info,
+									  ch_width);
 			rssi = conn_info->signal;
 		}
 
 		len = scnprintf(buf + length, buf_avail_len - length,
-				"freq: %u\nch_width: %s\nsignal: %ddBm\ntx_bit_rate: %u\nrx_bit_rate: %u\n",
-				chan_freq, hdd_ch_width_str(ch_width), rssi,
+				"freq: %u\nch_width: %s\noper_ch_width: %s\nsignal: %ddBm\ntx_bit_rate: %u\nrx_bit_rate: %u\n",
+				chan_freq, hdd_ch_width_str(ch_width),
+				hdd_ch_width_str(oper_ch_width), rssi,
 				tx_bit_rate, rx_bit_rate);
 
 		if (len <= 0)
@@ -844,6 +880,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	struct hdd_connection_info *conn_info;
 	uint32_t tx_bit_rate, rx_bit_rate;
 	int ret_val;
+	enum phy_ch_width ch_width, oper_ch_width;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
@@ -881,6 +918,10 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		hdd_err("No sufficient buf_avail_len");
 		return buf_avail_len;
 	}
+
+	ch_width = conn_info->ch_width;
+	oper_ch_width = wlan_hdd_fetch_connect_info_oper_ch_width(adapter->deflink,
+								  ch_width);
 	ret_val = scnprintf(buf + length, buf_avail_len - length,
 			    "ssid = %s\n"
 			    "bssid = " QDF_MAC_ADDR_FMT "\n"
@@ -888,6 +929,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 			    "auth_time = %s\n"
 			    "freq = %u\n"
 			    "ch_width = %s\n"
+			    "oper_ch_width = %s\n"
 			    "signal = %ddBm\n"
 			    "tx_bit_rate = %u\n"
 			    "rx_bit_rate = %u\n"
@@ -898,7 +940,8 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 			    conn_info->connect_time,
 			    conn_info->auth_time,
 			    conn_info->chan_freq,
-			    hdd_ch_width_str(conn_info->ch_width),
+			    hdd_ch_width_str(ch_width),
+			    hdd_ch_width_str(oper_ch_width),
 			    conn_info->signal,
 			    tx_bit_rate,
 			    rx_bit_rate,
