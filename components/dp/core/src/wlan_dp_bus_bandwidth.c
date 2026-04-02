@@ -1658,7 +1658,7 @@ bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
 	return ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc);
 }
 #endif
-
+#ifdef WLAN_DP_BUS_BW_FAST_TPUT_LEVEL
 /**
  * dp_set_cpu_high_clock() - Control CPU frequency scaling for fast throughput
  * @dp_ctx: DP context pointer
@@ -1749,6 +1749,90 @@ dp_set_cpu_high_clock(struct wlan_dp_psoc_context *dp_ctx, int high_req)
 }
 
 /**
+ * dp_bus_bw_update_fast_vote_level() - Update vote level for FAST/SUPER_FAST
+ * @dp_ctx: handle to DP context
+ * @total_pkts: total Tx and Rx packets
+ * @next_vote_level: pointer to next vote level to be updated
+ * @tput_level: pointer to throughput level to be updated
+ *
+ * Check if total packets exceed SUPER_FAST or FAST threshold and update
+ * the vote level and throughput level accordingly.
+ *
+ * Returns: true if vote level was updated, false otherwise
+ */
+static inline bool
+dp_bus_bw_update_fast_vote_level(struct wlan_dp_psoc_context *dp_ctx,
+				 u64 total_pkts,
+				 enum pld_bus_width_type *next_vote_level,
+				 enum tput_level *tput_level)
+{
+	if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_fast_threshold) {
+		*next_vote_level = PLD_BUS_WIDTH_SUPER_FAST;
+		*tput_level = TPUT_LEVEL_SUPER_FAST;
+		return true;
+	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_fast_threshold) {
+		*next_vote_level = PLD_BUS_WIDTH_FAST;
+		*tput_level = TPUT_LEVEL_FAST;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * dp_bus_bw_handle_fast_tput_pcie_lp() - Handle PCIe LP voting for FAST tput
+ * @dp_ctx: handle to DP context
+ * @hif_ctx: HIF context
+ * @tput_level: current throughput level
+ * @prev_tput_level: previous throughput level
+ *
+ * Manage PCIe link low power state voting during FAST throughput transitions.
+ * Prevents PCIe LP when transitioning to FAST TPUT and allows it when
+ * transitioning below FAST TPUT.
+ *
+ * Returns: None
+ */
+static inline void
+dp_bus_bw_handle_fast_tput_pcie_lp(struct wlan_dp_psoc_context *dp_ctx,
+				   void *hif_ctx,
+				   enum tput_level tput_level,
+				   enum tput_level prev_tput_level)
+{
+	if (tput_level >= TPUT_LEVEL_FAST &&
+	    prev_tput_level < TPUT_LEVEL_FAST) {
+		dp_set_cpu_high_clock(dp_ctx, true);
+		/* Vote for PCIe LP prevent when transitioning to FAST TPUT */
+		if (hif_prevent_link_low_power_states(hif_ctx))
+			dp_info("Failed to prevent PCIe link low power states");
+		else
+			dp_info("PCIe LP prevent vote applied for FAST TPUT");
+	} else if (tput_level < TPUT_LEVEL_FAST &&
+		   prev_tput_level >= TPUT_LEVEL_FAST) {
+		dp_set_cpu_high_clock(dp_ctx, false);
+		/* Remove PCIe LP vote when transitioning below FAST TPUT */
+		hif_allow_link_low_power_states(hif_ctx);
+		dp_info("PCIe LP vote removed for below FAST TPUT");
+	}
+}
+#else
+static inline bool
+dp_bus_bw_update_fast_vote_level(struct wlan_dp_psoc_context *dp_ctx,
+				 u64 total_pkts,
+				 enum pld_bus_width_type *next_vote_level,
+				 enum tput_level *tput_level)
+{
+	return false;
+}
+
+static inline void
+dp_bus_bw_handle_fast_tput_pcie_lp(struct wlan_dp_psoc_context *dp_ctx,
+				   void *hif_ctx,
+				   enum tput_level tput_level,
+				   enum tput_level prev_tput_level)
+{
+}
+#endif /* WLAN_DP_BUS_BW_FAST_TPUT_LEVEL */
+
+/**
  * dp_pld_request_bus_bandwidth() - Function to control bus bandwidth
  * @dp_ctx: handle to DP context
  * @tx_packets: transmit packet count received in BW interval
@@ -1795,12 +1879,10 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	if (dp_ctx->high_bus_bw_request) {
 		next_vote_level = PLD_BUS_WIDTH_VERY_HIGH;
 		tput_level = TPUT_LEVEL_VERY_HIGH;
-	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_fast_threshold) {
-		next_vote_level = PLD_BUS_WIDTH_SUPER_FAST;
-		tput_level = TPUT_LEVEL_SUPER_FAST;
-	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_fast_threshold) {
-		next_vote_level = PLD_BUS_WIDTH_FAST;
-		tput_level = TPUT_LEVEL_FAST;
+	} else if (dp_bus_bw_update_fast_vote_level(dp_ctx, total_pkts,
+						    &next_vote_level,
+						    &tput_level)) {
+		/* Vote level updated for FAST/SUPER_FAST tput */
 	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_high_threshold) {
 		next_vote_level = PLD_BUS_WIDTH_SUPER_HIGH;
 		tput_level = TPUT_LEVEL_SUPER_HIGH;
@@ -1848,21 +1930,8 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	dp_rtpm_tput_policy_apply(dp_ctx, tput_level);
 
 	/* PCIe LP voting for FAST throughput transitions */
-	if (tput_level >= TPUT_LEVEL_FAST &&
-	    prev_tput_level < TPUT_LEVEL_FAST) {
-		dp_set_cpu_high_clock(dp_ctx, true);
-		/* Vote for PCIe LP prevent when transitioning to FAST TPUT */
-		if (hif_prevent_link_low_power_states(hif_ctx))
-			dp_info("Failed to prevent PCIe link low power states");
-		else
-			dp_info("PCIe LP prevent vote applied for FAST TPUT");
-	} else if (tput_level < TPUT_LEVEL_FAST &&
-		   prev_tput_level >= TPUT_LEVEL_FAST) {
-		dp_set_cpu_high_clock(dp_ctx, false);
-		/* Remove PCIe LP vote when transitioning below FAST TPUT */
-		hif_allow_link_low_power_states(hif_ctx);
-		dp_info("PCIe LP vote removed for below FAST TPUT");
-	}
+	dp_bus_bw_handle_fast_tput_pcie_lp(dp_ctx, hif_ctx,
+					   tput_level, prev_tput_level);
 
 	dptrace_high_tput_req =
 			next_vote_level > PLD_BUS_WIDTH_IDLE ? true : false;
