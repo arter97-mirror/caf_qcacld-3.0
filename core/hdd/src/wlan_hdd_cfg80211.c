@@ -36785,7 +36785,6 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 						int link_id,
 						struct wlan_channel *chan_info)
 {
-	QDF_STATUS status;
 	struct hdd_station_ctx *sta_ctx = NULL;
 	struct ch_params ch_params = {0};
 	struct wlan_hdd_link_info *link_info;
@@ -36793,7 +36792,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	uint8_t vdev_id;
 	struct wlan_channel *des_chan;
 	qdf_freq_t sec_2g_freq = 0;
-	enum phy_ch_width cur_ch_width, bss_op_res_ch_width;
+	enum phy_ch_width cur_ch_width;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
@@ -36817,22 +36816,8 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	chan_info->ch_width =
 		wlan_mlme_get_ch_width_from_phymode(peer_phymode);
 
-	status = ucfg_mlme_vdev_get_bss_oper_ch_width_res(vdev,
-							  &bss_op_res_ch_width);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("Failed to fetch bss oper bw resource");
-		return qdf_status_to_os_return(status);
-	}
-
 	if (ucfg_mlme_get_cur_ch_width_update_from_ap(vdev, &cur_ch_width))
 		chan_info->ch_width = cur_ch_width;
-
-	if (bss_op_res_ch_width != CH_WIDTH_INVALID &&
-	    wlan_reg_get_bw_value(chan_info->ch_width) >
-	    wlan_reg_get_bw_value(bss_op_res_ch_width)) {
-		hdd_debug("Oper res BW %d", bss_op_res_ch_width);
-		chan_info->ch_width = bss_op_res_ch_width;
-	}
 
 	ch_params.ch_width = chan_info->ch_width;
 	ch_params.mhz_freq_seg1 = chan_info->ch_cfreq2;
