@@ -247,6 +247,11 @@ pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 {
 }
 
+static inline bool pld_ipci_is_direct_refill_supported(struct device *dev)
+{
+	return false;
+}
+
 static inline
 int pld_ipci_request_bus_bandwidth(struct device *dev, int bandwidth)
 {
@@ -544,6 +549,11 @@ static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
 	return false;
 }
 #endif
+
+static inline bool pld_ipci_is_direct_refill_supported(struct device *dev)
+{
+	return icnss_get_fw_cap(dev, ICNSS_FW_CAP_DIRECT_REFILL_SUPPORT);
+}
 
 static inline int pld_ipci_exit_power_save(struct device *dev)
 {

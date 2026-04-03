@@ -928,11 +928,13 @@ bool pld_is_direct_refill_supported(struct device *dev)
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_is_direct_refill_supported(dev);
 		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_is_direct_refill_supported(dev);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_IPCI_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_SNOC:
-	case PLD_BUS_TYPE_IPCI:
 	case PLD_BUS_TYPE_SDIO:
 	default:
 		break;
