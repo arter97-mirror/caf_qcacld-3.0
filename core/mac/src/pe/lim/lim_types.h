@@ -1788,19 +1788,31 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 
 #ifdef WLAN_FEATURE_11BN_SMD
 /**
- * lim_send_uhr_link_recfg_st_prep_req_frame() - Send UHR Link Reconfiguration
- * ST Preparation Request frame
- * @vdev_id: vdev id
- * @peer_mac: Peer mac addr
- * @req: Link reconfig request
+ * lim_send_uhr_link_recfg_st_prep_req_frame() - Send UHR Link Reconfig ST Prep Request
+ * @vdev_id: VDEV ID
+ * @target_ap_mac: Target AP MLD MAC address
+ * @args: Action frame arguments
+ * @req: Link reconfiguration request structure
  *
- * Return: 0 for success, non-zero for failure
+ * Return: QDF_STATUS
  */
 QDF_STATUS
-lim_send_uhr_link_recfg_st_prep_req_frame(uint8_t vdev_id,
-					  uint8_t *peer_mac,
-					  struct mlo_link_recfg_state_req *req);
-#endif
+lim_send_uhr_link_recfg_st_prep_req_frame(
+	uint8_t vdev_id,
+	uint8_t *target_ap_mac,
+	struct wlan_action_frame_args *args,
+	struct mlo_link_recfg_state_req *req);
+#else
+static inline QDF_STATUS
+lim_send_uhr_link_recfg_st_prep_req_frame(
+	uint8_t vdev_id,
+	uint8_t *target_ap_mac,
+	struct wlan_action_frame_args *args,
+	struct mlo_link_recfg_state_req *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**

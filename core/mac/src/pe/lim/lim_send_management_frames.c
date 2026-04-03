@@ -9999,4 +9999,251 @@ populate_nonce_ie(uint8_t *buf, uint16_t *out_len)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-#endif
+
+/*
+ * lim_send_uhr_link_recfg_st_prep_req_frame() - Send UHR Link Reconfig ST Prep Request
+ * @vdev_id: VDEV ID
+ * @target_ap_mac: Target AP MLD MAC address
+ * @args: Action frame arguments
+ * @req: Link reconfiguration request structure
+ *
+ * This function sends UHR Link Reconfiguration Request frame with Type=0
+ * (ST preparation) to the target AP MLD during SMD roaming preparation phase.
+ *
+ * UHR Link Reconfiguration Request frame Action field format
+ * +----------+--------+-------------+------+----------+------------------+
+ * | Category | Action | Dialog      | Type | OCI IE   | Reconfig ML IE   |
+ * |   (43)   |  (0)   | Token       | (0)  |(optional)| (variable)       |
+ * +----------+--------+-------------+------+----------+------------------+
+ * +----------------------+------------------+------------------+----------+
+ * | SMD BSS Transition   | DH Param IE      | Nonce IE         | MIC IE   |
+ * | Params (variable)    | (optional)       | (optional)       |(optional)|
+ * +----------------------+------------------+------------------+----------+
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+lim_send_uhr_link_recfg_st_prep_req_frame(
+		uint8_t vdev_id,
+		uint8_t *target_ap_mac,
+		struct wlan_action_frame_args *args,
+		struct mlo_link_recfg_state_req *req)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	QDF_STATUS qdf_status;
+	uint8_t tx_flag = 0;
+	uint16_t rv_mlie_len = 0;
+	uint32_t payload_size;
+	uint8_t *frame_ptr;
+	void *pkt_ptr = NULL;
+	uint8_t smd_bss_trans_ie[MAX_SMD_BSS_TRANS_IE_SIZE];
+	uint16_t smd_bss_trans_ie_len = 0;
+	uint8_t dh_ie[128];
+	uint16_t dh_ie_len = 0;
+	uint8_t nonce_ie[64];
+	uint16_t nonce_ie_len = 0;
+	tDot11fIEoci oci;
+	uint8_t *p_frame;
+	uint32_t num_bytes;
+	tpSirMacMgmtHdr mgmt_hdr;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	if (!req || !target_ap_mac || !args)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	/* Initialize OCI structure */
+	qdf_mem_zero(&oci, sizeof(oci));
+
+	/* Populate Reconfiguration Multi-Link IE for SMD roaming */
+	session->mlo_ie_total_len = 0;
+	qdf_mem_zero(&session->mlo_ie, sizeof(session->mlo_ie));
+
+	qdf_status = populate_rv_mlo_ie_smd(session->vdev, session, req);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_err("SMD: Failed to populate MLO IE, status=%d", qdf_status);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	rv_mlie_len = lim_caculate_mlo_ie_length(&session->mlo_ie);
+	session->mlo_ie_total_len = rv_mlie_len;
+	pe_debug("SMD: Reconfig ML IE len %d", rv_mlie_len);	
+	/* Add SMD BSS Transition Parameters element (mandatory for ST prep Type=0) */
+	qdf_status = populate_smd_bss_transition_params(session, req,
+			smd_bss_trans_ie,
+			&smd_bss_trans_ie_len);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_err("Failed to populate SMD BSS Transition Params IE");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pe_debug("SMD BSS Transition Params IE populated, len=%d",
+			smd_bss_trans_ie_len);
+
+	/* Conditional DH Parameter and Nonce IEs for Per-AP MLD PTK mode */
+	if (false){
+		//wlan_mlme_is_per_ap_mld_ptk_mode(mac_ctx->psoc)) {
+		/* Populate Diffie-Hellman Parameter IE */
+		qdf_status = populate_dh_param_ie(mac_ctx->psoc, dh_ie, &dh_ie_len);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to populate DH Parameter IE");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/* Populate Nonce IE */
+		qdf_status = populate_nonce_ie(nonce_ie, &nonce_ie_len);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to populate Nonce IE");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		//TODO: Populate MIC IE
+
+		pe_debug("Per-AP MLD PTK mode: DH IE len=%u, Nonce IE len=%u",
+				dh_ie_len, nonce_ie_len);
+	}
+
+	/* Populate OCI IE if OCV is supported */
+	if (req->add_link_info.num_links &&
+			lim_is_self_and_peer_ocv_capable(mac_ctx, target_ap_mac, session)) {
+		pe_debug("Add oci ie");
+		populate_oci_ie(mac_ctx, req->add_link_info.link[0].freq, &oci);
+	}
+
+	pe_debug("Sending UHR Link Reconfig ST Prep Request (Type=0) token %d to "
+			QDF_MAC_ADDR_FMT, args->arg1,
+			QDF_MAC_ADDR_REF(target_ap_mac));
+
+	/* Calculate payload size
+	 * Fixed fields: Category(1) + Action(1) + DialogToken(1) + Type(1) = 4
+	 * Variable: ML IE + SMD BSS Trans IE + DH IE + Nonce IE + OCI IE
+	 */
+	payload_size = sizeof(tSirMacMgmtHdr) + 4 + rv_mlie_len + smd_bss_trans_ie_len +
+		dh_ie_len + nonce_ie_len;
+
+	/* Add space for OCI IE if present:
+	 * EID(1) + Length(1) + ExtID(1) + op_class(1) + prim_ch(1) + freq_seg_1(1) = 6 bytes
+	 */
+	if (oci.present)
+		payload_size += 6;
+
+	/* Allocate management frame */
+	qdf_status = cds_packet_alloc((uint16_t)payload_size,
+			(void **)&frame_ptr,
+			(void **)&pkt_ptr);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		pe_err("Failed to allocate %d bytes for UHR Link Reconfig Request",
+				payload_size);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_zero(frame_ptr, payload_size);
+	p_frame = frame_ptr;
+
+	lim_populate_mac_header(mac_ctx, p_frame, WLAN_FC0_TYPE_MGMT,
+			SIR_MAC_MGMT_ACTION, target_ap_mac,
+			session->self_mac_addr);
+
+	/* Update A3 with the BSSID */
+	mgmt_hdr = (tpSirMacMgmtHdr)p_frame;
+	sir_copy_mac_addr(mgmt_hdr->bssId, session->bssId);
+	lim_set_protected_bit(mac_ctx, session, target_ap_mac, mgmt_hdr);
+
+	/* NOW write action frame body AFTER the MAC header */
+	p_frame += sizeof(tSirMacMgmtHdr);  // Skip past MAC header (24 bytes)
+
+	/* Pack fixed fields */
+	*p_frame++ = args->category;  /* Category = 43 */
+	*p_frame++ = args->action;      /* Action = 0 */
+	*p_frame++ = args->arg1;                     /* Dialog Token */
+	*p_frame++ = args->arg2; /* Type = 0 */
+
+	/* Pack OCI IE if present */
+	if (oci.present) {
+		*p_frame++ = WLAN_ELEMID_EXTN_ELEM;
+		*p_frame++ = sizeof(oci.op_class) + sizeof(oci.prim_ch_num) +
+			sizeof(oci.freq_seg_1_ch_num) + 1; /* +1 for ext ID */
+		*p_frame++ = WLAN_EXTN_ELEMID_OCI;
+		*p_frame++ = oci.op_class;
+		*p_frame++ = oci.prim_ch_num;
+		*p_frame++ = oci.freq_seg_1_ch_num;
+		pe_debug("OCI IE added: op_class=%d prim_ch=%d freq_seg_1=%d",
+				oci.op_class, oci.prim_ch_num, oci.freq_seg_1_ch_num);
+	}
+
+
+	if (rv_mlie_len) {
+		qdf_status = lim_fill_complete_mlo_ie(session, rv_mlie_len,
+						      p_frame);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("SMD: Failed to fill MLO IE, aborting frame send");
+			cds_packet_free((void *)pkt_ptr);
+			return qdf_status;
+		}
+	}
+
+	p_frame += rv_mlie_len;
+
+	/* Pack SMD BSS Transition Parameters IE */
+	qdf_mem_copy(p_frame, smd_bss_trans_ie, smd_bss_trans_ie_len);
+	p_frame += smd_bss_trans_ie_len;
+
+	/* Pack DH Parameter IE if present */
+	if (dh_ie_len > 0) {
+		qdf_mem_copy(p_frame, dh_ie, dh_ie_len);
+		p_frame += dh_ie_len;
+	}
+
+	/* Pack Nonce IE if present */
+	if (nonce_ie_len > 0) {
+		qdf_mem_copy(p_frame, nonce_ie, nonce_ie_len);
+		p_frame += nonce_ie_len;
+	}
+
+	num_bytes = p_frame - frame_ptr;
+
+	/* Transmit the frame */
+	if (req->add_link_info.num_links &&
+			wlan_reg_is_24ghz_ch_freq(req->add_link_info.link[0].freq))
+		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	/* Dump the ST frame request for debugging */
+	pe_debug("ST Frame Request Dump - Dialog Token: %d, Type: %d, Payload Size: %d",
+			args->arg1, UHR_LINK_RECONFIG_TYPE_ST_PREP, num_bytes);
+	pe_debug("ST Frame Request - Target AP: " QDF_MAC_ADDR_FMT ", Self MAC: " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(target_ap_mac),
+			QDF_MAC_ADDR_REF(session->self_mac_addr));
+	pe_debug("ST Frame Request - ML IE len: %d, SMD BSS Trans IE len: %d, DH IE len: %d, Nonce IE len: %d",
+			rv_mlie_len, smd_bss_trans_ie_len, dh_ie_len, nonce_ie_len);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			frame_ptr, num_bytes);
+	qdf_status = wma_tx_frame(mac_ctx, pkt_ptr, num_bytes,
+			TXRX_FRM_802_11_MGMT,
+			ANI_TXDIR_TODS,
+			7, /* TID - not used */
+			lim_tx_complete, frame_ptr,
+			tx_flag, session->vdev_id,
+			0, /* channel_freq - not used */
+			RATEID_DEFAULT, 0);
+
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		pe_err("Failed to send UHR Link Reconfig ST Prep Request, status=%d",
+				qdf_status);
+		cds_packet_free((void *)pkt_ptr);
+		return qdf_status;
+	}
+
+	pe_debug("UHR Link Reconfig ST Prep Request sent successfully, len=%d",
+			num_bytes);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */

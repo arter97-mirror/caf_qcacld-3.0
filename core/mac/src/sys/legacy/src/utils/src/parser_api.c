@@ -32,6 +32,7 @@
 #include "ani_global.h"
 #include "parser_api.h"
 #include "lim_utils.h"
+#include "lim_assoc_utils.h"
 #include "lim_security_utils.h"
 #include "utils_parser.h"
 #include "lim_ser_des_utils.h"
@@ -15792,7 +15793,6 @@ populate_smd_bss_transition_params(
 	uint8_t *ptr = ie_buf;
 	uint8_t st_control = 0;
 	uint16_t listen_interval;
-	uint8_t presence_bitmap = 0;
 	uint8_t i;
 
 	if (!session || !req || !ie_buf || !ie_len) {
@@ -16442,7 +16442,6 @@ populate_rv_mlo_ie_smd(struct wlan_objmgr_vdev *vdev,
 	mlo_ie->num_sta_profile = num_sta_prof;
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 
-
 	pe_debug("SMD: MLO IE populated with %d add link profiles, common-info length=%d",
 		 num_sta_prof, mlo_ie->num_data);
 	pe_debug("SMD: Dumping mlo_ie->data content:");
@@ -16451,7 +16450,6 @@ populate_rv_mlo_ie_smd(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
-
 #endif
 
 QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,

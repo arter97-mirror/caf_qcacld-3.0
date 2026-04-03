@@ -534,6 +534,54 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
  * Return: true if RSO should be skipped, false otherwise
  */
 bool smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * smd_link_recfg_free_perptk_ies() - Free per-PTK optional IE buffers in ST prep rsp
+ * @link_recfg_rsp: Response structure whose per-PTK fields need to be freed
+ *
+ * Frees key_delivery, mscs_descriptor, diffie_hellman_param, nonce, and mic
+ * element buffers allocated during ST prep response parsing.
+ *
+ * Return: void
+ */
+void
+smd_link_recfg_free_perptk_ies(struct wlan_mlo_link_recfg_rsp *link_recfg_rsp);
+
+/**
+ * smd_link_recfg_cleanup_rsp() - Free allocated fields in UHR ST prep rsp
+ * @ctx: Link reconfiguration context
+ * @link_recfg_rsp: Response structure whose fields need to be freed
+ *
+ * Frees oci_ie, mlo_ie, smd_bss_trans_params, per-PTK IEs, and context
+ * frame buffers allocated during ST prep response parsing. Also invokes
+ * smd_link_recfg_free_perptk_ies() for per-PTK optional elements.
+ * Called on failure from SMD APIs.
+ *
+ * Return: void
+ */
+void
+smd_link_recfg_cleanup_rsp(struct mlo_link_recfg_context *ctx,
+			   struct wlan_mlo_link_recfg_rsp *link_recfg_rsp);
+
+/**
+ * smd_link_recfg_parse_perptk_ies() - Parse per-PTK optional IEs from ST prep rsp
+ * @link_recfg_rsp: Response structure to populate
+ * @opt: Pointer to start of optional IE buffer
+ * @remaining: Number of bytes remaining in the buffer
+ *
+ * Walks the extension-IE list and allocates/copies key_delivery,
+ * mscs_descriptor, diffie_hellman_param, nonce, and mic elements into
+ * @link_recfg_rsp. On allocation failure the already-allocated fields are
+ * left intact and the caller is expected to invoke
+ * smd_link_recfg_free_perptk_ies() for cleanup.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NOMEM on allocation failure
+ */
+QDF_STATUS
+smd_link_recfg_parse_perptk_ies(
+	struct wlan_mlo_link_recfg_rsp *link_recfg_rsp,
+	uint8_t *opt, uint32_t remaining);
+
 #else
 static inline void
 smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
@@ -754,6 +802,19 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_serialization_command *cmd)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+smd_link_recfg_free_perptk_ies(struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
+{
+}
+
+static inline QDF_STATUS
+smd_link_recfg_parse_perptk_ies(
+	struct wlan_mlo_link_recfg_rsp *link_recfg_rsp,
+	uint8_t *opt, uint32_t remaining)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 #endif
