@@ -4890,7 +4890,7 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	uint8_t index = 0;
 	enum ieee80211_protmode prot_mode;
 	uint32_t keep_alive_period, keep_alive_method;
-	uint32_t edca_txop_duration_us;
+	uint32_t edca_txop_duration_us = 0;
 	QDF_STATUS ret;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	struct wlan_objmgr_vdev *vdev;
@@ -4978,19 +4978,17 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 
 	/* Send su_txop_burst_limit_us parameter for STA mode on 5GHz */
 	if (intr[vdev_id].type == WMI_VDEV_TYPE_STA &&
-	    WLAN_REG_IS_5GHZ_CH_FREQ(vdev->vdev_mlme.bss_chan->ch_freq)) {
+	    WLAN_REG_IS_5GHZ_CH_FREQ(vdev->vdev_mlme.bss_chan->ch_freq))
 		edca_txop_duration_us =
 		    wlan_mlme_get_edca_txop_duration_ms(mac_ctx->psoc) * 1000;
 
-		ret = mlme_check_index_setparam(
-					setparam,
+	ret = mlme_check_index_setparam(setparam,
 					wmi_vdev_param_su_txop_burst_limit_us,
 					edca_txop_duration_us, index++,
 					MAX_VDEV_SET_BSS_PARAMS);
-		if (QDF_IS_STATUS_ERROR(ret)) {
-			wma_debug("failed to set wmi_vdev_param_su_txop_burst_limit_us");
-			goto error;
-		}
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_debug("failed to set wmi_vdev_param_su_txop_burst_limit_us");
+		goto error;
 	}
 
 	ret = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
