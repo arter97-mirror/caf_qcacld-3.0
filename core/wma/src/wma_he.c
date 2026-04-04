@@ -332,8 +332,8 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 
 	he_cap->rx_he_mcs_map_lt_80 = rx_mcs_le_80;
 	he_cap->tx_he_mcs_map_lt_80 = tx_mcs_le_80;
-	*((uint16_t *)he_cap->tx_he_mcs_map_160) = rx_mcs_160;
-	*((uint16_t *)he_cap->rx_he_mcs_map_160) = tx_mcs_160;
+	*((uint16_t *)he_cap->rx_he_mcs_map_160) = rx_mcs_160;
+	*((uint16_t *)he_cap->tx_he_mcs_map_160) = tx_mcs_160;
 	*((uint16_t *)he_cap->rx_he_mcs_map_80_80) = rx_mcs_160;
 	*((uint16_t *)he_cap->tx_he_mcs_map_80_80) = tx_mcs_160;
 }
