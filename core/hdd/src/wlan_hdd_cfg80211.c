@@ -5743,8 +5743,15 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	uint8_t sta_indoor_ch_peer_scc = 0;
+	struct net_device *dev;
 
-	hdd_enter_dev(wdev->netdev);
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+
+	hdd_enter_dev(dev);
 
 	ret_val = wlan_hdd_validate_context(hdd_ctx);
 	if (ret_val)
@@ -37640,13 +37647,20 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 					   struct cfg80211_chan_def *chandef,
 					   int link_id)
 {
-	struct net_device *dev = wdev->netdev;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct net_device *dev;
+	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
 	int ret = 0;
 
 	if (wlan_hdd_wdev_is_ap_vlan(wdev))
 		return -EINVAL;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
@@ -37696,7 +37710,7 @@ static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 
-	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
 	if (errno)
 		return errno;
 
@@ -37716,7 +37730,7 @@ static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	/* Legacy purposes */
 	int link_id = -1;
 
-	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
 	if (errno)
 		return errno;
 
@@ -39369,16 +39383,24 @@ static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 						struct wireless_dev *wdev,
 						struct mgmt_frame_regs *upd)
 {
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct hdd_adapter *adapter;
 	struct hdd_context *hdd_ctx;
+	struct net_device *dev;
 
-	if (!adapter) {
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("netdev is null");
+		return;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (hdd_validate_adapter(adapter)) {
 		hdd_err("Invalid adapter");
 		return;
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
+	if (wlan_hdd_validate_context(hdd_ctx)) {
 		hdd_err("HDD context is null");
 		return;
 	}
@@ -39404,7 +39426,7 @@ static void wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 
-	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
 	if (errno)
 		return;
 

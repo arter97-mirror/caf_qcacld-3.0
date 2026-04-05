@@ -3339,6 +3339,11 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 		return -EIO;
 	}
 
+	if (!wdev->netdev) {
+		hdd_err("netdev is null, set tx power failed");
+		return -EIO;
+	}
+
 	adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
@@ -3604,13 +3609,19 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 {
 
 	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
-	struct net_device *ndev = wdev->netdev;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
+	struct net_device *ndev;
+	struct hdd_adapter *adapter;
 	QDF_STATUS status;
 	int ret;
 	static bool is_rate_limited;
 	struct wlan_objmgr_vdev *vdev;
 
+	ndev = hdd_wdev_get_netdev(wdev);
+	if (!ndev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+	adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	hdd_enter_dev(ndev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {

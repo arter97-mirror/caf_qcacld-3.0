@@ -383,21 +383,29 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      bool dont_wait_for_ack, u64 *cookie, int link_id)
 {
 	QDF_STATUS status;
-	struct net_device *dev = wdev->netdev;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct net_device *dev;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t type, sub_type;
 	uint16_t auth_algo;
 	QDF_STATUS qdf_status;
 	int ret;
 	uint32_t assoc_resp_len, ft_info_len = 0;
-	const uint8_t  *assoc_resp;
+	const uint8_t *assoc_resp;
 	void *ft_info;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
 	uint8_t vdev_id;
 	enum QDF_OPMODE opmode = QDF_STA_MODE;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -544,7 +552,8 @@ int wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 	int link_id = -1;
-	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+
+	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
 	if (errno)
 		return errno;
 
@@ -1243,12 +1252,19 @@ void hdd_clean_up_interface(struct hdd_context *hdd_ctx,
 
 int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
-	struct net_device *dev = wdev->netdev;
 	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_adapter *adapter;
+	struct net_device *dev;
 	int errno;
 
 	hdd_enter();
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -1320,11 +1336,19 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 static void
 _wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
-	struct net_device *dev = wdev->netdev;
-	struct hdd_wds_ext *osifp = netdev_priv(dev);
-	struct qdf_net_if *nif = (struct qdf_net_if *)osifp->parent_netdev;
+	struct net_device *dev;
+	struct hdd_wds_ext *osifp;
+	struct qdf_net_if *nif;
 
 	hdd_enter();
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return;
+	}
+	osifp = netdev_priv(dev);
+	nif = (struct qdf_net_if *)osifp->parent_netdev;
 
 	if (osifp->parent_netdev) {
 		qdf_net_if_release_dev(nif);
@@ -1366,9 +1390,16 @@ wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
+	struct net_device *dev;
 
 	if (wdev->iftype != NL80211_IFTYPE_AP_VLAN)
 		return -EINVAL;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
 
 	/*
 	 * Need to remove existing AP/VLAN interfaces even when driver is
@@ -1384,11 +1415,11 @@ wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 		return 0;
 	}
 
-	errno = osif_vdev_sync_trans_start_wait(wdev->netdev, &vdev_sync);
+	errno = osif_vdev_sync_wdev_trans_start_wait(wdev, &vdev_sync);
 	if (errno)
 		return errno;
 
-	osif_vdev_sync_unregister(wdev->netdev);
+	osif_vdev_sync_unregister(dev);
 	osif_vdev_sync_wait_for_ops(vdev_sync);
 
 	_wlan_hdd_del_wds_ext_intf(wiphy, wdev);
@@ -1410,17 +1441,27 @@ int wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct hdd_adapter *adapter;
+	struct net_device *dev;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	if (!wlan_hdd_del_wds_ext_intf(wiphy, wdev))
 		return 0;
 
 	adapter->delete_in_progress = true;
-	errno = osif_vdev_sync_trans_start_wait(wdev->netdev, &vdev_sync);
-	if (errno)
+	errno = osif_vdev_sync_wdev_trans_start_wait(wdev, &vdev_sync);
+	if (errno) {
+		adapter->delete_in_progress = false;
 		return errno;
+	}
 
-	osif_vdev_sync_unregister(wdev->netdev);
+	osif_vdev_sync_unregister(dev);
 	osif_vdev_sync_wait_for_ops(vdev_sync);
 
 	adapter->is_virtual_iface = true;
