@@ -1612,17 +1612,17 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 
 	hif_system_pm_set_state_resuming(hif_ctx);
 
+	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Prevent resume, dal resume rejected");
+		goto out;
+	}
+
 	qdf_status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
 						  type);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed pmo bus resume");
-		goto out;
-	}
-
-	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Prevent resume, dal resume rejected");
 		goto out;
 	}
 
