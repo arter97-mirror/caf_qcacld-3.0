@@ -1012,6 +1012,87 @@ int target_if_nan_rsp_handler(ol_scn_t scn, uint8_t *data, uint32_t len)
 	return 0;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * target_if_nan_next_dw_info_event_handler() - Handler for NAN next DW info event
+ * @scn: Opaque SOC handle
+ * @data: Event data from firmware
+ * @datalen: Length of event data
+ *
+ * This function handles the WMI_NAN_NEXT_DW_INFO_EVENTID event from firmware
+ * and forwards it to the UMAC layer for further processing.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int target_if_nan_next_dw_info_event_handler(ol_scn_t scn, uint8_t *data,
+						    uint32_t datalen)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_next_dw_info_event event;
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle;
+	struct nan_psoc_priv_obj *nan_psoc_obj;
+
+	if (!scn || !data) {
+		target_if_err("Invalid parameters");
+		return -EINVAL;
+	}
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		target_if_err("PSOC is NULL");
+		return -EINVAL;
+	}
+
+	nan_psoc_obj = nan_get_psoc_priv_obj(psoc);
+	if (!nan_psoc_obj) {
+		target_if_err("nan PSOC is NULL");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("WMI handle is NULL");
+		return -EINVAL;
+	}
+
+	/* Extract event parameters from WMI */
+	qdf_mem_zero(&event, sizeof(event));
+	status = wmi_extract_nan_next_dw_info(wmi_handle, data, &event);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("Failed to extract NAN next DW info: %d", status);
+		return -EINVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, event.vdev_id,
+                                                    WLAN_NAN_ID);
+	if (!vdev) {
+		target_if_err("vdev is null");
+		return -EINVAL;
+        }
+
+	if (!nan_psoc_obj->cb_obj.os_if_nan_next_dw_notif_handler) {
+		target_if_err("function handler is null");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+		return -EINVAL;
+	}
+
+	nan_psoc_obj->cb_obj.os_if_nan_next_dw_notif_handler(vdev, &event);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	return qdf_status_to_os_return(status);
+}
+#else
+static inline
+int target_if_nan_next_dw_info_event_handler(ol_scn_t scn, uint8_t *data,
+					     uint32_t datalen)
+{
+	return 0;
+}
+#endif
+
 QDF_STATUS target_if_nan_register_events(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS ret;
@@ -1118,6 +1199,15 @@ QDF_STATUS target_if_nan_register_events(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	ret = wmi_unified_register_event_handler(
+				handle, wmi_nan_next_dw_info_event_id,
+				target_if_nan_next_dw_info_event_handler,
+				WMI_RX_UMAC_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event registration failed, ret: %d", ret);
+		target_if_nan_deregister_events(psoc);
+		return QDF_STATUS_E_FAILURE;
+	}
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1187,6 +1277,14 @@ QDF_STATUS target_if_nan_deregister_events(struct wlan_objmgr_psoc *psoc)
 	}
 
 	ret = wmi_unified_unregister_event_handler(handle, wmi_ndp_event_id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event deregistration failed, ret: %d", ret);
+		status = ret;
+	}
+
+	ret = wmi_unified_unregister_event_handler(
+						handle,
+						wmi_nan_next_dw_info_event_id);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		target_if_err("wmi event deregistration failed, ret: %d", ret);
 		status = ret;

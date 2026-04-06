@@ -411,6 +411,18 @@ struct nan_datapath_channel_info {
 	uint8_t mac_id;
 };
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * struct nan_next_dw_info_event - NAN next discovery window info event
+ * @vdev_id: vdev identifier
+ * @channel_freq: Channel frequency in MHz
+ */
+struct nan_next_dw_info_event {
+	uint32_t vdev_id;
+	uint32_t channel_freq;
+};
+#endif
+
 #define NAN_CH_INFO_MAX_LEN \
 	(NAN_CH_INFO_MAX_CHANNELS * sizeof(struct nan_datapath_channel_info))
 
@@ -931,6 +943,7 @@ struct nan_pasn_peer_ops {
  * struct nan_callbacks - struct containing callback to non-converged driver
  * @os_if_nan_event_handler: OS IF Callback for handling NAN Discovery events
  * @os_if_ndp_event_handler: OS IF Callback for handling NAN Datapath events
+ * @os_if_nan_next_dw_notif_handler: OS IF Callback for NAN next DW notification
  * @ucfg_nan_request_process_cb: Callback to indicate NAN enable/disable
  * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
@@ -959,6 +972,10 @@ struct nan_callbacks {
 	void (*os_if_ndp_event_handler)(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					uint32_t type, void *msg);
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+	void (*os_if_nan_next_dw_notif_handler)(struct wlan_objmgr_vdev *vdev,
+						struct nan_next_dw_info_event *event);
+#endif
 	void (*ucfg_nan_request_process_cb)(void *cookie);
 	int (*ndi_open)(const char *iface_name, bool is_add_virtual_iface);
 	int (*ndi_set_mode)(const char *iface_name);

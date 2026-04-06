@@ -2635,6 +2635,73 @@ static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * os_if_nan_next_dw_notif_handler() - Handler for NAN next DW notification
+ * @vdev: VDEV object
+ * @event: NAN next DW info event
+ *
+ * This function notifies the kernel about the next NAN discovery window
+ * using cfg80211_next_nan_dw_notif().
+ *
+ * Return: None
+ */
+static void os_if_nan_next_dw_notif_handler(
+	struct wlan_objmgr_vdev *vdev,
+	struct nan_next_dw_info_event *event)
+{
+	struct vdev_osif_priv *osif_priv;
+	struct wireless_dev *wdev;
+	struct ieee80211_channel *chan;
+	struct wlan_objmgr_pdev *pdev;
+	struct pdev_osif_priv *pdev_osif_priv;
+	struct wiphy *wiphy;
+
+	if (!vdev || !event) {
+		osif_err("Invalid parameters");
+		return;
+	}
+
+	/* Get OSIF private structure */
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv || !osif_priv->wdev) {
+		osif_err("OSIF priv or wdev is NULL");
+		return;
+	}
+
+	wdev = osif_priv->wdev;
+
+	/* Get wiphy from pdev */
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		osif_err("PDEV is NULL");
+		return;
+	}
+
+	pdev_osif_priv = wlan_pdev_get_ospriv(pdev);
+	if (!pdev_osif_priv || !pdev_osif_priv->wiphy) {
+		osif_err("PDEV OSIF priv or wiphy is NULL");
+		return;
+	}
+
+	wiphy = pdev_osif_priv->wiphy;
+
+	/* Convert frequency to ieee80211_channel */
+	chan = ieee80211_get_channel(wiphy, event->channel_freq);
+	if (!chan) {
+		osif_err("Failed to convert frequency to channel");
+		return;
+	}
+
+	osif_debug("Notifying kernel: vdev_id=%u, freq=%u",
+		   event->vdev_id, event->channel_freq);
+
+	/* Notify kernel about next NAN discovery window */
+	cfg80211_next_nan_dw_notif(wdev, chan, GFP_ATOMIC);
+
+}
+#endif
+
 int os_if_nan_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
 				     struct nan_callbacks *cb_obj)
 {
@@ -2909,11 +2976,26 @@ fail:
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+static
+void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
+				   struct nan_callbacks *cb_obj)
+{
+	cb_obj->os_if_nan_next_dw_notif_handler =
+					os_if_nan_next_dw_notif_handler;
+}
+#else
+static inline
+void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
+				   struct nan_callbacks *cb_obj)
+{}
+#endif
 int os_if_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				     struct nan_callbacks *cb_obj)
 {
 	cb_obj->os_if_ndp_event_handler = os_if_nan_datapath_event_handler;
 	cb_obj->os_if_nan_event_handler = os_if_nan_discovery_event_handler;
+	osif_nan_register_dw_notif_cb(psoc, cb_obj);
 	return ucfg_nan_register_hdd_callbacks(psoc, cb_obj);
 }
 
