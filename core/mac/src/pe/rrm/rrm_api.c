@@ -1424,6 +1424,12 @@ rrm_check_ml_ie(uint8_t *ies, uint16_t len, uint8_t *mlie_copy_len)
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &ml_common_info_length);
 
+	if (ml_common_info_length > ml_ie_total_len) {
+		mlo_err("Common info length greater than mlie length %du %zu",
+			ml_common_info_length, ml_ie_total_len);
+		return NULL;
+	}
+
 	ml_bv_ie_len = sizeof(struct wlan_ie_multilink) + ml_common_info_length;
 	if (ml_bv_ie_len) {
 		mlie_copy = qdf_mem_malloc(ml_bv_ie_len);
