@@ -656,6 +656,20 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 	 */
 	/* RSN caps with global user MFP which can be used for cross-AKM roam */
 	rsn_caps = rso_cfg->rso_rsn_caps;
+	/*
+	 * Preserve STA self MFP capability bits (MFPC/MFPR) from the
+	 * original connection profile. These bits may be lost during roam
+	 * profile rebuild when user_mfp is not re-propagated. RSN self
+	 * capabilities are properties of the STA and must not change
+	 * across roam. Without this, firmware rejects roam candidates
+	 * from APs with MFP Required set.
+	 */
+	rsn_caps |= (rso_cfg->orig_sec_info.rsn_caps &
+		     (WLAN_CRYPTO_RSN_CAP_MFP_ENABLED |
+		      WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED));
+	mlme_debug("orig_rsn_caps=0x%04x rso_rsn_caps=0x%04x final_rsn_caps=0x%04x",
+		   rso_cfg->orig_sec_info.rsn_caps,
+		   rso_cfg->rso_rsn_caps, rsn_caps);
 
 	/* Fill LFR3 specific self capabilities for roam scan mode TLV */
 	self_caps.ess = 1;
