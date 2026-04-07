@@ -1984,6 +1984,9 @@ static QDF_STATUS mon_mlme_vdev_disconnect_peers(
 
 	mlme_legacy_debug("vdev id = %d",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+#ifdef DRIVER_PASSTHRU_MODE
+	lim_passthru_mlme_vdev_disconnect_peers(vdev_mlme, data_len, data);
+#endif
 	return wlan_vdev_mlme_sm_deliver_evt(
 				vdev_mlme->vdev,
 				WLAN_VDEV_SM_EV_DISCONNECT_COMPLETE,

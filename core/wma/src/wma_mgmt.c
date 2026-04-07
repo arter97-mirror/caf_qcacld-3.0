@@ -1825,6 +1825,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 #ifdef FEATURE_WLAN_TDLS
 	    || (STA_ENTRY_TDLS_PEER == params->staType)
 #endif /* FEATURE_WLAN_TDLS */
+	    || (IS_PASSTHRU_PEER(params->staType))
 	    ) {
 		qdf_mem_copy(cmd->peer_mac, params->staMac,
 						sizeof(cmd->peer_mac));
@@ -1923,6 +1924,9 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	if (STA_ENTRY_TDLS_PEER == params->staType)
 		cmd->auth_flag = 1;
 #endif /* FEATURE_WLAN_TDLS */
+	if (IS_PASSTHRU_PEER(params->staType)) {
+		cmd->auth_flag = 1;
+	}
 
 	if (params->wpa_rsn
 #ifdef FEATURE_WLAN_WAPI

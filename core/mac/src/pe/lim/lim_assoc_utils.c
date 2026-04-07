@@ -2313,6 +2313,8 @@ lim_add_sta(struct mac_context *mac_ctx,
 	else if (STA_ENTRY_TDLS_PEER == sta_ds->staType)
 		sta_Addr = &sta_ds->staAddr;
 #endif
+	else if (STA_ENTRY_PASSTHRU_PEER == sta_ds->staType)
+		sta_Addr = &sta_ds->staAddr;
 	else
 		sta_Addr = &sta_mac;
 
@@ -2403,6 +2405,10 @@ lim_add_sta(struct mac_context *mac_ctx,
 	lim_update_tdls_sta_eht_capable(mac_ctx, add_sta_params, sta_ds,
 					session_entry);
 
+#ifdef DRIVER_PASSTHRU_MODE
+	lim_update_passthru_config(mac_ctx, add_sta_params, sta_ds,
+				   session_entry);
+#endif
 	lim_update_sta_mlo_info(session_entry, add_sta_params, sta_ds);
 
 	add_sta_params->maxAmpduDensity = sta_ds->htAMpduDensity;

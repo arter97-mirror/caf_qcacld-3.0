@@ -5036,4 +5036,21 @@ struct start_bss_config {
 	uint8_t curr_conn_count;
 };
 
+/**
+ * struct sir_passthru_peer_setup_msg - msg used for passthru peer setup
+ * @message_type: message type
+ * @vdev_id: vdev id
+ * @peer_mac_addr: peer MAC address
+ */
+struct sir_passthru_peer_setup_msg {
+	uint16_t message_type;
+	uint16_t vdev_id;
+	struct qdf_mac_addr peer_mac_addr;
+	enum phy_ch_width ch_width;
+	uint32_t dot11mode;
+	uint8_t gi_val;
+	uint8_t nss;
+	uint8_t max_mcs;
+};
+
 #endif /* __SIR_API_H */

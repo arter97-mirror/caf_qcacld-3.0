@@ -13,11 +13,19 @@
 #define WLAN_HDD_WONDERTAP_H
 
 #include <qdf_event.h>
+#include "wlan_mlme_public_struct.h"
 
 #ifdef DRIVER_PASSTHRU_MODE
 #include <qdf_wondertap.h>
 
 #define WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS 10000
+
+struct hdd_wondertap_tx_rate_cfg {
+	enum phy_ch_width ch_width;
+	uint32_t dot11_mode;
+	uint8_t gi_val;
+	uint8_t nss;
+};
 
 /**
  * struct hdd_wondertap_context - hdd wondertap context
@@ -29,6 +37,7 @@
  * @is_frame_filter_set: is frame filter configured
  * @frame_filter: frame filter value
  * @magic: handle for external entity
+ * @tx_rate_cfg: transmit rate configuration
  */
 struct hdd_wondertap_context {
 	struct hdd_context *hdd_ctx;
@@ -39,6 +48,12 @@ struct hdd_wondertap_context {
 	bool is_frame_filter_set;
 	uint8_t frame_filter;
 	uint64_t magic;
+	struct hdd_wondertap_tx_rate_cfg tx_rate_cfg;
+};
+
+struct hdd_wondertap_peer_setup {
+	uint8_t vdev_id;
+	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
 };
 
 /**
