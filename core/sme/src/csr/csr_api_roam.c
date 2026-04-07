@@ -68,10 +68,10 @@
 #include "wlan_scan_utils_api.h"
 #include "wlan_p2p_cfg_api.h"
 #include "cfg_nan_api.h"
+#include "wlan_crypto_def_i.h"
 
 #include "wlan_pkt_capture_ucfg_api.h"
 
-#define RSN_AUTH_KEY_MGMT_SAE           WLAN_RSN_SEL(WLAN_AKM_SAE)
 #define MAX_PWR_FCC_CHAN_12 8
 #define MAX_PWR_FCC_CHAN_13 2
 
@@ -14004,6 +14004,8 @@ static ePhyChanBondState csr_get_cb_mode_from_ies(struct mac_context *mac,
 	uint8_t sec_ch = 0;
 	uint32_t ChannelBondingMode;
 	struct ch_params ch_params = {0};
+	struct wlan_crypto_params crypto_params;
+	QDF_STATUS status;
 
 	if (WLAN_REG_IS_24GHZ_CH(chan)) {
 		ChannelBondingMode =
@@ -14022,23 +14024,28 @@ static ePhyChanBondState csr_get_cb_mode_from_ies(struct mac_context *mac,
 		return PHY_SINGLE_CHANNEL_CENTERED;
 	}
 
-	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
-	if ((pIes->RSN.present && (pIes->RSN.pwise_cipher_suite_count == 1) &&
-		!memcmp(&(pIes->RSN.pwise_cipher_suites[0][0]),
-					"\x00\x0f\xac\x02", 4))
-		/* In Case only WPA1 is supported and TKIP is
-		 * the only one cipher suite in Unicast.
-		 */
-		|| (!pIes->RSN.present && (pIes->WPA.present &&
-			(pIes->WPA.unicast_cipher_count == 1) &&
-			!memcmp(&(pIes->WPA.unicast_ciphers[0][0]),
-					"\x00\x50\xf2\x02", 4)))) {
-		sme_debug("No channel bonding in TKIP mode");
+	if (!pIes->HTInfo.present)
+		return PHY_SINGLE_CHANNEL_CENTERED;
+
+	if (!pIes->RSNOpaque.present) {
+		sme_debug("RSN IE not present");
 		return PHY_SINGLE_CHANNEL_CENTERED;
 	}
 
-	if (!pIes->HTInfo.present)
+	status = wlan_get_crypto_params_from_opaquersn(&crypto_params,
+						pIes->RSNOpaque.data,
+						pIes->RSNOpaque.num_data);
+	if (status != QDF_STATUS_SUCCESS) {
+		sme_debug("Failed to get RSN Caps");
 		return PHY_SINGLE_CHANNEL_CENTERED;
+	}
+
+	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
+	if (HAS_PARAM(crypto_params.ucastcipherset, WLAN_CRYPTO_CIPHER_TKIP)) {
+		sme_debug("No channel bonding in TKIP mode, ucast: %x",
+			  crypto_params.ucastcipherset);
+		return PHY_SINGLE_CHANNEL_CENTERED;
+	}
 
 	/*
 	 * This is called during INFRA STA/CLIENT and should use the merged
@@ -15648,7 +15655,8 @@ bool csr_is_mfpc_capable(struct sDot11fIERSN *rsn)
  */
 static void csr_set_mgmt_enc_type(struct csr_roam_profile *profile,
 				  tDot11fBeaconIEs *ies,
-				  struct join_req *csr_join_req)
+				  struct join_req *csr_join_req,
+				  struct wlan_crypto_params *crypto_params)
 {
 	if (profile->MFPEnabled)
 		csr_join_req->MgmtEncryptionType =
@@ -15658,13 +15666,14 @@ static void csr_set_mgmt_enc_type(struct csr_roam_profile *profile,
 
 	if (profile->MFPEnabled &&
 	   !(profile->MFPRequired) &&
-	   !csr_is_mfpc_capable(&ies->RSN))
+	   !(crypto_params->rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED))
 		csr_join_req->MgmtEncryptionType = eSIR_ED_NONE;
 }
 #else
 static inline void csr_set_mgmt_enc_type(struct csr_roam_profile *profile,
 					 tDot11fBeaconIEs *pIes,
-					 struct join_req *csr_join_req)
+					 struct join_req *csr_join_req,
+					 struct wlan_crypto_params *crypto_params)
 {
 }
 #endif
@@ -16031,6 +16040,7 @@ QDF_STATUS csr_send_join_req_msg(struct mac_context *mac, uint32_t sessionId,
 	struct wlan_objmgr_vdev *vdev;
 	bool follow_ap_edca;
 	bool reconn_after_assoc_timeout = false;
+	struct wlan_crypto_params crypto_params;
 
 	if (!pSession) {
 		sme_err("session %d not found", sessionId);
@@ -16570,7 +16580,16 @@ QDF_STATUS csr_send_join_req_msg(struct mac_context *mac, uint32_t sessionId,
 		csr_join_req->MCEncryptionType =
 				csr_translate_encrypt_type_to_ed_type
 					(pProfile->negotiatedMCEncryptionType);
-	csr_set_mgmt_enc_type(pProfile, pIes, csr_join_req);
+
+		if (pIes->RSNOpaque.present) {
+			wlan_get_crypto_params_from_opaquersn(&crypto_params,
+					pIes->RSNOpaque.data,
+					pIes->RSNOpaque.num_data);
+		}
+
+		csr_set_mgmt_enc_type(pProfile, pIes, csr_join_req,
+				      &crypto_params);
+
 #ifdef FEATURE_WLAN_ESE
 		ese_config =  mac->mlme_cfg->lfr.ese_enabled;
 #endif
