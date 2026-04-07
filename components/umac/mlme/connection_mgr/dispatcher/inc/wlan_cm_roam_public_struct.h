@@ -697,6 +697,8 @@ struct sae_roam_auth_map {
  * @roam_cfg_rt_params_enabled: Flag used to cache the status of if real time
  * roam control param values changed by vendor commands.The same shall be
  * returned whenever queried for roam_cfg_rt_params_enabled status.
+ * @roam_scan_scheme: Signifies whether roam scan is performed on neighbor
+ * report channels only
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -754,6 +756,7 @@ struct rso_config {
 	bool is_disable_btm;
 	bool is_aggressive_roaming_mode;
 	bool roam_cfg_rt_params_enabled;
+	uint32_t roam_scan_scheme;
 };
 
 /**
@@ -897,6 +900,7 @@ struct rso_config_params {
  * @RECONNECT_DISALLOW_PERIOD: Reconnect disallow period value.
  * @NEIGHBOUR_LOOKUP_THRESHOLD_5GHZ: lookup threshold for 5ghz band
  * @NEIGHBOUR_LOOKUP_THRESHOLD_6GHZ: lookup threshold for 6ghz band
+ * @ROAM_SCAN_SCHEME: Value of partial roam scan policy
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -947,6 +951,7 @@ enum roam_cfg_param {
 	RECONNECT_DISALLOW_PERIOD,
 	NEIGHBOUR_LOOKUP_THRESHOLD_5GHZ,
 	NEIGHBOUR_LOOKUP_THRESHOLD_6GHZ,
+	ROAM_SCAN_SCHEME,
 };
 
 /**
@@ -2957,13 +2962,16 @@ struct wlan_cm_roam_tx_ops {
  * trigger partial frequency scans.
  * @ROAM_SCAN_FREQ_SCHEME_FULL_SCAN: Indicates the firmware to
  * trigger full frequency scans.
+ * @ROAM_SCAN_FREQ_SCHEME_NEIGHBOR_REPORT: Indicates fw to trigger partial scan
+ * on channels obtained from the neighbor report
  * @ROAM_SCAN_FREQ_SCHEME_NONE: Invalid scan mode
  */
 enum roam_scan_freq_scheme {
 	ROAM_SCAN_FREQ_SCHEME_NO_SCAN = 0,
 	ROAM_SCAN_FREQ_SCHEME_PARTIAL_SCAN = 1,
 	ROAM_SCAN_FREQ_SCHEME_FULL_SCAN = 2,
-	ROAM_SCAN_FREQ_SCHEME_NONE = 3,
+	ROAM_SCAN_FREQ_SCHEME_NEIGHBOR_REPORT = 3,
+	ROAM_SCAN_FREQ_SCHEME_NONE = 4,
 };
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL

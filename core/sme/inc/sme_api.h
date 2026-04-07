@@ -1501,6 +1501,19 @@ sme_modify_roam_cand_sel_criteria(mac_handle_t mac_handle,
 				  bool enable_scoring_for_roam);
 
 /**
+ * sme_set_roam_scan_scheme() - Set roam scan scheme
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev identifier
+ * @roam_scan_scheme: roam scan scheme value received from userspace
+ *
+ * Enable roam scan scheme is rso config
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_roam_scan_scheme(mac_handle_t mac_handle, uint8_t vdev_id,
+				    uint32_t roam_scan_scheme);
+
+/**
  * sme_roam_control_restore_default_config - Restore roam config to default
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id: vdev Identifier

@@ -1816,6 +1816,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	case RECONNECT_DISALLOW_PERIOD:
 		dst_cfg->reconnect_disallow_period = src_config->uint_value;
 		break;
+	case ROAM_SCAN_SCHEME:
+		rso_cfg->roam_scan_scheme = src_config->uint_value;
+		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
 		status = QDF_STATUS_E_FAILURE;
@@ -2006,6 +2009,7 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 	rso_cfg->is_disable_btm = false;
+	rso_cfg->roam_scan_scheme = ROAM_SCAN_FREQ_SCHEME_NONE;
 
 	return status;
 }

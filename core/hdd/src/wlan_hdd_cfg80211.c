@@ -6478,6 +6478,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U32},
 	[QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS] = {
 			.type = NLA_NESTED},
+	[QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION] = {
+			.type = NLA_FLAG},
 };
 
 /**
@@ -6854,6 +6856,42 @@ hdd_send_roam_cand_sel_criteria_to_sme(struct hdd_context *hdd_ctx,
 						   !!scoring);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to disable scoring");
+
+	return status;
+}
+
+/**
+ * hdd_send_roam_scan_policy_change_to_sme() - Send roam scan scheme to SME
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @scan_scheme: roam scan scheme to be updated in rso config
+ *
+ * This function processes the roam scan scheme attribute from userspace
+ * and updates the roam scan scheme in rso_config via SME layer API.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+hdd_send_roam_scan_policy_change_to_sme(struct hdd_context *hdd_ctx,
+					uint8_t vdev_id, uint32_t scan_scheme)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t val;
+
+	switch (scan_scheme) {
+	case QCA_ROAM_SCAN_SCHEME_NEIGHBOR_REPORT_SCAN:
+		val = ROAM_SCAN_FREQ_SCHEME_NEIGHBOR_REPORT;
+		break;
+	case QCA_ROAM_SCAN_SCHEME_DEFAULT:
+		val = ROAM_SCAN_FREQ_SCHEME_NONE;
+		break;
+	default:
+		hdd_err("Invalid roam scan scheme: %u", scan_scheme);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = sme_set_roam_scan_scheme(hdd_ctx->mac_handle, vdev_id,
+					  val);
 
 	return status;
 }
@@ -7434,8 +7472,16 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 
 	attr = tb2[QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME];
 	if (attr) {
-		param.scan_freq_scheme = nla_get_u32(attr);
-		is_wtc_param_updated = true;
+		value = nla_get_u32(attr);
+		if (value == QCA_ROAM_SCAN_SCHEME_NEIGHBOR_REPORT_SCAN ||
+		    value == QCA_ROAM_SCAN_SCHEME_DEFAULT) {
+			status = hdd_send_roam_scan_policy_change_to_sme(
+						hdd_ctx, vdev_id, value);
+			is_rso_update_required = true;
+		} else {
+			param.scan_freq_scheme = value;
+			is_wtc_param_updated = true;
+		}
 	}
 
 	attr = tb2[QCA_ATTR_ROAM_CONTROL_CONNECTED_RSSI_THRESHOLD];
@@ -7812,6 +7858,11 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 			return qdf_status_to_os_return(status);
 		}
 		is_rso_update_required = true;
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION];
+	if (attr && !roam_control_enable) {
+		hdd_debug("Neighbor report scan scheme lasts till disconnection");
 	}
 
 	/* send RSO update if required */

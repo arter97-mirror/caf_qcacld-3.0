@@ -5988,6 +5988,7 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	wlan_mlme_reinit_real_time_roam_parms(vdev);
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
+	rso_cfg->roam_scan_scheme = ROAM_SCAN_FREQ_SCHEME_NONE;
 }
 
 QDF_STATUS cm_roam_control_restore_default_config(struct wlan_objmgr_pdev *pdev,

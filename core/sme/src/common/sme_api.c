@@ -7649,6 +7649,36 @@ sme_modify_roam_cand_sel_criteria(mac_handle_t mac_handle,
 					  ENABLE_SCORING_FOR_ROAM, &src_config);
 }
 
+QDF_STATUS sme_set_roam_scan_scheme(mac_handle_t mac_handle, uint8_t vdev_id,
+				    uint32_t roam_scan_scheme)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+	QDF_STATUS status;
+
+	if (!mac->mlme_cfg->lfr.roam_scan_offload_enabled)
+		return QDF_STATUS_E_INVAL;
+
+	status = wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id,
+					    ROAM_CONFIG_ENABLE, &src_config);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Failed to get NCHO mode status: %d", status);
+		return status;
+	}
+
+	if (src_config.bool_value) {
+		sme_err("Neighbor report scan policy not allowed in NCHO mode");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(&src_config, sizeof(src_config));
+	src_config.uint_value = roam_scan_scheme;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id, ROAM_SCAN_SCHEME,
+					  &src_config);
+}
+
 QDF_STATUS sme_roam_control_restore_default_config(mac_handle_t mac_handle,
 						   uint8_t vdev_id)
 {
@@ -8045,13 +8075,13 @@ sme_set_neighbor_lookup_rssi_threshold_band(mac_handle_t mac_handle,
 	}
 
 	switch (band) {
-	case 0:
+	case NL80211_BAND_2GHZ:
 		reason = REASON_LOOKUP_THRESH_2P4GHZ_CHANGED;
 		break;
-	case 1:
+	case NL80211_BAND_5GHZ:
 		reason = REASON_LOOKUP_THRESH_5GHZ_CHANGED;
 		break;
-	case 3:
+	case NL80211_BAND_6GHZ:
 		reason = REASON_LOOKUP_THRESH_6GHZ_CHANGED;
 		break;
 	default:
