@@ -642,4 +642,21 @@ int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx)
 QDF_STATUS
 sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
 			     struct sap_context *sap_ctx);
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * sap_send_mcst_in_cac() - send mcst ie in bcn template in CAC
+ * @sap_ctx: SAP context
+ *
+ * This function add mcst ie into beacon template and send it to FW during CAC.
+ *
+ * Return: None
+ */
+void sap_send_mcst_in_cac(struct sap_context *sap_ctx);
+#else
+static inline
+void sap_send_mcst_in_cac(struct sap_context *sap_ctx)
+{
+}
+#endif
 #endif

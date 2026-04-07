@@ -3183,6 +3183,27 @@ void lim_req_send_delba_ind_process(struct mac_context *mac_ctx,
  */
 void lim_send_beacon(struct mac_context *mac_ctx, struct pe_session *session);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * lim_send_beacon_tmpl_during_cac() - This function send beacon tmpl during cac
+ * @mac_ctx: pointer to Global Mac Structure
+ * @sessionid: session id
+ *
+ * This Function is invoked to send the beacon tmpl in cac
+ *
+ * Return: none
+ */
+void lim_send_beacon_tmpl_during_cac(struct mac_context *mac_ctx,
+				     uint8_t sessionid);
+
+#else
+static inline
+void lim_send_beacon_tmpl_during_cac(struct mac_context *mac_ctx,
+				     uint8_t sessionid)
+{
+}
+#endif
+
 /**
  * lim_ndi_mlme_vdev_up_transition() - Send event to transition NDI VDEV to UP
  * @session: session pointer

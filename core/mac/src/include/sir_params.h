@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -543,6 +542,8 @@ enum halmsgtype {
 #define SIR_LIM_UPDATE_BEACON          (SIR_LIM_ITC_MSG_TYPES_BEGIN + 0x13)
 /* Indication from HAL to handle RX invalid peer */
 #define SIR_LIM_RX_INVALID_PEER        (SIR_LIM_ITC_MSG_TYPES_BEGIN + 0x15)
+
+#define SIR_LIM_SEND_BCN_TMPL_IN_CAC   (SIR_LIM_ITC_MSG_TYPES_BEGIN + 0x16)
 
 /* LIM Timeout messages */
 #define SIR_LIM_TIMEOUT_MSG_START      ((SIR_LIM_MODULE_ID << 8) + 0xD0)

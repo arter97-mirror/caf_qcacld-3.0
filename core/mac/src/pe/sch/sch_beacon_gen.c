@@ -841,7 +841,9 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 						    session);
 	}
 
-	if (bcn_2->ext_chan_switch_ann.present || bcn_2->ChanSwitchAnn.present)
+	if (bcn_2->ext_chan_switch_ann.present ||
+	    bcn_2->ChanSwitchAnn.present ||
+	    session->mcstie_send_in_cac)
 		populate_dot11f_max_chan_switch_time(
 			mac_ctx, &bcn_2->max_chan_switch_time, session);
 

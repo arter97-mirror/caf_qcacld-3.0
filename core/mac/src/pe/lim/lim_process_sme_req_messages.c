@@ -11313,6 +11313,18 @@ static void lim_process_update_rnr_ies(struct mac_context *mac_ctx,
 
 	ret = lim_populate_rnr_entry(mac_ctx, session_entry,
 				     &update_ie->piebuffer[ID_POS]);
+	/*
+	 * After updating the cached RNR entry, rebuild and push the beacon
+	 * template to FW so that the partner link's beacon immediately
+	 * reflects the new RNR IE (e.g. 5 GHz link info during CAC).
+	 * Without this the update only takes effect on the next periodic
+	 * beacon rebuild triggered by lim_send_beacon_tmpl_during_cac.
+	 */
+	if (LIM_IS_AP_ROLE(session_entry)) {
+		sch_set_fixed_beacon_fields(mac_ctx, session_entry);
+		lim_send_beacon_ind(mac_ctx, session_entry, REASON_RNR_UPDATE);
+	}
+
 end:
 	qdf_mem_free(update_ie->piebuffer);
 	update_ie->piebuffer = NULL;

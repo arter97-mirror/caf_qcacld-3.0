@@ -56,6 +56,7 @@
 #include <wlan_scan_api.h>
 #include "wlan_reg_services_api.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_mlme_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
@@ -5318,6 +5319,174 @@ static int sap_stop_dfs_cac_timer(struct sap_context *sap_ctx)
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * sap_should_send_bcn_with_mcst_in_cac() - Check if should send beacon with
+ * MCST IE during CAC
+ * @sap_ctx: SAP context
+ *
+ * Return: true if should send beacon with MCST IE, false otherwise
+ */
+static bool sap_should_send_bcn_with_mcst_in_cac(struct sap_context *sap_ctx)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct mac_context *mac_ctx;
+	qdf_freq_t freq;
+
+	if (!sap_ctx || !sap_ctx->vdev) {
+		sap_err("Invalid sap_ctx or vdev");
+		return false;
+	}
+
+	vdev = sap_ctx->vdev;
+
+	/* Must be MLO vdev */
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		sap_debug("vdev_id %d: Not MLO vdev",
+			  wlan_vdev_get_id(vdev));
+		return false;
+	}
+
+	/* Must be SAP mode */
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE) {
+		sap_debug("vdev_id %d: Not SAP mode",
+			  wlan_vdev_get_id(vdev));
+		return false;
+	}
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return false;
+	}
+
+	pdev = mac_ctx->pdev;
+	if (!pdev) {
+		sap_err("pdev is NULL");
+		return false;
+	}
+
+	freq = sap_ctx->chan_freq;
+
+	sap_debug("vdev_id %d: MLO SAP on DFS channel %d,send beacon with MCST IE",
+		  wlan_vdev_get_id(vdev), freq);
+
+	return true;
+}
+
+/**
+ * sap_set_mcst_ie_flag_for_cac() - Set mcstie_send_in_cac for CAC
+ * @sap_ctx: SAP context
+ *
+ * This function sets dfsIncludeChanSwIe to true for MLO SAP on DFS channel
+ * during CAC, so that beacon will include CSA/ECSA and MCST IE.
+ *
+ * Return: QDF_STATUS
+ */
+static void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
+					 bool flag)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	uint8_t session_id;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	session_id = sap_ctx->sessionId;
+	session = pe_find_session_by_vdev_id(mac_ctx, session_id);
+	if (!session) {
+		sap_err("session is NULL for vdev_id %d", session_id);
+		return;
+	}
+
+	/*
+	 * Set mcstie_send_in_cac to true so that sch_set_fixed_beacon_fields()
+	 * will add CSA/ECSA IE, which will then trigger MCST IE addition
+	 */
+	if (!flag) {
+		if (session->mcstie_send_in_cac) {
+			session->mcstie_send_in_cac = false;
+			session->dfsIncludeChanSwIe = false;
+			sap_debug("vdev_id %d: cleared mcstie_send_in_cac for CAC",
+				  session_id);
+		}
+	} else {
+		session->mcstie_send_in_cac = true;
+		sap_debug("vdev_id %d: set mcstie_send_in_cac for CAC",
+			  session_id);
+	}
+}
+
+/**
+ * sap_send_beacon_update_in_cac() - Post beacon update message for CAC
+ * @sap_ctx: SAP context
+ *
+ * This function posts SIR_LIM_UPDATE_BEACON_IND message to PE thread to
+ * update beacon template and send it to FW during CAC.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS sap_send_beacon_update_in_cac(struct sap_context *sap_ctx)
+{
+	struct scheduler_msg msg = {0};
+	QDF_STATUS status;
+	struct mac_context *mac_ctx;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Prepare message */
+	msg.type = SIR_LIM_SEND_BCN_TMPL_IN_CAC;
+	msg.bodyptr = NULL;
+	msg.bodyval = sap_ctx->sessionId;
+
+	/* Post message to PE thread */
+	status = scheduler_post_message(QDF_MODULE_ID_SAP,
+					QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE,
+					&msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("vdev_id %d: Failed to post beacon update message",
+			sap_ctx->sessionId);
+		return status;
+	}
+
+	sap_debug("vdev_id %d: Posted beacon update message for CAC",
+		  sap_ctx->sessionId);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void sap_send_mcst_in_cac(struct sap_context *sap_ctx)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!sap_ctx || !sap_ctx->vdev)
+		return;
+
+	psoc = wlan_vdev_get_psoc(sap_ctx->vdev);
+	if (!wlan_mlme_get_mlo_sap_mcst_ie_support(psoc))
+		return;
+
+	if (sap_should_send_bcn_with_mcst_in_cac(sap_ctx)) {
+		sap_set_mcst_ie_flag_for_cac(sap_ctx, true);
+		if (sap_send_beacon_update_in_cac(sap_ctx)) {
+			sap_err("vdev_id %d: Failed to post beacon update msg",
+				sap_ctx->sessionId);
+		}
+	}
+}
+#endif
+
 /*
  * Function to start the DFS CAC Timer
  * when SAP is started on a DFS channel
@@ -5343,6 +5512,7 @@ static int sap_start_dfs_cac_timer(struct sap_context *sap_ctx)
 	if (sap_ctx->dfs_cac_offload) {
 		sap_debug("cac timer offloaded to firmware");
 		mac->sap.SapDfsInfo.is_dfs_cac_timer_running = true;
+		sap_send_mcst_in_cac(sap_ctx);
 		return 1;
 	}
 
@@ -5370,6 +5540,7 @@ static int sap_start_dfs_cac_timer(struct sap_context *sap_ctx)
 	}
 
 	mac->sap.SapDfsInfo.is_dfs_cac_timer_running = true;
+	sap_send_mcst_in_cac(sap_ctx);
 
 	return 0;
 

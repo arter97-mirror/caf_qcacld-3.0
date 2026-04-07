@@ -13196,7 +13196,8 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 			tmp_count--;
 			continue;
 		}
-		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running &&
+		    !link_session->mcstie_send_in_cac) {
 			pe_debug("link not active if cac running");
 			tmp_count--;
 		}

@@ -4678,6 +4678,64 @@ void lim_update_beacon(struct mac_context *mac_ctx)
 	}
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+void lim_send_beacon_tmpl_during_cac(struct mac_context *mac_ctx,
+				     uint8_t sessionid)
+{
+	struct pe_session *session;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint16_t vdev_count;
+	int link;
+	struct pe_session *link_session;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, sessionid);
+	if (!session) {
+		pe_err("vdev %d: session not found", sessionid);
+		return;
+	}
+
+	if (LIM_IS_AP_ROLE(session) &&
+	    eLIM_SME_NORMAL_STATE == session->limSmeState) {
+		sch_set_fixed_beacon_fields(mac_ctx, session);
+
+		pe_debug("send beacon ind");
+		lim_send_beacon_ind(mac_ctx, session, REASON_DEFAULT);
+	}
+
+	/*
+	 * Also update partner links' beacon templates so that they include
+	 * this link's RNR entry (populate_dot11f_mlo_rnr gates on
+	 * link_session->mcstie_send_in_cac which was just set above).
+	 */
+	if (!wlan_vdev_mlme_is_mlo_ap(session->vdev))
+		return;
+
+	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+		if (wlan_vdev_list[link] == session->vdev)
+			goto release_ref;
+
+		link_session = pe_find_session_by_vdev_id(mac_ctx,
+							  wlan_vdev_get_id(wlan_vdev_list[link]));
+		if (!link_session)
+			goto release_ref;
+
+		if (LIM_IS_AP_ROLE(link_session) &&
+		    eLIM_SME_NORMAL_STATE == link_session->limSmeState) {
+			sch_set_fixed_beacon_fields(mac_ctx, link_session);
+			pe_debug("vdev %d: update partner link beacon for CAC RNR",
+				 wlan_vdev_get_id(wlan_vdev_list[link]));
+			lim_send_beacon_ind(mac_ctx, link_session,
+					    REASON_DEFAULT);
+		}
+release_ref:
+		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+	}
+}
+#endif
+
 struct pe_session *lim_is_ap_session_active(struct mac_context *mac)
 {
 	uint8_t i;

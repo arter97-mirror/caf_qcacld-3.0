@@ -1900,6 +1900,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_UPDATE_BEACON:
 		lim_update_beacon(mac_ctx);
 		break;
+	case SIR_LIM_SEND_BCN_TMPL_IN_CAC:
+		lim_send_beacon_tmpl_during_cac(mac_ctx, (uint8_t)msg->bodyval);
+		break;
 	case SIR_BB_XPORT_MGMT_MSG:
 		/* These messages are from Peer MAC entity.
 		 * The original msg which we were deferring have the
