@@ -3966,7 +3966,8 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 			  (is_he) ? WLAN_PHYMODE_11AXG_HE20 :
 			  (is_vht) ? WLAN_PHYMODE_11AC_VHT20_2G :
 			  WLAN_PHYMODE_11NG_HT20;
-#elif WLAN_FEATURE_11BE
+#else
+#ifdef WLAN_FEATURE_11BE
 		if (ch_width)
 			phymode = (is_eht) ? WLAN_PHYMODE_11BEG_EHT40 :
 					(is_he) ? WLAN_PHYMODE_11AXG_HE40 :
@@ -3986,6 +3987,7 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 			phymode = (is_he) ? WLAN_PHYMODE_11AXG_HE20 : (is_vht) ?
 					WLAN_PHYMODE_11AC_VHT20_2G :
 					WLAN_PHYMODE_11NG_HT20;
+#endif
 #endif
 		break;
 	case eSIR_11A_NW_TYPE:
