@@ -5023,4 +5023,24 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
  */
 void sme_deregister_disconnect_cb(mac_handle_t mac_handle);
 
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * sme_passthru_peer_setup() - api to request passthru peer setup.
+ * @mac_handle: mac hancle
+ * @vdev_id: vdev id
+ * @peer_mac_addr: mac address of the peer.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_passthru_peer_setup(mac_handle_t mac_handle,
+			struct sir_passthru_peer_setup_msg *peer_setup);
+#else
+static inline QDF_STATUS
+sme_passthru_peer_setup(mac_handle_t mac_handle,
+			struct sir_passthru_peer_setup_msg *peer_setup)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* #if !defined( __SME_API_H ) */
