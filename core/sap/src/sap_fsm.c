@@ -138,6 +138,10 @@ static int sap_stop_dfs_cac_timer(struct sap_context *sap_ctx);
 
 static int sap_start_dfs_cac_timer(struct sap_context *sap_ctx);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+static QDF_STATUS sap_send_beacon_update_in_cac(struct sap_context *sap_ctx);
+#endif
+
 /** sap_hdd_event_to_string() - convert hdd event to string
  * @event: eSapHddEvent event type
  *
@@ -4422,6 +4426,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 	} else if (msg == eSAP_DFS_CHANNEL_CAC_END) {
 		if (sap_ctx->vdev &&
 		    wlan_util_vdev_mgr_get_cac_timeout_for_vdev(sap_ctx->vdev)) {
+			sap_set_mcst_ie_flag_for_cac(sap_ctx, false);
 			qdf_status = sap_cac_end_notify(mac_handle, roam_info);
 		} else {
 			sap_debug("vdev %d cac duration is zero",
@@ -5375,17 +5380,8 @@ static bool sap_should_send_bcn_with_mcst_in_cac(struct sap_context *sap_ctx)
 	return true;
 }
 
-/**
- * sap_set_mcst_ie_flag_for_cac() - Set mcstie_send_in_cac for CAC
- * @sap_ctx: SAP context
- *
- * This function sets dfsIncludeChanSwIe to true for MLO SAP on DFS channel
- * during CAC, so that beacon will include CSA/ECSA and MCST IE.
- *
- * Return: QDF_STATUS
- */
-static void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
-					 bool flag)
+void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
+				  bool flag)
 {
 	struct mac_context *mac_ctx;
 	struct pe_session *session;
@@ -5414,6 +5410,7 @@ static void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
 			session->dfsIncludeChanSwIe = false;
 			sap_debug("vdev_id %d: cleared mcstie_send_in_cac for CAC",
 				  session_id);
+			sap_send_beacon_update_in_cac(sap_ctx);
 		}
 	} else {
 		session->mcstie_send_in_cac = true;

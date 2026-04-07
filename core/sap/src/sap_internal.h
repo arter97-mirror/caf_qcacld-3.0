@@ -653,9 +653,29 @@ sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
  * Return: None
  */
 void sap_send_mcst_in_cac(struct sap_context *sap_ctx);
+
+/**
+ * sap_set_mcst_ie_flag_for_cac() - Set mcstie_send_in_cac for CAC
+ * @sap_ctx: SAP context
+ * @flag: mcastie set or not
+ *
+ * This function sets dfsIncludeChanSwIe to true for MLO SAP on DFS channel
+ * during CAC, so that beacon will include CSA/ECSA and MCST IE.
+ *
+ * Return: QDF_STATUS
+ */
+void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
+				  bool flag);
+
 #else
 static inline
 void sap_send_mcst_in_cac(struct sap_context *sap_ctx)
+{
+}
+
+static inline
+void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
+				  bool flag)
 {
 }
 #endif
