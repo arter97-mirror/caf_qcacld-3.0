@@ -152,16 +152,21 @@ wlan_hdd_convert_wonder_preamble_to_wmi(qdf_wondertap_rate_preamble_t preamble)
 {
 	switch (preamble) {
 	case WONDERTAP_RATE_PREAMBLE_HT:
+		g_wt_ctx->tx_rate_cfg.dot11_mode = MLME_DOT11_MODE_11N;
 		return WMI_RATE_PREAMBLE_HT;
 	case WONDERTAP_RATE_PREAMBLE_VHT:
+		g_wt_ctx->tx_rate_cfg.dot11_mode = MLME_DOT11_MODE_11AC;
 		return WMI_RATE_PREAMBLE_VHT;
 	case WONDERTAP_RATE_PREAMBLE_HE:
+		g_wt_ctx->tx_rate_cfg.dot11_mode = MLME_DOT11_MODE_11AX;
 		return WMI_RATE_PREAMBLE_HE;
 	case WONDERTAP_RATE_PREAMBLE_EHT:
+		g_wt_ctx->tx_rate_cfg.dot11_mode = MLME_DOT11_MODE_11BE;
 		return WMI_RATE_PREAMBLE_EHT;
 	case WONDERTAP_RATE_PREAMBLE_LEGACY:
 	default:
-		return WMI_RATE_PREAMBLE_CCK;
+		g_wt_ctx->tx_rate_cfg.dot11_mode = MLME_DOT11_MODE_ABG;
+		return WMI_RATE_PREAMBLE_OFDM;
 	}
 }
 
@@ -201,6 +206,10 @@ __wlan_hdd_wondertap_set_fixed_tx_rate(struct hdd_adapter *adapter,
 		break;
 	}
 
+	g_wt_ctx->tx_rate_cfg.nss = params->nss;
+	g_wt_ctx->tx_rate_cfg.gi_val = gi;
+	g_wt_ctx->tx_rate_cfg.ch_width =
+		__wlan_hdd_convert_wt_bandwidth_to_phy_ch_width(params->bw);
 	ret = wma_cli_set_command(adapter->deflink->vdev_id,
 				  wmi_vdev_param_sgi,
 				  gi, VDEV_CMD);
@@ -628,6 +637,34 @@ stop_adapter:
 	hdd_stop_no_trans(adapter->dev);
 
 	return ret;
+}
+
+static void wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
+					  struct hdd_wondertap_peer_setup *peer)
+{
+	int ret;
+	mac_handle_t mac_handle;
+	struct sir_passthru_peer_setup_msg req;
+
+	if (wlan_hdd_validate_vdev_id(peer->vdev_id))
+		return;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return;
+
+	hdd_debug("vdev %d peer setup for " QDF_MAC_ADDR_FMT,
+		  peer->vdev_id,
+		  QDF_MAC_ADDR_REF(peer->peer_addr));
+	mac_handle = hdd_ctx->mac_handle;
+	qdf_mem_copy(req.peer_mac_addr.bytes, peer->peer_addr,
+		     QDF_MAC_ADDR_SIZE);
+	req.vdev_id = peer->vdev_id;
+	req.ch_width = g_wt_ctx->tx_rate_cfg.ch_width;
+	req.dot11mode = g_wt_ctx->tx_rate_cfg.dot11_mode;
+	req.gi_val = g_wt_ctx->tx_rate_cfg.gi_val;
+	req.nss = g_wt_ctx->tx_rate_cfg.nss;
+	sme_passthru_peer_setup(mac_handle, &req);
 }
 
 static inline QDF_STATUS

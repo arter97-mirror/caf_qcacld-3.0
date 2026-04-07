@@ -18552,3 +18552,54 @@ QDF_STATUS sme_probe_peer_req(mac_handle_t mac_handle, uint8_t vdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS
+sme_passthru_peer_setup(mac_handle_t mac_handle,
+			struct sir_passthru_peer_setup_msg *peer_setup)
+{
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct sir_passthru_peer_setup_msg *peer_setup_msg;
+	struct scheduler_msg sch_msg = {0};
+	struct csr_roam_session *csr_session;
+	enum QDF_OPMODE opmode;
+
+	csr_session = CSR_GET_SESSION(mac, peer_setup->vdev_id);
+	if (!csr_session) {
+		sme_err("session %d not found", peer_setup->vdev_id);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto error;
+	}
+
+	opmode = wlan_get_opmode_from_vdev_id(mac->pdev, peer_setup->vdev_id);
+	if (opmode != QDF_PASSTHRU_MODE) {
+		sme_err("Not passthru mode, session %d", peer_setup->vdev_id);
+		qdf_status = QDF_STATUS_E_INVAL;
+		goto error;
+	}
+	peer_setup_msg = qdf_mem_malloc(sizeof(*peer_setup_msg));
+	if (!peer_setup_msg) {
+		qdf_status = QDF_STATUS_E_NOMEM;
+		goto error;
+	}
+
+	qdf_mem_copy(peer_setup_msg, peer_setup, sizeof(*peer_setup_msg));
+	peer_setup_msg->message_type = WNI_SME_PASSTHRU_PEER_SETUP;
+	sme_debug("Passthru peer setup, vdev_id %d Peer: " QDF_MAC_ADDR_FMT,
+		  peer_setup_msg->vdev_id,
+		  QDF_MAC_ADDR_REF(peer_setup_msg->peer_mac_addr.bytes));
+
+	sch_msg.type = WNI_SME_PASSTHRU_PEER_SETUP;
+	sch_msg.bodyptr = peer_setup_msg;
+
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_PE,
+					    QDF_MODULE_ID_PE,
+					    &sch_msg);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		qdf_mem_free(peer_setup_msg);
+error:
+	return qdf_status;
+}
+#endif

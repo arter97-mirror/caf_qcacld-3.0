@@ -2327,6 +2327,50 @@ void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpDphHashNode sta_ds,
 				struct pe_session *session_entry);
 
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * lim_update_passthru_config(): Update passthru caps in add sta params
+ * @mac: pointer to MAC context
+ * @add_sta_params: pointer to add sta params
+ * @sta_ds: pointer to dph hash table entry
+ * @session_entry: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_passthru_config(struct mac_context *mac,
+				tpAddStaParams add_sta_params,
+				tpDphHashNode sta_ds,
+				struct pe_session *session_entry);
+/**
+ * lim_passthru_mlme_vdev_disconnect_peers() - delete passthru peers
+ * @vdev_mlme:  VDEV MLME comp object
+ * @data_len: data size
+ * @data: event data
+ *
+ * API invokes passthru peer deletion.
+ *
+ * Return: SUCCESS on successful peer deletion
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS
+lim_passthru_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
+					uint16_t data_len, void *data);
+#else
+static inline void lim_update_passthru_config(struct mac_context *mac,
+					      tpAddStaParams add_sta_params,
+					      tpDphHashNode sta_ds,
+					      struct pe_session *session_entry)
+{
+}
+
+static inline QDF_STATUS
+lim_passthru_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
+					uint16_t data_len, void *data)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
 #ifdef FEATURE_WLAN_TDLS
 /**
  * lim_update_tdls_sta_eht_capable(): Update eht_capable in add tdls sta params

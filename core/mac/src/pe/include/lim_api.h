@@ -1225,16 +1225,32 @@ void lim_passthrough_init_session(struct mac_context *mac_ptr,
  */
 void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 				    struct sir_delete_session *msg);
+/**
+ * lim_passthrough_peer_setup() - Peer setup for passthrough mode
+ * @mac: Pointer to global MAC context
+ * @msg: Pointer to peer setup message
+ *
+ * This function creates the peer and setup the peer capabilities to
+ * add sta in passthrough mode operation.
+ *
+ * Return: None
+ */
+void lim_passthrough_peer_setup(struct mac_context *mac,
+				struct sir_passthru_peer_setup_msg *msg);
 #else
 static inline
 void lim_passthrough_init_session(struct mac_context *mac_ptr,
 				  struct sir_create_session *msg)
 {
 }
-
 static inline
 void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 				    struct sir_delete_session *msg)
+{
+}
+static inline
+void lim_passthrough_peer_setup(struct mac_context *mac,
+				struct sir_passthru_peer_setup_msg *msg)
 {
 }
 #endif

@@ -49,6 +49,7 @@
 #define BSS_OPERATIONAL_MODE_STA    1
 #define BSS_OPERATIONAL_MODE_IBSS   2
 #define BSS_OPERATIONAL_MODE_NDI    3
+#define BSS_OPERATIONAL_MODE_PASSTHRU 4
 
 /* STA entry type in add sta message */
 #define STA_ENTRY_SELF              0
@@ -64,6 +65,13 @@
 #define IS_TDLS_PEER(type) false
 #endif /* FEATURE_WLAN_TDLS */
 #define STA_ENTRY_NDI_PEER          5
+#define STA_ENTRY_PASSTHRU_PEER     6
+
+#ifdef DRIVER_PASSTHRU_MODE
+#define IS_PASSTHRU_PEER(type) ((type) == STA_ENTRY_PASSTHRU_PEER)
+#else
+#define IS_PASSTHRU_PEER(type) false
+#endif
 
 #define STA_INVALID_IDX 0xFF
 

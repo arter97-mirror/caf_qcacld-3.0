@@ -4642,6 +4642,8 @@ void lim_process_add_sta_rsp(struct mac_context *mac_ctx,
 		lim_ndp_add_sta_rsp(mac_ctx, session, msg->bodyptr);
 	else if (add_sta_params->staType == STA_ENTRY_TDLS_PEER)
 		lim_process_tdls_add_sta_rsp(mac_ctx, msg->bodyptr, session);
+	else if (LIM_IS_PASSTHRU_ROLE(session))
+		lim_passthru_add_sta_rsp(mac_ctx, session, msg->bodyptr);
 	else
 		lim_process_mlm_add_sta_rsp(mac_ctx, msg, session);
 
@@ -9665,6 +9667,75 @@ void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
 	pe_debug("tdls eht_capable: %d", add_sta_params->eht_capable);
 }
 #endif
+#endif
+
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS
+lim_passthru_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
+					uint16_t data_len, void *data)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx;
+	uint8_t i = 0;
+	tpDphHashNode sta_ds = NULL;
+	QDF_STATUS status;
+
+	if (!data) {
+		mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+		if (!mac_ctx) {
+			pe_err("mac ctx is null");
+			return QDF_STATUS_E_INVAL;
+		}
+		session = pe_find_session_by_vdev_id(mac_ctx,
+				vdev_mlme->vdev->vdev_objmgr.vdev_id);
+		if (!session) {
+			pe_err("session is NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+	} else {
+		session = (struct pe_session *)data;
+		mac_ctx = session->mac_ctx;
+	}
+
+	if (!(session && LIM_IS_PASSTHRU_ROLE(session))) {
+		pe_info("session not in passthru mode");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 1; i < session->dph.dphHashTable.size; i++) {
+		sta_ds = dph_get_hash_entry(mac_ctx, i,
+					    &session->dph.dphHashTable);
+		if (!sta_ds || !sta_ds->valid)
+			continue;
+		status = lim_del_sta(mac_ctx, sta_ds, false, session);
+		if (QDF_STATUS_SUCCESS == status) {
+			lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr,
+						  sta_ds->assocId, session);
+			lim_release_peer_idx(mac_ctx, sta_ds->assocId, session);
+		} else {
+			pe_err("lim_del_sta failed with Status: %d", status);
+			QDF_ASSERT(0);
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void lim_update_passthru_config(struct mac_context *mac,
+				tpAddStaParams add_sta_params,
+				tpDphHashNode sta_ds,
+				struct pe_session *session_entry)
+{
+	if (sta_ds->staType != STA_ENTRY_PASSTHRU_PEER) {
+		pe_err("Invalid peer type");
+		return;
+	}
+	add_sta_params->eht_capable = 0;
+	add_sta_params->he_capable = 0;
+	add_sta_params->ht_caps = (*(uint16_t *)&session_entry->ht_config);
+	add_sta_params->vht_caps = session_entry->vht_config.caps;
+	pe_debug("passthru eht_capable: %d", add_sta_params->eht_capable);
+}
 #endif
 
 void lim_update_sta_eht_capable(struct mac_context *mac,

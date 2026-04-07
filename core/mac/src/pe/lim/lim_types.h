@@ -1228,7 +1228,25 @@ void lim_process_mlm_add_sta_rsp(struct mac_context *mac,
 				 struct pe_session *pe_session);
 void lim_process_mlm_del_sta_rsp(struct mac_context *mac,
 				 struct scheduler_msg *limMsgQ);
-
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * lim_passthru_add_sta_rsp() - Process add sta response in passthru mode
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: pointer to pe_session
+ * @add_sta_rsp: pointer to add sta response
+ *
+ * Return: None
+ */
+void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      tAddStaParams *add_sta_rsp);
+#else
+static inline
+void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      tAddStaParams *add_sta_rsp)
+{}
+#endif
 QDF_STATUS
 lim_process_mlm_del_all_sta_rsp(struct vdev_mlme_obj *vdev_mlme,
 				struct peer_delete_all_response *rsp);
