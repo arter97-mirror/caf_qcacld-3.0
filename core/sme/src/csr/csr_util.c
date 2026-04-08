@@ -34,6 +34,7 @@
 #include "wlan_serialization_legacy_api.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_crypto_global_api.h"
+#include "wlan_crypto_def_i.h"
 
 
 uint8_t csr_wpa_oui[][CSR_WPA_OUI_SIZE] = {
@@ -2839,6 +2840,135 @@ bool csr_lookup_pmkid(struct mac_context *mac, uint32_t sessionId,
 	return fRC;
 }
 
+static void csr_update_key_mgmt_crypto_param(struct wlan_objmgr_vdev *vdev,
+					     tDot11fIERSN ap_rsn)
+{
+	int32_t key_mgmt = 0;
+	int32_t neg_akm;
+	int32_t ap_akm;
+
+	neg_akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	if (neg_akm < 0) {
+		sme_err("Invalid AKM suite");
+		return;
+	}
+
+	SET_PARAM(ap_akm,
+		  wlan_crypto_rsn_suite_to_keymgmt(ap_rsn.akm_suite[0]));
+
+	/* Intersect crypto AKM and candidate AP's AKM */
+	neg_akm &= ap_akm;
+	if (neg_akm <= 0) {
+		sme_err("Invalid AKM suite after intersection with AP's AKM");
+		return;
+	}
+
+	/*
+	 * As there can be multiple AKM present select the most secured AKM
+	 * present
+	 */
+	if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_SAE))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B);
+	else if (HAS_PARAM(neg_akm,
+			   WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192))
+		SET_PARAM(key_mgmt,
+			  WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_OWE))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_OWE);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_DPP))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_DPP);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_PSK))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_PSK);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WAPI_PSK))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_WAPI_PSK);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WAPI_CERT))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_WAPI_CERT);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_CCKM))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_CCKM);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_OSEN))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_OSEN);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WPS))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_WPS);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_NO_WPA))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_NO_WPA);
+	else if (HAS_PARAM(neg_akm, WLAN_CRYPTO_KEY_MGMT_WPA_NONE))
+		SET_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_WPA_NONE);
+	else /* use original if no akm match */
+		key_mgmt = neg_akm;
+
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT,
+				   key_mgmt);
+}
+
+static void csr_update_ucast_cipher_crypto_param(struct wlan_objmgr_vdev *vdev,
+						 tDot11fIERSN ap_rsn)
+{
+	int32_t ucastcipherset = 0;
+	int32_t neg_ucastcipher;
+	int32_t ap_ucastcipher;
+
+	neg_ucastcipher = wlan_crypto_get_param(vdev,
+						WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	if (neg_ucastcipher < 0) {
+		sme_err("Invalid unicast cipherset");
+		return;
+	}
+
+	SET_PARAM(ap_ucastcipher,
+		  wlan_crypto_rsn_suite_to_cipher(ap_rsn.pwise_cipher_suites[0]));
+
+	/* Intersect crypto cipherset and candidate AP's cipherset */
+	neg_ucastcipher &= ap_ucastcipher;
+	if (neg_ucastcipher <= 0) {
+		sme_err("Invalid unicast cipherset after Intersection with AP's UC");
+		return;
+	}
+
+	/*
+	 * As there can be multiple ucastcipher present select the most secured
+	 * ucastcipher present.
+	 */
+	if (HAS_PARAM(neg_ucastcipher, WLAN_CRYPTO_CIPHER_AES_GCM_256))
+		SET_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_AES_GCM_256);
+	else if (HAS_PARAM(neg_ucastcipher, WLAN_CRYPTO_CIPHER_AES_CCM_256))
+		SET_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_AES_CCM_256);
+	else if (HAS_PARAM(neg_ucastcipher, WLAN_CRYPTO_CIPHER_AES_GCM))
+		SET_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_AES_GCM);
+	else if (HAS_PARAM(neg_ucastcipher, WLAN_CRYPTO_CIPHER_AES_CCM))
+		SET_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_AES_CCM);
+	else if (HAS_PARAM(neg_ucastcipher, WLAN_CRYPTO_CIPHER_TKIP))
+		SET_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_TKIP);
+	else
+		ucastcipherset = neg_ucastcipher;
+
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_UCAST_CIPHER,
+				   ucastcipherset);
+}
+
+#define MGMT_FRAME_FULL_PROTECTION (RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE)
+
 uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 			     struct csr_roam_profile *pProfile,
 			     struct bss_description *pSirBssDesc,
@@ -2850,7 +2980,8 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	uint8_t ie_len = 0;
 	struct qdf_mac_addr bssid;
 	tDot11fBeaconIEs *local_ap_ie = ap_ie;
-	uint16_t rsn_cap = 0, self_rsn_cap;
+	uint16_t rsn_cap = 0, self_rsn_cap, orig_rsn_cap;
+	int32_t rsn_val, orig_rsn_val;
 
 	if (!local_ap_ie &&
 	    (!QDF_IS_STATUS_SUCCESS(csr_get_parsed_bss_description_ies
@@ -2872,8 +3003,14 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 
 	qdf_mem_copy(bssid.bytes, pSirBssDesc->bssId, QDF_MAC_ADDR_SIZE);
 
-	self_rsn_cap = (uint16_t)wlan_crypto_get_param(vdev,
-						   WLAN_CRYPTO_PARAM_RSN_CAP);
+	rsn_val = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (rsn_val < 0) {
+		sme_err("Invalid mgmt cipher");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return ie_len;
+	}
+	self_rsn_cap = (uint16_t)rsn_val;
+
 	/* If AP is capable then use self capability else set PMF as 0 */
 	if (rsn_cap & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED &&
 	    pProfile->MFPCapable) {
@@ -2886,6 +3023,32 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	}
 	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
 				   self_rsn_cap);
+	/*
+	 * This user configure MFP capability is global and is for
+	 * multiple profiles which can be used by firmware for cross-AKM
+	 * roaming. When user configures MFP required then we should
+	 * set both MFPC and MFPR in RSN caps.
+	 */
+	orig_rsn_val = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_ORIG_RSN_CAP);
+	if (orig_rsn_val < 0) {
+		sme_err("Invalid mgmt cipher");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return ie_len;
+	}
+	orig_rsn_cap = (uint16_t)orig_rsn_val;
+
+	if (orig_rsn_cap == RSN_CAP_MFP_REQUIRED)
+		orig_rsn_cap = MGMT_FRAME_FULL_PROTECTION;
+
+	self_rsn_cap = (uint16_t)rsn_val;
+	self_rsn_cap = (self_rsn_cap) & (~MGMT_FRAME_FULL_PROTECTION);
+	orig_rsn_cap = self_rsn_cap | orig_rsn_cap;
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_ORIG_RSN_CAP,
+				   orig_rsn_cap);
+
+	csr_update_key_mgmt_crypto_param(vdev, local_ap_ie->RSN);
+	csr_update_ucast_cipher_crypto_param(vdev, local_ap_ie->RSN);
+
 	/*
 	 * TODO: Add support for Adaptive 11r connection after
 	 * call to csr_get_rsn_information is added here

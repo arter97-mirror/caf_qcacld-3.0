@@ -4120,7 +4120,7 @@ QDF_STATUS wma_roam_scan_fill_self_caps(tp_wma_handle wma_handle,
 		 * the RSN-CAPS in MSB of beacon Caps.
 		 */
 		crypto_rsn = wlan_crypto_get_param(vdev,
-						   WLAN_CRYPTO_PARAM_RSN_CAP);
+						   WLAN_CRYPTO_PARAM_ORIG_RSN_CAP);
 		if (crypto_rsn < 0) {
 			sme_err("Invalid RSN capabilities");
 		} else {
