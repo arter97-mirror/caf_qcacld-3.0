@@ -10111,6 +10111,19 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	session->gLimChannelSwitch.ch_center_freq_seg1 =
 						ch_params.center_freq_seg1;
 
+	/*
+	 * Follow VHT channel width encoding:
+	 * 0: 20/40 MHz， 1: 80/160/80+80 MHz
+	 */
+	if (req->ch_width > CH_WIDTH_40MHZ)
+		session->gLimWiderBWChannelSwitch.newChanWidth = 1;
+	else
+		session->gLimWiderBWChannelSwitch.newChanWidth = 0;
+	session->gLimWiderBWChannelSwitch.newCenterChanFreq0 =
+			ch_params.center_freq_seg0;
+	session->gLimWiderBWChannelSwitch.newCenterChanFreq1 =
+			ch_params.center_freq_seg1;
+
 	non_eht_ch_width = req->ch_width;
 	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
 	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
