@@ -4604,7 +4604,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 			if (conc_ml_sap_freq &&
 			    policy_mgr_is_current_hwmode_sbs(psoc))
 				same_mac = policy_mgr_2_freq_same_mac_in_sbs(
-								pm_ctx,
+								psoc,
 								sap_ch_freq,
 								pcl_freq);
 			else
@@ -4621,7 +4621,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 								pcl_freq);
 			else
 				same_mac = policy_mgr_2_freq_same_mac_in_sbs(
-								pm_ctx,
+								psoc,
 								sap_ch_freq,
 								pcl_freq);
 		} else

@@ -1190,7 +1190,7 @@ policy_mgr_2_freq_same_mac_in_dbs(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_2_freq_same_mac_in_sbs() - to check provided frequencies are
  * in sbs freq range or not
  *
- * @pm_ctx: policy mgr psoc priv object
+ * @psoc: PSOC object information
  * @freq_1: first frequency
  * @freq_2: second frequency
  *
@@ -1198,7 +1198,7 @@ policy_mgr_2_freq_same_mac_in_dbs(struct wlan_objmgr_psoc *psoc,
  *
  * Return: true/false.
  */
-bool policy_mgr_2_freq_same_mac_in_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+bool policy_mgr_2_freq_same_mac_in_sbs(struct wlan_objmgr_psoc *psoc,
 				       qdf_freq_t freq_1, qdf_freq_t freq_2);
 
 /**

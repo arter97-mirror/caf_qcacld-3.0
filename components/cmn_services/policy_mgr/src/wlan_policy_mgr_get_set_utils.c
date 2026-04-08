@@ -2023,15 +2023,22 @@ policy_mgr_2_freq_same_mac_in_dbs(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-policy_mgr_2_freq_same_mac_in_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+policy_mgr_2_freq_same_mac_in_sbs(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
 	struct policy_mgr_freq_range *sbs_low_share;
 	struct policy_mgr_freq_range *sbs_uppr_share;
 	struct policy_mgr_freq_range *sbs_range;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
 
 	/* Return true if non SBS capable HW */
-	if (!policy_mgr_is_hw_sbs_capable(pm_ctx->psoc))
+	if (!policy_mgr_is_hw_sbs_capable(psoc))
 		return true;
 
 	if (policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx)) {
@@ -2080,13 +2087,8 @@ policy_mgr_is_cur_freq_range_sbs(struct wlan_objmgr_psoc *psoc)
 bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 					  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool is_dbs_mode_same_mac = true;
 	bool is_sbs_mode_same_mac = true;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
-		return false;
 
 	is_dbs_mode_same_mac =
 		policy_mgr_2_freq_same_mac_in_dbs(psoc, freq_1, freq_2);
@@ -2094,7 +2096,7 @@ bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	/* if DBS mode leading to same mac, check for SBS mode */
 	if (is_dbs_mode_same_mac)
 		is_sbs_mode_same_mac =
-			policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq_1,
+			policy_mgr_2_freq_same_mac_in_sbs(psoc, freq_1,
 							  freq_2);
 
 	policy_mgr_rl_debug("freq1 %d freq2 %d: Same mac:: DBS:%d SBS:%d",
@@ -2301,6 +2303,36 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	return policy_mgr_3_freq_always_on_same_mac(psoc, freq_1, freq_2,
 						    freq_3);
 }
+
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+qdf_freq_t
+policy_mgr_get_conc_freq_if_ml_sta_in_smm(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t sap_ch_freq,
+					  qdf_freq_t ml_sta1_freq,
+					  qdf_freq_t ml_sta2_freq)
+{
+	qdf_freq_t intf_ch_freq;
+
+	if (policy_mgr_is_current_hwmode_dbs(psoc) ||
+	    policy_mgr_is_current_hwmode_sbs(psoc))
+		return 0;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(ml_sta1_freq) ||
+	    WLAN_REG_IS_24GHZ_CH_FREQ(ml_sta2_freq)) {
+		if (policy_mgr_2_freq_same_mac_in_dbs(psoc, ml_sta1_freq,
+						      sap_ch_freq))
+			intf_ch_freq = ml_sta1_freq;
+		else
+			intf_ch_freq = ml_sta2_freq;
+	} else {
+		if (policy_mgr_2_freq_same_mac_in_sbs(psoc, ml_sta1_freq,
+						      sap_ch_freq))
+			intf_ch_freq = ml_sta1_freq;
+		else
+			intf_ch_freq = ml_sta2_freq;
+	}
+	return intf_ch_freq;
+}
+#endif
 
 #ifdef FEATURE_FOURTH_CONNECTION
 static void
@@ -2667,12 +2699,6 @@ end:
 bool policy_mgr_are_sbs_chan(struct wlan_objmgr_psoc *psoc, qdf_freq_t freq_1,
 			     qdf_freq_t freq_2)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
-		return false;
-
 	if (!policy_mgr_is_hw_sbs_capable(psoc))
 		return false;
 
@@ -2680,7 +2706,7 @@ bool policy_mgr_are_sbs_chan(struct wlan_objmgr_psoc *psoc, qdf_freq_t freq_1,
 	    WLAN_REG_IS_24GHZ_CH_FREQ(freq_2))
 		return false;
 
-	return !policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq_1, freq_2);
+	return !policy_mgr_2_freq_same_mac_in_sbs(psoc, freq_1, freq_2);
 }
 
 bool policy_mgr_is_current_hwmode_sbs(struct wlan_objmgr_psoc *psoc)
