@@ -4408,6 +4408,8 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 
 				wlansap_start_beacon_req(sap_ctx);
 			}
+		} else {
+			sap_set_mcst_ie_flag_for_cac(sap_ctx, false);
 		}
 	} else if (msg == eSAP_MAC_START_FAILS ||
 		   msg == eSAP_HDD_STOP_INFRA_BSS) {
