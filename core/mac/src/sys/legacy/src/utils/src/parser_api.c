@@ -328,8 +328,13 @@ populate_dot11f_max_chan_switch_time(struct mac_context *mac,
 				     struct pe_session *pe_session)
 {
 	uint32_t switch_time = 0;
+	if (mac->sap.SapDfsInfo.is_dfs_cac_timer_running &&
+	    pe_session->mcstie_send_in_cac) {
+		switch_time = pe_session->cac_duration_ms;
+	} else {
+		switch_time = wlan_utils_get_vdev_remaining_channel_switch_time(pe_session->vdev);
+	}
 
-	switch_time = wlan_utils_get_vdev_remaining_channel_switch_time(pe_session->vdev);
 	/* switch_time is zero if mgmt.ap.last_bcn_ts_ms is 0 in above API */
 	if (!switch_time)
 		wlan_util_vdev_mgr_compute_max_channel_switch_time(pe_session->vdev,
