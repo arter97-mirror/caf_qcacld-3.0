@@ -2791,17 +2791,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
                 "//wlan/platform:wlan-platform-headers",
             ]
 
-    if target == "sa510m" or target == "sa510m.1g":
-        deps = deps + [
-            "//dataipa:include_headers",
-            "//dataipa:{}_{}_ipam".format(target, variant),
-        ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
-        deps = deps + [
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
-        ]
-
     if target == "sdxkova":
         tgt = "target-aarch64_cortex-a53_musl"
         board = "sdx85"
@@ -2812,7 +2801,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_prealloc".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_nl".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/dataipa-{}:include_headers".format(tgt, board, ipa_ver),
-            "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
     print("name=", name)
