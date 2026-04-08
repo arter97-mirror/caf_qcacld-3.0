@@ -13546,7 +13546,8 @@ void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 		}
 
 		/* Non DFS primary channel may do CAC as well */
-		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running &&
+		    !link_session->mcstie_send_in_cac) {
 			pe_debug("skip rnrie populate if cac running");
 			goto release_ref;
 		}
