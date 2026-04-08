@@ -381,24 +381,125 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+static void
+__tdls_dump_peers_for_tdls_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
+				char **buf, uint32_t *buf_len)
+{
+	int i, len;
+	QDF_STATUS status;
+	qdf_list_t *head;
+	qdf_list_node_t *p_node;
+	struct tdls_peer *curr_peer;
+
+	if (!tdls_vdev || !buf || !*buf || !buf_len)
+		return;
+
+	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
+		head = &tdls_vdev->peer_list[i];
+		status = qdf_list_peek_front(head, &p_node);
+		while (QDF_IS_STATUS_SUCCESS(status)) {
+			curr_peer = qdf_container_of(p_node,
+						     struct tdls_peer, node);
+			if (*buf_len < 32 + 1)
+				return;
+
+			len = qdf_scnprintf(*buf, *buf_len,
+					    QDF_MAC_ADDR_FMT "%4s%3s%5d\n",
+					    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
+					    (curr_peer->tdls_support ==
+					     TDLS_CAP_SUPPORTED) ? "Y" : "N",
+					    TDLS_IS_LINK_CONNECTED(curr_peer) ? "Y" : "N",
+					    curr_peer->rssi);
+			*buf += len;
+			*buf_len -= len;
+
+			status = qdf_list_peek_next(head, p_node, &p_node);
+		}
+	}
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * tdls_dump_peers_for_mlo_vdev() - dump TDLS peers for MLO vdev
+ * @vdev: vdev object
+ * @tdls_vdev: tdls vdev object
+ * @buf: buffer pointer
+ * @buf_len: buffer length pointer
+ *
+ * This function iterates through all link vdevs in the MLO context
+ * and dumps TDLS peers for each link.
+ *
+ * Return: number of bytes written, or 0 on error
+ */
+static int
+tdls_dump_peers_for_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+			     struct tdls_vdev_priv_obj *tdls_vdev,
+			     char **buf, uint32_t *buf_len)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct tdls_vdev_priv_obj *link_tdls_vdev;
+	int link, len;
+	uint32_t init_buf_len = *buf_len;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx) {
+		/* Fall back to existing single-vdev dump */
+		__tdls_dump_peers_for_tdls_vdev(tdls_vdev, buf, buf_len);
+		return init_buf_len - *buf_len;
+	}
+
+	/*
+	 * Iterate all link vdevs in mlo_dev_ctx and dump peers
+	 * per link.
+	 */
+	for (link = 0; link < WLAN_UMAC_MLO_MAX_VDEVS; link++) {
+		link_vdev = mlo_dev_ctx->wlan_vdev_list[link];
+		if (!link_vdev)
+			continue;
+
+		link_tdls_vdev = wlan_vdev_get_tdls_vdev_obj(link_vdev);
+		if (!link_tdls_vdev)
+			continue;
+
+		if (*buf_len < 64)
+			break;
+
+		len = qdf_scnprintf(*buf, *buf_len,
+				    "\n[Link vdev_id=%d]\n",
+				    wlan_vdev_get_id(link_vdev));
+		*buf += len;
+		*buf_len -= len;
+
+		__tdls_dump_peers_for_tdls_vdev(link_tdls_vdev, buf, buf_len);
+	}
+
+	return init_buf_len - *buf_len;
+}
+#else
+static int
+tdls_dump_peers_for_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+			     struct tdls_vdev_priv_obj *tdls_vdev,
+			     char **buf, uint32_t *buf_len)
+{
+	/* MLO not supported, this function should not be called */
+	return 0;
+}
+#endif
+
 /**
  * __tdls_get_all_peers_from_list() - get all the tdls peers from the list
  * @get_tdls_peers: get_tdls_peers object
  *
  * Return: int
  */
-static int __tdls_get_all_peers_from_list(
-			struct tdls_get_all_peers *get_tdls_peers)
+static int
+__tdls_get_all_peers_from_list(struct tdls_get_all_peers *get_tdls_peers)
 {
-	int i;
 	int len, init_len;
-	qdf_list_t *head;
-	qdf_list_node_t *p_node;
-	struct tdls_peer *curr_peer;
 	char *buf;
 	int buf_len;
 	struct tdls_vdev_priv_obj *tdls_vdev;
-	QDF_STATUS status;
 
 	tdls_notice("Enter ");
 
@@ -429,29 +530,17 @@ static int __tdls_get_all_peers_from_list(
 	buf += len;
 	buf_len -= len;
 
-	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
-		head = &tdls_vdev->peer_list[i];
-		status = qdf_list_peek_front(head, &p_node);
-		while (QDF_IS_STATUS_SUCCESS(status)) {
-			curr_peer = qdf_container_of(p_node,
-						     struct tdls_peer, node);
-			if (buf_len < 32 + 1)
-				break;
-			len = qdf_scnprintf(buf, buf_len,
-				QDF_MAC_ADDR_FMT "%4s%3s%5d\n",
-				QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
-				(curr_peer->tdls_support ==
-				 TDLS_CAP_SUPPORTED) ? "Y" : "N",
-				TDLS_IS_LINK_CONNECTED(curr_peer) ? "Y" :
-				"N", curr_peer->rssi);
-			buf += len;
-			buf_len -= len;
-			status = qdf_list_peek_next(head, p_node, &p_node);
-		}
+	if (wlan_vdev_mlme_is_mlo_vdev(get_tdls_peers->vdev)) {
+		tdls_dump_peers_for_mlo_vdev(get_tdls_peers->vdev, tdls_vdev,
+					     &buf, &buf_len);
+	} else {
+		__tdls_dump_peers_for_tdls_vdev(tdls_vdev, &buf, &buf_len);
 	}
 
 	tdls_notice("Exit ");
-	return init_len - buf_len;
+
+	/* Ensure we never return more than was originally available */
+	return (buf_len < (uint32_t)init_len) ? (int)(init_len - (int)buf_len) : 0;
 }
 
 /**
