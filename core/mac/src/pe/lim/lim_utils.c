@@ -4736,6 +4736,61 @@ release_ref:
 }
 #endif
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+void lim_set_cac_chan_switch_info(struct mac_context *mac_ctx,
+				  struct sap_cac_chan_switch_params *params)
+{
+	struct pe_session *session;
+	int switch_count = 0;
+	bool switch_mode = true;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!params) {
+		pe_err("Invalid params");
+		return;
+	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx, params->vdev_id);
+	if (!session) {
+		pe_err("vdev %d: session not found", params->vdev_id);
+		return;
+	}
+
+	if (!session->mcstie_send_in_cac) {
+		pe_debug("vdev %d: mcstie_send_in_cac not set, skip",
+			 params->vdev_id);
+		return;
+	}
+
+	/* Read switchCount from INI (g_sap_chanswitch_beacon_cnt) */
+	status = wlan_mlme_get_sap_chn_switch_bcn_count(mac_ctx->psoc,
+							&switch_count);
+	if (QDF_IS_STATUS_ERROR(status) || switch_count <= 0)
+		switch_count = 10; /* default: 10 beacons */
+
+	/* Read switchMode from INI (gSapChannelSwitchMode):
+	 * true  -> mode 1 (stop TX during CSA)
+	 * false -> mode 0 (allow TX during CSA)
+	 */
+	status = wlan_mlme_get_sap_chn_switch_mode(mac_ctx->psoc,
+						   &switch_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		switch_mode = true; /* default: mode 1 */
+
+	session->dfsIncludeChanSwIe = true;
+	session->gLimChannelSwitch.sw_target_freq  = params->target_freq;
+	session->gLimChannelSwitch.primaryChannel  = params->primary_channel;
+	session->gLimChannelSwitch.ch_width        = params->ch_width;
+	session->gLimChannelSwitch.sec_ch_offset   = params->sec_ch_offset;
+	session->gLimChannelSwitch.switchCount     = switch_count;
+	session->gLimChannelSwitch.switchMode      = switch_mode ? 1 : 0;
+
+	pe_debug("vdev %d: CAC chan switch info set freq=%d bw=%d count=%d mode=%d",
+		 params->vdev_id, params->target_freq, params->ch_width,
+		 switch_count, session->gLimChannelSwitch.switchMode);
+}
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
+
 struct pe_session *lim_is_ap_session_active(struct mac_context *mac)
 {
 	uint8_t i;

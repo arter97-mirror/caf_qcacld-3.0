@@ -2987,6 +2987,28 @@ void lim_send_dfs_chan_sw_ie_update(struct mac_context *mac_ctx,
  */
 void lim_process_ap_ecsa_timeout(void *session);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * lim_set_cac_chan_switch_info() - Update PE session channel switch fields
+ * @mac_ctx: pointer to Global Mac Structure
+ * @params: channel switch parameters posted from SAP
+ *
+ * Handles SIR_LIM_SET_CAC_CHAN_SWITCH_INFO message. Updates
+ * gLimChannelSwitch fields (target freq, primary channel, bandwidth,
+ * sec_ch_offset, dfsIncludeChanSwIe) in the PE session.
+ * switchCount is read from g_sap_chanswitch_beacon_cnt INI and
+ * switchMode is read from gSapChannelSwitchMode INI.
+ */
+void lim_set_cac_chan_switch_info(struct mac_context *mac_ctx,
+				  struct sap_cac_chan_switch_params *params);
+#else
+static inline
+void lim_set_cac_chan_switch_info(struct mac_context *mac_ctx,
+				  struct sap_cac_chan_switch_params *params)
+{
+}
+#endif
+
 /**
  * lim_send_csa_tx_complete() - send csa tx complete event when beacon
  * count decremented to zero

@@ -5248,4 +5248,24 @@ struct sir_passthru_peer_del_msg {
 	uint16_t            vdev_id;
 	struct qdf_mac_addr peer_mac_addr;
 };
+
+/**
+ * struct sap_cac_chan_switch_params - channel switch parameters for CAC
+ * @vdev_id: vdev id of the SAP session
+ * @target_freq: target channel frequency in MHz
+ * @primary_channel: primary channel number
+ * @ch_width: channel width
+ * @sec_ch_offset: secondary channel offset
+ *
+ * Passed via SIR_LIM_SET_CAC_CHAN_SWITCH_INFO message from SAP to PE so
+ * that PE can update gLimChannelSwitch without direct cross-layer access.
+ */
+struct sap_cac_chan_switch_params {
+	uint8_t vdev_id;
+	qdf_freq_t target_freq;
+	uint8_t primary_channel;
+	enum phy_ch_width ch_width;
+	uint8_t sec_ch_offset;
+};
+
 #endif /* __SIR_API_H */

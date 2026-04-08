@@ -232,6 +232,8 @@ struct sap_context {
 	wlan_scan_requester req_id;
 	uint8_t sap_sta_id;
 	bool dfs_cac_offload;
+	/* whether set mcast during cac */
+	bool mcstie_send_in_cac;
 	bool is_chan_change_inprogress;
 	/* Disabled mcs13 by sap or not */
 	bool disabled_mcs13;
@@ -645,6 +647,22 @@ sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /**
+ * sap_post_cac_chan_switch_info() - Post CAC channel switch info to PE
+ * @sap_ctx: SAP context
+ * @chan_freq: target channel frequency in MHz
+ * @ch_params: channel parameters (width, sec_ch_offset, etc.)
+ *
+ * Posts SIR_LIM_SET_CAC_CHAN_SWITCH_INFO to PE so that PE can update
+ * gLimChannelSwitch fields without direct cross-layer access from SAP.
+ * switchCount and switchMode are read from INI by the PE handler.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sap_post_cac_chan_switch_info(struct sap_context *sap_ctx,
+					 qdf_freq_t chan_freq,
+					 struct ch_params *ch_params);
+
+/**
  * sap_send_mcst_in_cac() - send mcst ie in bcn template in CAC
  * @sap_ctx: SAP context
  *
@@ -668,6 +686,14 @@ void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
 				  bool flag);
 
 #else
+static inline QDF_STATUS
+sap_post_cac_chan_switch_info(struct sap_context *sap_ctx,
+			      qdf_freq_t chan_freq,
+			      struct ch_params *ch_params)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline
 void sap_send_mcst_in_cac(struct sap_context *sap_ctx)
 {

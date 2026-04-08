@@ -4023,6 +4023,21 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 			if (!sap_operating_on_dfs(mac_ctx, t_sap_ctx))
 				continue;
 
+			if (t_sap_ctx->mcstie_send_in_cac) {
+				sap_debug("SAP dfs CAC detected radar vdev %d freq %d",
+					  t_sap_ctx->sessionId,
+					  t_sap_ctx->chan_freq);
+				/*
+				 * Post channel switch info to PE via message
+				 * to avoid direct cross-layer access. PE will
+				 * update gLimChannelSwitch fields and read
+				 * switchCount/switchMode from INI.
+				 */
+				sap_post_cac_chan_switch_info(t_sap_ctx,
+							      ch_switch_info->target_chan_freq,
+							      &sap_ctx->ch_params);
+			}
+
 			t_sap_ctx->is_chan_change_inprogress = true;
 			/*
 			 * eSAP_DFS_CHANNEL_CAC_RADAR_FOUND:
@@ -5326,6 +5341,53 @@ static int sap_stop_dfs_cac_timer(struct sap_context *sap_ctx)
 }
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/* See sap_internal.h for kernel-doc */
+QDF_STATUS sap_post_cac_chan_switch_info(struct sap_context *sap_ctx,
+					 qdf_freq_t chan_freq,
+					 struct ch_params *ch_params)
+{
+	struct scheduler_msg msg = {0};
+	struct sap_cac_chan_switch_params *params;
+	struct mac_context *mac_ctx;
+	QDF_STATUS status;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	params = qdf_mem_malloc(sizeof(*params));
+	if (!params)
+		return QDF_STATUS_E_NOMEM;
+
+	params->vdev_id       = sap_ctx->sessionId;
+	params->target_freq   = chan_freq;
+	params->primary_channel =
+		wlan_reg_freq_to_chan(mac_ctx->pdev, chan_freq);
+	params->ch_width      = ch_params->ch_width;
+	params->sec_ch_offset = ch_params->sec_ch_offset;
+
+	msg.type    = SIR_LIM_SET_CAC_CHAN_SWITCH_INFO;
+	msg.bodyptr = params;
+	msg.bodyval = 0;
+
+	status = scheduler_post_message(QDF_MODULE_ID_SAP,
+					QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE,
+					&msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("vdev %d: failed to post SIR_LIM_SET_CAC_CHAN_SWITCH_INFO",
+			sap_ctx->sessionId);
+		qdf_mem_free(params);
+		return status;
+	}
+
+	sap_debug("vdev %d: posted CAC chan switch info freq=%d ch_width=%d",
+		  sap_ctx->sessionId, chan_freq, ch_params->ch_width);
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * sap_should_send_bcn_with_mcst_in_cac() - Check if should send beacon with
  * MCST IE during CAC
@@ -5412,9 +5474,11 @@ void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
 			sap_debug("vdev_id %d: cleared mcstie_send_in_cac for CAC",
 				  session_id);
 			sap_send_beacon_update_in_cac(sap_ctx);
+			sap_ctx->mcstie_send_in_cac = false;
 		}
 	} else {
 		session->mcstie_send_in_cac = true;
+		sap_ctx->mcstie_send_in_cac = true;
 		sap_debug("vdev_id %d: set mcstie_send_in_cac for CAC",
 			  session_id);
 	}
