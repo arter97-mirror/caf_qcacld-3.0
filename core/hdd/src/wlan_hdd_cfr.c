@@ -1053,6 +1053,9 @@ static void wlan_cfg80211_reset_cfr(struct pdev_cfr *pcfr, uint8_t value)
 	pcfr->unassoc_phy_mode = value;
 	pcfr->bandwidth = value;
 	pcfr->is_cfr_data_present = value;
+	pcfr->is_cfr_rx = value;
+	pcfr->is_cfr_tx = value;
+	memset(pcfr->peer_addr, value, QDF_MAC_ADDR_SIZE);
 }
 
 static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
