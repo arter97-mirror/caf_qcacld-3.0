@@ -36,6 +36,7 @@
 
 #include "wlan_tdls_main.h"
 #include "wlan_tdls_stats.h"
+#include <wlan_tdls_cfg_api.h>
 #include <wlan_tdls_stats_public_structs.h>
 #include <wlan_sm_engine.h>
 
@@ -575,25 +576,72 @@ static const char *tdls_stats_sm_event_names[] = {
 };
 
 /**
- * tdls_stats_sm_create() - Create the TDLS stats state machine.
- * @stats_ctx: TDLS stats context (pre-allocated by caller)
- * @initial_state: Initial SM state (TDLS_STATS_S_INIT or TDLS_STATS_S_DISABLED)
+ * tdls_stats_sm_create() - Allocate and initialise the TDLS stats context
+ *                          and state machine.
+ * @psoc: PSOC object — used to query FW service capability and stored as
+ *        a back-pointer in the allocated context.
+ * @stats_ctx_out: Output pointer.  On success, *@stats_ctx_out is set to
+ *                 the newly allocated and fully initialised context.
+ *                 The caller stores this in the TDLS PSOC object
+ *                 (e.g. tdls_soc_priv_obj::stats_ctx).
  *
- * Creates the wlan_sm_engine instance, stores the handle in @stats_ctx,
- * and initialises the SM spinlock.  The cache database must be initialised
- * separately by the caller when FW capability is present.
+ * Design note — why a double pointer?
+ *   This function owns the allocation of tdls_stats_context.  The double
+ *   pointer is the standard C "allocate-and-return" pattern: the function
+ *   writes the allocated pointer into *stats_ctx_out so the caller never
+ *   needs to pre-allocate or know the size of the context.  The caller
+ *   must later pass the returned pointer to tdls_stats_sm_destroy() which
+ *   frees it.
  *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ * Initialisation sequence:
+ *   1. Allocate tdls_stats_context (includes embedded cache DB).
+ *   2. Query wmi_service_tdls_stats_info to pick the initial state:
+ *        FW capable   -> TDLS_STATS_S_INIT  (begin caching immediately)
+ *        FW incapable -> TDLS_STATS_S_DISABLED (permanent; no caching)
+ *   3. Create the wlan_sm_engine instance (triggers initial state entry).
+ *   4. Create the SM spinlock.
+ *   5. If initial state is INIT, initialise the cache DB.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
  */
-QDF_STATUS tdls_stats_sm_create(struct tdls_stats_context *stats_ctx,
-				enum tdls_stats_sm_state initial_state)
+QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
+				struct tdls_stats_context **stats_ctx_out)
 {
+	struct tdls_stats_context *stats_ctx;
 	struct wlan_sm *sm;
 	uint8_t name[WLAN_SM_ENGINE_MAX_NAME];
+	enum tdls_stats_sm_state initial_state;
+	QDF_STATUS status;
+	bool is_tdls_stats_supported;
 
-	if (!stats_ctx)
+	if (!psoc || !stats_ctx_out)
 		return QDF_STATUS_E_INVAL;
 
+	/* Step 1: Allocate the context (includes the embedded cache DB) */
+	stats_ctx = qdf_mem_malloc(sizeof(*stats_ctx));
+	if (!stats_ctx) {
+		tdls_err("TDLS stats: failed to allocate stats context");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	stats_ctx->psoc    = psoc;
+	stats_ctx->psoc_id = wlan_psoc_get_id(psoc);
+	stats_ctx->db_initialized = false;
+
+	/* Step 2: Determine initial state from INI and FW service capability.
+	 * This is a one-time decision at PSOC create time.
+	 *   INI and FW capable   -> INIT     (start caching immediately)
+	 *   INI OR FW incapable -> DISABLED (permanent terminal state)
+	 */
+	cfg_tdls_get_stats_enable(psoc, &is_tdls_stats_supported);
+	initial_state = is_tdls_stats_supported
+				? TDLS_STATS_S_INIT : TDLS_STATS_S_DISABLED;
+
+	/* Step 3: Create the SM engine.
+	 * The initial state's entry callback (INIT or DISABLED) does nothing
+	 * and does not acquire tdls_stats_sm_lock, so the lock need not exist
+	 * yet at this point.
+	 */
 	qdf_scnprintf(name, sizeof(name), "TDLS-Stats-PSOC:%d",
 		      stats_ctx->psoc_id);
 
@@ -603,34 +651,78 @@ QDF_STATUS tdls_stats_sm_create(struct tdls_stats_context *stats_ctx,
 			    tdls_stats_sm_event_names,
 			    QDF_ARRAY_SIZE(tdls_stats_sm_event_names));
 	if (!sm) {
-		tdls_err("TDLS stats state machine creation failed");
+		tdls_err("TDLS stats: state machine creation failed");
+		qdf_mem_free(stats_ctx);
 		return QDF_STATUS_E_NOMEM;
 	}
-
 	stats_ctx->sm.sm_hdl = sm;
 
+	/* Step 4: Create the SM spinlock (after SM engine, matching
+	 * ttlm_sm_create pattern).
+	 * Lock order: tdls_stats_sm_lock (outer) -> db.lock (inner).
+	 */
 	tdls_stats_lock_create(stats_ctx);
 
+	/* Step 5: Initialise the cache DB only for the INIT path.
+	 * The DISABLED path never uses the cache DB.
+	 */
+	if (initial_state == TDLS_STATS_S_INIT) {
+		status = tdls_stats_db_init(&stats_ctx->db,
+					    TDLS_STATS_HIST_MAX_NODES);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("TDLS stats: cache DB init failed, status %d",
+				 status);
+			tdls_stats_lock_destroy(stats_ctx);
+			wlan_sm_delete(stats_ctx->sm.sm_hdl);
+			qdf_mem_free(stats_ctx);
+			return status;
+		}
+		stats_ctx->db_initialized = true;
+	}
+
+	*stats_ctx_out = stats_ctx;
+
+	tdls_debug("TDLS stats SM created, psoc %d, initial state %d",
+		   stats_ctx->psoc_id, initial_state);
 	return QDF_STATUS_SUCCESS;
 }
 
 /**
- * tdls_stats_sm_destroy() - Destroy the TDLS stats state machine.
- * @stats_ctx: TDLS stats context
+ * tdls_stats_sm_destroy() - Destroy the TDLS stats state machine and free
+ *                           all associated resources.
+ * @stats_ctx: TDLS stats context returned by tdls_stats_sm_create().
  *
- * Destroys the SM spinlock and deletes the wlan_sm_engine instance.
- * The cache database must be deinitialised separately by the caller
- * before invoking this function.
+ * Cleanup order (mirrors ttlm_sm_destroy pattern):
+ *   1. Deinit cache DB — only if db_initialized is true (INIT path).
+ *      All state exit callbacks do not access the DB, so it is safe to
+ *      deinit the DB before deleting the SM engine.
+ *   2. Destroy the SM spinlock — all state exit callbacks do not acquire
+ *      tdls_stats_sm_lock, so destroying it before wlan_sm_delete() is safe.
+ *   3. Delete the SM engine.
+ *   4. Free the context itself.
  *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
  */
 QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 {
 	if (!stats_ctx)
 		return QDF_STATUS_E_INVAL;
 
+	/* 1. Deinit cache DB only if it was initialised */
+	if (stats_ctx->db_initialized) {
+		tdls_stats_db_deinit(&stats_ctx->db);
+		stats_ctx->db_initialized = false;
+	}
+
+	/* 2. Destroy SM spinlock */
 	tdls_stats_lock_destroy(stats_ctx);
+
+	/* 3. Delete SM engine */
 	wlan_sm_delete(stats_ctx->sm.sm_hdl);
 
+	/* 4. Free context */
+	qdf_mem_free(stats_ctx);
+
+	tdls_debug("TDLS stats SM destroyed");
 	return QDF_STATUS_SUCCESS;
 }
