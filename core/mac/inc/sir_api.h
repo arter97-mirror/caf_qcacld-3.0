@@ -53,6 +53,9 @@ struct mac_context;
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_structs.h"
 #endif
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+#include <wow_wake_reason.h>
+#endif
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 #define WLAN_DOT11_BASIC_RATE_MASK (0x80)
@@ -5020,4 +5023,26 @@ struct start_bss_config {
 	uint8_t curr_conn_count;
 };
 
+/* forward decl: names the type in callback signatures even when undefined */
+struct wow_wakeup_notify_msg;
+
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+/**
+ * struct wow_wakeup_notify_msg - WoW wakeup payload posted from WMA to SME
+ * @ts: host monotonic boot time (us) at event arrival
+ * @wake_reason: firmware WOW_WAKE_REASON_TYPE value, or
+ *               WOW_WAKE_REASON_CODE_UNSPECIFIED
+ * @pbm_len: valid bytes in @pbm_buffer; 0 for non-PBM wakes
+ * @pbm_buffer: raw packet bytes for pattern-byte-match wakes
+ *
+ * Allocated by WMA, posted via scheduler_post_message to SME, freed by the
+ * SME message loop after dispatch.
+ */
+struct wow_wakeup_notify_msg {
+	uint64_t ts;
+	uint32_t wake_reason;
+	uint32_t pbm_len;
+	uint8_t  pbm_buffer[WOW_WAKE_REASON_PBM_BUF_SIZE];
+};
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
 #endif /* __SIR_API_H */

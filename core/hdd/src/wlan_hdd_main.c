@@ -146,6 +146,7 @@
 #include "enet.h"
 #include <cdp_txrx_cmn_struct.h>
 #include "wlan_hdd_sysfs.h"
+#include "wlan_hdd_sysfs_wow_wake_reason.h"
 #include "wlan_disa_ucfg_api.h"
 #include "wlan_disa_obj_mgmt_api.h"
 #include "wlan_action_oui_ucfg_api.h"
@@ -8567,6 +8568,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_ALLOW_NEW_INTF",
 		"NET_DEV_HOLD_GET_STA_CONNECTIONS",
 		"NET_DEV_HOLD_LOCAL_PKT_CAPTURE",
+		"NET_DEV_HOLD_WOW_WAKEUP_NOTIFY",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -19303,6 +19305,64 @@ static QDF_STATUS hdd_send_pagefault_report_to_user(struct hdd_context *hdd_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+static void hdd_wow_wakeup_notify_cb(struct wow_wakeup_notify_msg *notify,
+				     uint32_t vdev_id)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
+	struct qdf_mac_addr *mac_addr;
+	struct wow_wake_reason_uapi uapi = {0};
+
+	if (!notify)
+		return;
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info ||
+	    WLAN_HDD_ADAPTER_MAGIC != link_info->adapter->magic) {
+		hdd_err("Invalid adapter or adapter has invalid magic");
+		return;
+	}
+
+	/* hold a ref since this callback dereferences adapter asynchronously */
+	adapter = link_info->adapter;
+	hdd_adapter_dev_hold_debug(adapter, NET_DEV_HOLD_WOW_WAKEUP_NOTIFY);
+
+	mac_addr = hdd_adapter_get_link_mac_addr(link_info);
+	if (!mac_addr)
+		goto release_ref;
+
+	uapi.ts = notify->ts;
+	uapi.wake_reason = notify->wake_reason;
+
+	strscpy((char *)uapi.ifname, adapter->dev->name,
+		sizeof(uapi.ifname));
+	qdf_mem_copy(uapi.mac_addr, mac_addr->bytes,
+		     WOW_WAKE_REASON_MAC_ADDR_SIZE);
+
+	if (notify->pbm_len > 0) {
+		uapi.pbm_len = min_t(uint32_t, notify->pbm_len,
+				     WOW_WAKE_REASON_PBM_BUF_SIZE);
+		qdf_mem_copy(uapi.pbm_buffer, notify->pbm_buffer, uapi.pbm_len);
+	}
+
+	hdd_sysfs_wow_wake_reason_notify(&uapi);
+
+release_ref:
+	hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_WOW_WAKEUP_NOTIFY);
+}
+#else
+static inline void
+hdd_wow_wakeup_notify_cb(struct wow_wakeup_notify_msg *notify,
+			 uint32_t vdev_id)
+{
+}
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
+
 static QDF_STATUS hdd_pagefault_action_cb(void *buf, uint32_t buf_len)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -19429,6 +19489,8 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 
 	sme_register_pagefault_cb(mac_handle, hdd_pagefault_action_cb);
 
+	sme_register_wow_wakeup_cb(mac_handle, hdd_wow_wakeup_notify_cb);
+
 	sme_register_set_disconnect_cb(mac_handle,
 				       hdd_set_disconnect_link_info_cb);
 
@@ -19467,6 +19529,8 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	sme_deregister_sap_channel_bw_update_cb(mac_handle);
 
 	sme_deregister_ssr_on_pagefault_cb(mac_handle);
+
+	sme_deregister_wow_wakeup_cb(mac_handle);
 
 	sme_smem_oem_event_deinit(mac_handle);
 

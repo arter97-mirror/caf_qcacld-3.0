@@ -842,6 +842,41 @@ sme_register_pagefault_cb(mac_handle_t mac_handle,
  */
 void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle);
 
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+/**
+ * sme_register_wow_wakeup_cb() - Register callback for WoW wakeup notification
+ * @mac_handle: Opaque handle to the global MAC context
+ * @cb: Callback invoked by SME message loop (process context) when a WoW
+ *      wakeup event arrives from firmware.
+ *
+ * Return: None
+ */
+void sme_register_wow_wakeup_cb(mac_handle_t mac_handle,
+				void (*cb)(
+				struct wow_wakeup_notify_msg *notify,
+				uint32_t vdev_id));
+
+/**
+ * sme_deregister_wow_wakeup_cb() - Deregister WoW wakeup callback
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_deregister_wow_wakeup_cb(mac_handle_t mac_handle);
+#else
+static inline void
+sme_register_wow_wakeup_cb(mac_handle_t mac_handle,
+			   void (*cb)(struct wow_wakeup_notify_msg *notify,
+				      uint32_t vdev_id))
+{
+}
+
+static inline void
+sme_deregister_wow_wakeup_cb(mac_handle_t mac_handle)
+{
+}
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
+
 #ifdef FEATURE_OEM_DATA
 /**
  * sme_oem_data_cmd() - the wrapper to send oem data cmd to wma

@@ -2038,6 +2038,11 @@ config WLAN_WOW_ITO
 	bool "Enable WLAN_WOW_ITO"
 	default n
 
+config WLAN_WOW_WAKEUP_NOTIFY
+	bool "Enable WoW wakeup reason sysfs notification"
+	depends on WLAN_SYSFS
+	default n
+
 config WLAN_WOWL_ADD_PTRN
 	bool "Enable WLAN_WOWL_ADD_PTRN"
 	default n
