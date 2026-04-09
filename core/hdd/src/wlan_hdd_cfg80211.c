@@ -295,8 +295,15 @@
 /* Power datapath operation type */
 #define POWER_DP_OPERATION_RETRIEVE  2
 
-/* Power datapath stats type bitmask */
-#define POWER_DP_STATS_TYPE_ALL 0x03
+/* Power datapath stats type bitmask
+ * Below types of power datapath stats can be queried from FW
+ * 0: Power stats
+ * 1: Datapath stats
+ * 2: Power and Datapath
+ * 4: SOC stats
+ * 5: All
+ */
+#define POWER_DP_STATS_TYPE_ALL 0x05
 
 /* Power datapath core index */
 #define POWER_DP_CORE_INDEX_ALL 0xFF
@@ -26413,7 +26420,7 @@ static int pack_power_stats_struct_based(
 	struct cp_stats_power_datapath_info *cp_stats)
 {
 	wifi_core_radio_stats radio_stats[POWER_STATS_MAX_NUM_CORES];
-	wifi_chip_power_state chip_stats[POWER_STATS_MAX_NUM_CORES];
+	wifi_chip_power_state chip_stats = {0};
 	int ret, i;
 
 	/* Validate power stats are present */
@@ -26476,31 +26483,28 @@ static int pack_power_stats_struct_based(
 	}
 
 	/* Fill chip power stats per core */
-	qdf_mem_zero(chip_stats, sizeof(chip_stats));
-	for (i = 0; i < cp_stats->num_power_stats; i++) {
-		chip_stats[i].wlan_pwr_on_time =
-			cp_stats->power_stats[i].wlan_pwr_on_time;
-		chip_stats[i].sleep_levels_num =
-			cp_stats->power_stats[i].sleep_levels_num;
+	chip_stats.wlan_pwr_on_time =
+		cp_stats->wlan_soc_pwr_on_time;
+	chip_stats.sleep_levels_num =
+		cp_stats->wlan_soc_sleep_levels_num;
 
-		if (chip_stats[i].sleep_levels_num >
-		    POWER_STATS_MAX_NUM_SLEEP_LEVELS) {
-			hdd_warn("core[%d] Truncating sleep_levels_num from %d to %d",
-				 i, chip_stats[i].sleep_levels_num,
-				 POWER_STATS_MAX_NUM_SLEEP_LEVELS);
-			chip_stats[i].sleep_levels_num =
-				POWER_STATS_MAX_NUM_SLEEP_LEVELS;
-		}
-
-		qdf_mem_copy(chip_stats[i].sleep_time_per_levels,
-			     cp_stats->power_stats[i].sleep_time_per_levels,
-			     sizeof(__u32) * chip_stats[i].sleep_levels_num);
+	if (chip_stats.sleep_levels_num >
+		POWER_STATS_MAX_NUM_SLEEP_LEVELS) {
+		hdd_warn("core[%d] Truncating sleep_levels_num from %d to %d",
+			 i, chip_stats.sleep_levels_num,
+			 POWER_STATS_MAX_NUM_SLEEP_LEVELS);
+		chip_stats.sleep_levels_num =
+			POWER_STATS_MAX_NUM_SLEEP_LEVELS;
 	}
+
+	qdf_mem_copy(chip_stats.sleep_time_per_levels,
+		     cp_stats->wlan_soc_sleep_time_per_level,
+		     sizeof(__u32) * chip_stats.sleep_levels_num);
 
 	/* Put chip power stats as binary blob (all cores) */
 	ret = nla_put(skb, POWER_STATS_ATTRIBUTE_CHIP_POWER_STATS,
-		      sizeof(wifi_chip_power_state) * cp_stats->num_power_stats,
-		      chip_stats);
+		      sizeof(wifi_chip_power_state),
+		      &chip_stats);
 	if (ret) {
 		hdd_err("Failed to put chip_power_stats: %d", ret);
 		return ret;
@@ -26632,6 +26636,8 @@ static int __wlan_hdd_cfg80211_get_power_stats(
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
 	struct request_info info = {0};
+	struct request_info last_req = {0};
+	bool pending = false;
 	struct osif_request *request;
 	struct power_stats_priv *priv;
 	static const struct osif_request_params params = {
@@ -26710,13 +26716,21 @@ static int __wlan_hdd_cfg80211_get_power_stats(
 	/* Wait for firmware response (osif_request handles timeout) */
 	ret = osif_request_wait_for_response(request);
 	if (ret) {
-		hdd_err("Timeout waiting for power stats response");
+		hdd_err("Timeout waiting for power stats response ret: %d",
+			ret);
+		ucfg_mc_cp_stats_reset_pending_req(hdd_ctx->psoc,
+						   TYPE_POWER_DATAPATH_STATS,
+						   &last_req, &pending);
 		goto put_request;
 	}
 
 	priv = osif_request_priv(request);
 
 	/* Validate firmware provided stats */
+	if (!priv->stats.wlan_soc_pwr_on_time) {
+		hdd_debug("Firmware did not provide chip stats");
+	}
+
 	if (!priv->stats.power_stats_valid ||
 	    !priv->stats.tx_rate_stats_valid ||
 	    !priv->stats.rx_rate_stats_valid) {

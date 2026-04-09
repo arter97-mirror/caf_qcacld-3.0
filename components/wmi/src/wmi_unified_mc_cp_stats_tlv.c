@@ -633,6 +633,11 @@ extract_power_datapath_stats_event_tlv(
 	/* Extract fixed parameters */
 	event->status = ev->status;
 	event->stats_type_bitmap = ev->stats_type_bitmap;
+	event->wlan_soc_pwr_on_time = ev->wlan_soc_pwr_on_time;
+	event->wlan_soc_sleep_levels_num = ev->wlan_soc_sleep_levels_num;
+	qdf_mem_copy(event->wlan_soc_sleep_time_per_level,
+		     ev->wlan_soc_sleep_time_per_level,
+		     sizeof(event->wlan_soc_sleep_time_per_level));
 
 	wmi_debug("status %d, stats_type 0x%x",
 		  ev->status, ev->stats_type_bitmap);

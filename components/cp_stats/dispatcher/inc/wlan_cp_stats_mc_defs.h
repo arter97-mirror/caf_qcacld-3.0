@@ -490,6 +490,11 @@ struct cp_stats_rx_rate_info {
  * struct cp_stats_power_datapath_info - CP stats power and datapath info
  * @status: Status from firmware (0 = success, non-zero = error)
  * @stats_type_bitmap: Stats type bitmap indicating which stats are included
+ * @wlan_soc_pwr_on_time: WLAN power on time (ms)
+ * @wlan_soc_sleep_levels_num: Number of sleep levels supported. Could be less
+ * than WMI_MAX_SLEEP_LEVELS based on the chip
+ * @wlan_soc_sleep_time_per_level: soc sleep level. Same WMI_MAX_SLEEP_LEVELS
+ * is used for sizing
  * @num_power_stats: Number of power stats entries (num_cores)
  * @num_tx_rate_stats: Number of TX rate stats entries
  * @num_rx_rate_stats: Number of RX rate stats entries
@@ -503,6 +508,9 @@ struct cp_stats_rx_rate_info {
 struct cp_stats_power_datapath_info {
 	uint32_t status;
 	uint32_t stats_type_bitmap;
+	uint32_t wlan_soc_pwr_on_time;
+	uint32_t wlan_soc_sleep_levels_num;
+	uint32_t wlan_soc_sleep_time_per_level[WMI_MAX_SLEEP_LEVELS];
 	uint32_t num_power_stats;
 	uint32_t num_tx_rate_stats;
 	uint32_t num_rx_rate_stats;
