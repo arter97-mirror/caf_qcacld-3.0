@@ -130,6 +130,44 @@ void tdls_stats_lock_release(struct tdls_stats_context *stats_ctx);
  * =========================================================================
  */
 
+/* =========================================================================
+ * Cache database lifecycle APIs (defined in wlan_tdls_stats.c)
+ * =========================================================================
+ */
+
+/**
+ * tdls_stats_db_init() - Initialise the TDLS stats cache database.
+ * @db: Pointer to the cache database structure to initialise.
+ * @max_entries: Maximum number of entries the cache can hold.
+ *
+ * Zeroes the structure, sets the capacity, creates the spinlock, and
+ * creates the QDF list.  Called during PSOC creation when FW capability
+ * is present.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tdls_stats_db_init(struct tdls_stats_db *db,
+			      uint32_t max_entries);
+
+/**
+ * tdls_stats_db_flush() - Silently remove all entries from the cache.
+ * @db: Pointer to the cache database structure.
+ *
+ * Removes and frees every node without emitting vendor events.  Used
+ * during cleanup / deinit only.  Distinct from
+ * tdls_stats_flush_entire_cache() which emits vendor events.
+ */
+void tdls_stats_db_flush(struct tdls_stats_db *db);
+
+/**
+ * tdls_stats_db_deinit() - Deinitialise the TDLS stats cache database.
+ * @db: Pointer to the cache database structure.
+ *
+ * Flushes all remaining entries, destroys the QDF list, and destroys
+ * the spinlock.  Called during PSOC destruction.
+ */
+void tdls_stats_db_deinit(struct tdls_stats_db *db);
+
 /**
  * tdls_stats_push() - Insert a stats entry into the cache database.
  * @db: TDLS stats cache database.

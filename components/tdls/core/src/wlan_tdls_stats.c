@@ -65,6 +65,87 @@ void tdls_stats_lock_release(struct tdls_stats_context *stats_ctx)
 }
 
 /* =========================================================================
+ * Cache database operations
+ * =========================================================================
+ */
+
+/**
+ * tdls_stats_db_init() - Initialise the TDLS stats cache database.
+ * @db: Pointer to the cache database structure to initialise.
+ * @max_entries: Maximum number of entries the cache can hold.
+ *
+ * Zeroes the structure, sets the capacity, creates the spinlock, and
+ * creates the QDF list.  Called during PSOC creation when FW capability
+ * is present.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if arguments
+ *         are invalid.
+ */
+QDF_STATUS tdls_stats_db_init(struct tdls_stats_db *db, uint32_t max_entries)
+{
+	if (!db || !max_entries)
+		return QDF_STATUS_E_INVAL;
+
+	qdf_mem_zero(db, sizeof(*db));
+	db->max_entries = max_entries;
+	db->num_entries = 0;
+
+	qdf_spinlock_create(&db->lock);
+	qdf_list_create(&db->list, max_entries);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * tdls_stats_db_flush() - Silently remove all entries from the cache.
+ * @db: Pointer to the cache database structure.
+ *
+ * Removes and frees every node without emitting vendor events.  Used
+ * during cleanup / deinit only.  Distinct from
+ * tdls_stats_flush_entire_cache() which emits vendor events for each entry.
+ */
+void tdls_stats_db_flush(struct tdls_stats_db *db)
+{
+	qdf_list_node_t *ln = NULL;
+	struct tdls_stats_node *node;
+
+	if (!db)
+		return;
+
+	qdf_spin_lock_bh(&db->lock);
+
+	while (!qdf_list_empty(&db->list)) {
+		if (QDF_IS_STATUS_ERROR(
+			qdf_list_remove_front(&db->list, &ln)) || !ln)
+			break;
+
+		node = qdf_container_of(ln, struct tdls_stats_node, node);
+		qdf_mem_free(node);
+		db->num_entries--;
+	}
+
+	qdf_spin_unlock_bh(&db->lock);
+}
+
+/**
+ * tdls_stats_db_deinit() - Deinitialise the TDLS stats cache database.
+ * @db: Pointer to the cache database structure.
+ *
+ * Flushes all remaining entries, destroys the QDF list, and destroys
+ * the spinlock.  Called during PSOC destruction.
+ */
+void tdls_stats_db_deinit(struct tdls_stats_db *db)
+{
+	if (!db)
+		return;
+
+	tdls_stats_db_flush(db);
+
+	qdf_list_destroy(&db->list);
+	qdf_spinlock_destroy(&db->lock);
+}
+
+/* =========================================================================
  * State machine transition and event delivery helpers
  * =========================================================================
  */
