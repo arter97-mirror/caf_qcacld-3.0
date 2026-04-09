@@ -3754,6 +3754,20 @@ IE smd_bss_trans_params (EID_EXTN_ID_ELEMENT) OUI (0x9B)
     data[1..256];
 }
 
+IE security_profile (EID_EXTN_ID_ELEMENT) OUI (0xA2)
+{
+    {
+        extended_key_id: 1;
+        ocvc: 1;
+        reserved: 6;
+    }
+    {
+        number_of_octets_of_security_profile_bitmap: 4;
+        number_of_vendor_security_profile: 4;
+    }
+    data[2..255];
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                                MULTIIEs                                 //
 /////////////////////////////////////////////////////////////////////////////
@@ -4182,6 +4196,7 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  uhr_op;
+    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4289,6 +4304,7 @@ FRAME Beacon2
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  uhr_op;
+    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4370,6 +4386,7 @@ FRAME BeaconIEs
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  uhr_op;
+    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4435,6 +4452,7 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  t2lm_ie[0..2];
     OPTIE  reg_connect;
     OPTIE  uhr_cap;
+    OPTIE  security_profile;
 
     OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
@@ -4496,6 +4514,7 @@ FRAME AssocResponse                       // 7.2.3.5
     OPTIE  t2lm_ie[0..2];
     OPTIE  uhr_cap;
     OPTIE  uhr_op;
+    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMParams;
@@ -4545,6 +4564,7 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  t2lm_ie[0..2];
     OPTIE  reg_connect;
     OPTIE  uhr_cap;
+    OPTIE  security_profile;
 
     OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
@@ -4601,6 +4621,7 @@ FRAME ReAssocResponse                     // 7.2.3.7
     OPTIE  t2lm_ie[0..2];
     OPTIE  uhr_cap;
     OPTIE  uhr_op;
+    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMParams;
@@ -4695,6 +4716,7 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  t2lm_ie[0..2];
     OPTIE  uhr_cap;
     OPTIE  uhr_op;
+    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
