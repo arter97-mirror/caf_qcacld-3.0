@@ -2368,6 +2368,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	uint32_t tdls_uapsd_mask;
 #endif
 	bool get_peer_info_enable;
+	bool tdls_stats_info;
 
 	/* Set up UAPSD */
 	ucfg_mlme_set_sap_uapsd_flag(hdd_ctx->psoc, cfg->uapsd);
@@ -2424,6 +2425,11 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 		cfg_tdls_set_sleep_sta_enable(hdd_ctx->psoc, true);
 	else
 		cfg_tdls_set_sleep_sta_enable(hdd_ctx->psoc, false);
+
+	cfg_tdls_get_stats_enable(hdd_ctx->psoc, &tdls_stats_info);
+	cfg_tdls_set_stats_enable(hdd_ctx->psoc,
+				  tdls_stats_info &&
+				  cfg->en_tdls_stats_info);
 #endif
 	hdd_update_roam_offload(hdd_ctx, cfg);
 

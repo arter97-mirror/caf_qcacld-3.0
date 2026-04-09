@@ -40,6 +40,7 @@
  * @en_tdls_uapsd_buf_sta: enable sta tdls uapsd buf
  * @en_tdls_uapsd_sleep_sta: enable sta tdls uapsd sleep
  * @en_tdls_wideband_support: Get TDLS wideband support
+ * @en_tdls_stats_info: Get TDLS Stats Info support
  * @en_tdls_11ax_support: Get TDLS ax support
  * @en_tdls_6g_support: Get TDLS 6g fw capability
  * @en_tdls_mlo_support: Get TDLS mlo fw support
@@ -85,6 +86,7 @@ struct wma_tgt_services {
 	bool en_tdls_uapsd_buf_sta;
 	bool en_tdls_uapsd_sleep_sta;
 	bool en_tdls_wideband_support;
+	bool en_tdls_stats_info;
 #ifdef WLAN_FEATURE_11AX
 	bool en_tdls_11ax_support;
 	bool en_tdls_6g_support;

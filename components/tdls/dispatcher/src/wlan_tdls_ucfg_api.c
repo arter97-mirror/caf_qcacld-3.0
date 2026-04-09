@@ -215,6 +215,8 @@ static QDF_STATUS tdls_object_init_params(
 			cfg_get(psoc, CFG_TL_DELAYED_TRGR_FRM_INTERVAL);
 	tdls_soc_obj->tdls_configs.tdls_wmm_mode_enable =
 			cfg_get(psoc,  CFG_TDLS_WMM_MODE_ENABLE);
+	tdls_soc_obj->tdls_configs.tdls_stats_enable =
+			cfg_get(psoc, CFG_TDLS_STATS_ENABLE);
 	tdls_soc_obj->tdls_configs.tdls_off_chan_enable =
 			cfg_get(psoc, CFG_TDLS_OFF_CHANNEL_ENABLED);
 	tdls_soc_obj->tdls_configs.tdls_buffer_sta_enable =

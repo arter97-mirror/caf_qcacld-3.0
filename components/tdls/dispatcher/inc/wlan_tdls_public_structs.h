@@ -531,6 +531,7 @@ enum tdls_feature_bit {
  * @tdls_off_chan_enable: tdls off channel enable
  * @tdls_off_chan_enable_orig: original tdls off channel enable
  * @tdls_wmm_mode_enable: tdls wmm mode enable
+ * @tdls_stats_enable: tdls stats reporting feature enable
  * @tdls_external_control: tdls external control enable
  * @tdls_implicit_trigger_enable: tdls implicit trigger enable
  * @tdls_scan_enable: tdls scan enable
@@ -565,6 +566,7 @@ struct tdls_user_config {
 	bool tdls_off_chan_enable;
 	bool tdls_off_chan_enable_orig;
 	bool tdls_wmm_mode_enable;
+	bool tdls_stats_enable;
 	uint8_t tdls_external_control;
 	bool tdls_implicit_trigger_enable;
 	bool tdls_scan_enable;

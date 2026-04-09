@@ -5369,6 +5369,16 @@ wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
 					     wmi_service_tdls_wideband_support);
 }
 
+static inline void
+wma_get_tdls_stats_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_stats_info =
+			wmi_service_enabled(wmi_handle,
+					    wmi_service_tdls_stats_info);
+	wma_debug("FW TDLS stats support: %d", cfg->en_tdls_stats_info);
+}
+
 #ifdef WLAN_FEATURE_TDLS_NSS_4_4
 /**
  * wma_get_tdls_nss_confirm_support() - update tgt services with service tdls
@@ -5504,6 +5514,11 @@ wma_get_tdls_nss_confirm_support(struct wmi_unified *wmi_handle,
 static inline void
 wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
 			      struct wma_tgt_services *cfg)
+{}
+
+static inline void
+wma_get_tdls_stats_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
 {}
 #endif
 
@@ -5751,6 +5766,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_tdls_mlo_support(wmi_handle, cfg);
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
+	wma_get_tdls_stats_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
 	wma_get_tdls_nss_confirm_support(wmi_handle, cfg);
 	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);

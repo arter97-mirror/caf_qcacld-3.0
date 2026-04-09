@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -155,6 +155,28 @@ void cfg_tdls_restore_off_channel_enable(struct wlan_objmgr_psoc *psoc);
  * Return: NULL
  */
 void cfg_tdls_store_off_channel_enable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_tdls_get_stats_enable() - get tdls stats enable
+ * @psoc:        pointer to psoc object
+ * @val:         pointer to tdls stats enable
+ *
+ * This function gets tdls stats enable
+ */
+QDF_STATUS
+cfg_tdls_get_stats_enable(struct wlan_objmgr_psoc *psoc,
+			  bool *val);
+
+/**
+ * cfg_tdls_set_stats_enable() - set tdls stats enable
+ * @psoc:        pointer to psoc object
+ * @val:         tdls stats enable
+ *
+ * This function sets tdls stats enable
+ */
+QDF_STATUS
+cfg_tdls_set_stats_enable(struct wlan_objmgr_psoc *psoc,
+			  bool val);
 
 /**
  * cfg_tdls_get_wmm_mode_enable() - get tdls wmm mode enable
@@ -362,6 +384,22 @@ cfg_tdls_restore_off_channel_enable(struct wlan_objmgr_psoc *psoc)
 static inline void
 cfg_tdls_store_off_channel_enable(struct wlan_objmgr_psoc *psoc)
 {
+}
+
+static inline QDF_STATUS
+cfg_tdls_get_stats_enable(struct wlan_objmgr_psoc *psoc,
+			  bool *val)
+{
+	*val = false;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+cfg_tdls_set_stats_enable(struct wlan_objmgr_psoc *psoc,
+			  bool val)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS
