@@ -145,6 +145,107 @@ void tdls_stats_db_deinit(struct tdls_stats_db *db)
 	qdf_spinlock_destroy(&db->lock);
 }
 
+/**
+ * tdls_stats_push() - Insert a stats entry into the cache database.
+ * @db: TDLS stats cache database.
+ * @entry: Entry to insert (copied into a newly allocated node).
+ *
+ * If the cache is full the oldest entry (at the front of the list) is
+ * evicted before the new entry is inserted at the back, maintaining
+ * FIFO order.  All operations are protected by @db->lock.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
+			   const struct tdls_stats_entry *entry)
+{
+	struct tdls_stats_node *node;
+	qdf_list_node_t *old_ln = NULL;
+	QDF_STATUS status;
+
+	if (!db || !entry)
+		return QDF_STATUS_E_INVAL;
+
+	qdf_spin_lock_bh(&db->lock);
+
+	/* Evict oldest entry if the cache is full */
+	if (db->num_entries >= db->max_entries) {
+		status = qdf_list_remove_front(&db->list, &old_ln);
+
+		if (QDF_IS_STATUS_SUCCESS(status) && old_ln) {
+			struct tdls_stats_node *old_node =
+				qdf_container_of(old_ln,
+						 struct tdls_stats_node, node);
+			qdf_mem_free(old_node);
+			db->num_entries--;
+		}
+	}
+
+	/* Allocate a new node */
+	node = qdf_mem_malloc(sizeof(*node));
+	if (!node) {
+		qdf_spin_unlock_bh(&db->lock);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* Copy entry data and insert at the back (newest at tail) */
+	node->entry = *entry;
+	qdf_list_insert_back(&db->list, &node->node);
+	db->num_entries++;
+
+	qdf_spin_unlock_bh(&db->lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * tdls_stats_flush_entire_cache() - Flush all cached entries as vendor events.
+ * @stats_ctx: TDLS stats context.
+ *
+ * Dequeues every entry from the cache database in FIFO (oldest-first)
+ * order and emits each one as a vendor event via tdls_emit_vendor_event().
+ * The lock is released while emitting each event to avoid holding it
+ * across the vendor-event path.  Called from the ENABLED state entry
+ * callback when transitioning from INIT.
+ *
+ * Return: Number of entries flushed.
+ */
+uint32_t tdls_stats_flush_entire_cache(struct tdls_stats_context *stats_ctx)
+{
+	uint32_t flushed_count = 0;
+	qdf_list_node_t *ln = NULL;
+	qdf_list_node_t *next_ln = NULL;
+	struct tdls_stats_node *node;
+
+	if (!stats_ctx)
+		return 0;
+
+	qdf_spin_lock_bh(&stats_ctx->db.lock);
+	qdf_list_peek_front(&stats_ctx->db.list, &ln);
+
+	while (ln) {
+		qdf_list_peek_next(&stats_ctx->db.list, ln, &next_ln);
+		qdf_list_remove_front(&stats_ctx->db.list, &ln);
+		stats_ctx->db.num_entries--;
+
+		/* Release lock before emitting the vendor event */
+		qdf_spin_unlock_bh(&stats_ctx->db.lock);
+
+		node = qdf_container_of(ln, struct tdls_stats_node, node);
+		tdls_emit_vendor_event(&node->entry);
+		qdf_mem_free(node);
+		flushed_count++;
+
+		qdf_spin_lock_bh(&stats_ctx->db.lock);
+		ln = next_ln;
+		next_ln = NULL;
+	}
+
+	qdf_spin_unlock_bh(&stats_ctx->db.lock);
+
+	return flushed_count;
+}
+
 /* =========================================================================
  * State machine transition and event delivery helpers
  * =========================================================================
