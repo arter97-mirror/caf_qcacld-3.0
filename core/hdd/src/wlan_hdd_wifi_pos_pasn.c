@@ -512,18 +512,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	if (!data)
 		return -ENOMEM;
 
-	data->vdev_id = adapter->deflink->vdev_id;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
-						    data->vdev_id,
-						    WLAN_WIFI_POS_OSIF_ID);
-	if (!vdev) {
-		hdd_err_rl("Vdev is not found for id:%d", data->vdev_id);
-		ret = -EINVAL;
-		goto err;
-	}
-
 	if (!tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_PEER_MAC_ADDR]) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_OSIF_ID);
 		hdd_err_rl("BSSID is not present");
 		ret = -EINVAL;
 		goto err;
@@ -537,6 +526,34 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		qdf_mem_copy(data->src_mac_addr.bytes,
 			     nla_data(tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_SRC_ADDR]),
 			     QDF_MAC_ADDR_SIZE);
+
+	peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
+					   data->peer_mac_addr.bytes,
+					   WLAN_WIFI_POS_OSIF_ID);
+	if (!peer) {
+		hdd_debug("PASN peer is not found");
+		ret = 0;
+		goto err;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		hdd_err_rl("Vdev is NULL for PASN peer");
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_WIFI_POS_OSIF_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Failed to get vdev reference");
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+		ret = -EFAULT;
+		goto err;
+	}
+
+	data->vdev_id = wlan_vdev_get_id(vdev);
+	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
 
 	data->key_seed_len =
 		nla_len(tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_LTF_KEYSEED]);
@@ -579,13 +596,13 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 
 	peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
 					   data->peer_mac_addr.bytes,
-					   WLAN_WIFI_POS_CORE_ID);
+					   WLAN_WIFI_POS_OSIF_ID);
 	if (!peer) {
-		hdd_err_rl("PASN peer is not found");
 		/*
 		 * Auth status need not be sent for the BSS PASN
 		 * peer. So, return if peer is not found
 		 */
+		hdd_err_rl("PASN peer is not found after LTF keyseed");
 		ret = 0;
 		goto err;
 	}
@@ -596,7 +613,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	 */
 	peer_type = wlan_peer_get_peer_type(peer);
 	if (peer_type != WLAN_PEER_RTT_PASN) {
-		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
 		ret = 0;
 		goto err;
 	}
@@ -610,7 +627,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	 */
 	is_ltf_keyseed_required =
 			ucfg_wifi_pos_is_ltf_keyseed_required_for_peer(peer);
-	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
+	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
 
 	if (!is_ltf_keyseed_required) {
 		ret = 0;
@@ -628,7 +645,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		goto err;
 	}
 
-	pasn_auth_status->vdev_id = adapter->deflink->vdev_id;
+	pasn_auth_status->vdev_id = data->vdev_id;
 	pasn_auth_status->num_peers = 1;
 	qdf_mem_copy(pasn_auth_status->auth_status[0].peer_mac.bytes,
 		     data->peer_mac_addr.bytes, QDF_MAC_ADDR_SIZE);
