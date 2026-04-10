@@ -2482,15 +2482,6 @@ bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 	return ucfg_nan_is_beamforming_supported(psoc);
 }
 
-/*
- * The NAN Cluster ID is a MAC address that takes a value from
- * 50-6F-9A-01-00-00 to 50-6F-9A-01-FF-FF and is carried in the A3 field of
- * some of the NAN frames. The NAN Cluster ID is randomly chosen by the device
- * that initiates the NAN Cluster.
- */
-#define NAN_CLUSTER_MATCH      "\x50\x6F\x9A\x01"
-#define NAN_CLUSTER_MATCH_SIZE 4
-
 /**
  * wlan_nan_is_bssid_in_cluster() - to check whether BSSID is a part of NAN
  * cluster

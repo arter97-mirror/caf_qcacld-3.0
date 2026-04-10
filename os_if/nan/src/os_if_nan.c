@@ -2637,6 +2637,72 @@ static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 /**
+ * os_if_nan_process_cluster_event() - Process NAN cluster event
+ * @vdev: vdev object
+ * @cluster_event: cluster event information
+ *
+ * This function processes the cluster event and calls
+ * cfg80211_nan_cluster_joined to notify the kernel/userspace.
+ *
+ * Return: None
+ */
+static void
+os_if_nan_process_cluster_event(struct wlan_objmgr_vdev *vdev,
+				struct nan_cluster_event *cluster_event)
+{
+	struct wireless_dev *wdev;
+	struct vdev_osif_priv *osif_priv;
+	bool new_cluster;
+
+	if (!vdev || !cluster_event) {
+		nan_err("Invalid parameters");
+		return;
+	}
+
+	/* Get wireless_dev from vdev */
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv || !osif_priv->wdev) {
+		nan_err("Failed to get wdev from vdev");
+		return;
+	}
+	wdev = osif_priv->wdev;
+
+	/* Determine new_cluster flag based on event type */
+	if (cluster_event->event_type == NAN_CLUSTER_EVENT_STARTED) {
+		new_cluster = true;
+		nan_debug("NAN started new cluster");
+	} else if (cluster_event->event_type == NAN_CLUSTER_EVENT_JOINED) {
+		new_cluster = false;
+		nan_debug("NAN joined existing cluster");
+	} else {
+		nan_err("Invalid cluster event type: %d",
+			cluster_event->event_type);
+		return;
+	}
+
+	nan_debug("Cluster event: vdev_id=%d, cluster_id=%02x:%02x:%02x:%02x:%02x:%02x, new_cluster=%d",
+		  cluster_event->vdev_id,
+		  cluster_event->cluster_id[0], cluster_event->cluster_id[1],
+		  cluster_event->cluster_id[2], cluster_event->cluster_id[3],
+		  cluster_event->cluster_id[4], cluster_event->cluster_id[5],
+		  new_cluster);
+
+	/*
+	 * Call cfg80211_nan_cluster_joined to notify kernel/userspace
+	 *
+	 * Parameters:
+	 * - wdev: wireless device
+	 * - cluster_id: 6-byte cluster identifier
+	 * - new_cluster: true if started new cluster, false if joined existing
+	 * - gfp: GFP_KERNEL for process context (we're in work queue context)
+	 */
+	cfg80211_nan_cluster_joined(wdev, cluster_event->cluster_id,
+				    new_cluster, GFP_KERNEL);
+
+	return;
+}
+
+/**
  * os_if_nan_next_dw_notif_handler() - Handler for NAN next DW notification
  * @vdev: VDEV object
  * @event: NAN next DW info event
@@ -2984,18 +3050,33 @@ void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
 	cb_obj->os_if_nan_next_dw_notif_handler =
 					os_if_nan_next_dw_notif_handler;
 }
+
+static
+void osif_nan_register_cluster_event_cb(struct wlan_objmgr_psoc *psoc,
+					struct nan_callbacks *cb_obj)
+{
+	cb_obj->os_if_nan_process_cluster_event =
+					os_if_nan_process_cluster_event;
+}
 #else
 static inline
 void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
 				   struct nan_callbacks *cb_obj)
 {}
+
+static
+void osif_nan_register_cluster_event_cb(struct wlan_objmgr_psoc *psoc,
+					struct nan_callbacks *cb_obj)
+{}
 #endif
+
 int os_if_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				     struct nan_callbacks *cb_obj)
 {
 	cb_obj->os_if_ndp_event_handler = os_if_nan_datapath_event_handler;
 	cb_obj->os_if_nan_event_handler = os_if_nan_discovery_event_handler;
 	osif_nan_register_dw_notif_cb(psoc, cb_obj);
+	osif_nan_register_cluster_event_cb(psoc, cb_obj);
 	return ucfg_nan_register_hdd_callbacks(psoc, cb_obj);
 }
 

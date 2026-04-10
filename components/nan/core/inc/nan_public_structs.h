@@ -101,6 +101,16 @@ enum nan_opmode_bit {
 #define NAN_S3_SUPPORT_BIT 4
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 
+/*
+ * The NAN Cluster ID is a MAC address that takes a value from
+ * 50-6F-9A-01-00-00 to 50-6F-9A-01-FF-FF and is carried in the A3 field of
+ * some of the NAN frames. The NAN Cluster ID is randomly chosen by the device
+ * that initiates the NAN Cluster.
+ */
+#define NAN_CLUSTER_MATCH      "\x50\x6F\x9A\x01"
+#define NAN_CLUSTER_MATCH_SIZE 4
+#define NAN_CLUSTER_ID_SIZE 6
+
 /**
  * enum nan_disable_req_type - NAN disable request type
  * @NAN_DISABLE_REQ_DEFAULT: Default NAN disable request
@@ -421,6 +431,21 @@ struct nan_next_dw_info_event {
 	uint32_t vdev_id;
 	uint32_t channel_freq;
 };
+
+/**
+ * struct nan_cluster_event - NAN cluster event information
+ * @vdev_id: vdev identifier
+ * @cluster_id: 6-byte cluster identifier (MAC address format)
+ * @event_type: Type of cluster event (joined or started)
+ */
+struct nan_cluster_event {
+	uint32_t vdev_id;
+	uint8_t cluster_id[NAN_CLUSTER_ID_SIZE];
+	uint32_t event_type;
+};
+
+#define NAN_CLUSTER_EVENT_JOINED  0
+#define NAN_CLUSTER_EVENT_STARTED 1
 #endif
 
 #define NAN_CH_INFO_MAX_LEN \
@@ -944,6 +969,7 @@ struct nan_pasn_peer_ops {
  * @os_if_nan_event_handler: OS IF Callback for handling NAN Discovery events
  * @os_if_ndp_event_handler: OS IF Callback for handling NAN Datapath events
  * @os_if_nan_next_dw_notif_handler: OS IF Callback for NAN next DW notification
+ * @os_if_nan_process_cluster_event: OS IF Callback for NAN cluster notification
  * @ucfg_nan_request_process_cb: Callback to indicate NAN enable/disable
  * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
@@ -975,6 +1001,8 @@ struct nan_callbacks {
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 	void (*os_if_nan_next_dw_notif_handler)(struct wlan_objmgr_vdev *vdev,
 						struct nan_next_dw_info_event *event);
+	void (*os_if_nan_process_cluster_event)(struct wlan_objmgr_vdev *vdev,
+						struct nan_cluster_event *event);
 #endif
 	void (*ucfg_nan_request_process_cb)(void *cookie);
 	int (*ndi_open)(const char *iface_name, bool is_add_virtual_iface);

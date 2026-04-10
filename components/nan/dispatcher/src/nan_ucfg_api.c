@@ -566,11 +566,25 @@ void nan_regiser_dw_notif_cb(struct nan_psoc_priv_obj *psoc_obj,
 	psoc_obj->cb_obj.os_if_nan_next_dw_notif_handler =
 				cb_obj->os_if_nan_next_dw_notif_handler;
 }
+
+void nan_regiser_cluster_event_cb(struct nan_psoc_priv_obj *psoc_obj,
+				  struct nan_callbacks *cb_obj)
+{
+	psoc_obj->cb_obj.os_if_nan_process_cluster_event =
+				cb_obj->os_if_nan_process_cluster_event;
+}
 #else
 static inline
 void nan_regiser_dw_notif_cb(struct nan_psoc_priv_obj *psoc_obj,
 			     struct nan_callbacks *cb_obj)
-{}
+{
+}
+
+static inline
+void nan_regiser_cluster_event_cb(struct nan_psoc_priv_obj *psoc_obj,
+				  struct nan_callbacks *cb_obj)
+{
+}
 #endif
 
 int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
@@ -605,6 +619,7 @@ int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				cb_obj->nan_concurrency_update;
 	psoc_obj->cb_obj.set_mc_list = cb_obj->set_mc_list;
 	nan_regiser_dw_notif_cb(psoc_obj, cb_obj);
+	nan_regiser_cluster_event_cb(psoc_obj, cb_obj);
 	nan_register_sr_concurrency_callback(psoc_obj, cb_obj);
 	nan_regiser_ndp_update_peer_bw_cb(psoc_obj, cb_obj);
 
