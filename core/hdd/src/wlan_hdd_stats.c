@@ -4470,6 +4470,88 @@ static void hdd_get_max_rate_ht(struct hdd_station_info *stainfo,
 	*max_mcs_idx = mcsidx;
 }
 
+static void hdd_get_max_rate_he(struct hdd_station_info *stainfo,
+				struct hdd_fw_txrx_stats *stats,
+				uint32_t rate_flags,
+				uint8_t nss,
+				uint32_t *maxrate,
+				uint8_t *max_mcs_idx,
+				bool report_max)
+{
+	struct index_he_data_rate_type *supported_he_mcs_rate;
+	uint32_t tmprate = 0;
+	uint32_t he_max_mcs;
+	uint8_t dcm = 0, mcsidx = INVALID_MCS_IDX;
+	int8_t rssi = stats->rssi;
+	int mode;
+	int i;
+	int sgi;
+
+	supported_he_mcs_rate = (struct index_he_data_rate_type *)
+		((nss == 1) ?
+		 supported_he_mcs_rate_nss1 :
+		 supported_he_mcs_rate_nss2);
+
+	if (rate_flags & TX_RATE_HE160)
+		mode = 3;
+	else if (rate_flags & TX_RATE_HE80)
+		mode = 2;
+	else if (rate_flags & TX_RATE_HE40)
+		mode = 1;
+	else
+		mode = 0;
+
+	sgi = (rate_flags & TX_RATE_SGI) ? 0 : 2;
+	if (rate_flags &
+	    (TX_RATE_HE160 | TX_RATE_HE80 | TX_RATE_HE40 |
+	    TX_RATE_HE20)) {
+		he_max_mcs =
+			(enum data_rate_11ax_max_mcs)
+			(stainfo->tx_mcs_map & DATA_RATE_11AX_MCS_MASK);
+
+		if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
+			mcsidx = 9;
+		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_10) {
+			mcsidx = 10;
+		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_11) {
+			mcsidx = 11;
+		} else {
+			hdd_err("invalid he_max_mcs");
+			/* report real mcs idx */
+			mcsidx = stats->tx_rate.mcs;
+		}
+
+		if (!report_max) {
+			for (i = 0; i <= mcsidx; i++) {
+				if (rssi <= rssi_mcs_tbl[mode][i]) {
+					mcsidx = i;
+					break;
+				}
+			}
+			if (mcsidx < stats->tx_rate.mcs)
+				mcsidx = stats->tx_rate.mcs;
+		}
+
+		if (rate_flags & TX_RATE_HE160)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE160_rate[dcm][sgi];
+		else if (rate_flags & TX_RATE_HE80)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE80_rate[dcm][sgi];
+		else if (rate_flags & TX_RATE_HE40)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE40_rate[dcm][sgi];
+		else if (rate_flags & TX_RATE_HE20)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE20_rate[dcm][sgi];
+	}
+
+	hdd_debug("tmprate %d mcsidx %d", tmprate, mcsidx);
+
+	*maxrate = tmprate;
+	*max_mcs_idx = mcsidx;
+}
+
 /**
  * hdd_get_max_rate_vht() - get max rate for vht mode
  * @stainfo: stainfo pointer
@@ -4880,13 +4962,20 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 		 */
 		if ((rssidx != 3) &&
 		    !(rate_flags & TX_RATE_LEGACY)) {
-			hdd_get_max_rate_vht(stainfo,
-					     stats,
-					     rate_flags,
-					     nss,
-					     &tmprate,
-					     &mcsidx,
-					     rssidx == 0);
+			hdd_get_max_rate_he(stainfo, stats, rate_flags, nss,
+					    &tmprate, &mcsidx, rssidx == 0);
+			if (maxrate < tmprate &&
+			    mcsidx != INVALID_MCS_IDX)
+				maxrate = tmprate;
+
+			if (mcsidx == INVALID_MCS_IDX)
+				hdd_get_max_rate_vht(stainfo,
+						     stats,
+						     rate_flags,
+						     nss,
+						     &tmprate,
+						     &mcsidx,
+						     rssidx == 0);
 
 			if (maxrate < tmprate &&
 			    mcsidx != INVALID_MCS_IDX)
