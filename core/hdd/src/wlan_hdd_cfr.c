@@ -746,7 +746,7 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 }
 
 #define DEFAULT_CFR_NSS 0xff
-#define DEFAULT_CFR_BW  0xf
+#define DEFAULT_CFR_BW  0x1f
 static QDF_STATUS
 wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 				   struct nlattr *tb[])
