@@ -2346,6 +2346,10 @@ config DP_TX_TRACKING
 	bool "Enable DP_TX_TRACKING"
 	default n
 
+config DP_TCP_MEM_PARAM_CTRL
+	bool "Enable DP_TCP_MEM_PARAM_CTRL"
+	default n
+
 config WLAN_DP_MLO_DEV_CTX
 	bool "Enable WLAN_DP_MLO_DEV_CTX"
 	default n
@@ -3075,4 +3079,8 @@ config HIF_LARGE_CE_RING_HISTORY
 	int "Enable HIF_LARGE_CE_RING_HISTORY"
 	default 8192
 endif
+config WLAN_TAS_SYSFS
+	bool "Enable TAS sysfs"
+	default n
+
 endif # QCA_CLD_WLAN

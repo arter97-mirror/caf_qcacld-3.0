@@ -164,7 +164,7 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 		/*
 		 * Due to audio share glitch with P2P clients caused by roam
 		 * scan on concurrent interface, disable roaming if
-		 * "p2p_disable_roam" ini is enabled. Donot re-enable roaming
+		 * "p2p_disable_roam" ini is enabled. Do not re-enable roaming
 		 * again on other STA interface if p2p client connection is
 		 * active on any vdev.
 		 */
@@ -209,6 +209,8 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
 
 	wlan_ll_sap_switch_bearer_on_sta_connect_complete(psoc, vdev_id);
+
+	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -308,6 +310,7 @@ if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
 
 	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
 	policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
+	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }

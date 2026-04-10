@@ -566,7 +566,7 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
 		if (pp_t->pp)
 			pools_allocated++;
 
-		if (type == pp_t->type && !pp_t->in_use &&
+		if (pp_t->pp && type == pp_t->type && !pp_t->in_use &&
 		    pool_size == pp_t->pool_size) {
 			pp_t->in_use = true;
 			if (pp_track_id)

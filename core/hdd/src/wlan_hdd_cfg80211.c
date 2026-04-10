@@ -30493,11 +30493,18 @@ static int __wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
 /**
  * wlan_hdd_cfg80211_set_wiphy_params() - set wiphy parameters
  * @wiphy: Pointer to wiphy
+ * @radio_idx: radio index
  * @changed: Parameters changed
  *
  * Return: 0 for success, non-zero for failure
  */
-static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+					      int radio_idx, u32 changed)
+#else
+static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+					      u32 changed)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -33971,9 +33978,16 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	return qdf_status_to_os_return(status);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
+					   int radio_idx,
+					   uint32_t tx_mask,
+					   uint32_t rx_mask)
+#else
 static int wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 					   uint32_t tx_mask,
 					   uint32_t rx_mask)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -34020,9 +34034,16 @@ static int __wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
+					   int radio_idx,
+					   uint32_t *tx_mask,
+					   uint32_t *rx_mask)
+#else
 static int wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 					   uint32_t *tx_mask,
 					   uint32_t *rx_mask)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -36023,6 +36044,40 @@ __wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
  * delete link data from upper layer.
  * @wiphy: wiphy struct
  * @dev: net device
+ * @req: MLO link reconfiguration request
+ *
+ * This API fetch add or delete link params based on link id mask
+ * and invokes target if API to send add delete link info.
+ *
+ * Return: status, 0 in case of success else negative value.
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int
+wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      struct cfg80211_ml_reconf_req *req)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_setup_link_reconfig(wiphy, dev,
+							req->add_links,
+							req->rem_links);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
+/**
+ * wlan_hdd_cfg80211_setup_link_reconfig() - API to get add or
+ * delete link data from upper layer.
+ * @wiphy: wiphy struct
+ * @dev: net device
  * @add_links: added link reconfig params
  * @rem_links: removed link id bitmap
  *
@@ -36052,6 +36107,7 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 
 	return errno;
 }
+#endif
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 1))

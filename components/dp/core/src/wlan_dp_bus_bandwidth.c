@@ -671,6 +671,59 @@ static void dp_reset_tcp_adv_win_scale(struct wlan_dp_psoc_context *dp_ctx)
 	wlan_dp_update_tcp_rx_param(dp_ctx, &rx_tp_data);
 }
 
+#ifdef DP_TCP_MEM_PARAM_CTRL
+static inline bool
+wlan_cfg_tcp_mem_param_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return !!cfg_get(psoc, CFG_DP_TCP_MEM_PARAM_CTRL);
+}
+
+void wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_dp_psoc_context *dp_ctx,
+				   struct wlan_tcp_mem_param *data)
+{
+	struct wlan_dp_psoc_callbacks *dp_ops;
+	int radio;
+
+	if (!dp_ctx) {
+		dp_err("dp_ctx is null");
+		return;
+	}
+
+	if (!data) {
+		dp_err("Data is null");
+		return;
+	}
+
+	if (!wlan_cfg_tcp_mem_param_ctrl_enabled(psoc)) {
+		dp_debug("TCP param control is disabled");
+		return;
+	}
+
+	dp_ops = &dp_ctx->dp_ops;
+	radio = cds_get_radio_index();
+	if (radio == -EINVAL) {
+		dp_err("Invalid radio index");
+		return;
+	}
+
+	dp_ops->dp_send_svc_nlink_msg(radio, WLAN_SVC_SET_TCP_MEM_PARAM,
+				     (void *)data,
+				     sizeof(struct wlan_tcp_mem_param));
+}
+#else
+void wlan_dp_update_tcp_mem_params(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_dp_psoc_context *dp_ctx,
+				   struct wlan_tcp_mem_param *data)
+{
+}
+
+static inline bool
+wlan_cfg_tcp_mem_param_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 void wlan_dp_update_tcp_rx_param(struct wlan_dp_psoc_context *dp_ctx,
 				 struct wlan_rx_tp_data *data)
 {
@@ -2207,6 +2260,7 @@ int dp_bus_bandwidth_init(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	struct wlan_tcp_mem_param tcp_mem_param = {0};
 	QDF_STATUS status;
 
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
@@ -2217,6 +2271,9 @@ int dp_bus_bandwidth_init(struct wlan_objmgr_psoc *psoc)
 	qdf_spinlock_create(&dp_ctx->bus_bw_lock);
 
 	dp_ctx->dp_ops.dp_pm_qos_add_request(ctx);
+
+	tcp_mem_param.enable = true;
+	wlan_dp_update_tcp_mem_params(psoc, dp_ctx, &tcp_mem_param);
 
 	wlan_dp_init_tx_rx_histogram(dp_ctx);
 	status = qdf_periodic_work_create(&dp_ctx->bus_bw_work,
@@ -2231,6 +2288,7 @@ int dp_bus_bandwidth_init(struct wlan_objmgr_psoc *psoc)
 void dp_bus_bandwidth_deinit(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+	struct wlan_tcp_mem_param tcp_mem_param = {0};
 	hdd_cb_handle ctx;
 
 	if (!dp_ctx) {
@@ -2253,6 +2311,8 @@ void dp_bus_bandwidth_deinit(struct wlan_objmgr_psoc *psoc)
 	qdf_periodic_work_destroy(&dp_ctx->bus_bw_work);
 	qdf_spinlock_destroy(&dp_ctx->bus_bw_lock);
 	wlan_dp_deinit_tx_rx_histogram(dp_ctx);
+	tcp_mem_param.enable = false;
+	wlan_dp_update_tcp_mem_params(psoc, dp_ctx, &tcp_mem_param);
 	dp_ctx->dp_ops.dp_pm_qos_remove_request(ctx);
 
 	dp_exit();

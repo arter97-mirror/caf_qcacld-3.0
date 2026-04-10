@@ -6113,7 +6113,7 @@ bool wlan_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev)
 	if (!wlan_vdev_get_mlo_external_sae_auth_conversion(vdev))
 		return false;
 
-	if (!wlan_cm_is_vdev_connecting(vdev)) {
+	if (wlan_cm_is_vdev_roaming(vdev)) {
 		if (!wlan_cm_roam_is_mlo_ap(vdev))
 			return false;
 	} else if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
@@ -6192,8 +6192,7 @@ void wlan_cm_store_mlo_roam_peer_address(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_copy(rso_config->sae_roam_auth.peer_linkaddr.bytes,
 		     &auth_event->ap_bssid, QDF_MAC_ADDR_SIZE);
 
-	mlme_debug("vdev: %d mld addr " QDF_MAC_ADDR_FMT "link addr " QDF_MAC_ADDR_FMT,
-		   wlan_vdev_get_id(vdev),
+	mlme_debug("mld addr " QDF_MAC_ADDR_FMT "link addr " QDF_MAC_ADDR_FMT,
 		   QDF_MAC_ADDR_REF(rso_config->sae_roam_auth.peer_mldaddr.bytes),
 		   QDF_MAC_ADDR_REF(rso_config->sae_roam_auth.peer_linkaddr.bytes));
 rel_ref:

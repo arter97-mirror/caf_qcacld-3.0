@@ -2537,6 +2537,11 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_haps.c",
         ],
     },
+    "CONFIG_WLAN_TAS_SYSFS": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_tas.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
