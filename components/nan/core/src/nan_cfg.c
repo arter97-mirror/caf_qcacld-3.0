@@ -15,6 +15,26 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_nan_api.h"
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * nan_dw_time_cfg_init() - Initialize NAN DW config param
+ * @psoc: Pointer to PSOC Object
+ * @nan_obj: Pointer to NAN private object
+ *
+ * This function initialize NAN config params
+ */
+static void nan_dw_time_cfg_init(struct wlan_objmgr_psoc *psoc,
+				 struct nan_psoc_priv_obj *nan_obj)
+{
+	nan_obj->cfg_param.nan_dw_time = cfg_get(psoc, CFG_NAN_DW_TIME);
+}
+#else
+static inline
+void nan_dw_time_cfg_init(struct wlan_objmgr_psoc *psoc,
+			  struct nan_psoc_priv_obj *nan_obj)
+{}
+#endif
+
 /**
  * nan_cfg_init() - Initialize NAN config params
  * @psoc: Pointer to PSOC Object
@@ -47,7 +67,7 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_STA_P2P_NDP_CONCURRENCY);
 	nan_obj->cfg_param.prefer_nan_chan_for_p2p =
 				cfg_get(psoc, CFG_PREFER_NAN_CHAN_FOR_P2P);
-	nan_obj->cfg_param.nan_config = cfg_get(psoc, CFG_NAN_CONFIG);
+	nan_dw_time_cfg_init(psoc, nan_obj);
 }
 
 /**

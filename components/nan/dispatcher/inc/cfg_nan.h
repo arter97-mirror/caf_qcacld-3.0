@@ -341,6 +341,33 @@
 				     CFG_VALUE_OR_DEFAULT, \
 				     "NAN capability configuration bitmap")
 
+/*
+ * <ini>
+ * nan_dw_time - Minimum lead time (in milliseconds) that firmware must ensure
+ * to wait before sending DW_INFO_EVENT.
+ * @Min: 20
+ * @Max: 40
+ * @Default: 20
+ *
+ * This parameter configures the minimum lead time for NAN Discovery Window
+ * information events from firmware to host. The firmware will ensure this
+ * minimum time gap before sending DW_INFO_EVENT to allow the host sufficient
+ * time to prepare for the discovery window.
+ *
+ * Related: None
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_NAN_DW_TIME CFG_INI_UINT("nan_dw_time", \
+				     20, \
+				     40, \
+				     20, \
+				     CFG_VALUE_OR_DEFAULT, \
+				     "NAN DW time")
 
 #ifdef WLAN_FEATURE_NAN
 #define CFG_NAN_DISC CFG(CFG_NAN_ENABLE) \
@@ -362,6 +389,7 @@
 			CFG(CFG_NDI_MAX_SUPPORT) \
 			CFG(CFG_NAN_FEATURE_CONFIG) \
 			CFG(CFG_NAN_ENABLE_EHT_CAP) \
-			CFG(CFG_NAN_CONFIG)
+			CFG(CFG_NAN_CONFIG) \
+			CFG(CFG_NAN_DW_TIME)
 
 #endif

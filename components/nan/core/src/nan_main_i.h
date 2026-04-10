@@ -109,6 +109,7 @@ enum nan_disc_state {
  *                      configuration in firmware. It's sent to firmware through
  *                      wmi_vdev_param_enable_disable_nan_config_features
  * @nan_config: NAN config to enable/disable capabilities
+ * @nan_dw_time: NAN DW time
  */
 struct nan_cfg_params {
 	uint32_t enable:1;
@@ -128,6 +129,9 @@ struct nan_cfg_params {
 	uint32_t max_ndi;
 	uint32_t nan_feature_config;
 	uint32_t nan_config;
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+	uint8_t nan_dw_time;
+#endif
 };
 
 #define MAX_NDP_PEERS 8

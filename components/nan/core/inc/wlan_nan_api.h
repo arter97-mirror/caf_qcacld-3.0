@@ -34,6 +34,9 @@
 
 #include "../src/nan_main_i.h"
 
+/* don't allow FW to send NAN event */
+#define NAN_INVALID_DW_TIME 0
+
 struct wlan_objmgr_psoc;
 
 /**
@@ -520,5 +523,23 @@ nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
  */
 QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
 			       struct nan_capabilities *caps);
+/**
+ * wlan_get_nan_init_dw_time() - get nan init dw time
+ *
+ * @psoc: PSOC object
+ *
+ * Return: NAN DW time
+ */
+static inline uint8_t
+wlan_get_nan_init_dw_time(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		return NAN_INVALID_DW_TIME;
+	}
+
+	return nan_obj->cfg_param.nan_dw_time;
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_API_H_ */
