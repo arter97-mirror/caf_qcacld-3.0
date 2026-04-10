@@ -26,7 +26,6 @@
  *
  *   - SM lifecycle:    tdls_stats_sm_create() / tdls_stats_sm_destroy()
  *   - SM transition:   tdls_stats_sm_transition_to()
- *   - Lock helpers:    tdls_stats_lock_{create,destroy,acquire,release}()
  *
  * It also forward-declares the helper functions that wlan_tdls_stats.c
  * calls but that are defined in other stats-subsystem files (cache DB,
@@ -110,34 +109,42 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx);
 void tdls_stats_sm_transition_to(struct tdls_stats_context *stats_ctx,
 				 enum tdls_stats_sm_state state);
 
-/* =========================================================================
- * Lock helpers (defined in wlan_tdls_stats.c)
- * =========================================================================
+/**
+ * tdls_stats_sm_deliver_event_sync() - Deliver an event to the TDLS stats SM
+ *                                      without acquiring the SM lock.
+ * @stats_ctx: TDLS stats context
+ * @event: Event id (enum tdls_stats_sm_evt)
+ * @data_len: Length of event data in bytes
+ * @data: Pointer to event-specific data
+ *
+ * Dispatches @event directly to the SM engine.  The caller is responsible
+ * for holding @stats_ctx->sm.tdls_stats_sm_lock before invoking this
+ * function.  Use tdls_stats_sm_deliver_event() when the lock is not
+ * already held.
+ *
+ * Return: QDF_STATUS
  */
+QDF_STATUS
+tdls_stats_sm_deliver_event_sync(struct tdls_stats_context *stats_ctx,
+				 enum tdls_stats_sm_evt event,
+				 uint16_t data_len, void *data);
 
 /**
- * tdls_stats_lock_create() - Initialise the SM spinlock.
- * @stats_ctx: TDLS stats context.
+ * tdls_stats_sm_deliver_event() - Deliver an event to the TDLS stats SM
+ *                                 with SM lock protection.
+ * @stats_ctx: TDLS stats context
+ * @event: Event id (enum tdls_stats_sm_evt)
+ * @data_len: Length of event data in bytes
+ * @data: Pointer to event-specific data
+ *
+ * Acquires @stats_ctx->sm.tdls_stats_sm_lock, dispatches @event to the
+ * SM engine via tdls_stats_sm_deliver_event_sync(), then releases the lock.
+ *
+ * Return: QDF_STATUS
  */
-void tdls_stats_lock_create(struct tdls_stats_context *stats_ctx);
-
-/**
- * tdls_stats_lock_destroy() - Destroy the SM spinlock.
- * @stats_ctx: TDLS stats context.
- */
-void tdls_stats_lock_destroy(struct tdls_stats_context *stats_ctx);
-
-/**
- * tdls_stats_lock_acquire() - Acquire the SM spinlock (BH-safe).
- * @stats_ctx: TDLS stats context.
- */
-void tdls_stats_lock_acquire(struct tdls_stats_context *stats_ctx);
-
-/**
- * tdls_stats_lock_release() - Release the SM spinlock (BH-safe).
- * @stats_ctx: TDLS stats context.
- */
-void tdls_stats_lock_release(struct tdls_stats_context *stats_ctx);
+QDF_STATUS tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
+				       enum tdls_stats_sm_evt event,
+				       uint16_t data_len, void *data);
 
 /* =========================================================================
  * Cache database lifecycle APIs (defined in wlan_tdls_stats.c)
@@ -176,19 +183,6 @@ void tdls_stats_db_flush(struct tdls_stats_db *db);
  * the spinlock.  Called during PSOC destruction.
  */
 void tdls_stats_db_deinit(struct tdls_stats_db *db);
-
-/**
- * tdls_stats_push() - Insert a stats entry into the cache database.
- * @db: TDLS stats cache database.
- * @entry: Entry to insert (copied into a newly allocated node).
- *
- * If the cache is full the oldest entry is evicted before the new one
- * is inserted (FIFO eviction policy).
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
- */
-QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
-			   const struct tdls_stats_entry *entry);
 
 /**
  * tdls_stats_flush_entire_cache() - Flush all cached entries as vendor events.

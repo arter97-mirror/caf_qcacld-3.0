@@ -26,12 +26,6 @@
  * Callers must include this header and link against the TDLS component
  * to deliver events to the SM.
  *
- * Two variants are provided:
- *   tdls_stats_sm_deliver_event()      - acquires the SM lock; use this
- *                                        from all external callers
- *   tdls_stats_sm_deliver_event_sync() - lock-free; use this only when
- *                                        the SM lock is already held
- *
  * Lock ordering: tdls_stats_sm_lock (outer) -> tdls_stats_db::lock (inner).
  */
 
@@ -41,44 +35,21 @@
 #include <wlan_tdls_stats_public_structs.h>
 
 /**
- * tdls_stats_sm_deliver_event_sync() - Deliver an event to the TDLS stats SM
- *                                      without acquiring the SM lock.
+ * wlan_tdls_stats_sm_deliver_event() - Deliver an event to the TDLS stats SM.
  * @stats_ctx: TDLS stats context
  * @event: Event id (enum tdls_stats_sm_evt)
  * @data_len: Length of event data in bytes
  * @data: Pointer to event-specific data
  *
- * Dispatches @event directly to the SM engine.  The caller is responsible
- * for holding @stats_ctx->sm.tdls_stats_sm_lock before invoking this
- * function.  Use tdls_stats_sm_deliver_event() when the lock is not
- * already held.
+ * Dispatcher entry point for all external callers (OS-IF, target_if).
+ * Delegates to the core tdls_stats_sm_deliver_event() which acquires the
+ * SM lock, dispatches the event, and releases the lock.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-tdls_stats_sm_deliver_event_sync(struct tdls_stats_context *stats_ctx,
+wlan_tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
 				 enum tdls_stats_sm_evt event,
-				 uint16_t data_len, void *data);
-
-/**
- * tdls_stats_sm_deliver_event() - Deliver an event to the TDLS stats SM
- *                                 with SM lock protection.
- * @stats_ctx: TDLS stats context
- * @event: Event id (enum tdls_stats_sm_evt)
- * @data_len: Length of event data in bytes
- * @data: Pointer to event-specific data
- *
- * Acquires @stats_ctx->sm.tdls_stats_sm_lock, dispatches @event to the
- * SM engine, then releases the lock.  This is the standard entry point
- * for all external callers (OS-IF, target_if).
- *
- * Do NOT call this function while already holding tdls_stats_sm_lock;
- * use tdls_stats_sm_deliver_event_sync() instead to avoid deadlock.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
-				       enum tdls_stats_sm_evt event,
-				       uint16_t data_len, void *data);
+					    uint16_t data_len, void *data);
 
 #endif /* _WLAN_TDLS_STATS_API_H_ */

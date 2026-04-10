@@ -41,31 +41,6 @@
 #include <wlan_sm_engine.h>
 
 /* =========================================================================
- * Lock helpers
- * =========================================================================
- */
-
-void tdls_stats_lock_create(struct tdls_stats_context *stats_ctx)
-{
-	qdf_spinlock_create(&stats_ctx->sm.tdls_stats_sm_lock);
-}
-
-void tdls_stats_lock_destroy(struct tdls_stats_context *stats_ctx)
-{
-	qdf_spinlock_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
-}
-
-void tdls_stats_lock_acquire(struct tdls_stats_context *stats_ctx)
-{
-	qdf_spin_lock_bh(&stats_ctx->sm.tdls_stats_sm_lock);
-}
-
-void tdls_stats_lock_release(struct tdls_stats_context *stats_ctx)
-{
-	qdf_spin_unlock_bh(&stats_ctx->sm.tdls_stats_sm_lock);
-}
-
-/* =========================================================================
  * Cache database operations
  * =========================================================================
  */
@@ -157,8 +132,8 @@ void tdls_stats_db_deinit(struct tdls_stats_db *db)
  *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
  */
-QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
-			   const struct tdls_stats_entry *entry)
+static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
+				  const struct tdls_stats_entry *entry)
 {
 	struct tdls_stats_node *node;
 	qdf_list_node_t *old_ln = NULL;
@@ -265,6 +240,56 @@ void tdls_stats_sm_transition_to(struct tdls_stats_context *stats_ctx,
 				 enum tdls_stats_sm_state state)
 {
 	wlan_sm_transition_to(stats_ctx->sm.sm_hdl, state);
+}
+
+/**
+ * tdls_stats_sm_deliver_event_sync() - Deliver an event to the TDLS stats SM
+ *                                      without acquiring the SM lock.
+ * @stats_ctx: TDLS stats context
+ * @event: Event id (enum tdls_stats_sm_evt)
+ * @data_len: Length of event data in bytes
+ * @data: Pointer to event-specific data
+ *
+ * Dispatches @event directly to the SM engine.  The caller is responsible
+ * for holding @stats_ctx->sm.tdls_stats_sm_lock before invoking this
+ * function.  Use tdls_stats_sm_deliver_event() when the lock is not
+ * already held.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tdls_stats_sm_deliver_event_sync(struct tdls_stats_context *stats_ctx,
+				 enum tdls_stats_sm_evt event,
+				 uint16_t data_len, void *data)
+{
+	return wlan_sm_dispatch(stats_ctx->sm.sm_hdl, event, data_len, data);
+}
+
+/**
+ * tdls_stats_sm_deliver_event() - Deliver an event to the TDLS stats SM
+ *                                 with SM lock protection.
+ * @stats_ctx: TDLS stats context
+ * @event: Event id (enum tdls_stats_sm_evt)
+ * @data_len: Length of event data in bytes
+ * @data: Pointer to event-specific data
+ *
+ * Acquires @stats_ctx->sm.tdls_stats_sm_lock, dispatches @event to the
+ * SM engine via tdls_stats_sm_deliver_event_sync(), then releases the lock.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
+				       enum tdls_stats_sm_evt event,
+				       uint16_t data_len, void *data)
+{
+	QDF_STATUS status;
+
+	qdf_spin_lock_bh(&stats_ctx->sm.tdls_stats_sm_lock);
+	status = tdls_stats_sm_deliver_event_sync(stats_ctx, event,
+						  data_len, data);
+	qdf_spin_unlock_bh(&stats_ctx->sm.tdls_stats_sm_lock);
+
+	return status;
 }
 
 /* =========================================================================
@@ -512,8 +537,6 @@ static bool tdls_stats_state_enabled_event(void *ctx, uint16_t event,
  *   - parent state id  (WLAN_SM_ENGINE_STATE_NONE = no parent / flat SM)
  *   - initial sub-state (WLAN_SM_ENGINE_STATE_NONE = no sub-states)
  *   - has_substates flag
- *   - human-readable state name (used in debug logs)
- *   - entry, exit, and event callbacks
  *
  * Note: non-static so wlan_sm_create() can reference it directly.
  * =========================================================================
@@ -642,8 +665,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	 * and does not acquire tdls_stats_sm_lock, so the lock need not exist
 	 * yet at this point.
 	 */
-	qdf_scnprintf(name, sizeof(name), "TDLS-Stats-PSOC:%d",
-		      stats_ctx->psoc_id);
+	qdf_scnprintf(name, sizeof(name), "TDLS-Stats");
 
 	sm = wlan_sm_create(name, stats_ctx, initial_state,
 			    tdls_stats_sm_info,
@@ -661,7 +683,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	 * ttlm_sm_create pattern).
 	 * Lock order: tdls_stats_sm_lock (outer) -> db.lock (inner).
 	 */
-	tdls_stats_lock_create(stats_ctx);
+	qdf_spinlock_create(&stats_ctx->sm.tdls_stats_sm_lock);
 
 	/* Step 5: Initialise the cache DB only for the INIT path.
 	 * The DISABLED path never uses the cache DB.
@@ -672,7 +694,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			tdls_err("TDLS stats: cache DB init failed, status %d",
 				 status);
-			tdls_stats_lock_destroy(stats_ctx);
+			qdf_spinlock_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
 			wlan_sm_delete(stats_ctx->sm.sm_hdl);
 			qdf_mem_free(stats_ctx);
 			return status;
@@ -715,7 +737,7 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 	}
 
 	/* 2. Destroy SM spinlock */
-	tdls_stats_lock_destroy(stats_ctx);
+	qdf_spinlock_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
 
 	/* 3. Delete SM engine */
 	wlan_sm_delete(stats_ctx->sm.sm_hdl);
