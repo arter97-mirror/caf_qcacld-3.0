@@ -2266,18 +2266,15 @@ void populate_dot11f_ecsa_param_set_for_ll_sap(
 void
 sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
 					    uint32_t frame_len,
-					    tDot11fAssocResponse *ar,
 					    tpSirAssocRsp p_assoc_rsp);
 
 void
 sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
 				       uint32_t nframe,
-				       tDot11fProbeResponse *pr,
 				       tpSirProbeRespBeacon p_probe_resp);
 
 void
 sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
-					tDot11fBeacon *bcn_frm,
 					tpSirProbeRespBeacon bcn_struct);
 
 QDF_STATUS
@@ -2288,25 +2285,21 @@ lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
 void
 sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
 					     uint32_t frame_len,
-					     tDot11fAssocResponse *ar,
 					     tpSirAssocRsp p_assoc_rsp);
 
 void
 sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
 					    uint32_t nframe,
-					    tDot11fAssocRequest *ar,
 					    tpSirAssocReq p_assoc_req);
 
 void
 sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
 					uint32_t nframe,
-					tDot11fProbeResponse *pr,
 					tpSirProbeRespBeacon p_probe_resp);
 #else
 static inline void
 sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
 					    uint32_t frame_len,
-					    tDot11fAssocResponse *ar,
 					    tpSirAssocRsp p_assoc_rsp)
 {
 }
@@ -2314,14 +2307,12 @@ sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
 static inline void
 sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
 				       uint32_t nframe,
-				       tDot11fProbeResponse *pr,
 				       tpSirProbeRespBeacon p_probe_resp)
 {
 }
 
 static inline void
 sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
-					tDot11fBeacon *bcn_frm,
 					tpSirProbeRespBeacon bcn_struct)
 {
 }
@@ -2329,7 +2320,6 @@ sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
 static inline void
 sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
 					     uint32_t frame_len,
-					     tDot11fAssocResponse *ar,
 					     tpSirAssocRsp p_assoc_rsp)
 {
 }
@@ -2337,7 +2327,6 @@ sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
 static inline void
 sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
 					    uint32_t nframe,
-					    tDot11fAssocRequest *ar,
 					    tpSirAssocReq p_assoc_req)
 {
 }
@@ -2345,7 +2334,6 @@ sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
 static inline void
 sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
 					uint32_t nframe,
-					tDot11fProbeResponse *pr,
 					tpSirProbeRespBeacon p_probe_resp)
 {
 }

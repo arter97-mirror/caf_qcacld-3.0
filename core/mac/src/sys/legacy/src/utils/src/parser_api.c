@@ -3908,8 +3908,12 @@ QDF_STATUS sir_convert_probe_frame2_struct(struct mac_context *mac,
 	update_bss_color_change_ie_from_probe_rsp(pr, pProbeResp);
 	sir_convert_probe_frame2_mlo_struct(pFrame, nFrame, pr, pProbeResp);
 	sir_convert_probe_frame2_t2lm_struct(pr, pProbeResp);
-	sir_convert_probe_frame2_uhr_op_struct(pFrame, nFrame, pr, pProbeResp);
-	sir_convert_probe_frame2_uhr_cap_struct(pFrame, nFrame, pr, pProbeResp);
+	if (pr->uhr_op.present)
+		sir_convert_probe_frame2_uhr_op_struct(pFrame, nFrame,
+						       pProbeResp);
+	if (pr->uhr_cap.present)
+		sir_convert_probe_frame2_uhr_cap_struct(pFrame, nFrame,
+							pProbeResp);
 
 	qdf_mem_free(pr);
 	return QDF_STATUS_SUCCESS;
@@ -4284,8 +4288,9 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 	sir_convert_assoc_req_frame2_eht_struct(ar, pAssocReq);
 	fils_convert_assoc_req_frame2_struct(ar, pAssocReq);
 	sir_convert_assoc_req_frame2_mlo_struct(pFrame, nFrame, ar, pAssocReq);
-	sir_convert_assoc_req_frame2_uhr_cap_struct(pFrame, nFrame,
-						    ar, pAssocReq);
+	if (ar->uhr_cap.present)
+		sir_convert_assoc_req_frame2_uhr_cap_struct(pFrame, nFrame,
+							    pAssocReq);
 
 	pe_debug("ht %d vht %d opmode %d vendor vht %d he %d he 6ghband %d eht %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
@@ -5121,10 +5126,12 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 						 session_entry, ar, pAssocRsp);
 	sir_convert_assoc_resp_frame2_t2lm_struct(mac, frame, frame_len,
 						  session_entry, ar, pAssocRsp);
-	sir_convert_assoc_resp_frame2_uhr_op_struct(frame, frame_len,
-						    ar, pAssocRsp);
-	sir_convert_assoc_resp_frame2_uhr_cap_struct(frame, frame_len,
-						     ar, pAssocRsp);
+	if (ar->uhr_op.present)
+		sir_convert_assoc_resp_frame2_uhr_op_struct(frame, frame_len,
+							    pAssocRsp);
+	if (ar->uhr_cap.present)
+		sir_convert_assoc_resp_frame2_uhr_cap_struct(frame, frame_len,
+							     pAssocRsp);
 	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,
@@ -6680,8 +6687,9 @@ QDF_STATUS sir_convert_beacon_frame2_struct(struct mac_context *mac,
 					     pBeaconStruct);
 	sir_convert_beacon_frame2_t2lm_struct(pBeacon, pBeaconStruct);
 	sir_convert_beacon_frame2_sr_struct(pBeacon, pBeaconStruct);
-	sir_convert_beacon_frame2_uhr_op_struct(pPayload, nPayload,
-						pBeacon, pBeaconStruct);
+	if (pBeacon->uhr_op.present)
+		sir_convert_beacon_frame2_uhr_op_struct(pPayload, nPayload,
+							pBeaconStruct);
 
 	qdf_mem_free(pBeacon);
 	return QDF_STATUS_SUCCESS;
@@ -16780,7 +16788,6 @@ find_uhr_op_ie(uint8_t *buf, qdf_size_t buflen, uint8_t **ie, qdf_size_t *ielen)
 void
 sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
 					    uint32_t frame_len,
-					    tDot11fAssocResponse *ar,
 					    tpSirAssocRsp p_assoc_rsp)
 {
 	uint8_t *uhr_op_ie;
@@ -16822,7 +16829,6 @@ sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
 void
 sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
 				       uint32_t nframe,
-				       tDot11fProbeResponse *pr,
 				       tpSirProbeRespBeacon p_probe_resp)
 {
 	uint8_t *uhr_op_ie;
@@ -16855,7 +16861,6 @@ sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
 
 void
 sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
-					tDot11fBeacon *bcn_frm,
 					tpSirProbeRespBeacon bcn_struct)
 {
 	uint8_t *uhr_op_ie;
@@ -17126,7 +17131,6 @@ find_uhr_cap_ie(uint8_t *buf, qdf_size_t buflen,
 void
 sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
 					     uint32_t frame_len,
-					     tDot11fAssocResponse *ar,
 					     tpSirAssocRsp p_assoc_rsp)
 {
 	uint8_t *uhr_cap_ie;
@@ -17162,7 +17166,6 @@ sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
 void
 sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
 					    uint32_t nframe,
-					    tDot11fAssocRequest *ar,
 					    tpSirAssocReq p_assoc_req)
 {
 	uint8_t *uhr_cap_ie;
@@ -17197,7 +17200,6 @@ sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
 void
 sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
 					uint32_t nframe,
-					tDot11fProbeResponse *pr,
 					tpSirProbeRespBeacon p_probe_resp)
 {
 	uint8_t *uhr_cap_ie;
