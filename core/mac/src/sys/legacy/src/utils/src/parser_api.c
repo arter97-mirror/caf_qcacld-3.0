@@ -4137,6 +4137,152 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pFrame,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * find_smd_ie() - Find SMD Information Element in frame
+ * @buf: Frame buffer
+ * @buf_len: Frame buffer length
+ * @smd_ie: Output pointer to SMD IE (if found)
+ * @ielen: Output IE length
+ *
+ * Searches for SMD Information Element (Element ID 255, Extension ID 154)
+ * in the provided frame buffer.
+ *
+ * Pattern: Same as find_uhr_op_ie()
+ *
+ * Return: QDF_STATUS_SUCCESS if found, error otherwise
+ */
+static QDF_STATUS find_smd_ie(uint8_t *buf, qdf_size_t buf_len,
+			      uint8_t **smd_ie, qdf_size_t *ielen)
+{
+	uint8_t *p;
+	qdf_size_t len = buf_len;
+	uint8_t ext_id;
+
+	if (!buf || !smd_ie || !ielen) {
+		pe_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*smd_ie = NULL;
+	*ielen = 0;
+
+	p = buf;
+	while (len > WLAN_SMD_INFO_IE_MIN_LEN) {
+		uint8_t elem_id = p[0];
+		uint8_t elem_len = p[1];
+
+		if (elem_len > (len - MIN_IE_LEN)) {
+			pe_debug("Invalid IE length: %d, remaining: %zu",
+				 elem_len, len);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		if (elem_id == WLAN_ELEMID_EXTN_ELEM && elem_len >= 1) {
+			ext_id = p[PAYLOAD_START_POS];
+			if (ext_id == WLAN_EXTN_ELEMID_SMD_INFO) {
+				*smd_ie = p;
+				*ielen = MIN_IE_LEN + elem_len;
+				pe_debug("Found SMD IE: len=%zu", *ielen);
+				return QDF_STATUS_SUCCESS;
+			}
+		}
+
+		/* Move to next IE */
+		len -= (MIN_IE_LEN + elem_len);
+		p += (MIN_IE_LEN + elem_len);
+	}
+
+	pe_debug("SMD IE not found in frame");
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * lim_unpack_ieee80211_smd_payload() - Unpack SMD IE payload
+ * @smd_ie: Pointer to SMD IE
+ * @ie_len: IE length
+ * @smd: Output structure for parsed SMD IE
+ *
+ * Parses SMD Information Element payload and extracts:
+ * - SMD Identifier (6 bytes)
+ * - SMD Capabilities (1 byte)
+ * - SMD Timeout (2 bytes, little-endian)
+ *
+ * SMD IE Format (11 bytes total):
+ *   Byte 0:    Element ID = 255
+ *   Byte 1:    Length = 9
+ *   Byte 2:    Extension ID = 154
+ *   Bytes 3-8: SMD Identifier (6 bytes)
+ *   Byte 9:    SMD Capabilities (1 byte)
+ *   Bytes 10: SMD Timeout (1 byte, little-endian)
+ *
+ * Pattern: Same as lim_unpack_ieee80211_uhr_op_payload()
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+#define WLAN_SMD_IE_TOTAL_LEN 11
+#define WLAN_SMD_IE_MIN_LEN 9
+static QDF_STATUS lim_unpack_ieee80211_smd_payload(uint8_t *smd_ie,
+						   qdf_size_t ie_len,
+						   struct wlan_smd_ie *smd)
+{
+	uint8_t cap_byte;
+
+	if (!smd_ie || !smd) {
+		pe_err("Invalid parameters: smd_ie=%pK smd=%pK",
+		       smd_ie, smd);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (ie_len < WLAN_SMD_IE_TOTAL_LEN) {
+		pe_err("SMD IE too short: %zu bytes (min %d)",
+		       ie_len, WLAN_SMD_IE_TOTAL_LEN);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (smd_ie[0] != WLAN_ELEMID_EXTN_ELEM ||
+	    smd_ie[1] != WLAN_SMD_IE_MIN_LEN ||
+	    smd_ie[2] != WLAN_EXTN_ELEMID_SMD_INFO) {
+		pe_err("Invalid SMD IE header: %02x %02x %02x",
+		       smd_ie[0],
+		       smd_ie[1],
+		       smd_ie[2]);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(smd, sizeof(*smd));
+	qdf_mem_copy(smd->smd_identifier,
+		     &smd_ie[2 + 1],
+		     QDF_MAC_ADDR_SIZE);
+
+	cap_byte = smd_ie[PAYLOAD_START_POS + 1 + 6];
+	smd->smd_cap.dl_data_forwarding =
+		SMD_CAP_GET_DL_DATA_FWD(cap_byte);
+	smd->smd_cap.max_num_prepared_target_ap_mlds =
+		SMD_CAP_GET_MAX_TARGET(cap_byte);
+	smd->smd_cap.smd_type =
+		SMD_CAP_GET_TYPE(cap_byte);
+	smd->smd_cap.ptk_mode =
+		SMD_CAP_GET_PTK_MODE(cap_byte);
+	smd->smd_cap.neigh_ap_probe =
+		SMD_CAP_GET_NEIGH_AP_PROBE(cap_byte);
+	smd->smd_cap.reserved =
+		SMD_CAP_GET_RESERVED(cap_byte);
+
+	smd->smd_timeout = smd_ie[PAYLOAD_START_POS + 1 + 6 + 1];
+
+	smd->present = true;
+	pe_debug("Parsed SMD IE:");
+	pe_debug("  SMD ID: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(smd->smd_identifier));
+	pe_debug("  Timeout: %u TUs (%u ms)",
+		 smd->smd_timeout,
+		 (smd->smd_timeout * 1024) / 1000);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 				    uint8_t *pFrame, uint32_t nFrame,
