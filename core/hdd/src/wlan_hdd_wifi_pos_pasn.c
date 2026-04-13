@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -762,3 +761,10 @@ wlan_hdd_cfg80211_set_secure_ranging_context(struct wiphy *wiphy,
 
 	return errno;
 }
+
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+bool wlan_hdd_is_pd_iface(struct wireless_dev *wdev)
+{
+	return (wdev->iftype == NL80211_IFTYPE_PD);
+}
+#endif

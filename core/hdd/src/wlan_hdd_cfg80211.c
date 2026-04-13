@@ -43,6 +43,7 @@
 #include "wlan_hdd_wext.h"
 #include "sme_api.h"
 #include "sme_power_save_api.h"
+#include "wlan_crypto_global_api.h"
 #include "wlan_hdd_p2p.h"
 #include "wlan_hdd_cfg80211.h"
 #include "wlan_hdd_hostapd.h"
@@ -32361,6 +32362,231 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 }
 
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+QDF_STATUS
+wlan_hdd_cfg80211_create_pmsr_peer(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *peer_mac_addr)
+{
+	struct osif_request *request = NULL;
+	struct scheduler_msg msg = {0};
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_pasn_request *peer_create_req;
+	uint8_t peer_create_status;
+	uint8_t *priv;
+	static const struct osif_request_params req_params = {
+		.priv_size = sizeof(peer_create_status),
+		.timeout_ms = PASN_PEER_CREATE_TIMEOUT_MS,
+	};
+
+	hdd_enter();
+
+	peer_create_req = qdf_mem_malloc(sizeof(*peer_create_req));
+	if (!peer_create_req)
+		return QDF_STATUS_E_NOMEM;
+
+	peer_create_req->psoc = psoc;
+	peer_create_req->peer_mac = *peer_mac_addr;
+	peer_create_req->vdev_id = wlan_vdev_get_id(vdev);
+	peer_create_req->peer_type = WLAN_WIFI_POS_PASN_SECURE_PEER;
+	peer_create_req->is_userspace_peer_create = true;
+	hdd_debug("vdev:%d peer_type:%d peer_mac: " QDF_MAC_ADDR_FMT,
+		  peer_create_req->vdev_id,
+		  peer_create_req->peer_type,
+		  QDF_MAC_ADDR_REF(peer_create_req->peer_mac.bytes));
+
+	msg.bodyptr = peer_create_req;
+	msg.type = WIFI_POS_NB_PASN_PEER_CREATE_REQ;
+	msg.callback = wlan_wifi_pos_process_msg;
+	msg.flush_callback = wlan_wifi_pos_pasn_flush_callback;
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		qdf_mem_free(peer_create_req);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	wifi_pos_set_pasn_keys_ctx(psoc, osif_request_cookie(request));
+
+	status = scheduler_post_message(QDF_MODULE_ID_WIFIPOS,
+					QDF_MODULE_ID_WIFIPOS,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to post PASN peer create msg to WMA, status: %d",
+			status);
+		wlan_wifi_pos_pasn_flush_callback(&msg);
+		goto end;
+	}
+
+	status = osif_request_wait_for_response(request);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("PASN request timed out %d", status);
+		goto end;
+	}
+
+	priv = osif_request_priv(request);
+	peer_create_status = *priv;
+	if (peer_create_status) {
+		hdd_err("PASN peer create failed for peer:" QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac_addr->bytes));
+		goto end;
+	}
+
+	hdd_debug("PASN peer: " QDF_MAC_ADDR_FMT " created successfully",
+		  QDF_MAC_ADDR_REF(peer_mac_addr->bytes));
+end:
+	if (request)
+		osif_request_put(request);
+
+	hdd_exit();
+
+	return status;
+}
+
+#define WLAN_PASN_AUTH_KEY_INDEX 0
+static int __wlan_hdd_cfg80211_set_pmsr_key(struct wiphy *wiphy,
+					    struct hdd_adapter *adapter,
+					    struct wlan_objmgr_vdev *vdev,
+					    u8 key_index, bool pairwise,
+					    const u8 *mac_addr,
+					    struct key_params *params)
+{
+	QDF_STATUS status;
+	int errno;
+	int cipher_len;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct wlan_crypto_key *crypto_key;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_crypto_ltf_keyseed_data *data;
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	bool is_ltf_key_seed_required = (params->ltf_keyseed_len &&
+					 params->ltf_keyseed);
+
+	/* wait for add peer completion & then install pairwise & LTF keyseed */
+	status = wlan_hdd_cfg80211_create_pmsr_peer(
+			psoc, vdev, (struct qdf_mac_addr *)mac_addr);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	/* Check if peer got created */
+	peer = wlan_objmgr_get_peer_by_mac(psoc, (uint8_t *)mac_addr,
+					   WLAN_WIFI_POS_OSIF_ID);
+	if (!peer)
+		return -EINVAL;
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+
+	crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
+	if (!crypto_key)
+		return -ENOMEM;
+
+	/* Populate the crypto key parameters */
+	crypto_key->keyix = WLAN_PASN_AUTH_KEY_INDEX;
+	crypto_key->keylen = params->key_len;
+	if (crypto_key->keylen >
+	    (WLAN_CRYPTO_KEYBUF_SIZE + WLAN_CRYPTO_MICBUF_SIZE)) {
+		qdf_mem_free(crypto_key);
+		hdd_err_rl("Invalid key length %d", crypto_key->keylen);
+		return -EINVAL;
+	}
+	qdf_mem_copy(&crypto_key->keyval[0], params->key, crypto_key->keylen);
+
+	/* Convert received nl cipher to internal cipher type */
+	crypto_key->cipher_type = osif_nl_to_crypto_cipher_type(params->cipher);
+	cipher_len = osif_nl_to_crypto_cipher_len(params->cipher);
+	if (cipher_len < 0 || crypto_key->keylen < cipher_len) {
+		hdd_err_rl("Invalid cipher length %d key_len:%d", cipher_len,
+			   crypto_key->keylen);
+		qdf_mem_free(crypto_key);
+		return -EINVAL;
+	}
+
+	qdf_mem_copy(crypto_key->macaddr, mac_addr, QDF_MAC_ADDR_SIZE);
+	status = ucfg_crypto_set_key_req(vdev, crypto_key,
+					 WLAN_CRYPTO_KEY_TYPE_UNICAST);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("vdev:%d PASN set_key failed", wlan_vdev_get_id(vdev));
+		qdf_mem_free(crypto_key);
+		return -EFAULT;
+	}
+
+	qdf_mem_free(crypto_key);
+	if (!is_ltf_key_seed_required)
+		return qdf_status_to_os_return(status);
+
+	data = qdf_mem_malloc(sizeof(*data));
+	if (!data)
+		return -ENOMEM;
+
+	data->vdev_id = adapter->deflink->vdev_id;
+	qdf_mem_copy(data->peer_mac_addr.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+	data->key_seed_len = params->ltf_keyseed_len;
+	qdf_mem_copy(data->key_seed, params->ltf_keyseed,
+		     data->key_seed_len);
+
+	errno = wlan_crypto_set_ltf_keyseed(hdd_ctx->psoc, data);
+	if (errno)
+		hdd_err_rl("Failed to set LTF keyseed");
+
+	qdf_mem_free(data);
+
+	return errno;
+}
+
+static int wlan_hdd_cfg80211_set_pmsr_key(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  u8 key_index, bool pairwise,
+					  const u8 *mac_addr,
+					  struct key_params *params)
+{
+	int errno = -EINVAL;
+	struct osif_vdev_sync *vdev_sync;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct wlan_objmgr_vdev *vdev;
+
+	/*
+	 * Set key will be received on PD interface.
+	 * Route it to the Station vdev.
+	 */
+	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!adapter || !adapter->wdev.netdev)
+		return -EINVAL;
+
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+		return errno;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	errno = osif_vdev_sync_op_start(adapter->dev, &vdev_sync);
+	if (errno) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return errno;
+	}
+
+	errno = __wlan_hdd_cfg80211_set_pmsr_key(wiphy, adapter, vdev,
+						 key_index, pairwise,
+						 mac_addr, params);
+	osif_vdev_sync_op_stop(vdev_sync);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return errno;
+}
+#else
+static int wlan_hdd_cfg80211_set_pmsr_key(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  u8 key_index, bool pairwise,
+					  const u8 *mac_addr,
+					  struct key_params *params)
+{
+	return -EINVAL;
+}
+#endif /* CFG80211_PD_SUPPORT && WLAN_FEATURE_RTT_11AZ_SUPPORT */
+#endif /* CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV */
+
+#ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
 #ifdef CFG80211_SET_KEY_WITH_SRC_MAC
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
@@ -32378,9 +32604,14 @@ static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 {
 	int errno = -EINVAL;
 	struct osif_vdev_sync *vdev_sync;
-	struct hdd_adapter *adapter = qdf_container_of(wdev,
-						   struct hdd_adapter,
-						   wdev);
+	struct hdd_adapter *adapter;
+
+	if (wlan_hdd_is_pd_iface(wdev))
+		return wlan_hdd_cfg80211_set_pmsr_key(wiphy, wdev, key_index,
+						      pairwise, mac_addr,
+						      params);
+
+	adapter = qdf_container_of(wdev, struct hdd_adapter, wdev);
 
 	if (!adapter || wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return errno;

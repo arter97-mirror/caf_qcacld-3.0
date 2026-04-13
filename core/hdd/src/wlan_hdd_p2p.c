@@ -61,6 +61,7 @@
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_api.h"
 #include "wlan_p2p_api.h"
+#include "wlan_hdd_wifi_pos_pasn.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -552,6 +553,15 @@ int wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 	int link_id = -1;
+
+	if (wlan_hdd_is_pd_iface(wdev)) {
+		struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+		struct hdd_adapter *sta_adapter;
+
+		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+		if (sta_adapter && sta_adapter->wdev.netdev)
+			wdev = &sta_adapter->wdev;
+	}
 
 	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
 	if (errno)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,4 +73,21 @@ wlan_hdd_cfg80211_set_secure_ranging_context(struct wiphy *wiphy,
 #define FEATURE_WIFI_POS_11AZ_AUTH_COMMANDS
 #define FEATURE_WIFI_POS_SET_SECURE_RANGING_CONTEXT_COMMANDS
 #endif /* WIFI_POS_CONVERGED && WLAN_FEATURE_RTT_11AZ_SUPPORT */
+
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+
+/**
+ * wlan_hdd_is_pd_iface() - is PD interface
+ * @wdev: pointer to wireless dev
+ *
+ * Return: true if the given WDEV is for PD interface
+ */
+bool wlan_hdd_is_pd_iface(struct wireless_dev *wdev);
+#else
+static inline
+bool wlan_hdd_is_pd_iface(struct wireless_dev *wdev)
+{
+	return false;
+}
+#endif  /* CFG80211_PD_SUPPORT & WLAN_FEATURE_RTT_11AZ_SUPPORT */
 #endif /* __WLAN_HDD_WIFI_POS_PASN_H__ */

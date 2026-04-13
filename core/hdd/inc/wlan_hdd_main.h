@@ -1346,6 +1346,21 @@ enum hdd_wlm_latency_level {
 	HDD_WLM_LATENCY_LEVEL_ULTRALOW = 3,
 };
 
+/**
+ * struct hdd_pmsr_req - Internal state for an active PMSR request
+ * @cookie: cfg80211 request cookie
+ * @is_valid: Is the cached request valid
+ * @vdev_id: vdev id for the request
+ * @req_id: WMI request id (lower 32 bits of cookie)
+ * @nl_port_id: NL port id
+ */
+struct hdd_pmsr_req {
+	u64 cookie;
+	bool is_valid;
+	u8 vdev_id;
+	u32 req_id;
+	u32 nl_port_id;
+};
 
 /**
  * struct hdd_adapter - hdd vdev/net_device context
@@ -1367,6 +1382,19 @@ enum hdd_wlm_latency_level {
  *       wpa_supplicant then using CT Window value we need to Enable
  *       Opportunistic Power Save
  * @allow_power_save: STA/CLI powersave enable/disable from userspace
+ * @icmp_ito_restore_timer: Timer used to restore original power save
+ * parameters after inactivity
+ * @icmp_ito_changed: Boolean flag indicating whether the power save
+ * ITO (Inactivity Timeout) has been modified due to ICMP-triggered power save
+ * disable operation
+ * @icmp_ito_timer_initialized: Indicates whether the ICMP ITO restore timer
+ * has been initialized
+ * @icmp_ps_last_req_time_lock: Spinlock protecting access to
+ * @icmp_ps_last_req_time
+ * @icmp_ps_last_req_time: Timestamp (in ns) of the most recent ICMP request
+ * observed
+ * @icmp_ps_saved_ito: Stores the original power save inactivity timeout
+ * (ps_ito) prior to ICMP-triggered disable.
  * @mac_addr: Current MAC Address for the adapter
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
@@ -1481,6 +1509,7 @@ enum hdd_wlm_latency_level {
  * @discon_link_info: link_info pointer on which post disconnect stats to be
  *                    fetched
  * @wfd_mode: WFD mode for P2P interface
+ * @pmsr_req: PMSR request context
  * @enable_active_apf_mode: Enable active APF mode flag
  * @dhcp_config_setsuspend: Enable when DHCP in progress and get setsuspend cmd
  * @idle_roam_monitor_enabled: True when idle roam monitor WMI command has been
@@ -1713,6 +1742,7 @@ struct hdd_adapter {
 #if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 	uint8_t wfd_mode;
 #endif
+	struct hdd_pmsr_req pmsr_req;
 	bool enable_active_apf_mode;
 	bool dhcp_config_setsuspend;
 	bool idle_roam_monitor_enabled;
