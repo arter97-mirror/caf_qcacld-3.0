@@ -33569,11 +33569,32 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 	qdf_freq_t start_freq, end_freq, sec_2g_freq;
 	uint8_t vdev_id = info->subband_info.vdev_id;
 	struct assoc_channel_info assoc_chan_info;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t cbm_24ghz = 0;
 
 	scanned_ch_width = wlan_hdd_get_ch_width_from_chan_info(info);
 	if (scanned_ch_width == CH_WIDTH_INVALID) {
 		hdd_debug("vdev %d: Invalid scanned_ch_width", vdev_id);
 		return;
+	}
+
+	if (wlan_reg_is_24ghz_ch_freq(info->freq) &&
+	    scanned_ch_width == CH_WIDTH_40MHZ) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
+							    vdev_id,
+							    WLAN_OSIF_ID);
+		if (vdev) {
+			ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
+							    &cbm_24ghz);
+			if (wlan_cm_get_force_20mhz_in_24ghz(vdev) ||
+			    !cbm_24ghz) {
+				hdd_debug("vdev %d: Override scanned_ch_width to 20MHz for freq:%d",
+					  vdev_id, info->freq);
+				scanned_ch_width = CH_WIDTH_20MHZ;
+				info->subband_info.num_chan = 1;
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+		}
 	}
 
 	if (scanned_ch_width == CH_WIDTH_20MHZ) {
