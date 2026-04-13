@@ -495,6 +495,13 @@ target_if_cp_stats_extract_pdev_extd_stats(struct wmi_unified *wmi_hdl,
 	if (!(stats_param->stats_id & WMI_REQUEST_PDEV_EXTD_STAT))
 		return QDF_STATUS_SUCCESS;
 
+	if (stats_param->num_pdev_ext_stats > WLAN_UMAC_MAX_RP_PID) {
+		cp_stats_err("Invalid PDEV stats received from FW: received=%u, max=%u",
+			     stats_param->num_pdev_ext_stats,
+			     WLAN_UMAC_MAX_RP_PID);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	ev->pdev_extd_stats = qdf_mem_malloc(sizeof(*ev->pdev_extd_stats) *
 					     WLAN_UMAC_MAX_RP_PID);
 	if (!ev->pdev_extd_stats)

@@ -4068,15 +4068,41 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		if (csr_akm_type == eCSR_AUTH_TYPE_OWE) {
 			roam_info->owe_pending_assoc_ind = qdf_mem_malloc(
 							    sizeof(*pAssocInd));
-			if (roam_info->owe_pending_assoc_ind)
+			if (roam_info->owe_pending_assoc_ind) {
 				qdf_mem_copy(roam_info->owe_pending_assoc_ind,
 					     pAssocInd, sizeof(*pAssocInd));
+				if (pAssocInd->assocReqLength) {
+					roam_info->owe_pending_assoc_ind->assocReqPtr =
+						qdf_mem_malloc(pAssocInd->assocReqLength);
+					if (roam_info->owe_pending_assoc_ind->assocReqPtr) {
+						qdf_mem_copy(roam_info->owe_pending_assoc_ind->assocReqPtr,
+							     pAssocInd->assocReqPtr,
+							     pAssocInd->assocReqLength);
+					} else {
+						sme_err("OWE assocReqPtr alloc failed");
+						roam_info->owe_pending_assoc_ind->assocReqPtr = NULL;
+					}
+				}
+			}
 		} else if (csr_akm_type == eCSR_AUTH_TYPE_FT_RSN_PSK) {
 			roam_info->ft_pending_assoc_ind = qdf_mem_malloc(
 			    sizeof(*pAssocInd));
-			if (roam_info->ft_pending_assoc_ind)
+			if (roam_info->ft_pending_assoc_ind) {
 				qdf_mem_copy(roam_info->ft_pending_assoc_ind,
 					     pAssocInd, sizeof(*pAssocInd));
+				if (roam_info->ft_pending_assoc_ind->assocReqLength) {
+					roam_info->ft_pending_assoc_ind->assocReqPtr =
+						qdf_mem_malloc(pAssocInd->assocReqLength);
+					if (roam_info->ft_pending_assoc_ind->assocReqPtr) {
+						qdf_mem_copy(roam_info->ft_pending_assoc_ind->assocReqPtr,
+							     pAssocInd->assocReqPtr,
+							     pAssocInd->assocReqLength);
+					} else {
+						sme_err("FT assocReqPtr alloc failed");
+						roam_info->ft_pending_assoc_ind->assocReqPtr = NULL;
+					}
+				}
+			}
 		}
 		status = csr_roam_call_callback(mac_ctx, sessionId,
 					roam_info, eCSR_ROAM_INFRA_IND,
@@ -4084,9 +4110,13 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			/* Refused due to Mac filtering */
 			if (roam_info->owe_pending_assoc_ind) {
+				if (roam_info->owe_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(roam_info->owe_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(roam_info->owe_pending_assoc_ind);
 				roam_info->owe_pending_assoc_ind = NULL;
 			} else if (roam_info->ft_pending_assoc_ind) {
+				if (roam_info->ft_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(roam_info->ft_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(roam_info->ft_pending_assoc_ind);
 				roam_info->ft_pending_assoc_ind = NULL;
 			}
@@ -6905,6 +6935,28 @@ enum wlan_serialization_cmd_type csr_get_cmd_type(tSmeCmd *sme_cmd)
 	return cmd_type;
 }
 
+bool csr_is_sme_umac_ser_cmd_type(struct wlan_serialization_command *cmd)
+{
+	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
+		return false;
+
+	switch (cmd->cmd_type) {
+	case WLAN_SER_CMD_WM_STATUS_CHANGE:
+	case WLAN_SER_CMD_FORCE_DISASSOC_STA:
+	case WLAN_SER_CMD_FORCE_DEAUTH_STA:
+	case WLAN_SER_CMD_ADDTS:
+	case WLAN_SER_CMD_DELTS:
+	case WLAN_SER_CMD_SET_HW_MODE:
+	case WLAN_SER_CMD_NSS_UPDATE:
+	case WLAN_SER_CMD_SET_DUAL_MAC_CONFIG:
+	case WLAN_SER_CMD_SET_ANTENNA_MODE:
+	case WLAN_SER_CMD_SAP_BW_UPDATE:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static uint32_t csr_get_monotonous_number(struct mac_context *mac_ctx)
 {
 	uint32_t cmd_id;
@@ -6922,12 +6974,6 @@ static void csr_fill_cmd_timeout(struct wlan_serialization_command *cmd)
 	switch (cmd->cmd_type) {
 	case WLAN_SER_CMD_WM_STATUS_CHANGE:
 		cmd->cmd_timeout_duration = SME_CMD_PEER_DISCONNECT_TIMEOUT;
-		break;
-	case WLAN_SER_CMD_VDEV_START_BSS:
-		cmd->cmd_timeout_duration = SME_CMD_VDEV_START_BSS_TIMEOUT;
-		break;
-	case WLAN_SER_CMD_VDEV_STOP_BSS:
-		cmd->cmd_timeout_duration = SME_CMD_STOP_BSS_CMD_TIMEOUT;
 		break;
 	case WLAN_SER_CMD_FORCE_DISASSOC_STA:
 	case WLAN_SER_CMD_FORCE_DEAUTH_STA:
@@ -8089,7 +8135,7 @@ QDF_STATUS csr_bss_start(struct mac_context *mac, uint32_t vdev_id,
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_START_BSS);
 	cmd.umac_cmd = start_bss_cfg;
 	cmd.vdev = vdev;
-	csr_fill_cmd_timeout(&cmd);
+	cmd.cmd_timeout_duration = SME_CMD_VDEV_START_BSS_TIMEOUT;
 
 	status = wlan_vdev_mlme_ser_start_bss(&cmd);
 	switch (status) {
@@ -8145,7 +8191,7 @@ QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac,
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_STOP_BSS);
 	cmd.umac_cmd = stop_bss_req;
 	cmd.vdev = vdev;
-	csr_fill_cmd_timeout(&cmd);
+	cmd.cmd_timeout_duration = SME_CMD_STOP_BSS_CMD_TIMEOUT;
 
 	status = wlan_vdev_mlme_ser_stop_bss(&cmd);
 	switch (status) {

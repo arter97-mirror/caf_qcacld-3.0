@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,7 @@
 #include "wlan_lmac_if_def.h"
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_hdd_dcs.h"
+#include "wlan_ll_sap_api.h"
 
 /**
  * hdd_green_ap_check_enable() - to check whether to enable green ap or not
@@ -298,6 +299,9 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 				mac_id,
 				vdev_id, lp_flags);
 
+	if (lp_flags == QCA_WLAN_DOZED_AP_ENABLE)
+		wlan_ll_sap_set_cur_freq_unused_cu(hdd_ctx->psoc, vdev_id, 0);
+
 	len = NLMSG_HDRLEN;
 	/*QCA_WLAN_VENDOR_ATTR_DOZED_AP_COOKIE*/
 	len += nla_total_size(sizeof(u64));
@@ -354,6 +358,11 @@ QDF_STATUS wlan_hdd_send_green_ap_ll_ps_event(
 	uint32_t len;
 	struct vdev_osif_priv *osif_priv;
 	struct sk_buff *skb;
+
+	if (!vdev) {
+		hdd_err("VDEV is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv) {

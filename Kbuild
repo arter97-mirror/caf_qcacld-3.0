@@ -2731,6 +2731,10 @@ ifeq ($(CONFIG_WLAN_DP_DYNAMIC_RESOURCE_MGMT), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_resource_mgr.o
 endif
 
+ifeq ($(CONFIG_WLAN_HAPS_ENABLE), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_haps.o
+endif
+
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
 
 #######################################################
@@ -3715,6 +3719,7 @@ endif
 
 #Enable NL80211 test mode
 ccflags-$(CONFIG_NL80211_TESTMODE) += -DWLAN_NL80211_TESTMODE
+ccflags-$(CONFIG_NL80211_TESTMODE) += -DCONFIG_NL80211_TESTMODE
 
 # Flag to enable bus auto suspend
 ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
@@ -5028,6 +5033,7 @@ ccflags-$(CONFIG_FEATURE_ENABLE_CE_DP_IRQ_AFFINE) += -DFEATURE_ENABLE_CE_DP_IRQ_
 ccflags-$(CONFIG_WLAN_SUPPORT_SERVICE_CLASS) += -DWLAN_SUPPORT_SERVICE_CLASS
 ccflags-$(CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION) += -DWLAN_SUPPORT_FLOW_PRIORTIZATION
 ccflags-$(CONFIG_WLAN_SUPPORT_LAPB) += -DWLAN_SUPPORT_LAPB
+ccflags-$(CONFIG_WLAN_HAPS_ENABLE) += -DWLAN_HAPS_ENABLE
 found = $(shell if grep -qF "walt_get_cpus_taken" $(srctree)/kernel/sched/walt/walt.c; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DWALT_GET_CPU_TAKEN_SUPPORT
@@ -5210,6 +5216,8 @@ endif
 ifneq ($(WLAN_CTRL_NAME),)
 ccflags-y += -DWLAN_CTRL_NAME=\"$(WLAN_CTRL_NAME)\"
 endif
+
+ccflags-$(CONFIG_CFG80211_PROP_MULTI_LINK_SUPPORT) += -DCFG80211_PROP_MULTI_LINK_SUPPORT
 
 # inject some build related information
 ifeq ($(CONFIG_BUILD_TAG), y)
