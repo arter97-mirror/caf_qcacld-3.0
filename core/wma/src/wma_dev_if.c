@@ -4471,6 +4471,9 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		return -EINVAL;
 	}
 
+	qdf_copy_macaddr(&req_msg->addr, &peer_mac);
+	req_msg->vdev_id = event->vdev_id;
+
 	wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 	qdf_mc_timer_stop(&req_msg->event_timeout);
 	qdf_mc_timer_destroy(&req_msg->event_timeout);
