@@ -1327,6 +1327,9 @@ wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	if (qdf_is_recovering()) {
 		hdd_debug("Recovering, perform best-effort WDS EXT cleanup");
 		_wlan_hdd_del_wds_ext_intf(wiphy, wdev);
+		vdev_sync = osif_vdev_sync_unregister(wdev->netdev);
+		if (vdev_sync)
+			osif_vdev_sync_destroy(vdev_sync);
 		return 0;
 	}
 
