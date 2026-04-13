@@ -2176,6 +2176,10 @@ config NUM_SOC_PERF_CLUSTER
 	int "enable NUM_SOC_PERF_CLUSTER"
 	default 0
 
+config SOC_PERF_CLUSTER_FIRST
+	bool "Enable SOC_PERF_CLUSTER_FIRST"
+	default n
+
 config WLAN_OPEN_SOURCE
 	bool "enable WLAN_OPEN_SOURCE"
 	default n
