@@ -236,6 +236,36 @@ wlan_p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
 				  uint64_t rnd_cookie, uint32_t duration);
 
 /**
+ * wlan_p2p_check_random_mac() - Check if given mac address is present in random
+ * mac address pool
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev_id
+ * @random_mac_addr: random mac address
+ *
+ * Return: True if the given mac address is present
+ */
+bool wlan_p2p_check_random_mac(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id,
+			       uint8_t *random_mac_addr);
+
+/**
+ * wlan_p2p_add_random_mac() - add or append random mac to given vdev rand mac list
+ * @soc: soc object
+ * @vdev_id: vdev id
+ * @mac: mac addr to be added or append
+ * @freq: frequency
+ * @rnd_cookie: random mac mgmt tx cookie
+ *
+ * This function will add or append the mac addr entry to vdev random mac list.
+ * Once the mac addr filter is not needed, it can be removed by
+ * p2p_del_random_mac.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			uint8_t *mac, uint32_t freq, uint64_t rnd_cookie);
+
+/**
  * wlan_p2p_del_random_mac() - del mac filter from given vdev rand mac list
  * @soc: soc object
  * @vdev_id: vdev id

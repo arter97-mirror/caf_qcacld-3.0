@@ -2356,7 +2356,7 @@ append_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
  *             QDF_STATUS_SUCCESS - add a new entry.
  *             other : failed to add the mac address entry.
  */
-static QDF_STATUS
+QDF_STATUS
 p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 		   uint8_t *mac, uint32_t freq, uint64_t rnd_cookie)
 {

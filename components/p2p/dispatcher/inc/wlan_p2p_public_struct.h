@@ -31,6 +31,9 @@
 #define P2P_MC_ADDR      "\x51\x6F\x9A\x02"
 #define P2P_MC_ADDR_SIZE 4
 
+#define USD_ADDR    "\x51\x6F\x9A\x01"
+#define USD_ADDR_SIZE 4
+
 #define HEADER_LEN_P2P_IE  6
 
 #define P2P_1X1_WAR_OUI   "\x00\x50\xf2\x04"
@@ -534,6 +537,7 @@ struct p2p_usd_ssi {
  * @vdev_id: VDEV ID
  * @op_type: OP type
  * @p2p_mac_addr: P2P MAC address
+ * @multicast_mac_addr: Multicast mac address used in USD discovery
  * @instance_id: instance ID
  * @service_info: Service information structure
  * @ssi: SSI information structure
@@ -545,6 +549,7 @@ struct p2p_usd_attr_params {
 	uint32_t vdev_id;
 	enum p2p_usd_op_type op_type;
 	struct qdf_mac_addr p2p_mac_addr;
+	struct qdf_mac_addr multicast_mac_addr;
 	uint8_t instance_id;
 	struct p2p_usd_service_info service_info;
 	struct p2p_usd_ssi ssi;

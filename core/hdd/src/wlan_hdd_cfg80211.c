@@ -39970,6 +39970,8 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 	.start_pd = wlan_hdd_cfg80211_start_pd,
 	.stop_pd = wlan_hdd_cfg80211_stop_pd,
+	.start_pmsr = wlan_hdd_cfg80211_start_pmsr,
+	.abort_pmsr = wlan_hdd_cfg80211_abort_pmsr,
 #endif
 	.set_antenna = wlan_hdd_cfg80211_set_chainmask,
 	.get_antenna = wlan_hdd_cfg80211_get_chainmask,

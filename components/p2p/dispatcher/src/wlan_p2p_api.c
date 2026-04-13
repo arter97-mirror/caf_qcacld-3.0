@@ -216,6 +216,19 @@ uint8_t wlan_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
 	return p2p_psoc_priv_get_sta_vdev_id(psoc);
 }
 
+bool wlan_p2p_check_random_mac(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id,
+			       uint8_t *random_mac_addr)
+{
+	return p2p_check_random_mac(psoc, vdev_id, random_mac_addr);
+}
+
+QDF_STATUS
+wlan_p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			uint8_t *mac, uint32_t freq, uint64_t rnd_cookie)
+{
+	return p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie);
+}
+
 QDF_STATUS
 wlan_p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 			uint64_t rnd_cookie)

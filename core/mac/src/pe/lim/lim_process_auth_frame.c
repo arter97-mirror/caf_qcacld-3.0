@@ -50,6 +50,8 @@
 #include "wlan_nan_api_i.h"
 #include <utils_mlo.h>
 #include "lim_session_utils.h"
+#include "wlan_p2p_api.h"
+
 /**
  * is_auth_valid
  *
@@ -2519,8 +2521,14 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 							mac_hdr->bssId,
 							WLAN_MGMT_RX_ID);
 			if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
-				pe_err("NAN vdev_id not found");
-				return QDF_STATUS_E_FAILURE;
+				pe_debug("vdev_id not found");
+				/*
+				 * If the mac address based vdev lookup fails,
+				 * this could be PASN frame for USD ranging.
+				 * Forward the frame to userspace in any
+				 * available interface.
+				 */
+				vdev_id = SME_SESSION_ID_ANY;
 			}
 		}
 

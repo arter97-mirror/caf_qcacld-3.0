@@ -40,6 +40,8 @@
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_p2p.h"
 #include "wma_api.h"
+#include "wlan_hdd_wifi_pos_pasn.h"
+#include "wlan_p2p_api.h"
 
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
@@ -96,6 +98,10 @@ p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1] = {
 	},
 	[QCA_WLAN_VENDOR_ATTR_USD_STATUS] = {
 		.type = NLA_U8,
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID] = {
+		.type = NLA_BINARY,
+		.len = QDF_MAC_ADDR_SIZE
 	},
 };
 
@@ -239,9 +245,16 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
+	struct hdd_adapter *pd_adapter = NULL;
 	bool is_success;
 	uint8_t *src_macaddr;
 	struct qdf_mac_addr p2p_mac_addr = {0};
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
 
 	psoc = user_data;
 	if (!psoc) {
@@ -259,12 +272,16 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 
 	wlan_mlme_get_p2p_device_mac_addr(vdev, &p2p_mac_addr);
 	src_macaddr = &(tx_cnf->buf[SRC_MAC_ADDRESS_OFFSET]);
+	if (src_macaddr)
+		pd_adapter = hdd_get_adapter_by_macaddr(hdd_ctx, src_macaddr);
 
 	if (ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc) &&
 	    src_macaddr &&
 	    (qdf_mem_cmp(src_macaddr, p2p_mac_addr.bytes,
 			 QDF_MAC_ADDR_SIZE) == 0)) {
 		wdev = osif_vdev_mgr_get_p2p_wdev();
+	} else if (pd_adapter && wlan_hdd_is_pd_iface(&pd_adapter->wdev)) {
+		wdev = &pd_adapter->wdev;
 	} else {
 		osif_priv = wlan_vdev_get_ospriv(vdev);
 		if (!osif_priv) {
@@ -791,6 +808,10 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   usd_param->ssi.data, usd_param->ssi.len);
 	}
 
+	if (qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_CANCEL_SUBSCRIBE ||
+	    qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_CANCEL_PUBLISH)
+		wlan_p2p_del_random_mac(psoc, vdev_id, usd_param->instance_id);
+
 	/**
 	 * no need to parse other attributes for the OP type other than
 	 * Publish and Subscribe
@@ -865,6 +886,12 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	usd_param->freq_config.default_freq = nla_get_u32(tb2[freq_config]);
+	if (qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH ||
+	    qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE)
+		wlan_p2p_add_random_mac(psoc, vdev_id,
+					usd_param->p2p_mac_addr.bytes,
+					usd_param->freq_config.default_freq,
+					usd_param->instance_id);
 
 	freq_config = QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_FREQ_LIST;
 
@@ -914,6 +941,14 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	usd_param->ttl = nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_USD_TTL]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID]) {
+		qdf_mem_copy(usd_param->multicast_mac_addr.bytes,
+			     nla_data(tb[QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID]),
+			     QDF_MAC_ADDR_SIZE);
+	} else {
+		osif_debug("Network ID is not present");
+	}
 
 end:
 	usd_param->vdev_id = vdev_id;
