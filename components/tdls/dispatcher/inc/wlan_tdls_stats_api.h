@@ -33,6 +33,7 @@
 #define _WLAN_TDLS_STATS_API_H_
 
 #include <wlan_tdls_stats_public_structs.h>
+#include <wlan_objmgr_psoc_obj.h>
 
 /**
  * wlan_tdls_stats_sm_deliver_event() - Deliver an event to the TDLS stats SM.
@@ -50,6 +51,18 @@
 QDF_STATUS
 wlan_tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
 				 enum tdls_stats_sm_evt event,
-					    uint16_t data_len, void *data);
+				 uint16_t data_len, void *data);
+
+/**
+ * wlan_tdls_get_tdls_stats() - Dispatcher API to handle a TDLS stats
+ *                              enable/disable request from the HDD layer.
+ * @psoc: PSOC object.
+ * @enable: true  -> enable TDLS stats forwarding (TDLS_STATS_EV_ENABLE)
+ *          false -> disable TDLS stats forwarding (TDLS_STATS_EV_DISABLE)
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
+				    bool enable);
 
 #endif /* _WLAN_TDLS_STATS_API_H_ */

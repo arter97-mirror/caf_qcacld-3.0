@@ -819,3 +819,25 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 	tdls_debug("TDLS stats SM destroyed");
 	return QDF_STATUS_SUCCESS;
 }
+
+/**
+ * tdls_get_tdls_stats() - Core API to handle a TDLS stats enable/disable
+ *                         request from the dispatcher layer.
+ * @stats_ctx: TDLS stats context obtained from tdls_soc_priv_obj::stats_ctx.
+ * @enable: true  -> deliver TDLS_STATS_EV_ENABLE to the SM
+ *          false -> deliver TDLS_STATS_EV_DISABLE to the SM
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tdls_get_tdls_stats(struct tdls_stats_context *stats_ctx,
+			       bool enable)
+{
+	enum tdls_stats_sm_evt event;
+
+	if (!stats_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	event = enable ? TDLS_STATS_EV_ENABLE : TDLS_STATS_EV_DISABLE;
+
+	return tdls_stats_sm_deliver_event(stats_ctx, event, 0, NULL);
+}

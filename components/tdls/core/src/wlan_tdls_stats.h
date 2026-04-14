@@ -214,4 +214,16 @@ void tdls_emit_vendor_event(const struct tdls_stats_entry *entry);
  */
 void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * tdls_get_tdls_stats() - Core API to handle a TDLS stats enable/disable
+ *                         request from the dispatcher layer.
+ * @stats_ctx: TDLS stats context obtained from tdls_soc_priv_obj::stats_ctx.
+ * @enable: true  -> deliver TDLS_STATS_EV_ENABLE to the SM
+ *          false -> deliver TDLS_STATS_EV_DISABLE to the SM
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tdls_get_tdls_stats(struct tdls_stats_context *stats_ctx,
+			       bool enable);
+
 #endif /* _WLAN_TDLS_STATS_H_ */

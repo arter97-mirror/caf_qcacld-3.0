@@ -47,6 +47,7 @@
 #include <wlan_reg_ucfg_api.h>
 #include "wlan_tdls_api.h"
 #include "wlan_policy_mgr_ucfg.h"
+#include <wlan_tdls_stats_api.h>
 
 /**
  * enum qca_wlan_vendor_tdls_trigger_mode_hdd_map: Maps the user space TDLS
@@ -126,6 +127,17 @@ const struct nla_policy
 		[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK] = {
 						.type = NLA_U8},
 };
+
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+const struct nla_policy
+	wlan_hdd_tdls_stats_policy
+	[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX + 1] = {
+		[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG] = {
+						.type = NLA_U32},
+		[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES] = {
+						.type = NLA_NESTED},
+};
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 const struct nla_policy
 	wlan_hdd_tdls_mode_configuration_policy
@@ -355,6 +367,63 @@ __wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
 	return ret;
 }
 
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+static int
+__wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   const void *data,
+				   int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX + 1];
+	int ret = 0;
+	uint32_t id;
+	enum qca_wlan_tdls_stats_config tdls_stats_enable;
+	struct nlattr *tdls_stats_attr;
+	QDF_STATUS status;
+
+	hdd_enter_dev(dev);
+	if (!adapter)
+		return -EINVAL;
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_debug("Failed to get TDLS info due to opmode:%d",
+			  adapter->device_mode);
+		return -EOPNOTSUPP;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX,
+				    data, data_len,
+				    wlan_hdd_tdls_stats_policy)) {
+		hdd_err("Invalid attribute");
+		return -EINVAL;
+	}
+
+	id = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG;
+	tdls_stats_attr = tb[id];
+
+	if (!tdls_stats_attr) {
+		hdd_err("TDLS stats enable/disable NOT specified");
+		return -EINVAL;
+	}
+
+	tdls_stats_enable = nla_get_u32(tdls_stats_attr);
+	hdd_debug("Userspace TDLS stats: %d", tdls_stats_enable);
+
+	status = wlan_tdls_get_tdls_stats(hdd_ctx->psoc,
+					  tdls_stats_enable !=
+					  QCA_WLAN_TDLS_STATS_CONFIG_DISABLE);
+
+	return qdf_status_to_os_return(status);
+}
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
+
 /**
  * __wlan_hdd_cfg80211_configure_tdls_mode() - configure the tdls mode
  * @wiphy: wiphy
@@ -495,6 +564,27 @@ int wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
 
 	return errno;
 }
+
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+int wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data,
+				     int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_tdls_stats(wiphy, wdev,
+						   data, data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 static int wlan_hdd_tdls_enable(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)

@@ -31,6 +31,7 @@
 
 #include <wlan_tdls_stats_api.h>
 #include "wlan_tdls_stats.h"
+#include "wlan_tdls_main.h"
 
 /**
  * wlan_tdls_stats_sm_deliver_event() - Dispatcher entry point to deliver an
@@ -49,7 +50,35 @@
 QDF_STATUS
 wlan_tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
 				 enum tdls_stats_sm_evt event,
-					    uint16_t data_len, void *data)
+				 uint16_t data_len, void *data)
 {
 	return tdls_stats_sm_deliver_event(stats_ctx, event, data_len, data);
+}
+
+/**
+ * wlan_tdls_get_tdls_stats() - Dispatcher API to handle a TDLS stats
+ *                              enable/disable request from the HDD layer.
+ * @psoc: PSOC object.
+ * @enable: true  -> enable TDLS stats forwarding (TDLS_STATS_EV_ENABLE)
+ *          false -> disable TDLS stats forwarding (TDLS_STATS_EV_DISABLE)
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
+				    bool enable)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		tdls_err("TDLS soc obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc_obj->stats_ctx) {
+		tdls_err("TDLS stats context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return tdls_get_tdls_stats(soc_obj->stats_ctx, enable);
 }
