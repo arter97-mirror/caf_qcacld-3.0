@@ -357,6 +357,7 @@ static QDF_STATUS lim_populate_fd_tmpl_frame(struct mac_context *mac,
 	uint8_t i, idx;
 	tSirMacMgmtHdr *mac_hdr;
 	struct qdf_mac_addr broadcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
+	bool set_gvp_tx_power = false;
 
 	pe_debug("FD TMPL freq: %d chWidth: %d", cur_chan_freq, chwidth);
 
@@ -459,8 +460,12 @@ static QDF_STATUS lim_populate_fd_tmpl_frame(struct mac_context *mac,
 	/* Add TPE IE */
 	if ((wlan_reg_is_6ghz_chan_freq(cur_chan_freq)) ||
 	    (pe_session->vhtCapability)) {
+		if (wlan_mlme_get_gvp_op_control(mac->psoc) &&
+		    wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq))
+			set_gvp_tx_power = true;
 		populate_dot11f_tx_power_env(mac, pe_session, &tpe[0], chwidth,
-					     cur_chan_freq, &tpe_num, false);
+					     cur_chan_freq, &tpe_num, false,
+					     set_gvp_tx_power);
 		if (tpe_num > WLAN_MAX_NUM_TPE_IE) {
 			pe_err("tpe_num  %d greater than max size", tpe_num);
 			return QDF_STATUS_E_FAILURE;

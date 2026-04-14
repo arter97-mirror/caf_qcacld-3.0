@@ -3822,7 +3822,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			if (wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq) &&
 			    wlan_mlme_get_gvp_op_control(mac->psoc)) {
 				pe_debug("Setting GVP power for 6 GHz AP");
-				gvp_tx_power = WLAN_DEF_GVP_TX_POWER;
+				gvp_tx_power = WLAN_DEF_GVP_EIRP_TX_POWER;
 				lim_set_tpc_power(mac, pe_session, NULL, false,
 						  gvp_tx_power);
 				goto next;

@@ -911,7 +911,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 			     struct pe_session *session,
 			     tDot11fIEtransmit_power_env *pDot11f,
 			     enum phy_ch_width ch_width, uint32_t chan_freq,
-			     uint16_t *num_tpe, bool is_ch_switch);
+			     uint16_t *num_tpe, bool is_ch_switch,
+			     bool set_gvp_tx_power);
 
 /* / Populate a tDot11fIEChannelSwitchWrapper */
 void

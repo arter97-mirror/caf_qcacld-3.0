@@ -674,6 +674,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	tDot11fIEtransmit_power_env *transmit_power_env = NULL;
 	uint16_t num_transmit_power_env = 0;
 	uint16_t uhr_op_ie_len = 0, uhr_cap_ie_len = 0;
+	bool set_gvp_tx_power = false;
 
 	/* We don't answer requests in this case*/
 	if (ANI_DRIVER_TYPE(mac_ctx) == QDF_DRIVER_TYPE_MFG)
@@ -800,12 +801,15 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		if (!transmit_power_env)
 			goto err_ret;
 
+		if (wlan_mlme_get_gvp_op_control(mac_ctx->psoc) &&
+		    wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq))
+			set_gvp_tx_power = true;
 		populate_dot11f_tx_power_env(mac_ctx, pe_session,
 					     transmit_power_env,
 					     pe_session->ch_width,
 					     pe_session->curr_op_freq,
 					     &num_transmit_power_env,
-					     false);
+					     false, set_gvp_tx_power);
 		tpe_ie_len = lim_get_tpe_ie_length(pe_session->ch_width,
 						   transmit_power_env,
 						   num_transmit_power_env);

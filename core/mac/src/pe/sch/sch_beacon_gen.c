@@ -696,6 +696,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	tDot11fIEtransmit_power_env *transmit_power_env = NULL;
 	uint16_t num_transmit_power_env = 0;
 	uint16_t uhr_op_ie_len;
+	bool set_gvp_tx_power = false;
 
 	tim_size = sch_get_tim_size(HAL_NUM_STA);
 
@@ -878,12 +879,16 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			status = QDF_STATUS_E_NOMEM;
 			goto free_and_exit;
 		}
+
+		if (wlan_mlme_get_gvp_op_control(mac_ctx->psoc) &&
+		    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
+			set_gvp_tx_power = true;
 		populate_dot11f_tx_power_env(mac_ctx, session,
 					     transmit_power_env,
 					     session->ch_width,
 					     session->curr_op_freq,
 					     &num_transmit_power_env,
-					     false);
+					     false, set_gvp_tx_power);
 		tpe_ie_len = lim_get_tpe_ie_length(session->ch_width,
 						   transmit_power_env,
 						   num_transmit_power_env);

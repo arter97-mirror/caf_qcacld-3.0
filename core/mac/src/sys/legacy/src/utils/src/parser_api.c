@@ -529,7 +529,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 			     struct pe_session *session,
 			     tDot11fIEtransmit_power_env *tpe_ptr,
 			     enum phy_ch_width chan_width, uint32_t chan_freq,
-			     uint16_t *num_tpe, bool is_chan_switch)
+			     uint16_t *num_tpe, bool is_chan_switch,
+			     bool set_gvp_tx_power)
 {
 	uint8_t count, band_mask;
 	uint16_t eirp_power, psd_power, punct_bitmap = NO_SCHANS_PUNC;
@@ -545,6 +546,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 	enum phy_ch_width legacy_bw;
 	bool get_vlp_pwr = false;
 	enum reg_6g_ap_type ap_pwr_type;
+	uint16_t gvp_eirp_tx_pwr = WLAN_DEF_GVP_STA_EIRP_TPE_TX_POWER;
+	uint16_t gvp_psd_tx_pwr = WLAN_DEF_GVP_STA_PSD_TPE_TX_POWER;
 
 	wlan_reg_get_cur_6g_ap_pwr_type(mac->pdev, &ap_pwr_type);
 	if (ap_pwr_type == REG_INDOOR_ENABLED_AP)
@@ -598,8 +601,13 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 		tpe_ptr->max_tx_pwr_interpret = LOCAL_EIRP;
 		tpe_ptr->max_tx_pwr_category = REG_DEFAULT_CLIENT;
 		tpe_ptr->num_tx_power = num_tx_power;
-		for (count = 0; count < num_tx_power; count++)
+		for (count = 0; count < num_tx_power; count++) {
 			tpe_ptr->tx_power[count] = eirp_power;
+			if (set_gvp_tx_power)
+				tpe_ptr->tx_power[count] =
+					QDF_MAX(tpe_ptr->tx_power[count],
+						gvp_eirp_tx_pwr);
+		}
 
 		if (num_extn_tx_pwr)
 			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq, 0);
@@ -631,8 +639,13 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 		tpe_ptr->num_tx_power = num_tx_power;
 		for (count = 0; count < num_tx_power; count++) {
 			tpe_ptr->tx_power[count] = eirp_power * 2;
-			pe_debug("non-psd default TPE %d %d",
-				 count, tpe_ptr->tx_power[count]);
+			if (set_gvp_tx_power)
+				tpe_ptr->tx_power[count] =
+					QDF_MAX(tpe_ptr->tx_power[count],
+						gvp_eirp_tx_pwr);
+			pe_debug("non-psd default TPE %d %d, GVP tx pwr: %d",
+				 count, tpe_ptr->tx_power[count],
+				 gvp_eirp_tx_pwr);
 		}
 		if (num_extn_tx_pwr)
 			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq, 0);
@@ -666,8 +679,13 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 			tpe_ptr->num_tx_power = num_tx_power;
 			for (count = 0; count < num_tx_power; count++) {
 				tpe_ptr->tx_power[count] = eirp_power * 2;
-				pe_debug("non-psd subord TPE %d %d",
-					 count, tpe_ptr->tx_power[count]);
+				if (set_gvp_tx_power)
+					tpe_ptr->tx_power[count] =
+					QDF_MAX(tpe_ptr->tx_power[count],
+						gvp_eirp_tx_pwr);
+				pe_debug("non-psd subord TPE %d %d, GVP tx pwr: %d",
+					 count, tpe_ptr->tx_power[count],
+					 gvp_eirp_tx_pwr);
 			}
 			if (num_extn_tx_pwr)
 				update_ext_max_tpe_power(mac, tpe_ptr,
@@ -764,9 +782,13 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 						&psd_power,
 						get_vlp_pwr);
 		tpe_ptr->tx_power[count] = psd_power * 2;
+		if (set_gvp_tx_power)
+			tpe_ptr->tx_power[count] =
+					QDF_MAX(tpe_ptr->tx_power[count],
+						gvp_psd_tx_pwr);
 		curr_freq += 20;
-		pe_debug("psd default TPE %d %d",
-			 count, tpe_ptr->tx_power[count]);
+		pe_debug("psd default TPE %d %d, GVP tx pwr: %d",
+			 count, tpe_ptr->tx_power[count], gvp_psd_tx_pwr);
 	}
 
 	if (num_extn_tx_pwr)
@@ -800,9 +822,14 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 						&psd_power,
 						get_vlp_pwr);
 			tpe_ptr->tx_power[count] = psd_power * 2;
+			if (set_gvp_tx_power)
+				tpe_ptr->tx_power[count] =
+					QDF_MAX(tpe_ptr->tx_power[count],
+						gvp_psd_tx_pwr);
 			curr_freq += 20;
-			pe_debug("psd subord TPE %d %d",
-				 count, tpe_ptr->tx_power[count]);
+			pe_debug("psd subord TPE %d %d, GVP tx pwr: %d",
+				 count, tpe_ptr->tx_power[count],
+				 gvp_psd_tx_pwr);
 		}
 		if (num_extn_tx_pwr)
 			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq,
@@ -825,6 +852,7 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	uint8_t ccfs0, ccfs1;
 	enum phy_ch_width ch_width;
 	uint8_t vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+	bool set_gvp_tx_power = false;
 
 	/*
 	 * The new country subelement is present only when
@@ -869,11 +897,14 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	 * Add the Transmit power Envelope Sublement.
 	 */
 	if (pe_session->vhtCapability) {
+		if (wlan_mlme_get_gvp_op_control(mac->psoc) &&
+		    wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq))
+			set_gvp_tx_power = true;
 		populate_dot11f_tx_power_env(mac, pe_session,
 				&pDot11f->transmit_power_env[0],
 				pe_session->gLimChannelSwitch.ch_width,
 				pe_session->gLimChannelSwitch.sw_target_freq,
-				&num_tpe, true);
+				&num_tpe, true, set_gvp_tx_power);
 		pDot11f->num_transmit_power_env = 1;
 	}
 }
