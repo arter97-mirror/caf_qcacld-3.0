@@ -910,11 +910,24 @@ static enum hw_mode_bandwidth policy_mgr_map_wmi_channel_width_to_hw_mode_bw(
 	return HW_MODE_BW_NONE;
 }
 
+/**
+ * policy_mgr_get_hw_mode_chains() - Get hardware mode chains based on calc type
+ * @caps: Pointer to MAC PHY capabilities
+ * @tx_chains: Pointer to store TX chains
+ * @rx_chains: Pointer to store RX chains
+ * @calc_type: Type of calculation (MIN or MAX)
+ *
+ * This function calculates either minimum or maximum chains across 2G and 5G
+ * bands based on the calculation type specified.
+ *
+ * Return: None
+ */
 static void
-policy_mgr_get_hw_mode_min_chains(struct wlan_psoc_host_mac_phy_caps *caps,
-				  uint8_t *tx_chains, uint8_t *rx_chains)
+policy_mgr_get_hw_mode_chains(struct wlan_psoc_host_mac_phy_caps *caps,
+			      uint8_t *tx_chains, uint8_t *rx_chains,
+			      enum chain_calc_type_t calc_type)
 {
-	uint8_t num_min_tx_chains = 0, num_min_rx_chains = 0;
+	uint8_t num_calc_tx_chains = 0, num_calc_rx_chains = 0;
 	uint8_t num_tx_chains_5g = 0, num_rx_chains_5g = 0;
 	uint8_t num_tx_chains_2g = 0, num_rx_chains_2g = 0;
 
@@ -929,28 +942,54 @@ policy_mgr_get_hw_mode_min_chains(struct wlan_psoc_host_mac_phy_caps *caps,
 	}
 
 	if (num_tx_chains_5g && num_tx_chains_2g)
-		num_min_tx_chains = QDF_MIN(num_tx_chains_5g, num_tx_chains_2g);
+		num_calc_tx_chains = (calc_type == CHAIN_CALC_MIN) ?
+			QDF_MIN(num_tx_chains_5g, num_tx_chains_2g) :
+			QDF_MAX(num_tx_chains_5g, num_tx_chains_2g);
 	else if (num_tx_chains_5g)
-		num_min_tx_chains = num_tx_chains_5g;
+		num_calc_tx_chains = num_tx_chains_5g;
 	else if (num_tx_chains_2g)
-		num_min_tx_chains = num_tx_chains_2g;
+		num_calc_tx_chains = num_tx_chains_2g;
+
 
 	if (num_rx_chains_5g && num_rx_chains_2g)
-		num_min_rx_chains = QDF_MIN(num_rx_chains_5g, num_rx_chains_2g);
+		num_calc_rx_chains = (calc_type == CHAIN_CALC_MIN) ?
+			QDF_MIN(num_rx_chains_5g, num_rx_chains_2g) :
+			QDF_MAX(num_rx_chains_5g, num_rx_chains_2g);
 	else if (num_rx_chains_5g)
-		num_min_rx_chains = num_rx_chains_5g;
+		num_calc_rx_chains = num_rx_chains_5g;
 	else if (num_rx_chains_2g)
-		num_min_rx_chains = num_rx_chains_2g;
+		num_calc_rx_chains = num_rx_chains_2g;
 
-	if (!*tx_chains && num_min_tx_chains)
-		*tx_chains = num_min_tx_chains;
-	else if (num_min_tx_chains)
-		*tx_chains = QDF_MIN(*tx_chains, num_min_tx_chains);
 
-	if (!*rx_chains && num_min_rx_chains)
-		*rx_chains = num_min_rx_chains;
-	else if (num_min_rx_chains)
-		*rx_chains = QDF_MIN(*rx_chains, num_min_rx_chains);
+	if (!*tx_chains && num_calc_tx_chains)
+		*tx_chains = num_calc_tx_chains;
+	else if (num_calc_tx_chains)
+		*tx_chains = (calc_type == CHAIN_CALC_MIN) ?
+			QDF_MIN(*tx_chains, num_calc_tx_chains) :
+			QDF_MAX(*tx_chains, num_calc_tx_chains);
+
+	if (!*rx_chains && num_calc_rx_chains)
+		*rx_chains = num_calc_rx_chains;
+	else if (num_calc_rx_chains)
+		*rx_chains = (calc_type == CHAIN_CALC_MIN) ?
+			QDF_MIN(*rx_chains, num_calc_rx_chains) :
+			QDF_MAX(*rx_chains, num_calc_rx_chains);
+}
+
+static void
+policy_mgr_get_hw_mode_min_chains(struct wlan_psoc_host_mac_phy_caps *caps,
+				  uint8_t *tx_chains, uint8_t *rx_chains)
+{
+	policy_mgr_get_hw_mode_chains(caps, tx_chains, rx_chains,
+				      CHAIN_CALC_MIN);
+}
+
+static void
+policy_mgr_get_hw_mode_max_chains(struct wlan_psoc_host_mac_phy_caps *caps,
+				  uint8_t *tx_chains, uint8_t *rx_chains)
+{
+	policy_mgr_get_hw_mode_chains(caps, tx_chains, rx_chains,
+				      CHAIN_CALC_MAX);
 }
 
 static void policy_mgr_get_hw_mode_params(
@@ -1800,6 +1839,7 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct tgt_info *info;
 	uint8_t min_tx_chains = 0, min_rx_chains = 0;
+	uint8_t max_tx_chains = 0, max_rx_chains = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1847,6 +1887,8 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_hw_mode_params(tmp, &mac0_ss_bw_info);
 		policy_mgr_get_hw_mode_min_chains(tmp, &min_tx_chains,
 						  &min_rx_chains);
+		policy_mgr_get_hw_mode_max_chains(tmp, &max_tx_chains,
+						  &max_rx_chains);
 		dbs_mode = HW_MODE_DBS_NONE;
 		sbs_mode = HW_MODE_SBS_NONE;
 		emlsr_mode = HW_MODE_EMLSR_NONE;
@@ -1879,6 +1921,8 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_get_hw_mode_params(tmp, &mac1_ss_bw_info);
 			policy_mgr_get_hw_mode_min_chains(tmp, &min_tx_chains,
 							  &min_rx_chains);
+			policy_mgr_get_hw_mode_max_chains(tmp, &max_tx_chains,
+							  &max_rx_chains);
 			policy_mgr_update_mac_freq_info(psoc, pm_ctx,
 							hw_config_type,
 							tmp->phy_id, tmp);
@@ -1921,6 +1965,8 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 
 	pm_ctx->cfg.min_tx_chains = min_tx_chains;
 	pm_ctx->cfg.min_rx_chains = min_rx_chains;
+	pm_ctx->cfg.max_tx_chains = max_tx_chains;
+	pm_ctx->cfg.max_rx_chains = max_rx_chains;
 
 	policy_mgr_debug("Updated HW mode list: Num modes:%d, min chains Tx/Rx %dx%d",
 			 pm_ctx->num_dbs_hw_modes,
@@ -12783,6 +12829,24 @@ void policy_mgr_get_hw_dbs_max_bw(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+policy_mgr_fetch_min_max_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
+					     uint8_t *min_tx_nss,
+					     uint8_t *min_rx_nss,
+					     uint8_t *max_tx_nss,
+					     uint8_t *max_rx_nss)
+{
+	QDF_STATUS status;
+
+	status = policy_mgr_fetch_min_nss_across_hw_modes(psoc, min_tx_nss,
+							  min_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	return policy_mgr_fetch_max_nss_across_hw_modes(psoc, max_tx_nss,
+						       max_rx_nss);
+}
+
+QDF_STATUS
 policy_mgr_fetch_min_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *tx_nss, uint8_t *rx_nss)
 {
@@ -12794,6 +12858,22 @@ policy_mgr_fetch_min_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
 
 	*tx_nss = pm_ctx->cfg.min_tx_chains;
 	*rx_nss = pm_ctx->cfg.min_rx_chains;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_fetch_max_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *tx_nss, uint8_t *rx_nss)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	*tx_nss = pm_ctx->cfg.max_tx_chains;
+	*rx_nss = pm_ctx->cfg.max_rx_chains;
 
 	return QDF_STATUS_SUCCESS;
 }

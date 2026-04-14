@@ -299,6 +299,8 @@ extern enum policy_mgr_conc_next_action
  *                                  on same band
  * @min_tx_chains: Min number of Tx chains supported across all the HW modes
  * @min_rx_chains: Min number of Rx chains supported across all the HW modes
+ * @max_tx_chains: Max number of Tx chains supported across all the HW modes
+ * @max_rx_chains: Max number of Rx chains supported across all the HW modes
  * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
  * @use_sap_original_bw: Enable/Disable sap original BW as default
  *                       BW when do restart
@@ -336,6 +338,8 @@ struct policy_mgr_cfg {
 	bool multi_sap_allowed_on_same_band;
 	uint8_t min_tx_chains;
 	uint8_t min_rx_chains;
+	uint8_t max_tx_chains;
+	uint8_t max_rx_chains;
 #ifdef WLAN_FEATURE_SR
 	bool sr_in_same_mac_conc;
 #endif
@@ -471,6 +475,16 @@ struct policy_mgr_psoc_priv_obj {
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	uint32_t restriction_mask;
 #endif
+};
+
+/**
+ * enum chain_calc_type_t - Chain calculation type
+ * @CHAIN_CALC_MIN: Calculate minimum chains
+ * @CHAIN_CALC_MAX: Calculate maximum chains
+ */
+enum chain_calc_type_t {
+	CHAIN_CALC_MIN,
+	CHAIN_CALC_MAX
 };
 
 /**

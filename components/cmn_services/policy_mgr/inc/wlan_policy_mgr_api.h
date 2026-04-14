@@ -4281,6 +4281,27 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 					  uint32_t ch_freq, bool *ok);
 
 /**
+ * policy_mgr_fetch_min_max_nss_across_hw_modes() - Fetch minimum and
+ * maximum NSS across HW modes
+ * @psoc: PSOC object information
+ * @min_tx_nss: Pointer to store minimum TX NSS
+ * @min_rx_nss: Pointer to store minimum RX NSS
+ * @max_tx_nss: Pointer to store maximum TX NSS
+ * @max_rx_nss: Pointer to store maximum RX NSS
+ *
+ * This function fills both minimum and maximum TX/RX NSS values by calling
+ * the existing per-mode NSS fetch APIs.
+ *
+ * Return: QDF_STATUS_SUCCESS if successful, QDF_STATUS_E_NULL_VALUE otherwise
+ */
+QDF_STATUS
+policy_mgr_fetch_min_max_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
+					     uint8_t *min_tx_nss,
+					     uint8_t *min_rx_nss,
+					     uint8_t *max_tx_nss,
+					     uint8_t *max_rx_nss);
+
+/**
  * policy_mgr_fetch_min_nss_across_hw_modes() - Fetch minimum NSS across
  * HW modes
  * @psoc: PSOC object information
@@ -4294,6 +4315,22 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 policy_mgr_fetch_min_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *tx_nss, uint8_t *rx_nss);
+
+/**
+ * policy_mgr_fetch_max_nss_across_hw_modes() - Fetch maximum NSS across
+ * HW modes
+ * @psoc: PSOC object information
+ * @tx_nss: Pointer to store maximum TX NSS
+ * @rx_nss: Pointer to store maximum RX NSS
+ *
+ * This function fetches the maximum TX and RX NSS values across all
+ * supported hardware modes.
+ *
+ * Return: QDF_STATUS_SUCCESS if successful, QDF_STATUS_E_NULL_VALUE otherwise
+ */
+QDF_STATUS
+policy_mgr_fetch_max_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *tx_nss, uint8_t *rx_nss);
 
 /**
