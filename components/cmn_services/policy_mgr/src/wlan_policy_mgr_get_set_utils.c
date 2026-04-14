@@ -11736,6 +11736,8 @@ void policy_mgr_get_hw_dbs_max_bw(struct wlan_objmgr_psoc *psoc,
 				POLICY_MGR_HW_MODE_MAC0_BANDWIDTH_GET(param);
 			bw_dbs->mac1_bw =
 				POLICY_MGR_HW_MODE_MAC1_BANDWIDTH_GET(param);
+			policy_mgr_debug("mac0_bw %d mac1_bw %d",
+					 bw_dbs->mac0_bw, bw_dbs->mac1_bw);
 		} else {
 			continue;
 		}

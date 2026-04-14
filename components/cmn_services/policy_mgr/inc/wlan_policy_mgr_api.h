@@ -5961,6 +5961,22 @@ policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id, qdf_freq_t freq);
 
 /**
+ * policy_mgr_is_conn_lead_to_bw_downgrade() - New freq leads to BW downgrade
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id of the caller
+ * @freq: New connection frequency
+ * @ch_width: Channel width
+ *
+ * This API loops through existing connections from policy_mgr connection table
+ *
+ * Return: True if new frequency causes BW downgrade
+ */
+bool
+policy_mgr_is_conn_lead_to_bw_downgrade(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, qdf_freq_t freq,
+					enum phy_ch_width ch_width);
+
+/**
  * policy_mgr_sap_ch_width_update() - Update SAP ch_width
  * @psoc: PSOC object information
  * @next_action: next action to happen in order to update bandwidth

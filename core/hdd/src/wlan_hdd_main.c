@@ -1185,6 +1185,10 @@ static int hdd_netdev_notifier_call(struct notifier_block *nb,
 	struct osif_vdev_sync *vdev_sync;
 	int errno;
 
+	if (net_dev->ieee80211_ptr &&
+	    wlan_hdd_wdev_is_ap_vlan(net_dev->ieee80211_ptr))
+		return NOTIFY_DONE;
+
 	if (net_dev->priv_flags & IFF_EBRIDGE) {
 		errno = hdd_netdev_notifier_bridge_intf(net_dev, state);
 		if (errno)
@@ -7309,14 +7313,12 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	uint8_t latency_level;
 
 	/* cfg80211 initialization and registration */
-	dev = alloc_netdev_mqs(sizeof(*adapter), name,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
-			      name_assign_type,
-#endif
-			      ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE ||
-			       wlan_hdd_is_session_type_monitor(session_type)) ?
-			       hdd_mon_mode_ether_setup : ether_setup),
-			      NUM_TX_QUEUES, NUM_RX_QUEUES);
+	dev = hdd_alloc_netdev_mqs(sizeof(*adapter), name,
+				   name_assign_type,
+				   ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE ||
+				     wlan_hdd_is_session_type_monitor(session_type)) ?
+				    hdd_mon_mode_ether_setup : ether_setup),
+				   NUM_TX_QUEUES, NUM_RX_QUEUES);
 
 	if (!dev) {
 		hdd_err("Failed to allocate new net_device '%s'", name);

@@ -4296,7 +4296,10 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 		wma_err("Failed to set BEACON/DTIM_PERIOD/PWRLIMIT/SLOTTIME/PROTECTION params");
 		goto error;
 	}
-	mlme_set_max_reg_power(intr[vdev_id].vdev, maxTxPower);
+	if (maxTxPower && maxTxPower != INVALID_TXPOWER) {
+		wma_debug("vdev %d set max reg power %d", vdev_id, maxTxPower);
+		mlme_set_max_reg_power(intr[vdev_id].vdev, maxTxPower);
+	}
 	wlan_mlme_get_sta_keep_alive_period(wma->psoc,
 					    &keep_alive_period);
 	wma_set_sta_keep_alive(
