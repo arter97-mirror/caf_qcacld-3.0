@@ -29,6 +29,7 @@
 #include "wlan_tdls_mgmt.h"
 #include "wlan_tdls_api.h"
 #include "wlan_tdls_tgt_api.h"
+#include "wlan_tdls_stats.h"
 #include "wlan_policy_mgr_public_struct.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_scan_ucfg_api.h"
@@ -146,6 +147,16 @@ QDF_STATUS tdls_psoc_obj_create_notification(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
+	/* Create TDLS stats state machine */
+	status = tdls_stats_sm_create(psoc, &tdls_soc_obj->stats_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("TDLS stats SM create failed (status %d) - stats logging unavailable",
+			 status);
+		tdls_soc_obj->stats_ctx = NULL;
+		/* Non-fatal: reset status so PSOC attach succeeds */
+		status = QDF_STATUS_SUCCESS;
+	}
+
 	tdls_soc_global = tdls_soc_obj;
 	tdls_notice("TDLS obj attach to psoc successfully");
 
@@ -163,6 +174,12 @@ QDF_STATUS tdls_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc,
 	if (!tdls_soc_obj) {
 		tdls_err("Failed to get tdls obj in psoc");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Destroy the TDLS stats SM if it was successfully created */
+	if (tdls_soc_obj->stats_ctx) {
+		tdls_stats_sm_destroy(tdls_soc_obj->stats_ctx);
+		tdls_soc_obj->stats_ctx = NULL;
 	}
 
 	status = wlan_objmgr_psoc_component_obj_detach(psoc,

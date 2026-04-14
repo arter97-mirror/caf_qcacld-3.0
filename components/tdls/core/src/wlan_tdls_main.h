@@ -33,6 +33,7 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_tdls_public_structs.h>
+#include <wlan_tdls_stats_public_structs.h>
 #include <scheduler_api.h>
 #include "wlan_serialization_api.h"
 #include <wlan_utility.h>
@@ -221,6 +222,7 @@ struct tdls_callbacks {
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  * @is_user_tdls_enable: bool to check whether TDLS enable through userspace
  * @tdls_cb: TDLS callbacks to other modules
+ * @stats_ctx: TDLS stats state machine context
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -283,6 +285,7 @@ struct tdls_soc_priv_obj {
 	bool fw_tdls_wideband_capability;
 	bool is_user_tdls_enable;
 	struct tdls_callbacks tdls_cb;
+	struct tdls_stats_context *stats_ctx;
 };
 
 /**
