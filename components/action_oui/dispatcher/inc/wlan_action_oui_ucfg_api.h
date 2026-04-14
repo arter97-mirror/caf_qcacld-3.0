@@ -267,6 +267,15 @@ ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if ((action_id == ACTION_OUI_ALLOW_NSS_GREATER_THAN_2 ||
+	     action_id == ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2) &&
+	    oui_ext_num > ACTION_OUI_MAX_HOST_FW_EXT) {
+		action_oui_warn("Trim OUI count for action id %u from %u to %u",
+				action_id, oui_ext_num,
+				ACTION_OUI_MAX_HOST_FW_EXT);
+		oui_ext_num = ACTION_OUI_MAX_HOST_FW_EXT;
+	}
+
 	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext,
 						 oui_ext_num);
 	return status;

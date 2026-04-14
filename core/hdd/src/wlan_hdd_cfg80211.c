@@ -39294,17 +39294,29 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	action_oui_op = nla_get_u8(
 			tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP]);
 
-	if (action_oui_id != QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS &&
-	    action_oui_id != QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI)
-	{
+	if (action_oui_id !=
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS &&
+	    action_oui_id !=
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI &&
+	    action_oui_id !=
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ALLOW_NSS_GT_2 &&
+	    action_oui_id !=
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2) {
 		hdd_err("Invalid id %d", action_oui_id);
 		ret = -EOPNOTSUPP;
 		goto exit;
 	}
 	if (action_oui_id == QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS)
 		oui_id = ACTION_OUI_ENABLE_DYNAMIC_SMPS;
-	else if (action_oui_id == QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI)
+	else if (action_oui_id ==
+		 QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI)
 		oui_id = ACTION_OUI_ENABLE_DSMPS_BY_RSSI;
+	else if (action_oui_id ==
+		 QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ALLOW_NSS_GT_2)
+		oui_id = ACTION_OUI_ALLOW_NSS_GREATER_THAN_2;
+	else if (action_oui_id ==
+		 QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2)
+		oui_id = ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2;
 
 	if (action_oui_op > QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
 		hdd_err("Invalid oui op %d", action_oui_op);
@@ -39313,9 +39325,9 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	}
 
 	if (action_oui_op == QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
-		status = ucfg_action_oui_cleanup(
-					hdd_ctx->psoc,
-					oui_id);
+		status = ucfg_action_oui_restore_default_and_send(
+							  hdd_ctx->psoc,
+							  oui_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_debug("action oui cleanup failure");
 			ret = -EINVAL;
@@ -39421,6 +39433,15 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	}
 
 	hdd_debug("oui_id %d oui num %d", oui_id, i);
+	if (ucfg_action_oui_is_dynamic(oui_id)) {
+		status = ucfg_action_oui_cleanup(hdd_ctx->psoc, oui_id);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to clear mutually exclusive action OUI lists");
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+
 	status = ucfg_action_oui_extension_store(hdd_ctx->psoc,
 						 oui_id,
 						 action_oui_buf, i);
@@ -39428,6 +39449,13 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		ret = -EINVAL;
 		goto exit;
 	}
+	status = ucfg_action_oui_send_by_id(hdd_ctx->psoc, oui_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send action_oui id: %u", oui_id);
+		ret = -EINVAL;
+		goto exit;
+	}
+
 
 	if (action_oui_id == QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS) {
 		ucfg_disable_dynamic_smps(hdd_ctx->psoc);
