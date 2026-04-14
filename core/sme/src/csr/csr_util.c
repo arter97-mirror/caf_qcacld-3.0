@@ -1490,6 +1490,19 @@ enum csr_cfgdot11mode csr_phy_mode_to_dot11mode(enum wlan_phymode phy_mode)
 	case WLAN_PHYMODE_11BEA_EHT320:
 		return eCSR_CFG_DOT11_MODE_11BE;
 #endif
+#ifdef WLAN_FEATURE_11BN
+	case WLAN_PHYMODE_11BNA_UHR20:
+	case WLAN_PHYMODE_11BNG_UHR20:
+	case WLAN_PHYMODE_11BNA_UHR40:
+	case WLAN_PHYMODE_11BNG_UHR40PLUS:
+	case WLAN_PHYMODE_11BNG_UHR40MINUS:
+	case WLAN_PHYMODE_11BNG_UHR40:
+	case WLAN_PHYMODE_11BNA_UHR80:
+	case WLAN_PHYMODE_11BNG_UHR80:
+	case WLAN_PHYMODE_11BNA_UHR160:
+	case WLAN_PHYMODE_11BNA_UHR320:
+		return eCSR_CFG_DOT11_MODE_11BN;
+#endif
 	default:
 		sme_err("invalid phy mode %d", phy_mode);
 		return eCSR_CFG_DOT11_MODE_MAX;

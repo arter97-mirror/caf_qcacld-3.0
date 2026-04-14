@@ -587,6 +587,11 @@ uint8_t *hdd_dot11_mode_str(uint32_t dot11mode)
 	case eCSR_CFG_DOT11_MODE_11BE:
 	case eCSR_CFG_DOT11_MODE_11BE_ONLY:
 		return "DOT11_MODE_11BE";
+#ifdef WLAN_FEATURE_11BN
+	case eCSR_CFG_DOT11_MODE_11BN:
+	case eCSR_CFG_DOT11_MODE_11BN_ONLY:
+		return "DOT11_MODE_11BN";
+#endif
 	}
 
 	return "UNKNOWN";
@@ -1131,4 +1136,3 @@ void hdd_sysfs_connect_info_interface_destroy(struct hdd_adapter *adapter)
 {
 	device_remove_file(&adapter->dev->dev, &dev_attr_connect_info);
 }
-
