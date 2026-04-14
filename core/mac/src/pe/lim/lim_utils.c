@@ -12740,7 +12740,8 @@ enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 
 bool
 lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
-		  struct bss_description *bss_desc, bool force_vlp)
+		  struct bss_description *bss_desc, bool force_vlp,
+		  uint8_t gvp_tx_power)
 {
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	struct vdev_mlme_obj *mlme_obj;
@@ -12768,7 +12769,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, force_vlp);
+	lim_calculate_tpc(mac_ctx, session, force_vlp, gvp_tx_power);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -12860,7 +12861,7 @@ lim_update_tx_power(struct mac_context *mac_ctx, struct pe_session *sap_session,
 		if (sta_session->lim_join_req)
 			bss_desc = &sta_session->lim_join_req->bssDescription;
 
-		lim_set_tpc_power(mac_ctx, sta_session, bss_desc, false);
+		lim_set_tpc_power(mac_ctx, sta_session, bss_desc, false, 0);
 	} else {
 		/*
 		 * SAP and STA are in different AP power types. Therefore,
@@ -12974,7 +12975,7 @@ lim_check_conc_power_for_csa(struct mac_context *mac_ctx,
 	    (wlan_vdev_mlme_get_state(sap_session->vdev) == WLAN_VDEV_S_UP)) {
 		if (lim_is_power_change_required_for_sta(mac_ctx, sta_session,
 							 sap_session)) {
-			lim_set_tpc_power(mac_ctx, sap_session, NULL, false);
+			lim_set_tpc_power(mac_ctx, sap_session, NULL, false, 0);
 			if (lim_update_tx_power(mac_ctx, sap_session,
 						sta_session, false) ==
 							QDF_STATUS_SUCCESS)
@@ -13078,7 +13079,7 @@ set_tpc:
 	if (session->lim_join_req)
 		bss_desc = &session->lim_join_req->bssDescription;
 
-	lim_set_tpc_power(mac_ctx, session, bss_desc, false);
+	lim_set_tpc_power(mac_ctx, session, bss_desc, false, 0);
 }
 
 /**
@@ -13122,7 +13123,7 @@ lim_recompute_sta_cli_tpc(struct mac_context *mac,
 
 	mlme_set_best_6g_power_type(session->vdev, power_type_6g);
 	session->best_6g_power_type = power_type_6g;
-	lim_set_tpc_power(mac, session, NULL, false);
+	lim_set_tpc_power(mac, session, NULL, false, 0);
 }
 
 /**
@@ -13150,7 +13151,7 @@ lim_recompute_sap_go_tpc_bcn(struct mac_context *mac,
 		return;
 	}
 
-	lim_set_tpc_power(mac, session, NULL, false);
+	lim_set_tpc_power(mac, session, NULL, false, 0);
 }
 
 void

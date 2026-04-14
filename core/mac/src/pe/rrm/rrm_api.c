@@ -256,7 +256,7 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 				pLinkReq->MaxTxPower.maxTxPower;
 		/* Set is_power_constraint_abs to true to calculate tpc power */
 		mlme_obj->reg_tpc_obj.is_power_constraint_abs = true;
-		lim_calculate_tpc(mac, pe_session, false);
+		lim_calculate_tpc(mac, pe_session, false, 0);
 
 		LinkReport.txPower =
 			mlme_obj->reg_tpc_obj.chan_power_info[0].tx_power;

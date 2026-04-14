@@ -191,6 +191,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * @mac: mac handle
  * @session: PE Session Entry
  * @force_ap_vlp_pwr: Use VLP power for SAP and Go
+ * @gvp_tx_power: GVP tx power
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -199,7 +200,8 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  */
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool force_ap_vlp_pwr);
+		       bool force_ap_vlp_pwr,
+		       uint8_t gvp_tx_power);
 
 /* AID pool management functions */
 
@@ -3727,12 +3729,14 @@ lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie);
  * @pe_session: Pointer to session
  * @bss_desc: Pointer to bss description
  * @force_vlp: Flag to force use VLP power
+ * @gvp_tx_power: GVP TX power
  *
  * Return: TPC status
  */
 bool
 lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
-		  struct bss_description *bss_desc, bool force_vlp);
+		  struct bss_description *bss_desc, bool force_vlp,
+		  uint8_t gvp_tx_power);
 
 /**
  * lim_update_tx_power() - Function to update the TX power for

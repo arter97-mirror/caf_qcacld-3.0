@@ -736,7 +736,7 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			goto end;
 		}
 
-		lim_calculate_tpc(mac_ctx, session, false);
+		lim_calculate_tpc(mac_ctx, session, false, 0);
 
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,

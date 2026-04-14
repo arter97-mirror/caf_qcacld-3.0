@@ -6839,7 +6839,7 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool force_vlp_pwr)
+		       bool force_vlp_pwr, uint8_t gvp_tx_power)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -6856,6 +6856,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	int8_t tpe_power;
 	bool skip_tpe = false;
 	bool psd_eirp_support_present;
+	uint8_t gvp_oper_control = 0;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!mlme_obj) {
@@ -7059,6 +7060,40 @@ void lim_calculate_tpc(struct mac_context *mac,
 		}
 		mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
 						(uint8_t)max_tx_power_allowed;
+
+		gvp_oper_control = wlan_mlme_get_gvp_op_control(mac->psoc);
+		if (gvp_oper_control &&
+		    ap_power_type_6g == REG_VERY_LOW_POWER_AP) {
+			if (gvp_tx_power && (gvp_tx_power <= reg_max)) {
+				pe_debug("GVP %d less than reg power: %d, do not update with gvp limit",
+					 gvp_tx_power, reg_max);
+				continue;
+			}
+
+			if (gvp_tx_power) {
+				pe_debug("GVP tx power: %d", gvp_tx_power);
+				mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+								gvp_tx_power;
+				is_psd_power = false;
+			}
+			if (LIM_IS_STA_ROLE(session)) {
+				if (gvp_tx_power && tpe_power) {
+					if (is_psd_power) {
+						mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+							QDF_MIN(tpe_power,
+								WLAN_DEF_GVP_STA_PSD_TPE_TX_POWER);
+						is_psd_power = true;
+					} else {
+						mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+							QDF_MIN(tpe_power,
+								WLAN_DEF_GVP_STA_EIRP_TPE_TX_POWER);
+						is_psd_power = false;
+					}
+				}
+			}
+			ap_power_type_6g = REG_GEO_FENCED_VARIABLE_POWER_AP;
+			mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
+		}
 
 		pe_debug("freq: %d reg power: %d, max_tx_power(eirp/psd): %d",
 			 mlme_obj->reg_tpc_obj.frequency[i], reg_max,

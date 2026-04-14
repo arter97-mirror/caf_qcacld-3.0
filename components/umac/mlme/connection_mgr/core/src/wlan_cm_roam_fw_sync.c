@@ -1352,7 +1352,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
-	lim_set_tpc_power(mac_ctx, session, NULL, false);
+	lim_set_tpc_power(mac_ctx, session, NULL, false, 0);
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 

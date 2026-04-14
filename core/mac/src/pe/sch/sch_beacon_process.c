@@ -747,8 +747,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		    session->cal_tpc_post_csa || change_in_sta_pwr_type) {
 			if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) &&
 			    session->best_6g_power_type == REG_INDOOR_ENABLED_AP)
-				lim_set_tpc_power(mac_ctx, session, NULL, true);
-			lim_set_tpc_power(mac_ctx, session, NULL, false);
+				lim_set_tpc_power(mac_ctx, session, NULL,
+						  true, 0);
+			lim_set_tpc_power(mac_ctx, session, NULL, false, 0);
 			session->cal_tpc_post_csa = false;
 		}
 	} else if (!session->sta_follows_sap_power) {

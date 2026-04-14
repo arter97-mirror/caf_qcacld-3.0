@@ -2527,7 +2527,7 @@ lim_set_tpc_for_sap_go(struct mac_context *mac_ctx,
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 	if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq) &&
 	    ap_power_type_6g == REG_INDOOR_ENABLED_AP) {
-		lim_calculate_tpc(mac_ctx, session_entry, true);
+		lim_calculate_tpc(mac_ctx, session_entry, true, 0);
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,
 					      session_entry->vdev_id,
@@ -2538,7 +2538,7 @@ lim_set_tpc_for_sap_go(struct mac_context *mac_ctx,
 			goto update_sta_tpc;
 	}
 
-	lim_calculate_tpc(mac_ctx, session_entry, false);
+	lim_calculate_tpc(mac_ctx, session_entry, false, 0);
 	if (tx_ops->set_tpc_power)
 		tx_ops->set_tpc_power(mac_ctx->psoc,
 				      session_entry->vdev_id,
@@ -3303,13 +3303,13 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 			 * indoor enabled AP TPC, so that FW can cache VLP TPC
 			 * and use during system suspend
 			 */
-			lim_calculate_tpc(mac_ctx, session_entry, true);
+			lim_calculate_tpc(mac_ctx, session_entry, true, 0);
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
 						      session_entry->vdev_id,
 						      &mlme_obj->reg_tpc_obj);
 		}
-		lim_calculate_tpc(mac_ctx, session_entry, false);
+		lim_calculate_tpc(mac_ctx, session_entry, false, 0);
 
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,
@@ -3741,6 +3741,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deferred flag. */
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
+	uint8_t gvp_tx_power;
 
 	if (!rsp) {
 		pe_err("Vdev start response is NULL");
@@ -3819,13 +3820,23 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			wlan_reg_get_cur_6g_ap_pwr_type(mac->pdev,
 							&ap_power_type_6g);
 			if (wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq) &&
+			    wlan_mlme_get_gvp_op_control(mac->psoc)) {
+				pe_debug("Setting GVP power for 6 GHz AP");
+				gvp_tx_power = WLAN_DEF_GVP_TX_POWER;
+				lim_set_tpc_power(mac, pe_session, NULL, false,
+						  gvp_tx_power);
+				goto next;
+			}
+
+			if (wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq) &&
 			    ap_power_type_6g == REG_INDOOR_ENABLED_AP) {
-				lim_set_tpc_power(mac, pe_session, NULL, true);
+				lim_set_tpc_power(mac, pe_session, NULL,
+						  true, 0);
 				if (policy_mgr_is_vdev_ll_lt_sap(
 					mac->psoc, pe_session->vdev_id))
 					goto next;
 			}
-			lim_set_tpc_power(mac, pe_session, NULL, false);
+			lim_set_tpc_power(mac, pe_session, NULL, false, 0);
 		}
 		/* Note: This event code specific to SAP mode
 		 * When SAP session issues channel change as performing
