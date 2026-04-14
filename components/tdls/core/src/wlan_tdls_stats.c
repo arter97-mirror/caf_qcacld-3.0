@@ -29,9 +29,11 @@
  *   - SM lifecycle APIs: create, destroy, deliver_event, transition
  *
  * State overview:
- *   DISABLED  - FW capability absent; all events dropped (terminal state)
- *   INIT      - Default caching; events buffered in the cache database
- *   ENABLED   - Active forwarding; events emitted immediately as vendor events
+ *   DISABLED   - INI and FW capability absent; all events dropped.
+ *   INIT       - Default caching; events buffered in the cache database.
+ *   ENABLING   - Intermediate parent state entered on EV_ENABLE from INIT.
+ *     SS_ENABLED - Sub-state: events emitted immediately as vendor events;
+ *                  entered from ENABLING on a second EV_ENABLE delivery
  */
 
 #include "wlan_tdls_main.h"
@@ -184,7 +186,7 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
  * Dequeues every entry from the cache database in FIFO (oldest-first)
  * order and emits each one as a vendor event via tdls_emit_vendor_event().
  * The lock is released while emitting each event to avoid holding it
- * across the vendor-event path.  Called from the ENABLED state entry
+ * across the vendor-event path.  Called from the SS_ENABLED sub-state entry
  * callback when transitioning from INIT.
  *
  * Return: Number of entries flushed.
@@ -370,7 +372,7 @@ static void tdls_stats_state_init_entry(void *ctx)
  * @ctx: TDLS stats context (struct tdls_stats_context *)
  *
  * Called by the SM engine before leaving the INIT state.
- * The cache is left intact; the ENABLED entry callback is responsible
+ * The cache is left intact; the SS_ENABLED entry callback is responsible
  * for flushing it.
  */
 static void tdls_stats_state_init_exit(void *ctx)
@@ -384,13 +386,6 @@ static void tdls_stats_state_init_exit(void *ctx)
  * @event: Event id (enum tdls_stats_sm_evt)
  * @event_data_len: Length of event data in bytes
  * @event_data: Pointer to event-specific data
- *
- * Handles events while in the INIT (default caching) state:
- *   EV_ENABLE        - transition to ENABLED immediately
- *   EV_DISABLE       - idempotent; already in default caching mode
- *   EV_NEW_EVENT     - cache the entry in the stats database
- *   EV_FW_STATS      - cache the entry in the stats database
- *   EV_STA_CONNECTED - send WMI enable=1 if single-STA SCC; no state change
  *
  * Return: true if event was handled, false otherwise
  */
@@ -406,14 +401,15 @@ static bool tdls_stats_state_init_event(void *ctx, uint16_t event,
 
 	switch (event) {
 	case TDLS_STATS_EV_ENABLE:
-		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_ENABLED);
+		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_ENABLING);
+		tdls_stats_sm_deliver_event_sync(stats_ctx,
+						 TDLS_STATS_EV_ENABLE,
+						 0, NULL);
 		break;
-
 	case TDLS_STATS_EV_DISABLE:
 		/* Already in default caching mode — idempotent */
 		tdls_debug("TDLS stats: DISABLE in INIT state - no-op");
 		break;
-
 	case TDLS_STATS_EV_NEW_EVENT:
 	case TDLS_STATS_EV_FW_STATS:
 		entry = (struct tdls_stats_entry *)event_data;
@@ -424,12 +420,13 @@ static bool tdls_stats_state_init_event(void *ctx, uint16_t event,
 			event_handled = false;
 		}
 		break;
-
 	case TDLS_STATS_EV_STA_CONNECTED:
 		tdls_stats_handle_sta_connection(
 				(struct wlan_objmgr_vdev *)event_data);
 		break;
-
+	case TDLS_STATS_EV_ENABLE_ACTIVE:
+		tdls_debug("TDLS stats: Cache is already flushed");
+		break;
 	default:
 		event_handled = false;
 		break;
@@ -438,27 +435,105 @@ static bool tdls_stats_state_init_event(void *ctx, uint16_t event,
 	return event_handled;
 }
 
-/* =========================================================================
- * ENABLED state callbacks
- * =========================================================================
- */
-
 /**
- * tdls_stats_state_enabled_entry() - Entry callback for ENABLED state.
+ * tdls_stats_state_enabling_entry() - Entry callback for ENABLING state.
  * @ctx: TDLS stats context (struct tdls_stats_context *)
  *
- * Called by the SM engine when entering the ENABLED state.
+ * Called by the SM engine when entering the ENABLING parent state.
+ * A synchronous EV_ENABLE is delivered by the INIT event handler
+ * immediately after this entry, which drives the transition into
+ * the SS_ENABLED sub-state.
+ */
+static void tdls_stats_state_enabling_entry(void *ctx)
+{
+	tdls_debug("TDLS stats: entered ENABLING state");
+}
+
+/**
+ * tdls_stats_state_enabling_exit() - Exit callback for ENABLING state.
+ * @ctx: TDLS stats context (struct tdls_stats_context *)
+ *
+ * Called by the SM engine after the sub-state exit when leaving the
+ * ENABLING hierarchy.  No cleanup required.
+ */
+static void tdls_stats_state_enabling_exit(void *ctx)
+{
+	tdls_debug("TDLS stats: exiting ENABLING state");
+}
+
+/**
+ * tdls_stats_state_enabling_event() - Event handler for ENABLING parent state.
+ * @ctx: TDLS stats context (struct tdls_stats_context *)
+ * @event: Event id (enum tdls_stats_sm_evt)
+ * @event_data_len: Length of event data in bytes
+ * @event_data: Pointer to event-specific data
+ *
+ * Return: true if event was handled, false otherwise
+ */
+static bool tdls_stats_state_enabling_event(void *ctx, uint16_t event,
+					    uint16_t event_data_len,
+					    void *event_data)
+{
+	struct tdls_stats_context *stats_ctx =
+				(struct tdls_stats_context *)ctx;
+	bool event_handled = true;
+	struct scheduler_msg msg = {0};
+	uint32_t flushed;
+
+	switch (event) {
+	case TDLS_STATS_EV_ENABLE:
+		msg.callback = tdls_process_cmd;
+		msg.type = TDLS_STATS_ENABLE;
+		msg.bodyptr = stats_ctx;
+		status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+						QDF_MODULE_ID_TDLS,
+						QDF_MODULE_ID_TARGET_IF, &msg);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("post TDLS STATS ENABLE/DISABLE fail");
+			event_handled = false;
+		}
+		break;
+	case TDLS_STATS_EV_DISABLE:
+		flushed = tdls_stats_flush_entire_cache(stats_ctx);
+		tdls_debug("TDLS stats: cache flush complete, %u records emitted",
+			   flushed);
+
+		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_INIT);
+		break;
+	case TDLS_STATS_EV_ENABLE_ACTIVE:
+		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_SS_ENABLED);
+		break;
+	case TDLS_STATS_EV_NEW_EVENT:
+	case TDLS_STATS_EV_FW_STATS:
+		break;
+	case TDLS_STATS_EV_STA_CONNECTED:
+		tdls_stats_handle_sta_connection(
+			(struct wlan_objmgr_vdev *)event_data);
+		break;
+	default:
+		event_handled = false;
+		break;
+	}
+
+	return event_handled;
+}
+
+/**
+ * tdls_stats_subst_enabled_entry() - Entry callback for SS_ENABLED sub-state.
+ * @ctx: TDLS stats context (struct tdls_stats_context *)
+ *
+ * Called by the SM engine when entering the SS_ENABLED sub-state.
  * Flushes all entries currently held in the cache database by emitting
  * them as vendor events in FIFO (oldest-first) order, then switches to
  * immediate-forwarding mode for all subsequent events.
  */
-static void tdls_stats_state_enabled_entry(void *ctx)
+static void tdls_stats_subst_enabled_entry(void *ctx)
 {
 	struct tdls_stats_context *stats_ctx =
 				(struct tdls_stats_context *)ctx;
 	uint32_t flushed;
 
-	tdls_debug("TDLS stats: entered ENABLED state - flushing cache");
+	tdls_debug("TDLS stats: entered SS_ENABLED sub-state - flushing cache");
 
 	flushed = tdls_stats_flush_entire_cache(stats_ctx);
 
@@ -467,34 +542,27 @@ static void tdls_stats_state_enabled_entry(void *ctx)
 }
 
 /**
- * tdls_stats_state_enabled_exit() - Exit callback for ENABLED state.
+ * tdls_stats_subst_enabled_exit() - Exit callback for SS_ENABLED sub-state.
  * @ctx: TDLS stats context (struct tdls_stats_context *)
  *
- * Called by the SM engine before leaving the ENABLED state.
+ * Called by the SM engine before leaving the SS_ENABLED sub-state.
  * No cleanup required.
  */
-static void tdls_stats_state_enabled_exit(void *ctx)
+static void tdls_stats_subst_enabled_exit(void *ctx)
 {
-	tdls_debug("TDLS stats: exiting ENABLED state");
+	tdls_debug("TDLS stats: exiting SS_ENABLED sub-state");
 }
 
 /**
- * tdls_stats_state_enabled_event() - Event handler for ENABLED state.
+ * tdls_stats_subst_enabled_event() - Event handler for SS_ENABLED sub-state.
  * @ctx: TDLS stats context (struct tdls_stats_context *)
  * @event: Event id (enum tdls_stats_sm_evt)
  * @event_data_len: Length of event data in bytes
  * @event_data: Pointer to event-specific data
  *
- * Handles events while in the ENABLED (immediate forwarding) state:
- *   EV_ENABLE        - idempotent; already enabled
- *   EV_DISABLE       - transition back to INIT (resume default caching)
- *   EV_NEW_EVENT     - emit entry immediately as a vendor event
- *   EV_FW_STATS      - emit entry immediately as a vendor event
- *   EV_STA_CONNECTED - send WMI enable=1 if single-STA SCC; no state change
- *
  * Return: true if event was handled, false otherwise
  */
-static bool tdls_stats_state_enabled_event(void *ctx, uint16_t event,
+static bool tdls_stats_subst_enabled_event(void *ctx, uint16_t event,
 					   uint16_t event_data_len,
 					   void *event_data)
 {
@@ -506,24 +574,23 @@ static bool tdls_stats_state_enabled_event(void *ctx, uint16_t event,
 	switch (event) {
 	case TDLS_STATS_EV_ENABLE:
 		/* Already enabled — idempotent */
-		tdls_debug("TDLS stats: ENABLE in ENABLED state - no-op");
+		tdls_debug("TDLS stats: ENABLE in SS_ENABLED sub-state - no-op");
 		break;
-
 	case TDLS_STATS_EV_DISABLE:
 		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_INIT);
 		break;
-
 	case TDLS_STATS_EV_NEW_EVENT:
 	case TDLS_STATS_EV_FW_STATS:
 		entry = (struct tdls_stats_entry *)event_data;
 		tdls_emit_vendor_event(entry);
 		break;
-
 	case TDLS_STATS_EV_STA_CONNECTED:
 		tdls_stats_handle_sta_connection(
 				(struct wlan_objmgr_vdev *)event_data);
 		break;
-
+	case TDLS_STATS_EV_ENABLE_ACTIVE:
+		tdls_debug("TDLS stats: ENABLE_ACTIVE in SS_ENABLED sub-state - no-op");
+		break;
 	default:
 		event_handled = false;
 		break;
@@ -531,19 +598,6 @@ static bool tdls_stats_state_enabled_event(void *ctx, uint16_t event,
 
 	return event_handled;
 }
-
-/* =========================================================================
- * State machine info table
- *
- * Each entry maps to one state in enum tdls_stats_sm_state and provides:
- *   - state id
- *   - parent state id  (WLAN_SM_ENGINE_STATE_NONE = no parent / flat SM)
- *   - initial sub-state (WLAN_SM_ENGINE_STATE_NONE = no sub-states)
- *   - has_substates flag
- *
- * Note: non-static so wlan_sm_create() can reference it directly.
- * =========================================================================
- */
 
 struct wlan_sm_state_info tdls_stats_sm_info[] = {
 	{
@@ -567,14 +621,14 @@ struct wlan_sm_state_info tdls_stats_sm_info[] = {
 		tdls_stats_state_init_event
 	},
 	{
-		(uint8_t)TDLS_STATS_S_ENABLED,
+		(uint8_t)TDLS_STATS_S_ENABLING,
 		(uint8_t)WLAN_SM_ENGINE_STATE_NONE,
 		(uint8_t)WLAN_SM_ENGINE_STATE_NONE,
-		false,
-		"TDLS_STATS_ENABLED",
-		tdls_stats_state_enabled_entry,
-		tdls_stats_state_enabled_exit,
-		tdls_stats_state_enabled_event
+		true,
+		"TDLS_STATS_ENABLING",
+		tdls_stats_state_enabling_entry,
+		tdls_stats_state_enabling_exit,
+		tdls_stats_state_enabling_event
 	},
 	{
 		(uint8_t)TDLS_STATS_S_MAX,
@@ -586,12 +640,17 @@ struct wlan_sm_state_info tdls_stats_sm_info[] = {
 		NULL,
 		NULL
 	},
+	{
+		(uint8_t)TDLS_STATS_SS_ENABLED,
+		(uint8_t)TDLS_STATS_S_ENABLING,
+		(uint8_t)WLAN_SM_ENGINE_STATE_NONE,
+		false,
+		"TDLS_STATS_SS_ENABLED",
+		tdls_stats_subst_enabled_entry,
+		tdls_stats_subst_enabled_exit,
+		tdls_stats_subst_enabled_event
+	},
 };
-
-/* =========================================================================
- * Event name table and SM lifecycle APIs
- * =========================================================================
- */
 
 static const char *tdls_stats_sm_event_names[] = {
 	"EV_ENABLE",
@@ -679,23 +738,6 @@ void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev)
  *                 The caller stores this in the TDLS PSOC object
  *                 (e.g. tdls_soc_priv_obj::stats_ctx).
  *
- * Design note — why a double pointer?
- *   This function owns the allocation of tdls_stats_context.  The double
- *   pointer is the standard C "allocate-and-return" pattern: the function
- *   writes the allocated pointer into *stats_ctx_out so the caller never
- *   needs to pre-allocate or know the size of the context.  The caller
- *   must later pass the returned pointer to tdls_stats_sm_destroy() which
- *   frees it.
- *
- * Initialisation sequence:
- *   1. Allocate tdls_stats_context (includes embedded cache DB).
- *   2. Query wmi_service_tdls_stats_info to pick the initial state:
- *        FW capable   -> TDLS_STATS_S_INIT  (begin caching immediately)
- *        FW incapable -> TDLS_STATS_S_DISABLED (permanent; no caching)
- *   3. Create the wlan_sm_engine instance (triggers initial state entry).
- *   4. Create the SM spinlock.
- *   5. If initial state is INIT, initialise the cache DB.
- *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
  */
 QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
@@ -711,31 +753,20 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	if (!psoc || !stats_ctx_out)
 		return QDF_STATUS_E_INVAL;
 
-	/* Step 1: Allocate the context (includes the embedded cache DB) */
 	stats_ctx = qdf_mem_malloc(sizeof(*stats_ctx));
 	if (!stats_ctx) {
 		tdls_err("TDLS stats: failed to allocate stats context");
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	stats_ctx->psoc    = psoc;
+	stats_ctx->psoc = psoc;
 	stats_ctx->psoc_id = wlan_psoc_get_id(psoc);
 	stats_ctx->db_initialized = false;
 
-	/* Step 2: Determine initial state from INI and FW service capability.
-	 * This is a one-time decision at PSOC create time.
-	 *   INI and FW capable   -> INIT     (start caching immediately)
-	 *   INI OR FW incapable -> DISABLED (permanent terminal state)
-	 */
 	cfg_tdls_get_stats_enable(psoc, &is_tdls_stats_supported);
 	initial_state = is_tdls_stats_supported
 				? TDLS_STATS_S_INIT : TDLS_STATS_S_DISABLED;
 
-	/* Step 3: Create the SM engine.
-	 * The initial state's entry callback (INIT or DISABLED) does nothing
-	 * and does not acquire tdls_stats_sm_lock, so the lock need not exist
-	 * yet at this point.
-	 */
 	qdf_scnprintf(name, sizeof(name), "TDLS-Stats");
 
 	sm = wlan_sm_create(name, stats_ctx, initial_state,
@@ -750,15 +781,8 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	}
 	stats_ctx->sm.sm_hdl = sm;
 
-	/* Step 4: Create the SM spinlock (after SM engine, matching
-	 * ttlm_sm_create pattern).
-	 * Lock order: tdls_stats_sm_lock (outer) -> db.lock (inner).
-	 */
 	qdf_spinlock_create(&stats_ctx->sm.tdls_stats_sm_lock);
 
-	/* Step 5: Initialise the cache DB only for the INIT path.
-	 * The DISABLED path never uses the cache DB.
-	 */
 	if (initial_state == TDLS_STATS_S_INIT) {
 		status = tdls_stats_db_init(&stats_ctx->db,
 					    TDLS_STATS_HIST_MAX_NODES);
@@ -785,15 +809,6 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
  *                           all associated resources.
  * @stats_ctx: TDLS stats context returned by tdls_stats_sm_create().
  *
- * Cleanup order (mirrors ttlm_sm_destroy pattern):
- *   1. Deinit cache DB — only if db_initialized is true (INIT path).
- *      All state exit callbacks do not access the DB, so it is safe to
- *      deinit the DB before deleting the SM engine.
- *   2. Destroy the SM spinlock — all state exit callbacks do not acquire
- *      tdls_stats_sm_lock, so destroying it before wlan_sm_delete() is safe.
- *   3. Delete the SM engine.
- *   4. Free the context itself.
- *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
  */
 QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
@@ -801,23 +816,43 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 	if (!stats_ctx)
 		return QDF_STATUS_E_INVAL;
 
-	/* 1. Deinit cache DB only if it was initialised */
 	if (stats_ctx->db_initialized) {
 		tdls_stats_db_deinit(&stats_ctx->db);
 		stats_ctx->db_initialized = false;
 	}
 
-	/* 2. Destroy SM spinlock */
 	qdf_spinlock_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
 
-	/* 3. Delete SM engine */
 	wlan_sm_delete(stats_ctx->sm.sm_hdl);
 
-	/* 4. Free context */
 	qdf_mem_free(stats_ctx);
 
 	tdls_debug("TDLS stats SM destroyed");
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * tdls_stats_enable_cmd() - Core handler for the TDLS_STATS_ENABLE scheduler
+ *                           message.
+ * @stats_ctx: TDLS stats context obtained from the scheduler message bodyptr.
+ *
+ * Called from the scheduler thread (via tdls_process_cmd) when a
+ * TDLS_STATS_ENABLE message is dequeued.  Delivers TDLS_STATS_EV_ENABLE to
+ * the SM only when the SM is in the ENABLING parent state, i.e. waiting for
+ * the scheduler-thread confirmation to enter SS_ENABLED.  All other states
+ * are either already active (SS_ENABLED — no-op) or stale (INIT / DISABLED —
+ * ignore).
+ *
+ * Lock note: uses tdls_stats_sm_deliver_event() which acquires
+ * tdls_stats_sm_lock internally; must NOT be called while that lock is held.
+ */
+void tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx)
+{
+	if (!stats_ctx)
+		return;
+
+	tdls_stats_sm_deliver_event(stats_ctx, TDLS_STATS_EV_ENABLE_ACTIVE,
+				    0, NULL);
 }
 
 /**
@@ -832,12 +867,23 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 QDF_STATUS tdls_get_tdls_stats(struct tdls_stats_context *stats_ctx,
 			       bool enable)
 {
-	enum tdls_stats_sm_evt event;
+	enum tdls_stats_sm_state state;
 
 	if (!stats_ctx)
 		return QDF_STATUS_E_INVAL;
 
-	event = enable ? TDLS_STATS_EV_ENABLE : TDLS_STATS_EV_DISABLE;
+	state = wlan_sm_get_current_state(stats_ctx->sm.sm_hdl);
 
-	return tdls_stats_sm_deliver_event(stats_ctx, event, 0, NULL);
+	if (!enable && (state == TDLS_STATS_S_DISABLED ||
+			state == TDLS_STATS_S_INIT))
+		return QDF_STATUS_SUCCESS;
+
+	if (enable && (state == TDLS_STATS_S_ENABLING ||
+		       state == TDLS_STATS_SS_ENABLED))
+		return QDF_STATUS_SUCCESS;
+
+	return tdls_stats_sm_deliver_event(stats_ctx,
+					   enable ? TDLS_STATS_EV_ENABLE
+						  : TDLS_STATS_EV_DISABLE,
+					   0, NULL);
 }

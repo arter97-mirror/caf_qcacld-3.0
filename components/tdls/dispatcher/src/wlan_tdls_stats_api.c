@@ -56,6 +56,18 @@ wlan_tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
 }
 
 /**
+ * wlan_tdls_stats_enable_cmd() - Dispatcher wrapper for the
+ *                                TDLS_STATS_ENABLE scheduler message handler.
+ * @stats_ctx: TDLS stats context obtained from the scheduler message bodyptr.
+ *
+ * Return: None
+ */
+void wlan_tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx)
+{
+	tdls_stats_enable_cmd(stats_ctx);
+}
+
+/**
  * wlan_tdls_get_tdls_stats() - Dispatcher API to handle a TDLS stats
  *                              enable/disable request from the HDD layer.
  * @psoc: PSOC object.

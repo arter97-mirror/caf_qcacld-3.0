@@ -215,6 +215,15 @@ void tdls_emit_vendor_event(const struct tdls_stats_entry *entry);
 void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * tdls_stats_enable_cmd() - Core handler for the TDLS_STATS_ENABLE scheduler
+ *                           message.
+ * @stats_ctx: TDLS stats context obtained from the scheduler message bodyptr.
+ *
+ * Must NOT be called while tdls_stats_sm_lock is held.
+ */
+void tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx);
+
+/**
  * tdls_get_tdls_stats() - Core API to handle a TDLS stats enable/disable
  *                         request from the dispatcher layer.
  * @stats_ctx: TDLS stats context obtained from tdls_soc_priv_obj::stats_ctx.

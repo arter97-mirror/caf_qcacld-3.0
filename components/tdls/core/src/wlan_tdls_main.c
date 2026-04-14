@@ -30,6 +30,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_tdls_tgt_api.h"
 #include "wlan_tdls_stats.h"
+#include <wlan_tdls_stats_api.h>
 #include "wlan_policy_mgr_public_struct.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_scan_ucfg_api.h"
@@ -83,6 +84,7 @@ static char *tdls_get_cmd_type_str(enum tdls_command_type cmd_type)
 	CASE_RETURN_STRING(TDLS_DELETE_ALL_PEERS_INDICATION);
 	CASE_RETURN_STRING(TDLS_CMD_START_BSS);
 	CASE_RETURN_STRING(TDLS_CMD_SET_LINK_UNFORCE);
+	CASE_RETURN_STRING(TDLS_STATS_ENABLE);
 	default:
 		return "Invalid TDLS command";
 	}
@@ -807,6 +809,9 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_CMD_SET_LINK_UNFORCE:
 		tdls_handle_link_unforce(msg->bodyptr);
+		break;
+	case TDLS_STATS_ENABLE:
+		wlan_tdls_stats_enable_cmd(msg->bodyptr);
 		break;
 	default:
 		break;

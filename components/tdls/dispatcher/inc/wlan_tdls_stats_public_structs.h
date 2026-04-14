@@ -150,26 +150,31 @@ enum tdls_stats_reason_code {
 
 /**
  * enum tdls_stats_sm_state - TDLS stats state machine states.
- * @TDLS_STATS_S_DISABLED: FW capability absent; logging permanently disabled.
- *                         No caching, no forwarding.  All events are dropped.
- *                         This is a terminal state — no transitions out.
- * @TDLS_STATS_S_INIT:     Default caching state.  All TDLS events are cached
- *                         in the stats database until an enable command is
- *                         received.
- * @TDLS_STATS_S_ENABLED:  Active forwarding state.  All TDLS events are
- *                         forwarded immediately as vendor events; no caching.
- * @TDLS_STATS_S_MAX:      Sentinel — not a valid state.
- *
- * The initial state is determined once at PSOC creation based on FW service
- * capability:
- *   - FW capability present  -> @TDLS_STATS_S_INIT
- *   - FW capability absent   -> @TDLS_STATS_S_DISABLED (permanent)
+ * @TDLS_STATS_S_DISABLED:  FW capability absent; logging permanently disabled.
+ *                          No caching, no forwarding.  All events are dropped.
+ *                          This is a terminal state — no transitions out.
+ * @TDLS_STATS_S_INIT:      Default caching state.  All TDLS events are cached
+ *                          in the stats database until an enable command is
+ *                          received.
+ * @TDLS_STATS_S_ENABLING:  Parent state for the active-forwarding hierarchy.
+ *                          Has one sub-state: @TDLS_STATS_SS_ENABLED.
+ * @TDLS_STATS_S_MAX:       Sentinel for main states — not a valid state.
+ *                          Shares the same integer value as the first
+ *                          sub-state (@TDLS_STATS_SS_ENABLED), following
+ *                          the same convention used by the TTLM SM.
+ * @TDLS_STATS_SS_ENABLED:  Sub-state of @TDLS_STATS_S_ENABLING.
+ *                          Active forwarding mode: all TDLS events are
+ *                          forwarded immediately as vendor events; no caching.
+ *                          On entry the cache is flushed (oldest-first).
+ * @TDLS_STATS_SS_MAX:      Sentinel for sub-states — not a valid state.
  */
 enum tdls_stats_sm_state {
-	TDLS_STATS_S_DISABLED = 0,
-	TDLS_STATS_S_INIT,
-	TDLS_STATS_S_ENABLED,
-	TDLS_STATS_S_MAX,
+	TDLS_STATS_S_DISABLED  = 0,
+	TDLS_STATS_S_INIT      = 1,
+	TDLS_STATS_S_ENABLING  = 2,
+	TDLS_STATS_S_MAX       = 3,
+	TDLS_STATS_SS_ENABLED  = 4,
+	TDLS_STATS_SS_MAX      = 5,
 };
 
 /**
@@ -183,6 +188,7 @@ enum tdls_stats_sm_state {
  * @TDLS_STATS_EV_STA_CONNECTED: STA connection completed; triggers WMI
  *                               enable=1 if single-STA SCC condition is met.
  *                               Does not cause a state transition.
+ * @TDLS_STATS_EV_ENABLE_ACTIVE: TDLS stats enable is active.
  * @TDLS_STATS_EV_MAX:           Sentinel — not a valid event.
  */
 enum tdls_stats_sm_evt {
@@ -191,6 +197,7 @@ enum tdls_stats_sm_evt {
 	TDLS_STATS_EV_NEW_EVENT,
 	TDLS_STATS_EV_FW_STATS,
 	TDLS_STATS_EV_STA_CONNECTED,
+	TDLS_STATS_EV_ENABLE_ACTIVE,
 	TDLS_STATS_EV_MAX,
 };
 
