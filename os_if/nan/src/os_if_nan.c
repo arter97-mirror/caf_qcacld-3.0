@@ -3192,16 +3192,13 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 
 	osif_debug("Sending NAN Enable Req. NAN Ch Freq: %d %d",
 		   nan_req->social_chan_2g_freq, nan_req->social_chan_5g_freq);
-
-	/* Use serialization instead of direct call */
-	status = ucfg_nan_ser_enable_req(vdev_id, nan_req);
-
+	status = ucfg_nan_discovery_req(nan_req, NAN_ENABLE_REQ);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		osif_debug("Successfully sent NAN Enable request via serialization");
+		osif_debug("Successfully sent NAN Enable request");
 		os_if_cstats_log_nan_disc_enable_req_evt(vdev_id, nan_req);
 	} else {
-		osif_err("Unable to send NAN Enable request via serialization");
+		osif_err("Unable to send NAN Enable request");
 	}
 
 	qdf_mem_free(nan_req);

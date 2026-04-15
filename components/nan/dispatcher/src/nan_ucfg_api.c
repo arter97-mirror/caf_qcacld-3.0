@@ -729,12 +729,6 @@ bool ucfg_is_nan_disc_active(struct wlan_objmgr_psoc *psoc)
 	return nan_is_disc_active(psoc);
 }
 
-QDF_STATUS ucfg_nan_ser_enable_req(uint8_t vdev_id,
-				   struct nan_enable_req *nan_req)
-{
-	return nan_ser_enable_req(vdev_id, nan_req);
-}
-
 QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 {
 	struct wlan_objmgr_psoc *psoc;

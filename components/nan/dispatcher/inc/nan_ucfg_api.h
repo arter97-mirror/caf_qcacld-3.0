@@ -285,19 +285,6 @@ QDF_STATUS ucfg_nan_get_callbacks(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type);
 
 /**
- * ucfg_nan_ser_enable_req() - Serialize NAN enable request
- * @vdev_id: VDEV ID
- * @nan_req: NAN enable request
- *
- * This function serializes the NAN enable request to ensure proper
- * sequencing with other commands.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_nan_ser_enable_req(uint8_t vdev_id,
-				   struct nan_enable_req *nan_req);
-
-/**
  * ucfg_is_nan_conc_control_supported() - is NAN concurrency controlled by host
  * @psoc: pointer to psoc object
  *
