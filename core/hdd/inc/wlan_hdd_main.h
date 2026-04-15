@@ -1483,6 +1483,11 @@ enum hdd_wlm_latency_level {
  * @wfd_mode: WFD mode for P2P interface
  * @enable_active_apf_mode: Enable active APF mode flag
  * @dhcp_config_setsuspend: Enable when DHCP in progress and get setsuspend cmd
+ * @idle_roam_monitor_enabled: True when idle roam monitor WMI command has been
+ *  sent to firmware during the current screen-off state. Used to prevent
+ *  re-enabling idle roaming if the framework re-sends SETSUSPENDMODE 1 after
+ *  a roam (without SETSUSPENDMODE 0 in between) while DHCP is still in
+ *  progress. Reset to false when SETSUSPENDMODE 0 (screen ON) is received.
  * @is_probe_peer_pending: Enable if a probe peer command is pending
  * @probe_peer_cookie: Cookie for correlating probe peer request with completion
  * @user_nss_ctx: Pointer to user configured NSS
@@ -1710,6 +1715,7 @@ struct hdd_adapter {
 #endif
 	bool enable_active_apf_mode;
 	bool dhcp_config_setsuspend;
+	bool idle_roam_monitor_enabled;
 	qdf_atomic_t is_probe_peer_pending;
 	u64 probe_peer_cookie;
 	void *user_nss_ctx;

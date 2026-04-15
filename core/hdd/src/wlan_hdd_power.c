@@ -1245,18 +1245,50 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 		hdd_dhcp_v4_done_ind(hdd_ctx->mac_handle, adapter);
 
 		if (adapter->dhcp_config_setsuspend) {
-			link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+			/*
+			 * DHCP renewal completed. A SETSUSPENDMODE 1 command
+			 * was deferred while DHCP was in progress.
+			 *
+			 * Only ONE idle roam is allowed per screen-off state.
+			 * If idle roam monitor was already
+			 * enabled earlier in this screen-off period (e.g. the
+			 * first SETSUSPENDMODE 1 before any DHCP), do NOT
+			 * re-enable it here. Re-enabling would cause the
+			 * firmware to trigger a second idle roam scan.
+			 *
+			 * Only send the WMI enable if idle roam monitor has
+			 * not been enabled yet during this screen-off state.
+			 *
+			 * if SETSUSPENDMODE 0 was received before DHCP
+			 * completed, dhcp_config_setsuspend
+			 * was cleared and we won't reach here.
+			 */
+			if (adapter->idle_roam_monitor_enabled) {
+				hdd_nofl_debug("Idle roam already enabled this screen-off, skip re-enable after DHCP");
+			} else {
+				link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 						adapter->deflink->vdev_id);
-			if (!link_info)
-				goto exit;
+				if (!link_info) {
+					adapter->dhcp_config_setsuspend = false;
+					goto exit;
+				}
 
-			if (hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1))
-				goto exit;
-			if (hdd_send_idle_roam_suspend_mode(hdd_ctx, 1))
-				goto exit;
+				if (hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1))
+					goto exit;
+				if (hdd_send_idle_roam_suspend_mode(hdd_ctx, 1))
+					goto exit;
+				adapter->idle_roam_monitor_enabled = true;
+			}
 			adapter->dhcp_config_setsuspend = false;
 		}
 
+		/*
+		 * If SETSUSPENDMODE 1 was already processed before this DHCP
+		 * renewal (dhcp_config_setsuspend was never set), do not send
+		 * the enable command again.
+		 * If no SETSUSPENDMODE 1 was ever received
+		 * (dhcp_config_setsuspend == false), do not send any command.
+		 */
 		if (!ucfg_pmo_is_arp_offload_enabled(hdd_ctx->psoc)) {
 			hdd_debug("Offload not enabled");
 			goto exit;

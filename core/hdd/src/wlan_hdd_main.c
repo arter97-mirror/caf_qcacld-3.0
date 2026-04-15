@@ -24596,6 +24596,20 @@ void hdd_set_disconnect_link_info_cb(uint8_t vdev_id, bool is_disconnect_sent)
 	adapter->discon_link_info = link_info;
 	hdd_debug("vdev_id %d is_disconnect_sent %d", link_info->vdev_id,
 		  is_disconnect_sent);
+
+	/*
+	 * Reset idle_roam_monitor_enabled on a real disconnect (sent OTA)
+	 * so that idle roam can be re-enabled after reconnect, even if the
+	 * framework does not send SETSUSPENDMODE 0 during the disconnect.
+	 *
+	 * For roam-induced disconnects (is_disconnect_sent = false), the flag
+	 * is intentionally kept true to prevent a second idle roam scan from
+	 * being triggered after the roam completes.
+	 */
+	if (is_disconnect_sent) {
+		adapter->idle_roam_monitor_enabled = false;
+		adapter->dhcp_config_setsuspend = false;
+	}
 }
 
 void hdd_sap_channel_bw_update_cb(uint8_t vdev_id)

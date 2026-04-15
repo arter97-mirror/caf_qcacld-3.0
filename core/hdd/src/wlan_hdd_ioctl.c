@@ -3304,18 +3304,98 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 		  idle_monitor,
 		  ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc));
 
-	if (sme_get_dhcp_status(hdd_ctx->mac_handle, link_info->vdev_id) &&
-	    idle_monitor == 1) {
-		hdd_nofl_debug("DHCP in progress. Ignore SETSUSPEND command");
-		adapter->dhcp_config_setsuspend = true;
-		return 0;
+	if (idle_monitor == 1) {
+		/*
+		 * Screen OFF: if DHCP is in progress, defer the idle roam
+		 * monitor enable command. It will be sent once DHCP completes
+		 * via __wlan_hdd_ipv4_changed().
+		 */
+		if (sme_get_dhcp_status(hdd_ctx->mac_handle,
+					link_info->vdev_id)) {
+			hdd_nofl_debug("DHCP in progress. Defer SETSUSPENDMODE 1");
+			adapter->dhcp_config_setsuspend = true;
+			return 0;
+		}
+
+		/*
+		 * If idle roam monitor was already enabled in this screen-off
+		 * state, skip re-enabling it. This handles the case where the
+		 * framework re-sends SETSUSPENDMODE 1 after a roam (without
+		 * SETSUSPENDMODE 0 in between) and DHCP has already completed
+		 * by the time the command arrives (so it is not deferred).
+		 */
+		if (adapter->idle_roam_monitor_enabled) {
+			hdd_nofl_debug("Idle roam already enabled this screen-off, skip re-enable");
+			return 0;
+		}
+
+		errno = hdd_handle_apf_mode_on_idle(hdd_ctx, link_info,
+						    idle_monitor);
+		if (errno)
+			return errno;
+
+		errno = hdd_send_idle_roam_suspend_mode(hdd_ctx, idle_monitor);
+		if (!errno)
+			/*
+			 * Track that idle roam monitor is now enabled for this
+			 * screen-off state. This prevents re-enabling it if
+			 * the framework re-sends SETSUSPENDMODE 1 after a roam
+			 * (without SETSUSPENDMODE 0 in between) regardless of
+			 * whether DHCP is in progress at that point.
+			 *
+			 * Sequence that triggers the duplicate idle roam:
+			 *  1. Screen OFF → SETSUSPENDMODE 1 → WMI enable sent
+			 *     → idle_roam_monitor_enabled = true
+			 *  2. Idle roam triggered → roam to new AP (screen
+			 *     still off)
+			 *  3. Post-roam DHCP renewal starts (screen still off)
+			 *  4. Framework re-sends SETSUSPENDMODE 1 after roam
+			 *     (no SETSUSPENDMODE 0 in between, screen still
+				off)
+			 *     → DHCP in progress → deferred
+			 *     (dhcp_config_setsuspend=true)
+			 *  5. DHCP completes → dhcp_config_setsuspend==true
+			 *     [BUG: WMI enable sent again → second idle roam]
+			 *
+			 * With this fix, step 5 checks
+			 * idle_roam_monitor_enabled and skips the re-enable.
+			 */
+			adapter->idle_roam_monitor_enabled = true;
+		return errno;
 	}
+
+	/*
+	 * Screen ON (idle_monitor == 0):
+	 * Clear the deferred flag to prevent idle roaming from being
+	 * triggered after the screen is already ON.
+	 *
+	 * Without this fix, the following sequence causes idle roaming to
+	 * be triggered twice / at the wrong time:
+	 *   1. DHCP starts
+	 *   2. SETSUSPENDMODE 1 received → deferred
+		(dhcp_config_setsuspend=true)
+	 *   3. SETSUSPENDMODE 0 received → WMI disable sent
+	 *      [BUG: dhcp_config_setsuspend NOT cleared in original code]
+	 *   4. DHCP completes → __wlan_hdd_ipv4_changed sees
+	 *      dhcp_config_setsuspend==true → sends WMI enable UNEXPECTEDLY
+	 *      even though screen is already ON (idle roaming triggered twice)
+	 *
+	 * clear dhcp_config_setsuspend here so that step 4 above does
+	 * not send the WMI enable command after SETSUSPENDMODE 0 was received.
+	 */
+	adapter->dhcp_config_setsuspend = false;
 
 	errno = hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, idle_monitor);
 	/* Always attempt to send idle roam suspend mode regardless of APF result */
 	ret = hdd_send_idle_roam_suspend_mode(hdd_ctx, idle_monitor);
 	if (!errno)
 		errno = ret;
+	/*
+	 * Reset the per-screen-off idle roam state unconditionally so that
+	 * the next screen-off cycle can enable idle roaming again, even if
+	 * the WMI disable command failed.
+	 */
+	adapter->idle_roam_monitor_enabled = false;
 	return errno;
 }
 
