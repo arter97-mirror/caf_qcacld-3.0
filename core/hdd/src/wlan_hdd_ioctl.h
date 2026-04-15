@@ -206,4 +206,19 @@ hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
 int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
 				struct wlan_hdd_link_info *link_info,
 				uint8_t idle_monitor);
+
+/**
+ * hdd_send_idle_roam_suspend_mode() - Send idle roam suspend mode to firmware
+ * @hdd_ctx: Pointer to hdd context
+ * @idle_monitor: Idle monitor value (0 = active/screen-on, 1 = idle/screen-off)
+ *
+ * This function sends the idle roam suspend mode to firmware via PMO.
+ * It is decoupled from hdd_handle_apf_mode_on_idle() so that APF mode
+ * handling and idle roam suspend mode notification can be invoked
+ * independently by callers.
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+int hdd_send_idle_roam_suspend_mode(struct hdd_context *hdd_ctx,
+				    uint8_t idle_monitor);
 #endif /* end #if !defined(WLAN_HDD_IOCTL_H) */

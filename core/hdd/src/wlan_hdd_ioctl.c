@@ -3277,7 +3277,7 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 				    struct hdd_priv_data *priv_data)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
-	int errno;
+	int errno, ret;
 	uint8_t *value = command;
 	uint8_t idle_monitor;
 
@@ -3311,14 +3311,18 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 		return 0;
 	}
 
-	return hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, idle_monitor);
+	errno = hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, idle_monitor);
+	/* Always attempt to send idle roam suspend mode regardless of APF result */
+	ret = hdd_send_idle_roam_suspend_mode(hdd_ctx, idle_monitor);
+	if (!errno)
+		errno = ret;
+	return errno;
 }
 
 int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
 				struct wlan_hdd_link_info *link_info,
 				uint8_t idle_monitor)
 {
-	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -3346,6 +3350,26 @@ int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		}
 	}
+
+	return 0;
+}
+
+/**
+ * hdd_send_idle_roam_suspend_mode() - Send idle roam suspend mode to firmware
+ * @hdd_ctx: Pointer to hdd context
+ * @idle_monitor: Idle monitor value (0 = active/screen-on, 1 = idle/screen-off)
+ *
+ * This function sends the idle roam suspend mode to firmware via PMO.
+ * It is decoupled from hdd_handle_apf_mode_on_idle() so that APF mode
+ * handling and idle roam suspend mode notification can be invoked
+ * independently by callers.
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+int hdd_send_idle_roam_suspend_mode(struct hdd_context *hdd_ctx,
+				    uint8_t idle_monitor)
+{
+	QDF_STATUS status;
 
 	status = ucfg_pmo_tgt_psoc_send_idle_roam_suspend_mode(hdd_ctx->psoc,
 							       idle_monitor);

@@ -1250,7 +1250,10 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 			if (!link_info)
 				goto exit;
 
-			hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1);
+			if (hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1))
+				goto exit;
+			if (hdd_send_idle_roam_suspend_mode(hdd_ctx, 1))
+				goto exit;
 			adapter->dhcp_config_setsuspend = false;
 		}
 
