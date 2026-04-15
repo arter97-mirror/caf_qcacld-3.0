@@ -3812,6 +3812,9 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *event_param;
 	WOW_EVENT_INFO_fixed_param *wake_info;
 
+	if (!wma || !wma->psoc)
+		return -EINVAL;
+
 	event_param = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *)event;
 	if (!event_param) {
 		wma_err("Wake event data is null");
