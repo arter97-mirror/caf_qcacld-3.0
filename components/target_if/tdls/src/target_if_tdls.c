@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -160,6 +160,35 @@ target_if_tdls_unregister_event_handler(struct wlan_objmgr_psoc *psoc,
 					    wmi_tdls_peer_event_id);
 }
 
+/**
+ * target_if_tdls_request_stats_info() - Send WMI_REQUEST_STATS_INFO_CMDID
+ * @psoc: PSOC object
+ * @vdev_id: ID of the STA vdev for which stats collection is requested
+ * @enable: 1 = enable FW TDLS stats collection (SCC only);
+ *          host never sends 0 — FW handles disable automatically
+ *
+ * Sends WMI_REQUEST_STATS_INFO_CMDID to firmware to start per-peer TDLS
+ * data stats collection on the specified vdev.  Called once per STA
+ * connection when a single-STA SCC condition is detected.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+static QDF_STATUS
+target_if_tdls_request_stats_info(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, uint32_t enable)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("TDLS stats: Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wmi_unified_tdls_request_stats_info_cmd(wmi_handle,
+						       vdev_id, enable);
+}
+
 QDF_STATUS
 target_if_tdls_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -172,6 +201,7 @@ target_if_tdls_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	tdls_txops->tdls_reg_ev_handler = target_if_tdls_register_event_handler;
 	tdls_txops->tdls_unreg_ev_handler =
 		target_if_tdls_unregister_event_handler;
+	tdls_txops->request_stats_info = target_if_tdls_request_stats_info;
 
 	return QDF_STATUS_SUCCESS;
 }

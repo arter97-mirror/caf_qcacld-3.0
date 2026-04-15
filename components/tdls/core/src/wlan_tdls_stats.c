@@ -39,6 +39,9 @@
 #include <wlan_tdls_cfg_api.h>
 #include <wlan_tdls_stats_public_structs.h>
 #include <wlan_sm_engine.h>
+#include "wlan_tdls_tgt_api.h"
+#include "wlan_policy_mgr_public_struct.h"
+#include "wlan_policy_mgr_api.h"
 
 /* =========================================================================
  * Cache database operations
@@ -597,6 +600,74 @@ static const char *tdls_stats_sm_event_names[] = {
 	"EV_FW_STATS",
 	"EV_STA_CONNECTED",
 };
+
+/**
+ * tdls_stats_handle_sta_connection() - Handle a STA-connected event.
+ * @vdev: VDEV on which the STA connection completed.
+ *
+ * Called from the TDLS stats state machine when TDLS_STATS_EV_STA_CONNECTED
+ * is delivered (from both INIT and SS_ENABLED states).
+ *
+ * Checks the current connection state via the policy manager:
+ *   - Single STA connection with SCC (no MCC): sends WMI enable=1 to start
+ *     FW TDLS stats collection.
+ *   - Multiple STAs or MCC active: no WMI command sent; FW handles disable
+ *     automatically on disconnect/MCC transitions.
+ *
+ * No state machine transitions are performed — the state machine is driven
+ * independently by GETTDLSINFO enable/disable user commands.
+ */
+void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t sta_count;
+	bool is_mcc;
+	QDF_STATUS status;
+
+	if (!vdev) {
+		tdls_err("TDLS stats: vdev is NULL in sta_connection handler");
+		return;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		tdls_err("TDLS stats: psoc is NULL in sta_connection handler");
+		return;
+	}
+
+	/*
+	 * Query current STA connection count and MCC status via the policy
+	 * manager.  These are the same APIs used by tdls_set_ct_mode() and
+	 * tdls_is_concurrency_allowed() for consistency.
+	 */
+	sta_count = policy_mgr_mode_specific_connection_count(psoc,
+							      PM_STA_MODE,
+							      NULL);
+	is_mcc = policy_mgr_is_mcc_on_any_sta_vdev(psoc);
+
+	if (sta_count == 1 && !is_mcc) {
+		/*
+		 * Single STA, SCC condition met — send WMI enable=1 to start
+		 * FW TDLS stats collection.  Host never sends enable=0; FW
+		 * handles disable automatically on disconnect/MCC.
+		 */
+		tdls_debug("TDLS stats: STA connected SCC (sta_count=%u, mcc=%d, vdev_id=%u), sending WMI enable=1",
+			   sta_count, is_mcc, wlan_vdev_get_id(vdev));
+		status = tgt_tdls_request_stats_info(psoc,
+						     wlan_vdev_get_id(vdev),
+						     1);
+		if (QDF_IS_STATUS_ERROR(status))
+			tdls_err("TDLS stats: WMI request_stats_info enable=1 failed, status %d",
+				 status);
+	} else {
+		/*
+		 * MCC or multiple STAs — no WMI command.  FW handles disable
+		 * automatically; no state machine transition needed.
+		 */
+		tdls_debug("TDLS stats: STA connected but not SCC (sta_count=%u, mcc=%d) - no WMI cmd",
+			   sta_count, is_mcc);
+	}
+}
 
 /**
  * tdls_stats_sm_create() - Allocate and initialise the TDLS stats context
