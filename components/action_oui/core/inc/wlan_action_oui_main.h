@@ -125,10 +125,13 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 /**
  * action_oui_psoc_enable() - Notify action OUI psoc enable
  * @psoc: objmgr psoc object
+ * @load_default_config: flag to indicate if we need to load
+ * default config or not.
  *
  * Return: void
  */
-void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc);
+void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+			    bool load_default_config);
 
 /**
  * action_oui_psoc_disable() - Notify action OUI psoc disable
@@ -248,7 +251,8 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 }
 
 static inline
-void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc)
+void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+			    bool load_default_config)
 {
 }
 

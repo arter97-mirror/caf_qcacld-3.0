@@ -22235,14 +22235,16 @@ void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	policy_mgr_psoc_enable(psoc);
 	ucfg_tdls_psoc_enable(psoc);
 	ucfg_fwol_psoc_enable(psoc);
-	ucfg_action_oui_psoc_enable(psoc);
 	ucfg_ll_sap_psoc_enable(psoc);
+	if (!cds_is_driver_recovering())
+		ucfg_action_oui_psoc_enable(psoc, true);
+	else
+		ucfg_action_oui_psoc_enable(psoc, false);
 }
 
 void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 	ucfg_ll_sap_psoc_disable(psoc);
-	ucfg_action_oui_psoc_disable(psoc);
 	ucfg_fwol_psoc_disable(psoc);
 	ucfg_tdls_psoc_disable(psoc);
 	policy_mgr_psoc_disable(psoc);
@@ -22251,6 +22253,8 @@ void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	nan_psoc_disable(psoc);
 	disa_psoc_disable(psoc);
 	ocb_psoc_disable(psoc);
+	if (!cds_is_driver_recovering())
+		ucfg_action_oui_psoc_disable(psoc);
 }
 
 QDF_STATUS hdd_component_pdev_open(struct wlan_objmgr_pdev *pdev)

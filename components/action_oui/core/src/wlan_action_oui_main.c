@@ -426,7 +426,8 @@ exit:
 	return status;
 }
 
-void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc)
+void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+			    bool load_default_config)
 {
 	struct action_oui_psoc_priv *psoc_priv;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -439,14 +440,16 @@ void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		goto exit;
 	}
 
-	action_oui_load_config(psoc_priv);
+	if (load_default_config) {
+		action_oui_load_config(psoc_priv);
 
-	status = action_oui_allocate(psoc_priv);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		action_oui_err("Failed to alloc action_oui");
-		goto exit;
+		status = action_oui_allocate(psoc_priv);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			action_oui_err("Failed to alloc action_oui");
+			goto exit;
+		}
+		action_oui_parse_config(psoc);
 	}
-	action_oui_parse_config(psoc);
 	action_oui_send_config(psoc);
 exit:
 	ACTION_OUI_EXIT();
