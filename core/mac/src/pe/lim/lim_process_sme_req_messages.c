@@ -10107,7 +10107,7 @@ static void lim_process_hw_mode_change_notify(struct mac_context *mac_ctx)
 		if (!mac_ctx->lim.gpSession[idx].valid)
 			continue;
 		session = &mac_ctx->lim.gpSession[idx];
-		if (!lim_update_ap_session_nss(session))
+		if (!lim_update_ap_session_nss(session, false))
 			continue;
 
 		status = sch_set_fixed_beacon_fields(mac_ctx, session);

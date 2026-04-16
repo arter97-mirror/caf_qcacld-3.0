@@ -1500,7 +1500,8 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 	return status;
 }
 
-bool lim_update_ap_session_nss(struct pe_session *session)
+bool lim_update_ap_session_nss(struct pe_session *session,
+			       bool bypass_hw_mode)
 {
 	QDF_STATUS status;
 	struct mac_context *mac;
@@ -1526,17 +1527,19 @@ bool lim_update_ap_session_nss(struct pe_session *session)
 		return false;
 	}
 
-	status = policy_mgr_curr_hwmode_fetch_chains_for_freq(psoc,
-							      session->curr_op_freq,
-							      &hwmode_tx_nss,
-							      &hwmode_rx_nss);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_debug("Failed to fetch hwmode nss %d", status);
-		return false;
-	}
+	if (!bypass_hw_mode) {
+		status = policy_mgr_curr_hwmode_fetch_chains_for_freq(
+						psoc, session->curr_op_freq,
+						&hwmode_tx_nss,
+						&hwmode_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to fetch hwmode nss %d", status);
+			return false;
+		}
 
-	vdev_tx_nss = QDF_MIN(vdev_tx_nss, hwmode_tx_nss);
-	vdev_rx_nss = QDF_MIN(vdev_rx_nss, hwmode_rx_nss);
+		vdev_tx_nss = QDF_MIN(vdev_tx_nss, hwmode_tx_nss);
+		vdev_rx_nss = QDF_MIN(vdev_rx_nss, hwmode_rx_nss);
+	}
 
 	if (session->cap_tx_nss == vdev_tx_nss &&
 	    session->cap_rx_nss == vdev_rx_nss)

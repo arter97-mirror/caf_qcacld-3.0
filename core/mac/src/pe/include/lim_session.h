@@ -1322,6 +1322,7 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 /**
  * lim_update_ap_session_nss() - Update NSS parameters for AP session
  * @session: PE session entry
+ * @bypass_hw_mode: Bypass HW mode limits while update of NSS
  *
  * This function updates the NSS (Number of Spatial Streams) parameters for
  * an AP session based on current hardware mode and vdev capabilities.
@@ -1330,9 +1331,13 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
  * a change in NSS values.
  * It also updates HE and EHT MCS sets according to the new NSS values.
  *
+ * If @bypass_hw_mode is set, then logic to limit the session NSS to current
+ * hwmode will be by-passed.
+ *
  * Return: true if NSS was updated and vdev is in active state, false otherwise
  */
-bool lim_update_ap_session_nss(struct pe_session *session);
+bool lim_update_ap_session_nss(struct pe_session *session,
+			       bool bypass_hw_mode);
 
 /**
  * lim_dump_session_info() - Dump the key parameters of PE session
