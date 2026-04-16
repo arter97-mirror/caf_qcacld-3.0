@@ -33,6 +33,7 @@
 #ifdef FEATURE_RUNTIME_PM
 #include <wlan_pmo_common_public_struct.h>
 #endif
+#include <wlan_tdls_stats_public_structs.h>
 
 #define WLAN_TDLS_STA_MAX_NUM                        8
 #define WLAN_TDLS_STA_P_UAPSD_OFFCHAN_MAX_NUM        1
@@ -749,6 +750,12 @@ struct tdls_osif_cb {
  * @tdls_osif_init_cb: callback to initialize the tdls priv
  * @tdls_osif_deinit_cb: callback to deinitialize the tdls priv
  * @tdls_osif_update_cb: callback to update osif params
+ * @tdls_stats_emit_cb: OS-IF callback to emit a TDLS stats entry as a
+ *                      vendor event.  Registered by HDD in
+ *                      hdd_update_tdls_config() and stored in
+ *                      tdls_soc_priv_obj by ucfg_tdls_update_config().
+ *                      The psoc pointer is passed as the first argument
+ *                      when the callback is invoked.
  */
 struct tdls_start_params {
 	struct tdls_user_config config;
@@ -771,6 +778,7 @@ struct tdls_start_params {
 	tdls_vdev_init_cb tdls_osif_init_cb;
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;
 	struct tdls_osif_cb tdls_osif_update_cb;
+	tdls_stats_emit_cb tdls_stats_emit_cb;
 };
 
 /**

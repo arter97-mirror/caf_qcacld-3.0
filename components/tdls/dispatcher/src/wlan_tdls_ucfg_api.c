@@ -505,6 +505,7 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	       req->tdls_osif_update_cb.tdls_osif_conn_update;
 	soc_obj->tdls_osif_update_cb.tdls_osif_disconn_update =
 	       req->tdls_osif_update_cb.tdls_osif_disconn_update;
+	soc_obj->stats_emit_cb = req->tdls_stats_emit_cb;
 	tdls_pm_call_backs.tdls_notify_increment_session =
 			tdls_notify_increment_session;
 

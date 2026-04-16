@@ -1980,7 +1980,8 @@ static int hdd_update_tdls_config(struct hdd_context *hdd_ctx)
 	tdls_cfg.tdls_osif_update_cb.tdls_osif_conn_update =
 					hdd_check_and_set_tdls_conn_params;
 	tdls_cfg.tdls_osif_update_cb.tdls_osif_disconn_update =
-					hdd_check_and_set_tdls_disconn_params;
+				hdd_check_and_set_tdls_disconn_params;
+	hdd_tdls_stats_register_emit_cb(&tdls_cfg);
 
 	status = ucfg_tdls_update_config(psoc, &tdls_cfg);
 	if (status != QDF_STATUS_SUCCESS) {

@@ -213,7 +213,8 @@ uint32_t tdls_stats_flush_entire_cache(struct tdls_stats_context *stats_ctx)
 		qdf_spin_unlock_bh(&stats_ctx->db.lock);
 
 		node = qdf_container_of(ln, struct tdls_stats_node, node);
-		tdls_emit_vendor_event(&node->entry);
+
+		tdls_emit_vendor_event(stats_ctx->psoc, &node->entry);
 		qdf_mem_free(node);
 		flushed_count++;
 
@@ -633,7 +634,7 @@ static bool tdls_stats_subst_enabled_event(void *ctx, uint16_t event,
 		break;
 	case TDLS_STATS_EV_NEW_EVENT:
 		entry = (struct tdls_stats_entry *)event_data;
-		tdls_emit_vendor_event(entry);
+		tdls_emit_vendor_event(stats_ctx->psoc, entry);
 		break;
 	case TDLS_STATS_EV_FW_STATS:
 		/*
@@ -645,7 +646,8 @@ static bool tdls_stats_subst_enabled_event(void *ctx, uint16_t event,
 		if (!batch || !batch->entries || !batch->num_entries)
 			break;
 		for (i = 0; i < batch->num_entries; i++)
-			tdls_emit_vendor_event(&batch->entries[i]);
+			tdls_emit_vendor_event(stats_ctx->psoc,
+					       &batch->entries[i]);
 		break;
 	case TDLS_STATS_EV_STA_CONNECTED:
 		tdls_stats_handle_sta_connection(
@@ -790,6 +792,39 @@ void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev)
 		tdls_debug("TDLS stats: STA connected but not SCC (sta_count=%u, mcc=%d) - no WMI cmd",
 			   sta_count, is_mcc);
 	}
+}
+
+/**
+ * tdls_emit_vendor_event() - Emit a single stats entry as a vendor event.
+ * @psoc:  PSOC object used to look up the registered OS-IF callback.
+ * @entry: Stats entry to emit.
+ *
+ * Retrieves the tdls_stats_emit_cb registered by the OS-IF layer (HDD) via
+ * wlan_tdls_register_stats_emit_cb() and invokes it.  This keeps the TDLS
+ * component free of any direct dependency on HDD headers.
+ *
+ * If no callback has been registered the entry is silently dropped.
+ */
+void tdls_emit_vendor_event(struct wlan_objmgr_psoc *psoc,
+			    const struct tdls_stats_entry *entry)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	if (!psoc || !entry)
+		return;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		tdls_err("TDLS stats: soc_obj is NULL, dropping entry");
+		return;
+	}
+
+	if (!soc_obj->stats_emit_cb) {
+		tdls_debug("TDLS stats: no emit callback registered, dropping entry");
+		return;
+	}
+
+	soc_obj->stats_emit_cb(soc_obj->soc, entry);
 }
 
 /**

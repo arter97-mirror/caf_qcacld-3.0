@@ -45,14 +45,6 @@
  */
 
 /**
- * TDLS_STATS_NON_MLO_LINK_ID - Sentinel link ID for non-MLO connections.
- *
- * Used in struct tdls_stats_entry::link_id to indicate that the TDLS
- * session is not associated with any specific MLO link.
- */
-#define TDLS_STATS_NON_MLO_LINK_ID      0xFF
-
-/**
  * TDLS_STATS_MAX_MCS_COUNTERS - Size of the per-direction MCS histogram arrays.
  *
  * Matches the firmware constant WMI_ENHANCE_STATS_MAX_MCS_COUNTERS (16).
@@ -222,8 +214,6 @@ enum tdls_stats_sm_evt {
  * @subtype:             Event subtype; see enum tdls_stats_subtype.
  * @success:             Outcome flag: 0 = success, 1 = failure.
  * @reason_code:         Reason code; see enum tdls_stats_reason_code.
- * @link_id:             MLO link ID.  Set to %TDLS_STATS_NON_MLO_LINK_ID
- *                       for non-MLO sessions.
  * @rssi:                RSSI in dBm (range -127 to 0).
  * @snr:                 Signal-to-noise ratio.
  * @channel:             Operating channel number.
@@ -282,7 +272,6 @@ struct tdls_stats_entry {
 	uint8_t  subtype;
 	uint8_t  success;
 	uint8_t  reason_code;
-	uint8_t  link_id;
 	int16_t  rssi;
 	int16_t  snr;
 	uint16_t channel;
@@ -378,6 +367,19 @@ struct tdls_stats_sm {
 	struct wlan_sm *sm_hdl;
 	qdf_spinlock_t  tdls_stats_sm_lock;
 };
+
+/**
+ * typedef tdls_stats_emit_cb - Callback to emit a TDLS stats entry to
+ *                              user space as a vendor event.
+ * @psoc:  PSOC object pointer.
+ * @entry: The stats entry to emit.
+ *
+ * Registered by the OS-IF layer (HDD) and called by the TDLS stats state
+ * machine whenever a stats entry needs to be forwarded to user space.
+ * This callback replaces any direct call from the TDLS component into HDD.
+ */
+typedef void (*tdls_stats_emit_cb)(struct wlan_objmgr_psoc *psoc,
+				   const struct tdls_stats_entry *entry);
 
 /**
  * struct tdls_stats_context - TDLS stats context (per-PSOC).

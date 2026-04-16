@@ -25,6 +25,7 @@
  */
 
 #include "qca_vendor.h"
+#include <wlan_tdls_stats_public_structs.h>
 
 struct hdd_context;
 
@@ -344,6 +345,40 @@ QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
  * Return: none
  */
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg);
+
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+/**
+ * hdd_tdls_stats_emit_cb() - OS-IF callback that emits a TDLS stats entry
+ *                            as a QCA vendor event.
+ * @psoc:  PSOC object pointer.
+ * @entry: Stats entry to emit.
+ *
+ * Registered with the TDLS component via tdls_start_params so that the
+ * TDLS stats state machine can forward entries to user space.
+ */
+void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
+			    const struct tdls_stats_entry *entry);
+
+/**
+ * hdd_tdls_stats_register_emit_cb() - Register TDLS stats emit callback
+ * @tdls_cfg: pointer to tdls_start_params structure
+ *
+ * Registers hdd_tdls_stats_emit_cb with the TDLS component so that the
+ * TDLS stats state machine can forward entries to user space.
+ *
+ * Return: none
+ */
+static inline void
+hdd_tdls_stats_register_emit_cb(struct tdls_start_params *tdls_cfg)
+{
+	tdls_cfg->tdls_stats_emit_cb = hdd_tdls_stats_emit_cb;
+}
+#else
+static inline void
+hdd_tdls_stats_register_emit_cb(struct tdls_start_params *tdls_cfg)
+{
+}
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 /**
  * hdd_config_tdls_with_band_switch() - configure tdls when band changes

@@ -198,12 +198,17 @@ uint32_t tdls_stats_flush_entire_cache(struct tdls_stats_context *stats_ctx);
 
 /**
  * tdls_emit_vendor_event() - Emit a single stats entry as a vendor event.
+ * @psoc:  PSOC object used to look up the registered OS-IF callback.
  * @entry: Stats entry to emit.
  *
- * Formats @entry and delivers it to user space via the nl80211 vendor
- * event path.
+ * Retrieves the %tdls_stats_emit_cb callback registered by the OS-IF layer
+ * (HDD) via wlan_tdls_register_stats_emit_cb() and invokes it.  This keeps
+ * the TDLS component free of any direct dependency on HDD headers.
+ *
+ * If no callback has been registered the entry is silently dropped.
  */
-void tdls_emit_vendor_event(const struct tdls_stats_entry *entry);
+void tdls_emit_vendor_event(struct wlan_objmgr_psoc *psoc,
+			    const struct tdls_stats_entry *entry);
 
 /**
  * tdls_stats_handle_sta_connection() - Handle a STA-connected event.
