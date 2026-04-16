@@ -2957,10 +2957,14 @@ enum roam_scan_freq_scheme {
  * structure
  * @vendor_handoff_context: vendor handoff context
  * @req_in_progress: to check whether vendor handoff request in progress or not
+ * @pending_fetch: vendor handoff param fetch was deferred because an MLO
+ *   link switch was in progress on the assoc vdev. The fetch will be
+ *   triggered automatically when RSO is re-enabled after the link switch.
  */
 struct wlan_cm_vendor_handoff_param {
 	void *vendor_handoff_context;
 	bool req_in_progress;
+	bool pending_fetch;
 };
 #endif
 

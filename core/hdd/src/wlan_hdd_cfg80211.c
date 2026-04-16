@@ -6968,7 +6968,13 @@ hdd_set_roam_rx_linkspeed_threshold(struct wlan_objmgr_psoc *psoc,
  * @hdd_ctx: HDD context
  * @vdev_id: vdev id
  *
- * Wrapper function for hdd_cm_get_handoff_param
+ * Wrapper for hdd_cm_get_handoff_param(). The RSO state check and
+ * deferred-fetch logic are handled in the core layer
+ * (cm_roam_send_vendor_handoff_param_req): if RSO is not enabled
+ * (e.g., temporarily stopped during MLO link switch), the core layer
+ * sets pending_fetch = true and returns QDF_STATUS_E_AGAIN, which
+ * hdd_cm_get_handoff_param() treats as success (deferred). The fetch
+ * is triggered automatically when RSO is re-enabled.
  *
  * Return: QDF_STATUS
  */

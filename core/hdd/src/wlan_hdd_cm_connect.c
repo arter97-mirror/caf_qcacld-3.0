@@ -2275,6 +2275,17 @@ QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
 	status = ucfg_cm_roam_send_vendor_handoff_param_req(psoc, vdev_id,
 							param_id,
 							vendor_handoff_context);
+	if (status == QDF_STATUS_E_AGAIN) {
+		/*
+		 * RSO is not enabled; fetch was deferred by the core layer
+		 * (pending_fetch flag set). Return success so the caller
+		 * (NCHO enable path) does not fail — the fetch will be
+		 * triggered automatically when RSO is re-enabled.
+		 */
+		hdd_debug("vendor handoff fetch deferred, RSO not enabled");
+		status = QDF_STATUS_SUCCESS;
+		goto error;
+	}
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Unable to get vendor handoff param");
 		goto error;

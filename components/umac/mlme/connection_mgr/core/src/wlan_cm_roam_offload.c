@@ -939,6 +939,7 @@ cm_roam_send_vendor_handoff_param_req(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_cm_vendor_handoff_param *vhp;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -953,15 +954,53 @@ cm_roam_send_vendor_handoff_param_req(struct wlan_objmgr_psoc *psoc,
 		goto error;
 	}
 
-	if (mlme_priv->cm_roam.vendor_handoff_param.req_in_progress) {
-		mlme_debug("vendor handoff request is already in progress");
-		status = QDF_STATUS_E_FAILURE;
+	vhp = &mlme_priv->cm_roam.vendor_handoff_param;
+
+	/*
+	 * If this is a user-triggered request (non-NULL context) and an
+	 * MLO link switch is in progress on the assoc vdev, defer the
+	 * fetch by setting pending_fetch. The fetch will be triggered
+	 * automatically when RSO is re-enabled after the link switch via
+	 * cm_roam_trigger_deferred_vendor_handoff().
+	 *
+	 * The check is restricted to the assoc vdev because NCHO config
+	 * is stored on the assoc vdev only. If a link switch is in
+	 * progress on a partner/link vdev, the command is accepted
+	 * normally on the assoc vdev.
+	 */
+	if (vendor_handoff_context &&
+	    !wlan_vdev_mlme_get_is_mlo_link(psoc, vdev_id) &&
+	    mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_debug("vdev %d: link switch in progress, defer handoff",
+			   vdev_id);
+		vhp->pending_fetch = true;
+		status = QDF_STATUS_E_AGAIN;
+		goto error;
+	}
+
+	if (vhp->req_in_progress) {
+		/*
+		 * A deferred fire-and-forget fetch (NULL context) may be in
+		 * flight when a new user-triggered request arrives. In that
+		 * case, update the context so the pending FW response will
+		 * complete the new request instead of being silently dropped.
+		 * For any other in-progress case, reject the new request.
+		 */
+		if (vendor_handoff_context &&
+		    !vhp->vendor_handoff_context) {
+			mlme_debug("vdev %d: deferred fetch in flight, updating context",
+				   vdev_id);
+			vhp->vendor_handoff_context = vendor_handoff_context;
+			status = QDF_STATUS_SUCCESS;
+		} else {
+			mlme_debug("vendor handoff request is already in progress");
+			status = QDF_STATUS_E_FAILURE;
+		}
 		goto error;
 	} else {
 		mlme_debug("Set vendor handoff req in progress context");
-		mlme_priv->cm_roam.vendor_handoff_param.req_in_progress = true;
-		mlme_priv->cm_roam.vendor_handoff_param.vendor_handoff_context =
-							vendor_handoff_context;
+		vhp->req_in_progress = true;
+		vhp->vendor_handoff_context = vendor_handoff_context;
 	}
 
 	req = qdf_mem_malloc(sizeof(*req));
@@ -4831,6 +4870,103 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * cm_roam_trigger_deferred_vendor_handoff() - Trigger deferred vendor
+ * handoff param fetch after RSO is re-enabled.
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ *
+ * If vendor handoff param fetch was deferred because an MLO link switch
+ * was in progress on the assoc vdev, send a fire-and-forget WMI command
+ * now that RSO is re-enabled. FW responds asynchronously and values are
+ * stored in rso_cfg->cfg_param via cm_roam_update_vendor_handoff_config().
+ * No timer or blocking is needed — if FW does not respond it is a
+ * firmware bug and INI defaults remain in effect.
+ *
+ * Return: None
+ */
+static void
+cm_roam_trigger_deferred_vendor_handoff(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_cm_vendor_handoff_param *vhp;
+	struct cm_roam_values_copy src_config = {};
+	QDF_STATUS status;
+
+	if (!cm_roam_is_vendor_handoff_control_enable(psoc))
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		goto release;
+
+	vhp = &mlme_priv->cm_roam.vendor_handoff_param;
+	if (!vhp->pending_fetch)
+		goto release;
+
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
+				   ROAM_CONFIG_ENABLE, &src_config);
+	if (!src_config.bool_value) {
+		/*
+		 * NCHO is no longer enabled; discard the pending fetch
+		 * so it is not retried on subsequent RSO enables.
+		 */
+		vhp->pending_fetch = false;
+		goto release;
+	}
+
+	/*
+	 * If a vendor handoff request is already in flight, skip the
+	 * deferred fetch — the in-flight request will update the params
+	 * when FW responds.
+	 */
+	if (vhp->req_in_progress) {
+		mlme_debug("vdev %d: vendor handoff req in progress, skip deferred fetch",
+			   vdev_id);
+		vhp->pending_fetch = false;
+		goto release;
+	}
+
+	mlme_debug("vdev %d: deferred vendor handoff fetch", vdev_id);
+	vhp->pending_fetch = false;
+
+	/*
+	 * Send a fire-and-forget WMI command (NULL context). FW responds
+	 * asynchronously; values are stored in rso_cfg->cfg_param via
+	 * cm_roam_update_vendor_handoff_config(). req_in_progress is reset
+	 * in cm_roam_vendor_handoff_event_handler() when FW responds.
+	 * No timer or blocking needed here.
+	 */
+	status = cm_roam_send_vendor_handoff_param_req(psoc, vdev_id,
+					VENDOR_CONTROL_PARAM_ROAM_ALL,
+					NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("vdev %d: deferred vendor handoff fetch failed, will retry on next RSO enable",
+			 vdev_id);
+		vhp->req_in_progress = false;
+		vhp->vendor_handoff_context = NULL;
+		vhp->pending_fetch = true;
+	}
+
+release:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+#else
+static inline void
+cm_roam_trigger_deferred_vendor_handoff(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+}
+#endif /* WLAN_VENDOR_HANDOFF_CONTROL */
+
 /**
  * cm_roam_switch_to_rso_enable() - roam state handling for rso started
  * @pdev: pdev pointer
@@ -4951,6 +5087,13 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 		return status;
 	}
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_ENABLED);
+
+	/*
+	 * If vendor handoff param fetch was deferred because RSO was
+	 * disabled (e.g., during MLO link switch), re-fetch now that
+	 * RSO is re-enabled.
+	 */
+	cm_roam_trigger_deferred_vendor_handoff(psoc, vdev_id);
 
 	/* If the set_key for the connected bssid was received during Roam sync
 	 * in progress, then the RSO update to the FW will be rejected. The RSO

@@ -3528,11 +3528,22 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_debug("Failed to update params in rso_config struct");
 
-	status = mlme_cm_osif_get_vendor_handoff_params(psoc,
+	/*
+	 * For user-triggered requests (non-NULL context), signal the waiting
+	 * thread via the osif callback so hdd_cm_get_handoff_param() can
+	 * return the result to the caller.
+	 *
+	 * For deferred fire-and-forget requests (NULL context, triggered by
+	 * cm_roam_trigger_deferred_vendor_handoff()), no thread is waiting —
+	 * skip the osif callback.
+	 *
+	 * Always reset req_in_progress so future requests are not blocked.
+	 */
+	if (vendor_handoff_context) {
+		status = mlme_cm_osif_get_vendor_handoff_params(psoc,
 							vendor_handoff_context);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_debug("Failed to free vendor handoff request");
-		return;
+		if (QDF_IS_STATUS_ERROR(status))
+			mlme_debug("Failed to notify vendor handoff request");
 	}
 
 	mlme_debug("Reset vendor handoff req in progress context");
