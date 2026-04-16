@@ -1228,26 +1228,116 @@ static int target_if_nan_next_dw_info_event_handler(ol_scn_t scn, uint8_t *data,
 
 	return qdf_status_to_os_return(status);
 }
+
+/**
+ * target_if_deregister_nan_std_mode_event_handler() - Deregister NAN std mode
+ *						       events
+ * @psoc: psoc pointer
+ *
+ * This function deregisters nan std mode events.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_* on failure
+ */
+static QDF_STATUS
+target_if_deregister_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS ret, status = QDF_STATUS_SUCCESS;
+	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!handle) {
+		target_if_err("handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = wmi_unified_unregister_event_handler(
+						handle,
+						wmi_nan_next_dw_info_event_id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event deregistration failed, ret: %d", ret);
+		status = ret;
+	}
+
+	ret = wmi_unified_unregister_event_handler(
+					handle,
+					wmi_nan_joined_cluster_event_id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event deregistration failed, ret: %d", ret);
+		status = ret;
+	}
+
+	ret = wmi_unified_unregister_event_handler(handle,
+					     wmi_nan_started_cluster_event_id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event deregistration failed, ret: %d", ret);
+		status = ret;
+	}
+
+	return status;
+}
+
+
+/**
+ * target_if_register_nan_std_mode_event_handler() - Register NAN std mode
+ *						     events
+ * @psoc: psoc pointer
+ *
+ * This function registers nan std mode events.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_* on failure
+ */
+static QDF_STATUS
+target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS ret;
+	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!handle) {
+		target_if_err("handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = wmi_unified_register_event_handler(
+				handle, wmi_nan_next_dw_info_event_id,
+				target_if_nan_next_dw_info_event_handler,
+				WMI_RX_UMAC_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event registration failed, ret: %d", ret);
+		target_if_nan_deregister_events(psoc);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = wmi_unified_register_event_handler(
+				handle, wmi_nan_joined_cluster_event_id,
+				target_if_nan_join_cluster_event_handler,
+				WMI_RX_UMAC_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event registration failed, ret: %d", ret);
+		target_if_nan_deregister_events(psoc);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = wmi_unified_register_event_handler(
+				handle, wmi_nan_started_cluster_event_id,
+				target_if_nan_start_cluster_event_handler,
+				WMI_RX_UMAC_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event registration failed, ret: %d", ret);
+		target_if_nan_deregister_events(psoc);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
 #else
-static inline
-int target_if_nan_next_dw_info_event_handler(ol_scn_t scn, uint8_t *data,
-					     uint32_t datalen)
+static inline QDF_STATUS
+target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
 {
-	return 0;
+	return QDF_STATUS_SUCCESS;
 }
 
-static inline
-int target_if_nan_join_cluster_event_handler(ol_scn_t scn, uint8_t *data,
-					     uint32_t datalen)
+static inline QDF_STATUS
+target_if_deregister_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
 {
-	return 0;
-}
-
-static inline
-int target_if_nan_start_cluster_event_handler(ol_scn_t scn, uint8_t *data,
-					      uint32_t datalen)
-{
-	return 0;
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -1357,35 +1447,10 @@ QDF_STATUS target_if_nan_register_events(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ret = wmi_unified_register_event_handler(
-				handle, wmi_nan_next_dw_info_event_id,
-				target_if_nan_next_dw_info_event_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
+	ret = target_if_register_nan_std_mode_event_handler(psoc);
+	if (QDF_IS_STATUS_ERROR(ret))
 		return QDF_STATUS_E_FAILURE;
-	}
 
-	ret = wmi_unified_register_event_handler(
-				handle, wmi_nan_joined_cluster_event_id,
-				target_if_nan_join_cluster_event_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle, wmi_nan_started_cluster_event_id,
-				target_if_nan_start_cluster_event_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1459,29 +1524,9 @@ QDF_STATUS target_if_nan_deregister_events(struct wlan_objmgr_psoc *psoc)
 		target_if_err("wmi event deregistration failed, ret: %d", ret);
 		status = ret;
 	}
-
-	ret = wmi_unified_unregister_event_handler(
-						handle,
-						wmi_nan_next_dw_info_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
+	ret = target_if_deregister_nan_std_mode_event_handler(psoc);
+	if (QDF_IS_STATUS_ERROR(ret))
 		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_joined_cluster_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	wmi_unified_unregister_event_handler(handle,
-					     wmi_nan_started_cluster_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
