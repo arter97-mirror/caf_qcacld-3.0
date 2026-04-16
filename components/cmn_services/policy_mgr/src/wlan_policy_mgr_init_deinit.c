@@ -963,6 +963,8 @@ QDF_STATUS policy_mgr_register_conc_cb(struct wlan_objmgr_psoc *psoc,
 					conc_cbacks->connection_info_update;
 	pm_ctx->conc_cbacks.ap_assist_dfs_group_notify =
 					conc_cbacks->ap_assist_dfs_group_notify;
+	pm_ctx->conc_cbacks.sap_user_nss_update_cb =
+					conc_cbacks->sap_user_nss_update_cb;
 	return QDF_STATUS_SUCCESS;
 }
 

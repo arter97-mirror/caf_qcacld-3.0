@@ -16125,3 +16125,178 @@ policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
 	return allow;
 }
 #endif
+
+/**
+ * policy_mgr_get_freq_range_for_hw_mode_idx() - Get freq range for HW mode
+ * @psoc: PSOC object
+ * @hw_mode_idx: HW mode index
+ *
+ * This function returns the frequency range for a given HW mode index.
+ *
+ * Return: Pointer to freq_range structure, NULL on error
+ */
+static struct policy_mgr_freq_range *
+policy_mgr_get_freq_range_for_hw_mode_idx(struct wlan_objmgr_psoc *psoc,
+					  uint32_t hw_mode_idx)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_hw_mode_params hw_mode;
+	enum policy_mgr_mode mode;
+	QDF_STATUS status;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return NULL;
+	}
+
+	status = policy_mgr_get_hw_mode_from_idx(psoc, hw_mode_idx, &hw_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		return NULL;
+
+	/* Determine mode from hw_mode capabilities */
+	if (hw_mode.sbs_cap)
+		mode = MODE_SBS;
+	else if (hw_mode.dbs_cap)
+		mode = MODE_DBS;
+	else
+		mode = MODE_SMM;
+
+	return &pm_ctx->hw_mode.freq_range_caps[mode][0];
+}
+
+QDF_STATUS
+policy_mgr_hwmode_fetch_chains_for_freq(struct wlan_objmgr_psoc *psoc,
+					uint32_t hw_mode_idx,
+					qdf_freq_t freq,
+					uint8_t *tx_chains,
+					uint8_t *rx_chains)
+{
+	uint8_t mac_id;
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_freq_range *freq_range;
+	struct policy_mgr_hw_mode_params hw_mode;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	status = policy_mgr_get_hw_mode_from_idx(psoc, hw_mode_idx, &hw_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	freq_range = policy_mgr_get_freq_range_for_hw_mode_idx(psoc,
+							       hw_mode_idx);
+	if (!freq_range) {
+		policy_mgr_err("Failed to get freq range for hw_mode %d",
+			       hw_mode_idx);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mac_id = policy_mgr_get_mac_id_for_freq(freq_range, freq);
+	if (mac_id >= MAX_MAC) {
+		policy_mgr_debug("Freq %u not within range for hw_mode %d",
+				 freq, hw_mode_idx);
+		return QDF_STATUS_E_RANGE;
+	}
+
+	if (mac_id == MAC0_ID) {
+		*tx_chains = hw_mode.mac0_tx_ss;
+		*rx_chains = hw_mode.mac0_rx_ss;
+	} else {
+		*tx_chains = hw_mode.mac1_tx_ss;
+		*rx_chains = hw_mode.mac1_rx_ss;
+	}
+
+	if (!*tx_chains || !*rx_chains) {
+		policy_mgr_debug("HW Mode %d MAC%d with wrong Tx/Rx NSS %dx%d",
+				 hw_mode_idx, mac_id, *tx_chains, *rx_chains);
+		status = policy_mgr_fetch_min_nss_across_hw_modes(psoc,
+								  tx_chains,
+								  rx_chains);
+	}
+
+	return status;
+}
+
+bool
+policy_mgr_are_2_freq_on_same_mac_in_hwmode(struct wlan_objmgr_psoc *psoc,
+					    uint32_t hw_mode_idx,
+					    qdf_freq_t freq_1,
+					    qdf_freq_t freq_2)
+{
+	uint8_t mac_id_1, mac_id_2;
+	struct policy_mgr_freq_range *freq_range;
+
+	freq_range = policy_mgr_get_freq_range_for_hw_mode_idx(psoc,
+							       hw_mode_idx);
+	if (!freq_range) {
+		policy_mgr_err("Failed to get freq range for hw_mode %d",
+			       hw_mode_idx);
+		return false;
+	}
+
+	mac_id_1 = policy_mgr_get_mac_id_for_freq(freq_range, freq_1);
+	mac_id_2 = policy_mgr_get_mac_id_for_freq(freq_range, freq_2);
+
+	if (mac_id_1 >= MAX_MAC || mac_id_2 >= MAX_MAC) {
+		policy_mgr_debug("Freq %u or %u not within range",
+				 freq_1, freq_2);
+		return false;
+	}
+
+	return (mac_id_1 == mac_id_2);
+}
+
+QDF_STATUS
+policy_mgr_validate_user_req_tx_rx_nss(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id,
+				       uint8_t req_tx_nss,
+				       uint8_t req_rx_nss)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	qdf_freq_t vdev_freq;
+	uint8_t sup_tx_chains, sup_rx_chains;
+	QDF_STATUS status;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Step 1: Get vdev operating frequency */
+	vdev_freq = wlan_get_operation_chan_freq_vdev_id(pm_ctx->pdev,
+							 vdev_id);
+	if (!vdev_freq) {
+		policy_mgr_err("Failed to get freq for vdev %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Step 2: Check current HW mode support */
+	status = policy_mgr_curr_hwmode_fetch_chains_for_freq(psoc, vdev_freq,
+							      &sup_tx_chains,
+							      &sup_rx_chains);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Failed to fetch chains for current hw mode");
+		return status;
+	}
+
+	/* Step 3: If current HW mode supports requested NSS, return success */
+	if (req_tx_nss <= sup_tx_chains && req_rx_nss <= sup_rx_chains) {
+		policy_mgr_debug("Current HW mode supports req NSS %dx%d",
+				 req_tx_nss, req_rx_nss);
+		if (pm_ctx->conc_cbacks.sap_user_nss_update_cb)
+			pm_ctx->conc_cbacks.sap_user_nss_update_cb(vdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (policy_mgr_get_connection_count(psoc) > 1)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	if (pm_ctx->conc_cbacks.sap_user_nss_update_cb)
+		pm_ctx->conc_cbacks.sap_user_nss_update_cb(vdev_id);
+
+	return QDF_STATUS_SUCCESS;
+}

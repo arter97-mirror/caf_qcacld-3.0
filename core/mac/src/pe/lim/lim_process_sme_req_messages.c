@@ -10125,6 +10125,40 @@ static void lim_process_hw_mode_change_notify(struct mac_context *mac_ctx)
 	}
 }
 
+void lim_handle_sap_user_nss_update_req(uint8_t vdev_id)
+{
+	QDF_STATUS status;
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		pe_debug("MAC context NULL");
+		return;
+	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_debug("Session not found for %d", vdev_id);
+		return;
+	}
+
+	if (!lim_update_ap_session_nss(session, true))
+		return;
+
+	status = sch_set_fixed_beacon_fields(mac_ctx, session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fill beacon fields for %d",
+			 session->vdev_id);
+		return;
+	}
+
+	status = lim_send_beacon_ind(mac_ctx, session, REASON_NSS_UPDATE);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_debug("Failed to update beacon tmp for %d",
+			 session->vdev_id);
+}
+
 /**
  * lim_process_sme_req_messages()
  *

@@ -959,6 +959,7 @@ static void lim_register_policy_mgr_callback(struct wlan_objmgr_psoc *psoc)
 	conc_cbacks.connection_info_update = lim_send_conc_params_update;
 	conc_cbacks.ap_assist_dfs_group_notify =
 					lim_check_ap_assist_dfs_p2p_group;
+	conc_cbacks.sap_user_nss_update_cb = lim_handle_sap_user_nss_update_req;
 
 	if (QDF_STATUS_SUCCESS != policy_mgr_register_conc_cb(psoc,
 							      &conc_cbacks)) {

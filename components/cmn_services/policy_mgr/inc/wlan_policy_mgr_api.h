@@ -2495,11 +2495,14 @@ struct policy_mgr_hdd_cbacks {
  * policy manager either due to addition or removal from connection table to
  * re-evaluate the status of P2P Group which are assisted by concurrent DFS
  * infra connection
+ * @sap_user_nss_update_cb: Callback to handle user NSS update request, only
+ * applies for P2P-GO and SAP modes.
  */
 
 struct policy_mgr_conc_cbacks {
 	void (*connection_info_update)(void);
 	void (*ap_assist_dfs_group_notify)(bool is_incr_session);
+	void (*sap_user_nss_update_cb)(uint8_t vdev_id);
 };
 
 /**
@@ -6853,4 +6856,54 @@ policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
 					       uint8_t vdev_id, uint32_t freq,
 					       enum hw_mode_bandwidth bw);
 #endif
+
+/**
+ * policy_mgr_hwmode_fetch_chains_for_freq() - API to fetch supported chains
+ * for given frequency in a specified HW mode.
+ * @psoc: Pointer to psoc object manager
+ * @hw_mode_idx: HW mode index
+ * @freq: Frequency to find the chains for
+ * @tx_chains: Pointer to save the retrieved Tx chains
+ * @rx_chains: Pointer to save the retrieved Rx chains
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_hwmode_fetch_chains_for_freq(struct wlan_objmgr_psoc *psoc,
+					uint32_t hw_mode_idx,
+					qdf_freq_t freq,
+					uint8_t *tx_chains,
+					uint8_t *rx_chains);
+
+/**
+ * policy_mgr_are_2_freq_on_same_mac_in_hwmode() - Check if 2 freqs are on
+ * same MAC in given HW mode
+ * @psoc: PSOC object
+ * @hw_mode_idx: HW mode index
+ * @freq_1: Freq 1
+ * @freq_2: Freq 2
+ *
+ * Return: true if on same MAC
+ */
+bool
+policy_mgr_are_2_freq_on_same_mac_in_hwmode(struct wlan_objmgr_psoc *psoc,
+					    uint32_t hw_mode_idx,
+					    qdf_freq_t freq_1,
+					    qdf_freq_t freq_2);
+
+/**
+ * policy_mgr_validate_user_req_tx_rx_nss() - Validate requested chains for vdev
+ * @psoc: PSOC object
+ * @vdev_id: Vdev ID
+ * @req_tx_nss: Requested Tx NSS
+ * @req_rx_nss: Requested Rx NSS
+ *
+ * Return: QDF_STATUS_SUCCESS if supported by any HW mode without concurrency
+ * conflict.
+ */
+QDF_STATUS
+policy_mgr_validate_user_req_tx_rx_nss(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id,
+				       uint8_t req_tx_nss,
+				       uint8_t req_rx_nss);
 #endif /* __WLAN_POLICY_MGR_API_H */

@@ -211,6 +211,19 @@ bool is_mgmt_protected(uint32_t vdev_id, const uint8_t *peer_mac_addr);
 void lim_check_ap_assist_dfs_p2p_group(bool is_incr_session);
 
 /**
+ * lim_handle_sap_user_nss_update_req() - Update NSS and beacon template
+ * for one AP vdev
+ * @vdev_id: VDEV id
+ *
+ * Find the active PE session matching @vdev_id, update the AP session NSS
+ * while bypassing HW mode NSS limits, and push the updated beacon template
+ * to firmware.
+ *
+ * Return: None
+ */
+void lim_handle_sap_user_nss_update_req(uint8_t vdev_id);
+
+/**
  * lim_fill_dfs_p2p_group_params() - Fill the params of P2P group operating
  * in DFS channel.
  * @pe_session: Session
