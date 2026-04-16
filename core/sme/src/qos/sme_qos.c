@@ -5180,6 +5180,16 @@ static QDF_STATUS sme_qos_process_preauth_success_ind(struct mac_context *mac_ct
 				goto add_next_ric;
 
 			/*
+			 * Check if adding another TSPEC would exceed
+			 * buffer size.
+			 */
+			if (ric_offset >= MAX_FTIE_SIZE) {
+				sme_err("RIC offset %u exceeds or equals max FTIE size %u, skipping remaining TSPECs",
+					ric_offset, MAX_FTIE_SIZE);
+				break;
+			}
+
+			/*
 			 * If a tspec status is pending, take requested_QoSInfo
 			 * for RIC request, else use curr_QoSInfo for the
 			 * RIC request
@@ -5197,7 +5207,7 @@ static QDF_STATUS sme_qos_process_preauth_success_ind(struct mac_context *mac_ct
 			}
 add_next_ric:
 			ric_offset += ric_ielen;
-			mlme_priv->connect_info.ft_info.ric_ies_length = ric_ielen;
+			mlme_priv->connect_info.ft_info.ric_ies_length += ric_ielen;
 			tspec_mask_status >>= 1;
 			tspec_pending_status >>= 1;
 			tspec_idx++;
