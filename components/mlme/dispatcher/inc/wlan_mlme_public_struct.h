@@ -1809,7 +1809,6 @@ struct wlan_mlme_lfr_cfg {
 	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
-	bool lfr3_support_single_mac_dual_sta_roaming;
 	bool enable_self_bss_roam;
 	bool enable_disconnect_roam_offload;
 	bool enable_idle_roam;

@@ -404,19 +404,6 @@ static void policy_mgr_init_non_dbs_pcl(struct wlan_objmgr_psoc *psoc)
 		&second_connection_pcl_nodbs_no_interband_mcc_table;
 		third_connection_pcl_non_dbs_table =
 		&third_connection_pcl_nodbs_no_interband_mcc_table;
-	} else if (!wmi_service_enabled(wmi_handle,
-		   wmi_service_no_interband_mcc_support) &&
-		   !wmi_service_enabled(wmi_handle,
-				wmi_service_dual_band_simultaneous_support)) {
-		/*
-		 * Allow MCC case when f/w indicates interband_mcc_support
-		 * for non dbs card
-		 */
-		second_connection_pcl_non_dbs_table =
-		&second_connection_pcl_nodbs_interband_mcc_table;
-
-		third_connection_pcl_non_dbs_table =
-		&third_connection_pcl_nodbs_table;
 	} else {
 		second_connection_pcl_non_dbs_table =
 		&second_connection_pcl_nodbs_table;

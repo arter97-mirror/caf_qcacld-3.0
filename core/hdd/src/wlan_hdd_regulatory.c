@@ -813,9 +813,6 @@ uint32_t hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(uint8_t qca_setband)
 	case QCA_SETBAND_2G:
 		band_bitmap |= BIT(REG_BAND_2G);
 		break;
-	case (QCA_SETBAND_2G | QCA_SETBAND_5G):
-		band_bitmap |= (BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
-		break;
 	default:
 		hdd_err("Invalid band value %u", qca_setband);
 		return 0;
@@ -1941,39 +1938,4 @@ void hdd_update_regdb_offload_config(struct hdd_context *hdd_ctx)
 
 	hdd_debug("Ignore regdb offload Indication from FW");
 	ucfg_set_ignore_fw_reg_offload_ind(hdd_ctx->psoc);
-}
-
-void hdd_remove_vlp_depriority_channels(struct wlan_objmgr_pdev *pdev,
-					uint16_t *ch_freq_list,
-					uint32_t *num_channels)
-{
-	uint32_t num_chan_temp = 0;
-	uint16_t i;
-	uint8_t country[REG_ALPHA2_LEN + 1];
-	struct wlan_objmgr_psoc *psoc;
-
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc)
-		return;
-
-	if (!(*num_channels > 1))
-		return;
-
-	ucfg_reg_get_current_country(psoc, country);
-	if (!ucfg_reg_get_num_rules_of_ap_pwr_type(pdev,
-						   REG_VERY_LOW_POWER_AP)) {
-		hdd_debug("Current country %.2s don't support VLP", country);
-		return;
-	}
-
-	for (i = 0; i < *num_channels; i++) {
-		if (ucfg_reg_is_vlp_depriority_freq(pdev,
-						    ch_freq_list[i])) {
-			hdd_nofl_debug("skip freq %u", ch_freq_list[i]);
-			continue;
-		}
-		ch_freq_list[num_chan_temp++] = ch_freq_list[i];
-	}
-
-	*num_channels = num_chan_temp;
 }

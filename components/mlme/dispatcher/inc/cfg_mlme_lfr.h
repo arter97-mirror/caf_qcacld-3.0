@@ -2543,28 +2543,6 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"Enable roam on both STA vdev")
 
-/*
- * <ini>
- * support_single_mac_dual_sta_roam - single mac dual sta roaming feature
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This INI is used to enable/disable single mac dual sta roam feature
- *
- * Related: None
- *
- * Supported Feature: Dual station roaming on single mac card
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_SUPPORT_SINGLE_MAC_DUAL_STA_ROAM CFG_INI_BOOL( \
-	"support_single_mac_dual_sta_roam", \
-	0, \
-	"support single mac dual sta roam")
-
 #define ROAM_OFFLOAD_ALL \
 	CFG(CFG_LFR3_ROAMING_OFFLOAD) \
 	CFG(CFG_LFR3_ENABLE_SELF_BSS_ROAM) \
@@ -2578,7 +2556,6 @@
 	CFG(CFG_ROAM_TRIGGER_BITMAP) \
 	CFG(CFG_STA_DISABLE_ROAM) \
 	CFG(CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD) \
-	CFG(CFG_SUPPORT_SINGLE_MAC_DUAL_STA_ROAM) \
 
 #else
 #define ROAM_OFFLOAD_ALL

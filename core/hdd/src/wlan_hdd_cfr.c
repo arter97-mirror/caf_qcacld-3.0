@@ -1,7 +1,5 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -196,7 +194,7 @@ wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_CTRL_FILTER]) {
 		params.expected_ctrl_subtype = nla_get_u32(tb[
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_CTRL_FILTER]);
-		hdd_debug("expected_ctrl_subtype %d(%x)",
+		hdd_debug("expected_mgmt_subtype %d(%x)",
 			  params.expected_ctrl_subtype,
 			  params.expected_ctrl_subtype);
 	}
@@ -204,7 +202,7 @@ wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_DATA_FILTER]) {
 		params.expected_data_subtype = nla_get_u32(tb[
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_DATA_FILTER]);
-		hdd_debug("expected_data_subtype %d(%x)",
+		hdd_debug("expected_mgmt_subtype %d(%x)",
 			  params.expected_data_subtype,
 			  params.expected_data_subtype);
 	}

@@ -153,16 +153,4 @@ void hdd_modify_indoor_channel_state_flags(
  */
 void hdd_update_regdb_offload_config(struct hdd_context *hdd_ctx);
 
-/**
- * hdd_remove_vlp_depriority_channels() - Removes VLP depriority
- * channels from the channel list.
- * @pdev: PDEV object.
- * @ch_freq_list: Frequency list pointer.
- * @num_channels: Number of channels pointer.
- *
- * Return: None
- */
-void hdd_remove_vlp_depriority_channels(struct wlan_objmgr_pdev *pdev,
-					uint16_t *ch_freq_list,
-					uint32_t *num_channels);
 #endif

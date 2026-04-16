@@ -347,8 +347,7 @@ bool pmo_core_is_wow_applicable(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-static bool
-pmo_wow_wakeup_event_enabled(struct pmo_psoc_cfg *pmo_cfg, WOW_WAKE_EVENT_TYPE event)
+bool pmo_wow_wakeup_event_enabled(struct pmo_psoc_cfg *pmo_cfg, WOW_WAKE_EVENT_TYPE event)
 {
 	uint64_t mask;
 	bool cond, mask_enabled;

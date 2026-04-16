@@ -1573,8 +1573,6 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR3_ROAMING_OFFLOAD);
 	lfr->lfr3_dual_sta_roaming_enabled =
 		cfg_get(psoc, CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD);
-	lfr->lfr3_support_single_mac_dual_sta_roaming =
-		cfg_get(psoc, CFG_SUPPORT_SINGLE_MAC_DUAL_STA_ROAM);
 	lfr->enable_self_bss_roam = cfg_get(psoc, CFG_LFR3_ENABLE_SELF_BSS_ROAM);
 	lfr->enable_roam_reason_vsie =
 		cfg_get(psoc, CFG_ENABLE_ROAM_REASON_VSIE);

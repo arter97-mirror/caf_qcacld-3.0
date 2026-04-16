@@ -9269,8 +9269,6 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 	if (wma_validate_handle(wma_handle))
 		return QDF_STATUS_E_NULL_VALUE;
 
-	wma_debug("RSO_CFG: band_mask:%d vdev_id:%d",msg->band_mask,
-		  msg->vdev_id);
 	/*
 	 * if vdev_id is WLAN_UMAC_VDEV_ID_MAX, then roaming is enabled on
 	 * only one sta, so PDEV PCL command needs to be sent.

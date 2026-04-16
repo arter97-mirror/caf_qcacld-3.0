@@ -1162,8 +1162,7 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
 	return 0;
 }
 
-static int
-wlan_hdd_pld_get_bus_pm_state(struct device *dev,
+int wlan_hdd_pld_get_bus_pm_state(struct device *dev,
 				enum pld_bus_type bus_type)
 {
 	struct hdd_context *hdd_ctx;

@@ -1645,9 +1645,8 @@ policy_mgr_get_connected_roaming_vdev_band_mask(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id)
 {
 	uint32_t band_mask;
-	uint32_t band_mask_for_vdev = 0;
 	struct wlan_objmgr_vdev *vdev;
-	bool dual_sta_roam_active, is_pcl_per_vdev;
+	bool dual_sta_roam_active;
 	struct wlan_channel *chan;
 	uint32_t roam_band_mask;
 
@@ -1659,22 +1658,6 @@ policy_mgr_get_connected_roaming_vdev_band_mask(struct wlan_objmgr_psoc *psoc,
 	}
 
 	chan = wlan_vdev_get_active_channel(vdev);
-
-	band_mask_for_vdev |= BIT(wlan_reg_freq_to_band(chan->ch_freq));
-
-	is_pcl_per_vdev = wlan_cm_roam_is_pcl_per_vdev_active(psoc, vdev_id);
-	dual_sta_roam_active = wlan_mlme_get_dual_sta_roaming_enabled(psoc);
-
-	policy_mgr_debug("connected STA vdev_id:%d, pcl_per_vdev:%d, dual_sta_roam_active:%d",
-			 vdev_id, is_pcl_per_vdev,
-			 dual_sta_roam_active);
-
-	if (dual_sta_roam_active && is_pcl_per_vdev) {
-		policy_mgr_debug("connected vdev band mask:%d",
-				 band_mask_for_vdev);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-		return band_mask_for_vdev;
-	}
 
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &band_mask);
 	roam_band_mask = wlan_cm_get_roam_band_value(psoc, vdev);

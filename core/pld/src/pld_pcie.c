@@ -442,8 +442,7 @@ enum cnss_driver_mode pld_pcie_get_mode(void)
 #endif
 #endif
 
-static int
-pld_pcie_get_bus_pm_state(struct pci_dev *pdev, const struct pci_device_id *id)
+int pld_pcie_get_bus_pm_state(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct pld_context *pld_context;
 

@@ -4588,9 +4588,6 @@ wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 	if (!mlme_obj)
 		return cfg_default(CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD);
 
-	if (mlme_obj->cfg.lfr.lfr3_support_single_mac_dual_sta_roaming)
-		return true;
-
 	dual_sta_roaming_enabled =
 			mlme_obj->cfg.lfr.lfr3_roaming_offload &&
 			mlme_obj->cfg.lfr.lfr3_dual_sta_roaming_enabled &&

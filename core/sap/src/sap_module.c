@@ -56,7 +56,7 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
-#include "wlan_hdd_regulatory.h"
+
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
 static qdf_atomic_t sap_ctx_ref_count[SAP_MAX_NUM_SESSION];
@@ -2900,10 +2900,6 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx)
 			return INVALID_CHANNEL_ID;
 		}
 
-		hdd_remove_vlp_depriority_channels(mac->pdev,
-						   (uint16_t *)pcl_freqs,
-						   &pcl_len);
-
 		for (i = 0; i < pcl_len; i++) {
 			if (WLAN_REG_IS_SAME_BAND_FREQS(sap_ctx->chan_freq,
 							pcl_freqs[i])) {
@@ -2977,9 +2973,6 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx)
 	}
 
 	if (pcl_len) {
-		hdd_remove_vlp_depriority_channels(mac->pdev,
-						   (uint16_t *)pcl_freqs,
-						   &pcl_len);
 		status = wlansap_filter_ch_based_acs(sap_ctx, pcl_freqs,
 						     &pcl_len);
 		if (QDF_IS_STATUS_ERROR(status)) {

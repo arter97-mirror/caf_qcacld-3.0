@@ -2226,13 +2226,6 @@ enum policy_mgr_three_connection_mode
 		    WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq)) {
 			index = PM_SAP_SAP_SCC_5_STA_24_DBS;
-		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sap[0]].freq) &&
-		    WLAN_REG_IS_24GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sap[1]].freq) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_SAP_SAP_SCC_24_STA_5_DBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -3006,33 +2999,4 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 		break;
 	}
 	return ret;
-}
-
-QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
-						  struct wlan_objmgr_pdev *pdev,
-						  struct weighed_pcl *pcl,
-						  uint32_t num_pcl)
-{	uint32_t i;
-	uint8_t country[REG_ALPHA2_LEN + 1];
-
-	wlan_reg_read_current_country(psoc, country);
-
-	if (!wlan_reg_get_num_rules_of_ap_pwr_type(pdev,
-						   REG_VERY_LOW_POWER_AP)) {
-		policy_mgr_debug("Current country %.2s don't support VLP",
-				 country);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!num_pcl) {
-		policy_mgr_err("invalid number of channel length");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	for (i = 0; i < num_pcl; i++) {
-		if (wlan_reg_is_vlp_depriority_freq(pdev, pcl[i].freq))
-			pcl[i].weight = WEIGHT_OF_GROUP5_PCL_CHANNELS;
-	}
-
-	return QDF_STATUS_SUCCESS;
 }

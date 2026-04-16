@@ -8122,10 +8122,10 @@ static void csr_init_operating_classes(struct mac_context *mac)
 	uint8_t swap = 0;
 	uint8_t numClasses = 0;
 	uint8_t opClasses[REG_MAX_SUPP_OPER_CLASSES] = {0,};
-	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
-	wlan_reg_read_current_country(mac->psoc, reg_cc);
-	sme_debug("Current Country = %s", reg_cc);
+	sme_debug("Current Country = %c%c",
+		  mac->scan.countryCodeCurrent[0],
+		  mac->scan.countryCodeCurrent[1]);
 
 	csr_update_op_class_array(mac, opClasses,
 				  &mac->scan.base_channels, "20MHz", &i);

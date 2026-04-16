@@ -4172,18 +4172,4 @@ bool policy_mgr_is_hwmode_offload_enabled(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 						 enum policy_mgr_con_mode mode);
-/**
- * policy_mgr_modify_pcl_for_vlp_channels() - Update weightage for VLP channels.
- *
- * @psoc: Pointer to the psoc
- * @pdev: Pointer to the pdev
- * @pcl: PCL channel list
- * @num_pcl: Length of the PCL channel list
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
-						  struct wlan_objmgr_pdev *pdev,
-						  struct weighed_pcl *pcl,
-						  uint32_t num_pcl);
 #endif /* __WLAN_POLICY_MGR_API_H */
