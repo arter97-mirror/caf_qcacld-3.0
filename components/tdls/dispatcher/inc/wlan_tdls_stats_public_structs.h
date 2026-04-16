@@ -179,25 +179,33 @@ enum tdls_stats_sm_state {
 
 /**
  * enum tdls_stats_sm_evt - TDLS stats state machine events.
- * @TDLS_STATS_EV_ENABLE:        User enabled TDLS stats logging.
- * @TDLS_STATS_EV_DISABLE:       User disabled TDLS stats logging.
- * @TDLS_STATS_EV_NEW_EVENT:     A new TDLS control-path event occurred
- *                               (Types 0-4: setup, discovery, teardown, etc.).
- * @TDLS_STATS_EV_FW_STATS:      Firmware periodic stats event received
- *                               (Type 5: data stats).
- * @TDLS_STATS_EV_STA_CONNECTED: STA connection completed; triggers WMI
- *                               enable=1 if single-STA SCC condition is met.
- *                               Does not cause a state transition.
- * @TDLS_STATS_EV_ENABLE_ACTIVE: TDLS stats enable is active.
- * @TDLS_STATS_EV_MAX:           Sentinel — not a valid event.
+ * @TDLS_STATS_EV_ENABLE:             User enabled TDLS stats logging.
+ * @TDLS_STATS_EV_DISABLE:            User disabled TDLS stats logging.
+ * @TDLS_STATS_EV_NEW_EVENT:          A new TDLS stats event occurred (covers
+ *                                    all types: control-path Types 0-4 and
+ *                                    periodic data stats Type 5).  Used for
+ *                                    single-entry delivery.
+ * @TDLS_STATS_EV_STA_CONNECTED:      STA connection completed; triggers WMI
+ *                                    enable=1 if single-STA SCC condition is
+ *                                    met.  Does not cause a state transition.
+ * @TDLS_STATS_EV_ENABLE_ACTIVE:      TDLS stats enable is active.
+ * @TDLS_STATS_EV_FW_STATS:           Batch of TDLS stats entries from a single
+ *                                    FW WMI event (covers both control-path
+ *                                    Types 0-4 and periodic data stats Type 5).
+ *                                    Event data is a pointer to
+ *                                    struct tdls_stats_batch.  The SM loops
+ *                                    over all entries under a single lock
+ *                                    acquisition, avoiding N separate
+ *                                    lock/dispatch/unlock cycles.
+ * @TDLS_STATS_EV_MAX:                Sentinel — not a valid event.
  */
 enum tdls_stats_sm_evt {
 	TDLS_STATS_EV_ENABLE = 0,
 	TDLS_STATS_EV_DISABLE,
 	TDLS_STATS_EV_NEW_EVENT,
-	TDLS_STATS_EV_FW_STATS,
 	TDLS_STATS_EV_STA_CONNECTED,
 	TDLS_STATS_EV_ENABLE_ACTIVE,
+	TDLS_STATS_EV_FW_STATS,
 	TDLS_STATS_EV_MAX,
 };
 
@@ -225,30 +233,28 @@ enum tdls_stats_sm_evt {
  *                       Applicable for Type-5 entries only; not present in
  *                       wmi_tdls_data_stats and is derived by the host.
  *                       Set to 0 for all other event types.
- * @tx_pkts_cumulative:  Cumulative total TX packets for this TDLS session.
- *                       Sourced from WMI field tx_pkts_cumulative.
+ * @tx_ppdus_cumulative: Cumulative total TX PPDUs for this TDLS session.
+ *                       Sourced from WMI field tx_ppdus_cumulative.
  *                       Set to 0 for non-Type-5 entries.
  * @tx_mcs_data_ppdu:    TX MCS histogram — raw PPDU counts per MCS index
  *                       (array of %TDLS_STATS_MAX_MCS_COUNTERS elements).
  *                       Sourced from WMI field tx_mcs_data_ppdu[].
  *                       Formatted as "N=count,..." strings at vendor-event
  *                       emit time.  All zeros for non-Type-5 entries.
- * @tx_pkt_failures:     Number of TX packets that failed to be sent.
- *                       Sourced from WMI field tx_pkt_failures.
+ * @tx_ppdu_failures:    Number of TX PPDUs that failed to be sent.
+ *                       Sourced from WMI field tx_ppdu_failures.
  *                       Set to 0 for non-Type-5 entries.
- * @rx_pkts_cumulative:  Cumulative total RX packets for this TDLS session.
- *                       Sourced from WMI field rx_pkts_cumulative.
+ * @rx_ppdus_cumulative: Cumulative total RX PPDUs for this TDLS session.
+ *                       Sourced from WMI field rx_ppdus_cumulative.
  *                       Set to 0 for non-Type-5 entries.
  * @rx_mcs_data_ppdu:    RX MCS histogram — raw PPDU counts per MCS index
  *                       (array of %TDLS_STATS_MAX_MCS_COUNTERS elements).
  *                       Sourced from WMI field rx_mcs_data_ppdu[].
  *                       Formatted as "N=count,..." strings at vendor-event
  *                       emit time.  All zeros for non-Type-5 entries.
- * @rx_pkt_failures:     Best-effort RX packet failure count.
- *                       Sourced from WMI field rx_pkt_failures.
+ * @rx_ppdu_failures:    Best-effort RX PPDU failure count.
+ *                       Sourced from WMI field rx_ppdu_failures.
  *                       Set to 0 for non-Type-5 entries.
- * @tx_bytes_delta:      TX bytes delta since the previous Type-5 report.
- * @rx_bytes_delta:      RX bytes delta since the previous Type-5 report.
  * @session_id:          Per-peer session identifier.  Incremented each time
  *                       the TDLS link with this peer is torn down and
  *                       re-established.
@@ -259,7 +265,7 @@ enum tdls_stats_sm_evt {
  * path.
  *
  * Semantic notes:
- *  - @tx_pkts_cumulative and @rx_pkts_cumulative are cumulative totals,
+ *  - @tx_ppdus_cumulative and @rx_ppdus_cumulative are cumulative totals,
  *    not per-interval deltas.  The per-peer context stores the last
  *    snapshot (last_type5_tx_pkts / last_type5_rx_pkts) for traffic-
  *    detection delta computation.
@@ -267,7 +273,7 @@ enum tdls_stats_sm_evt {
  *    stored as raw uint32_t counts and converted to "N=count,..." strings
  *    only at vendor-event emit time.
  *  - For entries with @type != %TDLS_STATS_DATA, all Type-5 stats fields
- *    (@data_rate through @rx_pkt_failures) are set to 0.
+ *    (@data_rate through @rx_ppdu_failures) are set to 0.
  */
 struct tdls_stats_entry {
 	uint64_t ts_ms;
@@ -290,16 +296,32 @@ struct tdls_stats_entry {
 	 * MCS arrays are formatted as "N=count,..." strings at emit time.
 	 */
 	uint16_t data_rate;
-	uint32_t tx_pkts_cumulative;
+	uint32_t tx_ppdus_cumulative;
 	uint32_t tx_mcs_data_ppdu[TDLS_STATS_MAX_MCS_COUNTERS];
-	uint32_t tx_pkt_failures;
-	uint32_t rx_pkts_cumulative;
+	uint32_t tx_ppdu_failures;
+	uint32_t rx_ppdus_cumulative;
 	uint32_t rx_mcs_data_ppdu[TDLS_STATS_MAX_MCS_COUNTERS];
-	uint32_t rx_pkt_failures;
+	uint32_t rx_ppdu_failures;
 
-	uint64_t tx_bytes_delta;
-	uint64_t rx_bytes_delta;
 	uint32_t session_id;
+};
+
+/**
+ * struct tdls_stats_batch - Batch of TDLS stats entries from a single FW event.
+ * @num_entries: Number of valid entries in @entries[].
+ * @entries:     Pointer to an array of @num_entries stats entries.
+ *               The array is owned by the caller and must remain valid for
+ *               the entire duration of the synchronous SM dispatch call.
+ *
+ * Passed as @event_data for %TDLS_STATS_EV_FW_STATS events. The SM
+ * state handlers iterate over all @num_entries entries and apply the per-state
+ * operation (cache or emit) to each one under a single SM lock acquisition,
+ * avoiding N separate lock/unlock cycles when FW delivers N stats in one WMI
+ * event.
+ */
+struct tdls_stats_batch {
+	uint32_t                 num_entries;
+	struct tdls_stats_entry *entries;
 };
 
 /**

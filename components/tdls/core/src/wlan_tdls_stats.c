@@ -396,8 +396,10 @@ static bool tdls_stats_state_init_event(void *ctx, uint16_t event,
 	struct tdls_stats_context *stats_ctx =
 				(struct tdls_stats_context *)ctx;
 	struct tdls_stats_entry *entry;
+	struct tdls_stats_batch *batch;
 	bool event_handled = true;
 	QDF_STATUS status;
+	uint32_t i;
 
 	switch (event) {
 	case TDLS_STATS_EV_ENABLE:
@@ -411,13 +413,29 @@ static bool tdls_stats_state_init_event(void *ctx, uint16_t event,
 		tdls_debug("TDLS stats: DISABLE in INIT state - no-op");
 		break;
 	case TDLS_STATS_EV_NEW_EVENT:
-	case TDLS_STATS_EV_FW_STATS:
 		entry = (struct tdls_stats_entry *)event_data;
 		status = tdls_stats_push(&stats_ctx->db, entry);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			tdls_err("TDLS stats: failed to cache entry, status %d",
 				 status);
 			event_handled = false;
+		}
+		break;
+	case TDLS_STATS_EV_FW_STATS:
+		/*
+		 * FW delivered N entries in a single WMI event.  Loop over
+		 * all of them here, inside the SM, under the single lock
+		 * acquisition that the caller already holds.
+		 */
+		batch = (struct tdls_stats_batch *)event_data;
+		if (!batch || !batch->entries || !batch->num_entries)
+			break;
+		for (i = 0; i < batch->num_entries; i++) {
+			status = tdls_stats_push(&stats_ctx->db,
+						 &batch->entries[i]);
+			if (QDF_IS_STATUS_ERROR(status))
+				tdls_err("TDLS stats: failed to cache batch entry %u, status %d",
+					 i, status);
 		}
 		break;
 	case TDLS_STATS_EV_STA_CONNECTED:
@@ -476,9 +494,13 @@ static bool tdls_stats_state_enabling_event(void *ctx, uint16_t event,
 {
 	struct tdls_stats_context *stats_ctx =
 				(struct tdls_stats_context *)ctx;
+	struct tdls_stats_entry *entry;
+	struct tdls_stats_batch *batch;
 	bool event_handled = true;
 	struct scheduler_msg msg = {0};
 	uint32_t flushed;
+	QDF_STATUS status;
+	uint32_t i;
 
 	switch (event) {
 	case TDLS_STATS_EV_ENABLE:
@@ -504,7 +526,35 @@ static bool tdls_stats_state_enabling_event(void *ctx, uint16_t event,
 		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_SS_ENABLED);
 		break;
 	case TDLS_STATS_EV_NEW_EVENT:
+		/*
+		 * Cache the entry while the enable transition is in progress,
+		 * exactly as the INIT state does.  It will be flushed as a
+		 * vendor event when SS_ENABLED is entered.
+		 */
+		entry = (struct tdls_stats_entry *)event_data;
+		status = tdls_stats_push(&stats_ctx->db, entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("TDLS stats: failed to cache entry in ENABLING, status %d",
+				 status);
+			event_handled = false;
+		}
+		break;
 	case TDLS_STATS_EV_FW_STATS:
+		/*
+		 * Cache the batch entries while the enable transition is in
+		 * progress, exactly as the INIT state does.  They will be
+		 * flushed as vendor events when SS_ENABLED is entered.
+		 */
+		batch = (struct tdls_stats_batch *)event_data;
+		if (!batch || !batch->entries || !batch->num_entries)
+			break;
+		for (i = 0; i < batch->num_entries; i++) {
+			status = tdls_stats_push(&stats_ctx->db,
+						 &batch->entries[i]);
+			if (QDF_IS_STATUS_ERROR(status))
+				tdls_err("TDLS stats: failed to cache batch entry %u in ENABLING, status %d",
+					 i, status);
+		}
 		break;
 	case TDLS_STATS_EV_STA_CONNECTED:
 		tdls_stats_handle_sta_connection(
@@ -569,7 +619,9 @@ static bool tdls_stats_subst_enabled_event(void *ctx, uint16_t event,
 	struct tdls_stats_context *stats_ctx =
 				(struct tdls_stats_context *)ctx;
 	struct tdls_stats_entry *entry;
+	struct tdls_stats_batch *batch;
 	bool event_handled = true;
+	uint32_t i;
 
 	switch (event) {
 	case TDLS_STATS_EV_ENABLE:
@@ -580,9 +632,20 @@ static bool tdls_stats_subst_enabled_event(void *ctx, uint16_t event,
 		tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_INIT);
 		break;
 	case TDLS_STATS_EV_NEW_EVENT:
-	case TDLS_STATS_EV_FW_STATS:
 		entry = (struct tdls_stats_entry *)event_data;
 		tdls_emit_vendor_event(entry);
+		break;
+	case TDLS_STATS_EV_FW_STATS:
+		/*
+		 * FW delivered N entries in a single WMI event.  Loop over
+		 * all of them here, inside the SM, under the single lock
+		 * acquisition that the caller already holds.
+		 */
+		batch = (struct tdls_stats_batch *)event_data;
+		if (!batch || !batch->entries || !batch->num_entries)
+			break;
+		for (i = 0; i < batch->num_entries; i++)
+			tdls_emit_vendor_event(&batch->entries[i]);
 		break;
 	case TDLS_STATS_EV_STA_CONNECTED:
 		tdls_stats_handle_sta_connection(
@@ -656,8 +719,9 @@ static const char *tdls_stats_sm_event_names[] = {
 	"EV_ENABLE",
 	"EV_DISABLE",
 	"EV_NEW_EVENT",
-	"EV_FW_STATS",
 	"EV_STA_CONNECTED",
+	"EV_ENABLE_ACTIVE",
+	"EV_FW_STATS",
 };
 
 /**
