@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,6 +73,74 @@ static bool dp_swlm_is_tput_thresh_reached(struct dp_soc *soc, uint8_t rid)
 }
 
 /**
+ * dp_swlm_tcl_timer_dom_check() - Check timer-dominance and update coalescing
+ *     enable/disable state for a TCL ring.
+ * @swlm: DP SWLM pointer
+ * @rid: TCL ring id
+ * @curr_time: current timestamp in microseconds
+ *
+ * Called on every packet. Returns immediately if the 50ms monitor window
+ * has not yet expired.
+ *
+ */
+static void dp_swlm_tcl_timer_dom_check(struct dp_swlm *swlm, uint8_t rid,
+					uint64_t curr_time)
+{
+	struct dp_swlm_params *params = &swlm->params;
+	uint32_t total, timer_dom;
+
+	if (curr_time < params->tcl[rid].mon_win_ts + DP_SWLM_RATIO_WIN_US)
+		return;
+
+	total = params->tcl[rid].mon_bytes_flush_cnt;
+	timer_dom = params->tcl[rid].mon_timer_flush_cnt;
+
+	if (!total) {
+		/* No flushes in this window; re-enable after cooldown if
+		 * coalesce is still disabled. This helps to restart
+		 * coalescing when the traffic is stopped mid way and
+		 * coalesce was left in disabled state previously.
+		 */
+		if (params->tcl[rid].coalesce_disable &&
+		    curr_time - params->tcl[rid].coalesce_last_dis_ts >=
+		    DP_SWLM_RATIO_DIS_COOLDOWN_US) {
+			params->tcl[rid].coalesce_disable = 0;
+			params->tcl[rid].bytes_coalesced = 0;
+			params->tcl[rid].consec_timer_dom_cnt = 0;
+			DP_STATS_INC(swlm, tcl[rid].timer_dom_coalesce_ena, 1);
+		}
+		goto reset;
+	}
+
+	if (!params->tcl[rid].coalesce_disable) {
+		if (timer_dom << DP_SWLM_RATIO_THRESH_SHIFT > total) {
+			params->tcl[rid].consec_timer_dom_cnt++;
+			if (params->tcl[rid].consec_timer_dom_cnt <
+			    DP_SWLM_RATIO_DIS_CONSEC_WIN)
+				goto reset;
+			params->tcl[rid].coalesce_disable = 1;
+			params->tcl[rid].coalesce_last_dis_ts = curr_time;
+			params->tcl[rid].consec_timer_dom_cnt = 0;
+			DP_STATS_INC(swlm, tcl[rid].timer_dom_coalesce_dis, 1);
+		} else {
+			params->tcl[rid].consec_timer_dom_cnt = 0;
+		}
+	} else if (timer_dom << DP_SWLM_RATIO_THRESH_SHIFT < total &&
+		   curr_time - params->tcl[rid].coalesce_last_dis_ts >=
+		   DP_SWLM_RATIO_DIS_COOLDOWN_US) {
+		params->tcl[rid].coalesce_disable = 0;
+		params->tcl[rid].bytes_coalesced = 0;
+		params->tcl[rid].consec_timer_dom_cnt = 0;
+		DP_STATS_INC(swlm, tcl[rid].timer_dom_coalesce_ena, 1);
+	}
+
+reset:
+	params->tcl[rid].mon_win_ts = curr_time;
+	params->tcl[rid].mon_bytes_flush_cnt = 0;
+	params->tcl[rid].mon_timer_flush_cnt = 0;
+}
+
+/**
  * dp_swlm_can_tcl_wr_coalesce() - To check if current TCL reg write can be
  *				   coalesced or not.
  * @soc: Datapath global soc handle
@@ -96,6 +164,7 @@ dp_swlm_can_tcl_wr_coalesce(struct dp_soc *soc,
 	struct dp_swlm *swlm = &soc->swlm;
 	uint8_t rid = tcl_data->ring_id;
 	struct dp_swlm_params *params = &soc->swlm.params;
+	uint32_t prev_consec;
 
 	if (curr_time >= params->tcl[rid].expire_time) {
 		params->tcl[rid].expire_time = qdf_get_log_timestamp_usecs() +
@@ -114,15 +183,27 @@ dp_swlm_can_tcl_wr_coalesce(struct dp_soc *soc,
 
 	if (params->tcl[rid].tput_pass_cnt > DP_SWLM_TCL_TPUT_PASS_THRESH) {
 		coalesce = 1;
+
 		if (params->tcl[rid].bytes_coalesced >
 		    params->tcl[rid].bytes_flush_thresh) {
 			coalesce = 0;
+			prev_consec = params->tcl[rid].consec_timer_flush_cnt;
+			params->tcl[rid].consec_timer_flush_cnt = 0;
+			params->tcl[rid].mon_bytes_flush_cnt++;
+			if (prev_consec >= DP_SWLM_TIMER_DOM_CONSEC_MIN)
+				params->tcl[rid].mon_timer_flush_cnt++;
 			DP_STATS_INC(swlm, tcl[rid].bytes_thresh_reached, 1);
 		} else if (curr_time > params->tcl[rid].coalesce_end_time) {
 			coalesce = 0;
+			params->tcl[rid].consec_timer_flush_cnt++;
 			DP_STATS_INC(swlm, tcl[rid].time_thresh_reached, 1);
 		}
 	}
+
+	dp_swlm_tcl_timer_dom_check(swlm, rid, curr_time);
+
+	if (params->tcl[rid].coalesce_disable)
+		coalesce = 0;
 
 coalescing_fail:
 	if (!coalesce) {
@@ -162,6 +243,10 @@ QDF_STATUS dp_print_swlm_stats(struct dp_soc *soc)
 			swlm->stats.tcl[i].time_thresh_reached);
 		dp_info("Coalesce fail (TPUT sampling fail): %d",
 			swlm->stats.tcl[i].tput_criteria_fail);
+		dp_info("Coalesce fail (Timer dom dis): %d",
+			swlm->stats.tcl[i].timer_dom_coalesce_dis);
+		dp_info("Coalesce fail (Timer dom ena): %d",
+			swlm->stats.tcl[i].timer_dom_coalesce_ena);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -190,6 +275,15 @@ static void dp_swlm_tcl_flush_timer(void *arg)
 		return;
 	}
 
+	/*
+	 * consec_timer_flush_cnt is also read and reset in the TX datapath
+	 * without a lock. SWLM is intentionally designed lock-free to avoid
+	 * overhead in the hot TX path. This is a statistical heuristic counter
+	 * and an occasional lost increment has negligible impact on the
+	 * timer-dominance ratio computed over a 50ms window.
+	 */
+	soc->swlm.params.tcl[tcl->ring_id].consec_timer_flush_cnt++;
+
 	DP_STATS_INC(swlm, tcl[tcl->ring_id].timer_flush_success, 1);
 }
 
@@ -216,6 +310,14 @@ static inline QDF_STATUS dp_soc_swlm_tcl_attach(struct dp_soc *soc)
 		swlm->params.tcl[i].soc = soc;
 		swlm->params.tcl[i].ring_id = i;
 		swlm->params.tcl[i].bytes_flush_thresh = 0;
+		swlm->params.tcl[i].mon_win_ts =
+			qdf_get_log_timestamp_usecs();
+		swlm->params.tcl[i].mon_bytes_flush_cnt = 0;
+		swlm->params.tcl[i].mon_timer_flush_cnt = 0;
+		swlm->params.tcl[i].coalesce_disable = 0;
+		swlm->params.tcl[i].consec_timer_dom_cnt = 0;
+		swlm->params.tcl[i].consec_timer_flush_cnt = 0;
+		swlm->params.tcl[i].coalesce_last_dis_ts = 0;
 		qdf_timer_init(soc->osdev,
 			       &swlm->params.tcl[i].flush_timer,
 			       dp_swlm_tcl_flush_timer,
