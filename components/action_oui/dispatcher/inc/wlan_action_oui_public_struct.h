@@ -157,6 +157,9 @@ struct action_oui_mac_exclusion {
  *                                     build present.
  * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
  * @ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P: Force tx null frame on p2p Go
+ * @ACTION_OUI_HOST_FW_EXT_START: Dynamic length OUI start here- placeholder
+ * @ACTION_OUI_ALLOW_NSS_GREATER_THAN_2: Allow NSS > 2 for specified APs
+ * @ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2: Disallow NSS > 2 for specified APs
  * @ACTION_OUI_HOST_ONLY: host only action id start - placeholder.
  * New Firmware related "ACTION" needs to be added before this placeholder.
  * @ACTION_OUI_HOST_RECONN: reconnect to the same BSSID when wait for
@@ -198,6 +201,16 @@ enum action_oui_id {
 	ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ = 17,
 	ACTION_OUI_DISABLE_DYNAMIC_SMPS = 18,
 	ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P = 19,
+
+	/* 0-127 is reserved for action ids for which the data is static.
+	 * Size of the data is fixed and is not configurable.
+	 */
+
+	/* Dynamic length OUIs starts below */
+	ACTION_OUI_HOST_FW_EXT_START = 128,
+	ACTION_OUI_ALLOW_NSS_GREATER_THAN_2 =
+				ACTION_OUI_HOST_FW_EXT_START,
+	ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2 = 129,
 
 	/* host&fw interface add above here */
 	ACTION_OUI_HOST_ONLY,
