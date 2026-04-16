@@ -2678,4 +2678,14 @@ QDF_STATUS
 ucfg_pmo_send_vdev_sta_ps_param(struct wlan_objmgr_vdev *vdev,
 				enum pmo_sta_powersave_param ps_param,
 				uint32_t param_value);
+
+/**
+ * ucfg_pmo_get_beacon_lio_update_on_screen_on_off() - Get beacon LIO screen
+ * state update configuration
+ * @psoc: objmgr psoc handle
+ *
+ * Return: true if enabled, false otherwise
+ */
+bool
+ucfg_pmo_get_beacon_lio_update_on_screen_on_off(struct wlan_objmgr_psoc *psoc);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

@@ -844,6 +844,14 @@ ucfg_pmo_get_sta_mod_dtim(struct wlan_objmgr_psoc *psoc)
 	return pmo_psoc_ctx->psoc_cfg.sta_mod_dtim;
 }
 
+bool
+ucfg_pmo_get_beacon_lio_update_on_screen_on_off(struct wlan_objmgr_psoc *psoc)
+{
+	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
+
+	return pmo_psoc_ctx->psoc_cfg.beacon_lio_update_on_screen_on_off;
+}
+
 void
 ucfg_pmo_set_sta_mod_dtim(struct wlan_objmgr_psoc *psoc,
 			  uint8_t val)

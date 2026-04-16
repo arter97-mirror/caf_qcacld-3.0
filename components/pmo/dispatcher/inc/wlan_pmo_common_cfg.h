@@ -273,6 +273,33 @@
 
 /*
  * <ini>
+ * gBeaconLioUpdateOnScreenOnOff - Enable Beacon LIO update on screen state
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini enables/disables beacon Listen Interval Offload (LIO) updates
+ * based on screen on/off state. When enabled:
+ * - Screen ON: DTIM forced to 1 for low latency
+ * - Screen OFF: DTIM modulation enabled for power savings
+ *
+ * Screen state is detected via WMI_IDLE_TRIGGER_MONITOR_CMDID:
+ * - WMI_IDLE_TRIGGER_MONITOR_ON  = screen off (system idle)
+ * - WMI_IDLE_TRIGGER_MONITOR_OFF = screen on (system active)
+ *
+ * Related: WMI_PDEV_PARAM_BEACON_LIO_UPDATE_ON_SCREEN_ON_OFF
+ *
+ * Supported Feature: Power Management
+ * Usage: External
+ * </ini>
+ */
+#define CFG_PMO_BEACON_LIO_UPDATE_ON_SCREEN_ON_OFF CFG_INI_BOOL( \
+	"gBeaconLioUpdateOnScreenOnOff", \
+	0, \
+	"Enable Beacon LIO update on screen state")
+
+/*
+ * <ini>
  * gMCAddrListEnable - Enable/disable multicast MAC address list feature
  * @Min: 0
  * @Max: 1
@@ -907,6 +934,7 @@
 	CFG(CFG_PMO_ENABLE_TELESCOPIC_DTIM) \
 	CFG(CFG_PMO_MIN_TELESDTIM_LVL) \
 	CFG(CFG_PMO_ENABLE_MODULATED_DTIM) \
+	CFG(CFG_PMO_BEACON_LIO_UPDATE_ON_SCREEN_ON_OFF) \
 	CFG(CFG_PMO_ENABLE_FORCED_DTIM) \
 	CFG(CFG_PMO_MC_ADDR_LIST_ENABLE) \
 	CFG(CFG_PMO_POWERSAVE_MODE) \

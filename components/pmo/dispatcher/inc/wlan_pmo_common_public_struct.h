@@ -372,6 +372,8 @@ enum pmo_page_fault_action {
  * @d0_wow_supported: true if psoc supports D0 wow command
  * @ra_ratelimit_enable: true when ra filtering ins enabled else false
  * @ra_priority_enable: true when ra priority ins enabled else false
+ * @beacon_lio_update_on_screen_on_off: enable/disable beacon LIO update
+ *    based on screen on/off state
  * @ra_ratelimit_interval: ra packets interval
  * @magic_ptrn_enable: true when magic pattern is enabled else false
  * @deauth_enable: true when wake up on deauth is enabled else false
@@ -466,6 +468,7 @@ struct pmo_psoc_cfg {
 	bool d0_wow_supported;
 	bool ra_ratelimit_enable;
 	bool ra_priority_enable;
+	bool beacon_lio_update_on_screen_on_off;
 #ifdef FEATURE_WLAN_RA_FILTERING
 	uint16_t ra_ratelimit_interval;
 #endif
