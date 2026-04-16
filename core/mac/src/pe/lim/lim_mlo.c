@@ -33,6 +33,7 @@
 #include <wlan_mlo_mgr_peer.h>
 #include <lim_utils.h>
 #include <utils_mlo.h>
+#include "wlan_action_oui_api.h"
 
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
@@ -1129,6 +1130,8 @@ QDF_STATUS lim_mlo_link_add_fetch_nss(uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct bss_description *bss_desc;
 	struct sir_dot11f_nss_info nss_ies = {0};
+	struct action_oui_search_attr attr = {0};
+	uint8_t tx_nss_oui, rx_nss_oui;
 
 	mac = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac) {
@@ -1195,6 +1198,19 @@ QDF_STATUS lim_mlo_link_add_fetch_nss(uint8_t vdev_id,
 				  MLME_DOT11_MODE_11BE);
 	*tx_nss = QDF_MIN(self_tx_nss, nss_ies.cap_rx_nss);
 	*rx_nss = QDF_MIN(self_rx_nss, nss_ies.cap_tx_nss);
+	tx_nss_oui = *tx_nss;
+	rx_nss_oui = *rx_nss;
+	/* Apply OUI-based NSS restrictions for MLO link add */
+	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	attr.ie_length = wlan_get_ielen_from_bss_description(bss_desc);
+	attr.mac_addr = bss_desc->bssId;
+
+	wlan_mlme_determine_allowed_nss(mac->psoc, &attr,
+					&tx_nss_oui, &rx_nss_oui);
+
+	*tx_nss = QDF_MIN(*tx_nss, tx_nss_oui);
+	*rx_nss = QDF_MIN(*rx_nss, rx_nss_oui);
+
 	qdf_mem_free(bss_desc);
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);

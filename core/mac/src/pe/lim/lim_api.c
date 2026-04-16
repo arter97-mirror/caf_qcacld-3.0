@@ -92,6 +92,7 @@
 #include "wlan_mlme_api.h"
 #include <wlan_p2p_api.h>
 #include "wlan_action_oui_main.h"
+#include "wlan_action_oui_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -4440,6 +4441,8 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	struct scan_cache_entry *cache_entry;
 	struct sir_dot11f_nss_info nss_ies;
 	struct mlo_link_info link_info = {0};
+	struct action_oui_search_attr attr = {0};
+	uint8_t tx_nss_oui, rx_nss_oui;
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
@@ -4495,6 +4498,18 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 
 	cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies.cap_rx_nss);
 	cap_rx_nss = QDF_MIN(cap_rx_nss, nss_ies.cap_tx_nss);
+
+	tx_nss_oui = cap_tx_nss;
+	rx_nss_oui = cap_rx_nss;
+	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	attr.ie_length = wlan_get_ielen_from_bss_description(bss_desc);
+	attr.mac_addr = bss_desc->bssId;
+
+	wlan_mlme_determine_allowed_nss(mac_ctx->psoc, &attr,
+					&tx_nss_oui, &rx_nss_oui);
+
+	cap_tx_nss = QDF_MIN(cap_tx_nss, tx_nss_oui);
+	cap_rx_nss = QDF_MIN(cap_rx_nss, rx_nss_oui);
 
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);

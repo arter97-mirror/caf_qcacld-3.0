@@ -43,6 +43,8 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_cmn_ieee80211.h"
+#include "wlan_action_oui_public_struct.h"
+#include "wlan_action_oui_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -10112,4 +10114,50 @@ QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *p
 	mlme_debug("Set P2P GC keep-awake during NoA: %d", value);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_mlme_determine_allowed_nss(struct wlan_objmgr_psoc *psoc,
+				     struct action_oui_search_attr *attr,
+				     uint8_t *tx_nss, uint8_t *rx_nss)
+{
+	bool found_in_list = false;
+	uint32_t list_type = ACTION_OUI_MAXIMUM_ID;
+	uint8_t min_tx_nss = 0, min_rx_nss = 0;
+	uint8_t max_tx_nss = 0, max_rx_nss = 0;
+	QDF_STATUS status;
+
+	if (!psoc || !attr || !tx_nss || !rx_nss)
+		return;
+
+	wlan_action_oui_get_nss_policy(psoc, attr, &found_in_list, &list_type);
+	if (list_type == ACTION_OUI_MAXIMUM_ID)
+		return;
+
+	status = policy_mgr_fetch_min_max_nss_across_hw_modes(psoc,
+							      &min_tx_nss,
+							      &min_rx_nss,
+							      &max_tx_nss,
+							      &max_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to fetch min/max NSS across HW modes");
+		return;
+	}
+
+	if (list_type == ACTION_OUI_ALLOW_NSS_GREATER_THAN_2) {
+		if (found_in_list) {
+			*tx_nss = QDF_MIN(*tx_nss, max_tx_nss);
+			*rx_nss = QDF_MIN(*rx_nss, max_rx_nss);
+		} else {
+			*tx_nss = QDF_MIN(*tx_nss, min_tx_nss);
+			*rx_nss = QDF_MIN(*rx_nss, min_rx_nss);
+		}
+	} else if (list_type == ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2) {
+		if (found_in_list) {
+			*tx_nss = QDF_MIN(*tx_nss, min_tx_nss);
+			*rx_nss = QDF_MIN(*rx_nss, min_rx_nss);
+		} else {
+			*tx_nss = QDF_MIN(*tx_nss, max_tx_nss);
+			*rx_nss = QDF_MIN(*rx_nss, max_rx_nss);
+		}
+	}
 }

@@ -24,6 +24,7 @@
 #define _WLAN_MLME_API_H_
 
 #include <wlan_mlme_public_struct.h>
+#include "wlan_action_oui_public_struct.h"
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_cmn.h>
 #include "sme_api.h"
@@ -6271,4 +6272,20 @@ bool wlan_mlme_get_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
 						      bool value);
+
+/**
+ * wlan_mlme_determine_allowed_nss() - determine allowed NSS in MLME
+ * @psoc: pointer to psoc object
+ * @attr: action OUI search attributes
+ * @tx_nss: pointer to TX NSS value (input/output)
+ * @rx_nss: pointer to RX NSS value (input/output)
+ *
+ * This dispatcher API applies MLME-side NSS allow/deny decision logic using
+ * the action OUI NSS policy and hardware min/max NSS limits.
+ *
+ * Return: void
+ */
+void wlan_mlme_determine_allowed_nss(struct wlan_objmgr_psoc *psoc,
+				     struct action_oui_search_attr *attr,
+				     uint8_t *tx_nss, uint8_t *rx_nss);
 #endif /* _WLAN_MLME_API_H_ */

@@ -42,6 +42,7 @@
 #include <lim_assoc_utils.h>
 #include <lim_process_fils.h>
 #include <wlan_action_oui_main.h>
+#include <wlan_action_oui_api.h>
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_link_switch.h"
 
@@ -1305,6 +1306,9 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 	struct sir_dot11f_nss_info nss_ies;
 	uint8_t cap_tx_nss = NSS_1x1_MODE, cap_rx_nss = NSS_1x1_MODE;
 	uint8_t op_tx_nss = NSS_1x1_MODE, op_rx_nss = NSS_1x1_MODE;
+	struct action_oui_search_attr attr = {0};
+	uint8_t tx_nss_oui = 0;
+	uint8_t rx_nss_oui = 0;
 
 	if (wlan_cm_is_vdev_roam_sync_inprogress(session->vdev)) {
 		status = wlan_vdev_mlme_get_bss_nss_params(session->vdev,
@@ -1371,6 +1375,19 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 
 		cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies.cap_rx_nss);
 		cap_rx_nss = QDF_MIN(cap_rx_nss, nss_ies.cap_tx_nss);
+
+		tx_nss_oui = cap_tx_nss;
+		rx_nss_oui = cap_rx_nss;
+		attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+		attr.ie_length =
+			wlan_get_ielen_from_bss_description(bss_desc);
+		attr.mac_addr = bss_desc->bssId;
+
+		wlan_mlme_determine_allowed_nss(mac_ctx->psoc, &attr,
+						&tx_nss_oui, &rx_nss_oui);
+
+		cap_tx_nss = QDF_MIN(cap_tx_nss, tx_nss_oui);
+		cap_rx_nss = QDF_MIN(cap_rx_nss, rx_nss_oui);
 	}
 
 	is_2g_band = wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq);
@@ -1390,7 +1407,8 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 		op_rx_nss = cap_rx_nss;
 	}
 
-	pe_debug("AP Tx/Rx %dx%d, STA %s band CNX %dx%d (%dx%d), %s%s",
+	pe_debug("Allowed Tx/Rx %dx%d AP Tx/Rx %dx%d, STA %s band CNX %dx%d (%dx%d), %s%s ",
+		 tx_nss_oui, rx_nss_oui,
 		 nss_ies.cap_tx_nss, nss_ies.cap_rx_nss,
 		 is_2g_band ? "2.4 GHz" : "5/6 GHz",
 		 cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss,
