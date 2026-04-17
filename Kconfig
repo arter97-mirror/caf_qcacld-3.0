@@ -324,6 +324,10 @@ config DP_TX_COMP_RING_DESC_SANITY_CHECK
 	bool "Enable DP_TX_COMP_RING_DESC_SANITY_CHECK"
 	default n
 
+config DP_RX_RING_DESC_SANITY_CHECK
+	bool "Enable DP_RX_RING_DESC_SANITY_CHECK"
+	default n
+
 config DP_TX_HW_DESC_HISTORY
 	bool "Enable DP_TX_HW_DESC_HISTORY"
 	default n
