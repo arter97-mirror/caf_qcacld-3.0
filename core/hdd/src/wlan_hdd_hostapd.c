@@ -2048,6 +2048,10 @@ static void hdd_hostapd_set_sap_key(struct wlan_hdd_link_info *link_info)
 			continue;
 
 		hdd_debug("key idx %d", key_index);
+		if (key_index == 0) {
+			hdd_debug("skip key idx %d", key_index);
+			continue;
+		}
 		ucfg_crypto_set_key_req(vdev, crypto_key,
 					WLAN_CRYPTO_KEY_TYPE_GROUP);
 		wma_update_set_key(link_info->vdev_id, false, key_index,
