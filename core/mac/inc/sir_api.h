@@ -762,7 +762,7 @@ struct bss_description {
 	/* offset of the ieFields from bssId. */
 	uint16_t length;
 	tSirMacAddr bssId;
-	unsigned long scansystimensec;
+	uint64_t scansystimensec;
 	uint32_t timeStamp[2];
 	uint16_t beaconInterval;
 	uint16_t capabilityInfo;
@@ -5114,7 +5114,7 @@ struct sir_rssi_disallow_lst {
 	enum dlm_reject_ap_reason reject_reason;
 	enum dlm_reject_ap_source source;
 	uint32_t original_timeout;
-	qdf_time_t received_time;
+	uint64_t received_time;
 };
 
 /**

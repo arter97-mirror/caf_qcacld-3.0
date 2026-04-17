@@ -3341,7 +3341,7 @@ wlan_mlme_is_ba_2k_jump_iot_ap(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS
 wlan_mlme_set_last_delba_sent_time(struct wlan_objmgr_vdev *vdev,
-				   qdf_time_t delba_sent_time);
+				   uint64_t delba_sent_time);
 
 /**
  * wlan_mlme_get_last_delba_sent_time() - Get the last delba sent ts
@@ -3349,7 +3349,7 @@ wlan_mlme_set_last_delba_sent_time(struct wlan_objmgr_vdev *vdev,
  *
  * Return: Last delba timestamp if cached, 0 otherwise
  */
-qdf_time_t
+uint64_t
 wlan_mlme_get_last_delba_sent_time(struct wlan_objmgr_vdev *vdev);
 
 /**

@@ -5243,7 +5243,7 @@ bool wlan_mlme_is_ba_2k_jump_iot_ap(struct wlan_objmgr_vdev *vdev)
 
 QDF_STATUS
 wlan_mlme_set_last_delba_sent_time(struct wlan_objmgr_vdev *vdev,
-				   qdf_time_t delba_sent_time)
+				   uint64_t delba_sent_time)
 {
 	struct mlme_legacy_priv *mlme_priv;
 
@@ -5258,7 +5258,7 @@ wlan_mlme_set_last_delba_sent_time(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-qdf_time_t
+uint64_t
 wlan_mlme_get_last_delba_sent_time(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_legacy_priv *mlme_priv;

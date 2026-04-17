@@ -1629,7 +1629,7 @@ static void csr_tsm_stats_rsp_processor(struct mac_context *mac, void *pMsg)
 static void csr_send_ese_adjacent_ap_rep_ind(struct mac_context *mac,
 					struct csr_roam_session *pSession)
 {
-	uint32_t roamTS2 = 0;
+	uint64_t roamTS2 = 0;
 	struct csr_roam_info *roam_info;
 	struct pe_session *pe_session = NULL;
 	uint8_t sessionId = WLAN_UMAC_VDEV_ID_MAX;

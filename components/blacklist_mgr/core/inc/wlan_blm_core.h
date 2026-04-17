@@ -106,12 +106,12 @@
  * @driver_monitor_timestamp: Time when driver adds BSSID to monitor list.
  */
 struct dlm_reject_ap_timestamp {
-	qdf_time_t userspace_avoid_timestamp;
-	qdf_time_t driver_avoid_timestamp;
-	qdf_time_t userspace_denylist_timestamp;
-	qdf_time_t driver_denylist_timestamp;
-	qdf_time_t rssi_reject_timestamp;
-	qdf_time_t driver_monitor_timestamp;
+	uint64_t userspace_avoid_timestamp;
+	uint64_t driver_avoid_timestamp;
+	uint64_t userspace_denylist_timestamp;
+	uint64_t driver_denylist_timestamp;
+	uint64_t rssi_reject_timestamp;
+	uint64_t driver_monitor_timestamp;
 };
 
 /**
@@ -160,7 +160,7 @@ struct dlm_reject_ap {
 		uint32_t reject_ap_reason;
 	};
 	enum dlm_reject_ap_source source;
-	qdf_time_t connect_timestamp;
+	uint64_t connect_timestamp;
 };
 
 /**
