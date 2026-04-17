@@ -132,6 +132,7 @@ static void lim_extract_he_op(struct pe_session *session,
 	pe_debug("6G op info: ch_wd %d cntr_freq_seg0 %d cntr_freq_seg1 %d",
 		 session->ch_width, session->ch_center_freq_seg0,
 		 session->ch_center_freq_seg1);
+	pe_debug("6G op info: ap_power_type %d", session->ap_power_type);
 
 	if (!session->ch_center_freq_seg1)
 		return;
