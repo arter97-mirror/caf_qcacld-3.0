@@ -500,6 +500,10 @@ static QDF_STATUS ucfg_nan_sch_msg_flush_cb(struct scheduler_msg *msg)
 	case NDP_END_ALL:
 		vdev = ((struct nan_datapath_end_all_ndps *)msg->bodyptr)->vdev;
 		break;
+	case NDP_UPDATE_CONFIG:
+		vdev = ((struct nan_datapath_update_config *)msg->bodyptr)
+			->vdev;
+		break;
 	default:
 		nan_err("Invalid NAN msg type during sch flush");
 		return QDF_STATUS_E_INVAL;
@@ -555,6 +559,9 @@ QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 		break;
 	case NDP_END_ALL:
 		len = sizeof(struct nan_datapath_end_all_ndps);
+		break;
+	case NDP_UPDATE_CONFIG:
+		len = sizeof(struct nan_datapath_update_config);
 		break;
 	default:
 		nan_err("in correct message req type: %d", req_type);

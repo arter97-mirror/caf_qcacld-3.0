@@ -160,7 +160,7 @@ tListElem *csr_nonscan_active_ll_peek_head(struct mac_context *mac_ctx,
 
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac_ctx->psoc,
 								 false);
-	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
+	if (!csr_is_sme_umac_ser_cmd_type(cmd))
 		return NULL;
 
 	sme_cmd = cmd->umac_cmd;
@@ -177,7 +177,7 @@ tListElem *csr_nonscan_pending_ll_peek_head(struct mac_context *mac_ctx,
 	cmd = wlan_serialization_peek_head_pending_cmd_using_psoc(mac_ctx->psoc,
 								  false);
 	while (cmd) {
-		if (cmd->source == WLAN_UMAC_COMP_MLME) {
+		if (csr_is_sme_umac_ser_cmd_type(cmd)) {
 			sme_cmd = cmd->umac_cmd;
 			return &sme_cmd->Link;
 		}
@@ -219,7 +219,7 @@ tListElem *csr_nonscan_pending_ll_next(struct mac_context *mac_ctx,
 	if (cmd.vdev)
 		wlan_objmgr_vdev_release_ref(cmd.vdev, WLAN_LEGACY_SME_ID);
 	while (tcmd) {
-		if (tcmd->source == WLAN_UMAC_COMP_MLME) {
+		if (csr_is_sme_umac_ser_cmd_type(tcmd)) {
 			sme_cmd = tcmd->umac_cmd;
 			return &sme_cmd->Link;
 		}

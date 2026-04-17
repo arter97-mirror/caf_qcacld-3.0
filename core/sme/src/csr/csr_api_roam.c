@@ -6912,6 +6912,28 @@ enum wlan_serialization_cmd_type csr_get_cmd_type(tSmeCmd *sme_cmd)
 	return cmd_type;
 }
 
+bool csr_is_sme_umac_ser_cmd_type(struct wlan_serialization_command *cmd)
+{
+	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
+		return false;
+
+	switch (cmd->cmd_type) {
+	case WLAN_SER_CMD_WM_STATUS_CHANGE:
+	case WLAN_SER_CMD_FORCE_DISASSOC_STA:
+	case WLAN_SER_CMD_FORCE_DEAUTH_STA:
+	case WLAN_SER_CMD_ADDTS:
+	case WLAN_SER_CMD_DELTS:
+	case WLAN_SER_CMD_SET_HW_MODE:
+	case WLAN_SER_CMD_NSS_UPDATE:
+	case WLAN_SER_CMD_SET_DUAL_MAC_CONFIG:
+	case WLAN_SER_CMD_SET_ANTENNA_MODE:
+	case WLAN_SER_CMD_SAP_BW_UPDATE:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static uint32_t csr_get_monotonous_number(struct mac_context *mac_ctx)
 {
 	uint32_t cmd_id;
@@ -6929,12 +6951,6 @@ static void csr_fill_cmd_timeout(struct wlan_serialization_command *cmd)
 	switch (cmd->cmd_type) {
 	case WLAN_SER_CMD_WM_STATUS_CHANGE:
 		cmd->cmd_timeout_duration = SME_CMD_PEER_DISCONNECT_TIMEOUT;
-		break;
-	case WLAN_SER_CMD_VDEV_START_BSS:
-		cmd->cmd_timeout_duration = SME_CMD_VDEV_START_BSS_TIMEOUT;
-		break;
-	case WLAN_SER_CMD_VDEV_STOP_BSS:
-		cmd->cmd_timeout_duration = SME_CMD_STOP_BSS_CMD_TIMEOUT;
 		break;
 	case WLAN_SER_CMD_FORCE_DISASSOC_STA:
 	case WLAN_SER_CMD_FORCE_DEAUTH_STA:
@@ -8096,7 +8112,7 @@ QDF_STATUS csr_bss_start(struct mac_context *mac, uint32_t vdev_id,
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_START_BSS);
 	cmd.umac_cmd = start_bss_cfg;
 	cmd.vdev = vdev;
-	csr_fill_cmd_timeout(&cmd);
+	cmd.cmd_timeout_duration = SME_CMD_VDEV_START_BSS_TIMEOUT;
 
 	status = wlan_vdev_mlme_ser_start_bss(&cmd);
 	switch (status) {
@@ -8152,7 +8168,7 @@ QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac,
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_STOP_BSS);
 	cmd.umac_cmd = stop_bss_req;
 	cmd.vdev = vdev;
-	csr_fill_cmd_timeout(&cmd);
+	cmd.cmd_timeout_duration = SME_CMD_STOP_BSS_CMD_TIMEOUT;
 
 	status = wlan_vdev_mlme_ser_stop_bss(&cmd);
 	switch (status) {

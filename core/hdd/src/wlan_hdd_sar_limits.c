@@ -1280,6 +1280,24 @@ void wlan_hdd_sar_timers_reset(struct hdd_context *hdd_ctx)
 
 }
 
+void wlan_hdd_sar_timers_stop(struct hdd_context *hdd_ctx)
+{
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
+		return;
+
+	hdd_enter();
+
+	if (QDF_TIMER_STATE_RUNNING ==
+		qdf_mc_timer_get_current_state(&hdd_ctx->sar_safety_timer))
+		qdf_mc_timer_stop(&hdd_ctx->sar_safety_timer);
+
+	qdf_event_set(&hdd_ctx->sar_safety_req_resp_event);
+
+	qdf_delayed_work_stop_sync(&hdd_ctx->sar_safety_unsolicited_work);
+
+	hdd_exit();
+}
+
 void wlan_hdd_sar_timers_init(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;

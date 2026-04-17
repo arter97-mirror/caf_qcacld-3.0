@@ -180,11 +180,8 @@ wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
 	struct twt_psoc_priv_obj *twt_psoc_obj;
 
 	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
-	if (!twt_psoc_obj) {
-		twt_psoc_obj->cfg_params.twt_responder  =
-					cfg_default(CFG_TWT_RESPONDER);
+	if (!twt_psoc_obj)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	twt_psoc_obj->cfg_params.twt_responder =
 			twt_psoc_obj->cfg_params.twt_responder_orig;
