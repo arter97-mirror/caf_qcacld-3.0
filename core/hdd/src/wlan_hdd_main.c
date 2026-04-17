@@ -18809,7 +18809,7 @@ static void hdd_hastings_bt_war_initialize(struct hdd_context *hdd_ctx)
 		hdd_hastings_bt_war_enable_fw(hdd_ctx);
 }
 
-#define MAX_PDEV_CFG_CDS_PARAMS 8
+#define MAX_PDEV_CFG_CDS_PARAMS 9
 /* params being sent:
  * wmi_pdev_param_set_iot_pattern
  * wmi_pdev_param_max_mpdus_in_ampdu
@@ -18819,6 +18819,7 @@ static void hdd_hastings_bt_war_initialize(struct hdd_context *hdd_ctx)
  * wmi_pdev_param_gcmp_support_enable
  * wmi_pdev_auto_detect_power_failure
  * wmi_pdev_param_fast_pwr_transition
+ * wmi_pdev_param_beacon_lio_update_on_screen_on_off
  */
 
 /**
@@ -18964,6 +18965,18 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	/* Send some pdev params to maintain legacy order of pdev set params
 	 * at hdd_pre_enable_configure
 	 */
+
+	set_value = ucfg_pmo_get_beacon_lio_update_on_screen_on_off(hdd_ctx->psoc);
+
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_pdev_param_beacon_lio_update_on_screen_on_off,
+			set_value, index++,
+			max_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed at wmi_pdev_param_beacon_lio_update_on_screen_on_off");
+		goto out;
+	}
 	status = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
 						     WMI_PDEV_ID_SOC, setparam,
 						     index);
