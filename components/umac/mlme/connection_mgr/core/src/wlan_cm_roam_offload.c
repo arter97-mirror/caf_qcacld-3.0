@@ -3955,11 +3955,12 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (mlo_mgr_is_unified_connect_disconnect_supported(psoc)) {
-		mlme_debug("skip RSO cmd vdev %d due to linkswich in progress",
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(psoc)) {
+		mlme_debug("skip RSO cmd vdev %d due to link switch in progress",
 			   vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-		return QDF_STATUS_SUCCESS;
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	mlme_clear_rso_pending_disable_req_bitmap(psoc, vdev_id);
