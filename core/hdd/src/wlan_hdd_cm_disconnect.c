@@ -299,8 +299,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	mac_handle = hdd_ctx->mac_handle;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc,
-						      link_info->vdev))
+	if (mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc, vdev))
 		return;
 
 	/* update P2P connection status */
