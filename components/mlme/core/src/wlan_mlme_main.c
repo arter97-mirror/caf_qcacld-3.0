@@ -1044,6 +1044,160 @@ struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
 	return &mlme_priv->ini_cfg;
 }
 
+uint8_t mlme_get_nss_chain_shift(enum QDF_OPMODE device_mode)
+{
+	switch (device_mode) {
+	case QDF_STA_MODE:
+		return WLAN_STA_NSS_CHAINS_SHIFT;
+	case QDF_SAP_MODE:
+		return WLAN_SAP_NSS_CHAINS_SHIFT;
+	case QDF_P2P_GO_MODE:
+		return WLAN_P2P_GO_NSS_CHAINS_SHIFT;
+	case QDF_P2P_CLIENT_MODE:
+		return WLAN_P2P_CLI_CHAINS_SHIFT;
+	case QDF_P2P_DEVICE_MODE:
+		return WLAN_P2P_DEV_NSS_CHAINS_SHIFT;
+	case QDF_IBSS_MODE:
+		return WLAN_IBSS_NSS_CHAINS_SHIFT;
+	case QDF_OCB_MODE:
+		return WLAN_OCB_NSS_CHAINS_SHIFT;
+	case QDF_NAN_DISC_MODE:
+	case QDF_NDI_MODE:
+		return WLAN_NAN_NSS_CHAINS_SHIFT;
+	case QDF_TDLS_MODE:
+		return WLAN_TDLS_NSS_CHAINS_SHIFT;
+	default:
+		return WLAN_STA_NSS_CHAINS_SHIFT;
+	}
+}
+
+QDF_STATUS
+mlme_fetch_psoc_nss_chain_params_for_mode(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_mlme_nss_chains *mode_ini_cfg,
+					  enum QDF_OPMODE device_mode,
+					  uint8_t rf_chains_supported,
+					  enum wlan_mlme_cfg_nss_src cfg_src)
+{
+	QDF_STATUS status;
+	uint8_t nss_chain_shift;
+	uint8_t max_supported_nss, band_2g_nss, band_5g_nss;
+	enum coex_btc_chain_mode btc_chain_mode;
+	struct wlan_mlme_psoc_ext_obj *mlme_priv;
+	struct wlan_mlme_nss_chains *nss_chains_ini_cfg;
+	enum nss_chains_band_info band_2g, band_5g;
+
+	mlme_priv = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_priv) {
+		mlme_legacy_err("psoc legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (cfg_src == WLAN_MLME_CFG_SRC_STARTUP)
+		nss_chains_ini_cfg = &mlme_priv->cfg.nss_chains_startup_cfg;
+	else
+		nss_chains_ini_cfg = &mlme_priv->cfg.nss_chains_ini_cfg;
+
+	nss_chain_shift = mlme_get_nss_chain_shift(device_mode);
+	max_supported_nss =
+		QDF_MIN(mlme_priv->cfg.vht_caps.vht_cap_info.enable_mimo + 1,
+			rf_chains_supported);
+
+	status = wlan_coex_psoc_get_btc_chain_mode(psoc, &btc_chain_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to get BT coex chain mode");
+		btc_chain_mode = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	}
+
+	band_2g = NSS_CHAINS_BAND_2GHZ;
+	band_5g = NSS_CHAINS_BAND_5GHZ;
+
+	band_5g_nss = max_supported_nss;
+	band_2g_nss = ((btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_FDD ||
+			btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_HYBRID) ||
+		       (device_mode == QDF_NDI_MODE &&
+			mlme_priv->cfg.gen.as_enabled)) ?
+		      QDF_MIN(NSS_1x1_MODE, max_supported_nss) :
+		      max_supported_nss;
+
+	mode_ini_cfg->num_rx_chains[band_2g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_rx_chains[band_2g],
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->num_tx_chains[band_2g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_tx_chains[band_2g],
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->num_rx_chains[band_5g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_rx_chains[band_5g],
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->num_tx_chains[band_5g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_tx_chains[band_5g],
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->rx_nss[band_2g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->rx_nss[band_2g],
+				nss_chain_shift), band_2g_nss);
+
+	mode_ini_cfg->tx_nss[band_2g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->tx_nss[band_2g],
+				nss_chain_shift), band_2g_nss);
+
+	mode_ini_cfg->rx_nss[band_5g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->rx_nss[band_5g],
+				nss_chain_shift), band_5g_nss);
+
+	mode_ini_cfg->tx_nss[band_5g] =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->tx_nss[band_5g],
+				nss_chain_shift), band_5g_nss);
+
+	mode_ini_cfg->num_tx_chains_11a =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_tx_chains_11a,
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->num_tx_chains_11b =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_tx_chains_11b,
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->num_tx_chains_11g =
+		QDF_MIN(WLAN_GET_VDEV_NSS_CHAIN(
+				nss_chains_ini_cfg->num_tx_chains_11g,
+				nss_chain_shift), rf_chains_supported);
+
+	mode_ini_cfg->disable_rx_mrc[band_2g] =
+		nss_chains_ini_cfg->disable_rx_mrc[band_2g];
+	mode_ini_cfg->disable_tx_mrc[band_2g] =
+		nss_chains_ini_cfg->disable_tx_mrc[band_2g];
+
+	mode_ini_cfg->disable_rx_mrc[band_5g] =
+		nss_chains_ini_cfg->disable_rx_mrc[band_5g];
+	mode_ini_cfg->disable_tx_mrc[band_5g] =
+		nss_chains_ini_cfg->disable_tx_mrc[band_5g];
+
+	mode_ini_cfg->enable_dynamic_nss_chains_cfg =
+			nss_chains_ini_cfg->enable_dynamic_nss_chains_cfg;
+	mode_ini_cfg->restart_sap_on_dyn_nss_chains_cfg =
+			nss_chains_ini_cfg->restart_sap_on_dyn_nss_chains_cfg;
+	mode_ini_cfg->fast_chain_selection =
+			nss_chains_ini_cfg->fast_chain_selection;
+	mode_ini_cfg->prefer_curr_hw_mode_nss =
+			nss_chains_ini_cfg->prefer_curr_hw_mode_nss;
+	mode_ini_cfg->better_chain_rssi_threshold =
+			nss_chains_ini_cfg->better_chain_rssi_threshold;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_legacy_priv *mlme_priv;

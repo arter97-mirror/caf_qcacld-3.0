@@ -4191,7 +4191,6 @@ void hdd_update_macaddr(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_store_nss_chains_cfg_in_vdev() - Store the per vdev ini cfg in vdev_obj
- * @hdd_ctx: HDD context passed from caller
  * @vdev: VDEV passed with caller holding reference.
  *
  * This function will store the per vdev nss params to the particular mlme
@@ -4200,9 +4199,7 @@ void hdd_update_macaddr(struct hdd_context *hdd_ctx,
  *
  * Return: None
  */
-void
-hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
-				 struct wlan_objmgr_vdev *vdev);
+void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_hdd_set_roaming_state() - Enable or disable roaming

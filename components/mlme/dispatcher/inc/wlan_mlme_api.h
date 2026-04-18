@@ -2767,6 +2767,17 @@ QDF_STATUS
 wlan_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 
 /**
+ * wlan_mlme_get_nss_chain_shift() - Wrapper to fetch the NSS shift for mode
+ * @device_mode: QDF_OPMODE for which needs NSS shift index
+ *
+ * Returns NSS shift from LSB
+ */
+static inline uint8_t wlan_mlme_get_nss_chain_shift(enum QDF_OPMODE device_mode)
+{
+	return mlme_get_nss_chain_shift(device_mode);
+}
+
+/**
  * wlan_mlme_get_enable_dynamic_nss_chains_cfg() - API to get whether dynamic
  * nss and chain config is enabled or not
  * @psoc: psoc context
@@ -2833,6 +2844,24 @@ wlan_mlme_cfg_set_prefer_curr_hw_mode_nss(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_mlme_cfg_get_prefer_curr_hw_mode_nss(struct wlan_objmgr_psoc *psoc,
 					  bool *value);
+
+/**
+ * wlan_mlme_fetch_psoc_nss_chain_params_for_mode() - wrapper to populate
+ * nss/chains
+ * @psoc: psoc object
+ * @mode_ini_cfg: output nss/chains config
+ * @device_mode: vdev operating mode
+ * @rf_chains_supported: max rf chains supported by fw/hw
+ * @cfg_src: source config to use
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_fetch_psoc_nss_chain_params_for_mode(struct wlan_objmgr_psoc *psoc,
+					       struct wlan_mlme_nss_chains *mode_ini_cfg,
+					       enum QDF_OPMODE device_mode,
+					       uint8_t rf_chains_supported,
+					       enum wlan_mlme_cfg_nss_src cfg_src);
 
 /**
  * wlan_mlme_cfg_get_dynamic_nss_chains_support() - API to get current value of

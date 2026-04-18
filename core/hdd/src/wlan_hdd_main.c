@@ -1862,9 +1862,11 @@ static int hdd_update_tdls_config(struct hdd_context *hdd_ctx)
 	struct wlan_mlme_nss_chains vdev_ini_cfg;
 
 	/* Populate the nss chain params from ini for this vdev type */
-	sme_populate_nss_chain_params(hdd_ctx->mac_handle, &vdev_ini_cfg,
-				      QDF_TDLS_MODE,
-				      hdd_ctx->num_rf_chains);
+	wlan_mlme_fetch_psoc_nss_chain_params_for_mode(psoc,
+						       &vdev_ini_cfg,
+						       QDF_TDLS_MODE,
+						       hdd_ctx->num_rf_chains,
+						       WLAN_MLME_CFG_SRC_GLOBAL);
 
 	cfg_tdls_set_vdev_nss_2g(hdd_ctx->psoc,
 				 vdev_ini_cfg.rx_nss[NSS_CHAINS_BAND_2GHZ]);
@@ -8239,16 +8241,26 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	return ret;
 }
 
-void
-hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
-				 struct wlan_objmgr_vdev *vdev)
+void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev)
 {
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
 	struct wlan_mlme_nss_chains vdev_ini_cfg;
+	struct hdd_context *hdd_ctx;
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
 
-	/* Populate the nss chain params from ini for this vdev type */
-	sme_populate_nss_chain_params(hdd_ctx->mac_handle, &vdev_ini_cfg,
-				      wlan_vdev_mlme_get_opmode(vdev),
-				      hdd_ctx->num_rf_chains);
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info)
+		return;
+
+	adapter = link_info->adapter;
+	hdd_ctx = adapter->hdd_ctx;
+	wlan_mlme_fetch_psoc_nss_chain_params_for_mode(
+					hdd_ctx->psoc,
+					&vdev_ini_cfg,
+					opmode,
+					hdd_ctx->num_rf_chains,
+					WLAN_MLME_CFG_SRC_GLOBAL);
 
 	/* Store the nss chain config into the vdev */
 	sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
@@ -8553,7 +8565,7 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 
 	ucfg_fwol_configure_vdev_params(psoc, vdev);
 	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev, opmode);
-	hdd_store_nss_chains_cfg_in_vdev(hdd_ctx, vdev);
+	hdd_store_nss_chains_cfg_in_vdev(vdev);
 	hdd_vdev_configure_rtscts_enable(hdd_ctx, vdev);
 }
 

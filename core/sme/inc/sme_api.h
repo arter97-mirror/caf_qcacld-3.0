@@ -274,24 +274,6 @@ QDF_STATUS sme_start(mac_handle_t mac_handle);
 QDF_STATUS sme_stop(mac_handle_t mac_handle);
 
 /**
- * sme_populate_nss_chain_params() - fill vdev nss chain params from ini
- * @mac_handle: The handle returned by mac_open.
- * @vdev_ini_cfg: pointer to the structure to be filled
- * @device_mode: device mode (eg STA, SAP etc.)
- * @rf_chains_supported: number of chains supported by fw(updated during
- *                       service ready event)
- *
- * This API will fill the nss chain params for the particular vdev from ini
- * configuration for the respective vdev.
- *
- * Return: none
- */
-void sme_populate_nss_chain_params(mac_handle_t mac_handle,
-			     struct wlan_mlme_nss_chains *vdev_ini_cfg,
-			     enum QDF_OPMODE device_mode,
-			     uint8_t rf_chains_supported);
-
-/**
  * sme_store_nss_chains_cfg_in_vdev() - fill vdev nss chain params from ini
  * @vdev: Pointer to vdev obj
  * @vdev_ini_cfg: pointer to the structure the values are to be filled from

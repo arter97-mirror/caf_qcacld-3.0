@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -88,7 +88,7 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_OSIF_ID);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_store_nss_chains_cfg_in_vdev(adapter->hdd_ctx, vdev);
+		hdd_store_nss_chains_cfg_in_vdev(vdev);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 	}
 

@@ -1146,6 +1146,32 @@ struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
 					struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_get_nss_chain_shift() - API to fetch NSS shift for mode
+ * @device_mode: Mode to fetch shift
+ *
+ * Returns the shift from the LSB for the NSS bits for the given
+ * mode.
+ */
+uint8_t mlme_get_nss_chain_shift(enum QDF_OPMODE device_mode);
+
+/**
+ * mlme_fetch_psoc_nss_chain_params_for_mode() - fill nss/chain params for mode
+ * @psoc: pointer to psoc object
+ * @mode_ini_cfg: output nss/chain config to populate
+ * @device_mode: vdev operating mode
+ * @rf_chains_supported: max rf chains supported by fw/hw
+ * @cfg_src: source config to use, current INI or startup snapshot
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_fetch_psoc_nss_chain_params_for_mode(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_mlme_nss_chains *mode_ini_cfg,
+					  enum QDF_OPMODE device_mode,
+					  uint8_t rf_chains_supported,
+					  enum wlan_mlme_cfg_nss_src cfg_src);
+
+/**
  * mlme_get_dynamic_vdev_config() - get the vdev dynamic config params
  * @vdev: vdev pointer
  *

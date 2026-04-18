@@ -1931,6 +1931,28 @@ enum dot11p_mode {
 #define WLAN_MAX_VDEV_CHAINS             2
 #endif
 
+#define WLAN_STA_NSS_CHAINS_SHIFT        0
+#define WLAN_SAP_NSS_CHAINS_SHIFT        3
+#define WLAN_P2P_GO_NSS_CHAINS_SHIFT     6
+#define WLAN_P2P_CLI_CHAINS_SHIFT        9
+#define WLAN_TDLS_NSS_CHAINS_SHIFT       12
+#define WLAN_IBSS_NSS_CHAINS_SHIFT       15
+#define WLAN_P2P_DEV_NSS_CHAINS_SHIFT    18
+#define WLAN_OCB_NSS_CHAINS_SHIFT        21
+#define WLAN_NAN_NSS_CHAINS_SHIFT        24
+#define WLAN_NSS_CHAIN_MASK              0x7
+#define WLAN_GET_VDEV_NSS_CHAIN(x, y)    (((x) >> (y)) & WLAN_NSS_CHAIN_MASK)
+
+/**
+ * enum wlan_mlme_cfg_nss_src - source of nss/chain config to be used
+ * @WLAN_MLME_CFG_SRC_GLOBAL: Use global MLME ini cfg
+ * @WLAN_MLME_CFG_SRC_STARTUP: Use startup nss/chain cfg (startup ini knobs)
+ */
+enum wlan_mlme_cfg_nss_src {
+	WLAN_MLME_CFG_SRC_GLOBAL = 0,
+	WLAN_MLME_CFG_SRC_STARTUP,
+};
+
 /**
  * enum wlan_mlme_nss_chains_state - per band request state
  * @BAND_REQ_FORCE: vendor specified numeric non-255 values
@@ -3113,6 +3135,7 @@ struct wlan_mlme_iot {
  * @sap_cfg: sap CFG items
  * @p2p: p2p CFG items
  * @nss_chains_ini_cfg: Per vdev nss, chains related CFG items
+ * @nss_chains_startup_cfg: Per vdev nss, chains related startup CFG items
  * @sta: sta CFG Items
  * @stats: stats CFG Items
  * @roam_scoring: BSS Scoring related CFG Items
@@ -3172,6 +3195,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_cfg_sap sap_cfg;
 	struct wlan_mlme_p2p_cfg p2p;
 	struct wlan_mlme_nss_chains nss_chains_ini_cfg;
+	struct wlan_mlme_nss_chains nss_chains_startup_cfg;
 	struct wlan_mlme_sta_cfg sta;
 	struct wlan_mlme_stats_cfg stats;
 	struct wlan_mlme_roam_scoring_cfg roam_scoring;

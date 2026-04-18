@@ -2973,6 +2973,31 @@ ucfg_mlme_update_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_fetch_psoc_nss_chain_params_for_mode() - fill nss/chains config
+ * for mode
+ * @psoc: psoc context
+ * @mode_ini_cfg: output nss/chains config
+ * @device_mode: vdev operating mode
+ * @rf_chains_supported: max rf chains supported by fw/hw
+ * @cfg_src: source config to use
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_fetch_psoc_nss_chain_params_for_mode(struct wlan_objmgr_psoc *psoc,
+					       struct wlan_mlme_nss_chains *mode_ini_cfg,
+					       enum QDF_OPMODE device_mode,
+					       uint8_t rf_chains_supported,
+					       enum wlan_mlme_cfg_nss_src cfg_src)
+{
+	return wlan_mlme_fetch_psoc_nss_chain_params_for_mode(psoc,
+							      mode_ini_cfg,
+							      device_mode,
+							      rf_chains_supported,
+							      cfg_src);
+}
+
+/**
  * ucfg_mlme_get_sta_num_tx_chains() - UCFG API to get station num tx chains
  *
  * @psoc: psoc context

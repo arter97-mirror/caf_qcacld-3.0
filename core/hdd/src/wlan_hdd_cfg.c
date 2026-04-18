@@ -1170,7 +1170,7 @@ static void hdd_update_nss_in_vdev(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return;
 
-	hdd_store_nss_chains_cfg_in_vdev(adapter->hdd_ctx, vdev);
+	hdd_store_nss_chains_cfg_in_vdev(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
