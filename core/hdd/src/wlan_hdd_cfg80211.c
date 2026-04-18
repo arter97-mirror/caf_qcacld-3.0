@@ -16118,8 +16118,8 @@ static int hdd_get_sta_keepalive_interval(struct wlan_hdd_link_info *link_info,
 
 /* UP date this to SAP mode as well, to fetch the limits */
 static QDF_STATUS
-hdd_fill_nss_chains_limits(struct wlan_hdd_link_info *link_info,
-			   struct wlan_mlme_nss_chains *nss_chains_limits)
+hdd_fill_vdev_up_nss_chains_limits(struct wlan_hdd_link_info *link_info,
+				   struct wlan_mlme_nss_chains *nss_chains_limits)
 {
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -16136,6 +16136,13 @@ hdd_fill_nss_chains_limits(struct wlan_hdd_link_info *link_info,
 		hdd_debug("Failed to get INI config for VDEV %d",
 			  link_info->vdev_id);
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE) {
+		qdf_mem_copy(nss_chains_limits, ini_limits,
+			     sizeof(*nss_chains_limits));
+		return QDF_STATUS_SUCCESS;
 	}
 
 	def_freq = wlan_get_operation_chan_freq(link_info->vdev);
@@ -16223,7 +16230,7 @@ static int hdd_get_nss_chains_config(struct wlan_hdd_link_info *link_info,
 		return -EOPNOTSUPP;
 	}
 
-	status = hdd_fill_nss_chains_limits(link_info, &limits);
+	status = hdd_fill_vdev_up_nss_chains_limits(link_info, &limits);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to fill limits");
 		return -EINVAL;
@@ -16520,14 +16527,14 @@ typedef int (*interdependent_setter_fn)(struct wlan_hdd_link_info *link_info,
 					struct nlattr **tb);
 
 static enum wlan_vendor_nss_chains_req_type
-hdd_parse_vendor_nss_chains_req(struct wlan_mlme_nss_chains *req,
-				struct nlattr *tb[],
-				enum wlan_vendor_nss_chains_parse_type type)
+hdd_parse_vendor_nss_chains_per_band_req(struct wlan_mlme_nss_chains *req,
+					 struct nlattr *tb[],
+					 enum wlan_vendor_nss_chains_parse_type type)
 {
 	uint8_t i;
 	bool all_unspecified = true;
 	bool all_no_force = true;
-	bool is_nss_type = (type == WLAN_VENDOR_PARSE_TYPE_NSS);
+	bool is_nss_type = (type == WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS);
 	uint32_t tx, rx;
 	enum wlan_vendor_nss_chains_req_type ven_req_type;
 	enum wlan_mlme_nss_chains_state *req_state;
@@ -16643,12 +16650,21 @@ invalid:
 }
 
 static QDF_STATUS
-hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
-					struct wlan_mlme_nss_chains *req,
-					struct wlan_mlme_nss_chains *limits)
+hdd_resolve_vdev_up_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
+						struct wlan_mlme_nss_chains *req,
+						struct wlan_mlme_nss_chains *limits)
 {
+	bool use_ini_limits = false;
 	uint8_t i;
-	struct wlan_mlme_nss_chains *dyn;
+	struct wlan_mlme_nss_chains *dyn, *ini;
+	enum QDF_OPMODE opmode = link_info->adapter->device_mode;
+
+	ini = ucfg_mlme_get_ini_vdev_config(link_info->vdev);
+	if (!ini) {
+		hdd_debug("Failed to fetch VDEV INI NSS config for %d",
+			  link_info->vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	dyn = ucfg_mlme_get_dynamic_vdev_config(link_info->vdev);
 	if (!dyn) {
@@ -16656,6 +16672,9 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 			  link_info->vdev_id);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE)
+		use_ini_limits = true;
 
 	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
 		uint32_t *tx_nss = &req->tx_nss[i];
@@ -16674,9 +16693,13 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 			/* Use MIN logic */
 			uint32_t tx_chain_constraint = req_chains_force ?
 						       req->num_tx_chains[i] :
+						       use_ini_limits ?
+						       ini->num_tx_chains[i] :
 						       dyn->num_tx_chains[i];
 			uint32_t rx_chain_constraint = req_chains_force ?
 						       req->num_rx_chains[i] :
+						       use_ini_limits ?
+						       ini->num_rx_chains[i] :
 						       dyn->num_rx_chains[i];
 
 			*tx_nss = QDF_MIN(tx_chain_constraint,
@@ -16810,8 +16833,8 @@ hdd_validate_and_apply_nss_chains_req(struct wlan_hdd_link_info *link_info,
 	return status;
 }
 
-static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
-					struct nlattr *tb[])
+static int hdd_config_vendor_nss_chains_per_band(struct wlan_hdd_link_info *link_info,
+						 struct nlattr *tb[])
 {
 	uint8_t ll_lt_sap_vdev_id;
 	struct wlan_mlme_nss_chains req = {0};
@@ -16822,11 +16845,11 @@ static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	nss_req_type =
-		hdd_parse_vendor_nss_chains_req(&req, tb,
-						WLAN_VENDOR_PARSE_TYPE_NSS);
+		hdd_parse_vendor_nss_chains_per_band_req(&req, tb,
+						WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS);
 	chains_req_type =
-		hdd_parse_vendor_nss_chains_req(&req, tb,
-						WLAN_VENDOR_PARSE_TYPE_CHAINS);
+		hdd_parse_vendor_nss_chains_per_band_req(&req, tb,
+						WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS);
 
 	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE &&
 	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE)
@@ -16876,12 +16899,12 @@ static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 		goto vdev_ref;
 	}
 
-	status = hdd_fill_nss_chains_limits(link_info, &limits);
+	status = hdd_fill_vdev_up_nss_chains_limits(link_info, &limits);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_ref;
 
-	status = hdd_resolve_non_force_nss_chains_fields(link_info, &req,
-							 &limits);
+	status = hdd_resolve_vdev_up_non_force_nss_chains_fields(link_info,
+								 &req, &limits);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_ref;
 
@@ -16920,7 +16943,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_set_channel_width,
 	hdd_config_peer_ampdu,
 	hdd_set_ul_mu_config,
-	hdd_config_vendor_nss_chains,
+	hdd_config_vendor_nss_chains_per_band,
 	hdd_config_data_stall_param,
 	hdd_config_set_tx_chain_mask_per_band,
 };

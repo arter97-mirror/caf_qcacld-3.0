@@ -759,10 +759,14 @@ enum wlan_vendor_nss_chains_req_type {
  * enum wlan_vendor_nss_chains_parse_type - Type of vendor params to parse
  * @WLAN_VENDOR_PARSE_TYPE_NSS: Parse NSS attributes
  * @WLAN_VENDOR_PARSE_TYPE_CHAINS: Parse Chains attributes
+ * @WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS: Parse Per-Band NSS attributes
+ * @WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS: Parse Per-Band Chains attributes
  */
 enum wlan_vendor_nss_chains_parse_type {
 	WLAN_VENDOR_PARSE_TYPE_NSS,
 	WLAN_VENDOR_PARSE_TYPE_CHAINS,
+	WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS,
+	WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS,
 };
 
 /**

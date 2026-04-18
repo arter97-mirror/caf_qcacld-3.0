@@ -5322,6 +5322,7 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		      struct wlan_mlme_nss_chains *user_cfg,
 		      uint8_t vdev_id)
 {
+	enum QDF_OPMODE opmode;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct wlan_mlme_nss_chains *dynamic_cfg;
@@ -5379,6 +5380,22 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		goto release_lock;
 	}
 	sme_debug("User params verified, sending to fw vdev id %d", vdev_id);
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
+		uint8_t tx_nss, rx_nss;
+		qdf_freq_t freq =
+			wlan_get_operation_chan_freq_vdev_id(mac_ctx->pdev,
+							     vdev_id);
+		int band_idx = wlan_reg_is_24ghz_ch_freq(freq) ?
+			       NSS_CHAINS_BAND_2GHZ : NSS_CHAINS_BAND_5GHZ;
+
+		tx_nss = user_cfg->tx_nss[band_idx];
+		rx_nss = user_cfg->rx_nss[band_idx];
+
+		policy_mgr_validate_user_req_tx_rx_nss(mac_ctx->psoc, vdev_id,
+						       tx_nss, rx_nss);
+	}
 
 	status = wma_vdev_nss_chain_params_send(vdev_id, user_cfg);
 	if (QDF_IS_STATUS_ERROR(status)) {
