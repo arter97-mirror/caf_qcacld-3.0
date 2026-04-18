@@ -4991,32 +4991,37 @@ sme_validate_nss_chains_config(struct wlan_objmgr_vdev *vdev,
 }
 
 static void sme_update_legacy_rate_tx_chains(mac_handle_t mac_handle,
-					     enum QDF_OPMODE vdev_op_mode)
+					     enum QDF_OPMODE vdev_op_mode,
+					     enum wlan_mlme_cfg_nss_src cfg_src)
 {
 	uint8_t nss_shift, ini_chains;
 	uint32_t num_nss_bits = 0x3;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct wlan_mlme_chain_cfg *fw_chain_cfg =
 				&mac_ctx->mlme_cfg->fw_chain_cfg;
-	struct wlan_mlme_nss_chains *ini_cfg =
-				&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
+	struct wlan_mlme_nss_chains *ini_cfg;
+
+	if (cfg_src == WLAN_MLME_CFG_SRC_STARTUP)
+		ini_cfg = &mac_ctx->mlme_cfg->nss_chains_startup_cfg;
+	else
+		ini_cfg = &mac_ctx->mlme_cfg->nss_chains_ini_cfg;
 
 	nss_shift = wlan_mlme_get_nss_chain_shift(vdev_op_mode);
 
-	ini_chains = QDF_GET_BITS(ini_cfg->num_tx_chains_11b,
-				  nss_shift, num_nss_bits);
+	ini_chains = WLAN_GET_VDEV_NSS_CHAIN(ini_cfg->num_tx_chains_11b,
+					     nss_shift);
 	QDF_SET_BITS(ini_cfg->num_tx_chains_11b, nss_shift, num_nss_bits,
 		     QDF_MIN(QDF_MIN(ini_chains, WLAN_MAX_VDEV_CHAINS),
 			     fw_chain_cfg->max_tx_chains_2g));
 
-	ini_chains = QDF_GET_BITS(ini_cfg->num_tx_chains_11g,
-				  nss_shift, num_nss_bits);
+	ini_chains = WLAN_GET_VDEV_NSS_CHAIN(ini_cfg->num_tx_chains_11g,
+					     nss_shift);
 	QDF_SET_BITS(ini_cfg->num_tx_chains_11g, nss_shift, num_nss_bits,
 		     QDF_MIN(QDF_MIN(ini_chains, WLAN_MAX_VDEV_CHAINS),
 			     fw_chain_cfg->max_tx_chains_2g));
 
-	ini_chains = QDF_GET_BITS(ini_cfg->num_tx_chains_11a,
-				  nss_shift, num_nss_bits);
+	ini_chains = WLAN_GET_VDEV_NSS_CHAIN(ini_cfg->num_tx_chains_11a,
+					     nss_shift);
 	QDF_SET_BITS(ini_cfg->num_tx_chains_11a, nss_shift, num_nss_bits,
 		     QDF_MIN(QDF_MIN(ini_chains, WLAN_MAX_VDEV_CHAINS),
 			     fw_chain_cfg->max_tx_chains_5g));
@@ -5044,6 +5049,57 @@ static void sme_modify_chains_in_mlme_cfg(mac_handle_t mac_handle,
 		 (QDF_MIN(tx_chains, WLAN_MAX_VDEV_CHAINS) << nss_shift);
 	sme_debug("rx chains %d tx chains %d changed for vdev mode %d for band %d",
 		  rx_chains, tx_chains, vdev_op_mode, band);
+}
+
+static void
+sme_modify_nss_in_mlme_startup_cfg(mac_handle_t mac_handle,
+				   enum QDF_OPMODE vdev_op_mode,
+				   enum nss_chains_band_info band)
+{
+	uint8_t final_tx_nss, final_rx_nss;
+	uint8_t nss_shift, max_tx_nss, max_rx_nss, cfg_tx_nss, cfg_rx_nss;
+	uint32_t nss_mask = 0x7;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct wlan_mlme_nss_chains *psoc_ini_cfg =
+					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
+	struct wlan_mlme_nss_chains *psoc_startup_cfg =
+				&mac_ctx->mlme_cfg->nss_chains_startup_cfg;
+
+	nss_shift = wlan_mlme_get_nss_chain_shift(vdev_op_mode);
+	max_tx_nss = WLAN_GET_VDEV_NSS_CHAIN(psoc_ini_cfg->tx_nss[band],
+					     nss_shift);
+	max_rx_nss = WLAN_GET_VDEV_NSS_CHAIN(psoc_ini_cfg->rx_nss[band],
+					     nss_shift);
+
+	cfg_tx_nss = WLAN_GET_VDEV_NSS_CHAIN(psoc_startup_cfg->tx_nss[band],
+					     nss_shift);
+	cfg_rx_nss = WLAN_GET_VDEV_NSS_CHAIN(psoc_startup_cfg->rx_nss[band],
+					     nss_shift);
+
+	if (!cfg_tx_nss || (cfg_tx_nss > max_tx_nss))
+		final_tx_nss = max_tx_nss;
+	else
+		final_tx_nss = cfg_tx_nss;
+
+	if (!cfg_rx_nss || (cfg_rx_nss > max_rx_nss))
+		final_rx_nss = max_rx_nss;
+	else
+		final_rx_nss = cfg_rx_nss;
+
+	psoc_startup_cfg->tx_nss[band] &= ~(nss_mask << nss_shift);
+	psoc_startup_cfg->tx_nss[band] |= (final_tx_nss << nss_shift);
+
+	psoc_startup_cfg->rx_nss[band] &= ~(nss_mask << nss_shift);
+	psoc_startup_cfg->rx_nss[band] |= (final_rx_nss << nss_shift);
+
+	psoc_startup_cfg->num_tx_chains[band] &= ~(nss_mask << nss_shift);
+	psoc_startup_cfg->num_tx_chains[band] |= (final_tx_nss << nss_shift);
+
+	psoc_startup_cfg->num_rx_chains[band] &= ~(nss_mask << nss_shift);
+	psoc_startup_cfg->num_rx_chains[band] |= (final_rx_nss << nss_shift);
+
+	sme_debug("Band %d, Mode %d, Tx/Rx %dx%d",
+		  band, vdev_op_mode, final_tx_nss, final_rx_nss);
 }
 
 static void
@@ -5152,11 +5208,17 @@ sme_modify_nss_chains_tgt_cfg(mac_handle_t mac_handle,
 				      band);
 
 	/* Calling only for 2.4Ghz as all the legacy rates are updated */
-	if (band == NSS_CHAINS_BAND_2GHZ)
-		sme_update_legacy_rate_tx_chains(mac_handle, vdev_op_mode);
+	if (band == NSS_CHAINS_BAND_2GHZ) {
+		sme_update_legacy_rate_tx_chains(mac_handle, vdev_op_mode,
+						 WLAN_MLME_CFG_SRC_GLOBAL);
+		sme_update_legacy_rate_tx_chains(mac_handle, vdev_op_mode,
+						 WLAN_MLME_CFG_SRC_STARTUP);
+	}
 
 	sme_modify_nss_in_mlme_cfg(mac_handle, max_supported_rx_nss,
 				   max_supported_tx_nss, vdev_op_mode, band);
+
+	sme_modify_nss_in_mlme_startup_cfg(mac_handle, vdev_op_mode, band);
 }
 
 void
@@ -13640,8 +13702,8 @@ void sme_update_vdev_type_nss(mac_handle_t mac_handle, uint8_t max_supp_nss,
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct vdev_type_nss *vdev_nss;
 
-	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
-					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
+	struct wlan_mlme_nss_chains *nss_chains_startup_cfg =
+					&mac_ctx->mlme_cfg->nss_chains_startup_cfg;
 
 	if (band == NSS_CHAINS_BAND_5GHZ)
 		vdev_nss = &mac_ctx->vdev_type_nss_5g;
@@ -13649,43 +13711,43 @@ void sme_update_vdev_type_nss(mac_handle_t mac_handle, uint8_t max_supp_nss,
 		vdev_nss = &mac_ctx->vdev_type_nss_2g;
 
 	vdev_nss->sta = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_STA_NSS_CHAINS_SHIFT));
 	vdev_nss->sap = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_SAP_NSS_CHAINS_SHIFT));
 	vdev_nss->p2p_go = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_P2P_GO_NSS_CHAINS_SHIFT));
 	vdev_nss->p2p_cli = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_P2P_CLI_CHAINS_SHIFT));
 	vdev_nss->p2p_dev = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_P2P_DEV_NSS_CHAINS_SHIFT));
 	vdev_nss->ibss = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_IBSS_NSS_CHAINS_SHIFT));
 	vdev_nss->tdls = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_TDLS_NSS_CHAINS_SHIFT));
 	vdev_nss->ocb = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_OCB_NSS_CHAINS_SHIFT));
 	vdev_nss->nan = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_NAN_NSS_CHAINS_SHIFT));
 	vdev_nss->ndi = QDF_MIN(max_supp_nss, WLAN_GET_VDEV_NSS_CHAIN(
-						nss_chains_ini_cfg->
+						nss_chains_startup_cfg->
 							rx_nss[band],
 						WLAN_NAN_NSS_CHAINS_SHIFT));
 

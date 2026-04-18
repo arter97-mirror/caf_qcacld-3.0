@@ -4017,6 +4017,55 @@ static void mlme_init_nss_chains(struct wlan_objmgr_psoc *psoc,
 			!!cfg_get(psoc, CFG_PREFER_CURR_HW_MODE_NSS_CONFIG);
 }
 
+static void mlme_init_nss_chains_startup_cfg(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_mlme_nss_chains *startup_cfg)
+{
+	enum nss_chains_band_info band;
+
+	/* Initialize all fields from INI like nss_chains_ini_cfg */
+	startup_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ] =
+				cfg_get(psoc, CFG_STARTUP_TX_NSS_2G);
+	startup_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ] =
+				cfg_get(psoc, CFG_STARTUP_TX_NSS_5G);
+	startup_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ] =
+				cfg_get(psoc, CFG_STARTUP_RX_NSS_2G);
+	startup_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ] =
+				cfg_get(psoc, CFG_STARTUP_RX_NSS_5G);
+
+	startup_cfg->num_tx_chains_11b = cfg_get(psoc, CFG_NUM_TX_CHAINS_11b);
+	startup_cfg->num_tx_chains_11g = cfg_get(psoc, CFG_NUM_TX_CHAINS_11g);
+	startup_cfg->num_tx_chains_11a = cfg_get(psoc, CFG_NUM_TX_CHAINS_11a);
+
+	startup_cfg->disable_rx_mrc[NSS_CHAINS_BAND_2GHZ] =
+					   cfg_get(psoc, CFG_DISABLE_RX_MRC_2G);
+	startup_cfg->disable_rx_mrc[NSS_CHAINS_BAND_5GHZ] =
+					   cfg_get(psoc, CFG_DISABLE_RX_MRC_5G);
+	startup_cfg->disable_tx_mrc[NSS_CHAINS_BAND_2GHZ] =
+					   cfg_get(psoc, CFG_DISABLE_TX_MRC_2G);
+	startup_cfg->disable_tx_mrc[NSS_CHAINS_BAND_5GHZ] =
+					   cfg_get(psoc, CFG_DISABLE_TX_MRC_5G);
+	startup_cfg->enable_dynamic_nss_chains_cfg =
+			cfg_get(psoc, CFG_ENABLE_DYNAMIC_NSS_CHAIN_CONFIG);
+	startup_cfg->restart_sap_on_dyn_nss_chains_cfg =
+			cfg_get(psoc,
+				CFG_RESTART_SAP_ON_DYNAMIC_NSS_CHAINS_CONFIG);
+	startup_cfg->fast_chain_selection =
+				cfg_get(psoc, CFG_FAST_CHAIN_SELECTION_CONFIG);
+	startup_cfg->better_chain_rssi_threshold =
+			cfg_get(psoc, CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG);
+	startup_cfg->prefer_curr_hw_mode_nss =
+			!!cfg_get(psoc, CFG_PREFER_CURR_HW_MODE_NSS_CONFIG);
+
+	/*
+	 * Enforce "chains mirror NSS" rule for startup config:
+	 * Set chain counts equal to NSS values for both bands
+	 */
+	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
+		startup_cfg->num_tx_chains[band] = startup_cfg->tx_nss[band];
+		startup_cfg->num_rx_chains[band] = startup_cfg->rx_nss[band];
+	}
+}
+
 static void mlme_init_wep_cfg(struct wlan_mlme_wep_cfg *wep_params)
 {
 	wep_params->is_privacy_enabled = cfg_default(CFG_PRIVACY_ENABLED);
@@ -4797,6 +4846,7 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_chainmask_cfg(psoc, &mlme_cfg->chainmask_cfg);
 	mlme_init_sap_cfg(psoc, &mlme_cfg->sap_cfg);
 	mlme_init_nss_chains(psoc, &mlme_cfg->nss_chains_ini_cfg);
+	mlme_init_nss_chains_startup_cfg(psoc, &mlme_cfg->nss_chains_startup_cfg);
 	mlme_init_twt_cfg(psoc, &mlme_cfg->twt_cfg);
 	mlme_init_he_cap_in_cfg(psoc, mlme_cfg);
 	mlme_init_eht_cap_in_cfg(psoc, mlme_cfg);

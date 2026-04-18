@@ -355,6 +355,179 @@
 
 /*
  * <ini>
+ * startup_tx_nss_2g - Startup TX NSS config per vdev for 2.4ghz connections
+ * @Min: 0x0
+ * @Max: 0x04924924
+ * @Default: 0x080480
+ *
+ * This ini is used to change the num of tx spatial streams for eg:-
+ * 0x01249249 - change all VDEVs startup tx nss for 2.4 GHz to 1 each
+ * 0x02492492 - change all VDEVs startup tx nss for 2.4 GHz to 2 each
+ * 0x036DB6DB - Change all VDEVs startup tx NSS for 2.4 GHz to 3 each
+ * 0x04924924 - Change all VDEVs startup tx NSS for 2.4 GHz to 4 each
+ * Bits          VDEV Type
+ * BIT[0:2]        STA
+ * BIT[3:5]        SAP
+ * BIT[6:8]        P2P GO
+ * BIT[9:11]       P2P Client
+ * BIT[12:14]      TDLS
+ * BIT[15:17]      IBSS
+ * BIT[18:20]      P2P device
+ * BIT[21:23]      OCB
+ * BIT[24:26]      NAN
+ * BIT[27:31]      Reserved
+ *
+ * Related: STA/SAP/P2P/IBSS/NAN.
+ *
+ * Supported Feature: Dynamic chainmask
+ *
+ * This INI uses the same per-vdev packed encoding as tx_nss_2g.
+ * If any modes values is zero, then it picks the value from `tx_nss_2g`
+ *
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STARTUP_TX_NSS_2G CFG_INI_UINT( \
+				"startup_tx_nss_2g", \
+				0x0, \
+				0x04924924, \
+				0x080480, \
+				CFG_VALUE_OR_DEFAULT, \
+				"startup tx nss 2.4ghz")
+
+/*
+ * <ini>
+ * startup_tx_nss_5g - Startup TX NSS config per vdev for 5ghz connections
+ * @Min: 0x0
+ * @Max: 0x04924924
+ * @Default: 0x080480
+ *
+ * This ini is used to change the num of tx spatial streams for eg:-
+ * 0x01249249 - change all VDEVs startup tx nss for 5 GHz to 1 each
+ * 0x02492492 - change all VDEVs startup tx nss for 5 GHz to 2 each
+ * 0x036DB6DB - Change all VDEVs startup tx NSS for 5 GHz to 3 each
+ * 0x04924924 - Change all VDEVs startup tx NSS for 5 GHz to 4 each
+ * Bits          VDEV Type
+ * BIT[0:2]        STA
+ * BIT[3:5]        SAP
+ * BIT[6:8]        P2P GO
+ * BIT[9:11]       P2P Client
+ * BIT[12:14]      TDLS
+ * BIT[15:17]      IBSS
+ * BIT[18:20]      P2P device
+ * BIT[21:23]      OCB
+ * BIT[24:26]      NAN
+ * BIT[27:31]      Reserved
+ *
+ * Related: STA/SAP/P2P/IBSS/NAN.
+ *
+ * Supported Feature: Dynamic chainmask
+ *
+ * This INI uses the same per-vdev packed encoding as tx_nss_5g.
+ * If any modes values is zero, then it picks the value from `tx_nss_5g`
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STARTUP_TX_NSS_5G CFG_INI_UINT( \
+				"startup_tx_nss_5g", \
+				0x0, \
+				0x04924924, \
+				0x080480, \
+				CFG_VALUE_OR_DEFAULT, \
+				"startup tx nss 5ghz")
+
+/*
+ * <ini>
+ * startup_rx_nss_2g - Startup RX NSS config per vdev for 2.4ghz connections
+ * @Min: 0x0
+ * @Max: 0x04924924
+ * @Default: 0x080480
+ *
+ * This ini is used to change the num of rx spatial streams for eg:-
+ * 0x01249249 - change all VDEVs startup rx nss for 2.4 GHz to 1 each
+ * 0x02492492 - change all VDEVs startup rx nss for 2.4 GHz to 2 each
+ * 0x036DB6DB - Change all VDEVs startup rx NSS for 2.4 GHz to 3 each
+ * 0x04924924 - Change all VDEVs startup rx NSS for 2.4 GHz to 4 each
+ * Bits          VDEV Type
+ * BIT[0:2]        STA
+ * BIT[3:5]        SAP
+ * BIT[6:8]        P2P GO
+ * BIT[9:11]       P2P Client
+ * BIT[12:14]      TDLS
+ * BIT[15:17]      IBSS
+ * BIT[18:20]      P2P device
+ * BIT[21:23]      OCB
+ * BIT[24:26]      NAN
+ * BIT[27:31]      Reserved
+ *
+ * Related: STA/SAP/P2P/IBSS/NAN.
+ *
+ * Supported Feature: Dynamic chainmask
+ *
+ * This INI uses the same per-vdev packed encoding as rx_nss_2g.
+ * If any modes values is zero, then it picks the value from `rx_nss_2g`
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STARTUP_RX_NSS_2G CFG_INI_UINT( \
+				"startup_rx_nss_2g", \
+				0x0, \
+				0x04924924, \
+				0x080480, \
+				CFG_VALUE_OR_DEFAULT, \
+				"startup rx nss 2.4ghz")
+
+/*
+ * <ini>
+ * startup_rx_nss_5g - Startup RX NSS config per vdev for 5ghz connections
+ * @Min: 0x0
+ * @Max: 0x04924924
+ * @Default: 0x080480
+ *
+ * This ini is used to change the num of rx spatial streams for eg:-
+ * 0x01249249 - change all VDEVs startup rx nss for 5 GHz to 1 each
+ * 0x02492492 - change all VDEVs startup rx nss for 5 GHz to 2 each
+ * 0x036DB6DB - Change all VDEVs startup rx NSS for 5 GHz to 3 each
+ * 0x04924924 - Change all VDEVs startup rx NSS for 5 GHz to 4 each
+ * Bits          VDEV Type
+ * BIT[0:2]        STA
+ * BIT[3:5]        SAP
+ * BIT[6:8]        P2P GO
+ * BIT[9:11]       P2P Client
+ * BIT[12:14]      TDLS
+ * BIT[15:17]      IBSS
+ * BIT[18:20]      P2P device
+ * BIT[21:23]      OCB
+ * BIT[24:26]      NAN
+ * BIT[27:31]      Reserved
+ *
+ * Related: STA/SAP/P2P/IBSS/NAN.
+ *
+ * Supported Feature: Dynamic chainmask
+ *
+ * This INI uses the same per-vdev packed encoding as rx_nss_5g.
+ * If any modes values is zero, then it picks the value from `rx_nss_5g`
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STARTUP_RX_NSS_5G CFG_INI_UINT( \
+				"startup_rx_nss_5g", \
+				0x0, \
+				0x04924924, \
+				0x080480, \
+				CFG_VALUE_OR_DEFAULT, \
+				"startup rx nss 5ghz")
+
+/*
+ * <ini>
  * num_tx_chains_11b - Config Param to change number of tx
  * chains per vdev for 2.4ghz 11b mode connections
  * @Min: 0x01249249
@@ -674,6 +847,10 @@
 	CFG(CFG_TX_NSS_2G) \
 	CFG(CFG_RX_NSS_5G) \
 	CFG(CFG_RX_NSS_2G) \
+	CFG(CFG_STARTUP_TX_NSS_2G) \
+	CFG(CFG_STARTUP_TX_NSS_5G) \
+	CFG(CFG_STARTUP_RX_NSS_2G) \
+	CFG(CFG_STARTUP_RX_NSS_5G) \
 	CFG(CFG_NUM_TX_CHAINS_11b) \
 	CFG(CFG_NUM_TX_CHAINS_11g) \
 	CFG(CFG_NUM_TX_CHAINS_11a) \

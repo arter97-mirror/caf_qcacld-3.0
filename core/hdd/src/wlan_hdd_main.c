@@ -8260,7 +8260,7 @@ void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev)
 					&vdev_ini_cfg,
 					opmode,
 					hdd_ctx->num_rf_chains,
-					WLAN_MLME_CFG_SRC_GLOBAL);
+					WLAN_MLME_CFG_SRC_STARTUP);
 
 	/* Store the nss chain config into the vdev */
 	sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
