@@ -10987,76 +10987,6 @@ hdd_set_dynamic_antenna_mode(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
-static int hdd_config_vdev_chains(struct wlan_hdd_link_info *link_info,
-				  struct nlattr *tb[])
-{
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint8_t tx_chains, rx_chains;
-	struct nlattr *tx_attr =
-		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS];
-	struct nlattr *rx_attr =
-		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS];
-
-	if (!tx_attr && !rx_attr)
-		return 0;
-
-	/* if one is present, both must be present */
-	if (!tx_attr || !rx_attr) {
-		hdd_err("Missing attribute for %s",
-			tx_attr ? "RX" : "TX");
-		return -EINVAL;
-	}
-
-	tx_chains = nla_get_u8(tx_attr);
-	rx_chains = nla_get_u8(rx_attr);
-
-	hdd_debug("tx_chains %d rx_chains %d", tx_chains, rx_chains);
-	if (hdd_ctx->dynamic_nss_chains_support)
-		return hdd_set_dynamic_antenna_mode(link_info,
-						    rx_chains, tx_chains);
-	return 0;
-}
-
-static int hdd_config_tx_rx_nss(struct wlan_hdd_link_info *link_info,
-				struct nlattr *tb[])
-{
-	uint8_t tx_nss, rx_nss;
-	QDF_STATUS status;
-
-	struct nlattr *tx_attr =
-		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS];
-	struct nlattr *rx_attr =
-		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS];
-
-	if (!tx_attr && !rx_attr)
-		return 0;
-
-	/* if one is present, both must be present */
-	if (!tx_attr || !rx_attr) {
-		hdd_err("Missing attribute for %s",
-			tx_attr ? "RX" : "TX");
-		return -EINVAL;
-	}
-
-	tx_nss = nla_get_u8(tx_attr);
-	rx_nss = nla_get_u8(rx_attr);
-	hdd_debug("tx_nss %d rx_nss %d", tx_nss, rx_nss);
-	/* Only allow NSS tx nss is lesser or equal to rx nss*/
-	if (tx_nss > rx_nss) {
-		hdd_err("Setting tx_nss %d rx_nss %d not allowed", tx_nss,
-			rx_nss);
-		return -EINVAL;
-	}
-	status = hdd_update_nss(link_info, tx_nss, rx_nss);
-	if (status != QDF_STATUS_SUCCESS) {
-		hdd_debug("Can't set tx_nss %d rx_nss %d", tx_nss, rx_nss);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 #define MAX_PDEV_TXRX_CHAIN_PARAMS 4
 #define DEFAULT_CHAIN_MASK 0xff
 static int _hdd_config_set_tx_chain_mask_per_band(struct wiphy *wiphy,
@@ -16527,6 +16457,57 @@ typedef int (*interdependent_setter_fn)(struct wlan_hdd_link_info *link_info,
 					struct nlattr **tb);
 
 static enum wlan_vendor_nss_chains_req_type
+hdd_parse_vendor_nss_chains_req(struct wlan_mlme_nss_chains *req,
+				struct nlattr *tb[],
+				enum wlan_vendor_nss_chains_parse_type type)
+{
+	bool is_nss_type = (type == WLAN_VENDOR_PARSE_TYPE_NSS);
+	uint8_t tx = 0, rx = 0;
+	uint32_t tx_attr, rx_attr;
+	uint8_t i;
+
+	if (is_nss_type) {
+		tx_attr = QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS;
+		rx_attr = QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS;
+	} else {
+		tx_attr = QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS;
+		rx_attr = QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS;
+	}
+
+	if (!tb[tx_attr] && !tb[rx_attr])
+		return WLAN_VENDOR_NSS_CHAIN_REQ_NONE;
+
+	if (!tb[tx_attr] || !tb[rx_attr])
+		return WLAN_VENDOR_NSS_CHAIN_REQ_INVALID;
+
+	tx = nla_get_u8(tb[tx_attr]);
+	rx = nla_get_u8(tb[rx_attr]);
+
+	hdd_debug("User %s Req: Tx/Rx: %dx%d",
+		  is_nss_type ? "NSS" : "Chains", tx, rx);
+
+	if (!tx && !rx)
+		return WLAN_VENDOR_NSS_CHAIN_REQ_NO_FORCE;
+
+	if (!tx || !rx)
+		return WLAN_VENDOR_NSS_CHAIN_REQ_INVALID;
+
+	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
+		if (is_nss_type) {
+			req->tx_nss[i] = tx;
+			req->rx_nss[i] = rx;
+			req->nss_band_state[i] = BAND_REQ_NO_FORCE;
+		} else {
+			req->num_tx_chains[i] = tx;
+			req->num_rx_chains[i] = rx;
+			req->chains_band_state[i] = BAND_REQ_NO_FORCE;
+		}
+	}
+
+	return WLAN_VENDOR_NSS_CHAIN_REQ_NO_FORCE;
+}
+
+static enum wlan_vendor_nss_chains_req_type
 hdd_parse_vendor_nss_chains_per_band_req(struct wlan_mlme_nss_chains *req,
 					 struct nlattr *tb[],
 					 enum wlan_vendor_nss_chains_parse_type type)
@@ -16739,13 +16720,17 @@ hdd_resolve_vdev_up_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_
 }
 
 static QDF_STATUS
-hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info)
+hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info,
+				  bool set_ies)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_mlme_nss_chains *new_user_cfg, *iter_dyn_cfg;
+	struct wlan_mlme_nss_chains *new_ini_cfg, *iter_ini_cfg;
+	struct wlan_mlme_nss_chains *adapter_nss_ctx;
 	struct wlan_objmgr_vdev *vdev, *iter_vdev;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_hdd_link_info *iter_info;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
@@ -16760,6 +16745,17 @@ hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info)
 		status = QDF_STATUS_E_INVAL;
 		goto exit;
 	}
+
+	if (set_ies) {
+		new_ini_cfg = ucfg_mlme_get_ini_vdev_config(vdev);
+		if (!new_ini_cfg) {
+			hdd_debug("Failed to fetch vdev %d ini config",
+				  link_info->vdev_id);
+			status = QDF_STATUS_E_INVAL;
+			goto exit;
+		}
+	}
+
 	hdd_adapter_for_each_active_link_info(adapter, iter_info) {
 		if (iter_info->vdev_id == wlan_vdev_get_id(vdev))
 			continue;
@@ -16782,7 +16778,42 @@ hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info)
 		}
 
 		*iter_dyn_cfg = *new_user_cfg;
+
+		if (set_ies) {
+			iter_ini_cfg = ucfg_mlme_get_ini_vdev_config(iter_vdev);
+			if (!iter_ini_cfg) {
+				hdd_objmgr_put_vdev_by_user(iter_vdev,
+							    WLAN_OSIF_ID);
+				hdd_debug("Failed to fetch vdev %d ini config",
+					  iter_info->vdev_id);
+				status = QDF_STATUS_E_INVAL;
+				goto exit;
+			}
+			*iter_ini_cfg = *new_ini_cfg;
+			sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+						  iter_info->vdev_id,
+						  adapter->device_mode);
+		}
 		hdd_objmgr_put_vdev_by_user(iter_vdev, WLAN_OSIF_ID);
+	}
+
+	if (set_ies) {
+		/* Store the applied config in adapter context */
+		if (!adapter->user_nss_ctx) {
+			adapter->user_nss_ctx =
+				qdf_mem_malloc(sizeof(*iter_dyn_cfg));
+			if (!adapter->user_nss_ctx) {
+				status = QDF_STATUS_E_NOMEM;
+				goto exit;
+			}
+		}
+		adapter_nss_ctx =
+			(struct wlan_mlme_nss_chains *)adapter->user_nss_ctx;
+		*adapter_nss_ctx = *new_ini_cfg;
+
+		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+					  link_info->vdev_id,
+					  adapter->device_mode);
 	}
 
 exit:
@@ -16828,7 +16859,7 @@ hdd_validate_and_apply_nss_chains_req(struct wlan_hdd_link_info *link_info,
 	status = sme_nss_chains_update(hdd_ctx->mac_handle, req,
 				       link_info->vdev_id);
 	if (QDF_IS_STATUS_SUCCESS(status))
-		status = hdd_update_vdev_nss_chains_config(link_info);
+		status = hdd_update_vdev_nss_chains_config(link_info, false);
 
 	return status;
 }
@@ -16922,6 +16953,144 @@ vdev_ref:
 	return -EINVAL;
 }
 
+static QDF_STATUS
+hdd_fill_vdev_init_nss_chains_limits(struct wlan_hdd_link_info *link_info,
+				     struct wlan_mlme_nss_chains *nss_chains_limits)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	ucfg_mlme_fetch_psoc_nss_chain_params_for_mode(hdd_ctx->psoc,
+						       nss_chains_limits,
+						       adapter->device_mode,
+						       hdd_ctx->num_rf_chains,
+						       WLAN_MLME_CFG_SRC_GLOBAL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
+					struct wlan_mlme_nss_chains *req,
+					struct wlan_mlme_nss_chains *limits)
+{
+	uint8_t i, max_tx_nss = 0, max_rx_nss = 0;
+	uint8_t max_tx_chains = 0, max_rx_chains = 0;
+
+	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
+		max_tx_nss = QDF_MAX(max_tx_nss, limits->tx_nss[i]);
+		max_rx_nss = QDF_MAX(max_rx_nss, limits->rx_nss[i]);
+
+		max_tx_chains = QDF_MAX(max_tx_chains,
+					limits->num_tx_chains[i]);
+		max_rx_chains = QDF_MAX(max_rx_chains,
+					limits->num_rx_chains[i]);
+	}
+
+	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
+		if (!req->tx_nss[i])
+			req->tx_nss[i] = limits->tx_nss[i];
+		else if ((req->tx_nss[i] <= max_tx_nss) &&
+			 (req->tx_nss[i] > limits->tx_nss[i]))
+			req->tx_nss[i] = limits->tx_nss[i];
+
+		if (!req->rx_nss[i])
+			req->rx_nss[i] = limits->rx_nss[i];
+		else if ((req->rx_nss[i] <= max_rx_nss) &&
+			 (req->rx_nss[i] > limits->rx_nss[i]))
+			req->rx_nss[i] = limits->rx_nss[i];
+
+		if (!req->num_tx_chains[i])
+			req->num_tx_chains[i] = limits->num_tx_chains[i];
+		else if ((req->num_tx_chains[i] <= max_tx_chains) &&
+			 (req->num_tx_chains[i] > limits->num_tx_chains[i]))
+			req->num_tx_chains[i] = limits->num_tx_chains[i];
+
+		if (!req->num_rx_chains[i])
+			req->num_rx_chains[i] = limits->num_rx_chains[i];
+		else if ((req->num_rx_chains[i] <= max_rx_chains) &&
+			 (req->num_rx_chains[i] > limits->num_rx_chains[i]))
+			req->num_rx_chains[i] = limits->num_rx_chains[i];
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
+					struct nlattr *tb[])
+{
+	struct wlan_mlme_nss_chains req = {0};
+	struct wlan_mlme_nss_chains limits = {0};
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_vendor_nss_chains_req_type nss_req_type, chains_req_type;
+	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	nss_req_type = hdd_parse_vendor_nss_chains_req(&req, tb,
+						       WLAN_VENDOR_PARSE_TYPE_NSS);
+	chains_req_type = hdd_parse_vendor_nss_chains_req(&req, tb,
+						       WLAN_VENDOR_PARSE_TYPE_CHAINS);
+
+	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE &&
+	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE)
+		return 0;
+
+	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID &&
+	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID) {
+		hdd_err("Invalid NSS/Chain configuration");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("Invalid hdd_ctx");
+		return -EINVAL;
+	}
+
+	if (!hdd_ctx->dynamic_nss_chains_support) {
+		hdd_err("Dynamic nss chain update is not supported");
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("SME session not opened, vdev is NULL");
+		return -EINVAL;
+	}
+
+	if (hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_err("Can't update nss values in connected state");
+		goto vdev_ref;
+	}
+
+	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto vdev_ref;
+
+	status = hdd_resolve_non_force_nss_chains_fields(link_info, &req,
+							 &limits);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto vdev_ref;
+
+	status = sme_nss_chains_update_no_session(hdd_ctx->mac_handle, &req,
+						  link_info->vdev_id);
+	if (QDF_IS_STATUS_ERROR(status) && status != QDF_STATUS_E_ALREADY)
+		goto vdev_ref;
+
+	if (status != QDF_STATUS_E_ALREADY) {
+		status = hdd_update_vdev_nss_chains_config(link_info, true);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto vdev_ref;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return 0;
+
+vdev_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return -EINVAL;
+}
+
 /* vtable for interdependent setters */
 static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_access_policy,
@@ -16934,9 +17103,8 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	wlan_hdd_cfg80211_wifi_set_reorder_timeout,
 	wlan_hdd_cfg80211_wifi_set_rx_blocksize,
 	hdd_config_msdu_aggregation,
-	hdd_config_vdev_chains,
 	hdd_config_ani,
-	hdd_config_tx_rx_nss,
+	hdd_config_vendor_nss_chains,
 	hdd_process_generic_set_cmd,
 	hdd_config_phy_mode,
 	hdd_config_power,

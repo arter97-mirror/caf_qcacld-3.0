@@ -343,6 +343,24 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		      uint8_t vdev_id);
 
 /**
+ * sme_nss_chains_update_no_session() - validate against PSOC INI and
+ * update VDEV INI
+ * @mac_handle: The handle returned by mac_open.
+ * @user_cfg: pointer to the structure to be validated and updated
+ * @vdev_id: vdev id
+ *
+ * This API validates the config against PSOC INI limits, and if correct
+ * updates the VDEV INI config and dynamic config (without sending to FW).
+ * Intended for use when the VDEV is not in a connected state.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_nss_chains_update_no_session(mac_handle_t mac_handle,
+				 struct wlan_mlme_nss_chains *user_cfg,
+				 uint8_t vdev_id);
+
+/**
  * sme_update_bfer_caps_as_per_nss_chains() - Update beamformer caps as per nss
  * chains.
  * @mac_handle: The handle returned by mac_open

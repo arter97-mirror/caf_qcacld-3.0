@@ -1486,6 +1486,7 @@ enum hdd_wlm_latency_level {
  * @dhcp_config_setsuspend: Enable when DHCP in progress and get setsuspend cmd
  * @is_probe_peer_pending: Enable if a probe peer command is pending
  * @probe_peer_cookie: Cookie for correlating probe peer request with completion
+ * @user_nss_ctx: Pointer to user configured NSS
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1712,6 +1713,7 @@ struct hdd_adapter {
 	bool dhcp_config_setsuspend;
 	qdf_atomic_t is_probe_peer_pending;
 	u64 probe_peer_cookie;
+	void *user_nss_ctx;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)

@@ -4990,6 +4990,144 @@ sme_validate_nss_chains_config(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool sme_nss_chains_cmp_user_cfg(struct wlan_mlme_nss_chains *user_cfg,
+					struct wlan_mlme_nss_chains *dyn_cfg)
+{
+	if (qdf_mem_cmp(user_cfg->num_tx_chains, dyn_cfg->num_tx_chains,
+			sizeof(user_cfg->num_tx_chains)) ||
+	    qdf_mem_cmp(user_cfg->num_rx_chains, dyn_cfg->num_rx_chains,
+			sizeof(user_cfg->num_rx_chains)) ||
+	    qdf_mem_cmp(user_cfg->tx_nss, dyn_cfg->tx_nss,
+			sizeof(user_cfg->tx_nss)) ||
+	    qdf_mem_cmp(user_cfg->rx_nss, dyn_cfg->rx_nss,
+			sizeof(user_cfg->rx_nss)))
+		return true;
+
+	if (user_cfg->num_tx_chains_11b != dyn_cfg->num_tx_chains_11b ||
+	    user_cfg->num_tx_chains_11a != dyn_cfg->num_tx_chains_11a ||
+	    user_cfg->num_tx_chains_11g != dyn_cfg->num_tx_chains_11g)
+		return true;
+
+	if (mlme_is_nss_chains_force_config(user_cfg) !=
+	    mlme_is_nss_chains_force_config(dyn_cfg))
+		return true;
+
+	qdf_mem_copy(dyn_cfg->nss_band_state, user_cfg->nss_band_state,
+		     sizeof(dyn_cfg->nss_band_state));
+	qdf_mem_copy(dyn_cfg->chains_band_state, user_cfg->chains_band_state,
+		     sizeof(dyn_cfg->chains_band_state));
+
+	return false;
+}
+
+#define SME_NSS_DUMP_LOG_LEN 200
+static void sme_dump_nss_cfg(struct wlan_mlme_nss_chains *user_cfg)
+{
+	uint16_t len = 0;
+	uint8_t log_buf[SME_NSS_DUMP_LOG_LEN] = {0};
+
+	len += qdf_scnprintf(log_buf + len, SME_NSS_DUMP_LOG_LEN - len,
+			     "2.4 GHz - Tx/Rx NSS: %dx%d (%s), Tx/Rx Chains: %dx%d (%s); ",
+			     user_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ],
+			     user_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ],
+			     (user_cfg->nss_band_state[NSS_CHAINS_BAND_2GHZ] ==
+			      BAND_REQ_FORCE) ? "F" : "N",
+			     user_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
+			     user_cfg->num_rx_chains[NSS_CHAINS_BAND_2GHZ],
+			     (user_cfg->chains_band_state[NSS_CHAINS_BAND_2GHZ] ==
+			      BAND_REQ_FORCE) ? "F" : "N");
+
+	len += qdf_scnprintf(log_buf + len, SME_NSS_DUMP_LOG_LEN - len,
+			     "5/6 GHz - Tx/Rx NSS: %dx%d (%s), Tx/Rx Chains: %dx%d (%s); ",
+			     user_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ],
+			     user_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ],
+			     (user_cfg->nss_band_state[NSS_CHAINS_BAND_5GHZ] ==
+			      BAND_REQ_FORCE) ? "F" : "N",
+			     user_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ],
+			     user_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ],
+			     (user_cfg->chains_band_state[NSS_CHAINS_BAND_5GHZ] ==
+			      BAND_REQ_FORCE) ? "F" : "N");
+
+	len += qdf_scnprintf(log_buf + len, SME_NSS_DUMP_LOG_LEN - len,
+			     "Tx Chains 11a: %d, 11b: %d, 11g: %d",
+			     user_cfg->num_tx_chains_11a,
+			     user_cfg->num_tx_chains_11b,
+			     user_cfg->num_tx_chains_11g);
+
+	sme_nofl_debug("%s", log_buf);
+}
+
+#undef SME_NSS_DUMP_LOG_LEN
+
+static QDF_STATUS
+sme_validate_psoc_nss_chains_config(mac_handle_t mac_handle,
+				    struct wlan_objmgr_vdev *vdev,
+				    struct wlan_mlme_nss_chains *user_cfg)
+{
+	QDF_STATUS status;
+	enum nss_chains_band_info band;
+	struct wlan_mlme_nss_chains mode_ini_cfg, *vdev_ini_cfg, *dyn_cfg;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	enum QDF_OPMODE vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	vdev_ini_cfg = mlme_get_ini_vdev_config(vdev);
+	if (!vdev_ini_cfg) {
+		sme_err("nss chain dynamic config NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dyn_cfg = mlme_get_dynamic_vdev_config(vdev);
+	if (!dyn_cfg) {
+		sme_err("nss chain dynamic config NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_mlme_fetch_psoc_nss_chain_params_for_mode(mac_ctx->psoc,
+						       &mode_ini_cfg,
+						       vdev_opmode,
+						       WLAN_MAX_VDEV_CHAINS,
+						       WLAN_MLME_CFG_SRC_GLOBAL);
+
+	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
+		sme_populate_user_config(&mode_ini_cfg, user_cfg,
+					 &mode_ini_cfg, band);
+		status = sme_validate_from_ini_config(user_cfg,
+						      &mode_ini_cfg, band);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			sme_err("Validation from psoc ini config failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+		status = sme_validate_user_nss_chain_params(user_cfg, band);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			sme_err("User cfg validation failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	sme_fill_vdev_chain_ini_params(mac_ctx, user_cfg);
+
+	sme_debug("ini_cfg");
+	sme_dump_nss_cfg(vdev_ini_cfg);
+	sme_debug("user_cfg");
+	sme_dump_nss_cfg(user_cfg);
+
+	sme_debug("ini_cfg");
+	sme_dump_nss_cfg(vdev_ini_cfg);
+	sme_debug("user_cfg");
+	sme_dump_nss_cfg(user_cfg);
+
+	if (!sme_nss_chains_cmp_user_cfg(user_cfg, vdev_ini_cfg)) {
+		sme_debug("current vdev ini config same as user config");
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	/* On success, save to VDEV INI and dynamic config */
+	*vdev_ini_cfg = *user_cfg;
+	*dyn_cfg = *user_cfg;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void sme_update_legacy_rate_tx_chains(mac_handle_t mac_handle,
 					     enum QDF_OPMODE vdev_op_mode,
 					     enum wlan_mlme_cfg_nss_src cfg_src)
@@ -5248,75 +5386,6 @@ sme_update_nss_in_mlme_cfg(mac_handle_t mac_handle,
 					   vdev_op_mode, band);
 }
 
-#define SME_NSS_DUMP_LOG_LEN 200
-static void sme_dump_nss_cfg(struct wlan_mlme_nss_chains *user_cfg)
-{
-	uint16_t len = 0;
-	uint8_t log_buf[SME_NSS_DUMP_LOG_LEN] = {0};
-
-	len += qdf_scnprintf(log_buf + len, SME_NSS_DUMP_LOG_LEN - len,
-			     "2.4 GHz - Tx/Rx NSS: %dx%d (%s), Tx/Rx Chains: %dx%d (%s); ",
-			     user_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ],
-			     user_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ],
-			     (user_cfg->nss_band_state[NSS_CHAINS_BAND_2GHZ] ==
-			      BAND_REQ_FORCE) ? "F" : "N",
-			     user_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
-			     user_cfg->num_rx_chains[NSS_CHAINS_BAND_2GHZ],
-			     (user_cfg->chains_band_state[NSS_CHAINS_BAND_2GHZ] ==
-			      BAND_REQ_FORCE) ? "F" : "N");
-
-	len += qdf_scnprintf(log_buf + len, SME_NSS_DUMP_LOG_LEN - len,
-			     "5/6 GHz - Tx/Rx NSS: %dx%d (%s), Tx/Rx Chains: %dx%d (%s); ",
-			     user_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ],
-			     user_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ],
-			     (user_cfg->nss_band_state[NSS_CHAINS_BAND_5GHZ] ==
-			      BAND_REQ_FORCE) ? "F" : "N",
-			     user_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ],
-			     user_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ],
-			     (user_cfg->chains_band_state[NSS_CHAINS_BAND_5GHZ] ==
-			      BAND_REQ_FORCE) ? "F" : "N");
-
-	len += qdf_scnprintf(log_buf + len, SME_NSS_DUMP_LOG_LEN - len,
-			     "Tx Chains 11a: %d, 11b: %d, 11g: %d",
-			     user_cfg->num_tx_chains_11a,
-			     user_cfg->num_tx_chains_11b,
-			     user_cfg->num_tx_chains_11g);
-
-	sme_nofl_debug("%s", log_buf);
-}
-
-#undef SME_NSS_DUMP_LOG_LEN
-
-static bool sme_nss_chains_cmp_user_cfg(struct wlan_mlme_nss_chains *user_cfg,
-					struct wlan_mlme_nss_chains *dyn_cfg)
-{
-	if (qdf_mem_cmp(user_cfg->num_tx_chains, dyn_cfg->num_tx_chains,
-			sizeof(user_cfg->num_tx_chains)) ||
-	    qdf_mem_cmp(user_cfg->num_rx_chains, dyn_cfg->num_rx_chains,
-			sizeof(user_cfg->num_rx_chains)) ||
-	    qdf_mem_cmp(user_cfg->tx_nss, dyn_cfg->tx_nss,
-			sizeof(user_cfg->tx_nss)) ||
-	    qdf_mem_cmp(user_cfg->rx_nss, dyn_cfg->rx_nss,
-			sizeof(user_cfg->rx_nss)))
-		return true;
-
-	if (user_cfg->num_tx_chains_11b != dyn_cfg->num_tx_chains_11b ||
-	    user_cfg->num_tx_chains_11a != dyn_cfg->num_tx_chains_11a ||
-	    user_cfg->num_tx_chains_11g != dyn_cfg->num_tx_chains_11g)
-		return true;
-
-	if (mlme_is_nss_chains_force_config(user_cfg) !=
-	    mlme_is_nss_chains_force_config(dyn_cfg))
-		return true;
-
-	qdf_mem_copy(dyn_cfg->nss_band_state, user_cfg->nss_band_state,
-		     sizeof(dyn_cfg->nss_band_state));
-	qdf_mem_copy(dyn_cfg->chains_band_state, user_cfg->chains_band_state,
-		     sizeof(dyn_cfg->chains_band_state));
-
-	return false;
-}
-
 QDF_STATUS
 sme_nss_chains_update(mac_handle_t mac_handle,
 		      struct wlan_mlme_nss_chains *user_cfg,
@@ -5406,6 +5475,39 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 	*dynamic_cfg = *user_cfg;
 
 release_lock:
+	sme_release_global_lock(&mac_ctx->sme);
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	return status;
+}
+
+QDF_STATUS
+sme_nss_chains_update_no_session(mac_handle_t mac_handle,
+				 struct wlan_mlme_nss_chains *user_cfg,
+				 uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct wlan_objmgr_vdev *vdev =
+		       wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+							    vdev_id,
+							    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("Got NULL vdev obj, returning");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto release_ref;
+
+	status = sme_validate_psoc_nss_chains_config(mac_handle, vdev,
+						     user_cfg);
+	if (QDF_IS_STATUS_ERROR(status) && status != QDF_STATUS_E_ALREADY)
+		sme_err("PSOC NSS chains config validation failed");
+
 	sme_release_global_lock(&mac_ctx->sme);
 
 release_ref:
