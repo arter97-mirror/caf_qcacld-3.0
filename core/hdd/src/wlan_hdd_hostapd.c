@@ -3796,6 +3796,10 @@ stopbss:
 		qdf_mem_free(unknownSTAEvent);
 		qdf_mem_free(maxAssocExceededEvent);
 		qdf_mem_free(we_custom_event);
+		if (adapter->user_nss_ctx) {
+			qdf_mem_free(adapter->user_nss_ctx);
+			adapter->user_nss_ctx = NULL;
+		}
 
 		/* once the event is set, structure dev/adapter should
 		 * not be touched since they are now subject to being deleted
@@ -5204,30 +5208,6 @@ bool hdd_sap_destroy_ctx(struct wlan_hdd_link_info *link_info)
 	link_info->session.ap.sap_context = NULL;
 
 	return true;
-}
-
-void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
-{
-	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct wlan_hdd_link_info *link_info;
-
-	/* sap_ctx is not destroyed as it will be leveraged for sap restart */
-	if (is_ssr)
-		return;
-
-	hdd_debug("destroying all the sap context");
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   NET_DEV_HOLD_SAP_DESTROY_CTX_ALL) {
-		if (adapter->device_mode == QDF_SAP_MODE) {
-			hdd_adapter_for_each_active_link_info(adapter,
-							      link_info) {
-				hdd_sap_destroy_ctx(link_info);
-			}
-		}
-		hdd_adapter_dev_put_debug(adapter,
-					  NET_DEV_HOLD_SAP_DESTROY_CTX_ALL);
-	}
 }
 
 void

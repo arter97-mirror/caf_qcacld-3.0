@@ -346,18 +346,6 @@ bool hdd_sap_create_ctx(struct wlan_hdd_link_info *link_info);
  * Return: true or false based on overall success or failure
  */
 bool hdd_sap_destroy_ctx(struct wlan_hdd_link_info *link_info);
-/**
- * hdd_sap_destroy_ctx_all() - Wrapper API to destroy all SAP context
- * @hdd_ctx: pointer to HDD context
- * @is_ssr: true if SSR is in progress
- *
- * This wrapper API can be called to destroy all the sap context.
- * if is_ssr is true, it will return as sap_ctx will be used when
- * restart sap.
- *
- * Return: none
- */
-void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr);
 
 /**
  * hdd_hostapd_stop_no_trans() - hdd stop function for hostapd interface

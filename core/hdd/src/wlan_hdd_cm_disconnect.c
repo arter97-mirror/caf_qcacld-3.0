@@ -221,6 +221,11 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	hdd_wmm_dscp_initial_state(adapter);
 	wlan_deregister_txrx_packetdump(OL_TXRX_PDEV_ID);
 
+	if (adapter->user_nss_ctx) {
+		qdf_mem_free(adapter->user_nss_ctx);
+		adapter->user_nss_ctx = NULL;
+	}
+
 	hdd_place_marker(adapter, "DISCONNECTED", NULL);
 }
 

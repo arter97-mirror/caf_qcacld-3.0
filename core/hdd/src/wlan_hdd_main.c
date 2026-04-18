@@ -8881,14 +8881,13 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_GET_SAP_OPERATING_BAND",
 		"NET_DEV_HOLD_RECOVERY_NOTIFIER_CALL",
 		"NET_DEV_HOLD_IS_ANY_STA_CONNECTING",
-		"NET_DEV_HOLD_SAP_DESTROY_CTX_ALL",
+		"NET_DEV_HOLD_DESTROY_CTX_ALL",
 		"NET_DEV_HOLD_DRV_CMD_MAX_TX_POWER",
 		"NET_DEV_HOLD_IPA_SET_TX_FLOW_INFO",
 		"NET_DEV_HOLD_SET_RPS_CPU_MASK",
 		"NET_DEV_HOLD_DFS_INDICATE_RADAR",
 		"NET_DEV_HOLD_MAX_STA_INTERFACE_UP_COUNT_REACHED",
 		"NET_DEV_HOLD_IS_CHAN_SWITCH_IN_PROGRESS",
-		"NET_DEV_HOLD_STA_DESTROY_CTX_ALL",
 		"NET_DEV_HOLD_CHECK_FOR_EXISTING_MACADDR",
 		"NET_DEV_HOLD_DEINIT_ALL_ADAPTERS",
 		"NET_DEV_HOLD_STOP_ALL_ADAPTERS",
@@ -9135,31 +9134,6 @@ void hdd_cleanup_conn_info(struct wlan_hdd_link_info *link_info)
 	hdd_cleanup_eht_capabilities(link_info);
 	hdd_cleanup_he_operation_info(link_info);
 	hdd_cleanup_prev_ap_bcn_ie(link_info);
-}
-
-/**
- * hdd_sta_destroy_ctx_all() - cleanup all station contexts
- * @hdd_ctx: Global HDD context
- *
- * This function destroys all the station contexts
- *
- * Return: none
- */
-static void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
-{
-	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct wlan_hdd_link_info *link_info;
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   NET_DEV_HOLD_STA_DESTROY_CTX_ALL) {
-		if (adapter->device_mode == QDF_STA_MODE) {
-			hdd_adapter_for_each_link_info(adapter, link_info) {
-				hdd_cleanup_conn_info(link_info);
-			}
-		}
-		hdd_adapter_dev_put_debug(adapter,
-					  NET_DEV_HOLD_STA_DESTROY_CTX_ALL);
-	}
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
@@ -10423,6 +10397,10 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 	policy_mgr_clear_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);
 	qdf_event_destroy(&adapter->peer_cleanup_done);
 	hdd_adapter_feature_update_work_deinit(adapter);
+	if (adapter->user_nss_ctx) {
+		qdf_mem_free(adapter->user_nss_ctx);
+		adapter->user_nss_ctx = NULL;
+	}
 	hdd_cleanup_adapter(hdd_ctx, adapter, rtnl_held);
 	ucfg_dp_destroy_intf(hdd_ctx->psoc, &adapter_mac);
 }
@@ -19149,6 +19127,33 @@ static void hdd_deregister_policy_manager_callback(
 }
 #endif
 
+static void hdd_adapter_destroy_ctx_all(struct hdd_context *hdd_ctx,
+					bool is_recovery_stop)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   NET_DEV_HOLD_DESTROY_CTX_ALL) {
+		if (adapter->user_nss_ctx) {
+			qdf_mem_free(adapter->user_nss_ctx);
+			adapter->user_nss_ctx = NULL;
+		}
+
+		if (adapter->device_mode == QDF_STA_MODE)
+			hdd_adapter_for_each_link_info(adapter, link_info)
+				hdd_cleanup_conn_info(link_info);
+
+		if (adapter->device_mode == QDF_SAP_MODE && !is_recovery_stop)
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info)
+				hdd_sap_destroy_ctx(link_info);
+
+		hdd_adapter_dev_put_debug(adapter,
+					  NET_DEV_HOLD_DESTROY_CTX_ALL);
+	}
+}
+
 int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 {
 	void *hif_ctx;
@@ -19331,8 +19336,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	if (!is_recovery_stop)
 		wlan_hdd_free_sar_config(hdd_ctx);
 
-	hdd_sap_destroy_ctx_all(hdd_ctx, is_recovery_stop);
-	hdd_sta_destroy_ctx_all(hdd_ctx);
+	hdd_adapter_destroy_ctx_all(hdd_ctx, is_recovery_stop);
 
 	/*
 	 * Reset the driver mode specific bus bw level

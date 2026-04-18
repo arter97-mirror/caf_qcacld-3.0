@@ -345,9 +345,6 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 		ml_nlink_conn_change_notify(
 			psoc, vdev_id, ml_nlink_disconnect_completion_evt,
 			NULL);
-		qdf_mem_copy(mlme_get_dynamic_vdev_config(vdev),
-			     mlme_get_ini_vdev_config(vdev),
-			     sizeof(struct wlan_mlme_nss_chains));
 	}
 
 	wlan_vdev_mlme_init_bss_oper_res_params(vdev);

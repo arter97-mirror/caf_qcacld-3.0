@@ -4673,6 +4673,15 @@ QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
 	struct vdev_mlme_obj *vdev_mlme = NULL;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_nss_chains vdev_startup_cfg;
+	enum QDF_OPMODE vdev_opmode;
+
+	psoc = wlan_vdev_get_psoc(iface->vdev);
+	if (!psoc) {
+		wma_debug("Failed to get psoc");
+		return status;
+	}
 
 	if (!wma_is_vdev_valid(vdev_id)) {
 		wma_err("Invalid vdev id:%d", vdev_id);
@@ -4693,10 +4702,21 @@ QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 	 * and we dont want the config of previous connection to affect the
 	 * current connection.
 	 */
-	if (wlan_vdev_mlme_get_opmode(iface->vdev) != QDF_STA_MODE)
+
+	vdev_opmode = wlan_vdev_mlme_get_opmode(iface->vdev);
+	if (vdev_opmode != QDF_STA_MODE) {
+		wlan_mlme_fetch_psoc_nss_chain_params_for_mode(psoc,
+							       &vdev_startup_cfg,
+							       vdev_opmode,
+							       WLAN_MAX_VDEV_CHAINS,
+							       WLAN_MLME_CFG_SRC_STARTUP);
 		qdf_mem_copy(mlme_get_dynamic_vdev_config(iface->vdev),
-			     mlme_get_ini_vdev_config(iface->vdev),
+			     &vdev_startup_cfg,
 			     sizeof(struct wlan_mlme_nss_chains));
+		qdf_mem_copy(mlme_get_ini_vdev_config(iface->vdev),
+			     &vdev_startup_cfg,
+			     sizeof(struct wlan_mlme_nss_chains));
+	}
 
 	status = vdev_mgr_stop_send(vdev_mlme);
 

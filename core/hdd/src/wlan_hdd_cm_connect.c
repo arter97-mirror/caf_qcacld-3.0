@@ -1090,6 +1090,10 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_rec_connect_info(rsp);
 	hdd_debug("Invoking packetdump deregistration API");
 	wlan_deregister_txrx_packetdump(OL_TXRX_PDEV_ID);
+	if (adapter->user_nss_ctx) {
+		qdf_mem_free(adapter->user_nss_ctx);
+		adapter->user_nss_ctx = NULL;
+	}
 }
 
 static void

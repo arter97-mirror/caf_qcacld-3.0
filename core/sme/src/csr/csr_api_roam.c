@@ -6042,10 +6042,13 @@ QDF_STATUS
 cm_csr_disconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_cm_discon_rsp *rsp)
 {
+	bool send_vdev_ies_to_fw = false;
 	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_nss_chains vdev_startup_cfg;
+	enum QDF_OPMODE vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
 
 	/*
 	 * This API is to update legacy struct and should be removed once
@@ -6073,10 +6076,30 @@ cm_csr_disconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * to reset back to self cap
 	 */
 	if (mlme_obj->cfg.obss_ht40.is_override_ht20_40_24g) {
+		send_vdev_ies_to_fw = true;
 		wlan_cm_set_force_20mhz_in_24ghz(vdev, true);
-		sme_set_vdev_ies_per_band(mac_handle, vdev_id,
-					  wlan_vdev_mlme_get_opmode(vdev));
 	}
+
+	if (rsp->req.req.source != CM_MLO_LINK_SWITCH_DISCONNECT) {
+		if (wlan_cm_check_mlo_roam_auth_status(vdev)) {
+			qdf_mem_copy(mlme_get_dynamic_vdev_config(vdev),
+				     mlme_get_ini_vdev_config(vdev),
+				     sizeof(struct wlan_mlme_nss_chains));
+		} else {
+			wlan_mlme_fetch_psoc_nss_chain_params_for_mode(mac_ctx->psoc,
+								       &vdev_startup_cfg,
+								       vdev_opmode,
+								       WLAN_MAX_VDEV_CHAINS,
+								       WLAN_MLME_CFG_SRC_STARTUP);
+
+			sme_store_nss_chains_cfg_in_vdev(vdev,
+							 &vdev_startup_cfg);
+			send_vdev_ies_to_fw = true;
+		}
+	}
+
+	if (send_vdev_ies_to_fw)
+		sme_set_vdev_ies_per_band(mac_handle, vdev_id, vdev_opmode);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -8310,15 +8333,26 @@ static bool csr_process_sap_results(struct mac_context *mac_ctx,
 	eRoamCmdStatus roam_status = eCSR_ROAM_INFRA_IND;
 	eCsrRoamResult roam_result = eCSR_ROAM_RESULT_INFRA_START_FAILED;
 	enum QDF_OPMODE opmode;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlme_nss_chains vdev_ini_cfg;
 
 	if (!session) {
 		sme_err("session %d not found ", vdev_id);
 		return false;
 	}
 
-	roam_info = qdf_mem_malloc(sizeof(*roam_info));
-	if (!roam_info)
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_debug("Failed to get vdev %d", vdev_id);
 		return false;
+	}
+
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (!roam_info) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return false;
+	}
 
 	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
 	sme_debug("SAP result : %d", result);
@@ -8336,6 +8370,16 @@ static bool csr_process_sap_results(struct mac_context *mac_ctx,
 							  &roam_result,
 							  roam_info);
 		}
+
+		wlan_mlme_fetch_psoc_nss_chain_params_for_mode(mac_ctx->psoc,
+							       &vdev_ini_cfg,
+							       opmode,
+							       WLAN_MAX_VDEV_CHAINS,
+							       WLAN_MLME_CFG_SRC_STARTUP);
+
+		/* Store the nss chain config into the vdev */
+		sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
+
 		csr_roam_call_callback(mac_ctx, vdev_id, roam_info,
 				       roam_status, roam_result);
 		csr_set_default_dot11_mode(mac_ctx);
@@ -8358,6 +8402,8 @@ static bool csr_process_sap_results(struct mac_context *mac_ctx,
 		sme_err("Invalid response");
 		break;
 	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	qdf_mem_free(roam_info);
 	return true;
 }
