@@ -2653,6 +2653,199 @@ exit:
 	return bss_op_res_len;
 }
 
+/**
+ * hdd_softap_fill_bss_oper_res_params() - Fill BSS operating resource params
+ * @link_info: HDD link info pointer
+ * @skb: pointer to skb
+ *
+ * This function calculates the length of BSS operating resource for SAP modes.
+ *
+ * Return: Length of BSS operating resource
+ */
+static int
+hdd_softap_fill_bss_oper_res_params(struct wlan_hdd_link_info *link_info,
+				    struct sk_buff *skb)
+{
+	int ret = 0;
+	QDF_STATUS status;
+	uint8_t tx_nss = 0xFF, rx_nss = 0xFF;
+	uint8_t tx_chains = 0xFF, rx_chains = 0xFF;
+	struct wlan_objmgr_vdev *vdev;
+	struct nlattr *mlo_info_nest, *mlo_link_nest;
+	uint8_t link_id;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		ret = 0;
+		goto exit;
+	}
+
+	status = ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(vdev,
+								  &tx_nss,
+								  &rx_nss,
+								  &tx_chains,
+								  &rx_chains);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ret = qdf_status_to_os_return(status);
+		goto exit;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_debug("Non-MLO Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
+			  tx_nss, rx_nss, tx_chains, rx_chains);
+
+		if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
+			       tx_nss) ||
+		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
+			       rx_nss) ||
+		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
+			       tx_chains) ||
+		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
+			       rx_chains))
+			ret = -EINVAL;
+
+		goto exit;
+	}
+
+	mlo_info_nest =
+		nla_nest_start(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS);
+	if (!mlo_info_nest) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	link_id = wlan_vdev_get_link_id(vdev);
+	hdd_debug("Link-ID %d Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
+		  link_id, tx_nss, rx_nss, tx_chains, rx_chains);
+
+	mlo_link_nest = nla_nest_start(skb, 0);
+	if (!mlo_link_nest) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID,
+		       link_id) ||
+	    nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
+		       tx_nss) ||
+	    nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
+		       rx_nss) ||
+	    nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
+		       tx_chains) ||
+	    nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
+		       rx_chains)) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	nla_nest_end(skb, mlo_link_nest);
+	nla_nest_end(skb, mlo_info_nest);
+
+exit:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	hdd_debug("Status %d", ret);
+	return ret;
+}
+
+static int
+hdd_softap_get_bss_oper_res_len(struct wlan_hdd_link_info *link_info)
+{
+	uint16_t per_mlo_link_addn_len;
+	uint16_t bss_op_res_len = 0, per_bssid_len = 0;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return 0;
+
+	if (!hdd_is_vdev_in_conn_state(link_info))
+		goto exit;
+
+	/* Tx + Rx NSS */
+	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
+	/* Tx + Rx Chains */
+	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		bss_op_res_len = per_bssid_len;
+		goto exit;
+	}
+
+	/* MLO Link ID */
+	per_mlo_link_addn_len = nla_total_size(sizeof(uint8_t));
+
+	/* Start of nested attributes */
+	bss_op_res_len += NLA_HDRLEN;
+
+	/*
+	 * Implement code as if for_each loop is only run once,
+	 * modify the code such a way to reflect it.
+	 */
+	/* Each element of nested attributes */
+	bss_op_res_len += NLA_HDRLEN;
+	bss_op_res_len += per_bssid_len + per_mlo_link_addn_len;
+
+exit:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	hdd_debug("OP BSS Len %d", bss_op_res_len);
+	return bss_op_res_len;
+}
+
+/**
+ * hdd_softap_get_bss_self_info_ex() - send SAP info to userspace,
+ * for SAP mode only
+ * @link_info: Pointer of link info in HDD adapter.
+ *
+ * Return: 0 if success else error status
+ */
+static int hdd_softap_get_bss_self_info_ex(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct sk_buff *skb;
+	uint32_t nl_buf_len = 0;
+	int ret;
+	uint16_t vdev_bss_oper_res_len = 0;
+
+	if (wma_is_vdev_operating_params_event_support_enabled())
+		vdev_bss_oper_res_len =
+				hdd_softap_get_bss_oper_res_len(link_info);
+
+	nl_buf_len += vdev_bss_oper_res_len;
+
+	if (!nl_buf_len) {
+		hdd_debug("No SAP info length present");
+		return 0;
+	}
+
+	nl_buf_len += NLMSG_HDRLEN;
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						       nl_buf_len);
+	if (!skb) {
+		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return -EINVAL;
+	}
+
+	if (vdev_bss_oper_res_len &&
+	    hdd_softap_fill_bss_oper_res_params(link_info, skb)) {
+		wlan_cfg80211_vendor_free_skb(skb);
+		return -EINVAL;
+	}
+
+	ret = wlan_cfg80211_vendor_cmd_reply(skb);
+
+	return ret;
+}
+
 static int
 hdd_adapter_fill_bss_oper_res_params(struct wlan_hdd_link_info *link_info,
 				     struct sk_buff *skb)
@@ -3035,7 +3228,12 @@ __hdd_cfg80211_get_sta_info_cmd(struct wiphy *wiphy,
 			   QDF_MAC_ADDR_SIZE);
 		hdd_debug("STA " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(mac_addr.bytes));
-		status = hdd_get_station_remote_ex(hdd_ctx, adapter, mac_addr);
+		if (qdf_is_macaddr_equal(&mac_addr,
+					 hdd_adapter_get_link_mac_addr(adapter->deflink)))
+			status = hdd_softap_get_bss_self_info_ex(adapter->deflink);
+		else
+			status = hdd_get_station_remote_ex(hdd_ctx, adapter,
+							   mac_addr);
 		break;
 	default:
 		hdd_err_rl("Invalid device_mode: %d", adapter->device_mode);

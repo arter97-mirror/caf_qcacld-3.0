@@ -15775,149 +15775,6 @@ static int hdd_get_nss_config(struct wlan_hdd_link_info *link_info,
 }
 
 /**
- * hdd_get_num_tx_chains_config() - Get the number of tx chains supported by
- * the adapter
- * @link_info: Link info pointer in HDD adapter
- * @skb: sk buffer to hold nl80211 attributes
- * @id: Request attribute ID
- *
- * Return: 0 on success; error number otherwise
- */
-static int hdd_get_num_tx_chains_config(struct wlan_hdd_link_info *link_info,
-					struct sk_buff *skb, uint32_t id)
-{
-	uint8_t tx_chains;
-	QDF_STATUS status;
-
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_err("Not in connected state");
-		return -EINVAL;
-	}
-
-	status = hdd_get_num_tx_chains(link_info, &tx_chains);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to get num tx chains");
-		return -EINVAL;
-	}
-
-	hdd_debug("num_tx_chains %d", tx_chains);
-	if (nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS, tx_chains)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
- * hdd_get_tx_nss_config() - Get the number of tx spatial streams supported by
- * the adapter
- * @link_info: Link info pointer in HDD adapter
- * @skb: sk buffer to hold nl80211 attributes
- * @id: Request attribute ID
- *
- * Return: 0 on success; error number otherwise
- */
-static int hdd_get_tx_nss_config(struct wlan_hdd_link_info *link_info,
-				 struct sk_buff *skb, uint32_t id)
-{
-	uint8_t tx_nss;
-	QDF_STATUS status;
-
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_err("Not in connected state");
-		return -EINVAL;
-	}
-
-	status = hdd_get_tx_nss(link_info, &tx_nss);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to get nss");
-		return -EINVAL;
-	}
-
-	hdd_debug("tx_nss %d", tx_nss);
-	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS, tx_nss)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
- * hdd_get_num_rx_chains_config() - Get the number of rx chains supported by
- * the adapter
- * @link_info: Link info pointer in HDD adapter
- * @skb: sk buffer to hold nl80211 attributes
- * @id: Request attribute ID
- *
- * Return: 0 on success; error number otherwise
- */
-static int hdd_get_num_rx_chains_config(struct wlan_hdd_link_info *link_info,
-					struct sk_buff *skb,
-					uint32_t id)
-{
-	uint8_t rx_chains;
-	QDF_STATUS status;
-
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_err("Not in connected state");
-		return -EINVAL;
-	}
-
-	status = hdd_get_num_rx_chains(link_info, &rx_chains);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to get num rx chains");
-		return -EINVAL;
-	}
-
-	hdd_debug("num_rx_chains %d", rx_chains);
-	if (nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS, rx_chains)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
- * hdd_get_rx_nss_config() - Get the number of rx spatial streams supported by
- * the adapter
- * @link_info: Link info pointer in HDD adapter
- * @skb: sk buffer to hold nl80211 attributes
- * @id: Request attribute ID
- *
- * Return: 0 on success; error number otherwise
- */
-static int hdd_get_rx_nss_config(struct wlan_hdd_link_info *link_info,
-				 struct sk_buff *skb, uint32_t id)
-{
-	uint8_t rx_nss;
-	QDF_STATUS status;
-
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_err("Not in connected state");
-		return -EINVAL;
-	}
-
-	status = hdd_get_rx_nss(link_info, &rx_nss);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to get nss");
-		return -EINVAL;
-	}
-
-	hdd_debug("rx_nss %d", rx_nss);
-	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS, rx_nss)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
  * hdd_get_listen_interval_config() - Get listen interval from driver
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
@@ -16144,13 +16001,79 @@ static int hdd_get_nss_chains_config(struct wlan_hdd_link_info *link_info,
 				     uint32_t id)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct wlan_mlme_nss_chains *dyn;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t value = 0;
+	int ret = 0;
+
+	if (hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_err("Rejecting as interface is in connected state");
+		return -EINVAL;
+	}
+
+	if (!hdd_ctx->dynamic_nss_chains_support) {
+		hdd_err("Dynamic nss chain update is not supported");
+		return -EOPNOTSUPP;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Failed to get vdev reference");
+		return -EINVAL;
+	}
+
+	dyn = ucfg_mlme_get_dynamic_vdev_config(vdev);
+	if (!dyn) {
+		hdd_err("Failed to get dynamic config");
+		ret = -EINVAL;
+		goto put_vdev;
+	}
+
+	switch (id) {
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS:
+		value = QDF_MAX(dyn->tx_nss[NSS_CHAINS_BAND_2GHZ],
+				dyn->tx_nss[NSS_CHAINS_BAND_5GHZ]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS:
+		value = QDF_MAX(dyn->rx_nss[NSS_CHAINS_BAND_2GHZ],
+				dyn->rx_nss[NSS_CHAINS_BAND_5GHZ]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS:
+		value = QDF_MAX(dyn->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
+				dyn->num_tx_chains[NSS_CHAINS_BAND_5GHZ]);
+		break;
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS:
+		value = QDF_MAX(dyn->num_rx_chains[NSS_CHAINS_BAND_2GHZ],
+				dyn->num_rx_chains[NSS_CHAINS_BAND_5GHZ]);
+		break;
+	default:
+		ret = -EINVAL;
+		goto put_vdev;
+	}
+
+	if (nla_put_u8(skb, id, value)) {
+		hdd_err("nla_put failure");
+		ret = -EINVAL;
+	}
+
+put_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return ret;
+}
+
+static int hdd_get_per_band_nss_chains_config(struct wlan_hdd_link_info *link_info,
+					      struct sk_buff *skb,
+					      uint32_t id)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct wlan_mlme_nss_chains limits = {0};
 	struct wlan_mlme_nss_chains *dyn;
 	QDF_STATUS status;
 	uint8_t value = 0;
 	enum nss_chains_band_info band;
 
-	if (!hdd_cm_is_vdev_connected(link_info)) {
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
 		hdd_err("Not in connected state");
 		return -EINVAL;
 	}
@@ -16292,19 +16215,19 @@ static const struct config_getters config_getters[] = {
 	 hdd_get_optimized_power_config},
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS,
 	 sizeof(uint8_t),
-	 hdd_get_tx_nss_config},
+	 hdd_get_nss_chains_config},
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS,
 	 sizeof(uint8_t),
-	 hdd_get_rx_nss_config},
+	 hdd_get_nss_chains_config},
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
 	 sizeof(uint32_t),
 	 hdd_get_listen_interval_config},
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS,
 	 sizeof(uint8_t),
-	 hdd_get_num_tx_chains_config},
+	 hdd_get_nss_chains_config},
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS,
 	 sizeof(uint8_t),
-	 hdd_get_num_rx_chains_config},
+	 hdd_get_nss_chains_config},
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS,
 	 WLAN_MAX_ML_BSS_LINKS * sizeof(uint8_t) * 2,
 	 hdd_get_mlo_max_band_info},
@@ -16316,28 +16239,28 @@ static const struct config_getters config_getters[] = {
 	 hdd_get_dfs_owner_disable},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ,
 	 sizeof(uint8_t),
-	 hdd_get_nss_chains_config},
+	 hdd_get_per_band_nss_chains_config},
 };
 
 /**
