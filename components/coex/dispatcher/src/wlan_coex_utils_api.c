@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -145,3 +145,10 @@ QDF_STATUS wlan_dbam_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	return wlan_dbam_detach(psoc);
 }
 #endif
+
+QDF_STATUS
+wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val)
+{
+	return coex_psoc_get_btc_chain_mode(psoc, val);
+}

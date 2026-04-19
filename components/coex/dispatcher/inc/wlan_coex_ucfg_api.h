@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,22 +28,6 @@
 #include "wlan_coex_public_structs.h"
 
 /**
- * enum coex_btc_chain_mode - btc chain mode definitions
- * @WLAN_COEX_BTC_CHAIN_MODE_SHARED: chains of BT and WLAN 2.4 GHz are shared.
- * @WLAN_COEX_BTC_CHAIN_MODE_FDD: chains of BT and WLAN 2.4 GHz are
- * separated, FDD mode.
- * @WLAN_COEX_BTC_CHAIN_MODE_HYBRID: chains of BT and WLAN 2.4 GHz are
- * separated, hybrid mode.
- * @WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED: chain mode is not set.
- */
-enum coex_btc_chain_mode {
-	WLAN_COEX_BTC_CHAIN_MODE_SHARED = 0,
-	WLAN_COEX_BTC_CHAIN_MODE_FDD,
-	WLAN_COEX_BTC_CHAIN_MODE_HYBRID,
-	WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED = 0xFF,
-};
-
-/**
  * enum coex_config_type - coex config type definitions
  * @COEX_CONFIG_BTC_CHAIN_MODE: config BT coex chain mode
  * @COEX_CONFIG_TYPE_MAX: max value
@@ -61,6 +45,17 @@ enum coex_config_type {
  * Return: void
  */
 typedef QDF_STATUS (*update_coex_cb)(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_coex_psoc_get_btc_chain_mode() - API to get BT coex chain mode from psoc
+ * @psoc: pointer to psoc object
+ * @val: pointer to BT coex chain mode
+ *
+ * Return : status of operation
+ */
+QDF_STATUS
+ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val);
 
 #ifdef FEATURE_COEX
 /**
@@ -87,17 +82,6 @@ ucfg_coex_register_cfg_updated_handler(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 				  enum coex_btc_chain_mode val);
-
-/**
- * ucfg_coex_psoc_get_btc_chain_mode() - API to get BT coex chain mode from psoc
- * @psoc: pointer to psoc object
- * @val: pointer to BT coex chain mode
- *
- * Return : status of operation
- */
-QDF_STATUS
-ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
-				  enum coex_btc_chain_mode *val);
 
 /**
  * ucfg_coex_send_btc_chain_mode() - API to send BT coex config to target if
@@ -138,16 +122,6 @@ ucfg_coex_register_cfg_updated_handler(struct wlan_objmgr_psoc *psoc,
 				       enum coex_config_type type,
 				       update_coex_cb handler)
 {
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
-				  enum coex_btc_chain_mode *val)
-{
-	if (val)
-		*val = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
-
 	return QDF_STATUS_SUCCESS;
 }
 

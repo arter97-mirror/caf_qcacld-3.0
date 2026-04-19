@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -175,7 +175,7 @@ wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 				  enum coex_btc_chain_mode val);
 
 /**
- * wlan_coex_psoc_get_btc_chain_mode() - private API to get BT coex chain mode
+ * coex_psoc_get_btc_chain_mode() - private API to get BT coex chain mode
  * from psoc
  * @psoc: pointer to psoc object
  * @val: pointer to BT coex chain mode
@@ -183,8 +183,18 @@ wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
  * Return : status of operation
  */
 QDF_STATUS
-wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
-				  enum coex_btc_chain_mode *val);
+coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+			     enum coex_btc_chain_mode *val);
+#else
+static inline QDF_STATUS
+coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+			     enum coex_btc_chain_mode *val)
+{
+	if (val)
+		*val = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #ifdef WLAN_FEATURE_DBAM_CONFIG
