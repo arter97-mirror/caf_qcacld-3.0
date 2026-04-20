@@ -113,6 +113,42 @@ static const uint8_t eth_890d_tdls_discvory_frm_hdr[] = {
 	0x89, 0x0d, 0x02, 0x0c, 0x0a,
 };
 
+/*
+ * TDLS Setup Request is sent as a data frame with 89-0d EtherType.
+ * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
+ *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_SETUP_REQUEST(0x00)
+ */
+static const uint8_t tdls_setup_req_frm_hdr[] = {
+	0x89, 0x0d, 0x02, 0x0c, 0x00,
+};
+
+/*
+ * TDLS Setup Response is sent as a data frame with 89-0d EtherType.
+ * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
+ *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_SETUP_RESPONSE(0x01)
+ */
+static const uint8_t tdls_setup_rsp_frm_hdr[] = {
+	0x89, 0x0d, 0x02, 0x0c, 0x01,
+};
+
+/*
+ * TDLS Setup Confirm is sent as a data frame with 89-0d EtherType.
+ * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
+ *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_SETUP_CONFIRM(0x02)
+ */
+static const uint8_t tdls_setup_cnf_frm_hdr[] = {
+	0x89, 0x0d, 0x02, 0x0c, 0x02,
+};
+
+/*
+ * TDLS Discovery Response is sent as a public action management frame
+ * (802.11 MGMT). Its action body starts at sizeof(tSirMacMgmtHdr).
+ * Pattern: ACTION_CATEGORY_PUBLIC (0x04) | TDLS_DISCOVERY_RESPONSE (0x0e)
+ */
+static const uint8_t tdls_discovery_rsp_frm_hdr[] = {
+	0x04, 0x0e,
+};
+
 #define TDLS_ETHR_HDR_LEN (sizeof(struct tdls_ethernet_hdr))
 
 /*
@@ -573,6 +609,12 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 	struct tdls_ethernet_hdr *ethernet_hdr;
 	tpSirMacActionFrameHdr action_hdr;
 	bool is_tdls_discvory_frm = false;
+	bool is_tdls_discovery_response_frm = false;
+	bool is_tdls_setup_request_frm = false;
+	bool is_tdls_setup_response_frm = false;
+	bool is_tdls_setup_confirm_frm = false;
+	uint8_t *peer_mac = NULL;
+	uint8_t *src_mac = NULL;
 
 
 	if (NO_SESSION != mac_ctx->lim.tdls_frm_session_id) {
@@ -583,11 +625,33 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 					  sizeof(*action_hdr)))) {
 			ethernet_hdr =
 				(struct tdls_ethernet_hdr *)qdf_nbuf_data(buf);
+			/* peer_mac is the first field of the Ethernet header */
+			peer_mac = ethernet_hdr->dest_addr;
+			/* src_mac is the second field of the Ethernet header */
+			src_mac = ethernet_hdr->src_addr;
 			is_tdls_discvory_frm =
 				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
 				TDLS_ETHR_HDR_LEN),
 				eth_890d_tdls_discvory_frm_hdr,
 				sizeof(eth_890d_tdls_discvory_frm_hdr));
+
+			is_tdls_setup_request_frm =
+				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
+				TDLS_ETHR_HDR_LEN),
+				tdls_setup_req_frm_hdr,
+				sizeof(tdls_setup_req_frm_hdr));
+
+			is_tdls_setup_response_frm =
+				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
+				TDLS_ETHR_HDR_LEN),
+				tdls_setup_rsp_frm_hdr,
+				sizeof(tdls_setup_rsp_frm_hdr));
+
+			is_tdls_setup_confirm_frm =
+				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
+				TDLS_ETHR_HDR_LEN),
+				tdls_setup_cnf_frm_hdr,
+				sizeof(tdls_setup_cnf_frm_hdr));
 
 			if (is_tdls_discvory_frm &&
 			    tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
@@ -597,15 +661,84 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 					ethernet_hdr->dest_addr);
 		}
 
+		/*
+		 * TDLS Discovery Response is a public action management frame.
+		 * Its action body (Category + Action) starts at offset
+		 * sizeof(tSirMacMgmtHdr) from the buffer start.
+		 * Match: ACTION_CATEGORY_PUBLIC (0x04) + TDLS_DISCOVERY_RESPONSE (0x0e)
+		 */
+		if (buf &&
+		    (qdf_nbuf_len(buf) >= (sizeof(tSirMacMgmtHdr) +
+					   sizeof(*action_hdr)))) {
+			is_tdls_discovery_response_frm =
+				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
+					      sizeof(tSirMacMgmtHdr)),
+					     tdls_discovery_rsp_frm_hdr,
+					     sizeof(tdls_discovery_rsp_frm_hdr));
+			/*
+			 * For Discovery Response (802.11 MGMT frame), the
+			 * destination address is in addr1 of the MAC header
+			 * at offset 4 (FC=2B + Duration=2B).
+			 */
+			if (is_tdls_discovery_response_frm) {
+				tpSirMacMgmtHdr mgmt_hdr =
+					(tpSirMacMgmtHdr)qdf_nbuf_data(buf);
+				peer_mac = mgmt_hdr->da;
+				src_mac  = mgmt_hdr->sa;
+			}
+		}
+
+		/*
+		 * Record TDLS stats for this tx completion event via the
+		 * dispatcher API which handles entry population, RSSI lookup
+		 * via tdls_find_peer(), and SM delivery internally.
+		 */
+		if (peer_mac &&
+		    (is_tdls_discvory_frm ||
+		     is_tdls_discovery_response_frm ||
+		     is_tdls_setup_request_frm ||
+		     is_tdls_setup_response_frm ||
+		     is_tdls_setup_confirm_frm)) {
+			uint8_t type, subtype;
+			bool tx_ok = (tx_complete ==
+				      WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
+
+			if (is_tdls_discvory_frm) {
+				type    = TDLS_STATS_DISCOVERY;
+				subtype = TDLS_STATS_SUBTYPE_REQ;
+			} else if (is_tdls_discovery_response_frm) {
+				type    = TDLS_STATS_DISCOVERY;
+				subtype = TDLS_STATS_SUBTYPE_RESP;
+			} else if (is_tdls_setup_request_frm) {
+				type    = TDLS_STATS_SETUP;
+				subtype = TDLS_STATS_SUBTYPE_REQ;
+			} else if (is_tdls_setup_response_frm) {
+				type    = TDLS_STATS_SETUP;
+				subtype = TDLS_STATS_SUBTYPE_RESP;
+			} else {
+				type    = TDLS_STATS_SETUP;
+				subtype = TDLS_STATS_SUBTYPE_CONFIRM;
+			}
+
+			wlan_tdls_record_mgmt_tx_complete(
+				mac_ctx->psoc,
+				mac_ctx->lim.tdls_frm_session_id,
+				peer_mac, type, subtype, tx_ok);
+		}
+
 		lim_send_sme_mgmt_tx_completion(mac_ctx,
 				mac_ctx->lim.tdls_frm_session_id,
 				tx_complete);
 		mac_ctx->lim.tdls_frm_session_id = NO_SESSION;
 	}
 
-	pe_debug("tdls_frm_session_id: %x tx_complete: %x is_discovery:%d",
+	pe_debug("tdls_frm_session_id: %x tx_complete: %x peer:" QDF_MAC_ADDR_FMT " self:" QDF_MAC_ADDR_FMT " is_discovery:%d is_discovery_rsp:%d is_setup_req:%d is_setup_rsp:%d is_setup_cnf:%d",
 		 mac_ctx->lim.tdls_frm_session_id, tx_complete,
-		 is_tdls_discvory_frm);
+		 QDF_MAC_ADDR_REF(peer_mac),
+		 QDF_MAC_ADDR_REF(src_mac),
+		 is_tdls_discvory_frm, is_tdls_discovery_response_frm,
+		 is_tdls_setup_request_frm, is_tdls_setup_response_frm,
+		 is_tdls_setup_confirm_frm);
 
 	if (buf)
 		qdf_nbuf_free(buf);

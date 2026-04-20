@@ -42,6 +42,9 @@
 #include <wlan_tdls_stats_public_structs.h>
 #include <wlan_sm_engine.h>
 
+/* Forward declaration to avoid circular includes with wlan_tdls_main.h */
+struct tdls_soc_priv_obj;
+
 /* =========================================================================
  * SM lifecycle APIs (defined in wlan_tdls_stats.c)
  * =========================================================================
@@ -227,6 +230,24 @@ void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev);
  * Must NOT be called while tdls_stats_sm_lock is held.
  */
 void tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx);
+
+/**
+ * tdls_stats_record_peer_add() - Record a TDLS stats entry when a new peer
+ *                                is added to the peer list.
+ * @soc_obj: TDLS soc private object (provides stats_ctx).
+ * @vdev:    VDEV on which the peer is being added (used for channel lookup).
+ * @macaddr: MAC address of the newly added peer.
+ * @rssi:    Last known RSSI for the peer (0 if not yet measured).
+ *
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_SETUP,
+ * subtype=TDLS_STATS_SUBTYPE_REQ, is_sender=0 (responder), and delivers
+ * it to the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
+				struct wlan_objmgr_vdev *vdev,
+				const uint8_t *macaddr,
+				int8_t rssi);
 
 /**
  * tdls_get_tdls_stats() - Core API to handle a TDLS stats enable/disable

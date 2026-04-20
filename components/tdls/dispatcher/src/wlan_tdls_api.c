@@ -30,9 +30,11 @@
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_objmgr_cmn.h>
 #include "wlan_tdls_cfg_api.h"
+#include "wlan_tdls_stats_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
 #include <wlan_mlo_mgr_link_switch.h>
+#include "wlan_mlme_main.h"
 
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
 				      struct tdls_callbacks *cbs)
@@ -595,6 +597,55 @@ struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 				      const uint8_t *macaddr)
 {
 	return tdls_find_peer(vdev_obj, macaddr);
+}
+
+void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id,
+				       const uint8_t *peer_mac,
+				       uint8_t type,
+				       uint8_t subtype,
+				       bool success)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+	struct wlan_objmgr_vdev *vdev;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_peer *peer;
+	struct tdls_stats_entry entry = {0};
+
+	if (!psoc || !peer_mac)
+		return;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj || !soc_obj->stats_ctx)
+		return;
+
+	entry.ts_ms       = qdf_get_time_of_the_day_ms();
+	qdf_mem_copy(entry.peer_mac, peer_mac, QDF_MAC_ADDR_SIZE);
+	entry.success     = success ? 0 : 1;
+	entry.is_sender   = 1;
+	entry.reason_code = TDLS_STATS_REASON_GENERAL;
+	entry.session_id  = vdev_id;
+	entry.type        = type;
+	entry.subtype     = subtype;
+
+	/* Get RSSI and operating channel from the vdev */
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						     WLAN_TDLS_NB_ID);
+	if (vdev) {
+		entry.channel = wlan_get_operation_chan_freq(vdev);
+
+		tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
+		if (tdls_vdev_obj) {
+			peer = tdls_find_peer(tdls_vdev_obj, peer_mac);
+			if (peer)
+				entry.rssi = peer->rssi;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+	}
+
+	wlan_tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
+					 TDLS_STATS_EV_NEW_EVENT,
+					 sizeof(entry), &entry);
 }
 
 #define WLAN_MLO_SINGLE_LINK 1

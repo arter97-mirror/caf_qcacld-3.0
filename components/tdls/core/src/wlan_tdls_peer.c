@@ -24,6 +24,7 @@
  */
 #include "wlan_tdls_main.h"
 #include "wlan_tdls_peer.h"
+#include "wlan_tdls_stats.h"
 #include <wlan_reg_services_api.h>
 #include <wlan_utility.h>
 #include <wlan_policy_mgr_api.h>
@@ -299,6 +300,10 @@ struct tdls_peer *tdls_add_peer(struct tdls_vdev_priv_obj *vdev_obj,
 	}
 
 	qdf_list_insert_back(head, &peer->node);
+
+	/* Record TDLS stats for new peer addition */
+	tdls_stats_record_peer_add(soc_obj, vdev_obj->vdev, macaddr,
+				   peer->rssi);
 
 	tdls_debug("add tdls peer: " QDF_MAC_ADDR_FMT,
 		   QDF_MAC_ADDR_REF(macaddr));
