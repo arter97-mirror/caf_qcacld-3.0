@@ -1460,6 +1460,69 @@ wma_populate_peer_mlo_common_info_sap(tp_wma_handle wma,
 }
 
 /**
+ * wma_force_inactive_for_sap_in_cac() - Check if an MLO STA link should be
+ *   force-inactivated because the partner SAP is in DFS CAC
+ * @smesessionId: SME/PE session ID of the STA vdev being associated
+ * @link_id: link ID of the partner link that may be under CAC
+ *
+ * Scans all active PE sessions looking for an MLO STA session whose
+ * mlo_link_in_cac flag is set and whose cac_link_id matches @link_id.
+ * When found, advances the link state to MLO_LINK_FORCE_WAIT_CAC_DONE so
+ * the caller (wma_populate_peer_mlo_common_info_sta) can set
+ * mlo_force_link_inactive in the peer-assoc WMA params, which instructs
+ * firmware to keep the link inactive until CAC on the SAP completes.
+ *
+ * Return: true if a matching CAC session was found and the state was updated,
+ *         false otherwise.
+ */
+static bool
+wma_force_inactive_for_sap_in_cac(uint8_t smesessionId,
+				  uint8_t link_id)
+{
+	uint8_t i;
+	struct pe_session *session;
+	struct pe_session *sta_session;
+	struct mac_context *mac_ctx;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return false;
+
+	/*
+	 * link_id is scoped to an MLD, not globally unique, so two different
+	 * MLDs may reuse the same link_id. Resolve the STA session being
+	 * associated first, then only match a CAC session that belongs to the
+	 * same MLD (mlo_dev_ctx), to avoid force-inactivating the wrong link.
+	 */
+	sta_session = pe_find_session_by_vdev_id(mac_ctx, smesessionId);
+	if (!sta_session || !sta_session->vdev ||
+	    !sta_session->vdev->mlo_dev_ctx)
+		return false;
+
+	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
+		if (!mac_ctx->lim.gpSession[i].valid)
+			continue;
+
+		session = &mac_ctx->lim.gpSession[i];
+		if (!session || !session->vdev ||
+		    !session->vdev->mlo_dev_ctx)
+			continue;
+
+		if (session->vdev->mlo_dev_ctx == sta_session->vdev->mlo_dev_ctx &&
+		    session->mlo_sta_cac_info.mlo_link_in_cac &&
+		    session->mlo_sta_cac_info.cac_link_id == link_id) {
+			/* Link is in CAC, set force inactive */
+			session->mlo_sta_cac_info.link_state =
+						MLO_LINK_FORCE_WAIT_CAC_DONE;
+			wma_debug("vdev %d link %d: Set mlo_force_link_inactive=1 for CAC",
+				  smesessionId, link_id);
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * wma_populate_peer_mlo_common_info_sta() - Set common info caps to
  * the peer assoc request for mlo sta mode
  * @wma: wma handle
@@ -1498,6 +1561,13 @@ wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
 				psoc, vdev, link_id_bitmap, LINK_ADD);
 		ml_nlink_init_concurrency_link_request(psoc, vdev);
 	}
+
+	/* For MLO STA, check if link is in CAC state */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    wma_force_inactive_for_sap_in_cac(params->smesessionId,
+					      params->link_id))
+		req->mlo_params.mlo_force_link_inactive = 1;
+
 	wma_debug("assoc_link %d" QDF_MAC_ADDR_FMT ", force inactive %d link id %d",
 		  req->mlo_params.mlo_assoc_link,
 		  QDF_MAC_ADDR_REF(peer->mldaddr),

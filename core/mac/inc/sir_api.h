@@ -5268,6 +5268,45 @@ struct sap_cac_chan_switch_params {
 	uint8_t sec_ch_offset;
 };
 
+/*
+ * enum mlo_link_force_state - State machine for MLO link force operations
+ *                             during DFS CAC
+ * @MLO_LINK_FORCE_STATE_UNKNOWN: Initial or unset state; no force operation
+ *                                in progress
+ * @MLO_LINK_FORCE_DO_CSA: Link must perform a Channel Switch Announcement
+ *                         to vacate the current DFS channel
+ * @MLO_LINK_FORCE_WAIT_CAC_DONE: Link has been force-inactivated toward FW
+ *                                and is waiting for the partner SAP's CAC
+ *                                to complete
+ * @MLO_LINK_FORCE_CAC_COMPLETE: CAC on the partner link has finished; the
+ *                               force-inactive restriction can be lifted
+ * @MLO_LINK_FORCE_SW2_NON_DFS: Link is being switched to a non-DFS channel
+ *                              as part of DFS avoidance after CAC failure or
+ *                              radar detection
+ */
+enum mlo_link_force_state {
+	MLO_LINK_FORCE_STATE_UNKNOWN = 0,
+	MLO_LINK_FORCE_DO_CSA = 1,
+	MLO_LINK_FORCE_WAIT_CAC_DONE = 2,
+	MLO_LINK_FORCE_CAC_COMPLETE = 3,
+	MLO_LINK_FORCE_SW2_NON_DFS = 4,
+};
+
+/**
+ * struct mlo_cac_info - MLO CAC information
+ * @mlo_link_in_cac: indicate STA partner link in cac.
+ *  MLO STA connect two links during MLO SAP in CAC.
+ *  STA will disallow TX by set force_inactive mode
+ *  to fw to follow DFS specification
+ * @cac_link_id: Link ID of the link in CAC
+ * @link_state: link state
+ */
+struct mlo_cac_info {
+	bool mlo_link_in_cac;
+	uint8_t cac_link_id;
+	enum mlo_link_force_state link_state;
+};
+
 /**
  * enum wfa_capa_qos_mgmt_features - WFA QoS management features capabilities
  * @WFA_CAPA_QOS_MGMT_DSCP_POLICY: Indicates support for DSCP policy management.

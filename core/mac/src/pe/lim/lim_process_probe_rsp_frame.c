@@ -429,6 +429,117 @@ lim_handle_uhr_tx_ap_probe_rsp(struct mac_context *mac_ctx,
 }
 #endif /* WLAN_FEATURE_11BN */
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * lim_process_mcst_ie_in_probe_rsp_frame() - Process MCST IE in probe response
+ * @mac_ctx: MAC context
+ * @session: PE session
+ * @probe_rsp: Probe response beacon structure
+ *
+ * This function processes MCST IE in probe response frame and sets
+ * mlo_link_in_cac flag if the link is in CAC state.
+ *
+ * Return: None
+ */
+static void
+lim_process_mcst_ie_in_probe_rsp_frame(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       tpSirProbeRespBeacon probe_rsp)
+{
+	uint8_t link_id;
+	const uint8_t *mcst_ie;
+
+	if (!session || !probe_rsp || !mac_ctx) {
+		pe_err("invalid input parameters");
+		return;
+	}
+
+	/* Check if probe response contains MCST IE in per-STA profile */
+	if (!probe_rsp->mlo_ie.mlo_ie_present)
+		return;
+
+	if (session->mlo_sta_cac_info.mlo_link_in_cac)
+		return;
+	pe_debug("num_sta_profile=%d",
+		 probe_rsp->mlo_ie.mlo_ie.num_sta_profile);
+
+	/* Parse per-STA profiles to find MCST IE */
+	for (int i = 0; i < probe_rsp->mlo_ie.mlo_ie.num_sta_profile; i++) {
+		uint8_t *per_sta_pro = probe_rsp->mlo_ie.mlo_ie.sta_profile[i].data;
+		uint32_t per_sta_pro_len = probe_rsp->mlo_ie.mlo_ie.sta_profile[i].num_data;
+		uint16_t stacontrol;
+		uint8_t *sta_pro;
+		uint32_t sta_pro_len;
+		uint8_t sta_info_len;
+		uint8_t mcst_ext_id = WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME;
+		uint32_t min_len = sizeof(struct subelem_header) +
+				   WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE + 1;
+
+		/*
+		 * Validate the per-STA profile is long enough to hold the
+		 * subelement header, STA control field and the STA info length
+		 * byte before dereferencing them, to avoid an out-of-bounds
+		 * read from a malformed frame.
+		 */
+		if (!per_sta_pro || per_sta_pro_len < min_len) {
+			pe_err("vdev %d: per-STA profile too short (%u)",
+			       session->vdev_id, per_sta_pro_len);
+			continue;
+		}
+
+		stacontrol = *(uint16_t *)(per_sta_pro + sizeof(struct subelem_header));
+		sta_info_len = *(uint8_t *)(per_sta_pro + sizeof(struct subelem_header) +
+					    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE);
+
+		{
+			uint32_t hdr_sz = sizeof(struct subelem_header) +
+					  WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE +
+					  sta_info_len +
+					  WLAN_CAPABILITYINFO_LEN;
+
+			if (per_sta_pro_len <= hdr_sz) {
+				pe_err("vdev %d: per-STA profile too short (%u)",
+				       session->vdev_id, per_sta_pro_len);
+				continue;
+			}
+			sta_pro = per_sta_pro + hdr_sz;
+			sta_pro_len = per_sta_pro_len - hdr_sz;
+		}
+
+		/* Look for MCST IE (Maximum Channel Switch Time IE).
+		 * MCST IE is an Extended Element: EID=255 (WLAN_MAC_EID_EXT),
+		 * ExtID=52 (WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME).
+		 * Must use wlan_get_ext_ie_ptr_from_ext_id() which searches
+		 * for EID=255 then matches ExtID. Using wlan_get_ie_ptr_from_eid(52,...)
+		 * would search for EID=52 which is WRONG - MCST IE first byte is 255.
+		 */
+		mcst_ie = wlan_get_ext_ie_ptr_from_ext_id(&mcst_ext_id, 1,
+							  sta_pro, sta_pro_len);
+
+		if (mcst_ie) {
+			link_id = QDF_GET_BITS(stacontrol,
+					       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
+					       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
+			pe_debug("vdev %d: Found MCST IE in probe rsp for link %d, set mlo_link_in_cac=true",
+				 session->vdev_id, link_id);
+
+			session->mlo_sta_cac_info.mlo_link_in_cac = true;
+			session->mlo_sta_cac_info.cac_link_id = link_id;
+
+			break;
+		}
+		pe_debug("mcst not found");
+	}
+}
+#else
+static void
+lim_process_mcst_ie_in_probe_rsp_frame(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       tpSirProbeRespBeacon probe_rsp)
+{
+}
+#endif
+
 /**
  * lim_process_probe_rsp_frame() - processes received Probe Response frame
  * @mac_ctx: Pointer to Global MAC structure
@@ -499,6 +610,14 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	    probe_rsp->uhr_cap_ie.present)
 		session_entry->ap_uhr_cap = probe_rsp->uhr_cap_ie;
 #endif
+
+	/* Process MCST IE for MLO STA */
+	if (wlan_vdev_mlme_get_opmode(session_entry->vdev) == QDF_STA_MODE &&
+	    wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
+		pe_debug("process mlo probe rsp");
+		lim_process_mcst_ie_in_probe_rsp_frame(mac_ctx, session_entry,
+						       probe_rsp);
+	}
 
 	if (!probe_rsp->chan_freq) {
 		probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);

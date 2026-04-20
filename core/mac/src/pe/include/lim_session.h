@@ -641,6 +641,7 @@ struct punc_chan_info {
  *                              due to bandwidth update
  * @mcstie_send_in_cac: sap send mcst ie in cac
  * @cac_radar_csa_in_progress: CSA beacon countdown running after radar in CAC
+ * @mlo_sta_cac_info: MLO STA related info
  * @cc_switch_mode:
  * @isCiscoVendorAP:
  * @add_ie_params:
@@ -983,6 +984,7 @@ struct pe_session {
 	uint8_t bw_update_include_ch_sw_ie;
 	bool mcstie_send_in_cac;
 	bool cac_radar_csa_in_progress;
+	struct mlo_cac_info mlo_sta_cac_info;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
