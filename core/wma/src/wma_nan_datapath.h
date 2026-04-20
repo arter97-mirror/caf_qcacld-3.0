@@ -124,4 +124,42 @@ QDF_STATUS wma_add_sta_ndi_mode(tp_wma_handle wma,
 static inline bool wma_is_ndi_active(tp_wma_handle wma_handle) { return false; }
 #endif /* WLAN_FEATURE_NAN */
 
+#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+/**
+ * wma_handle_ndp_peer_create_rsp() - Handle NDP peer create response
+ * @wma: wma handle
+ * @rsp_data: peer create response parameters received from firmware
+ * @req_msg: pending peer-create hold request being completed
+ *
+ * Return: none
+ */
+void wma_handle_ndp_peer_create_rsp(tp_wma_handle wma,
+				    struct peer_create_rsp_params *rsp_data,
+				    struct wma_target_req *req_msg);
+
+/**
+ * wma_handle_ndp_peer_create_timeout() - Handle NDP peer create confirm
+ * timeout
+ * @wma: wma handle
+ * @tgt_req: timed-out target request
+ *
+ * Return: none
+ */
+void wma_handle_ndp_peer_create_timeout(tp_wma_handle wma,
+					struct wma_target_req *tgt_req);
+#else
+static inline void
+wma_handle_ndp_peer_create_rsp(tp_wma_handle wma,
+			       struct peer_create_rsp_params *rsp_data,
+			       struct wma_target_req *req_msg)
+{
+}
+
+static inline void
+wma_handle_ndp_peer_create_timeout(tp_wma_handle wma,
+				   struct wma_target_req *tgt_req)
+{
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 #endif /* __WMA_NAN_DATAPATH_H */

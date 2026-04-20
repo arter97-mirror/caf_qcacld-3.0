@@ -191,6 +191,9 @@
 
 #define WMA_DELETE_NDP_PEER_RSP 0x0e
 
+/* NDP peer create response */
+#define WMA_NDP_PEER_CREATE_RESPONSE 0x14
+
 #define WMA_TDLS_PEER_CREATE_RESPONSE 0x0f
 #define WMA_TDLS_PEER_DELETE_RESPONSE 0x10
 /* Delete peer response for existing ranging peer */

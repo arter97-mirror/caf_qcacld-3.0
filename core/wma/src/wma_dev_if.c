@@ -2869,6 +2869,10 @@ static int wma_peer_create_resp_notify(tp_wma_handle wma,
 
 		return 0;
 	}
+
+	case WMA_NDP_PEER_CREATE_RESPONSE:
+		wma_handle_ndp_peer_create_rsp(wma, rsp_data, req_msg);
+		return 0;
 	}
 
 	qdf_mem_free(rsp_data);
@@ -5135,6 +5139,9 @@ void wma_hold_req_timer(void *data)
 					   (void *)add_sta, 0);
 	} else if (tgt_req->type == WMA_QOS_NULL_TX_REQ) {
 		wma_qos_null_tx_timeout_handler(wma, tgt_req);
+	} else if ((tgt_req->msg_type == WMA_PEER_CREATE_REQ) &&
+		   (tgt_req->type == WMA_NDP_PEER_CREATE_RESPONSE)) {
+		wma_handle_ndp_peer_create_timeout(wma, tgt_req);
 	} else {
 		wma_err("Unhandled timeout for msg_type:%d and type:%d",
 				tgt_req->msg_type, tgt_req->type);
@@ -6725,7 +6732,6 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			     supportedRates.supportedMCSSet,
 			     params->supportedRates.supportedMCSSet,
 			     SIR_MAC_MAX_SUPPORTED_MCS_SET);
-
 
 		ret = wma_send_peer_assoc(wma,
 				iface->nwType,

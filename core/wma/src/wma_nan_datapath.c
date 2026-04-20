@@ -34,6 +34,94 @@
 #include "cdp_txrx_tx_delay.h"
 #include "cdp_txrx_misc.h"
 #include <cdp_txrx_handle.h>
+#include "wlan_nan_api_i.h"
+
+#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+/**
+ * wma_ndp_peer_create_wait_for_confirm() - Wait for NDP peer create confirm
+ * @wma: wma handle
+ * @add_sta: add sta parameters
+ *
+ * This function waits for peer create confirmation from firmware for NDP peer.
+ *
+ * Return: QDF_STATUS_SUCCESS if request queued successfully, error otherwise
+ */
+static QDF_STATUS
+wma_ndp_peer_create_wait_for_confirm(tp_wma_handle wma,
+				     tpAddStaParams add_sta)
+{
+	struct wma_target_req *add_req;
+
+	if (!tgt_nan_is_fw_support_standard_mode(wma->psoc))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	if (!wlan_psoc_nif_fw_ext_cap_get(wma->psoc,
+					  WLAN_SOC_F_PEER_CREATE_RESP))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	wma_debug("Wait for NDP peer create confirm. vdev_id %d",
+		  add_sta->smesessionId);
+	add_req = wma_fill_hold_req(wma, add_sta->smesessionId,
+				    WMA_PEER_CREATE_REQ,
+				    WMA_NDP_PEER_CREATE_RESPONSE,
+				    add_sta->staMac, add_sta,
+				    WMA_PEER_CREATE_RESPONSE_TIMEOUT);
+	if (!add_req) {
+		wma_err("Failed to allocate request for vdev_id %d",
+			add_sta->smesessionId);
+		add_sta->status = QDF_STATUS_E_NULL_VALUE;
+		wma_remove_peer(wma, add_sta->staMac,
+				add_sta->smesessionId, false);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+wma_ndp_peer_create_wait_for_confirm(tp_wma_handle wma,
+				     tpAddStaParams add_sta)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+void wma_handle_ndp_peer_create_rsp(tp_wma_handle wma,
+				    struct peer_create_rsp_params *rsp_data,
+				    struct wma_target_req *req_msg)
+{
+	wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP, (void *)rsp_data, 0);
+	qdf_mem_free(req_msg);
+	wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+}
+
+void wma_handle_ndp_peer_create_timeout(tp_wma_handle wma,
+					struct wma_target_req *tgt_req)
+{
+	tAddStaParams *add_sta_params =
+		(tAddStaParams *)tgt_req->user_data;
+
+	wma_err("NDP peer create confirm timeout for vdev:%d",
+		tgt_req->vdev_id);
+
+	if (wma_crash_on_fw_timeout(wma->fw_timeout_crash))
+		wma_trigger_recovery_assert_on_fw_timeout(
+			WMA_NDP_PEER_CREATE_RESPONSE,
+			WMA_PEER_CREATE_RESPONSE_TIMEOUT);
+
+	if (!add_sta_params) {
+		wma_err("vdev:%d Invalid user data for NDP peer create",
+			tgt_req->vdev_id);
+		qdf_mem_free(tgt_req->user_data);
+		return;
+	}
+
+	add_sta_params->status = QDF_STATUS_E_TIMEOUT;
+	wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP,
+				   (void *)add_sta_params, 0);
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 QDF_STATUS wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 {
@@ -94,6 +182,12 @@ QDF_STATUS wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	cdp_peer_state_update(soc, add_sta->staMac, state);
 
 	add_sta->status = QDF_STATUS_SUCCESS;
+
+	/* Wait for peer create confirmation from firmware */
+	status = wma_ndp_peer_create_wait_for_confirm(wma, add_sta);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return status;
+
 send_rsp:
 	status = add_sta->status;
 	wma_debug("Sending add sta rsp to umac (mac:"QDF_MAC_ADDR_FMT", status:%d)",
