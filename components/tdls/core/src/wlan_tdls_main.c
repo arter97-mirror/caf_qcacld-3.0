@@ -1935,6 +1935,7 @@ tdls_update_discovery_tries(struct wlan_objmgr_vdev *vdev)
 QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify)
 {
 	QDF_STATUS status;
+	struct tdls_soc_priv_obj *soc_obj;
 
 	if (!notify) {
 		tdls_err("invalid param");
@@ -1950,6 +1951,23 @@ QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify)
 	status = tdls_process_sta_connect(notify);
 	if (QDF_IS_STATUS_SUCCESS(status))
 		tdls_update_discovery_tries(notify->vdev);
+
+	/*
+	 * Notify the TDLS stats SM that STA connection is complete.
+	 * The SM delivers TDLS_STATS_EV_STA_CONNECTED to the current
+	 * state handler, which calls tdls_stats_handle_sta_connection()
+	 * to send the WMI enable=1 command when the single-STA SCC
+	 * condition is met.
+	 *
+	 * Must be called before wlan_objmgr_vdev_release_ref() since
+	 * the SM handler dereferences the vdev pointer passed as
+	 * event data.
+	 */
+	soc_obj = wlan_vdev_get_tdls_soc_obj(notify->vdev);
+	if (soc_obj && soc_obj->stats_ctx)
+		tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
+					    TDLS_STATS_EV_STA_CONNECTED,
+					    0, notify->vdev);
 
 	wlan_objmgr_vdev_release_ref(notify->vdev, WLAN_TDLS_NB_ID);
 	qdf_mem_free(notify);
