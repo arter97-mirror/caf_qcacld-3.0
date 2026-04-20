@@ -4356,6 +4356,8 @@ wma_cdp_cp_peer_del_response(struct wlan_objmgr_psoc *psoc,
 {
 }
 
+#endif
+
 QDF_STATUS wma_peer_delete_resp_notify(tp_wma_handle wma,
 				       struct wma_target_req *req_msg)
 {
@@ -4421,8 +4423,6 @@ QDF_STATUS wma_peer_delete_resp_notify(tp_wma_handle wma,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#endif
 
 /**
  * wma_peer_delete_handler() - peer delete response handler
