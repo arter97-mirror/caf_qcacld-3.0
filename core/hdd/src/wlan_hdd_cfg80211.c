@@ -778,6 +778,16 @@ static const struct ieee80211_txrx_stypes
 		      BIT(SIR_MAC_MGMT_AUTH),
 	},
 #endif
+/* NL80211_IFTYPE_NAN_DATA is available on kernels >= 6.18.
+ * FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE is only defined for
+ * such kernels, so no separate kernel version guard is needed.
+ */
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+	[NL80211_IFTYPE_NAN_DATA] = {
+		.tx = 0xffff,
+		.rx = BIT(SIR_MAC_MGMT_AUTH) | BIT(SIR_MAC_MGMT_ACTION),
+	},
+#endif
 };
 
 /* Interface limits and combinations registered by the driver */
@@ -29506,11 +29516,33 @@ wlan_hdd_iftype_data_mem_free(struct hdd_context *hdd_ctx)
 }
 #endif
 
+/**
+ * wlan_hdd_set_nan_data_if_mode - Enable NAN data interface mode in wiphy
+ * @wiphy: pointer to wiphy structure
+ *
+ * Sets NL80211_IFTYPE_NAN_DATA in wiphy->interface_modes to advertise
+ * NAN data path (NDI) interface support to the kernel. Called only when
+ * FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE is enabled.
+ *
+ * Return: void
+ */
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+static void wlan_hdd_set_nan_data_if_mode(struct wiphy *wiphy)
+{
+	wiphy->interface_modes |= BIT(NL80211_IFTYPE_NAN_DATA);
+}
+#else
+static void wlan_hdd_set_nan_data_if_mode(struct wiphy *wiphy)
+{
+}
+#endif
+
 #if defined(WLAN_FEATURE_NAN) && \
 	   (KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE)
 static void wlan_hdd_set_nan_if_mode(struct wiphy *wiphy)
 {
 	wiphy->interface_modes |= BIT(NL80211_IFTYPE_NAN);
+	wlan_hdd_set_nan_data_if_mode(wiphy);
 }
 #else
 static void wlan_hdd_set_nan_if_mode(struct wiphy *wiphy)
