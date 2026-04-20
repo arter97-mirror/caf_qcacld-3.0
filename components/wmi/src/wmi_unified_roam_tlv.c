@@ -6661,11 +6661,97 @@ static QDF_STATUS send_roam_smd_config_cmd_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * send_vdev_repurpose_resp_cmd_tlv() - Send vdev repurpose response
+ * @wmi_handle: WMI handle
+ * @vdev_id: VDEV ID
+ * @repurpose_resp: Array of vdev repurpose response TLVs
+ * @num_repurpose_resp: Number of repurpose response TLVs
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+send_vdev_repurpose_resp_cmd_tlv(wmi_unified_t wmi_handle,
+				 uint8_t vdev_id,
+				 struct vdev_repurpose_params *repurpose_resp,
+				 uint8_t num_repurpose_resp)
+{
+	wmi_vdev_repurpose_resp_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	uint32_t len;
+	QDF_STATUS status;
+	uint8_t i;
+
+	/* Calculate buffer length */
+	len = sizeof(wmi_vdev_repurpose_resp_cmd_fixed_param);
+	len += WMI_TLV_HDR_SIZE; /* Array header */
+	len += num_repurpose_resp *
+		sizeof(wmi_vdev_repurpose_response_tlv_param);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("Failed to allocate memory for vdev repurpose resp");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+
+	/* Fill fixed param */
+	cmd = (wmi_vdev_repurpose_resp_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_repurpose_resp_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_vdev_repurpose_resp_cmd_fixed_param));
+	cmd->vdev_id = vdev_id;
+
+	buf_ptr += sizeof(wmi_vdev_repurpose_resp_cmd_fixed_param);
+
+	/* Fill TLV array header */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       num_repurpose_resp *
+		       sizeof(wmi_vdev_repurpose_response_tlv_param));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* Fill repurpose response TLVs */
+	for (i = 0; i < num_repurpose_resp; i++) {
+		wmi_vdev_repurpose_response_tlv_param *tlv =
+			(wmi_vdev_repurpose_response_tlv_param *)buf_ptr;
+
+		WMITLV_SET_HDR(
+			&tlv->tlv_header,
+			WMITLV_TAG_STRUC_wmi_vdev_repurpose_response_tlv_param,
+			WMITLV_GET_STRUCT_TLVLEN(
+				wmi_vdev_repurpose_response_tlv_param));
+
+		tlv->repurpose_vdev_id = repurpose_resp[i].repurpose_vdev_id;
+		tlv->status = repurpose_resp[i].status;
+
+		buf_ptr += sizeof(wmi_vdev_repurpose_response_tlv_param);
+	}
+
+	wmi_mtrace(WMI_VDEV_REPURPOSE_RESP_CMDID, vdev_id, 0);
+	status = wmi_unified_cmd_send(wmi_handle, buf, len,
+				      WMI_VDEV_REPURPOSE_RESP_CMDID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wmi_err("Failed to send vdev repurpose resp cmd: %d", status);
+		wmi_buf_free(buf);
+		return status;
+	}
+
+	wmi_debug("Sent vdev repurpose resp for vdev_id %d with %d TLVs",
+		  vdev_id, num_repurpose_resp);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void wmi_roam_smd_attach_tlv(struct wmi_unified *wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
 
 	ops->send_smd_roam_config = send_roam_smd_config_cmd_tlv;
+	ops->send_vdev_repurpose_resp_cmd = send_vdev_repurpose_resp_cmd_tlv;
 }
 
 #else

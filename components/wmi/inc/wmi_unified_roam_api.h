@@ -739,6 +739,22 @@ QDF_STATUS wmi_unified_get_roam_scan_ch_list(wmi_unified_t wmi_handle,
 QDF_STATUS wmi_unified_send_roam_smd_config(
 				wmi_unified_t wmi_handle,
 				struct wlan_roam_smd_config *params);
-#endif
-
+/**
+ * wmi_unified_vdev_repurpose_resp_cmd() - Send vdev repurpose response
+ *                                         to firmware
+ * @wmi_handle: WMI handle
+ * @vdev_id: VDEV ID
+ * @repurpose_resp: Array of vdev repurpose response TLVs
+ * @num_repurpose_resp: Number of repurpose response TLVs
+ *
+ * This function sends vdev repurpose response to firmware
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_vdev_repurpose_resp_cmd(
+				wmi_unified_t wmi_handle,
+				uint8_t vdev_id,
+				struct vdev_repurpose_params *repurpose_resp,
+				uint8_t num_repurpose_resp);
+#endif /* WLAN_FEATURE_11BN_SMD */
 #endif /* _WMI_UNIFIED_ROAM_API_H_ */

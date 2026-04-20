@@ -595,5 +595,21 @@ QDF_STATUS wmi_unified_send_roam_smd_config(wmi_unified_t wmi_handle,
 							     params);
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_unified_vdev_repurpose_resp_cmd(
+				wmi_unified_t wmi_handle,
+				uint8_t vdev_id,
+				struct vdev_repurpose_params *repurpose_resp,
+				uint8_t num_repurpose_resp)
+{
+	if (wmi_handle->ops->send_vdev_repurpose_resp_cmd)
+		return wmi_handle->ops->send_vdev_repurpose_resp_cmd(
+							wmi_handle,
+							vdev_id,
+							repurpose_resp,
+							num_repurpose_resp);
+
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 #endif

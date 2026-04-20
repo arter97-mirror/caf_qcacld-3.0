@@ -179,4 +179,16 @@ struct set_pcl_cmd_params {
 	uint8_t vdev_id;
 	struct wmi_pcl_chan_weights *weights;
 };
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * struct vdev_repurpose_params - VDEV repurpose response parameters
+ * @repurpose_vdev_id: VDEV ID to be repurposed
+ * @status: Status of the repurpose operation (0 is success)
+ */
+struct vdev_repurpose_params {
+	uint32_t repurpose_vdev_id;
+	uint32_t status;
+};
+#endif /* WLAN_FEATURE_11BN_SMD */
 #endif /* _WMI_UNIFIED_ROAM_PARAM_H_ */
