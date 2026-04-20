@@ -866,7 +866,8 @@ int wlan_hdd_cfg80211_nan_peer_params(struct wiphy *wiphy,
 	}
 
 	/* Validate vdev type */
-	if (adapter->device_mode != QDF_NAN_DISC_MODE) {
+	if (adapter->device_mode != QDF_NAN_DISC_MODE &&
+	    adapter->device_mode != QDF_NDI_MODE) {
 		hdd_err("Invalid vdev mode: %d", adapter->device_mode);
 		return -EINVAL;
 	}

@@ -248,6 +248,21 @@ int os_if_nan_process_peer_params(uint8_t vdev_id,
 				  struct wlan_objmgr_psoc *psoc,
 				  struct station_parameters *params,
 				  struct qdf_mac_addr *mac_addr);
+
+/**
+ * os_if_nan_ndi_peer_create() - Create NDI peer
+ * @vdev_id: vdev ID
+ * @psoc: pointer to psoc object
+ * @peer_mac: peer MAC address
+ *
+ * This function creates an NDI peer by calling the UCFG layer which
+ * invokes the existing lim_add_ndi_peer_converged callback.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_ndi_peer_create(uint8_t vdev_id,
+			      struct wlan_objmgr_psoc *psoc,
+			      struct qdf_mac_addr *peer_mac);
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**

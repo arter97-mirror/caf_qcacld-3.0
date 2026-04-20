@@ -162,6 +162,7 @@ struct nan_cfg_params {
  * @nan_local_sched_ctx: NAN local schedule request context
  * @nan_peer_sched_ctx: NAN peer schedule request context
  * @nan_peer_params_ctx: NAN peer params request context
+ * @ndp_peer_create_ctx: NDI peer create request context
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -188,6 +189,7 @@ struct nan_psoc_priv_obj {
 	void *nan_local_sched_ctx;
 	void *nan_peer_sched_ctx;
 	void *nan_peer_params_ctx;
+	void *ndp_peer_create_ctx;
 #endif
 };
 
@@ -640,6 +642,20 @@ QDF_STATUS nan_get_disable_req_info(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id);
 
+/**
+ * nan_add_peer_in_migrated_addr_list() - add peer address in the migrated
+ * list
+ * @psoc: pointer to psoc object
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac_addr);
+
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 /**
  * nan_is_fw_support_standard_mode() - wrapper API for function
@@ -669,6 +685,22 @@ QDF_STATUS nan_set_peer_schedule(struct nan_peer_sched_params *params);
  * Return: QDF_STATUS
  */
 QDF_STATUS nan_req_peer_params(struct nan_peer_params_req *req);
+
+/**
+ * nan_ndi_peer_create_req() - Process NDI peer create request
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev ID
+ * @peer_mac: peer MAC address
+ *
+ * This function processes the NDI peer create request by calling the
+ * registered callback (lim_add_ndi_peer_converged) which handles the
+ * actual peer creation including WMI command to firmware.
+ *
+ * Return: QDF_STATUS - Success or appropriate error code
+ */
+QDF_STATUS nan_ndi_peer_create_req(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac);
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

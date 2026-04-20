@@ -36720,15 +36720,20 @@ static bool wlan_hdd_cfg80211_handle_nan_peer(struct wiphy *wiphy,
 					      struct qdf_mac_addr *mac_addr)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	if (adapter->device_mode == QDF_NAN_DISC_MODE) {
-		*errno = wlan_hdd_cfg80211_nan_peer_params(wiphy,
-							   &adapter->wdev,
-							   params, mac_addr);
-		return true;
-	}
+	if (adapter->device_mode != QDF_NAN_DISC_MODE &&
+	    adapter->device_mode != QDF_NDI_MODE)
+		return false;
 
-	return false;
+	if (adapter->device_mode == QDF_NDI_MODE)
+		os_if_nan_ndi_peer_create(adapter->deflink->vdev_id,
+					  hdd_ctx->psoc, mac_addr);
+
+	*errno = wlan_hdd_cfg80211_nan_peer_params(wiphy, &adapter->wdev,
+						   params, mac_addr);
+
+	return true;
 }
 #else
 static inline bool wlan_hdd_cfg80211_handle_nan_peer(

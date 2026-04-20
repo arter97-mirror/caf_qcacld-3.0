@@ -1939,6 +1939,15 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 	return nan_cache_disable_req_info(psoc, value);
 }
 
+QDF_STATUS
+ucfg_nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
+					uint8_t nan_vdev_id,
+					struct qdf_mac_addr *peer_mac_addr)
+{
+	return nan_add_peer_in_migrated_addr_list(psoc, nan_vdev_id,
+						  peer_mac_addr);
+}
+
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
 bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
@@ -2075,5 +2084,19 @@ void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
 			   void *caps)
 {
 	nan_get_phy_caps(psoc, (struct nan_phy_caps *)caps);
+}
+
+QDF_STATUS ucfg_nan_ndi_peer_create(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct qdf_mac_addr *peer_mac)
+{
+	return nan_ndi_peer_create_req(psoc, vdev_id, peer_mac);
+}
+
+bool ucfg_nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *peer_mac_addr,
+				       enum QDF_OPMODE opmode)
+{
+	return nan_is_peer_exist_for_opmode(psoc, peer_mac_addr, opmode);
 }
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

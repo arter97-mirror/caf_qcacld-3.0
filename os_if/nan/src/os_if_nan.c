@@ -2131,6 +2131,45 @@ ndp_end_ind_nla_failed:
 	qdf_mem_free(ndp_instance_array);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * os_if_nan_ndi_peer_create_rsp_signal() - Signal completion of a pending
+ * NDI peer create request
+ * @vdev: vdev object on which the new NDP peer was indicated
+ *
+ * This function signals completion of the waiting thread in
+ * os_if_nan_ndi_peer_create() once firmware indicates the NDI peer has
+ * actually been created.
+ *
+ * Return: none
+ */
+static void os_if_nan_ndi_peer_create_rsp_signal(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct osif_request *request;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return;
+	}
+
+	request = osif_request_get(nan_get_ndp_peer_create_ctx(psoc));
+	if (!request) {
+		osif_debug("Obsolete request");
+		return;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+#else
+static inline void
+os_if_nan_ndi_peer_create_rsp_signal(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 /**
  * os_if_new_peer_ind_handler() - NDP new peer indication handler
  * @vdev: vdev object
@@ -2175,6 +2214,8 @@ static void os_if_new_peer_ind_handler(struct wlan_objmgr_vdev *vdev,
 	ucfg_nan_set_active_peers(vdev, active_peers);
 	ucfg_nan_cache_ndp_peer_mac_addr(psoc, &peer_ind->peer_mac_addr);
 	osif_debug("num_peers: %d", active_peers);
+
+	os_if_nan_ndi_peer_create_rsp_signal(vdev);
 }
 
 /**
@@ -4328,6 +4369,102 @@ end:
 	psoc_priv->nan_peer_params_ctx = NULL;
 	qdf_mem_free(ucfg_params);
 
+	return ret;
+}
+
+int os_if_nan_ndi_peer_create(uint8_t vdev_id,
+			      struct wlan_objmgr_psoc *psoc,
+			      struct qdf_mac_addr *peer_mac)
+{
+	QDF_STATUS status;
+	static const struct osif_request_params req_params = {
+		.priv_size = 0,
+		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
+	};
+	struct osif_request *request = NULL;
+	int ret;
+
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return -EINVAL;
+	}
+
+	if (!peer_mac) {
+		osif_err("peer_mac is NULL");
+		return -EINVAL;
+	}
+
+	osif_debug("Creating NDI peer: vdev_id=%u, peer_mac=" QDF_MAC_ADDR_FMT,
+		   vdev_id, QDF_MAC_ADDR_REF(peer_mac->bytes));
+
+	/*
+	 * When NMI == NDI the peer already exists on the NAN discovery vdev.
+	 * Delete it synchronously here, before posting the NDI peer-create
+	 * request, so firmware has fully processed the delete before the
+	 * create arrives -- avoiding the race that arises when both happen
+	 * inside the WMA/scheduler context.
+	 */
+	if (ucfg_nan_is_peer_exist_for_opmode(psoc, peer_mac,
+					      QDF_NAN_DISC_MODE)) {
+		struct wlan_objmgr_peer *nmi_peer;
+		uint8_t nmi_vdev_id;
+
+		nmi_peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac->bytes,
+						       WLAN_NAN_ID);
+		if (!nmi_peer) {
+			osif_err("NMI peer " QDF_MAC_ADDR_FMT " not in objmgr",
+				 QDF_MAC_ADDR_REF(peer_mac->bytes));
+			return -EINVAL;
+		}
+		nmi_vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(nmi_peer));
+		wlan_objmgr_peer_release_ref(nmi_peer, WLAN_NAN_ID);
+
+		osif_debug("NMI peer " QDF_MAC_ADDR_FMT " on disc vdev %d",
+			   QDF_MAC_ADDR_REF(peer_mac->bytes), nmi_vdev_id);
+
+		status = ucfg_nan_send_delete_pasn_peer(psoc, nmi_vdev_id,
+							peer_mac);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			osif_err("Failed to delete NMI peer before NDI create, status: %d",
+				 status);
+			return qdf_status_to_os_return(status);
+		}
+
+		status = ucfg_nan_add_peer_in_migrated_addr_list(psoc,
+								 nmi_vdev_id,
+								 peer_mac);
+		if (QDF_IS_STATUS_ERROR(status))
+			osif_err("Failed to record migration " QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(peer_mac->bytes));
+	}
+
+	status = ucfg_nan_ndi_peer_create(psoc, vdev_id, peer_mac);
+	if (status == QDF_STATUS_E_ALREADY)
+		return 0;
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	/* Allocate request for waiting on response */
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		osif_err("Request allocation failure");
+		return -ENOMEM;
+	}
+
+	nan_set_ndp_peer_create_ctx(psoc, osif_request_cookie(request));
+
+	/* Wait for response */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("NAN peer params request timed out: %d", ret);
+		goto end;
+	}
+
+	osif_debug("NDI peer created successfully");
+	ret = 0;
+end:
+	osif_request_put(request);
+	nan_set_ndp_peer_create_ctx(psoc, NULL);
 	return ret;
 }
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */

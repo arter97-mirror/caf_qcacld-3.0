@@ -165,7 +165,7 @@ QDF_STATUS nan_get_max_pairing_sessions(struct wlan_objmgr_psoc *psoc,
  *
  * Return: QDF status
  */
-static QDF_STATUS
+QDF_STATUS
 nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id,
 				   struct qdf_mac_addr *peer_mac_addr)
@@ -1343,6 +1343,62 @@ static QDF_STATUS nan_handle_peer_params_rsp(struct nan_peer_params_rsp *rsp)
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 	return status;
+}
+
+/**
+ * nan_ndi_peer_create_req() - Process NDI peer create request
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev ID
+ * @peer_mac: peer MAC address
+ *
+ * This function processes the NDI peer create request by calling the
+ * registered callback (lim_add_ndi_peer_converged) which handles the
+ * actual peer creation including WMI command to firmware.
+ *
+ * Return: QDF_STATUS - Success or appropriate error code
+ */
+QDF_STATUS nan_ndi_peer_create_req(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	QDF_STATUS status;
+
+	if (!peer_mac) {
+		nan_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!psoc) {
+		nan_err("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!psoc_nan_obj->cb_obj.add_ndi_peer) {
+		nan_err("add_ndi_peer callback is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	nan_debug("Creating NDI peer: " QDF_MAC_ADDR_FMT " vdev_id: %d",
+		  QDF_MAC_ADDR_REF(peer_mac->bytes), vdev_id);
+
+	/* Call the existing callback which invokes
+	 * lim_add_ndi_peer_converged
+	 */
+	status = psoc_nan_obj->cb_obj.add_ndi_peer(vdev_id, *peer_mac);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to add NDI peer: %d", status);
+		return status;
+	}
+
+	nan_debug("NDI peer created successfully");
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static inline QDF_STATUS

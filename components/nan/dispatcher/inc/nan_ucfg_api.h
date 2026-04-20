@@ -649,6 +649,21 @@ bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value);
 
+/**
+ * ucfg_nan_add_peer_in_migrated_addr_list() - record that a NAN peer has
+ * migrated from the NAN Discovery vdev to an NDI vdev, without caching the
+ * NDI vdev id on the (already-deleted) NAN Discovery peer object
+ * @psoc: pointer to psoc object
+ * @nan_vdev_id: NAN Discovery vdev id the peer migrated from
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
+					uint8_t nan_vdev_id,
+					struct qdf_mac_addr *peer_mac_addr);
+
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 /**
  * ucfg_nan_set_local_schedule() - Set NAN local schedule
@@ -736,6 +751,34 @@ QDF_STATUS ucfg_nan_set_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev,
  * Return: cached NAN peer params rsp status
  */
 uint32_t ucfg_nan_get_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_nan_ndi_peer_create() - Create NDI peer
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev ID
+ * @peer_mac: peer MAC address
+ *
+ * This function creates an NDI peer by calling the NAN core layer
+ * which invokes the existing lim_add_ndi_peer_converged callback.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_nan_ndi_peer_create(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct qdf_mac_addr *peer_mac);
+
+/**
+ * ucfg_nan_is_peer_exist_for_opmode() - wrapper for
+ * nan_is_peer_exist_for_opmode
+ * @psoc: pointer to PSOC object
+ * @peer_mac_addr: peer MAC address
+ * @opmode: vdev OP mode to match
+ *
+ * Return: true if the peer exists on a vdev of the given opmode, else false
+ */
+bool ucfg_nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *peer_mac_addr,
+				       enum QDF_OPMODE opmode);
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 #ifdef NDP_TX_BW_FLOW_CTRL
