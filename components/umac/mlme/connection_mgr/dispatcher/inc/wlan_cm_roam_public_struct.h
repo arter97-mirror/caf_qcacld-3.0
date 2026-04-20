@@ -1506,6 +1506,23 @@ struct wlan_roam_btm_config {
 	uint32_t btm_candidate_min_score;
 };
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * struct wlan_roam_smd_config - SMD config params
+ * @vdev_id: VDEV on which the parameters should be applied
+ * @prefer_mode: The mode used to control SMD transition (trade-off between
+ *	low latency and packet loss)
+ * @flags: Control flags for SMD configuration
+ * @manual_conf: Manual configuration options
+ */
+struct wlan_roam_smd_config {
+	uint8_t vdev_id;
+	uint32_t prefer_mode;
+	uint32_t flags;
+	uint32_t manual_conf;
+};
+#endif
+
 /**
  * struct wlan_roam_neighbor_report_params -neighbour report params
  * @time_offset: time offset after 11k offload command to trigger a neighbor

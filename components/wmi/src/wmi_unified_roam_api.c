@@ -585,4 +585,15 @@ wmi_extract_roam_candidate_frame_event(wmi_unified_t wmi_handle, uint8_t *event,
 								  len, data);
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef WLAN_FEATURE_11BN_SMD
+QDF_STATUS wmi_unified_send_roam_smd_config(wmi_unified_t wmi_handle,
+					    struct wlan_roam_smd_config *params)
+{
+	if (wmi_handle->ops->send_smd_roam_config)
+		return wmi_handle->ops->send_smd_roam_config(wmi_handle,
+							     params);
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 #endif

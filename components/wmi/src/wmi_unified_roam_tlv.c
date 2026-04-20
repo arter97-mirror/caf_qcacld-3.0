@@ -6616,6 +6616,64 @@ static QDF_STATUS send_btm_config_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * send_roam_smd_config_cmd_tlv() - Send wmi cmd for SMD config
+ * @wmi_handle: wmi handle
+ * @params: pointer to wlan_roam_smd_config
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS send_roam_smd_config_cmd_tlv(
+				wmi_unified_t wmi_handle,
+				struct wlan_roam_smd_config *params)
+{
+	wmi_roam_smd_config_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_roam_smd_config_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_roam_smd_config_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+				wmi_roam_smd_config_cmd_fixed_param));
+	cmd->vdev_id = params->vdev_id;
+	cmd->prefer_mode = params->prefer_mode;
+	cmd->flags = params->flags;
+	cmd->manual_conf = params->manual_conf;
+
+	wmi_debug("RSO_CFG: vdev_id:%u prefer_mode:%u flags:0x%x manual:0x%x",
+		  cmd->vdev_id, cmd->prefer_mode, cmd->flags, cmd->manual_conf);
+
+	wmi_mtrace(WMI_ROAM_SMD_CONFIG_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_ROAM_SMD_CONFIG_CMDID)) {
+		wmi_err("Failed to send WMI_ROAM_SMD_CONFIG_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void wmi_roam_smd_attach_tlv(struct wmi_unified *wmi_handle)
+{
+	struct wmi_ops *ops = wmi_handle->ops;
+
+	ops->send_smd_roam_config = send_roam_smd_config_cmd_tlv;
+}
+
+#else
+static void wmi_roam_smd_attach_tlv(struct wmi_unified *wmi_handle)
+{
+}
+#endif
+
 /**
  * send_roam_bss_load_config_tlv() - send roam load bss trigger configuration
  * @wmi_handle: wmi handle
@@ -7031,6 +7089,7 @@ void wmi_roam_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_roam_preauth_status = send_roam_preauth_status_tlv;
 	ops->extract_roam_event = extract_roam_event_tlv;
 
+	wmi_roam_smd_attach_tlv(wmi_handle);
 	wmi_roam_mlo_attach_tlv(wmi_handle);
 	wmi_lfr_subnet_detection_attach_tlv(wmi_handle);
 	wmi_rssi_monitor_attach_tlv(wmi_handle);

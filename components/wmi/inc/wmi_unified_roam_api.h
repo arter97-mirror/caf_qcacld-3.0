@@ -725,4 +725,20 @@ QDF_STATUS wmi_unified_invoke_neighbor_report_cmd(
 QDF_STATUS wmi_unified_get_roam_scan_ch_list(wmi_unified_t wmi_handle,
 					     uint8_t vdev_id);
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wmi_unified_send_roam_smd_config() - Send SMD roam configuration to firmware
+ * @wmi_handle: WMI handle
+ * @params: SMD roam configuration parameters
+ *
+ * This function sends the SMD roam configuration command to firmware to enable
+ * or disable SMD roaming features post-connection.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS wmi_unified_send_roam_smd_config(
+				wmi_unified_t wmi_handle,
+				struct wlan_roam_smd_config *params);
+#endif
+
 #endif /* _WMI_UNIFIED_ROAM_API_H_ */
