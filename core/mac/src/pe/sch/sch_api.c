@@ -676,9 +676,11 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 
 	MTRACE(mac_trace_msg_tx(mac, pe_session->peSessionId, msgQ.type));
 	retCode = wma_post_ctrl_msg(mac, &msgQ);
-	if (QDF_STATUS_SUCCESS != retCode)
+	if (QDF_STATUS_SUCCESS != retCode) {
 		pe_err("Posting SEND_BEACON_REQ to HAL failed, reason=%X",
 			retCode);
+		qdf_mem_free(beaconParams);
+	}
 
 	if (QDF_IS_STATUS_SUCCESS(retCode)) {
 		if (wlan_vdev_mlme_is_mlo_ap(pe_session->vdev))
