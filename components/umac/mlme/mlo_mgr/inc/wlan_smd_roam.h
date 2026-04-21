@@ -18,6 +18,13 @@
 
 #ifdef WLAN_FEATURE_11BN_SMD
 
+/* SMD removed link flag bit position for link_status_flags in
+ * struct mlo_link_info
+ * If link is deleted from setup links by SMD roaming, the link
+ * will be handled by similar behaviour as link removed.
+ */
+#define LS_SMD_LNK_REMOVE_BIT 1
+
 /**
  * smd_fw_roam_start - Handler for SMD roam start event handler
  *
@@ -97,6 +104,17 @@ bool
 smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx);
 
 /**
+ * smd_is_roaming_in_progress() - Check if SMD roaming is ongoing for a vdev
+ * @vdev: VDEV object manager
+ *
+ * Vdev-based wrapper around smd_roam_in_progress().
+ *
+ * Return: true if SMD roaming is in progress, false otherwise
+ */
+bool
+smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
+
+/**
  * smd_uhr_link_recfg_send_request_frame() - API to send Link Recfg request
  * @recfg_ctx: Link reconfiguration context
  * @req: Link reconfiguration state request
@@ -112,10 +130,25 @@ smd_uhr_link_recfg_send_request_frame(
 		struct mlo_link_recfg_state_req *req);
 
 /**
- * smd_st_prep_response_received() - API to handle Link Recfg rsp
+ * smd_find_first_accepted_link() - Find first accepted link from ST Prep response
  * @recfg_ctx: Link reconfiguration context
- * @recfg_resp_data: Link reconfiguration resp data
- * @event_data_len: Event data length
+ * @tran: Link reconfiguration state transition
+ *
+ * This function iterates through the add_link_info array in the transition
+ * request and returns the first link with status_code == STATUS_SUCCESS.
+ * This indicates the link was accepted by the target AP in the M2 response.
+ *
+ * Return: Pointer to first accepted wlan_mlo_link_recfg_bss_info, or NULL if
+ *         no accepted links found
+ */
+struct wlan_mlo_link_recfg_bss_info *
+smd_find_first_accepted_link(struct mlo_link_recfg_context *recfg_ctx,
+			     struct mlo_link_recfg_state_tran *tran);
+
+/**
+ * smd_st_prep_response_received() - API to handle UHR Link Recfg rsp
+ * @recfg_ctx: Link reconfiguration context
+ * @tran: Link reconfiguration state tran pointer
  *
  * API to handle UHR Link Reconfiguration ST prep response
  *
@@ -124,14 +157,152 @@ smd_uhr_link_recfg_send_request_frame(
  */
 QDF_STATUS
 smd_st_prep_response_received(struct mlo_link_recfg_context *recfg_ctx,
-			      struct link_recfg_rx_rsp *recfg_resp_data,
-			      uint16_t event_data_len);
+			      struct mlo_link_recfg_state_tran *tran);
+
+/**
+ * smd_link_recfg_complete() - API for SMD link recfg complete
+ * @recfg_ctx: Link reconfiguration context
+ * @success: boolean flag
+ *
+ * API for handle SMD UHR Link Reconfiguration complete
+ *
+ *
+ * Return: void
+ */
+void
+smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
+			bool success);
+
+/**
+ * smd_link_recfg_del_link_completed() - API for SMD link recfg del complete
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * API for SMD link reconfig del link complete handler
+ *
+ *
+ * Return: void
+ */
+void
+smd_link_recfg_del_link_completed(struct mlo_link_recfg_context *recfg_ctx);
+
+/**
+ * smd_host_link_switch_validate_request() - API to validate
+ * SMD roaming link switch
+ * @vdev: Vdev pointer
+ * @req: Link switch req pointer
+ *
+ * API to validate SMD roaming host triggered link switch
+ *
+ * Return: QDF_STATUS success or failure
+ */
+
+QDF_STATUS
+smd_host_link_switch_validate_request(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_mlo_link_switch_req *req);
+
+/**
+ * smd_get_prepared_ap_link_info() - Get the pointer of link info matching
+ * AP mac addr/bssid.
+ * @vdev: VDEV object manager.
+ * @ap_link_addr: Pointer to AP BSSID MAC address.
+ *
+ * Returns the pointer to link info data structure matching with AP mac address
+ * field.
+ *
+ * Return: Valid pointer on match or else %NULL
+ */
+struct mlo_link_info *
+smd_get_prepared_ap_link_info(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *ap_link_addr);
+
+/**
+ * smd_get_prep_ap_link_info() - Wrapper to get link info for a link switch req.
+ * @vdev: VDEV object manager.
+ * @req: Pointer to link switch request.
+ *
+ * Return: Valid pointer on match or else %NULL
+ */
+struct mlo_link_info *
+smd_get_prep_ap_link_info(struct wlan_objmgr_vdev *vdev,
+			  struct wlan_mlo_link_switch_req *req);
+
+/**
+ * smd_roam_prep_complete() - API to send
+ * SMD roam status command
+ * @recfg_ctx: Link Recfg ctx pointer
+ * @req: Link recfg state req pointer
+ *
+ * API to send SMD roam status command
+ *
+ * Return: QDF_STATUS success or failure
+ */
+QDF_STATUS
+smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
+		       struct mlo_link_recfg_state_req *req);
+
+bool
+smd_link_recfg_has_active_vdev_for_add_link(
+				struct mlo_link_recfg_context *recfg_ctx,
+				struct mlo_link_recfg_state_req *req,
+				struct wlan_mlo_link_switch_req *link_sw_req);
 #else
+static inline bool
+smd_link_recfg_has_active_vdev_for_add_link(
+				struct mlo_link_recfg_context *recfg_ctx,
+				struct mlo_link_recfg_state_req *req,
+				struct wlan_mlo_link_switch_req *link_sw_req)
+{
+	return false;
+}
 
 static inline QDF_STATUS
+smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
+		       struct mlo_link_recfg_state_req *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline struct mlo_link_info *
+smd_get_prepared_ap_link_info(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *ap_link_addr)
+{
+	return NULL;
+}
+
+static inline struct mlo_link_info *
+smd_get_prep_ap_link_info(struct wlan_objmgr_vdev *vdev,
+			  struct wlan_mlo_link_switch_req *req)
+{
+	return NULL;
+}
+
+static inline QDF_STATUS
+smd_host_link_switch_validate_request(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_mlo_link_switch_req *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+smd_link_recfg_del_link_completed(struct mlo_link_recfg_context *recfg_ctx)
+{
+}
+
+static inline void
+smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
+			bool success)
+{
+}
+
+static inline struct wlan_mlo_link_recfg_bss_info *
+smd_find_first_accepted_link(struct mlo_link_recfg_context *recfg_ctx,
+			     struct mlo_link_recfg_state_tran *tran)
+{
+	return NULL;
+}
+static inline QDF_STATUS
 smd_st_prep_response_received(struct mlo_link_recfg_context *recfg_ctx,
-			      struct link_recfg_rx_rsp *recfg_resp_data,
-			      uint16_t event_data_len)
+			      struct mlo_link_recfg_state_tran *tran)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -146,6 +317,12 @@ smd_uhr_link_recfg_send_request_frame(
 
 static inline bool
 smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx)
+{
+	return false;
+}
+
+static inline bool
+smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }
@@ -180,5 +357,5 @@ smd_link_recfg_assign_self_link_addr(
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif /* WLAN_FEATURE_11BN */
+#endif /* WLAN_FEATURE_11BN_SMD */
 #endif
