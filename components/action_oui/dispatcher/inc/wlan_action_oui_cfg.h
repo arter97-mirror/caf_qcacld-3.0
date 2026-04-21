@@ -999,6 +999,67 @@
 	"Used to specify action OUIs to control Aux listen configuration")
 
 /*
+ * Macros for default NSS list type
+ */
+#define ACTION_OUI_NSS_LIST_DENYLIST 0
+#define ACTION_OUI_NSS_LIST_ALLOWLIST 1
+
+/*
+ * <cfg>
+ * gActionOUIDefaultNSSListType - Used to specify default NSS list type
+ * (0 for Blacklist or 1 for Whitelist)
+ *
+ * This CFG is used to specify whether the default NSS list should be treated
+ * as a denylist (ACTION_OUI_NSS_LIST_DENYLIST = 0) or
+ * allowlist (ACTION_OUI_NSS_LIST_ALLOWLIST = 1).
+ * If host does not receive any vendor command or if host receives command to
+ * clear the NSS list then this default
+ * list type will be used along with gActionOUIDefaultNSSList.
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: Internal
+ *
+ * </cfg>
+ */
+#define CFG_ACTION_OUI_DEFAULT_NSS_LIST_TYPE CFG_UINT( \
+	"gActionOUIDefaultNSSListType", \
+	ACTION_OUI_NSS_LIST_DENYLIST, \
+	ACTION_OUI_NSS_LIST_ALLOWLIST, \
+	ACTION_OUI_NSS_LIST_ALLOWLIST, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Used to specify default NSS list type (0=BL/1=WL)")
+
+/*
+ * <cfg>
+ * gActionOUIDefaultNSSList - Used to specify default NSS list OUIs
+ *
+ * This CFG is used to specify default AP OUIs that will be used along with
+ * gActionOUIDefaultNSSListType (which specifies whether this list is a
+ * denylist or allowlist using ACTION_OUI_NSS_LIST_DENYLIST
+ * or ACTION_OUI_NSS_LIST_ALLOWLIST).
+ * If host does not receive any vendor command or if host receives command to
+ * clear the NSS list then this default list will be used.
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ * If no OUI set (empty string), then no default list is applied.
+ *
+ * Special value "ffffff 00 00" means ALL APs will be matched.
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: Internal
+ *
+ * </cfg>
+ */
+#define CFG_ACTION_OUI_DEFAULT_NSS_LIST CFG_STRING( \
+	"gActionOUIDefaultNSSList", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"ffffff 00 00", \
+	"Used to specify default NSS list OUIs")
+
+	/*
  * <ini>
  * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS - Used to disable Dynamic SMPS
  * capability for specified AP.
@@ -1223,6 +1284,8 @@
 	CFG(CFG_ACTION_OUI_DISABLE_BFORMEE) \
 	CFG(CFG_ACTION_OUI_LIMIT_BW) \
 	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
+	CFG(CFG_ACTION_OUI_DEFAULT_NSS_LIST_TYPE) \
+	CFG(CFG_ACTION_OUI_DEFAULT_NSS_LIST) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
 	CFG(CFG_ACTION_OUI_EXT_MLD_CAP_OP) \
 	CFG(CFG_ACTION_OUI_ENABLE_AMSDU_2G) \

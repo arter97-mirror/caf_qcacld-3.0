@@ -128,12 +128,38 @@ action_oui_destroy(struct action_oui_psoc_priv *psoc_priv)
 	}
 }
 
+/**
+ * action_oui_get_nss_action_id() - Get NSS action ID based on list type
+ *
+ * This function reads the NSS list type configuration and returns the
+ * appropriate action ID (ALLOW or DISALLOW).
+ *
+ * Return: enum action_oui_id
+ */
+static enum action_oui_id action_oui_get_nss_action_id(void)
+{
+	uint32_t nss_list_type;
+
+	nss_list_type = cfg_default(CFG_ACTION_OUI_DEFAULT_NSS_LIST_TYPE);
+	if (nss_list_type == ACTION_OUI_NSS_LIST_ALLOWLIST)
+		return ACTION_OUI_ALLOW_NSS_GREATER_THAN_2;
+	else if (nss_list_type == ACTION_OUI_NSS_LIST_DENYLIST)
+		return ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2;
+
+	/* Default to allow if invalid */
+	return ACTION_OUI_ALLOW_NSS_GREATER_THAN_2;
+}
+
 static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 {
 	struct wlan_objmgr_psoc *psoc = psoc_priv->psoc;
+	enum action_oui_id nss_action_id;
 
 	psoc_priv->is_action_oui_v2_enabled =
 		wlan_action_oui_v2_enabled(psoc_priv->psoc);
+
+	/* Get NSS action ID based on list type configuration */
+	nss_action_id = action_oui_get_nss_action_id();
 
 	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_CONNECT_1X1],
 		      cfg_get(psoc, CFG_ACTION_OUI_CONNECT_1X1),
@@ -239,7 +265,9 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 		      [ACTION_OUI_EARLY_RX],
 		      cfg_get(psoc, CFG_ACTION_OUI_EARLY_RX),
 		      ACTION_OUI_MAX_STR_LEN);
-
+	qdf_str_lcopy(psoc_priv->action_oui_str[nss_action_id],
+		      cfg_default(CFG_ACTION_OUI_DEFAULT_NSS_LIST),
+		      ACTION_OUI_MAX_STR_LEN);
 	if (psoc_priv->is_action_oui_v2_enabled) {
 		qdf_str_lcopy(psoc_priv->action_oui_str
 			      [ACTION_OUI_DISABLE_DYNAMIC_SMPS],
