@@ -66,6 +66,12 @@ LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
+# Prime Target DDK support
+ifeq ($(TARGET_BOARD_PLATFORM), prime)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
 # Auto Gen5 Target DDK support
 ifeq ($(TARGET_BOARD_PLATFORM), gen5)
 LOCAL_MODULE_DDK_BUILD := true
