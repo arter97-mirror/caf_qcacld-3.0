@@ -61,6 +61,7 @@
 #include "wlan_ipa_ucfg_api.h"
 #include "wlan_hdd_stats.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include "wma_api.h"
 
 #ifdef TX_MULTIQ_PER_AC
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
@@ -560,6 +561,211 @@ hdd_drop_tx_packet_on_ftm(struct sk_buff *skb)
 }
 #endif
 
+#ifdef WLAN_FEATURE_ICMP_ITO_MGMT
+/* Timeout in milliseconds to rollback power save mode after ICMP inactivity */
+#define HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS 2000
+
+/**
+ * hdd_icmp_ito_restore_timer_cb() - Timer callback to restore original ITO
+ * @context: vdev_id stored as uintptr_t
+ *
+ * This callback is invoked when no ICMP request is received for 2 seconds
+ * after the ITO was temporarily set to 2s. It restores the original ITO
+ * value.
+ *
+ * Return: None
+ */
+void hdd_icmp_ito_restore_timer_cb(void *context)
+{
+	/*
+	 * Use vdev_id (stored as uintptr_t) instead of a raw adapter pointer
+	 * to avoid use-after-free: the adapter may be freed while a pending
+	 * callback is waiting to run. Look up the adapter safely via the
+	 * object-manager-protected adapter list.
+	 */
+	uint8_t vdev_id = (uint8_t)(uintptr_t)context;
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
+	struct wlan_objmgr_vdev *vdev;
+	uint64_t now, elapsed_us;
+	uint16_t saved_ito;
+	QDF_STATUS status;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info)
+		return;
+
+	adapter = link_info->adapter;
+	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_PMO_ID);
+	if (!vdev) {
+		hdd_err("ICMP PS rollback: failed to get vdev");
+		return;
+	}
+	/* qdf_get_monotonic_boottime() returns microseconds */
+	now = qdf_get_monotonic_boottime();
+	qdf_spin_lock(&adapter->icmp_ps_last_req_time_lock);
+	elapsed_us = now - adapter->icmp_ps_last_req_time;
+	saved_ito = adapter->icmp_ps_saved_ito;
+	qdf_spin_unlock(&adapter->icmp_ps_last_req_time_lock);
+
+	/*
+	 * If a new ICMP request arrived within the rollback window, re-arm
+	 * the timer for the full timeout to avoid ITO switching mid-session.
+	 * Only rollback when there has been no ICMP activity for the full
+	 * timeout period.
+	 */
+	if (elapsed_us < (uint64_t)HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS * 1000ULL) {
+		qdf_mc_timer_start(&adapter->icmp_ito_restore_timer,
+				   HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
+		return;
+	}
+
+	hdd_debug("ICMP PS rollback: restoring original ITO for vdev %d",
+		  adapter->deflink->vdev_id);
+
+	/* Restore original ITO; PS mode stays
+	 * PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED
+	 */
+	if (saved_ito) {
+		status = wma_set_power_config_ito(adapter->deflink->vdev_id, saved_ito);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_debug("ICMP PS rollback: restored ito=%u for vdev %d",
+				  saved_ito, adapter->deflink->vdev_id);
+			qdf_spin_lock(&adapter->icmp_ps_last_req_time_lock);
+			adapter->icmp_ps_saved_ito = 0;
+			qdf_spin_unlock(&adapter->icmp_ps_last_req_time_lock);
+			qdf_atomic_set(&adapter->icmp_ito_changed, 0);
+		} else {
+			hdd_err("ICMP PS rollback: failed to restore ITO (%d), retry next ICMP",
+				status);
+			qdf_spin_lock(&adapter->icmp_ps_last_req_time_lock);
+			adapter->icmp_ps_saved_ito = 0;
+			qdf_spin_unlock(&adapter->icmp_ps_last_req_time_lock);
+			qdf_atomic_set(&adapter->icmp_ito_changed, 0);
+		}
+	}
+
+	/* Timer has fired; the timer framework already stopped it.
+	 * Do not call qdf_mc_timer_stop() from within the callback —
+	 * the timer is already in STOPPED state when the callback runs,
+	 * and calling stop() here would be a no-op at best or corrupt
+	 * the internal timer state at worst.
+	 */
+	qdf_atomic_set(&adapter->icmp_ito_changed, 0);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
+}
+
+/**
+ * hdd_handle_icmp_ps_management() - Handle ICMP-based ITO management
+ * @adapter: pointer to hdd adapter
+ * @skb: pointer to OS packet (sk_buff)
+ *
+ * When CFG_PMO_POWERSAVE_MODE is PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED
+ * and an ICMP request is detected, temporarily set ITO to 2s to keep the
+ * link responsive. The PS mode itself stays
+ * PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED.
+ * The original ITO is restored after 2 seconds of ICMP inactivity via the
+ * rollback timer.
+ *
+ * Return: None
+ */
+static void hdd_handle_icmp_ps_management(struct hdd_adapter *adapter,
+					  struct sk_buff *skb)
+{
+	struct hdd_context *hdd_ctx_icmp;
+	QDF_STATUS timer_status;
+	QDF_STATUS ito_status;
+
+	if (!((adapter->device_mode == QDF_STA_MODE ||
+	       adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
+	      adapter->icmp_ito_timer_initialized &&
+	      QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ICMP &&
+	      qdf_nbuf_data_is_icmpv4_req((qdf_nbuf_t)skb)))
+		return;
+
+	hdd_ctx_icmp = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx_icmp ||
+	    ucfg_pmo_get_default_power_save_mode(hdd_ctx_icmp->psoc) !=
+	    PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED)
+		return;
+
+	if (!qdf_atomic_read(&adapter->icmp_ito_changed)) {
+		struct pmo_ps_params curr_ps = {0};
+		struct wlan_objmgr_vdev *vdev;
+
+		hdd_debug("ICMP req: setting ITO to %dms for vdev %d",
+			  HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS,
+			  adapter->deflink->vdev_id);
+
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_PMO_ID);
+		if (!vdev) {
+			hdd_err("ICMP PS: failed to get vdev, skipping ITO change");
+			return;
+		}
+		/* Save original ITO from ucfg layer */
+		ucfg_pmo_get_ps_params(vdev, &curr_ps);
+		adapter->icmp_ps_saved_ito = curr_ps.ps_ito;
+
+		/*
+		 * Start the rollback timer BEFORE changing ITO. If the timer
+		 * fails to start, keep the original ITO unchanged to avoid
+		 * leaving ITO permanently changed with no rollback path.
+		 */
+		qdf_spin_lock_bh(&adapter->icmp_ps_last_req_time_lock);
+		adapter->icmp_ps_last_req_time = qdf_get_monotonic_boottime();
+		qdf_spin_unlock_bh(&adapter->icmp_ps_last_req_time_lock);
+
+		timer_status = qdf_mc_timer_start(&adapter->icmp_ito_restore_timer,
+						  HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS);
+		if (QDF_IS_STATUS_ERROR(timer_status)) {
+			hdd_err("ICMP PS: rollback timer start failed (%d), keeping ITO for vdev %d",
+				timer_status, adapter->deflink->vdev_id);
+			adapter->icmp_ps_saved_ito = 0;
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
+			return;
+		}
+
+		/* Timer started successfully; set ITO to 2s */
+		ito_status = wma_set_power_config_ito(adapter->deflink->vdev_id,
+						      HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS);
+		if (QDF_IS_STATUS_ERROR(ito_status)) {
+			/*
+			 * ITO update failed; stop the already-started
+			 * rollback timer and clear the saved ITO.
+			 */
+			hdd_err("ICMP PS: wma_set_power_config_ito failed (%d), stopping timer for vdev %d",
+				ito_status, adapter->deflink->vdev_id);
+			qdf_mc_timer_stop(&adapter->icmp_ito_restore_timer);
+			adapter->icmp_ps_saved_ito = 0;
+			return;
+		}
+		qdf_atomic_set(&adapter->icmp_ito_changed, 1);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
+	} else {
+		/* Update timestamp; timer callback handles re-arm */
+		qdf_spin_lock_bh(&adapter->icmp_ps_last_req_time_lock);
+		adapter->icmp_ps_last_req_time = qdf_get_monotonic_boottime();
+		qdf_spin_unlock_bh(&adapter->icmp_ps_last_req_time_lock);
+	}
+}
+#else
+static inline void
+hdd_handle_icmp_ps_management(struct hdd_adapter *adapter,
+			      struct sk_buff *skb)
+{
+}
+#endif
+
 /**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
@@ -591,6 +797,8 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 
 	osif_dp_mark_pkt_type(skb);
 	hdd_tx_latency_record_ingress_ts(adapter, skb);
+
+	hdd_handle_icmp_ps_management(adapter, skb);
 
 	if (adapter->device_mode == QDF_NDI_MODE &&
 	    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc))

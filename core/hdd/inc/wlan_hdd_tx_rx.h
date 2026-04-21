@@ -453,4 +453,18 @@ void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
 				   uint32_t ieee_link_id_valid,
 				   uint32_t ieee_link_id, void *context);
 
+#ifdef WLAN_FEATURE_ICMP_ITO_MGMT
+/**
+ * hdd_icmp_ito_restore_timer_cb() - Timer callback to restore original ITO
+ * @context: pointer to hdd_adapter
+ *
+ * This callback is invoked when no ICMP request is received for x seconds
+ * after the power save mode was temporarily disabled. It restores the power
+ * save mode to PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED.
+ *
+ * Return: None
+ */
+void hdd_icmp_ito_restore_timer_cb(void *context);
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

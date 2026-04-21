@@ -10875,6 +10875,71 @@ static inline bool wlan_hdd_nan_is_standard_mode(struct hdd_adapter *adapter)
 }
 #endif
 
+#ifdef WLAN_FEATURE_ICMP_ITO_MGMT
+/**
+ * hdd_init_icmp_ito_restore_timer() - Initialize ICMP ITO restore timer
+ * @adapter: pointer to hdd adapter
+ *
+ * This function initializes the ICMP-based power save rollback timer for
+ * STA/P2P-Client mode if not already initialized.
+ *
+ * Return: None
+ */
+static void hdd_init_icmp_ito_restore_timer(struct hdd_adapter *adapter)
+{
+	if ((adapter->device_mode == QDF_STA_MODE ||
+	     adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
+	    !adapter->icmp_ito_timer_initialized) {
+		qdf_mc_timer_init(&adapter->icmp_ito_restore_timer,
+				  QDF_TIMER_TYPE_SW,
+				  hdd_icmp_ito_restore_timer_cb,
+				  (void *)(uintptr_t)adapter->deflink->vdev_id);
+		qdf_atomic_set(&adapter->icmp_ito_changed, 0);
+		qdf_spinlock_create(&adapter->icmp_ps_last_req_time_lock);
+		adapter->icmp_ps_last_req_time = 0;
+		adapter->icmp_ito_timer_initialized = true;
+		hdd_debug("ICMP PS rollback timer initialized for vdev %d",
+			  adapter->deflink->vdev_id);
+	}
+}
+
+/**
+ * hdd_deinit_icmp_ito_restore_timer() - Destroy ICMP ITO restore timer
+ * @adapter: pointer to hdd adapter
+ *
+ * This function destroys the ICMP-based power save rollback timer if it
+ * has been initialized.
+ *
+ * Return: None
+ */
+static void hdd_deinit_icmp_ito_restore_timer(struct hdd_adapter *adapter)
+{
+	if (adapter->icmp_ito_timer_initialized) {
+		/*
+		 * ensure the callback checks the adapter’s “alive” flag，
+		 * before dereferencing
+		 */
+		if (QDF_TIMER_STATE_STOPPED !=
+		    qdf_mc_timer_get_current_state(&adapter->icmp_ito_restore_timer))
+			qdf_mc_timer_stop_sync(&adapter->icmp_ito_restore_timer);
+		qdf_mc_timer_destroy(&adapter->icmp_ito_restore_timer);
+		qdf_spinlock_destroy(&adapter->icmp_ps_last_req_time_lock);
+		adapter->icmp_ito_timer_initialized = false;
+		hdd_debug("ICMP PS rollback timer destroyed");
+	}
+}
+#else
+static inline void
+hdd_init_icmp_ito_restore_timer(struct hdd_adapter *adapter)
+{
+}
+
+static inline void
+hdd_deinit_icmp_ito_restore_timer(struct hdd_adapter *adapter)
+{
+}
+#endif
+
 static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -10882,6 +10947,15 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	struct wlan_hdd_link_info *link_info;
 
 	mode = adapter->device_mode;
+
+	/*
+	 * Stop and destroy the ICMP PS rollback timer before destroying the
+	 * vdev. The timer callback accesses the vdev (e.g., via
+	 * hdd_set_power_config()), so it must be stopped first to avoid a
+	 * use-after-free if the timer fires after hdd_vdev_destroy().
+	 */
+	hdd_deinit_icmp_ito_restore_timer(adapter);
+
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		vdev = hdd_objmgr_get_vdev_by_user(link_info,
 						   WLAN_INIT_DEINIT_ID);
@@ -17132,6 +17206,8 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 
 	hdd_register_hl_netdev_fc_timer(adapter,
 					hdd_tx_resume_timer_expired_handler);
+
+	hdd_init_icmp_ito_restore_timer(adapter);
 
 	if (hdd_get_multi_client_ll_support(adapter))
 		wlan_hdd_init_multi_client_info_table(adapter);

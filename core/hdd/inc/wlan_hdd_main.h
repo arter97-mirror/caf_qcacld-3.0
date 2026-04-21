@@ -1510,6 +1510,25 @@ struct hdd_adapter {
 	uint32_t ctw;
 	bool allow_power_save;
 
+#ifdef WLAN_FEATURE_ICMP_ITO_MGMT
+	/* ICMP-based power save management:
+	 * When CFG_PMO_POWERSAVE_MODE is
+	 * PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED,
+	 * temporarily disable power save on ICMP request and rollback after 2s.
+	 */
+	qdf_mc_timer_t icmp_ito_restore_timer;
+	qdf_atomic_t icmp_ito_changed;
+	bool icmp_ito_timer_initialized;
+	/* Spinlock protecting icmp_ps_last_req_time against
+	 * concurrent TX threads
+	 */
+	qdf_spinlock_t icmp_ps_last_req_time_lock;
+	/* Timestamp (us) of the last ICMP request; updated on every packet */
+	uint64_t icmp_ps_last_req_time;
+	/* Saved ps_ito before ICMP-based ITO change */
+	uint16_t icmp_ps_saved_ito;
+#endif
+
 	struct qdf_mac_addr mac_addr;
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 	struct qdf_mac_addr mld_addr;
