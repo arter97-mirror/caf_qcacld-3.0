@@ -1141,6 +1141,17 @@ wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	if (wdev->iftype != NL80211_IFTYPE_AP_VLAN)
 		return -EINVAL;
 
+	/*
+	 * Need to remove existing AP/VLAN interfaces even when driver is
+	 * recovering, will recreate when BH-STA connect back after recovering.
+	 * Below normal path will refuse to handle when driver is recovering.
+	 */
+	if (qdf_is_recovering()) {
+		hdd_debug("Recovering, perform best-effort WDS EXT cleanup");
+		_wlan_hdd_del_wds_ext_intf(wiphy, wdev);
+		return 0;
+	}
+
 	errno = osif_vdev_sync_trans_start_wait(wdev->netdev, &vdev_sync);
 	if (errno)
 		return errno;

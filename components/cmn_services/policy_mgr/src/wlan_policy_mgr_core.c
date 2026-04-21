@@ -4450,6 +4450,79 @@ policy_mgr_is_scc_with_existing_connection(qdf_freq_t pcl_freq)
 }
 
 /**
+ * policy_mgr_get_conc_ml_sap_link_freq()- Get concurrent ML SAP link frequency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @ml_sap_vdev: ml sap vdev or not
+ *
+ * This API returns concurrent ml sap freq if there are any.
+ * This function can only call when locked by qdf_conc_list_lock.
+ *
+ * Return: Concurrent ml sap freq if present. Otherwise 0.
+ */
+uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      bool *ml_sap_vdev)
+{
+	uint32_t conc_ml_sap_freq = 0;
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr *mld_addr;
+	struct qdf_mac_addr target_mld_addr, current_mld_addr;
+	uint8_t i;
+	struct policy_mgr_conc_connection_info *conn;
+
+	if (!policy_mgr_is_mlo_ap(psoc, vdev_id))
+		return 0;
+
+	*ml_sap_vdev = true;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			psoc,
+			vdev_id, WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		return 0;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	if (!mld_addr) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return 0;
+	}
+
+	qdf_mem_copy(&target_mld_addr, mld_addr, QDF_MAC_ADDR_SIZE);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		conn = &pm_conc_connection_list[i];
+
+	if (!conn->in_use || conn->mode != PM_SAP_MODE ||
+	    conn->vdev_id == vdev_id)
+		continue;
+
+	if (!policy_mgr_is_mlo_ap(psoc, conn->vdev_id))
+		continue;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, conn->vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		continue;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	if (mld_addr) {
+		qdf_mem_copy(&current_mld_addr, mld_addr, QDF_MAC_ADDR_SIZE);
+		if (qdf_is_macaddr_equal(&target_mld_addr, &current_mld_addr)) {
+			conc_ml_sap_freq = conn->freq;
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			break;
+		}
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	return conc_ml_sap_freq;
+}
+
+/**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
  * @psoc: Pointer to Psoc
@@ -4491,6 +4564,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t pcl_freq;
 	bool same_mac, sbs_ml_sta_present = false, dbs_ml_sta_present = false;
 	qdf_freq_t ll_lt_sap_freq;
+	bool ml_sap_vdev = false;
+	uint32_t conc_ml_sap_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4505,6 +4580,12 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 	op_mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
 	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
+
+	if (mode == PM_SAP_MODE)
+		conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+								psoc,
+								vdev_id,
+								&ml_sap_vdev);
 
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
@@ -4540,6 +4621,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 			continue;
 		if (allow_2ghz_only && !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_freq))
 			continue;
+		if (ml_sap_vdev && (conc_ml_sap_freq == pcl_freq))
+			continue;
 
 		/* Skip LL LT SAP freq and for SAP skip same mac freq */
 		if (ll_lt_sap_freq && (ll_lt_sap_freq == pcl_freq ||
@@ -4553,15 +4636,31 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		 * check same band logic as per the ML hw mode, else
 		 * use the API which is hw mode agnostic.
 		 */
-		if (dbs_ml_sta_present)
-			same_mac = policy_mgr_2_freq_same_mac_in_dbs(psoc,
+		if (dbs_ml_sta_present) {
+			if (conc_ml_sap_freq &&
+			    policy_mgr_is_current_hwmode_sbs(psoc))
+				same_mac = policy_mgr_2_freq_same_mac_in_sbs(
+								psoc,
 								sap_ch_freq,
 								pcl_freq);
-		else if (sbs_ml_sta_present)
-			same_mac = policy_mgr_2_freq_same_mac_in_sbs(pm_ctx,
+			else
+				same_mac = policy_mgr_2_freq_same_mac_in_dbs(
+								psoc,
 								sap_ch_freq,
 								pcl_freq);
-		else
+		} else if (sbs_ml_sta_present) {
+			if (conc_ml_sap_freq &&
+			    policy_mgr_is_current_hwmode_dbs(psoc))
+				same_mac = policy_mgr_2_freq_same_mac_in_dbs(
+								psoc,
+								sap_ch_freq,
+								pcl_freq);
+			else
+				same_mac = policy_mgr_2_freq_same_mac_in_sbs(
+								psoc,
+								sap_ch_freq,
+								pcl_freq);
+		} else
 			same_mac = policy_mgr_2_freq_always_on_same_mac(psoc,
 								sap_ch_freq,
 								pcl_freq);

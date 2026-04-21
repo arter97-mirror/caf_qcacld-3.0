@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -291,6 +291,8 @@ static void wlansap_owe_cleanup(struct sap_context *sap_ctx)
 			assoc_ind->owe_ie_len = 0;
 			assoc_ind->owe_status = STATUS_UNSPECIFIED_FAILURE;
 			status = sme_update_owe_info(mac, assoc_ind);
+			if (assoc_ind->assocReqPtr)
+				qdf_mem_free(assoc_ind->assocReqPtr);
 			qdf_mem_free(assoc_ind);
 		} else {
 			sap_err("Failed to remove assoc ind");
@@ -339,6 +341,8 @@ static void wlansap_ft_cleanup(struct sap_context *sap_ctx)
 			assoc_ind->ft_ie = NULL;
 			assoc_ind->ft_ie_len = 0;
 			assoc_ind->ft_status = STATUS_UNSPECIFIED_FAILURE;
+			if (assoc_ind->assocReqPtr)
+				qdf_mem_free(assoc_ind->assocReqPtr);
 			qdf_mem_free(assoc_ind);
 		} else {
 			sap_err("Failed to remove assoc ind");
@@ -1466,11 +1470,15 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 			ch_width = QDF_MIN(ch_width, tgt_ch_params->ch_width);
 
 		if (ch_width == CH_WIDTH_320MHZ &&
-		    policy_mgr_is_conn_lead_to_dbs_sbs(mac->psoc,
-						       sap_context->vdev_id,
-						       chan_freq))
-			ch_width = wlan_mlme_get_ap_oper_ch_width(
-							sap_context->vdev);
+		    policy_mgr_is_hw_dbs_capable(mac->psoc) &&
+		    policy_mgr_is_conn_lead_to_bw_downgrade(
+					mac->psoc,
+					sap_context->vdev_id,
+					chan_freq, ch_width)) {
+			ch_width = CH_WIDTH_160MHZ;
+			wlan_mlme_set_ap_oper_ch_width(sap_context->vdev,
+						       ch_width);
+		}
 	}
 	ch_params.ch_width = ch_width;
 	if (tgt_ch_params)
@@ -3370,6 +3378,8 @@ QDF_STATUS wlansap_update_owe_info(struct sap_context *sap_ctx,
 		assoc_ind->owe_ie_len = ie_len;
 		assoc_ind->owe_status = owe_status;
 		status = sme_update_owe_info(mac, assoc_ind);
+		if (assoc_ind->assocReqPtr)
+			qdf_mem_free(assoc_ind->assocReqPtr);
 		qdf_mem_free(assoc_ind);
 	} else {
 		/*
@@ -3445,6 +3455,8 @@ QDF_STATUS wlansap_update_ft_info(struct sap_context *sap_ctx,
 		assoc_ind->ft_ie_len = ie_len;
 		assoc_ind->ft_status = ft_status;
 		status = sme_update_ft_info(mac, assoc_ind);
+		if (assoc_ind->assocReqPtr)
+			qdf_mem_free(assoc_ind->assocReqPtr);
 		qdf_mem_free(assoc_ind);
 	}
 	return status;
