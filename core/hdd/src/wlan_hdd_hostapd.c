@@ -7676,7 +7676,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 
 	if (QDF_STATUS_SUCCESS !=
 	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq) &&
-	    !qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
+	    !test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		hdd_err("Invalid Ch_freq: %d", config->chan_freq);
 		ret = -EINVAL;
 		goto error;
