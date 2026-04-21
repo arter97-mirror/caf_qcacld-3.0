@@ -189,6 +189,14 @@ enum tdls_stats_sm_state {
  *                                    over all entries under a single lock
  *                                    acquisition, avoiding N separate
  *                                    lock/dispatch/unlock cycles.
+ * @TDLS_STATS_EV_FW_CAP_UPDATED:     FW service capability and INI have been
+ *                                    finalised (called after
+ *                                    cfg_tdls_set_stats_enable() writes the
+ *                                    combined INI && FW-cap value).  Handled
+ *                                    only in DISABLED state: if
+ *                                    tdls_stats_enable is now true the cache
+ *                                    DB is initialised and the SM transitions
+ *                                    to INIT.  No-op in all other states.
  * @TDLS_STATS_EV_MAX:                Sentinel — not a valid event.
  */
 enum tdls_stats_sm_evt {
@@ -198,6 +206,7 @@ enum tdls_stats_sm_evt {
 	TDLS_STATS_EV_STA_CONNECTED,
 	TDLS_STATS_EV_ENABLE_ACTIVE,
 	TDLS_STATS_EV_FW_STATS,
+	TDLS_STATS_EV_FW_CAP_UPDATED,
 	TDLS_STATS_EV_MAX,
 };
 

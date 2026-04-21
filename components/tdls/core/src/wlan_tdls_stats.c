@@ -331,24 +331,87 @@ static void tdls_stats_state_disabled_exit(void *ctx)
 }
 
 /**
+ * tdls_stats_handle_fw_cap_updated() - Handle FW capability + INI finalisation.
+ * @stats_ctx: TDLS stats context.
+ *
+ * Called from the DISABLED state event handler when
+ * TDLS_STATS_EV_FW_CAP_UPDATED is received.  Reads the combined
+ * (INI && FW-cap) value written by cfg_tdls_set_stats_enable().  If
+ * enabled, initialises the cache DB and transitions the SM to INIT.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+static QDF_STATUS
+tdls_stats_handle_fw_cap_updated(struct tdls_stats_context *stats_ctx)
+{
+	bool is_enabled;
+	QDF_STATUS status;
+
+	cfg_tdls_get_stats_enable(stats_ctx->psoc, &is_enabled);
+	if (!is_enabled) {
+		tdls_debug("TDLS stats: FW cap/INI disabled, remain in DISABLED");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!stats_ctx->db_initialized) {
+		status = tdls_stats_db_init(&stats_ctx->db,
+					    TDLS_STATS_HIST_MAX_NODES);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("TDLS stats: cache DB init failed (%d), remain DISABLED",
+				 status);
+			return status;
+		}
+		stats_ctx->db_initialized = true;
+	}
+
+	tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_INIT);
+	tdls_debug("TDLS stats SM: DISABLED -> INIT (FW cap confirmed, psoc %d)",
+		   stats_ctx->psoc_id);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * tdls_stats_state_disabled_event() - Event handler for DISABLED state.
  * @ctx: TDLS stats context (struct tdls_stats_context *)
  * @event: Event id (enum tdls_stats_sm_evt)
  * @event_data_len: Length of event data in bytes
  * @event_data: Pointer to event-specific data
  *
- * All events are silently dropped in the DISABLED state.  The state
- * machine enters DISABLED only when FW capability is absent and remains
- * there permanently — no event causes a transition out.
+ * Handles TDLS_STATS_EV_FW_CAP_UPDATED: once FW service capability and
+ * INI have been finalised (cfg_tdls_set_stats_enable() has been called),
+ * this event is delivered.  If tdls_stats_enable is now true the cache
+ * DB is initialised and the SM transitions to INIT.
  *
- * Return: true (event consumed / dropped)
+ * All other events are silently dropped.
+ *
+ * Return: true if event was handled, false otherwise
  */
 static bool tdls_stats_state_disabled_event(void *ctx, uint16_t event,
 					    uint16_t event_data_len,
 					    void *event_data)
 {
-	tdls_debug("TDLS stats: dropping event %u in DISABLED state", event);
-	return false;
+	struct tdls_stats_context *stats_ctx =
+				(struct tdls_stats_context *)ctx;
+	bool event_handled = true;
+	QDF_STATUS status;
+
+	switch (event) {
+	case TDLS_STATS_EV_FW_CAP_UPDATED:
+		status = tdls_stats_handle_fw_cap_updated(stats_ctx);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("TDLS stats: FW cap update handling failed, status %d",
+				 status);
+			event_handled = false;
+		}
+		break;
+	default:
+		tdls_debug("TDLS stats: dropping event %u in DISABLED state",
+			   event);
+		return false;
+	}
+
+	return event_handled;
 }
 
 /* =========================================================================
@@ -725,6 +788,7 @@ static const char *tdls_stats_sm_event_names[] = {
 	"EV_STA_CONNECTED",
 	"EV_ENABLE_ACTIVE",
 	"EV_FW_STATS",
+	"EV_FW_CAP_UPDATED",
 };
 
 /**
@@ -847,8 +911,6 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	struct wlan_sm *sm;
 	uint8_t name[WLAN_SM_ENGINE_MAX_NAME];
 	enum tdls_stats_sm_state initial_state;
-	QDF_STATUS status;
-	bool is_tdls_stats_supported;
 
 	if (!psoc || !stats_ctx_out)
 		return QDF_STATUS_E_INVAL;
@@ -863,9 +925,14 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	stats_ctx->psoc_id = wlan_psoc_get_id(psoc);
 	stats_ctx->db_initialized = false;
 
-	cfg_tdls_get_stats_enable(psoc, &is_tdls_stats_supported);
-	initial_state = is_tdls_stats_supported
-				? TDLS_STATS_S_INIT : TDLS_STATS_S_DISABLED;
+	/*
+	 * Always start in DISABLED.  The SM transitions to INIT when
+	 * TDLS_STATS_EV_FW_CAP_UPDATED is delivered after both the FW
+	 * service capability and the INI value have been finalised by
+	 * cfg_tdls_set_stats_enable().  This avoids the race where the
+	 * SM was created before FW caps / INI were known.
+	 */
+	initial_state = TDLS_STATS_S_DISABLED;
 
 	qdf_scnprintf(name, sizeof(name), "TDLS-Stats");
 
@@ -883,24 +950,10 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 
 	qdf_spinlock_create(&stats_ctx->sm.tdls_stats_sm_lock);
 
-	if (initial_state == TDLS_STATS_S_INIT) {
-		status = tdls_stats_db_init(&stats_ctx->db,
-					    TDLS_STATS_HIST_MAX_NODES);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			tdls_err("TDLS stats: cache DB init failed, status %d",
-				 status);
-			qdf_spinlock_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
-			wlan_sm_delete(stats_ctx->sm.sm_hdl);
-			qdf_mem_free(stats_ctx);
-			return status;
-		}
-		stats_ctx->db_initialized = true;
-	}
-
 	*stats_ctx_out = stats_ctx;
 
-	tdls_debug("TDLS stats SM created, psoc %d, initial state %d",
-		   stats_ctx->psoc_id, initial_state);
+	tdls_debug("TDLS stats SM created, psoc %d, initial state DISABLED",
+		   stats_ctx->psoc_id);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -967,21 +1020,6 @@ void tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx)
 QDF_STATUS tdls_get_tdls_stats(struct tdls_stats_context *stats_ctx,
 			       bool enable)
 {
-	enum tdls_stats_sm_state state;
-
-	if (!stats_ctx)
-		return QDF_STATUS_E_INVAL;
-
-	state = wlan_sm_get_current_state(stats_ctx->sm.sm_hdl);
-
-	if (!enable && (state == TDLS_STATS_S_DISABLED ||
-			state == TDLS_STATS_S_INIT))
-		return QDF_STATUS_SUCCESS;
-
-	if (enable && (state == TDLS_STATS_S_ENABLING ||
-		       state == TDLS_STATS_SS_ENABLED))
-		return QDF_STATUS_SUCCESS;
-
 	return tdls_stats_sm_deliver_event(stats_ctx,
 					   enable ? TDLS_STATS_EV_ENABLE
 						  : TDLS_STATS_EV_DISABLE,

@@ -74,4 +74,19 @@ void wlan_tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx);
 QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
 				    bool enable);
 
+/**
+ * wlan_tdls_stats_notify_fw_cap() - Notify the TDLS stats SM that FW service
+ *                                   capability and INI have been finalised.
+ * @psoc: PSOC object.
+ *
+ * Called from hdd_update_tdls_config() after cfg_tdls_set_stats_enable() has
+ * written the combined (INI && FW-cap) value.  Delivers
+ * TDLS_STATS_EV_FW_CAP_UPDATED to the SM.  If the SM is in DISABLED state
+ * and tdls_stats_enable is now true, the cache DB is initialised and the SM
+ * transitions to INIT.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_stats_notify_fw_cap(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_TDLS_STATS_API_H_ */

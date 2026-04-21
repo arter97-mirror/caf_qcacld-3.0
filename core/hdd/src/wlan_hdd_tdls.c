@@ -417,8 +417,7 @@ __wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
 	hdd_debug("Userspace TDLS stats: %d", tdls_stats_enable);
 
 	status = wlan_tdls_get_tdls_stats(hdd_ctx->psoc,
-					  tdls_stats_enable !=
-					  QCA_WLAN_TDLS_STATS_CONFIG_DISABLE);
+					  tdls_stats_enable);
 
 	return qdf_status_to_os_return(status);
 }

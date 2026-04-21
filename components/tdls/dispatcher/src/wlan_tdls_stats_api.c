@@ -94,3 +94,37 @@ QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
 
 	return tdls_get_tdls_stats(soc_obj->stats_ctx, enable);
 }
+
+/**
+ * wlan_tdls_stats_notify_fw_cap() - Notify the TDLS stats SM that FW service
+ *                                   capability and INI have been finalised.
+ * @psoc: PSOC object.
+ *
+ * Delivers TDLS_STATS_EV_FW_CAP_UPDATED to the SM.  If the SM is in DISABLED
+ * state and tdls_stats_enable is now true, the cache DB is initialised and
+ * the SM transitions to INIT.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_stats_notify_fw_cap(struct wlan_objmgr_psoc *psoc)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		tdls_err("TDLS soc obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc_obj->stats_ctx) {
+		tdls_err("TDLS stats context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
+					   TDLS_STATS_EV_FW_CAP_UPDATED,
+					   0, NULL);
+}
