@@ -766,6 +766,14 @@ struct mac_context {
 	struct wlan_uhr_cap_info uhr_cap_2g_orig;
 	struct wlan_uhr_cap_info uhr_cap_5g_orig;
 #endif
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+	void (*hlp_frame_ind_cb)(uint8_t vdev_id,
+				 uint8_t *hlp_data,
+				 uint16_t hlp_data_len,
+				 struct qdf_mac_addr *src_mac,
+				 struct qdf_mac_addr *dst_mac);
+#endif
 };
 
 #ifdef FEATURE_WLAN_TDLS

@@ -347,6 +347,7 @@ lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
 	auth_node->seq_num = ((mac_hdr->seqControl.seqNumHi << 4) |
 			      (mac_hdr->seqControl.seqNumLo));
 	auth_node->timestamp = qdf_mc_timer_get_system_ticks();
+	auth_node->vdev_id = pe_session->vdev_id;
 
 	auth_node->fils_info = qdf_mem_malloc(sizeof(struct pe_fils_session));
 	fils_info = auth_node->fils_info;
@@ -355,6 +356,15 @@ lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
 		lim_release_pre_auth_node(mac_ctx, auth_node);
 		return;
 	}
+	fils_info->keyname_nai_data = NULL;
+	fils_info->fils_erp_reauth_pkt = NULL;
+	fils_info->fils_rrk = NULL;
+	fils_info->fils_rik = NULL;
+	fils_info->fils_eap_finish_pkt = NULL;
+	fils_info->fils_rmsk = NULL;
+	fils_info->fils_pmk = NULL;
+	fils_info->auth_info.keyname = NULL;
+	fils_info->auth_info.domain_name = NULL;
 
 	lim_add_pre_auth_node(mac_ctx, auth_node);
 

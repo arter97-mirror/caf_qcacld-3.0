@@ -3411,6 +3411,40 @@ void populate_dot11f_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 		frm->fils_kde.num_kde_list = kde_data_len + KDE_TYPE_SIZE +
 						KDE_LEN_SIZE;
 	}
+	/* Populate HLP data if present */
+	if (fils_info->hlp_rsp_len) {
+		if (fils_info->hlp_rsp_len > FILS_HLP_MAX_LEN) {
+			frm->fils_hlp_container.num_hlp_packet =
+							FILS_HLP_MAX_LEN;
+		} else {
+			frm->fils_hlp_container.num_hlp_packet =
+						fils_info->hlp_rsp_len;
+		}
+
+		pe_debug("FILS HLP populate with len = %d",
+			 fils_info->hlp_rsp_len);
+		frm->fils_hlp_container.present = true;
+		qdf_mem_copy(frm->fils_hlp_container.dest_mac,
+			     fils_info->dst_mac.bytes,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(frm->fils_hlp_container.src_mac,
+			     fils_info->src_mac.bytes,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(frm->fils_hlp_container.hlp_packet,
+			     fils_info->hlp_rsp,
+			     frm->fils_hlp_container.num_hlp_packet);
+
+		if (fils_info->hlp_rsp_len > FILS_HLP_MAX_LEN) {
+			frm->fragment_ie.present = true;
+			frm->fragment_ie.num_data =
+				fils_info->hlp_rsp_len - FILS_HLP_MAX_LEN;
+			qdf_mem_copy(frm->fragment_ie.data,
+				     fils_info->hlp_rsp + FILS_HLP_MAX_LEN,
+				     frm->fragment_ie.num_data);
+		}
+		qdf_mem_free(fils_info->hlp_rsp);
+		fils_info->hlp_rsp = NULL;
+	}
 }
 #endif
 
@@ -14006,10 +14040,8 @@ static void wlan_update_bss_with_fils_data(struct mac_context *mac_ctx,
 		return;
 
 	fils_indication = qdf_mem_malloc(sizeof(*fils_indication));
-	if (!fils_indication) {
-		pe_err("malloc failed for fils_indication");
+	if (!fils_indication)
 		return;
-	}
 
 	ret = dot11f_unpack_ie_fils_indication(mac_ctx,
 				scan_entry->ie_list.fils_indication +
@@ -14024,7 +14056,6 @@ static void wlan_update_bss_with_fils_data(struct mac_context *mac_ctx,
 
 	fils_ind = qdf_mem_malloc(sizeof(*fils_ind));
 	if (!fils_ind) {
-		pe_err("malloc failed for fils_ind");
 		qdf_mem_free(fils_indication);
 		return;
 	}

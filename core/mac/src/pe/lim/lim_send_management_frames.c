@@ -2050,6 +2050,7 @@ static QDF_STATUS lim_assoc_rsp_tx_complete(
 	lim_install_fils_key(session_entry, mac_hdr->da);
 
 free_buffers:
+	lim_fils_cleanup(session_entry, mac_hdr->da);
 	lim_free_assoc_req_frm_buf(assoc_req);
 	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
 	session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
@@ -2063,6 +2064,7 @@ free_assoc_req:
 	lim_free_assoc_req_frm_buf(assoc_req);
 	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
 	session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
+	lim_fils_cleanup(session_entry, mac_hdr->da);
 end:
 	qdf_nbuf_free(buf);
 null_buf:

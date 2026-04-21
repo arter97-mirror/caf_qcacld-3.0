@@ -44,6 +44,7 @@
 #include "lim_ft_defs.h"
 #include "lim_session.h"
 #include "lim_send_messages.h"
+#include "lim_process_fils.h"
 
 #include "rrm_api.h"
 
@@ -265,6 +266,124 @@ void lim_process_sae_msg(struct mac_context *mac, struct sir_sae_msg *body)
 		lim_process_sae_msg_ap(mac, session, sae_msg);
 	else
 		pe_debug("SAE message on unsupported interface");
+}
+#endif
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * lim_process_hlp_msg() - Process HLP message
+ * @mac: Global MAC pointer
+ * @body: Buffer pointer
+ *
+ * Return: None
+ */
+void lim_process_hlp_msg(struct mac_context *mac,
+			 struct sir_fils_hlp_msg *body)
+{
+	struct sir_fils_hlp_msg *hlp_msg = body;
+	struct pe_session *session;
+	struct pe_fils_session *fils_info;
+	struct tLimPreAuthNode *sta_pre_auth_ctx;
+	struct lim_assoc_data *assoc_req;
+	bool assoc_ind_sent;
+	struct qdf_mac_addr peer_mac_addr;
+
+	if (!hlp_msg) {
+		pe_err("FILS HLP msg is NULL");
+		return;
+	}
+
+	if (!hlp_msg->hlp_data ||
+	    hlp_msg->hlp_data_len < (2 * QDF_MAC_ADDR_SIZE)) {
+		pe_err("FILS HLP: Invalid hlp_data or insufficient length");
+		return;
+	}
+
+	session = pe_find_session_by_vdev_id(mac, hlp_msg->vdev_id);
+	if (!session) {
+		pe_err("FILS HLP:Unable to find session");
+		return;
+	}
+	qdf_mem_copy(peer_mac_addr.bytes, hlp_msg->hlp_data,
+		     QDF_MAC_ADDR_SIZE);
+
+	/* Extract pre-auth context for the STA and move limMlmState
+	 * of preauth node to eLIM_MLM_AUTHENTICATED_STATE
+	 */
+	sta_pre_auth_ctx = lim_search_pre_auth_list(mac,
+						    peer_mac_addr.bytes);
+
+	if (!sta_pre_auth_ctx) {
+		pe_debug("No preauth node created for " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
+		return;
+	}
+	fils_info = sta_pre_auth_ctx->fils_info;
+	fils_info->hlp_rsp_len = hlp_msg->hlp_data_len -
+				 (2 * QDF_MAC_ADDR_SIZE);
+
+	if (sta_pre_auth_ctx->fils_info->hlp_rsp)
+		qdf_mem_free(sta_pre_auth_ctx->fils_info->hlp_rsp);
+
+	sta_pre_auth_ctx->fils_info->hlp_rsp =
+		qdf_mem_malloc(sta_pre_auth_ctx->fils_info->hlp_rsp_len);
+	if (!sta_pre_auth_ctx->fils_info->hlp_rsp) {
+		qdf_mem_free(hlp_msg->hlp_data);
+		hlp_msg->hlp_data = NULL;
+		qdf_delayed_work_stop_sync(&fils_info->hlp_timeout_work);
+		sta_pre_auth_ctx->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
+		return;
+	}
+
+	pe_debug("Copy HLP Data to PE Session");
+	/* copy dst mac */
+	qdf_mem_copy(sta_pre_auth_ctx->fils_info->dst_mac.bytes,
+		     hlp_msg->hlp_data, QDF_MAC_ADDR_SIZE);
+
+	/* copy src mac */
+	qdf_mem_copy(sta_pre_auth_ctx->fils_info->src_mac.bytes,
+		     hlp_msg->hlp_data + QDF_MAC_ADDR_SIZE,
+		     QDF_MAC_ADDR_SIZE);
+
+	/* copy data */
+	qdf_mem_copy(sta_pre_auth_ctx->fils_info->hlp_rsp,
+		     hlp_msg->hlp_data + (2 * QDF_MAC_ADDR_SIZE),
+		     hlp_msg->hlp_data_len - (2 * QDF_MAC_ADDR_SIZE));
+
+	qdf_mem_free(hlp_msg->hlp_data);
+	hlp_msg->hlp_data = NULL;
+
+	qdf_delayed_work_stop_sync(&fils_info->hlp_timeout_work);
+
+	assoc_req = &sta_pre_auth_ctx->assoc_req;
+
+	sta_pre_auth_ctx->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
+	/* Send assoc indication to SME if any assoc request is cached */
+	if (assoc_req->present) {
+		/* Assoc request is present in preauth context. Get the
+		 * assoc request and make it invalid in preauth context.
+		 * It'll be freed later in the legacy path.
+		 */
+		bool assoc_req_copied;
+
+		assoc_req->present = false;
+		pe_debug("Assoc req cached; handle it");
+		assoc_ind_sent =
+			lim_send_assoc_ind_to_sme(mac, session,
+						  assoc_req->sub_type,
+						  assoc_req->sa,
+						  assoc_req->assoc_req,
+						  session->fils_info->akm,
+						  assoc_req->pmf_connection,
+						  &assoc_req_copied,
+						  assoc_req->dup_entry,
+						  false,
+						  assoc_req->partner_peer_idx);
+		if (!assoc_ind_sent)
+			lim_process_assoc_cleanup(mac, session,
+						  assoc_req->sta_ds,
+						  assoc_req_copied);
+	}
 }
 #endif
 
@@ -2246,6 +2365,11 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case eWNI_SME_QOS_NULL_REQ:
 		lim_process_qos_null_req(msg);
+		break;
+	case WNI_SME_HLP_RESPONSE:
+		lim_process_hlp_msg(mac_ctx, msg->bodyptr);
+		qdf_mem_free((void *)msg->bodyptr);
+		msg->bodyptr = NULL;
 		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);

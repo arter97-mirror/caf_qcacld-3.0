@@ -2367,6 +2367,15 @@ static void lim_defer_sme_indication(struct mac_context *mac_ctx,
 	/* Extract pre-auth context for the STA, if any. */
 	sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx, sa);
 	if (sta_pre_auth_ctx->assoc_req.present) {
+		if (sta_pre_auth_ctx->fils_info &&
+		    sta_pre_auth_ctx->fils_info->is_fils_connection &&
+		    sta_pre_auth_ctx->mlmState == LIM_MLM_WT_FILS_HLP_STATE) {
+			pe_debug("Assoc req already cached for HLP vdev: %d peer:"
+				 QDF_MAC_ADDR_FMT,
+				 session->vdev_id,
+				 QDF_MAC_ADDR_REF(sa));
+			return;
+		}
 		pe_debug("Free the cached assoc req as a new one is received");
 		cached_req = &sta_pre_auth_ctx->assoc_req;
 		lim_process_assoc_cleanup(mac_ctx, session,
@@ -3179,7 +3188,21 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 
 		return QDF_STATUS_SUCCESS;
 	}
-
+	/* HLP Processing needs to be done. Defer Assoc Request handling
+	 * until HLP processing is done
+	 */
+	if (sta_pre_auth_ctx &&
+	    sta_pre_auth_ctx->authType == SIR_FILS_SK_WITHOUT_PFS &&
+	    sta_pre_auth_ctx->mlmState == LIM_MLM_WT_FILS_HLP_STATE) {
+		pe_debug("Defer FILS assoc request with HLP data from peer_addr:"
+			 QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(sa));
+		lim_defer_sme_indication(mac_ctx, session, sub_type, sa,
+					 assoc_req, pmf_connection,
+					 assoc_req_copied, dup_entry, sta_ds,
+					 peer_aid);
+		return QDF_STATUS_SUCCESS;
+	}
 	if (session->opmode == QDF_P2P_GO_MODE) {
 		/*
 		 * WAR: In P2P GO mode, if the P2P client device

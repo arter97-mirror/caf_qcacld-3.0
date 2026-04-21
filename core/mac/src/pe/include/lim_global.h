@@ -126,6 +126,7 @@ typedef enum eLimMlmStates {
 	eLIM_MLM_WT_FT_REASSOC_RSP_STATE,
 	eLIM_MLM_WT_SAE_AUTH_STATE,
 	eLIM_MLM_WT_FT_AUTH_STATE,
+	LIM_MLM_WT_FILS_HLP_STATE,
 } tLimMlmStates;
 
 /* 11h channel switch states */
@@ -210,6 +211,7 @@ typedef struct tLimPreAuthNode {
 	 * like anonce, snonce , tk etc.
 	 */
 	struct pe_fils_session *fils_info;
+	uint8_t vdev_id;
 } tLimPreAuthNode, *tpLimPreAuthNode;
 
 /* Pre-authentication table definition */

@@ -4964,6 +4964,21 @@ struct sir_sae_msg {
 	tSirResultCodes result_code;
 };
 
+/**
+ * struct sir_fils_hlp_msg - FILS HLP message structure
+ * @length: Total length of the message structure
+ * @vdev_id: vdev id for the SAP interface
+ * @hlp_data_len: Length of the HLP data payload in bytes
+ * @hlp_data: Pointer to the HLP data buffer containing the
+ *            hlp packets that are part of FILS authentication
+ */
+struct sir_fils_hlp_msg {
+	uint16_t length;
+	uint16_t vdev_id;
+	uint16_t hlp_data_len;
+	uint8_t *hlp_data;
+};
+
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 /**
  * struct sir_md_evt - motion detection event status

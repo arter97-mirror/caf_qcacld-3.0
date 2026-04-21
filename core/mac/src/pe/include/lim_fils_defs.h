@@ -18,6 +18,7 @@
  */
 
 #include "wlan_crypto_global_def.h"
+#include <qdf_delayed_work.h>
 
 #define FILS_EAP_TLV_MAX_DATA_LEN 255
 #define FILS_SHA256_128_AUTH_TAG 16
@@ -57,6 +58,7 @@
 #define IPN_LEN 6
 #define FILS_SESSION_LENGTH 8
 #define FILS_MAX_KDE_LIST_LEN 255
+#define FILS_HLP_MAX_LEN 242
 
 /* 12.12.2.5.3 80211-ai draft */
 #define FILS_SHA384_KEK_LEN 64
@@ -327,6 +329,10 @@ struct mac_ft_ie {
  * @src_mac: HLP source mac address
  * @hlp_data_len: HLP data length
  * @hlp_data: pointer to HLP data
+ * @hlp_rsp_len: HLP response length
+ * @hlp_rsp: pointer to HLP response data
+ * @hlp_timeout: Completion routine for hlp processing in case of timeout
+ * @hlp_timeout_work: Delayed workqueue to handle timeout scenario
  */
 struct pe_fils_session {
 	bool is_fils_connection;
@@ -382,4 +388,10 @@ struct pe_fils_session {
 	struct qdf_mac_addr src_mac;
 	uint16_t hlp_data_len;
 	uint8_t *hlp_data;
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+	uint16_t hlp_rsp_len;
+	uint8_t *hlp_rsp;
+	struct completion hlp_timeout;
+	struct qdf_delayed_work hlp_timeout_work;
+#endif
 };

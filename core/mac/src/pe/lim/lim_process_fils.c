@@ -29,6 +29,7 @@
 #include "qdf_util.h"
 #include "wlan_crypto_global_api.h"
 #include "wlan_cm_roam_api.h"
+#include "lim_security_utils.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 
@@ -694,6 +695,46 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 }
 
 #ifdef WLAN_FEATURE_FILS_SK_SAP
+QDF_STATUS lim_fils_cleanup(struct pe_session *pe_session,
+			    const void *mac_addr)
+{
+	struct pe_fils_session *fils_info;
+	struct qdf_delayed_work *hlp_timeout_work;
+	struct tLimPreAuthNode *auth_node;
+
+	fils_info = lim_get_fils_info(pe_session, (uint8_t *)mac_addr);
+	if (!fils_info) {
+		pe_err("Failed to get Fils info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Delete Pre auth node here as it is skipped while receiving
+	 * Assoc Req if auth type is FILS_SK
+	 */
+	if (fils_info->is_fils_connection) {
+		hlp_timeout_work = &fils_info->hlp_timeout_work;
+		qdf_delayed_work_stop_sync(hlp_timeout_work);
+		qdf_delayed_work_destroy(hlp_timeout_work);
+		auth_node = lim_search_pre_auth_list(pe_session->mac_ctx,
+						     (uint8_t *)mac_addr);
+		qdf_mem_free(fils_info->hlp_data);
+		fils_info->hlp_data = NULL;
+
+		fils_info->hlp_data_len = 0;
+		qdf_mem_free(auth_node->fils_info);
+		auth_node->fils_info = NULL;
+
+		lim_delete_pre_auth_node(pe_session->mac_ctx,
+					 (uint8_t *)mac_addr);
+		pe_debug("FILS hlp timeout work clean up done vdev: %d peer:"
+			QDF_MAC_ADDR_FMT,
+			pe_session->vdev_id,
+			QDF_MAC_ADDR_REF(mac_addr));
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session, bool unicast,
 			      uint8_t key_id, uint16_t key_length,
 			      uint8_t *key, struct qdf_mac_addr *mac_addr)
@@ -760,38 +801,31 @@ QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
 				       WLAN_CRYPTO_KEY_TYPE_UNICAST :
 				       WLAN_CRYPTO_KEY_TYPE_GROUP));
 }
+
 QDF_STATUS lim_install_fils_key(struct pe_session *pe_session,
 				const void *mac_addr)
 {
 	struct pe_fils_session *fils_info;
+	fils_info = lim_get_fils_info(pe_session, (uint8_t *)mac_addr);
+	if (!fils_info) {
+		pe_err("Failed to get Fils info");
+		return QDF_STATUS_E_FAILURE;
+	}
 
-	fils_info = lim_get_fils_info(pe_session, mac_addr);
-
-	if (fils_info && fils_info->is_fils_connection) {
+	if (fils_info->is_fils_connection) {
 		pe_debug("Installing FILS key for connection");
 		lim_cache_fils_key(pe_session, true, FILS_TK_INDEX,
-				   fils_info->tk_len, fils_info->tk, mac_addr);
+				   fils_info->tk_len, fils_info->tk,
+				   (struct qdf_mac_addr *)mac_addr);
 		lim_cache_fils_key(pe_session, false, FILS_GTK_INDEX,
 				   fils_info->gtk_len,
 				   fils_info->gtk,
-				   pe_session->bssId);
-		lim_set_fils_key(pe_session, true, FILS_TK_INDEX, mac_addr);
-		lim_set_fils_key(pe_session, false, FILS_GTK_INDEX,
-				 pe_session->bssId);
+				   (struct qdf_mac_addr *)pe_session->bssId);
+		lim_set_fils_key(pe_session, true, FILS_TK_INDEX);
+		lim_set_fils_key(pe_session, false, FILS_GTK_INDEX);
 	}
-
-	/* Delete Pre auth node here as it is skipped while receiving
-	 * Assoc Req if auth type is FILS_SK
-	 */
-	if (sme_assoc_ind->authType == SIR_FILS_SK_WITHOUT_PFS) {
-		qdf_mem_free(fils_info);
-		lim_delete_pre_auth_node(pe_session->mac_ctx,
-					 mac_addr);
-	}
-
 	return QDF_STATUS_SUCCESS;
 }
-
 
 /**
  * lim_generate_gtk()- This API generates GTK
@@ -2294,28 +2328,156 @@ void lim_update_fils_hlp_data(struct qdf_mac_addr *hlp_frm_src_mac,
 			      uint16_t frm_hlp_len, uint8_t *frm_hlp_data,
 			      struct pe_session *pe_session)
 {
-	struct pe_fils_session *pe_fils_info = pe_session->fils_info;
 
-	if (!pe_fils_info) {
+	struct pe_fils_session *fils_info;
+
+	fils_info = lim_get_fils_info(pe_session,
+				      (uint8_t *)hlp_frm_src_mac);
+
+	if (!fils_info) {
 		pe_err("Not a fils connection");
 		return;
 	}
 
 	if (frm_hlp_data && frm_hlp_len) {
-		qdf_mem_free(pe_fils_info->hlp_data);
-		pe_fils_info->hlp_data = qdf_mem_malloc(frm_hlp_len);
-		if (!pe_fils_info->hlp_data)
+		qdf_mem_free(fils_info->hlp_data);
+		fils_info->hlp_data = NULL;
+		fils_info->hlp_data = qdf_mem_malloc(frm_hlp_len);
+		if (!fils_info->hlp_data)
 			return;
 
 		pe_debug("FILS: hlp_data_len:%d", frm_hlp_len);
 		cds_copy_hlp_info(hlp_frm_dest_mac, hlp_frm_src_mac,
 				  frm_hlp_len, frm_hlp_data,
-				  &pe_fils_info->dst_mac,
-				  &pe_fils_info->src_mac,
-				  &pe_fils_info->hlp_data_len,
-				  pe_fils_info->hlp_data);
+				  &fils_info->dst_mac,
+				  &fils_info->src_mac,
+				  &fils_info->hlp_data_len,
+				  fils_info->hlp_data);
 	}
 }
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+void lim_update_hlp_info(struct mac_context *mac_ctx,
+			 struct pe_session *session_entry,
+			 struct qdf_mac_addr *peer_mac_addr)
+{
+	struct pe_fils_session *fils_info;
+	struct tLimPreAuthNode *sta_pre_auth_ctx;
+	struct qdf_delayed_work *hlp_timeout_work;
+	QDF_STATUS status;
+
+	if (!peer_mac_addr) {
+		pe_err("peer_mac_addr is NULL");
+		return;
+	}
+
+	fils_info = lim_get_fils_info(session_entry,
+				      peer_mac_addr->bytes);
+	if (!fils_info) {
+		pe_err("Failed to get Fils info");
+		return;
+	}
+
+	sta_pre_auth_ctx = lim_search_pre_auth_list(session_entry->mac_ctx,
+						    peer_mac_addr->bytes);
+
+	if (!sta_pre_auth_ctx) {
+		pe_debug("No preauth node created for " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer_mac_addr->bytes));
+		return;
+	}
+
+	if (mac_ctx->hlp_frame_ind_cb)
+		mac_ctx->hlp_frame_ind_cb(session_entry->vdev_id,
+					  fils_info->hlp_data,
+					  fils_info->hlp_data_len,
+					  (struct qdf_mac_addr *)
+					  fils_info->src_mac.bytes,
+					  (struct qdf_mac_addr *)
+					  fils_info->dst_mac.bytes);
+
+	hlp_timeout_work = &fils_info->hlp_timeout_work;
+	status = qdf_delayed_work_create(hlp_timeout_work,
+					 lim_sap_hlp_timeout_callback,
+					 sta_pre_auth_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to create hlp work queue, status: %d",
+		       status);
+		return;
+	}
+
+	sta_pre_auth_ctx->mlmState = LIM_MLM_WT_FILS_HLP_STATE;
+	qdf_delayed_work_start(&fils_info->hlp_timeout_work,
+			       FILS_HLP_PROCESSING_WAIT_TIME);
+}
+
+void lim_sap_hlp_timeout_callback(void *priv)
+{
+	struct tLimPreAuthNode *sta_pre_auth_ctx = priv;
+	struct lim_assoc_data *assoc_req;
+	bool assoc_ind_sent;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct pe_fils_session *fils_info;
+	struct pe_session *session;
+
+	if (!sta_pre_auth_ctx) {
+		pe_err("Preauth context is NULL");
+		return;
+	}
+
+	if (!sta_pre_auth_ctx->fils_info) {
+		pe_err("No Fils Info present");
+		return;
+	}
+
+	/* Check if already processed by HLP response */
+	if (sta_pre_auth_ctx->mlmState != LIM_MLM_WT_FILS_HLP_STATE) {
+		pe_debug("HLP already processed");
+		return;
+	}
+
+	fils_info = sta_pre_auth_ctx->fils_info;
+
+	session = pe_find_session_by_vdev_id(mac_ctx,
+					     sta_pre_auth_ctx->vdev_id);
+	if (!session) {
+		pe_err("Not able to find session for HLP timeout handling");
+		return;
+	}
+
+	assoc_req = &sta_pre_auth_ctx->assoc_req;
+
+	sta_pre_auth_ctx->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
+	/* Send assoc indication to SME if any assoc request is cached*/
+	if (assoc_req->present) {
+		/* Assoc request is present in preauth context. Get the assoc
+		 * request and make it invalid in preauth context. It'll be
+		 * freed later in the legacy path.
+		 */
+		bool assoc_req_copied;
+
+		assoc_req->present = false;
+		pe_debug("Assoc req cached; handle it");
+		assoc_ind_sent =
+			lim_send_assoc_ind_to_sme(mac_ctx,
+						  session,
+						  assoc_req->sub_type,
+						  assoc_req->sa,
+						  assoc_req->assoc_req,
+						  fils_info->akm,
+						  assoc_req->pmf_connection,
+						  &assoc_req_copied,
+						  assoc_req->dup_entry, false,
+						  assoc_req->partner_peer_idx);
+		if (!assoc_ind_sent)
+			lim_process_assoc_cleanup(session->mac_ctx,
+						  session,
+						  assoc_req->sta_ds,
+						  assoc_req_copied);
+	}
+	lim_fils_cleanup(session, assoc_req->sa);
+}
+#endif /* WLAN_FEATURE_FILS_SK_SAP */
 
 bool lim_verify_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 				      struct pe_session *session_entry,
@@ -2455,11 +2617,15 @@ bool lim_verify_fils_params_assoc_req(struct mac_context *mac_ctx,
 
 	qdf_mem_free(fils_key_auth);
 
-	lim_update_fils_hlp_data(&assoc_req->dst_mac,
-				 &assoc_req->src_mac,
+	lim_update_fils_hlp_data(&assoc_req->src_mac,
+				 &assoc_req->dst_mac,
 				 assoc_req->hlp_data_len,
 				 assoc_req->hlp_data,
 				 session_entry);
+
+	if (assoc_req->hlp_data_len)
+		lim_update_hlp_info(mac_ctx, session_entry,
+				    (struct qdf_mac_addr *)peer_mac_addr);
 	return true;
 
 verify_fils_params_fails:

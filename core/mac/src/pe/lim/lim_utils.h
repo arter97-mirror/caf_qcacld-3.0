@@ -3509,6 +3509,41 @@ static inline QDF_STATUS lim_trigger_auth_req_sae(
 {}
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * lim_process_hlp_msg() - Process FILS HLP message
+ * @mac: Pointer to global MAC context
+ * @body: Pointer to FILS HLP message
+ *
+ * Return: void
+ */
+void lim_process_hlp_msg(struct mac_context *mac,
+			 struct sir_fils_hlp_msg *body);
+
+/**
+ * lim_fils_cleanup() - Cleanup FILS session
+ * @pe_session: Pointer to PE session
+ * @mac_addr: MAC address of the peer
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on successful cleanup
+ */
+QDF_STATUS lim_fils_cleanup(struct pe_session *pe_session,
+			    const void *mac_addr);
+#else
+static inline void
+lim_process_hlp_msg(struct mac_context *mac,
+		    struct sir_fils_hlp_msg *body)
+{
+}
+
+static inline QDF_STATUS
+lim_fils_cleanup(struct pe_session *pe_session,
+		 const void *mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * lim_get_he_max_mcs_idx() - get max mcs index from he cap
  * @ch_width: channel width
