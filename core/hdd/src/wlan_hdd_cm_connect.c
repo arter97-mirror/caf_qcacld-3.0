@@ -889,6 +889,11 @@ def_chan:
 		hdd_debug("bw change from %d to %d",
 			  hdd_ap_ctx->sap_config.ch_width_orig,
 			  ch_bw);
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) &&
+		   ch_bw >= CH_WIDTH_80MHZ) {
+		hdd_debug("bw change from %d to CH_WIDTH_MAX for 2.4GHz ch",
+			  ch_bw);
+		ch_bw = CH_WIDTH_MAX;
 	}
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
