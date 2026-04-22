@@ -16415,7 +16415,11 @@ hdd_parse_vendor_nss_chains_req(struct wlan_mlme_nss_chains *req,
 	if (!tx || !rx)
 		return WLAN_VENDOR_NSS_CHAIN_REQ_INVALID;
 
+	if ((tx == 255 && rx != 255) || (tx != 255 && rx == 255))
+		return WLAN_VENDOR_NSS_CHAIN_REQ_INVALID;
+
 	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
+
 		if (is_nss_type) {
 			req->tx_nss[i] = tx;
 			req->rx_nss[i] = rx;
@@ -16878,7 +16882,8 @@ vdev_ref:
 
 static QDF_STATUS
 hdd_fill_vdev_init_nss_chains_limits(struct wlan_hdd_link_info *link_info,
-				     struct wlan_mlme_nss_chains *nss_chains_limits)
+				     struct wlan_mlme_nss_chains *nss_chains_limits,
+				     enum wlan_mlme_cfg_nss_src src)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -16887,7 +16892,7 @@ hdd_fill_vdev_init_nss_chains_limits(struct wlan_hdd_link_info *link_info,
 						       nss_chains_limits,
 						       adapter->device_mode,
 						       hdd_ctx->num_rf_chains,
-						       WLAN_MLME_CFG_SRC_GLOBAL);
+						       src);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -16897,8 +16902,23 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 					struct wlan_mlme_nss_chains *req,
 					struct wlan_mlme_nss_chains *limits)
 {
+	bool reset_to_def = true;;
 	uint8_t i, max_tx_nss = 0, max_rx_nss = 0;
 	uint8_t max_tx_chains = 0, max_rx_chains = 0;
+
+	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
+		if (req->num_tx_chains[i] != 0xFF || req->tx_nss[i] != 0xFF) {
+			reset_to_def = false;
+			break;
+		}
+	}
+
+	if (reset_to_def) {
+		hdd_fill_vdev_init_nss_chains_limits(link_info, req,
+						     WLAN_MLME_CFG_SRC_STARTUP);
+		return QDF_STATUS_SUCCESS;
+	}
+
 
 	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
 		max_tx_nss = QDF_MAX(max_tx_nss, limits->tx_nss[i]);
@@ -16908,6 +16928,16 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 					limits->num_tx_chains[i]);
 		max_rx_chains = QDF_MAX(max_rx_chains,
 					limits->num_rx_chains[i]);
+
+		if (req->tx_nss[i] == 0xFF) {
+			req->tx_nss[i] = 0;
+			req->rx_nss[i] = 0;
+		}
+
+		if (req->num_tx_chains[i] == 0xFF) {
+			req->num_tx_chains[i] = 0;
+			req->num_rx_chains[i] = 0;
+		}
 	}
 
 	for (i = 0; i < NSS_CHAINS_BAND_MAX; i++) {
@@ -16986,7 +17016,8 @@ static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 		goto vdev_ref;
 	}
 
-	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits);
+	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits,
+						       WLAN_MLME_CFG_SRC_GLOBAL);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_ref;
 

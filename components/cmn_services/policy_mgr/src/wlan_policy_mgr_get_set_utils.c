@@ -16256,40 +16256,11 @@ policy_mgr_validate_user_req_tx_rx_nss(struct wlan_objmgr_psoc *psoc,
 				       uint8_t req_rx_nss)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	qdf_freq_t vdev_freq;
-	uint8_t sup_tx_chains, sup_rx_chains;
-	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Step 1: Get vdev operating frequency */
-	vdev_freq = wlan_get_operation_chan_freq_vdev_id(pm_ctx->pdev,
-							 vdev_id);
-	if (!vdev_freq) {
-		policy_mgr_err("Failed to get freq for vdev %d", vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Step 2: Check current HW mode support */
-	status = policy_mgr_curr_hwmode_fetch_chains_for_freq(psoc, vdev_freq,
-							      &sup_tx_chains,
-							      &sup_rx_chains);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("Failed to fetch chains for current hw mode");
-		return status;
-	}
-
-	/* Step 3: If current HW mode supports requested NSS, return success */
-	if (req_tx_nss <= sup_tx_chains && req_rx_nss <= sup_rx_chains) {
-		policy_mgr_debug("Current HW mode supports req NSS %dx%d",
-				 req_tx_nss, req_rx_nss);
-		if (pm_ctx->conc_cbacks.sap_user_nss_update_cb)
-			pm_ctx->conc_cbacks.sap_user_nss_update_cb(vdev_id);
-		return QDF_STATUS_SUCCESS;
 	}
 
 	if (policy_mgr_get_connection_count(psoc) > 1)

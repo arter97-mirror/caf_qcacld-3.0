@@ -86,6 +86,14 @@ QDF_STATUS wlan_dbam_psoc_enable(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS wlan_dbam_psoc_disable(struct wlan_objmgr_psoc *psoc);
 #endif /* WLAN_FEATURE_DBAM_CONFIG */
 
+/**
+ * wlan_coex_psoc_get_btc_chain_mode() - Wrapper API to get BT coex chain mode
+ * from psoc
+ * @psoc: pointer to psoc object
+ * @val: pointer to BT coex chain mode
+ *
+ * Return : status of operation
+ */
 QDF_STATUS
 wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 				  enum coex_btc_chain_mode *val);

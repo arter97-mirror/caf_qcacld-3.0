@@ -5111,11 +5111,6 @@ sme_validate_psoc_nss_chains_config(mac_handle_t mac_handle,
 	sme_debug("user_cfg");
 	sme_dump_nss_cfg(user_cfg);
 
-	sme_debug("ini_cfg");
-	sme_dump_nss_cfg(vdev_ini_cfg);
-	sme_debug("user_cfg");
-	sme_dump_nss_cfg(user_cfg);
-
 	if (!sme_nss_chains_cmp_user_cfg(user_cfg, vdev_ini_cfg)) {
 		sme_debug("current vdev ini config same as user config");
 		return QDF_STATUS_E_ALREADY;
@@ -5450,6 +5445,9 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 	}
 	sme_debug("User params verified, sending to fw vdev id %d", vdev_id);
 
+	/* Update here before call to policy manager API */
+	*dynamic_cfg = *user_cfg;
+
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		uint8_t tx_nss, rx_nss;
@@ -5471,8 +5469,6 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		sme_err("params sent failed to fw vdev id %d", vdev_id);
 		goto release_lock;
 	}
-
-	*dynamic_cfg = *user_cfg;
 
 release_lock:
 	sme_release_global_lock(&mac_ctx->sme);

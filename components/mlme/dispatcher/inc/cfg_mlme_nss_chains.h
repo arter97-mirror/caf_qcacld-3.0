@@ -358,7 +358,7 @@
  * startup_tx_nss_2g - Startup TX NSS config per vdev for 2.4ghz connections
  * @Min: 0x0
  * @Max: 0x04924924
- * @Default: 0x080480
+ * @Default: 0x0
  *
  * This ini is used to change the num of tx spatial streams for eg:-
  * 0x01249249 - change all VDEVs startup tx nss for 2.4 GHz to 1 each
@@ -393,7 +393,7 @@
 				"startup_tx_nss_2g", \
 				0x0, \
 				0x04924924, \
-				0x080480, \
+				0x0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"startup tx nss 2.4ghz")
 
@@ -402,7 +402,7 @@
  * startup_tx_nss_5g - Startup TX NSS config per vdev for 5ghz connections
  * @Min: 0x0
  * @Max: 0x04924924
- * @Default: 0x080480
+ * @Default: 0x0
  *
  * This ini is used to change the num of tx spatial streams for eg:-
  * 0x01249249 - change all VDEVs startup tx nss for 5 GHz to 1 each
@@ -436,7 +436,7 @@
 				"startup_tx_nss_5g", \
 				0x0, \
 				0x04924924, \
-				0x080480, \
+				0x0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"startup tx nss 5ghz")
 
@@ -445,7 +445,7 @@
  * startup_rx_nss_2g - Startup RX NSS config per vdev for 2.4ghz connections
  * @Min: 0x0
  * @Max: 0x04924924
- * @Default: 0x080480
+ * @Default: 0x0
  *
  * This ini is used to change the num of rx spatial streams for eg:-
  * 0x01249249 - change all VDEVs startup rx nss for 2.4 GHz to 1 each
@@ -479,7 +479,7 @@
 				"startup_rx_nss_2g", \
 				0x0, \
 				0x04924924, \
-				0x080480, \
+				0x0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"startup rx nss 2.4ghz")
 
@@ -488,7 +488,7 @@
  * startup_rx_nss_5g - Startup RX NSS config per vdev for 5ghz connections
  * @Min: 0x0
  * @Max: 0x04924924
- * @Default: 0x080480
+ * @Default: 0x0
  *
  * This ini is used to change the num of rx spatial streams for eg:-
  * 0x01249249 - change all VDEVs startup rx nss for 5 GHz to 1 each
@@ -522,7 +522,7 @@
 				"startup_rx_nss_5g", \
 				0x0, \
 				0x04924924, \
-				0x080480, \
+				0x0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"startup rx nss 5ghz")
 
