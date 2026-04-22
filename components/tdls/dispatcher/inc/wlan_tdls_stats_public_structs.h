@@ -337,7 +337,7 @@ struct tdls_stats_node {
 
 /**
  * struct tdls_stats_db - TDLS stats cache database.
- * @lock:        Spinlock protecting all cache operations.
+ * @lock:        Mutex protecting all cache operations.
  * @max_entries: Maximum number of entries the cache can hold
  *               (%TDLS_STATS_HIST_MAX_NODES).
  * @num_entries: Current number of entries present in the cache.
@@ -353,10 +353,10 @@ struct tdls_stats_node {
  * any field of this structure unless db_initialized is true.
  */
 struct tdls_stats_db {
-	qdf_spinlock_t lock;
-	uint32_t       max_entries;
-	uint32_t       num_entries;
-	qdf_list_t     list;  /* oldest at front, newest at back */
+	qdf_mutex_t lock;
+	uint32_t    max_entries;
+	uint32_t    num_entries;
+	qdf_list_t  list;  /* oldest at front, newest at back */
 };
 
 /**
@@ -365,16 +365,18 @@ struct tdls_stats_db {
  *                       framework.  This is the authoritative source of
  *                       the current state; use wlan_sm_get_curstate() to
  *                       query it.
- * @tdls_stats_sm_lock:  Spinlock protecting state machine operations.
+ * @tdls_stats_sm_lock:  Mutex protecting state machine operations.
  *                       Must be held by external callers before invoking
- *                       tdls_stats_sm_deliver_event().
+ *                       tdls_stats_sm_deliver_event_sync().  Use
+ *                       tdls_stats_lock_acquire() / tdls_stats_lock_release()
+ *                       to acquire and release it.
  *
  * Lock ordering: tdls_stats_sm_lock (outer) -> tdls_stats_db::lock (inner).
  * Never acquire tdls_stats_sm_lock while already holding tdls_stats_db::lock.
  */
 struct tdls_stats_sm {
 	struct wlan_sm *sm_hdl;
-	qdf_spinlock_t  tdls_stats_sm_lock;
+	qdf_mutex_t     tdls_stats_sm_lock;
 };
 
 /**

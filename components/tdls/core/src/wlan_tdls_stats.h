@@ -46,6 +46,51 @@
 struct tdls_soc_priv_obj;
 
 /* =========================================================================
+ * SM lock helpers (inline, mirroring the cm_lock_* pattern)
+ * =========================================================================
+ */
+
+/**
+ * tdls_stats_lock_create() - Initialise the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_create(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_create(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/**
+ * tdls_stats_lock_destroy() - Destroy the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_destroy(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/**
+ * tdls_stats_lock_acquire() - Acquire the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_acquire(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_acquire(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/**
+ * tdls_stats_lock_release() - Release the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_release(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_release(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/* =========================================================================
  * SM lifecycle APIs (defined in wlan_tdls_stats.c)
  * =========================================================================
  */
@@ -65,7 +110,7 @@ struct tdls_soc_priv_obj;
  *   2. Queries wmi_service_tdls_stats_info to determine the initial state:
  *        - FW capability present  -> TDLS_STATS_S_INIT  (cache DB initialised)
  *        - FW capability absent   -> TDLS_STATS_S_DISABLED (cache DB skipped)
- *   3. Creates the wlan_sm_engine instance and the SM spinlock.
+ *   3. Creates the wlan_sm_engine instance and the SM mutex lock.
  *   4. Initialises the cache DB when starting in TDLS_STATS_S_INIT.
  *
  * The double-pointer output parameter is the standard C pattern for
@@ -85,7 +130,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
  *
  * Cleanup order:
  *   1. Deinit cache DB (only if db_initialized is true).
- *   2. Destroy the SM spinlock.
+ *   2. Destroy the SM mutex lock.
  *   3. Delete the wlan_sm_engine instance.
  *   4. Free the context itself.
  *
@@ -159,7 +204,7 @@ QDF_STATUS tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
  * @db: Pointer to the cache database structure to initialise.
  * @max_entries: Maximum number of entries the cache can hold.
  *
- * Zeroes the structure, sets the capacity, creates the spinlock, and
+ * Zeroes the structure, sets the capacity, creates the mutex, and
  * creates the QDF list.  Called during PSOC creation when FW capability
  * is present.
  *
@@ -183,7 +228,7 @@ void tdls_stats_db_flush(struct tdls_stats_db *db);
  * @db: Pointer to the cache database structure.
  *
  * Flushes all remaining entries, destroys the QDF list, and destroys
- * the spinlock.  Called during PSOC destruction.
+ * the mutex.  Called during PSOC destruction.
  */
 void tdls_stats_db_deinit(struct tdls_stats_db *db);
 

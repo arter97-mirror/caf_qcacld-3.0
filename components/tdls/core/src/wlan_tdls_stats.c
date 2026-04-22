@@ -56,7 +56,7 @@
  * @db: Pointer to the cache database structure to initialise.
  * @max_entries: Maximum number of entries the cache can hold.
  *
- * Zeroes the structure, sets the capacity, creates the spinlock, and
+ * Zeroes the structure, sets the capacity, creates the mutex, and
  * creates the QDF list.  Called during PSOC creation when FW capability
  * is present.
  *
@@ -72,7 +72,7 @@ QDF_STATUS tdls_stats_db_init(struct tdls_stats_db *db, uint32_t max_entries)
 	db->max_entries = max_entries;
 	db->num_entries = 0;
 
-	qdf_spinlock_create(&db->lock);
+	qdf_mutex_create(&db->lock);
 	qdf_list_create(&db->list, max_entries);
 
 	return QDF_STATUS_SUCCESS;
@@ -94,7 +94,7 @@ void tdls_stats_db_flush(struct tdls_stats_db *db)
 	if (!db)
 		return;
 
-	qdf_spin_lock_bh(&db->lock);
+	qdf_mutex_acquire(&db->lock);
 
 	while (!qdf_list_empty(&db->list)) {
 		if (QDF_IS_STATUS_ERROR(
@@ -106,7 +106,7 @@ void tdls_stats_db_flush(struct tdls_stats_db *db)
 		db->num_entries--;
 	}
 
-	qdf_spin_unlock_bh(&db->lock);
+	qdf_mutex_release(&db->lock);
 }
 
 /**
@@ -114,7 +114,7 @@ void tdls_stats_db_flush(struct tdls_stats_db *db)
  * @db: Pointer to the cache database structure.
  *
  * Flushes all remaining entries, destroys the QDF list, and destroys
- * the spinlock.  Called during PSOC destruction.
+ * the mutex.  Called during PSOC destruction.
  */
 void tdls_stats_db_deinit(struct tdls_stats_db *db)
 {
@@ -124,7 +124,7 @@ void tdls_stats_db_deinit(struct tdls_stats_db *db)
 	tdls_stats_db_flush(db);
 
 	qdf_list_destroy(&db->list);
-	qdf_spinlock_destroy(&db->lock);
+	qdf_mutex_destroy(&db->lock);
 }
 
 /**
@@ -148,7 +148,7 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	if (!db || !entry)
 		return QDF_STATUS_E_INVAL;
 
-	qdf_spin_lock_bh(&db->lock);
+	qdf_mutex_acquire(&db->lock);
 
 	/* Evict oldest entry if the cache is full */
 	if (db->num_entries >= db->max_entries) {
@@ -166,7 +166,7 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	/* Allocate a new node */
 	node = qdf_mem_malloc(sizeof(*node));
 	if (!node) {
-		qdf_spin_unlock_bh(&db->lock);
+		qdf_mutex_release(&db->lock);
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -175,7 +175,7 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	qdf_list_insert_back(&db->list, &node->node);
 	db->num_entries++;
 
-	qdf_spin_unlock_bh(&db->lock);
+	qdf_mutex_release(&db->lock);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -202,7 +202,7 @@ uint32_t tdls_stats_flush_entire_cache(struct tdls_stats_context *stats_ctx)
 	if (!stats_ctx)
 		return 0;
 
-	qdf_spin_lock_bh(&stats_ctx->db.lock);
+	qdf_mutex_acquire(&stats_ctx->db.lock);
 	qdf_list_peek_front(&stats_ctx->db.list, &ln);
 
 	while (ln) {
@@ -211,20 +211,19 @@ uint32_t tdls_stats_flush_entire_cache(struct tdls_stats_context *stats_ctx)
 		stats_ctx->db.num_entries--;
 
 		/* Release lock before emitting the vendor event */
-		qdf_spin_unlock_bh(&stats_ctx->db.lock);
+		qdf_mutex_release(&stats_ctx->db.lock);
 
 		node = qdf_container_of(ln, struct tdls_stats_node, node);
-
 		tdls_emit_vendor_event(stats_ctx->psoc, &node->entry);
 		qdf_mem_free(node);
 		flushed_count++;
 
-		qdf_spin_lock_bh(&stats_ctx->db.lock);
+		qdf_mutex_acquire(&stats_ctx->db.lock);
 		ln = next_ln;
 		next_ln = NULL;
 	}
 
-	qdf_spin_unlock_bh(&stats_ctx->db.lock);
+	qdf_mutex_release(&stats_ctx->db.lock);
 
 	return flushed_count;
 }
@@ -280,8 +279,9 @@ tdls_stats_sm_deliver_event_sync(struct tdls_stats_context *stats_ctx,
  * @data_len: Length of event data in bytes
  * @data: Pointer to event-specific data
  *
- * Acquires @stats_ctx->sm.tdls_stats_sm_lock, dispatches @event to the
- * SM engine via tdls_stats_sm_deliver_event_sync(), then releases the lock.
+ * Acquires @stats_ctx->sm.tdls_stats_sm_lock (mutex), dispatches @event
+ * to the SM engine via tdls_stats_sm_deliver_event_sync(), then releases
+ * the lock.
  *
  * Return: QDF_STATUS
  */
@@ -291,10 +291,10 @@ QDF_STATUS tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
 {
 	QDF_STATUS status;
 
-	qdf_spin_lock_bh(&stats_ctx->sm.tdls_stats_sm_lock);
+	tdls_stats_lock_acquire(stats_ctx);
 	status = tdls_stats_sm_deliver_event_sync(stats_ctx, event,
 						  data_len, data);
-	qdf_spin_unlock_bh(&stats_ctx->sm.tdls_stats_sm_lock);
+	tdls_stats_lock_release(stats_ctx);
 
 	return status;
 }
@@ -948,7 +948,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 	}
 	stats_ctx->sm.sm_hdl = sm;
 
-	qdf_spinlock_create(&stats_ctx->sm.tdls_stats_sm_lock);
+	tdls_stats_lock_create(stats_ctx);
 
 	*stats_ctx_out = stats_ctx;
 
@@ -974,7 +974,7 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 		stats_ctx->db_initialized = false;
 	}
 
-	qdf_spinlock_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
+	tdls_stats_lock_destroy(stats_ctx);
 
 	wlan_sm_delete(stats_ctx->sm.sm_hdl);
 
