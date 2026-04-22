@@ -3062,6 +3062,71 @@ static void os_if_nan_next_dw_notif_handler(
 	cfg80211_next_nan_dw_notif(wdev, chan, GFP_ATOMIC);
 
 }
+
+/**
+ * os_if_nan_dfs_channel_availability_handler() - Handler for NAN DFS channel
+ *     availability indication
+ * @vdev: VDEV object
+ * @event: NAN DFS channel availability indication event
+ *
+ * Translates the firmware DFS channel availability status to the corresponding
+ * nl80211_channel_evac_reason and notifies the kernel via
+ * cfg80211_nan_channel_evac().
+ *
+ * WMI status -> nl80211_channel_evac_reason mapping:
+ *   WMI_NAN_STATUS_STA_DISCONNECTED_FROM_DFS         ->
+ *       NL80211_CHAN_EVAC_REASON_DFS_MASTER_MODE_STOP
+ *   WMI_NAN_STATUS_NO_NAN_AVAIL_DFS_CHANNEL_DETECTED ->
+ *       NL80211_CHAN_EVAC_REASON_ASSISTED_DFS_PEER_VACATE
+ *   WMI_NAN_STATUS_NO_DFS_BEACONS_RECEIVED           ->
+ *       NL80211_CHAN_EVAC_REASON_ASSISTED_DFS_PEER_VACATE
+ *
+ * Return: None
+ */
+static void
+os_if_nan_dfs_channel_availability_handler(
+	struct wlan_objmgr_vdev *vdev,
+	struct nan_dfs_channel_availability_ind *event)
+{
+	struct vdev_osif_priv *osif_priv;
+	struct wireless_dev *wdev;
+	enum nl80211_channel_evac_reason reason;
+
+	if (!vdev || !event) {
+		osif_err("Invalid parameters");
+		return;
+	}
+
+	osif_debug("NAN DFS channel availability: vdev_id=%u status=%u",
+		   event->vdev_id, event->status);
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv || !osif_priv->wdev) {
+		osif_err("OSIF priv or wdev is NULL");
+		return;
+	}
+
+	wdev = osif_priv->wdev;
+
+	switch (event->status) {
+	case WMI_NAN_STATUS_STA_DISCONNECTED_FROM_DFS:
+		reason = NL80211_CHAN_EVAC_REASON_DFS_MASTER_MODE_STOP;
+		break;
+	case WMI_NAN_STATUS_NO_NAN_AVAIL_DFS_CHANNEL_DETECTED:
+	case WMI_NAN_STATUS_NO_DFS_BEACONS_RECEIVED:
+		reason = NL80211_CHAN_EVAC_REASON_ASSISTED_DFS_PEER_VACATE;
+		break;
+	default:
+		osif_err("Unknown DFS channel availability status: %u",
+			 event->status);
+		return;
+	}
+
+	osif_debug("Notifying kernel: vdev_id=%u reason=%d",
+		   event->vdev_id, reason);
+
+	cfg80211_nan_channel_evac(wdev, reason, GFP_ATOMIC);
+}
 #endif
 
 int os_if_nan_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
@@ -3345,6 +3410,8 @@ void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
 {
 	cb_obj->os_if_nan_next_dw_notif_handler =
 					os_if_nan_next_dw_notif_handler;
+	cb_obj->os_if_nan_dfs_channel_availability_handler =
+			os_if_nan_dfs_channel_availability_handler;
 }
 
 static

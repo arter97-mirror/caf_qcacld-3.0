@@ -538,6 +538,17 @@ struct nan_cluster_event {
 
 #define NAN_CLUSTER_EVENT_JOINED  0
 #define NAN_CLUSTER_EVENT_STARTED 1
+
+/**
+ * struct nan_dfs_channel_availability_ind - NAN DFS channel availability event
+ * @vdev_id: vdev identifier
+ * @status: DFS channel availability status code;
+ *          see WMI_NAN_DFS_CHANNEL_AVAILABILITY_STATUS_TYPE
+ */
+struct nan_dfs_channel_availability_ind {
+	uint32_t vdev_id;
+	uint32_t status;
+};
 #endif
 
 #define NAN_CH_INFO_MAX_LEN \
@@ -1267,6 +1278,8 @@ struct nan_pasn_peer_ops {
  * @os_if_nan_next_dw_notif_handler: OS IF Callback for NAN next DW notification
  * @os_if_nan_process_cluster_event: OS IF Callback for NAN cluster notification
  * @nan_vdev_destroy_cb: Callback to handle NAN vdev deletion
+ * @os_if_nan_dfs_channel_availability_handler: OS IF Callback for NAN DFS
+ *     channel availability indication
  * @ucfg_nan_request_process_cb: Callback to indicate NAN enable/disable
  * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
@@ -1301,6 +1314,9 @@ struct nan_callbacks {
 	void (*os_if_nan_process_cluster_event)(struct wlan_objmgr_vdev *vdev,
 						struct nan_cluster_event *event);
 	void (*nan_vdev_destroy_cb)(struct wlan_objmgr_psoc *psoc);
+	void (*os_if_nan_dfs_channel_availability_handler)(
+			struct wlan_objmgr_vdev *vdev,
+			struct nan_dfs_channel_availability_ind *event);
 #endif
 	void (*ucfg_nan_request_process_cb)(void *cookie);
 	int (*ndi_open)(const char *iface_name, bool is_add_virtual_iface);
