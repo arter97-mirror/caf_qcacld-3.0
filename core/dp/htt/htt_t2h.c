@@ -513,6 +513,12 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		uint8_t cookie;
 		uint8_t *stats_info_list;
 
+		if (qdf_nbuf_len(htt_t2h_msg) < (4 * sizeof(*msg_word))) {
+			qdf_print("invalid nbuff len");
+			WARN_ON(1);
+			break;
+		}
+
 		cookie = *(msg_word + 1);
 
 		stats_info_list = (uint8_t *) (msg_word + 3);
