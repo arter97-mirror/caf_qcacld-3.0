@@ -3600,6 +3600,7 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	eCsrRoamResult result = eCSR_ROAM_RESULT_NONE;
 	struct set_context_rsp *pRsp = (struct set_context_rsp *)msg_ptr;
 	struct qdf_mac_addr connected_bssid;
+	bool is_roam = false;
 
 	if (!pRsp) {
 		sme_err("set key response is NULL");
@@ -3628,6 +3629,10 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		  mac_ctx->obss_scan_offload, chan_freq,
 		  wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId));
 
+	if (MLME_IS_ROAMING_IN_PROG(mac_ctx->psoc, sessionId) ||
+	    MLME_IS_ROAM_SYNCH_IN_PROGRESS(mac_ctx->psoc, sessionId))
+		is_roam = true;
+
 	if (CSR_IS_WAIT_FOR_KEY(mac_ctx, sessionId)) {
 		/* We are done with authentication, whethere succeed or not */
 		csr_roam_substate_change(mac_ctx, eCSR_ROAM_SUBSTATE_NONE,
@@ -3639,6 +3644,14 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 			return;
 		}
 		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(mac_ctx->psoc);
+		/*
+		 * Keys are now installed, safe to trigger SAP restart
+		 * This handles the deferred SAP restart for
+		 * ROAM_AUTH_STATUS_CONNECTED case
+		 */
+		policy_mgr_trigger_deferred_sap_restart(mac_ctx->psoc,
+							sessionId,
+							is_roam);
 	}
 	if (eSIR_SME_SUCCESS == pRsp->status_code) {
 		qdf_copy_macaddr(&roam_info->peerMac, &pRsp->peer_macaddr);

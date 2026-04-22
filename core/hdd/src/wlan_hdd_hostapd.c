@@ -1733,7 +1733,7 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode)
 	case MODE_11AC_VHT20_2G:
 	case MODE_11AC_VHT40_2G:
 	case MODE_11AC_VHT80_2G:
-#ifdef CONFIG_160MHZ_SUPPORT
+#if CONFIG_160MHZ_SUPPORT
 	case MODE_11AC_VHT80_80:
 	case MODE_11AC_VHT160:
 #endif
@@ -2847,7 +2847,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		 * set this event at the very end because once this events
 		 * get set, caller thread is waiting to do further processing.
 		 * so once this event gets set, current worker thread might get
-		 * pre-empted by caller thread.
+		 * preempted by caller thread.
 		 */
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -3656,7 +3656,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			}
 		}
 
-		/* Check any SAP need restart, if initiater was not LL SAP */
+		/* Check any SAP need restart, if initiator was not LL SAP */
 		if (sap_ctx->csa_reason != CSA_REASON_LL_LT_SAP_EVENT &&
 		    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						  link_info->vdev_id))
@@ -4055,6 +4055,12 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx)
 		return -EINVAL;
+
+	if (sap_ctx->fsm_state != SAP_STARTED) {
+		hdd_err("CSA rejected - SAP not in STARTED state, current state:%d vdev:%d",
+			sap_ctx->fsm_state, link_info->vdev_id);
+		return -EINVAL;
+	}
 
 	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
 				link_info->link_flags)) {
@@ -9547,7 +9553,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 		if (channel_width != HW_MODE_20_MHZ) {
-			hdd_err("Hostapd (20+ MHz) conflits with config.ini (sub 20 MHz)");
+			hdd_err("Hostapd (20+ MHz) conflicts with config.ini (sub 20 MHz)");
 			return -EINVAL;
 		}
 		if (cds_is_5_mhz_enabled())

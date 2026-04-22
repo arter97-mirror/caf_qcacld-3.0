@@ -2247,7 +2247,7 @@ config DYNAMIC_DEBUG
 	default n
 
 config CONFIG_WLAN_DUMP_IN_PROGRESS
-	bool "enable WLAN_DUMP_IN_PROGRESS"
+	bool "enable CONFIG_WLAN_DUMP_IN_PROGRESS"
 	default n
 
 config WLAN_CHIPSET_STATS
@@ -2344,6 +2344,10 @@ config DP_SWLM
 
 config DP_TX_TRACKING
 	bool "Enable DP_TX_TRACKING"
+	default n
+
+config DP_TCP_MEM_PARAM_CTRL
+	bool "Enable DP_TCP_MEM_PARAM_CTRL"
 	default n
 
 config WLAN_DP_MLO_DEV_CTX
@@ -3060,6 +3064,23 @@ config INTERFACE_MGR
 
 config ENABLE_LOW_POWER_MODE
 	bool "Enable ENABLE_LOW_POWER_MODE"
+	default n
+
+config CNSS_ADRASTEA
+	bool "Enable CNSS_ADRASTEA"
+	default n
+
+config FEATURE_ENABLE_CE_DP_IRQ_AFFINE
+	bool "Enable FEATURE_ENABLE_CE_DP_IRQ_AFFINE"
+	default n
+
+if CNSS_ADRASTEA
+config HIF_LARGE_CE_RING_HISTORY
+	int "Enable HIF_LARGE_CE_RING_HISTORY"
+	default 8192
+endif
+config WLAN_TAS_SYSFS
+	bool "Enable TAS sysfs"
 	default n
 
 endif # QCA_CLD_WLAN

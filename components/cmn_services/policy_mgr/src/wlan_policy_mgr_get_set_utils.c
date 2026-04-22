@@ -52,6 +52,8 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_cm_api.h"
+#include <wlan_vdev_mgr_utils_api.h>
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -309,6 +311,72 @@ policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
 	*move_sap_go_first = pm_ctx->cfg.move_sap_go_1st_on_dfs_sta_csa;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void policy_mgr_trigger_deferred_sap_restart(struct wlan_objmgr_psoc *psoc,
+					     uint32_t vdev_id,
+					     bool is_roam)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool is_acs_mode = false;
+	bool is_host_4way_hs_supported = false;
+
+	is_host_4way_hs_supported =
+		wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
+	if (!is_host_4way_hs_supported)
+		return;
+
+	if (!is_roam)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (vdev) {
+		is_acs_mode = wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	policy_mgr_debug("vdev %d, deferred SAP restart after key install",
+			 vdev_id);
+
+	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
+							 is_acs_mode);
+}
+
+bool policy_mgr_is_roamed_eapol_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t i;
+	enum policy_mgr_con_mode mode;
+	uint8_t vdev_id;
+	bool roam_in_progress = false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		mode = pm_conc_connection_list[i].mode;
+		if (mode != PM_STA_MODE)
+			continue;
+
+		vdev_id = pm_conc_connection_list[i].vdev_id;
+		if (MLME_IS_ROAMING_IN_PROG(psoc, vdev_id) ||
+		    MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
+			policy_mgr_debug("vdev %d roaming in progress",
+					 vdev_id);
+			roam_in_progress = true;
+			break;
+		}
+	}
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return roam_in_progress;
 }
 
 bool

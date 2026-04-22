@@ -46,7 +46,8 @@ _target_chipset_map = {
         "peach-v2",
         "kiwi-v2",
         "wcn7750",
-	"wcn6450",
+        "wcn6450",
+        "adrastea",
     ],
     "alor-le": [
         "wcn7750",
@@ -71,8 +72,8 @@ _target_chipset_map = {
         "kiwi-v2",
     ],
     "chora": [
-	"wcn7750",
-	"wcn6450",
+        "wcn7750",
+        "wcn6450",
     ],
     "shikra":[
             "wlan",
@@ -97,6 +98,7 @@ _chipset_hw_map = {
     "fig": "BORON",
     "wcn7760": "BERYLLIUM",
     "qca6574": "ROME",
+    "adrastea" : "ADRASTEA",
 }
 
 _chipset_header_map = {
@@ -150,11 +152,11 @@ _chipset_header_map = {
     ],
     "qca6574": [
     ],
+    "adrastea" : [
+    ],
 }
 
 _hw_header_map = {
-    "ADRASTEA" : [
-    ],
     "BORON": [
 	"cmn/hal/wifi3.0/be",
 	"cmn/hal/wifi3.0/bn",
@@ -174,6 +176,8 @@ _hw_header_map = {
     "HELIUMPLUS": [
     ],
     "ROME": [
+    ],
+    "ADRASTEA" : [
     ],
 }
 
@@ -2533,6 +2537,11 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_haps.c",
         ],
     },
+    "CONFIG_WLAN_TAS_SYSFS": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_tas.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2728,7 +2737,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "wlan":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "wlan" or chipset == "adrastea":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]

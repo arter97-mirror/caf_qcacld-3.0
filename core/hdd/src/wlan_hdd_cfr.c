@@ -1722,7 +1722,7 @@ static int wlan_cfg80211_start_cfr_rx_capture(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* Validate bandwidth for associated mode */
-	if (pcfr->is_associated && pcfr->bandwidth > peer_bw) {
+	if (pcfr->is_associated && pcfr->bandwidth != peer_bw) {
 		cfr_err("Invalid peer bw %d  cfr bw %d for assoc RX mode",
 			peer_bw, pcfr->bandwidth);
 		status = -EINVAL;

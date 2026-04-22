@@ -999,7 +999,7 @@ enum wlan_epcs_frame {
  * gEnableRingBuffer - Enable Ring Buffer for Bug Report
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini is used to enable Ring Buffer
  *
@@ -1013,7 +1013,7 @@ enum wlan_epcs_frame {
  */
 #define CFG_ENABLE_RING_BUFFER CFG_INI_BOOL( \
 		"gEnableRingBuffer", \
-		1, \
+		0, \
 		"To Enable Ring Buffer")
 
 /*

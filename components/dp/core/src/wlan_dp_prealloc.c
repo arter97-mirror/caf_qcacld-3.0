@@ -370,7 +370,11 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
+#ifndef WLAN_SOFTUMAC_SUPPORT
 #define NUM_HW_LINK_DESCS (32 * 1024)
+#else
+#define NUM_HW_LINK_DESCS (32 * 64)
+#endif
 
 /* Size in bytes of HW LINK DESC */
 #define HW_LINK_DESC_SIZE 128
@@ -562,7 +566,7 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
 		if (pp_t->pp)
 			pools_allocated++;
 
-		if (type == pp_t->type && !pp_t->in_use &&
+		if (pp_t->pp && type == pp_t->type && !pp_t->in_use &&
 		    pool_size == pp_t->pool_size) {
 			pp_t->in_use = true;
 			if (pp_track_id)
@@ -724,7 +728,9 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	size_t rx_buf_size = 0;
 	uint32_t rx_pool_size;
 	bool rx_pp_en = false;
+	bool rx_pp_prealloc_en = false;
 	bool tx_pp_en = false;
+	bool tx_pp_prealloc_en = false;
 	bool dyn_rx_buf_alloc = false;
 	int base_pool_size;
 	int max_rx_pp_alloc;
@@ -735,8 +741,8 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 		return;
 
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_en, &rx_buf_size,
-			       &rx_pool_size);
-	if (!rx_pp_en)
+			       &rx_pool_size, &rx_pp_prealloc_en);
+	if (!rx_pp_en || !rx_pp_prealloc_en)
 		goto tx_pp_alloc;
 
 	dyn_rx_buf_alloc = dp_prealloc_is_dynamic_rsc_mgmt_enabled(ctrl_psoc);
@@ -796,8 +802,8 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	}
 
 tx_pp_alloc:
-	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en);
-	if (!tx_pp_en)
+	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en, &tx_pp_prealloc_en);
+	if (!tx_pp_en || !tx_pp_prealloc_en)
 		return;
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_tx_pp_allocs); i++) {
@@ -1094,10 +1100,11 @@ dp_prealloc_rx_iova_refcnt_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 {
 	size_t rx_buf_size;
 	bool rx_pp_enable = 0;
+	bool rx_pp_prealloc_en = false;
 	uint32_t rx_pool_size;
 
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_enable, &rx_buf_size,
-			       &rx_pool_size);
+			       &rx_pool_size, &rx_pp_prealloc_en);
 
 	return rx_pp_enable;
 }

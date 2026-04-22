@@ -91,7 +91,6 @@ ifeq ($(TARGET_BOARD_PLATFORM), shikra)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
-$(info __DEBUG__ Building for TARGET_BOARD_PLATFORM = $(TARGET_BOARD_PLATFORM))
 
 LOCAL_PATH := $(call my-dir)
 $(call wlog,LOCAL_PATH=$(LOCAL_PATH))
