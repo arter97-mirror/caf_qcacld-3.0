@@ -6249,7 +6249,9 @@ lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
 		return ch_width;
 
 	bw = ch_width;
-	max_ch_width = wlan_mlme_get_max_bw();
+	max_ch_width = wlan_mlme_get_max_curr_bw(mac_ctx->pdev,
+						 session->curr_op_freq,
+						 ch_width);
 	/*
 	 * If the session is in STA or P2P Client mode, and the current channel
 	 * width is 80 MHz, while the maximum supported channel width is
@@ -11906,7 +11908,9 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 		oper_mode = CH_WIDTH_20MHZ;
 	}
 
-	fw_vht_ch_wd = wlan_mlme_get_max_bw();
+	fw_vht_ch_wd = wlan_mlme_get_max_curr_bw(mac_ctx->pdev,
+						 session->curr_op_freq,
+						 ch_width);
 
 	if (ch_width > fw_vht_ch_wd) {
 		pe_debug_rl(QDF_MAC_ADDR_FMT ": Downgrade new bw: %d to max %d",

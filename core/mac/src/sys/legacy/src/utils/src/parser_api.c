@@ -8366,7 +8366,9 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		 */
 		if (session->opmode == QDF_STA_MODE ||
 		    session->opmode == QDF_P2P_CLIENT_MODE) {
-			max_ch_width = wlan_mlme_get_max_bw();
+			max_ch_width = wlan_mlme_get_max_curr_bw(mac_ctx->pdev,
+								 freq,
+								 ch_width);
 			if ((ch_width == CH_WIDTH_80MHZ) &&
 			    (max_ch_width >= CH_WIDTH_160MHZ))
 				ch_width = CH_WIDTH_160MHZ;
@@ -8402,7 +8404,11 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		he_cap->chan_width_0 = 0;
 		he_cap->chan_width_4 = 0;
 		he_cap->chan_width_6 = 0;
-		if (ch_width <= CH_WIDTH_80MHZ) {
+		if (ch_width < CH_WIDTH_40MHZ) {
+			he_cap->chan_width_1 = 0;
+			he_cap->chan_width_2 = 0;
+			he_cap->chan_width_3 = 0;
+		} else if (ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
 		} else if (ch_width == CH_WIDTH_160MHZ) {
