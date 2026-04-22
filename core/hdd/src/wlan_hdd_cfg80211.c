@@ -5594,6 +5594,31 @@ static inline void wlan_hdd_set_pcc_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* FEATURE_WLAN_SUPPORT_PCC */
 
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
+/**
+ * wlan_hdd_reset_wfd_mode() - reset wfd_mode when switching to P2P
+ * Device mode
+ * @adapter: pointer to the adapter
+ * @new_mode: the new operating mode being set
+ *
+ * When transitioning back to QDF_P2P_DEVICE_MODE, clear wfd_mode so that
+ * the next vdev creation starts with a clean state.
+ *
+ * Return: void
+ **/
+static void wlan_hdd_reset_wfd_mode(struct hdd_adapter *adapter,
+				    enum QDF_OPMODE new_mode)
+{
+	if (new_mode == QDF_P2P_DEVICE_MODE)
+		adapter->wfd_mode = P2P_MODE_WFD_INVALID;
+}
+#else
+static inline void wlan_hdd_reset_wfd_mode(struct hdd_adapter *adapter,
+					   enum QDF_OPMODE new_mode)
+{
+}
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC */
+
 static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *feature_flags)
 {
@@ -29989,6 +30014,7 @@ static int hdd_change_adapter_mode(struct hdd_adapter *adapter,
 	memset(&adapter->deflink->session, 0,
 	       sizeof(adapter->deflink->session));
 	adapter->device_mode = new_mode;
+	wlan_hdd_reset_wfd_mode(adapter, new_mode);
 	hdd_set_station_ops(netdev);
 
 	hdd_exit();
