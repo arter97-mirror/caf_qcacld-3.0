@@ -128,3 +128,25 @@ QDF_STATUS wlan_tdls_stats_notify_fw_cap(struct wlan_objmgr_psoc *psoc)
 					   TDLS_STATS_EV_FW_CAP_UPDATED,
 					   0, NULL);
 }
+
+/**
+ * wlan_tdls_stats_record_peers_teardown() - Dispatcher wrapper for the
+ *                                           unified TDLS teardown stats
+ *                                           recorder.
+ * @psoc:        PSOC object.
+ * @vdev_id:     Vdev ID of the STA session, or WLAN_UMAC_VDEV_ID_MAX to
+ *               record teardown for all connected peers regardless of vdev.
+ * @reason_code: Teardown reason to record for each peer.
+ *
+ * Thin wrapper that delegates to the core function
+ * tdls_stats_record_peers_teardown().
+ *
+ * Return: None
+ */
+void wlan_tdls_stats_record_peers_teardown(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id,
+				enum tdls_stats_reason_code reason_code)
+{
+	tdls_stats_record_peers_teardown(psoc, vdev_id, reason_code);
+}

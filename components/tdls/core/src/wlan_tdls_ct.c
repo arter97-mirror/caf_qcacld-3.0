@@ -27,6 +27,7 @@
 #include "wlan_tdls_peer.h"
 #include "wlan_tdls_ct.h"
 #include "wlan_tdls_mgmt.h"
+#include "wlan_tdls_stats.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_tdls_cmds_process.h"
 #include "wlan_reg_services_api.h"
@@ -922,9 +923,29 @@ tdls_ct_process_idle_handler(struct wlan_objmgr_vdev *vdev,
 			 " back to normal, will stay",
 			  QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 	} else {
+		enum tdls_stats_reason_code reason_code;
+
+		/*
+		 * Determine teardown reason for TDLS stats:
+		 *   - No traffic at all (both tx and rx are zero):
+		 *     TDLS_STATS_REASON_NO_TRAFFIC
+		 *   - Some traffic but below the idle threshold:
+		 *     TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC
+		 */
+		if (!curr_peer->tx_pkt && !curr_peer->rx_pkt)
+			reason_code = TDLS_STATS_REASON_NO_TRAFFIC;
+		else
+			reason_code = TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC;
+
+		/* Record teardown in TDLS stats state machine */
+		tdls_stats_record_peer_teardown(tdls_soc_obj, vdev,
+						curr_peer->peer_mac.bytes,
+						reason_code);
+
 		/* this tdls link needs to get torn down */
-		tdls_notice("trigger tdls link to "QDF_MAC_ADDR_FMT" down",
-			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+		tdls_notice("trigger tdls link to "QDF_MAC_ADDR_FMT" down, reason %d",
+			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
+			    reason_code);
 		tdls_indicate_teardown(tdls_vdev_obj,
 					curr_peer,
 					TDLS_TEARDOWN_PEER_UNSPEC_REASON);

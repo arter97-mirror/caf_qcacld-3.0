@@ -89,4 +89,29 @@ QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_tdls_stats_notify_fw_cap(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_tdls_stats_record_peers_teardown() - Dispatcher wrapper for the
+ *                                           unified TDLS teardown stats
+ *                                           recorder.
+ * @psoc:        PSOC object.
+ * @vdev_id:     Vdev ID of the STA session, or WLAN_UMAC_VDEV_ID_MAX to
+ *               record teardown for all connected peers regardless of vdev.
+ *               When WLAN_UMAC_VDEV_ID_MAX is passed, the TDLS link vdev is
+ *               used for the channel and session_id fields of the stats entry.
+ * @reason_code: Teardown reason to record for each peer.
+ *
+ * Covers two use cases:
+ *   1. Per-vdev (vdev_id != WLAN_UMAC_VDEV_ID_MAX): records teardown only for
+ *      peers whose session_id matches @vdev_id.
+ *   2. All-peers (vdev_id == WLAN_UMAC_VDEV_ID_MAX): records teardown for
+ *      every connected TDLS peer using the TDLS link vdev.  Use this for
+ *      concurrency-driven teardowns (e.g. SAP start, NAN enable).
+ *
+ * Return: None
+ */
+void wlan_tdls_stats_record_peers_teardown(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id,
+				enum tdls_stats_reason_code reason_code);
+
 #endif /* _WLAN_TDLS_STATS_API_H_ */

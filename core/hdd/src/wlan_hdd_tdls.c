@@ -702,6 +702,14 @@ static int wlan_hdd_tdls_disable(struct hdd_context *hdd_ctx,
 		if (!vdev)
 			return -EINVAL;
 
+		/*
+		 * Record teardown stats for all connected TDLS peers before
+		 * tearing down the links due to user-initiated TDLS disable.
+		 */
+		wlan_tdls_stats_record_peers_teardown(hdd_ctx->psoc,
+						      wlan_vdev_get_id(vdev),
+						      TDLS_STATS_REASON_GENERAL);
+
 		ucfg_tdls_teardown_links(hdd_ctx->psoc);
 		ucfg_tdls_set_user_tdls_enable(vdev, false);
 

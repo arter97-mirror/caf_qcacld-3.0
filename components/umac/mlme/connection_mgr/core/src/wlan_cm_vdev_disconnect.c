@@ -25,6 +25,7 @@
 #include "wlan_cm_api.h"
 #include "wlan_p2p_api.h"
 #include "wlan_tdls_api.h"
+#include <wlan_tdls_stats_api.h>
 #include <wlan_policy_mgr_api.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_pdev_obj.h>
@@ -101,9 +102,19 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 	 * so during subsequent disconnects also to not deleted the TDLS peers
 	 * TODO: Move all TDLS peers deletion logic from IF_MGR to be symmetric
 	 */
-	if (req->source == CM_OSIF_DISCONNECT)
+	if (req->source == CM_OSIF_DISCONNECT) {
+		/*
+		 * Record teardown stats for all connected TDLS peers before
+		 * notifying the TDLS component of the AP disconnect.
+		 * Reason: STA is leaving the network (user-initiated disconnect).
+		 */
+		wlan_tdls_stats_record_peers_teardown(
+					psoc,
+					req->vdev_id,
+					TDLS_STATS_REASON_DEAUTH_LEAVING);
 		wlan_tdls_notify_sta_disconnect(req->vdev_id, false,
 						true, vdev);
+	}
 
 	cm_abort_connect_request_timers(vdev);
 

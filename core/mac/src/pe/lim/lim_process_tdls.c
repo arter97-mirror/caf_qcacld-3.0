@@ -77,6 +77,7 @@
 #include "wlan_tdls_public_structs.h"
 #include "wlan_cfg80211_tdls.h"
 #include "wlan_tdls_api.h"
+#include "wlan_tdls_stats_api.h"
 #include "lim_mlo.h"
 #include "wlan_mlo_mgr_link_switch.h"
 
@@ -4541,6 +4542,13 @@ void lim_update_tdls_2g_bw(struct pe_session *session)
 	if (!psoc)
 		return;
 
+	/*
+	 * Record teardown stats for all connected TDLS peers before tearing
+	 * down the links due to AP BW change on 2.4 GHz.
+	 */
+	wlan_tdls_stats_record_peers_teardown(psoc, session->smeSessionId,
+					      TDLS_STATS_REASON_GENERAL);
+
 	wlan_tdls_teardown_links(psoc);
 }
 
@@ -4563,6 +4571,18 @@ QDF_STATUS lim_delete_tdls_peers(struct mac_context *mac_ctx,
 		pe_err("NULL session_entry");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	/*
+	 * Record teardown stats for all connected TDLS peers before deleting
+	 * them.  Use TDLS_STATS_REASON_ROAMED when the deletion is triggered
+	 * by a roam synch (pe_roam_synch_callback), so the stats SM captures
+	 * the roaming-induced teardown with the correct reason code.
+	 */
+	if (reason == TDLS_PEER_DEL_REASON_ROAMING)
+		wlan_tdls_stats_record_peers_teardown(
+					mac_ctx->psoc,
+					session_entry->smeSessionId,
+					TDLS_STATS_REASON_ROAMED);
 
 	lim_check_aid_and_delete_peer(mac_ctx, session_entry);
 

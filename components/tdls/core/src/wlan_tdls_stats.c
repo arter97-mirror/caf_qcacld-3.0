@@ -37,6 +37,7 @@
  */
 
 #include "wlan_tdls_main.h"
+#include "wlan_tdls_peer.h"
 #include "wlan_tdls_stats.h"
 #include <wlan_tdls_cfg_api.h>
 #include <wlan_tdls_stats_public_structs.h>
@@ -1052,4 +1053,131 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 				    TDLS_STATS_EV_NEW_EVENT,
 				    sizeof(entry), &entry);
+}
+
+void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
+				     struct wlan_objmgr_vdev *vdev,
+				     const uint8_t *macaddr,
+				     enum tdls_stats_reason_code reason_code)
+{
+	struct tdls_stats_entry entry = {0};
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_peer *peer;
+
+	if (!soc_obj || !vdev || !macaddr)
+		return;
+
+	if (!soc_obj->stats_ctx)
+		return;
+
+	entry.ts_ms       = qdf_get_time_of_the_day_ms();
+	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
+	entry.type        = TDLS_STATS_TEARDOWN;
+	entry.subtype     = TDLS_STATS_SUBTYPE_COMPLETE;
+	entry.is_sender   = 1;
+	entry.reason_code = reason_code;
+	entry.session_id  = wlan_vdev_get_id(vdev);
+	entry.channel     = wlan_get_operation_chan_freq(vdev);
+
+	/* Look up the peer to get the last known RSSI */
+	tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (tdls_vdev_obj) {
+		peer = tdls_find_peer(tdls_vdev_obj, macaddr);
+		if (peer)
+			entry.rssi = peer->rssi;
+	}
+
+	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
+				    TDLS_STATS_EV_NEW_EVENT,
+				    sizeof(entry), &entry);
+}
+
+/**
+ * tdls_stats_record_peers_teardown_loop() - Common helper to iterate over all
+ *                                             connected TDLS peers and record a
+ *                                             teardown stats entry for each.
+ * @soc_obj:       TDLS soc private object.
+ * @psoc:          PSOC object used to look up each peer's vdev by session_id.
+ * @reason_code:   Teardown reason code.
+ * @filter_vdev_id: If not WLAN_UMAC_VDEV_ID_MAX, only record peers whose
+ *                  session_id matches this value.  Pass WLAN_UMAC_VDEV_ID_MAX
+ *                  to record teardown for all connected peers.
+ *
+ * For each matching peer, the vdev is looked up from the peer's own
+ * session_id so that the stats entry carries the correct channel and
+ * session_id for that peer.
+ */
+static void
+tdls_stats_record_peers_teardown_loop(struct tdls_soc_priv_obj *soc_obj,
+				      struct wlan_objmgr_psoc *psoc,
+				      enum tdls_stats_reason_code reason_code,
+				      uint8_t filter_vdev_id)
+{
+	uint8_t staidx;
+	uint8_t peer_vdev_id;
+	struct wlan_objmgr_vdev *vdev;
+
+	for (staidx = 0; staidx < soc_obj->max_num_tdls_sta; staidx++) {
+		if (!soc_obj->tdls_conn_info[staidx].valid_entry)
+			continue;
+
+		peer_vdev_id = soc_obj->tdls_conn_info[staidx].session_id;
+
+		if (filter_vdev_id != WLAN_UMAC_VDEV_ID_MAX &&
+		    peer_vdev_id != filter_vdev_id)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, peer_vdev_id,
+							     WLAN_TDLS_NB_ID);
+		if (!vdev)
+			continue;
+
+		tdls_stats_record_peer_teardown(
+			soc_obj,
+			vdev,
+			soc_obj->tdls_conn_info[staidx].peer_mac.bytes,
+			reason_code);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+	}
+}
+
+/**
+ * tdls_stats_record_peers_teardown() - Unified teardown stats recorder for
+ *                                       connected TDLS peers.
+ * @psoc:        PSOC object.
+ * @vdev_id:     Vdev ID of the STA session, or WLAN_UMAC_VDEV_ID_MAX to
+ *               record teardown for all connected peers regardless of vdev.
+ * @reason_code: Teardown reason to record for each peer.
+ *
+ * Covers two use cases:
+ *
+ *   1. Per-vdev teardown (vdev_id != WLAN_UMAC_VDEV_ID_MAX):
+ *      Records teardown only for peers whose session_id matches @vdev_id.
+ *      Each peer's stats entry uses its own vdev for accurate channel and
+ *      session_id fields.
+ *
+ *   2. All-peers teardown (vdev_id == WLAN_UMAC_VDEV_ID_MAX):
+ *      Records teardown for every connected TDLS peer.  Each peer's stats
+ *      entry uses its own vdev (looked up from session_id) for accurate
+ *      channel and session_id fields.  Intended for concurrency-driven
+ *      teardowns where no single vdev is the trigger.
+ *
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peers_teardown(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      enum tdls_stats_reason_code reason_code)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	if (!psoc)
+		return;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj || !soc_obj->stats_ctx)
+		return;
+
+	tdls_stats_record_peers_teardown_loop(soc_obj, psoc, reason_code,
+					      vdev_id);
 }

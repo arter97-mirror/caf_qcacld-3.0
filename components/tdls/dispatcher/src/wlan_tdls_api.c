@@ -173,6 +173,16 @@ void  wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	/*
+	 * Record concurrency teardown stats for all connected TDLS peers
+	 * before initiating the synchronous teardown.
+	 */
+	wlan_tdls_stats_record_peers_teardown(
+		psoc, WLAN_UMAC_VDEV_ID_MAX,
+		policy_mgr_is_mcc_on_any_sta_vdev(psoc) ?
+			TDLS_STATS_REASON_CONC_DIFF_BAND :
+			TDLS_STATS_REASON_CONC_SAME_BAND);
+
 	wlan_tdls_teardown_links_sync(psoc, vdev);
 }
 
@@ -220,6 +230,15 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 	 * other vdev.
 	 */
 	if (!tdls_check_is_tdls_allowed(tdls_vdev)) {
+		/*
+		 * Record teardown stats for all connected TDLS peers before
+		 * tearing down the links due to BSS channel switch (CSA).
+		 */
+		wlan_tdls_stats_record_peers_teardown(
+					wlan_vdev_get_psoc(tdls_vdev),
+					wlan_vdev_get_id(tdls_vdev),
+					TDLS_STATS_REASON_BSS_CHANNEL_SWITCH);
+
 		tdls_disable_offchan_and_teardown_links(tdls_vdev);
 		tdls_debug("vdev %d disable the tdls in FW after CSA",
 			   wlan_vdev_get_id(tdls_vdev));

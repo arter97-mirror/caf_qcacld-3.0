@@ -295,6 +295,48 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 				int8_t rssi);
 
 /**
+ * tdls_stats_record_peer_teardown() - Record a TDLS teardown stats entry.
+ * @soc_obj:     TDLS soc private object (provides stats_ctx).
+ * @vdev:        VDEV on which the teardown is occurring.
+ * @macaddr:     MAC address of the peer being torn down.
+ * @reason_code: Teardown reason; use TDLS_STATS_REASON_NO_TRAFFIC when
+ *               both tx and rx packet counts are zero, or
+ *               TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC when traffic exists
+ *               but is below the idle threshold.
+ *
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_TEARDOWN,
+ * subtype=TDLS_STATS_SUBTYPE_GENERAL, is_sender=1, and delivers it to
+ * the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
+				     struct wlan_objmgr_vdev *vdev,
+				     const uint8_t *macaddr,
+				     enum tdls_stats_reason_code reason_code);
+
+/**
+ * tdls_stats_record_peers_teardown() - Unified teardown stats recorder for
+ *                                       connected TDLS peers.
+ * @psoc:        PSOC object.
+ * @vdev_id:     Vdev ID of the STA session, or WLAN_UMAC_VDEV_ID_MAX to
+ *               record teardown for all connected peers regardless of vdev.
+ *               When WLAN_UMAC_VDEV_ID_MAX is passed, the TDLS link vdev is
+ *               used for the channel and session_id fields of the stats entry.
+ * @reason_code: Teardown reason to record for each peer.
+ *
+ * Covers two use cases:
+ *   1. Per-vdev (vdev_id != WLAN_UMAC_VDEV_ID_MAX): records teardown only for
+ *      peers whose session_id matches @vdev_id.
+ *   2. All-peers (vdev_id == WLAN_UMAC_VDEV_ID_MAX): records teardown for
+ *      every connected TDLS peer using the TDLS link vdev.
+ *
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peers_teardown(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      enum tdls_stats_reason_code reason_code);
+
+/**
  * tdls_get_tdls_stats() - Core API to handle a TDLS stats enable/disable
  *                         request from the dispatcher layer.
  * @stats_ctx: TDLS stats context obtained from tdls_soc_priv_obj::stats_ctx.
