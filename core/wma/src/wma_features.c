@@ -5436,3 +5436,59 @@ int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
 }
 #endif
 
+#ifdef IPA_WDI3_VLAN_SUPPORT
+void wma_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
+				    uint8_t pdev_id,
+				    uint8_t dest_ring)
+{
+	uint32_t len = sizeof(wmi_pdev_update_pkt_routing_cmd_fixed_param);
+	wmi_pdev_update_pkt_routing_cmd_fixed_param *cmd;
+	uint8_t target_pdev_id;
+	wmi_unified_t wmi_hdl;
+	QDF_STATUS status;
+	uint32_t tlvlen;
+	wmi_buf_t buf;
+	uint32_t tag;
+
+	wmi_hdl = (wmi_unified_t)get_wmi_unified_hdl_from_psoc(psoc);
+	if (qdf_unlikely(!wmi_hdl))
+		return;
+
+	buf = wmi_buf_alloc(wmi_hdl, len);
+	if (!buf) {
+		target_if_err("wmi_buf_alloc failed");
+		return;
+	}
+
+	cmd = (wmi_pdev_update_pkt_routing_cmd_fixed_param *)wmi_buf_data(buf);
+
+	tag = WMITLV_TAG_STRUC_wmi_pdev_update_pkt_routing_cmd_fixed_param;
+	tlvlen = WMITLV_GET_STRUCT_TLVLEN(
+			wmi_pdev_update_pkt_routing_cmd_fixed_param);
+	WMITLV_SET_HDR(&cmd->tlv_header, tag, tlvlen);
+
+	target_pdev_id = wmi_hdl->ops->convert_host_pdev_id_to_target(wmi_hdl,
+								      pdev_id);
+	cmd->pdev_id = target_pdev_id;
+	cmd->op_code = WMI_PDEV_ADD_PKT_ROUTING;
+	cmd->routing_type_bitmap = BIT(WMI_PDEV_ROUTING_TYPE_VLAN);
+	cmd->dest_ring = dest_ring;
+	cmd->meta_data = WMI_PDEV_ROUTING_TYPE_VLAN;
+	cmd->dest_ring_handler = WMI_PDEV_WIFIRXCCE_USE_CCE_E;
+
+	target_if_debug("Set RX PKT ROUTING TYPE pdev_id: %u opcode: %u",
+			cmd->pdev_id, cmd->op_code);
+	target_if_debug("routing_bitmap: %u, dest_ring: %u",
+			cmd->routing_type_bitmap, cmd->dest_ring);
+	target_if_debug("dest_ring_handler: %u, meta_data: 0x%x",
+			cmd->dest_ring_handler, cmd->meta_data);
+
+	wmi_mtrace(WMI_PDEV_UPDATE_PKT_ROUTING_CMDID, cmd->pdev_id, 0);
+	status = wmi_unified_cmd_send(wmi_hdl, buf, len,
+				      WMI_PDEV_UPDATE_PKT_ROUTING_CMDID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wmi_buf_free(buf);
+		target_if_err("WMI_PDEV_UPDATE_PKT_ROUTING_CMDID failed");
+	}
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */

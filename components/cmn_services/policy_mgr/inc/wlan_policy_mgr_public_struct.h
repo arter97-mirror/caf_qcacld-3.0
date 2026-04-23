@@ -57,7 +57,11 @@
 
 #define MAX_MAC 2
 
-#ifdef FEATURE_FOURTH_CONNECTION
+#if defined(FEATURE_SIXTH_CONNECTION)
+#define MAX_NUMBER_OF_CONC_CONNECTIONS 6
+#elif defined(FEATURE_FIFTH_CONNECTION)
+#define MAX_NUMBER_OF_CONC_CONNECTIONS 5
+#elif defined(FEATURE_FOURTH_CONNECTION)
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 4
 #else
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 3
@@ -205,6 +209,8 @@ enum policy_mgr_pcl_group_id {
  * @POLICY_MGR_PCL_ORDER_NONE: no order
  * @POLICY_MGR_PCL_ORDER_24G_THEN_5G: 2.4 Ghz channel followed by 5 Ghz channel
  * @POLICY_MGR_PCL_ORDER_5G_THEN_2G: 5 Ghz channel followed by 2.4 Ghz channel
+ * @POLICY_MGR_PCL_ORDER_2G: 2G channels
+ * @POLICY_MGR_PCL_ORDER_5G: 5G channels
  *
  * Order in which the PCL is requested
  */
@@ -212,6 +218,8 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_NONE,
 	POLICY_MGR_PCL_ORDER_24G_THEN_5G,
 	POLICY_MGR_PCL_ORDER_5G_THEN_2G,
+	POLICY_MGR_PCL_ORDER_2G,
+	POLICY_MGR_PCL_ORDER_5G,
 };
 
 /**
@@ -331,6 +339,7 @@ enum policy_mgr_mac_use {
  * @PM_SCC_CH_5G: SCC channel & 5 Ghz channels
  * @PM_24G_SCC_CH: 2.4 Ghz channels & SCC channel
  * @PM_5G_SCC_CH: 5 Ghz channels & SCC channel
+ * @PM_SCC_ON_5_CH_5G: 5 Ghz SCC channel & 5 Ghz channels
  * @PM_SCC_ON_5_SCC_ON_24_24G: SCC channel on 5 Ghz, SCC
  *	channel on 2.4 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_5_SCC_ON_24_5G: SCC channel on 5 Ghz, SCC channel
@@ -339,6 +348,7 @@ enum policy_mgr_mac_use {
  *	channel on 5 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_24_SCC_ON_5_5G: SCC channel on 2.4 Ghz, SCC
  *	channel on 5 Ghz & 5 Ghz channels
+ * @PM_SCC_ON_24_CH_24G: SCC channel on 2.4 GHz & 2.4 GHz channels
  * @PM_SCC_ON_5_SCC_ON_24: SCC channel on 5 Ghz, SCC channel on
  *	2.4 Ghz
  * @PM_SCC_ON_24_SCC_ON_5: SCC channel on 2.4 Ghz, SCC channel
@@ -368,10 +378,12 @@ enum policy_mgr_pcl_type {
 	PM_SCC_CH_5G,
 	PM_24G_SCC_CH,
 	PM_5G_SCC_CH,
+	PM_SCC_ON_5_CH_5G,
 	PM_SCC_ON_5_SCC_ON_24_24G,
 	PM_SCC_ON_5_SCC_ON_24_5G,
 	PM_SCC_ON_24_SCC_ON_5_24G,
 	PM_SCC_ON_24_SCC_ON_5_5G,
+	PM_SCC_ON_24_CH_24G,
 	PM_SCC_ON_5_SCC_ON_24,
 	PM_SCC_ON_24_SCC_ON_5,
 	PM_MCC_CH_24G,
@@ -850,8 +862,12 @@ enum policy_mgr_two_connection_mode {
  * 5ghz DBS
  * @PM_NDI_NDI_5_NAN_DISC_24_DBS: Both NDI on 5ghz and NAN Disc on 2.4Ghz DBS
  * @PM_NDI_NDI_NAN_DISC_24_SMM: Both NDI, NAN Disc on 2.4ghz SMM
+ * @PM_SAP_SAP_SAP_SCC_24_SMM: AP+AP+AP on 2.4Ghz in SMM mode
+ * @PM_SAP_SAP_SAP_SCC_5_SMM: AP+AP+AP on 5Ghz in SMM mode
  * @PM_SAP_SAP_SCC_24_SAP_5_DBS: Both SAP on 2.4Ghz and another SAP on 5Ghz DBS
  * @PM_SAP_SAP_SCC_5_SAP_24_DBS: Both SAP on 5Ghz and another SAP on 2.4Ghz DBS
+ * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and and STA,
+ * SAP SCC MCC on DBS
  */
 enum policy_mgr_three_connection_mode {
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
@@ -868,12 +884,72 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_NDI_24_NDI_5_DBS,
 	PM_NDI_NDI_5_NAN_DISC_24_DBS,
 	PM_NDI_NDI_NAN_DISC_24_SMM,
+	PM_SAP_SAP_SAP_SCC_24_SMM,
+	PM_SAP_SAP_SAP_SCC_5_SMM,
 	PM_SAP_SAP_SCC_24_SAP_5_DBS,
 	PM_SAP_SAP_SCC_5_SAP_24_DBS,
+	PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS,
 
 	PM_MAX_THREE_CONNECTION_MODE
 };
 #endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+/**
+ * enum policy_mgr_four_connection_mode - Combination of first four
+ * connection type, concurrency state, band used.
+ * @PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS: NAN on 2GHz, both STA SCC
+ * or MCC on 2GHz/5GHz and SAP SCC on 2GHz
+ * @PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS : NAN on 2GHz, NDI on 2GHz/5GHz
+ * and both STA SCC or MCC on 2GHz/5GHz,
+ * @PM_SAP_SAP_24G_SAP_SAP_5G_DBS: AP+AP on 2 GHz, AP+AP on 5 GHz
+ * @PM_SAP_SAP_SAP_24G_SAP_5G_DBS: AP+AP+AP on 2 GHz, AP on 5 GHz
+ * @PM_SAP_SAP_SAP_5G_SAP_24G_DBS: AP+AP+AP on 5 GHz, AP on 2 GHz
+ * @PM_SAP_SAP_5G_SAP_SAP_5G_SBS: AP+AP on 5 GHz high, AP+AP on 5 GHz low
+ * @PM_SAP_SAP_SAP_5G_LOW_SAP_5G_HIGH_SBS: AP+AP+AP on 5 GHz low,
+ *					   AP on 5 GHz high
+ * @PM_SAP_SAP_SAP_5G_HIGH_SAP_5G_LOW_SBS: AP+AP+AP on 5 GHz high,
+ *					   AP on 5 GHz low
+ * @PM_MAX_FOUR_CONNECTION_MODE: Maximum enumeration
+ */
+enum policy_mgr_four_connection_mode {
+	/* NAN disc + ML-STA + SAP */
+	PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS,
+	/* NAN disc + NDI + ML-STA */
+	PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS,
+
+	/* 4 SAP */
+	PM_SAP_SAP_24G_SAP_SAP_5G_DBS,
+	PM_SAP_SAP_SAP_24G_SAP_5G_DBS,
+	PM_SAP_SAP_SAP_5G_SAP_24G_DBS,
+	PM_SAP_SAP_5G_SAP_SAP_5G_SBS,
+	PM_SAP_SAP_SAP_5G_LOW_SAP_5G_HIGH_SBS,
+	PM_SAP_SAP_SAP_5G_HIGH_SAP_5G_LOW_SBS,
+
+	PM_MAX_FOUR_CONNECTION_MODE,
+};
+#endif
+
+/**
+ * enum policy_mgr_five_connection_mode - Combination of first five
+ * connection type, concurrency state, band used.
+ * @PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS: AP+AP+AP on 2 GHz, AP+AP on 5 GHz
+ * @PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS: AP+AP+AP on 5 GHz, AP+AP on 2 GHz
+ * @PM_SAP_SAP_SAP_5G_LOW_SAP_SAP_5G_HIGH_SBS: AP+AP+AP on 5 GHz low,
+ * AP+AP on 5 GHz high
+ * @PM_SAP_SAP_SAP_5G_HIGH_SAP_SAP_5G_LOW_SBS: AP+AP+AP on 5 GHz high,
+ * AP+AP on 5 GHz low
+ * @PM_MAX_FIVE_CONNECTION_MODE: Maximum enumeration
+ */
+enum policy_mgr_five_connection_mode {
+	/* 5 SAP */
+	PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS,
+	PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS,
+	PM_SAP_SAP_SAP_5G_LOW_SAP_SAP_5G_HIGH_SBS,
+	PM_SAP_SAP_SAP_5G_HIGH_SAP_SAP_5G_LOW_SBS,
+
+	PM_MAX_FIVE_CONNECTION_MODE,
+};
 
 /**
  * enum policy_mgr_conc_next_action - actions to be taken on old

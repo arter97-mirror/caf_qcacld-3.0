@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *  Copyright (c) 2009 Atheros Communications Inc.  All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -30,6 +30,7 @@
 #include "ieee80211.h"
 #include "ieee80211_defines.h"
 #include "ieee80211_ioctl.h"
+#include "if_athioctl.h"
 
 #define ATH_PARAM_SHIFT     0x1000
 

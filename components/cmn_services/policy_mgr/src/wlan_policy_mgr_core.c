@@ -2320,6 +2320,47 @@ policy_mgr_get_connection_channels(struct wlan_objmgr_psoc *psoc,
 				conn_index++;
 			}
 		}
+	} else if (order == POLICY_MGR_PCL_ORDER_2G) {
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    idx < pcl_sz) {
+				pcl_freqs[idx] = cl[conn_index++].freq;
+				pcl_weights[idx] = weight1;
+				idx++;
+
+			} else {
+				conn_index++;
+			}
+		}
+	} else if (order == POLICY_MGR_PCL_ORDER_5G) {
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (skip_dfs_channel &&
+			    wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
+						     cl[conn_index].freq)) {
+				conn_index++;
+			} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+					cl[conn_index].freq) &&
+				   (idx < pcl_sz)) {
+				pcl_freqs[idx] = cl[conn_index++].freq;
+				pcl_weights[idx] = weight1;
+				idx++;
+			} else {
+				conn_index++;
+			}
+		}
+		conn_index = 0;
+		while (add_6ghz &&
+		       PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			bool is_6ghz_ch = WLAN_REG_IS_6GHZ_CHAN_FREQ(
+				cl[conn_index].freq);
+			if (is_6ghz_ch && idx < pcl_sz) {
+				pcl_freqs[idx] = cl[conn_index++].freq;
+				pcl_weights[idx] = weight1;
+				idx++;
+			} else {
+				conn_index++;
+			}
+		}
 	} else {
 		policy_mgr_err("unknown order %d", order);
 		status = QDF_STATUS_E_FAILURE;
@@ -2778,6 +2819,32 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_add_5g_to_pcl(psoc, pcl_channels, pcl_weights,
 					 pcl_sz, len,
 					 POLICY_MGR_PCL_GROUP_ID3_ID4,
+					 channel_list_5, chan_index_5,
+					 channel_list_6, chan_index_6);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_24_CH_24G:
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
+					  channel_list_24, chan_index_24);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5_CH_5G:
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_5G,
+						   skip_dfs_channel,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		policy_mgr_add_5g_to_pcl(psoc, pcl_channels, pcl_weights,
+					 pcl_sz, len,
+					 POLICY_MGR_PCL_GROUP_ID2_ID3,
 					 channel_list_5, chan_index_5,
 					 channel_list_6, chan_index_6);
 		status = QDF_STATUS_SUCCESS;

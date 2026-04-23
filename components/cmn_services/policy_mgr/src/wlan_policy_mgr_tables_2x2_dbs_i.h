@@ -1765,6 +1765,10 @@ fourth_connection_pcl_dbs_table
 	[PM_SAP_SAP_SCC_24_SAP_5_DBS] = {
 	[PM_SAP_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_SAP_SAP_SCC_5_SAP_24_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } },
+	[PM_SAP_SAP_SAP_SCC_24_SMM] = {
+	[PM_SAP_MODE] =	{ PM_5G, PM_5G, PM_5G } },
+	[PM_SAP_SAP_SAP_SCC_5_SMM] = {
 	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } }
 };
 #else
@@ -1781,20 +1785,225 @@ fourth_connection_pcl_dbs_table
 	[PM_MAX_THREE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
 	[PM_MAX_CONC_PRIORITY_MODE] = {
 	[PM_NAN_DISC_STA_24_NDI_5_DBS] = {
-	[PM_NDI_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
 	[PM_NAN_DISC_NDI_24_STA_5_DBS] = {
-	[PM_NDI_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
 	[PM_STA_NDI_5_NAN_DISC_24_DBS] = {
-	[PM_NDI_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
 	[PM_STA_NDI_NAN_DISC_24_SMM] = {
-	[PM_NDI_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
 	[PM_NAN_DISC_NDI_24_NDI_5_DBS] = {
 	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_NDI_NDI_5_NAN_DISC_24_DBS] = {
 	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_NDI_NDI_NAN_DISC_24_SMM] = {
-	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } }
+	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_STA_STA_5_NAN_DISC_24_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_STA_5_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_STA_STA_24_NAN_DISC_24_SMM] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_STA_24_SMM] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_STA_24_STA_5_NAN_DISC_24_SMM] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_STA_24_STA_5_NAN_DISC_24_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_STA_5_STA_24_NAN_DISC_24_SMM] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_STA_5_STA_24_NAN_DISC_24_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_5_STA_24_SMM] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_5_STA_24_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_24_STA_5_SMM] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_24_STA_5_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS] = {
+	[PM_STA_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS] = {
+	[PM_STA_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS] = {
+	[PM_STA_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+	[PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_24_SCC_MCC_PLUS_5_DBS] = {
+	[PM_STA_MODE] = { PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
+			 PM_SCC_ON_5_CH_5G},
+	[PM_P2P_GO_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24G,
+			     PM_SCC_ON_5_5G_SCC_ON_24G,
+			     PM_SCC_ON_5_5G_SCC_ON_24G},
+	[PM_SAP_MODE] = { PM_SCC_ON_5_SCC_ON_24, PM_SCC_ON_5_SCC_ON_24,
+			 PM_SCC_ON_5_SCC_ON_24},
+	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_5_SCC_MCC_PLUS_24_DBS] = {
+	[PM_STA_MODE] = { PM_SBS_CH_2G, PM_SBS_CH_2G,
+			  PM_SBS_CH_2G },
+	[PM_P2P_GO_MODE] = { PM_SBS_CH_24G_SCC_CH, PM_SBS_CH_24G_SCC_CH,
+			     PM_SBS_CH_24G_SCC_CH },
+	[PM_SAP_MODE] = { PM_SCC_ON_24_SCC_ON_5, PM_SCC_ON_24_SCC_ON_5,
+			  PM_SCC_ON_24_SCC_ON_5 },
+	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS] = {
+	[PM_STA_MODE] = {PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G},
+	[PM_P2P_GO_MODE] = {PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+			    PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+			    PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G},
+	[PM_SAP_MODE] = {PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G},
+	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS] = {
+	[PM_STA_MODE] = {PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G},
+	[PM_P2P_GO_MODE] = {PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
+			    PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
+			    PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G},
+	[PM_SAP_MODE] = {PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
+			 PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G},
+	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS] = {
+	[PM_STA_MODE] = {PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
+			 PM_SCC_ON_5_CH_5G},
+	[PM_P2P_GO_MODE] = {PM_SCC_ON_5_5G_SCC_ON_24G,
+			    PM_SCC_ON_5_5G_SCC_ON_24G,
+			    PM_SCC_ON_5_5G_SCC_ON_24G},
+	[PM_SAP_MODE] = {PM_SCC_ON_5_5G_SCC_ON_24G, PM_SCC_ON_5_5G_SCC_ON_24G,
+			 PM_SCC_ON_5_5G_SCC_ON_24G},
+	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_24_5_PLUS_5_LOW_OR_HIGH_SHARE_SBS] = {
+	[PM_STA_MODE] = {PM_SCC_ON_24_CH_24G, PM_SCC_ON_24_CH_24G,
+			PM_SCC_ON_24_CH_24G},
+	[PM_P2P_GO_MODE] = {PM_SCC_ON_24_SCC_ON_5_24G,
+			    PM_SCC_ON_24_SCC_ON_5_24G,
+			    PM_SCC_ON_24_SCC_ON_5_24G},
+	[PM_SAP_MODE] = {PM_SCC_ON_24_SCC_ON_5_24G, PM_SCC_ON_24_SCC_ON_5_24G,
+			PM_SCC_ON_24_SCC_ON_5_24G},
+	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
 };
+#endif
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+/*
+ * fifth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 5th connection, when we have 4 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 5 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+fifth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FOUR_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {
+#if !defined(MDM_PLATFORM)
+	[PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS] = {
+	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
+	[PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS] = {
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
+#endif
+	[PM_SAP_SAP_24G_SAP_SAP_5G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_CH, PM_SCC_CH, PM_SCC_CH} },
+	[PM_SAP_SAP_SAP_24G_SAP_5G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
+			 PM_SCC_ON_5_CH_5G} },
+	[PM_SAP_SAP_SAP_5G_SAP_24G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_24_CH_24G, PM_SCC_ON_24_CH_24G,
+			 PM_SCC_ON_24_CH_24G} },
+};
+#endif
+
+#ifdef FEATURE_SIXTH_CONNECTION
+#if defined(AUTO_PLATFORM)
+/*
+ * sixth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 6th connection, when we have 5 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 6 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {};
+#elif defined(MDM_PLATFORM)
+/*
+ * sixth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 6th connection, when we have 5 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 6 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {
+	[PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
+			 PM_SCC_ON_5_CH_5G} },
+	[PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_24_CH_24G, PM_SCC_ON_24_CH_24G,
+			 PM_SCC_ON_24_CH_24G} },
+};
+#else
+/*
+ * sixth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 6th connection, when we have 5 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 6 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {};
 #endif
 #endif
 

@@ -36,6 +36,7 @@
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_dcs_ucfg_api.h>
 #include <wlan_nlink_common.h>
+#include <ieee80211_defines.h>
 
 static struct son_callbacks g_son_os_if_cb;
 static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
@@ -499,6 +500,22 @@ int os_if_son_set_chan(struct wlan_objmgr_vdev *vdev,
 	return ret;
 }
 qdf_export_symbol(os_if_son_set_chan);
+
+int os_if_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev, uint32_t pri)
+{
+	int ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+
+	ret = g_son_os_if_cb.os_if_set_def_tidmap_prty(vdev, pri);
+	osif_debug("vdev %d pri %d ", wlan_vdev_get_id(vdev), pri);
+
+	return ret;
+}
+qdf_export_symbol(os_if_son_set_def_tidmap_prty);
 
 int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
 			      int cac_timeout)
@@ -1001,6 +1018,10 @@ QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *vdev,
 		break;
 	case VDEV_SET_WNM_BSS_PREF:
 		break;
+	case VDEV_SET_SON_MAP_VERSION:
+		break;
+	case VDEV_SET_MCTBL:
+		break;
 	case VDEV_GET_NSS:
 		break;
 	case VDEV_GET_CHAN:
@@ -1144,6 +1165,8 @@ QDF_STATUS os_if_son_peer_ops(struct wlan_objmgr_peer *peer,
 						(peer, WLAN_PEER_F_EXT_STATS);
 			}
 		}
+		break;
+	case PEER_SET_VLAN_ID:
 		break;
 	case PEER_REQ_INST_STAT:
 		status = wlan_son_peer_req_inst_stats(pdev, peer->macaddr,
