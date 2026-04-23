@@ -897,6 +897,7 @@ int wlan_hdd_wondertap_init(void **handle,
 	struct hdd_adapter *adapter;
 	struct hdd_wondertap_context *wt_ctx;
 	uint8_t curr_cc[REG_ALPHA2_LEN + 1] = {0};
+	struct bbm_params voting_params = {0};
 	QDF_STATUS status;
 	int errno;
 
@@ -1032,6 +1033,16 @@ int wlan_hdd_wondertap_init(void **handle,
 
 	*handle = (void *)wt_ctx->magic;
 
+	/*
+	 * Apply the PASSTHRU interface policy to set the
+	 * BUS voting to VERY_HIGH
+	 */
+	voting_params.policy = BBM_INTF_MODE_POLICY;
+	voting_params.policy_info.intf.intf_mode = QDF_PASSTHRU_MODE;
+	voting_params.policy_info.intf.set = 1;
+	ucfg_dp_bbm_apply_independent_policy(hdd_ctx->psoc, &voting_params);
+	ucfg_dp_set_current_throughput_level(hdd_ctx->psoc,
+					     PLD_BUS_WIDTH_VERY_HIGH);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return errno;
@@ -1092,6 +1103,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	struct wlan_hdd_link_info *sta_link_info;
 	struct pkt_filter_cfg filter_req = {0};
 	struct osif_vdev_sync *vdev_sync;
+	struct bbm_params voting_params = {0};
 	int errno;
 
 	hdd_enter();
@@ -1111,6 +1123,15 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	hdd_ctx = wt_ctx->hdd_ctx;
 	wt_adapter = wt_ctx->wt_adapter;
 	mutex_unlock(&g_wt_ctx_mutex);
+
+	/*
+	 * With PASSTHRU being the only interface policy, it is safe to
+	 * use QDF_MAX_NO_OF_MODE to withdraw this policy.
+	 */
+	voting_params.policy = BBM_INTF_MODE_POLICY;
+	voting_params.policy_info.intf.intf_mode = QDF_PASSTHRU_MODE;
+	voting_params.policy_info.intf.set = 0;
+	ucfg_dp_bbm_apply_independent_policy(hdd_ctx->psoc, &voting_params);
 
 	ASSERT_RTNL();
 

@@ -579,6 +579,7 @@ enum bbm_non_per_flag {
  *  is set without taking other policy vote levels into consideration.
  * @BBM_SELECT_TABLE_POLICY: policy where bus bw table is selected based on
  *  the latency level.
+ * @BBM_INTF_MODE_POLICY: Policy specific to certain interfaces
  * @BBM_MAX_POLICY: max policy
  */
 enum bbm_policy {
@@ -587,6 +588,7 @@ enum bbm_policy {
 	BBM_USER_POLICY,
 	BBM_NON_PERSISTENT_POLICY,
 	BBM_SELECT_TABLE_POLICY,
+	BBM_INTF_MODE_POLICY,
 	BBM_MAX_POLICY,
 };
 
@@ -614,6 +616,10 @@ enum wlm_ll_level {
  * @user_level: user bus bandwidth vote. valid for BBM_USER_POLICY.
  * @set: set or reset user level. valid for BBM_USER_POLICY.
  * @usr: user specific info
+ * @intf: Interface specific info
+ * @intf.intf_mode: Interface opmode. valid for BBM_INTF_MODE_POLICY.
+ * @intf.set: flag to indicate set or reset interface mode policy.
+ *	      Valid for BBM_INTF_MODE_POLICY.
  */
 union bbm_policy_info {
 	enum QDF_GLOBAL_MODE driver_mode;
@@ -624,6 +630,10 @@ union bbm_policy_info {
 		enum bus_bw_level user_level;
 		bool set;
 	} usr;
+	struct {
+		enum QDF_OPMODE intf_mode;
+		bool set;
+	} intf;
 };
 
 /**
