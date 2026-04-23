@@ -3588,6 +3588,102 @@ hdd_indicate_ese_bcn_report_ind(const struct hdd_adapter *adapter,
 
 #endif /* FEATURE_WLAN_ESE */
 
+/**
+ * hdd_csa_seg_chan_to_freq() - Convert a CSA center freq segment channel
+ * number to frequency
+ * @pdev: pdev object
+ * @op_class: new operating class from the CSA event
+ * @chan: center freq segment channel number
+ *
+ * Return: Channel frequency in MHz, or 0 if @chan is 0
+ */
+static qdf_freq_t hdd_csa_seg_chan_to_freq(struct wlan_objmgr_pdev *pdev,
+					   uint8_t op_class, uint8_t chan)
+{
+	if (!chan)
+		return 0;
+
+	if (op_class && wlan_reg_is_6ghz_op_class(pdev, op_class))
+		return wlan_reg_chan_band_to_freq(pdev, chan,
+						  BIT(REG_BAND_6G));
+
+	return wlan_reg_legacy_chan_to_freq(pdev, chan);
+}
+
+/**
+ * hdd_sta_csa_received_handler() - STA CSA received event handler
+ * @vdev_id: vdev id
+ * @csa_event: CSA offload parameters
+ *
+ * Handles CSA IE received event for STA mode by calling
+ * hdd_chan_change_started_notify directly. Registered as
+ * .osif_vdev_mgr_sta_csa_received in osif_vdev_mgrlegacy_ops.
+ *
+ * Return: None
+ */
+void hdd_sta_csa_received_handler(uint8_t vdev_id,
+				  struct csa_offload_params *csa_event)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx;
+	struct freq_change_info *ch_chng_info;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("link_info is NULL for vdev %d", vdev_id);
+		return;
+	}
+
+	ch_chng_info = &link_info->ch_chng_info;
+	if (ch_chng_info->ch_chng_type == CHAN_SWITCH_START_NOTIFY &&
+	    ch_chng_info->freq == csa_event->csa_chan_freq &&
+	    ch_chng_info->ch_params.ch_width == csa_event->new_ch_width) {
+		hdd_debug("vdev %d: CSA already in progress for freq %u width %d, skip duplicate start notify",
+			  vdev_id, csa_event->csa_chan_freq,
+			  csa_event->new_ch_width);
+		return;
+	}
+
+	ch_chng_info->freq = csa_event->csa_chan_freq;
+	ch_chng_info->ch_params.ch_width = csa_event->new_ch_width;
+	ch_chng_info->ch_params.sec_ch_offset = csa_event->sec_chan_offset;
+	ch_chng_info->ch_params.center_freq_seg0 = csa_event->new_ch_freq_seg1;
+	ch_chng_info->ch_params.center_freq_seg1 = csa_event->new_ch_freq_seg2;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (vdev) {
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (pdev) {
+			ch_chng_info->ch_params.mhz_freq_seg0 =
+				hdd_csa_seg_chan_to_freq(
+						pdev, csa_event->new_op_class,
+						csa_event->new_ch_freq_seg1);
+			ch_chng_info->ch_params.mhz_freq_seg1 =
+				hdd_csa_seg_chan_to_freq(
+						pdev, csa_event->new_op_class,
+						csa_event->new_ch_freq_seg2);
+		}
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	}
+
+	ch_chng_info->ch_chng_type = CHAN_SWITCH_START_NOTIFY;
+
+	hdd_debug("STA CSA IE received: vdev %d freq %u width %d",
+		  vdev_id, csa_event->csa_chan_freq,
+		  csa_event->new_ch_width);
+
+	hdd_chan_change_started_notify(link_info, ch_chng_info->freq,
+				       &ch_chng_info->ch_params);
+}
+
 /*
  * hdd_roam_channel_switch_handler() - hdd channel switch handler
  * @link_info: Link info pointer in HDD adapter

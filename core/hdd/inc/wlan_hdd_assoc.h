@@ -523,6 +523,19 @@ bool hdd_any_valid_peer_present(struct wlan_hdd_link_info *link_info);
 QDF_STATUS hdd_cm_register_cb(void);
 
 /**
+ * hdd_sta_csa_received_handler() - STA CSA received event handler
+ * @vdev_id: vdev id
+ * @csa_event: CSA offload parameters
+ *
+ * Handles CSA IE received event for STA mode. Registered as
+ * .osif_vdev_mgr_sta_csa_received in osif_vdev_mgrlegacy_ops.
+ *
+ * Return: None
+ */
+void hdd_sta_csa_received_handler(uint8_t vdev_id,
+				  struct csa_offload_params *csa_event);
+
+/**
  * hdd_cm_unregister_cb - Resets legacy callbacks to osif
  *
  * API to reset legacy callbacks to osif

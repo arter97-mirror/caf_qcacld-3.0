@@ -22437,6 +22437,7 @@ struct osif_vdev_mgr_ops osif_vdev_mgrlegacy_ops = {
 	.osif_vdev_mgr_send_scan_done_complete_cb =
 					hdd_send_scan_done_complete_cb,
 	.osif_vdev_mgr_get_p2p_wdev_cb = hdd_get_p2p_wdev,
+	.osif_vdev_mgr_sta_csa_received = hdd_sta_csa_received_handler,
 };
 
 static QDF_STATUS hdd_vdev_mgr_register_cb(void)

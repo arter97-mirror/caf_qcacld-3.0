@@ -228,6 +228,19 @@ wlan_get_ap_prefer_conc_ch_params(
 		struct ch_params *ch_params);
 
 /**
+ * hdd_chan_change_started_notify() - Notify channel switch started to
+ * userspace
+ * @link_info: pointer to link_info
+ * @freq: channel frequency
+ * @ch_params: channel params
+ *
+ * Return: None
+ */
+void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
+				    qdf_freq_t freq,
+				    struct ch_params *ch_params);
+
+/**
  * hdd_get_ap_6ghz_capable() - Get ap vdev 6ghz capable flags
  * @psoc: PSOC object information
  * @vdev_id: vdev id

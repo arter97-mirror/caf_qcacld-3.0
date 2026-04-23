@@ -2426,9 +2426,9 @@ static void hdd_copy_chan_params(struct wlan_objmgr_pdev *pdev,
  *
  * Return: None
  */
-static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
-					   qdf_freq_t freq,
-					   struct ch_params *ch_params)
+void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
+				    qdf_freq_t freq,
+				    struct ch_params *ch_params)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
