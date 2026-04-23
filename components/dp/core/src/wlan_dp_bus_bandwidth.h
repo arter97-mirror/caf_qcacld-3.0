@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,12 +41,14 @@ typedef const enum bus_bw_level
  * @curr_bus_bw_lookup_table: current bus bw lookup table
  * @curr_vote_level: current vote level
  * @per_policy_vote: per BBM policy related vote
+ * @intf_policy_vote: Interface policy votes for all the OPMODEs
  * @bbm_lock: BBM API lock
  */
 struct bbm_context {
 	bus_bw_table_type *curr_bus_bw_lookup_table;
 	enum bus_bw_level curr_vote_level;
 	enum bus_bw_level per_policy_vote[BBM_MAX_POLICY];
+	enum bus_bw_level intf_policy_vote[QDF_MAX_NO_OF_MODE];
 	qdf_mutex_t bbm_lock;
 };
 
