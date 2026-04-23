@@ -3343,6 +3343,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_mlo_roam_copy_partner_info_to_session(ft_session_ptr,
 						  roam_sync_ind_ptr);
 
+	mgmt_txrx_frame_hex_dump((uint8_t *)roam_sync_ind_ptr +
+				  roam_sync_ind_ptr->reassoc_req_offset,
+				  roam_sync_ind_ptr->reassoc_req_length, true);
 	reassoc_resp = (uint8_t *)roam_sync_ind_ptr +
 			roam_sync_ind_ptr->reassoc_resp_offset;
 	mgmt_txrx_frame_hex_dump(reassoc_resp,

@@ -820,6 +820,8 @@ void wlan_cm_set_psk_pmk(struct wlan_objmgr_pdev *pdev,
 		qdf_mem_copy(rso_cfg->psk_pmk, psk_pmk, pmk_len);
 	rso_cfg->pmk_len = pmk_len;
 
+	mlme_debug("session PMK stored for next roaming: vdev_id:%d pmk_len:%d",
+		   vdev_id, pmk_len);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
 			   rso_cfg->psk_pmk, WLAN_MAX_PMK_DUMP_BYTES);
 

@@ -499,11 +499,6 @@ cm_populate_connect_ies(struct roam_offload_synch_ind *roam_synch_data,
 			reassoc_rsp_len = roam_synch_data->reassoc_resp_length;
 		}
 
-		mlme_debug("vdevid: %d Assoc Rsp",
-			   rsp->connect_rsp.vdev_id);
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
-				   reassoc_rsp_ptr, reassoc_rsp_len);
-
 		/* Skip header and cache the IEs */
 		connect_ies->assoc_rsp.len = reassoc_rsp_len -
 					sizeof(struct wlan_frame_hdr);

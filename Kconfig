@@ -1197,6 +1197,10 @@ config SAE_SINGLE_PMK
 	bool "Enable SAE_SINGLE_PMK"
 	default n
 
+config WLAN_FEATURE_PMKSA_DEBUG_DUMP
+	bool "Enable PMKSA table debug dump"
+	default n
+
 config SAP_AVOID_ACS_FREQ_LIST
 	bool "Enable SAP_AVOID_ACS_FREQ_LIST"
 	default n

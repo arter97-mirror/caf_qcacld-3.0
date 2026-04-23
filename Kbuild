@@ -4772,6 +4772,9 @@ ccflags-$(CONFIG_ADAPTIVE_11R) += -DWLAN_ADAPTIVE_11R
 #Flag to enable/disable sae single pmk feature feature
 ccflags-$(CONFIG_SAE_SINGLE_PMK) += -DWLAN_SAE_SINGLE_PMK
 
+#Flag to enable/disable PMKSA debug dump feature
+ccflags-$(CONFIG_WLAN_FEATURE_PMKSA_DEBUG_DUMP) += -DWLAN_FEATURE_PMKSA_DEBUG_DUMP
+
 #Flag to enable/disable multi client low latency feature support
 ccflags-$(CONFIG_MULTI_CLIENT_LL_SUPPORT) += -DMULTI_CLIENT_LL_SUPPORT
 
