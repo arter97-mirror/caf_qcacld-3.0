@@ -3642,14 +3642,16 @@ lim_del_bss(struct mac_context *mac, tpDphHashNode sta, uint16_t bss_idx,
  * IEEE 802.11ac / IEEE 802.11-2024 (2 bits):
  * 00: Supports 80 MHz only
  * 01: Supports 160 MHz and 80+80 MHz
- * 10: Reserved
- * 11: Reserved
+ * 10: Supports 160 MHz
+ * 11: Supports 80+80 MHz
  *
  * Note: Driver uses the internal enum values below for code clarity.
  */
 enum lim_vht_supported_ch_width {
 	LIM_VHT_CAP_CH_WIDTH_80MHZ = 0,
 	LIM_VHT_CAP_CH_WIDTH_160_AND_80P80MHZ = 1,
+	LIM_VHT_CAP_CH_WIDTH_160MHZ = 2,
+	LIM_VHT_CAP_CH_WIDTH_80P80MHZ = 3
 };
 
 /**
@@ -3706,8 +3708,10 @@ enum phy_ch_width lim_get_vht_ap_max_ch_width(tDot11fIEVHTCaps *vht_caps)
 
 	switch (claimed_ch_width) {
 	case LIM_VHT_CAP_CH_WIDTH_80MHZ:
+	case LIM_VHT_CAP_CH_WIDTH_80P80MHZ:
 		ap_max_ch_width = CH_WIDTH_80MHZ;
 		break;
+	case LIM_VHT_CAP_CH_WIDTH_160MHZ:
 	case LIM_VHT_CAP_CH_WIDTH_160_AND_80P80MHZ:
 		ap_max_ch_width = CH_WIDTH_160MHZ;
 		break;
