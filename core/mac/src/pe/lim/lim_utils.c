@@ -10193,6 +10193,59 @@ void lim_populate_security_profile_ie(struct pe_session *pe_session,
 	pe_debug("vdev %d: Security Profile IE added, profile %d",
 		 pe_session->vdev_id, profile_num);
 }
+
+bool lim_validate_assoc_rsp_security_profile(
+		struct mac_context *mac_ctx,
+		struct pe_session *session_entry,
+		tSirAssocRsp *assoc_rsp)
+{
+	const uint8_t *ap_sp_ie;
+	uint16_t ap_sp_len;
+	uint8_t ap_bitmap_octets, rsp_bitmap_octets;
+	struct scan_cache_entry *scan_entry;
+	bool sp_match = false;
+
+	if (session_entry->sec_profile_num < 0 ||
+	    !session_entry->assoc_req ||
+	    !((tSirMacMgmtHdr *)session_entry->assoc_req)->fc.wep)
+		return true;
+
+	scan_entry = wlan_cm_get_curr_candidate_entry(session_entry->vdev,
+						      session_entry->cm_id);
+	if (!scan_entry) {
+		pe_err("SP IE validation: no scan entry for vdev %d",
+		       session_entry->vdev_id);
+		return true;
+	}
+
+	ap_sp_ie = util_scan_entry_security_profile(scan_entry);
+	ap_sp_len = ap_sp_ie ? ap_sp_ie[1] + 2 : 0;
+
+	if (assoc_rsp->security_profile.present && ap_sp_len >= 5) {
+		ap_bitmap_octets = ap_sp_ie[4] & 0x0f;
+		rsp_bitmap_octets =
+			assoc_rsp->security_profile
+			.number_of_octets_of_security_profile_bitmap;
+		sp_match =
+			(ap_sp_len >= (uint16_t)(5 + ap_bitmap_octets)) &&
+			((ap_sp_ie[3] & 0x03) ==
+			 (assoc_rsp->security_profile.extended_key_id |
+			  (assoc_rsp->security_profile.ocvc << 1))) &&
+			(ap_bitmap_octets == rsp_bitmap_octets) &&
+			(assoc_rsp->security_profile.num_data >=
+			 rsp_bitmap_octets) &&
+			!qdf_mem_cmp(ap_sp_ie + 5,
+				     assoc_rsp->security_profile.data,
+				     ap_bitmap_octets);
+	}
+
+	util_scan_free_cache_entry(scan_entry);
+
+	if (sp_match)
+		return true;
+
+	return false;
+}
 #endif /* WLAN_FEATURE_SECURITY_PROFILE */
 
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)

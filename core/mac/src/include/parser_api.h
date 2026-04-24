@@ -573,6 +573,9 @@ typedef struct sSirAssocRsp {
 #ifdef WLAN_FEATURE_11BN_SMD
 	struct wlan_smd_ie smd_ie;
 #endif
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+	tDot11fIEsecurity_profile security_profile;
+#endif
 } tSirAssocRsp, *tpSirAssocRsp;
 
 #ifdef FEATURE_WLAN_ESE
@@ -2282,6 +2285,18 @@ static inline
 void populate_dot11f_ecsa_param_set_for_ll_sap(
 			struct wlan_objmgr_vdev *vdev,
 			tDot11fIEqcn_ie *qcn_ie)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+void
+sir_copy_assoc_rsp_security_profile(tDot11fAssocResponse *ar,
+				    tpSirAssocRsp pAssocRsp);
+#else
+static inline void
+sir_copy_assoc_rsp_security_profile(tDot11fAssocResponse *ar,
+				    tpSirAssocRsp pAssocRsp)
 {
 }
 #endif

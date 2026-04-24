@@ -5242,6 +5242,18 @@ static inline void sir_convert_assoc_resp_frame2_sr(tpSirAssocRsp pAssocRsp,
 }
 #endif
 
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+void
+sir_copy_assoc_rsp_security_profile(tDot11fAssocResponse *ar,
+				    tpSirAssocRsp pAssocRsp)
+{
+	if (ar->security_profile.present)
+		qdf_mem_copy(&pAssocRsp->security_profile,
+			     &ar->security_profile,
+			     sizeof(tDot11fIEsecurity_profile));
+}
+#endif
+
 QDF_STATUS
 sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 				     struct pe_session *session_entry,
@@ -5539,6 +5551,7 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 	sir_convert_assoc_resp_frame2_smd_struct(frame,
 						 frame_len,
 						 ar, pAssocRsp);
+	sir_copy_assoc_rsp_security_profile(ar, pAssocRsp);
 	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,

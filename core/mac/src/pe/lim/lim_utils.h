@@ -4722,6 +4722,20 @@ void lim_fill_session_security_profile(struct pe_session *session,
 void lim_populate_security_profile_ie(struct pe_session *pe_session,
 				      tDot11fAssocRequest *frm,
 				      const uint8_t *rsnx_ie);
+
+/**
+ * lim_validate_assoc_rsp_security_profile() - Validate Security Profile
+ * IE in (Re)Association Response against the AP IE from scan
+ * @mac_ctx: MAC context
+ * @session_entry: PE session
+ * @assoc_rsp: parsed (Re)Association Response
+ *
+ * Return: true if validation passes, false if the frame must be rejected
+ */
+bool lim_validate_assoc_rsp_security_profile(
+		struct mac_context *mac_ctx,
+		struct pe_session *session_entry,
+		tSirAssocRsp *assoc_rsp);
 #else
 static inline void
 lim_fill_session_security_profile(struct pe_session *session,
@@ -4734,6 +4748,15 @@ lim_populate_security_profile_ie(struct pe_session *pe_session,
 				 tDot11fAssocRequest *frm,
 				 const uint8_t *rsnx_ie)
 {
+}
+
+static inline bool
+lim_validate_assoc_rsp_security_profile(
+		struct mac_context *mac_ctx,
+		struct pe_session *session_entry,
+		tSirAssocRsp *assoc_rsp)
+{
+	return true;
 }
 #endif /* WLAN_FEATURE_SECURITY_PROFILE */
 

@@ -1745,6 +1745,16 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		goto assocReject;
 	}
 
+	if (!lim_validate_assoc_rsp_security_profile(mac_ctx, session_entry,
+						     assoc_rsp)) {
+		pe_err("Security Profile IE mismatch in assoc response");
+		assoc_cnf.resultCode = eSIR_SME_INVALID_ASSOC_RSP_RXED;
+		assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
+		lim_send_disassoc_mgmt_frame(mac_ctx, REASON_UNSPEC_FAILURE,
+					     hdr->sa, session_entry, false);
+		goto assocReject;
+	}
+
 	if (assoc_rsp->QosMapSet.present)
 		qdf_mem_copy(&session_entry->QosMapSet,
 			     &assoc_rsp->QosMapSet,
