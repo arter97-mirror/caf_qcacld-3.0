@@ -70,6 +70,7 @@
 #include "qdf_util.h"
 #include "wlan_qct_sys.h"
 #include <wlan_scan_ucfg_api.h>
+#include "wlan_scan_utils_api.h"
 #include <wlan_dlm_api.h>
 #include <lim_assoc_utils.h>
 #include "wlan_mlme_ucfg_api.h"
@@ -10123,6 +10124,76 @@ QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+void lim_fill_session_security_profile(struct pe_session *session,
+				       struct scan_cache_entry *entry)
+{
+	session->sec_profile_num = -1;
+	if (!wlan_vdev_get_security_profile_enabled(session->vdev) ||
+	    !util_scan_entry_security_profile(entry))
+		return;
+
+	session->sec_profile_num =
+		entry->neg_sec_info.sec_profile_num;
+}
+
+void lim_populate_security_profile_ie(struct pe_session *pe_session,
+				      tDot11fAssocRequest *frm,
+				      const uint8_t *rsnx_ie)
+{
+	tDot11fIEsecurity_profile *sp;
+	uint8_t profile_num;
+	int32_t self_rsn_cap;
+	uint8_t num_bitmap_octets;
+	uint8_t bitmap_idx;
+
+	if (pe_session->sec_profile_num < 0)
+		return;
+
+	sp = &frm->security_profile;
+	profile_num = (uint8_t)pe_session->sec_profile_num;
+	num_bitmap_octets = (uint8_t)(profile_num / 8) + 1;
+
+	sp->present = 1;
+	/*
+	 * Reduced RSN Capabilities: reflect STA own capabilities.
+	 * Bit 0 = Extended Key ID, Bit 1 = OCVC — from vdev crypto.
+	 */
+	self_rsn_cap = wlan_crypto_get_param(pe_session->vdev,
+					     WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (self_rsn_cap >= 0) {
+		sp->extended_key_id =
+			!!(self_rsn_cap & WLAN_CRYPTO_RSN_CAP_EXTENDED_KEY_ID);
+		sp->ocvc =
+			!!(self_rsn_cap & WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED);
+	}
+	/* Bitmap is little-endian: byte[N/8] bit[N%8] for profile N.
+	 * e.g. profile 9 -> byte[1] |= BIT(1) -> [0x00, 0x02]
+	 */
+	sp->number_of_octets_of_security_profile_bitmap = num_bitmap_octets;
+	sp->number_of_vendor_security_profile = 0;
+	for (bitmap_idx = 0; bitmap_idx < num_bitmap_octets; bitmap_idx++) {
+		sp->data[bitmap_idx] =
+			(profile_num / 8 == bitmap_idx) ?
+			BIT(profile_num % 8) : 0;
+	}
+	sp->num_data = num_bitmap_octets;
+	/*
+	 * Extended RSN Capabilities: use STA own RSNXE already
+	 * stripped into rsnx_ie from the supplicant assoc IEs.
+	 */
+	if (rsnx_ie && rsnx_ie[TAG_LEN_POS] > 0 &&
+	    rsnx_ie[TAG_LEN_POS] <= sizeof(sp->data) - num_bitmap_octets) {
+		qdf_mem_copy(sp->data + num_bitmap_octets,
+			     rsnx_ie + MIN_IE_LEN,
+			     rsnx_ie[TAG_LEN_POS]);
+		sp->num_data += rsnx_ie[TAG_LEN_POS];
+	}
+	pe_debug("vdev %d: Security Profile IE added, profile %d",
+		 pe_session->vdev_id, profile_num);
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
 
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
 {

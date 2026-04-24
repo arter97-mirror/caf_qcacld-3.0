@@ -4694,4 +4694,47 @@ lim_fill_complete_uhr_op_ie(struct pe_session *session,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_11BN_TEST_SAP */
+
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+/**
+ * lim_fill_session_security_profile() - Store Security Profile IE info
+ * in PE session from the scan entry
+ * @session: PE session
+ * @entry: scan cache entry for the candidate AP
+ *
+ * Sets session->sec_profile_num and copies the raw AP Security Profile IE
+ * when both the vdev and AP support the Security Profile element.
+ */
+void lim_fill_session_security_profile(struct pe_session *session,
+				       struct scan_cache_entry *entry);
+
+/**
+ * lim_populate_security_profile_ie() - Populate Security Profile IE in
+ * the (Re)Association Request frame
+ * @pe_session: PE session
+ * @frm: dot11f AssocRequest frame structure
+ * @rsnx_ie: raw RSNXE from the supplicant assoc IEs, or NULL
+ *
+ * Fills frm->security_profile with the STA's Reduced RSN Capabilities,
+ * Security Profile Bitmap, and Extended RSN Capabilities when a valid
+ * profile was selected during scan.
+ */
+void lim_populate_security_profile_ie(struct pe_session *pe_session,
+				      tDot11fAssocRequest *frm,
+				      const uint8_t *rsnx_ie);
+#else
+static inline void
+lim_fill_session_security_profile(struct pe_session *session,
+				  struct scan_cache_entry *entry)
+{
+}
+
+static inline void
+lim_populate_security_profile_ie(struct pe_session *pe_session,
+				 tDot11fAssocRequest *frm,
+				 const uint8_t *rsnx_ie)
+{
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
+
 #endif /* __LIM_UTILS_H */

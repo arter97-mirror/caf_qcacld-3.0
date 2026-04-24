@@ -767,6 +767,7 @@ struct punc_chan_info {
  *   lim_add_sta() for passthru NEW action, cleared after
  * @uhr_nontx_mbssid_probe_to_tx_ap: probe req sent to TX AP BSSID
  * @saved_nontx_bssid: saved non-TX BSSID during UHR MBSSID probe redirect
+ * @sec_profile_num: selected Security Profile number (-1 if not used)
  */
 struct pe_session {
 	uint8_t available;
@@ -1129,6 +1130,9 @@ struct pe_session {
 #ifdef DRIVER_PASSTHRU_MODE
 	/* one-shot flag set before lim_add_sta(NEW), cleared after */
 	uint8_t passthru_pending_create_only;
+#endif
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+	int8_t sec_profile_num;
 #endif
 };
 

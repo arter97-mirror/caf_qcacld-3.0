@@ -4602,6 +4602,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 	}
 
+	lim_populate_security_profile_ie(pe_session, frm, rsnx_ie);
+
 	/* Strip EHT capabilities IE */
 	if (lim_is_session_eht_capable(pe_session)) {
 		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);

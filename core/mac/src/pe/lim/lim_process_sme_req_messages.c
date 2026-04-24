@@ -4844,6 +4844,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	cm_update_session_assoc_ie(mac_ctx->psoc, session->vdev_id,
 				   &req->assoc_ie);
 
+	lim_fill_session_security_profile(session, req->entry);
+
 	status = lim_fill_crypto_params(mac_ctx, session, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Error in handling RSNXE");
