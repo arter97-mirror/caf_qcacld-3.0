@@ -2176,6 +2176,15 @@ config NUM_SOC_PERF_CLUSTER
 	int "enable NUM_SOC_PERF_CLUSTER"
 	default 0
 
+config WLAN_MAX_CPUS
+	int "Maximum number of CPUs for WLAN driver static arrays"
+	default 8
+	help
+	  Caps NR_CPUS for WLAN driver static arrays to avoid
+	  excessive memory allocation on upstream kernels where
+	  NR_CPUS can be up to 256. Default 8 covers most
+	  mobile/IoT platforms.
+
 config SOC_PERF_CLUSTER_FIRST
 	bool "Enable SOC_PERF_CLUSTER_FIRST"
 	default n
