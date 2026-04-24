@@ -6957,6 +6957,10 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 	tgt_cap = wmi_service_enabled(wma->wmi_handle,
 				      wmi_service_mrsno_support);
 	ucfg_mlme_set_mrsno_support(psoc, tgt_cap);
+
+	tgt_cap = wmi_service_enabled(wma->wmi_handle,
+				      wmi_service_security_profile);
+	ucfg_mlme_set_security_profile_support(psoc, tgt_cap);
 }
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
