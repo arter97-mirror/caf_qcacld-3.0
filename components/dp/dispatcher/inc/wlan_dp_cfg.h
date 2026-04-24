@@ -1480,8 +1480,56 @@
 	CFG_INI_BOOL("dp_enable_load_balance", false, \
 		     "Enable/Disable load balance support")
 
+/*
+ * Bit layout for dp_lb_cpumask_override INI bitmask.
+ */
+#define DP_LB_CPUMASK_OVERRIDE_FORCE_INI       BIT(0)
+#define DP_LB_CPUMASK_OVERRIDE_RX_MASK_SHIFT   1
+#define DP_LB_CPUMASK_OVERRIDE_RX_MASK         (0xFFFF << DP_LB_CPUMASK_OVERRIDE_RX_MASK_SHIFT)
+
+/*
+ * <ini>
+ * dp_lb_cpumask_override - Load balance CPU mask override bitmask
+ *
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0x0
+ *
+ * This ini is a bitmask used to configure the RX CPU mask for load balance
+ * when DTSI-based CPU masks are not defined or need to be overridden.
+ *
+ * Bit layout:
+ *  Bit   0   : Force from INI.
+ *              If set (1), ignore DTSI and always use the RX CPU mask
+ *              from INI bits [16:1]. If the INI mask is 0, fall back to
+ *              little cluster CPUs.
+ *              If not set (0), read DTSI first. If DTSI is not defined,
+ *              use the INI RX CPU mask (bits [16:1]). If the INI mask is
+ *              also 0, fall back to little cluster CPUs.
+ *  Bits 1-16 : RX CPU mask (16 bits) - CPU mask for RX interrupts when
+ *              using INI-based configuration. Supports up to 16 CPUs.
+ *  Bits 17-31: Reserved
+ *
+ * Default value 0x0: Force bit not set, DTSI is used; if DTSI not
+ * defined, INI mask is tried; if INI also 0, little cluster CPUs used.
+ *
+ * Supported Feature: All modes
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_LB_CPUMASK_OVERRIDE \
+	CFG_INI_UINT("dp_lb_cpumask_override", \
+		     0, \
+		     0xFFFFFFFF, \
+		     0x0, \
+		     CFG_VALUE_OR_DEFAULT, \
+		     "Load balance CPU mask override bitmask")
+
 #define CFG_DP_LOAD_BALANCE \
-	CFG(CFG_DP_ENABLE_LOAD_BALANCE)
+	CFG(CFG_DP_ENABLE_LOAD_BALANCE) \
+	CFG(CFG_DP_LB_CPUMASK_OVERRIDE)
 #else
 #define CFG_DP_LOAD_BALANCE
 #endif

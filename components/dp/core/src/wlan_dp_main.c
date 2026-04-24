@@ -672,6 +672,8 @@ static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
 {
 	config->is_load_balance_enabled = cfg_get(psoc,
 						  CFG_DP_ENABLE_LOAD_BALANCE);
+	config->lb_cpumask_override = cfg_get(psoc,
+					      CFG_DP_LB_CPUMASK_OVERRIDE);
 }
 #else
 static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,

@@ -24,6 +24,44 @@
 
 #define NUM_CPUS_FOR_LOAD_BALANCE 2
 
+/**
+ * wlan_dp_load_balance_get_cpumask() - Get RX CPU mask for load balance init
+ * @dp_ctx: DP context
+ *
+ * Determines the RX CPU mask using the dp_lb_cpumask_override INI bitmask:
+ *  - If Force INI bit (bit 0) is set: ignore DTSI, use INI RX CPU mask
+ *    directly. If INI mask is 0, caller falls back to little cluster CPUs.
+ *  - If Force INI bit is not set: read DTSI first. If DTSI is defined,
+ *    use it. If DTSI is not defined, use INI RX CPU mask as fallback.
+ *    If INI mask is also 0, caller falls back to little cluster CPUs.
+ *
+ * Return: CPU mask to use, or 0 to let caller use little cluster fallback
+ */
+static unsigned int
+wlan_dp_load_balance_get_cpumask(struct wlan_dp_psoc_context *dp_ctx)
+{
+	uint32_t lb_config = dp_ctx->dp_cfg.lb_cpumask_override;
+	unsigned int ini_rx_cpumask;
+	unsigned int dtsi_cpumask = 0;
+
+	ini_rx_cpumask = (lb_config & DP_LB_CPUMASK_OVERRIDE_RX_MASK) >>
+			  DP_LB_CPUMASK_OVERRIDE_RX_MASK_SHIFT;
+
+	if (lb_config & DP_LB_CPUMASK_OVERRIDE_FORCE_INI) {
+		/* Force from INI: ignore DTSI, use INI mask directly */
+		return ini_rx_cpumask;
+	}
+
+	/* Try DTSI first */
+	pld_get_cpumask_for_wlan_rx_interrupts(dp_ctx->qdf_dev->dev,
+					       &dtsi_cpumask);
+	if (dtsi_cpumask)
+		return dtsi_cpumask;
+
+	/* DTSI not defined: use INI mask as fallback */
+	return ini_rx_cpumask;
+}
+
 /* weightage in percentage */
 #define OLDER_SAMPLE_WTG 25
 #define LATEST_SAMPLE_WTG (100 - OLDER_SAMPLE_WTG)
@@ -894,7 +932,7 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 	lb_data = &dp_ctx->lb_data;
 	qdf_spinlock_create(&lb_data->load_balance_lock);
 
-	pld_get_cpumask_for_wlan_rx_interrupts(dp_ctx->qdf_dev->dev, &cpumask);
+	cpumask = wlan_dp_load_balance_get_cpumask(dp_ctx);
 	if (cpumask) {
 		qdf_for_each_online_cpu(cpus) {
 			if (BIT(cpus) & cpumask)

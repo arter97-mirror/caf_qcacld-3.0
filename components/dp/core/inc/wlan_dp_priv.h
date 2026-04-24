@@ -195,6 +195,7 @@ struct dp_affn_override_params {
  * @is_direct_link_enabled: indicates whether direct link is enabled or not
  * @wlm_rx_aggr_control: Control Rx aggregation based on WLM state
  * @is_load_balance_enabled: indicates whether load balance is enabled or not
+ * @lb_cpumask_override: load balance CPU mask override bitmask
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
  * @stc_enable: indicates whether STC feature is enabled or not
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
@@ -292,6 +293,7 @@ struct wlan_dp_psoc_cfg {
 	bool wlm_rx_aggr_control;
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
 	bool is_load_balance_enabled;
+	uint32_t lb_cpumask_override;
 #endif
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 	bool is_flow_balance_enabled;
