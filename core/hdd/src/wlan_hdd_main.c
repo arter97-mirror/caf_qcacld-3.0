@@ -13455,6 +13455,12 @@ bool hdd_is_5g_supported(struct hdd_context *hdd_ctx)
 		return false;
 }
 
+#ifdef WLAN_ENABLE_SOCIAL_CHANNELS_5G_ONLY
+bool hdd_is_2g_supported(struct hdd_context *hdd_ctx)
+{
+	return true;
+}
+#else
 bool hdd_is_2g_supported(struct hdd_context *hdd_ctx)
 {
 	if (!hdd_ctx)
@@ -13465,6 +13471,7 @@ bool hdd_is_2g_supported(struct hdd_context *hdd_ctx)
 	else
 		return false;
 }
+#endif
 
 static int hdd_wiphy_init(struct hdd_context *hdd_ctx)
 {
