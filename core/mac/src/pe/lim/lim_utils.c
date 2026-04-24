@@ -10255,6 +10255,70 @@ bool lim_validate_assoc_rsp_security_profile(
 
 	return false;
 }
+
+static uint8_t lim_get_security_profile_ext_rsn_caps(const uint8_t *sp_ie,
+						     uint16_t sp_ie_len,
+						     uint8_t *ext_rsn_caps,
+						     uint8_t buf_len)
+{
+	uint8_t num_bitmap_octets, num_vendor, offset, ext_len;
+
+	if (!sp_ie || sp_ie_len < 7 || sp_ie[1] < 4)
+		return 0;
+
+	num_bitmap_octets = sp_ie[4] & 0x0f;
+	num_vendor        = (sp_ie[4] >> 4) & 0x0f;
+
+	/* Extended RSN Capabilities offset within IE data:
+	 * EIDext(1)+ReducedRSNCap(1)+SecProfileInd(1)+bitmap(N)+vendor(M*4)
+	 */
+	offset = 1 + 1 + 1 + num_bitmap_octets + num_vendor * 4;
+	if (sp_ie[1] <= offset)
+		return 0;
+
+	ext_len = sp_ie[1] - offset;
+	ext_len = QDF_MIN(ext_len, buf_len ? buf_len : ext_len);
+	if ((uint16_t)(2 + offset + ext_len) > sp_ie_len)
+		return 0;
+
+	if (ext_rsn_caps)
+		qdf_mem_copy(ext_rsn_caps, sp_ie + 2 + offset, ext_len);
+
+	return ext_len;
+}
+
+void lim_override_ap_rsnxe_from_security_profile(
+			struct pe_session *session,
+			const uint8_t *sp_ie,
+			const uint8_t **ap_rsnxe, uint8_t *ap_rsnxe_len,
+			uint8_t *buf, uint8_t buf_len)
+{
+	uint8_t ext_len;
+
+	if (session->sec_profile_num < 0 || !sp_ie)
+		return;
+
+	ext_len = lim_get_security_profile_ext_rsn_caps(
+			sp_ie, sp_ie[1] + 2,
+			buf + SIR_MAC_IE_TYPE_LEN_SIZE,
+			buf_len - SIR_MAC_IE_TYPE_LEN_SIZE);
+	if (ext_len) {
+		buf[SIR_MAC_IE_TYPE_OFFSET] = WLAN_ELEMID_RSNXE;
+		buf[SIR_MAC_IE_LEN_OFFSET]  = ext_len;
+		*ap_rsnxe = buf;
+		*ap_rsnxe_len = ext_len;
+	}
+}
+
+bool lim_security_profile_has_ext_rsn_caps(struct pe_session *session,
+					   const uint8_t *sp_ie)
+{
+	if (session->sec_profile_num < 0 || !sp_ie)
+		return false;
+
+	return lim_get_security_profile_ext_rsn_caps(sp_ie, sp_ie[1] + 2,
+						     NULL, 0) > 0;
+}
 #endif /* WLAN_FEATURE_SECURITY_PROFILE */
 
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)

@@ -4748,6 +4748,38 @@ bool lim_validate_assoc_rsp_security_profile(
 		struct mac_context *mac_ctx,
 		struct pe_session *session_entry,
 		tSirAssocRsp *assoc_rsp);
+
+/*
+ * lim_override_ap_rsnxe_from_security_profile() - Override AP RSNXE
+ * pointers from the Security Profile IE Extended RSN Capabilities field
+ * @session: PE session
+ * @sp_ie: raw AP Security Profile IE from scan entry (may be NULL)
+ * @ap_rsnxe: pointer to AP RSNXE pointer to override
+ * @ap_rsnxe_len: pointer to AP RSNXE length to override
+ * @buf: caller-supplied buffer to hold the extracted caps
+ * @buf_len: size of buf
+ *
+ * When the session has a valid Security Profile IE with an Extended RSN
+ * Capabilities field, updates *ap_rsnxe and *ap_rsnxe_len to point at
+ * that field instead of the beacon RSNXE.
+ */
+void lim_override_ap_rsnxe_from_security_profile(
+			struct pe_session *session,
+			const uint8_t *sp_ie,
+			const uint8_t **ap_rsnxe, uint8_t *ap_rsnxe_len,
+			uint8_t *buf, uint8_t buf_len);
+
+/**
+ * lim_security_profile_has_ext_rsn_caps() - Check whether the session
+ * Security Profile IE carries an Extended RSN Capabilities field
+ * @session: PE session
+ * @sp_ie: raw AP Security Profile IE from scan entry (may be NULL)
+ *
+ * Return: true if a valid Security Profile IE with Extended RSN
+ * Capabilities is present, false otherwise
+ */
+bool lim_security_profile_has_ext_rsn_caps(struct pe_session *session,
+					   const uint8_t *sp_ie);
 #else
 static inline void
 lim_fill_session_security_profile(struct pe_session *session,
@@ -4775,6 +4807,22 @@ lim_validate_assoc_rsp_security_profile(
 		tSirAssocRsp *assoc_rsp)
 {
 	return true;
+}
+
+static inline void
+lim_override_ap_rsnxe_from_security_profile(
+			struct pe_session *session,
+			const uint8_t *sp_ie,
+			const uint8_t **ap_rsnxe, uint8_t *ap_rsnxe_len,
+			uint8_t *buf, uint8_t buf_len)
+{
+}
+
+static inline bool
+lim_security_profile_has_ext_rsn_caps(struct pe_session *session,
+				      const uint8_t *sp_ie)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_SECURITY_PROFILE */
 

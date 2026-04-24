@@ -4339,9 +4339,11 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	int32_t akm;
 	uint8_t ap_rsnxe_len = 0, len = 0;
 	uint8_t *rsnxe = NULL, *new_rsnxe = NULL;
-	uint8_t *ap_rsnxe = NULL;
+	const uint8_t *sp_ie;
+	const uint8_t *ap_rsnxe = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t rsn_gen;
+	uint8_t sp_ext_rsn[32];
 
 	akm = wlan_crypto_get_param(session->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (akm == -1 ||
@@ -4376,6 +4378,14 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	rsn_gen = req->entry->neg_sec_info.rsn_gen_selected;
 	ap_rsnxe = util_scan_entry_rsnxe_by_gen(req->entry, rsn_gen);
 	ap_rsnxe_len = util_get_rsnxe_len_by_gen(req->entry, rsn_gen);
+
+	sp_ie = util_scan_entry_security_profile(req->entry);
+	lim_override_ap_rsnxe_from_security_profile(session,
+						    sp_ie,
+						    &ap_rsnxe,
+						    &ap_rsnxe_len,
+						    sp_ext_rsn,
+						    sizeof(sp_ext_rsn));
 
 	/*
 	 * Do not modify userspace RSNXE if either:
@@ -5414,6 +5424,7 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	uint32_t bss_len;
 	struct join_req *reassoc_req = NULL;
 	uint16_t caps;
+	const uint8_t *sp_ie;
 	uint32_t val;
 	tLimMlmReassocReq *mlm_reassoc_req;
 	tSirResultCodes ret_code = eSIR_SME_SUCCESS;
@@ -5509,9 +5520,11 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 
 	lim_strip_rsnx_ie(mac_ctx, session_entry, req);
 
+	sp_ie = util_scan_entry_security_profile(req->entry);
 	if (lim_is_rsn_profile(session_entry) &&
 	    !util_scan_entry_rsnxe_by_gen(req->entry,
-				req->entry->neg_sec_info.rsn_gen_selected)) {
+				req->entry->neg_sec_info.rsn_gen_selected) &&
+	    !lim_security_profile_has_ext_rsn_caps(session_entry, sp_ie)) {
 		pe_debug("Bss bcn has no RSNXE, strip if has");
 		status = lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
 				      (uint16_t *)&req->assoc_ie.len,
