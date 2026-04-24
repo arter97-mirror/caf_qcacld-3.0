@@ -6227,4 +6227,43 @@ QDF_STATUS
 ucfg_mlme_get_enable_social_channels_on_2g_disable(
 		struct wlan_objmgr_psoc *psoc, bool *value);
 
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+/*
+ * ucfg_mlme_set_security_profile_support() - Set Security Profile support
+ * @psoc: psoc object
+ * @val: Security Profile element support
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+ucfg_mlme_set_security_profile_support(struct wlan_objmgr_psoc *psoc,
+				       bool val);
+
+/*
+ * ucfg_mlme_get_security_profile_support() - Get Security Profile support
+ * @psoc: psoc object
+ * @val: pointer to uhr security profile support
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+ucfg_mlme_get_security_profile_support(struct wlan_objmgr_psoc *psoc,
+				       bool *val);
+#else
+static inline QDF_STATUS
+ucfg_mlme_set_security_profile_support(struct wlan_objmgr_psoc *psoc,
+				       bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_mlme_get_security_profile_support(struct wlan_objmgr_psoc *psoc,
+				       bool *val)
+{
+	*val = false;
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */

@@ -2435,6 +2435,7 @@ struct fw_scan_channels {
  * @roam_periodic_scan_interval: the interval in seconds after which STA
  * performs periodic partial scans till roaming succeeds or RSSI recovers
  * above threshold.
+ * @security_profile_support: support for Security Profile element
  * @reconnect_disallow_period: duration after which STA is allowed
  * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
  * @neighbor_lookup_rssi_threshold_5ghz: lookup rssi threshold for 5GHz band
@@ -2587,6 +2588,9 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t neighbor_lookup_rssi_threshold_5ghz;
 	uint32_t neighbor_lookup_rssi_threshold_6ghz;
 	bool disable_btm_cfg;
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+	bool security_profile_support;
+#endif
 };
 
 /**

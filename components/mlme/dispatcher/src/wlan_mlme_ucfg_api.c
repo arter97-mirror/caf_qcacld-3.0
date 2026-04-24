@@ -2278,3 +2278,37 @@ ucfg_mlme_get_enable_social_channels_on_2g_disable(
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+QDF_STATUS
+ucfg_mlme_set_security_profile_support(struct wlan_objmgr_psoc *psoc,
+				       bool val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.lfr.security_profile_support = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_get_security_profile_support(struct wlan_objmgr_psoc *psoc,
+				       bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = false;
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.lfr.security_profile_support;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
