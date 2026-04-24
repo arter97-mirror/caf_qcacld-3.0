@@ -1136,6 +1136,8 @@ lim_handle_assoc_failure_in_dlm(uint16_t status_code)
 		return true;
 	case STATUS_ASSOC_DENIED_UNSPEC:
 		return true;
+	case STATUS_REJECTED_INVALID_SECURITY_PROFILE:
+		return true;
 	}
 	return false;
 }
@@ -1163,6 +1165,8 @@ lim_get_dlm_reject_reason(uint16_t status_code)
 	case STATUS_AP_UNABLE_TO_HANDLE_NEW_STA:
 		return REASON_REASSOC_NO_MORE_STAS;
 	case STATUS_ASSOC_DENIED_UNSPEC:
+		return REASON_OTHER;
+	case STATUS_REJECTED_INVALID_SECURITY_PROFILE:
 		return REASON_OTHER;
 	}
 	return REASON_UNKNOWN;
