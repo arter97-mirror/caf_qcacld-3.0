@@ -5843,6 +5843,29 @@ static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 				  QCA_WLAN_VENDOR_FEATURE_RSN_OVERRIDE_STA);
 }
 
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+static inline void
+wlan_hdd_set_security_profile_feature(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *feature_flags)
+{
+	bool val = false;
+
+	if (QDF_IS_STATUS_ERROR(
+		ucfg_mlme_get_security_profile_support(psoc, &val)) || !val)
+		return;
+
+	hdd_debug("Target supports Security Profile element");
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SECURITY_PROFILE_STA);
+}
+#else
+static inline void
+wlan_hdd_set_security_profile_feature(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *feature_flags)
+{
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
+
 static inline void wlan_hdd_set_tx_power_feature(struct wlan_objmgr_psoc *psoc,
 						 uint8_t *feature_flags)
 {
@@ -6128,6 +6151,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_security_profile_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_cancel_noa_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
@@ -18150,6 +18174,23 @@ hdd_handle_smd_connect_ext_feature(struct hdd_context *hdd_ctx,
 {
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
+
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+static void
+hdd_handle_security_profile_connect_ext_feature(uint8_t ext_features,
+						bool *sec_profile)
+{
+	if (ext_features & BIT(QCA_CONNECT_EXT_FEATURE_SECURITY_PROFILE))
+		*sec_profile = true;
+}
+#else
+static inline void
+hdd_handle_security_profile_connect_ext_feature(uint8_t ext_features,
+						bool *sec_profile)
+{
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
+
 static int
 __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 					     struct wireless_dev *wdev,
@@ -18162,6 +18203,7 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t ext_features = 0, rsno_gen = 0;
 	bool smd_enabled = false;
+	bool sec_profile = false;
 	int8_t ret = 0;
 	struct nlattr *curr_attr;
 	struct qdf_mac_addr allowed_bss_link_addr[WLAN_MAX_NUM_ALLOWED_BSSIDS];
@@ -18201,12 +18243,19 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	hdd_handle_smd_connect_ext_feature(hdd_ctx, adapter,
 					   &ext_features, &smd_enabled);
 
+	hdd_handle_security_profile_connect_ext_feature(ext_features,
+							&sec_profile);
+
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		if (!link_info->vdev)
 			continue;
 		wlan_vdev_set_rsno_gen_supported(link_info->vdev, rsno_gen);
+
 		if (smd_enabled)
 			wlan_vdev_set_smd_enabled(vdev, smd_enabled);
+
+		wlan_vdev_set_security_profile_enabled(link_info->vdev,
+						       sec_profile);
 		wma_cli_set_command(link_info->vdev_id,
 				    wmi_vdev_param_connect_ext_features,
 				    ext_features, VDEV_CMD);
