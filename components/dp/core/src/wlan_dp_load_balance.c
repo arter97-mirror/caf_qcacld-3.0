@@ -324,7 +324,7 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 	struct wlan_dp_rx_ring_wtg weightages[MAX_REO_DEST_RINGS];
 	struct cpu_irq_load *cpu_load;
-	struct cpu_load cpu_load_avgs[NR_CPUS];
+	struct cpu_load cpu_load_avgs[QDF_MAX_AVAILABLE_CPU];
 	struct cpu_load *cpu_load_avg;
 	uint32_t per_ring_pkt_avg[MAX_REO_DEST_RINGS];
 	qdf_cpu_mask *cpu_mask = &lb_data->curr_cpu_mask;
@@ -571,8 +571,8 @@ wlan_dp_lb_compute_cpu_load_average(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 	struct cpu_irq_load *cpu_load;
 	void *hif_ctx = dp_ctx->hif_handle;
-	uint64_t wlan_irq_time[NR_CPUS] = {0};
-	uint64_t wlan_ksoftirqd_time[NR_CPUS] = {0};
+	uint64_t wlan_irq_time[QDF_MAX_AVAILABLE_CPU] = {0};
+	uint64_t wlan_ksoftirqd_time[QDF_MAX_AVAILABLE_CPU] = {0};
 	uint64_t curr_time_in_ns;
 	uint64_t total_irq_time, total_irq_time_cur;
 	uint64_t wlan_irq_time_cur;

@@ -1209,8 +1209,8 @@ struct wlan_dp_psoc_context {
 	uint32_t monitor_flag;
 	qdf_cpu_mask rx_thread_cpu_mask;
 
-	struct cpufreq_policy *cpufreq_pol[NR_CPUS];
-	struct freq_qos_request freq_qos_max_req[NR_CPUS];
+	struct cpufreq_policy *cpufreq_pol[QDF_MAX_AVAILABLE_CPU];
+	struct freq_qos_request freq_qos_max_req[QDF_MAX_AVAILABLE_CPU];
 };
 
 /**
