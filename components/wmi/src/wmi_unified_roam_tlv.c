@@ -220,6 +220,10 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 	/* fill in threshold values */
 	rssi_threshold_fp->vdev_id = roam_req->vdev_id;
 	rssi_threshold_fp->roam_scan_rssi_thresh = roam_req->rssi_thresh;
+	rssi_threshold_fp->roam_scan_rssi_thresh_5ghz =
+			roam_req->rssi_thresh_5ghz;
+	rssi_threshold_fp->roam_scan_rssi_thresh_6ghz =
+			roam_req->rssi_thresh_6ghz;
 	rssi_threshold_fp->roam_rssi_thresh_diff = roam_req->rssi_thresh_diff;
 	rssi_threshold_fp->hirssi_scan_max_count =
 			roam_req->hi_rssi_scan_max_count;
