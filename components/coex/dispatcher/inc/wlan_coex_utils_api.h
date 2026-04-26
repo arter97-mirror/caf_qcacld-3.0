@@ -25,6 +25,7 @@
 #ifndef _WLAN_COEX_UTILS_API_H_
 #define _WLAN_COEX_UTILS_API_H_
 #include <wlan_objmgr_psoc_obj.h>
+#include "wlan_coex_public_structs.h"
 
 /*
  * wlan_coex_init() - Coex module initialization API
@@ -94,7 +95,17 @@ QDF_STATUS wlan_dbam_psoc_disable(struct wlan_objmgr_psoc *psoc);
  *
  * Return : status of operation
  */
+#ifdef FEATURE_COEX
 QDF_STATUS
 wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 				  enum coex_btc_chain_mode *val);
+#else
+static inline QDF_STATUS
+wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val)
+{
+	*val = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif

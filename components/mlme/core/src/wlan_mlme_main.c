@@ -42,6 +42,7 @@
 #include "wlan_dp_api.h"
 #include "wlan_mlo_mgr_public_api.h"
 #include "wlan_coex_utils_api.h"
+#include "wlan_coex_ucfg_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 

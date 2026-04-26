@@ -53,9 +53,19 @@ typedef QDF_STATUS (*update_coex_cb)(struct wlan_objmgr_vdev *vdev);
  *
  * Return : status of operation
  */
+#ifdef FEATURE_COEX
 QDF_STATUS
 ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 				  enum coex_btc_chain_mode *val);
+#else
+static inline QDF_STATUS
+ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val)
+{
+	*val = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #ifdef FEATURE_COEX
 /**
