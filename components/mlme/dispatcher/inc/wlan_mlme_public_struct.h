@@ -2363,6 +2363,8 @@ struct fw_scan_channels {
  * above threshold.
  * @reconnect_disallow_period: duration after which STA is allowed
  * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
+ * @neighbor_lookup_rssi_threshold_5ghz: lookup rssi threshold for 5GHz band
+ * @neighbor_lookup_rssi_threshold_6ghz: lookup rssi threshold for 6GHz band
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2503,6 +2505,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t roam_aggre_threshold;
 	bool mrsno_support;
 	uint32_t roam_periodic_scan_interval;
+	uint32_t neighbor_lookup_rssi_threshold_5ghz;
+	uint32_t neighbor_lookup_rssi_threshold_6ghz;
 };
 
 /**

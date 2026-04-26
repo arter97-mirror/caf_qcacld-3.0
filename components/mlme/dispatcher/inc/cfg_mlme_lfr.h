@@ -1652,6 +1652,57 @@ enum roam_bg_scan {
 	CFG_VALUE_OR_DEFAULT, \
 	"Neighbor lookup rssi threshold")
 
+
+/*
+ * <ini>
+ * gNeighborLookupThreshold5ghz - Set neighbor lookup rssi threshold for 5GHz
+ * @Min: -100
+ * @Max: -50
+ * @Default: -76
+ *
+ * This is used to set the RSSI threshold for neighbor lookup in 5GHz band.
+ *
+ * Related: None
+ *
+ * Supported Feature: LFR Scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_5GHZ CFG_INI_INT( \
+	"gNeighborLookupThreshold5ghz", \
+	RoamRSSI_Trigger_min, \
+	RoamRSSI_Trigger_max, \
+	RoamRSSI_Trigger_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Neighbor lookup rssi threshold for 5GHz")
+
+/*
+ * <ini>
+ * gNeighborLookupThreshold6ghz - Set neighbor lookup rssi threshold for 6GHz
+ * @Min: -100
+ * @Max: -50
+ * @Default: -76
+ *
+ * This is used to set the RSSI threshold for neighbor lookup in 6GHz band.
+ *
+ * Related: None
+ *
+ * Supported Feature: LFR Scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_6GHZ CFG_INI_INT( \
+	"gNeighborLookupThreshold6ghz", \
+	RoamRSSI_Trigger_min, \
+	RoamRSSI_Trigger_max, \
+	RoamRSSI_Trigger_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Neighbor lookup rssi threshold for 6GHz")
+
 /*
  * <ini>
  * Aggressive_RoamRSSI_Trigger  - Set neighbor
@@ -3645,6 +3696,8 @@ enum roam_bg_scan {
 	CFG(CFG_LFR3_ROAM_INFO_STATS_NUM) \
 	CFG(CFG_HS_20_BTM_OFFLOAD_DISABLE) \
 	CFG(CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD) \
+	CFG(CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_5GHZ) \
+	CFG(CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_6GHZ) \
 	CFG_CONNECTION_ROAMING_CFG
 
 #endif /* CFG_MLME_LFR_H__ */
