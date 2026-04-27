@@ -887,6 +887,12 @@ static bool action_oui_id_valid(struct wlan_objmgr_psoc *psoc,
 	switch (action_id) {
 	case ACTION_OUI_ALLOW_NSS_GREATER_THAN_2:
 	case ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2:
+
+		if (!wlan_is_nss_allowlist_denylist_config_supported(psoc)) {
+			action_oui_debug("WL/BL feature is not supported");
+			return false;
+		}
+
 		active_action_id = action_oui_get_active_action_id(
 					psoc,
 					ACTION_OUI_ARBITRATOR_TYPE_NSS);

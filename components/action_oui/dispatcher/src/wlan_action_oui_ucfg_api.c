@@ -267,6 +267,12 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 	return wlan_action_oui_search(psoc, attr, action_id);
 }
 
+bool ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_is_nss_allowlist_denylist_config_supported(psoc);
+}
+
 bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id)
 {
 	return wlan_action_oui_is_dynamic(action_id);

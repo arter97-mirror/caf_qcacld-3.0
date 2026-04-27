@@ -700,6 +700,29 @@ bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc)
 	return v2_enabled;
 }
 
+bool
+wlan_is_nss_allowlist_denylist_config_supported(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_hdl;
+
+	if (!psoc) {
+		action_oui_err("Invalid psoc");
+		return false;
+	}
+
+	wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
+	if (!wmi_hdl) {
+		action_oui_err("wmi handle is NULL");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_hdl,
+				   wmi_service_supported_ext_oui_action_ids) &&
+	       wmi_service_enabled(
+			wmi_hdl,
+			wmi_service_support_whitelist_blacklist_ap_config);
+}
+
 /**
  * wlan_action_oui_convert_bit_to_byte_mask() - Convert bit mask to byte mask
  * @bit_mask_value: input, bit mask value, use 1 bit to mask 1 bit

@@ -39324,6 +39324,16 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		goto exit;
 	}
 
+	if ((action_oui_id ==
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ALLOW_NSS_GT_2 ||
+	    action_oui_id ==
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2) &&
+	    !ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
+							hdd_ctx->psoc)) {
+		ret = -ENOTSUPP;
+		goto exit;
+	}
+
 	if (action_oui_op == QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
 		status = ucfg_action_oui_restore_default_and_send(
 							  hdd_ctx->psoc,

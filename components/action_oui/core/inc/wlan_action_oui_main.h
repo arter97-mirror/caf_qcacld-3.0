@@ -170,6 +170,19 @@ void action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc);
 bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_is_nss_allowlist_denylist_config_supported() - Check NSS allow/denylist
+ * support
+ * @psoc: psoc object
+ *
+ * This function checks whether both the required FW services for NSS
+ * allowlist/denylist configuration are enabled.
+ *
+ * Return: true if both services are enabled, else false
+ */
+bool
+wlan_is_nss_allowlist_denylist_config_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_action_oui_add_token() - Add action oui token to oui extension
  * @action_token: oui token type
  * @value: oui token value
@@ -325,6 +338,12 @@ void action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc)
 
 static inline
 bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_is_nss_allowlist_denylist_config_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

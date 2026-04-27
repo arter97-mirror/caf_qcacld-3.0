@@ -138,6 +138,20 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 			    enum action_oui_id action_id);
 
 /**
+ * ucfg_action_oui_is_nss_allowlist_denylist_config_supported() - Check
+ * whether NSS allowlist/denylist configuration is supported
+ * @psoc: objmgr psoc object
+ *
+ * This UCFG API returns true only when both FW services required for NSS
+ * allowlist/denylist configuration are enabled.
+ *
+ * Return: true if supported, else false
+ */
+bool
+ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_action_oui_cleanup() - Cleanup action OUI configuration for given ID
  * @psoc: objmgr psoc object
  * @action_id: type of action to be cleaned up
@@ -422,6 +436,13 @@ static inline
 bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 			    struct action_oui_search_attr *attr,
 			    enum action_oui_id action_id)
+{
+	return false;
+}
+
+static inline
+bool ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
+				struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
