@@ -8791,6 +8791,16 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 					       &sinfo->txrate, tx_mcs_index,
 					       tx_nss, tx_dcm, tx_gi);
 
+		/*
+		 * FW reports 0 tx rate. Report max rate to
+		 * avoid showing 0 Mbps to userspace.
+		 */
+		if (!my_tx_rate)
+			hdd_report_max_rate(link_info, mac_handle,
+					    &sinfo->txrate, sinfo->signal,
+					    tx_rate_flags, tx_mcs_index,
+					    my_tx_rate, tx_nss);
+
 		/* Fill RX stats */
 		hdd_report_actual_rate(rx_rate_flags, my_rx_rate,
 				       &sinfo->rxrate, rx_mcs_index,
