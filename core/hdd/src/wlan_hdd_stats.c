@@ -8509,6 +8509,7 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 			    struct wlan_hdd_link_info *link_info)
 {
 	uint8_t preamble = link_info->hdd_stats.class_a_stat.rx_preamble;
+	uint32_t rx_mcs = link_info->hdd_stats.class_a_stat.rx_mcs_index;
 
 	sinfo->rxrate.nss = link_info->hdd_stats.class_a_stat.rx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
@@ -8525,6 +8526,11 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 		 * In this case, using FW rates which was set previously.
 		 */
 		hdd_debug("Driver failed to get rate, reporting FW rate");
+		return;
+	}
+
+	if (rx_mcs == INVALID_MCS_IDX) {
+		hdd_warn("Invalid rx mcs index, reporting FW rate");
 		return;
 	}
 
