@@ -135,7 +135,7 @@ void dp_get_bss_peer_on_active_tdls(void *soc, uint8_t *peer_mac,
 {
 	struct qdf_mac_addr mac_addr_tx_allowed = QDF_MAC_ADDR_ZERO_INIT;
 
-	if (qdf_unlikely(peer_info->state == OL_TXRX_PEER_STATE_INVALID)) {
+	if (qdf_unlikely(peer_info->state != OL_TXRX_PEER_STATE_AUTH)) {
 		/* Peer corresponding to dest_mac_addr is not found */
 		if (qdf_likely(dp_link->dp_intf->tdls_link_up)) {
 			/* Get BSS peer mac address */
