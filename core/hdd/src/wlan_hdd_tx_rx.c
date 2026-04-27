@@ -671,7 +671,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 	 * recovery here
 	 */
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		hdd_debug("Queue: %d status: %d txq->trans_start: %lu",
 			  i, netif_tx_queue_stopped(txq), txq->trans_start);
@@ -886,7 +886,7 @@ static void wlan_hdd_update_txq_timestamp(struct net_device *dev)
 	struct netdev_queue *txq;
 	int i;
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 
 		/*
@@ -949,12 +949,13 @@ static void wlan_hdd_update_pause_time(struct hdd_adapter *adapter,
 
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *queue_history,
-				  char *buf, uint32_t size)
+				  uint8_t num_tx_queues, char *buf,
+				  uint32_t size)
 {
 	unsigned int i;
 	unsigned int index = 0;
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < num_tx_queues; i++) {
 		index += qdf_scnprintf(buf + index,
 				       size - index,
 				       "%u:0x%lx ",
@@ -978,12 +979,9 @@ wlan_hdd_update_queue_history_state(struct net_device *dev,
 				    struct hdd_netif_queue_history *q_hist)
 {
 	unsigned int i = 0;
-	uint32_t num_tx_queues = 0;
 	struct netdev_queue *txq = NULL;
 
-	num_tx_queues = qdf_min(dev->num_tx_queues, (uint32_t)NUM_TX_QUEUES);
-
-	for (i = 0; i < num_tx_queues; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		q_hist->tx_q_state[i] = txq->state;
 	}
@@ -1327,22 +1325,21 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 	struct ol_txrx_desc_type sta_desc = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_objmgr_vdev *vdev;
-	bool eht_capab;
+	struct qdf_mac_addr *mac;
+
+	mac = hdd_adapter_get_link_mac_addr(link_info);
+	if (!mac) {
+		hdd_err("Invalid MAC address for monitor link");
+		return QDF_STATUS_E_INVAL;
+	}
+	/* self peer address extraction */
+	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, mac->bytes);
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
 		return QDF_STATUS_E_INVAL;
 	}
-
-	/* self peer address extraction */
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (eht_capab)
-		WLAN_ADDR_COPY(sta_desc.peer_addr.bytes,
-			       link_info->link_addr.bytes);
-	else
-		WLAN_ADDR_COPY(sta_desc.peer_addr.bytes,
-			       wlan_vdev_mlme_get_macaddr(vdev));
 
 	qdf_status = ucfg_dp_mon_register_txrx_ops(vdev);
 	if (QDF_STATUS_SUCCESS != qdf_status) {

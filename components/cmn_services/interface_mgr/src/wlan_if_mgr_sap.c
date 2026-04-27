@@ -246,7 +246,7 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (event_data && QDF_IS_STATUS_ERROR(event_data->status))
 		wlan_tdls_notify_start_bss_failure(psoc);
 
-	if (QDF_IS_STATUS_SUCCESS(event_data->status))
+	if (event_data && QDF_IS_STATUS_SUCCESS(event_data->status))
 		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
 
 	/*
