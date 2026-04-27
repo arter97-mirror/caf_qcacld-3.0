@@ -358,6 +358,18 @@ void pkt_capture_close_mon_thread(struct pkt_capture_mon_context *mon_ctx)
 	set_bit(PKT_CAPTURE_RX_POST_EVENT,
 		&mon_ctx->mon_event_flag);
 	wake_up_interruptible(&mon_ctx->mon_wait_queue);
+
+	/*
+	 * If mon thread is suspended (waiting on resume_mon_event),
+	 * wake_up_interruptible on mon_wait_queue won't reach it.
+	 * Complete resume_mon_event so the thread can wake up and
+	 * process the shutdown event.
+	 */
+	if (mon_ctx->is_mon_thread_suspended) {
+		mon_ctx->is_mon_thread_suspended = false;
+		complete(&mon_ctx->resume_mon_event);
+	}
+
 	wait_for_completion(&mon_ctx->mon_shutdown);
 	mon_ctx->mon_thread = NULL;
 	pkt_capture_drop_monpkt(mon_ctx);
