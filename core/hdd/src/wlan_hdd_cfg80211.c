@@ -25962,7 +25962,8 @@ const struct nla_policy wlan_hdd_tpc_backoff_policy[ADJUST_TX_POWER_MAX + 1] = {
 
 static uint8_t wlan_hdd_rate_value_to_rate_index(uint8_t rate_type,
 						 uint8_t band_index,
-						 uint8_t rate_value)
+						 uint8_t rate_value,
+						 bool cck_5g_tx)
 {
 	if (rate_type == RATE_TYPE_LEGACY) {
 		if (band_index == NL80211_BAND_2GHZ) {
@@ -25993,7 +25994,15 @@ static uint8_t wlan_hdd_rate_value_to_rate_index(uint8_t rate_type,
 
 		} else if (band_index == NL80211_BAND_5GHZ ||
 			   band_index == NL80211_BAND_6GHZ) {
-			if (rate_value == RATE_6)
+			if (cck_5g_tx && rate_value == RATE_1)
+				return 24;
+			else if (cck_5g_tx && rate_value == RATE_2)
+				return 25;
+			else if (cck_5g_tx && rate_value == RATE_5_5)
+				return 26;
+			else if (cck_5g_tx && rate_value == RATE_11)
+				return 27;
+			else if (rate_value == RATE_6)
 				return 0;
 			else if (rate_value == RATE_9)
 				return 1;
@@ -26056,9 +26065,13 @@ static int __wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
 	int max_chain_itr, max_mcs_itr, ret = -EINVAL;
 	struct tx_power_per_mcs_rate *txpower_adjust_params;
 	QDF_STATUS status;
+	bool cck_5g_rx = false, cck_5g_tx = false;
 
 	hdd_enter_dev(dev);
 	if (!hdd_ctx->pdev)
+		return -EINVAL;
+
+	if (!hdd_ctx->psoc)
 		return -EINVAL;
 
 	if (wlan_cfg80211_nla_parse(tb, ADJUST_TX_POWER_MAX, data, data_len,
@@ -26115,8 +26128,15 @@ static int __wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
 		else {
 			max_chain_itr =
 				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_5G_6G_CHAIN_NUM;
+			if (band_index == NL80211_BAND_5GHZ)
+				wlan_get_rx_tx_cck_5g_support_for_mode(
+						hdd_ctx->psoc, QDF_STA_MODE,
+						&cck_5g_rx, &cck_5g_tx);
 			max_mcs_itr =
 				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_5G_6G_RATE_NUM;
+			if (cck_5g_tx)
+				max_mcs_itr +=
+				WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_5G_RATE_NUM_EXT;
 		}
 
 		j = 0;
@@ -26171,7 +26191,8 @@ static int __wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
 				rate_index = wlan_hdd_rate_value_to_rate_index(
 								   rate_type,
 								   band_index,
-								   rate_value);
+								   rate_value,
+								   cck_5g_tx);
 				if (rate_index == INVALID_RATE)
 					continue;
 
