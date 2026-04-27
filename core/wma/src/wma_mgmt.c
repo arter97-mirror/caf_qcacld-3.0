@@ -1121,7 +1121,7 @@ static inline bool wma_is_phymode_eht(enum wlan_phymode phymode)
 }
 #endif
 
-#if CONFIG_160MHZ_SUPPORT
+#ifdef CONFIG_160MHZ_SUPPORT
 /**
  * wma_fw_to_host_phymode_160() - convert fw to host phymode for 160 mhz
  * phymodes
