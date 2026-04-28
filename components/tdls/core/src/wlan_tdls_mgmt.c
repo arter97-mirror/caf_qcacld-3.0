@@ -572,8 +572,8 @@ static QDF_STATUS tdls_process_rx_mgmt(
 		else
 			tdls_debug("rx mgmt, but no valid up layer callback");
 
-		tdls_recv_discovery_resp(tdls_vdev, mac);
 		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
+		tdls_recv_discovery_resp(tdls_vdev, mac);
 		goto end;
 	}
 

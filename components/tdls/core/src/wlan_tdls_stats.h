@@ -295,6 +295,24 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 				int8_t rssi);
 
 /**
+ * tdls_stats_record_discovery_resp() - Record a TDLS discovery response stats
+ *                                      entry.
+ * @soc_obj: TDLS soc private object (provides stats_ctx).
+ * @vdev:    VDEV on which the discovery response was received.
+ * @macaddr: MAC address of the peer that sent the discovery response.
+ * @rssi:    RSSI of the received discovery response frame.
+ *
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_DISCOVERY,
+ * subtype=TDLS_STATS_SUBTYPE_RESP, is_sender=0 (we received it), and
+ * delivers it to the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
+				      struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *macaddr,
+				      int8_t rssi);
+
+/**
  * tdls_stats_record_peer_teardown() - Record a TDLS teardown stats entry.
  * @soc_obj:     TDLS soc private object (provides stats_ctx).
  * @vdev:        VDEV on which the teardown is occurring.

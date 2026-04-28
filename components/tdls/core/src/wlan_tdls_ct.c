@@ -250,8 +250,8 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		if (tdls_soc && tdls_soc->tdls_rx_cb)
 			tdls_soc->tdls_rx_cb(tdls_soc->tdls_rx_cb_data,
 					     rx_mgmt);
-		tdls_recv_discovery_resp(tdls_vdev, mac);
 		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
+		tdls_recv_discovery_resp(tdls_vdev, mac);
 
 cleanup:
 		/* cleanup rx_mgmt for all the ML vdevs */
@@ -723,6 +723,9 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 		tdls_err("curr_peer is NULL");
 		return -EINVAL;
 	}
+
+	tdls_stats_record_discovery_resp(tdls_soc, tdls_vdev->vdev, mac,
+					 curr_peer->rssi);
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(tdls_vdev->vdev)) {
 		if (tdls_vdev->discovery_sent_cnt)

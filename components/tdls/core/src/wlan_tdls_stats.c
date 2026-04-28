@@ -1055,6 +1055,34 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 				    sizeof(entry), &entry);
 }
 
+void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
+				      struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *macaddr,
+				      int8_t rssi)
+{
+	struct tdls_stats_entry entry = {0};
+
+	if (!soc_obj || !vdev || !macaddr)
+		return;
+
+	if (!soc_obj->stats_ctx)
+		return;
+
+	entry.ts_ms       = qdf_get_time_of_the_day_ms();
+	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
+	entry.type        = TDLS_STATS_DISCOVERY;
+	entry.subtype     = TDLS_STATS_SUBTYPE_RESP;
+	entry.is_sender   = 0;
+	entry.reason_code = TDLS_STATS_REASON_GENERAL;
+	entry.session_id  = wlan_vdev_get_id(vdev);
+	entry.rssi        = rssi;
+	entry.channel     = wlan_get_operation_chan_freq(vdev);
+
+	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
+				    TDLS_STATS_EV_NEW_EVENT,
+				    sizeof(entry), &entry);
+}
+
 void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
 				     struct wlan_objmgr_vdev *vdev,
 				     const uint8_t *macaddr,
