@@ -325,6 +325,21 @@ QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
  */
 bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
 				      struct qdf_mac_addr *mac_addr);
+
+/**
+ * wlan_tdls_process_cmd() - Dispatcher wrapper for the TDLS command processor.
+ * @msg: Scheduler message containing the TDLS command type and body pointer.
+ *
+ * This is the public dispatcher-layer entry point for TDLS scheduler
+ * messages posted from external components (e.g. the DP layer via
+ * wlan_dp_rx_tdls_packet()).  It is registered as msg.callback in
+ * scheduler_post_message() calls and simply forwards to the core handler
+ * tdls_process_cmd().
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_tdls_process_cmd(struct scheduler_msg *msg);
+
 #else
 static inline
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
@@ -463,5 +478,10 @@ static inline void
 wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev)
 {}
+
+static inline QDF_STATUS wlan_tdls_process_cmd(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif

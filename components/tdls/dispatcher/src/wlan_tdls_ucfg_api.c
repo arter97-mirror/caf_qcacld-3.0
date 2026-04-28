@@ -26,6 +26,9 @@
 #include <wlan_tdls_ucfg_api.h>
 #include <wlan_tdls_tgt_api.h>
 #include "../../core/src/wlan_tdls_main.h"
+#include "../../core/src/wlan_tdls_stats.h"
+#include <qdf_trace.h>
+#include <wlan_mgmt_txrx_utils_api.h>
 #include "../../core/src/wlan_tdls_cmds_process.h"
 #include "../../core/src/wlan_tdls_ct.h"
 #include "../../core/src/wlan_tdls_mgmt.h"
@@ -506,6 +509,7 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	soc_obj->tdls_osif_update_cb.tdls_osif_disconn_update =
 	       req->tdls_osif_update_cb.tdls_osif_disconn_update;
 	soc_obj->stats_emit_cb = req->tdls_stats_emit_cb;
+
 	tdls_pm_call_backs.tdls_notify_increment_session =
 			tdls_notify_increment_session;
 

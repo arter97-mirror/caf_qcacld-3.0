@@ -1055,6 +1055,52 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 				    sizeof(entry), &entry);
 }
 
+void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
+			      struct wlan_objmgr_vdev *vdev,
+			      const uint8_t *macaddr,
+			      enum qdf_proto_dir dir,
+			      enum tdls_stats_type type,
+			      enum tdls_stats_subtype subtype,
+			      enum tdls_stats_reason_code reason_code)
+{
+	struct tdls_stats_entry entry = {0};
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	struct tdls_peer *peer;
+
+	if (!soc_obj || !vdev || !macaddr)
+		return;
+
+	if (!soc_obj->stats_ctx)
+		return;
+
+	/*
+	 * Look up the TDLS peer by MAC address to retrieve the last known
+	 * RSSI.  The peer MAC is extracted from the skb frame by the caller
+	 * (Destination MAC for TX, Source MAC for RX), so this effectively
+	 * reads the RSSI associated with the frame's peer.
+	 */
+	tdls_vdev = wlan_objmgr_vdev_get_comp_private_obj(vdev,
+							  WLAN_UMAC_COMP_TDLS);
+	if (tdls_vdev) {
+		peer = tdls_find_peer(tdls_vdev, macaddr);
+		if (peer)
+			entry.rssi = peer->rssi;
+	}
+
+	entry.ts_ms       = qdf_get_time_of_the_day_ms();
+	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
+	entry.type        = type;
+	entry.subtype     = subtype;
+	entry.is_sender   = (dir == QDF_TX) ? 1 : 0;
+	entry.reason_code = reason_code;
+	entry.session_id  = wlan_vdev_get_id(vdev);
+	entry.channel     = wlan_get_operation_chan_freq(vdev);
+
+	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
+				    TDLS_STATS_EV_NEW_EVENT,
+				    sizeof(entry), &entry);
+}
+
 void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
 				      struct wlan_objmgr_vdev *vdev,
 				      const uint8_t *macaddr,

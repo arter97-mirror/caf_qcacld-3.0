@@ -790,3 +790,19 @@ void wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
 	if (soc_obj->connected_peer_count == 1)
 		tdls_set_tdls_offchannelmode(vdev, ENABLE_CHANSWITCH);
 }
+
+/**
+ * wlan_tdls_process_cmd() - Dispatcher wrapper for the TDLS command processor.
+ * @msg: Scheduler message containing the TDLS command type and body pointer.
+ *
+ * Public dispatcher-layer entry point for TDLS scheduler messages posted
+ * from external components (e.g. the DP layer via wlan_dp_rx_tdls_packet()).
+ * Registered as msg.callback in scheduler_post_message() calls and simply
+ * forwards to the core handler tdls_process_cmd().
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_tdls_process_cmd(struct scheduler_msg *msg)
+{
+	return tdls_process_cmd(msg);
+}

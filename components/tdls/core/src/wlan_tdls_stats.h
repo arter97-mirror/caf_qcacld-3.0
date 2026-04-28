@@ -295,6 +295,32 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 				int8_t rssi);
 
 /**
+ * tdls_stats_record_dp_pkt() - Record a TDLS data-path packet stats entry.
+ * @soc_obj:     TDLS soc private object (provides stats_ctx).
+ * @vdev:        VDEV on which the packet was sent/received.
+ * @macaddr:     Peer MAC address of the packet.
+ * @dir:         QDF_TX or QDF_RX.
+ * @type:        TDLS stats event type derived from the TDLS action code.
+ * @subtype:     TDLS stats event subtype derived from the TDLS action code.
+ * @reason_code: Reason code to record with the entry; use
+ *               TDLS_STATS_REASON_GENERAL for normal data-path frames.
+ *
+ * Called from tdls_process_stats_dp_pkt() on the TDLS scheduler thread
+ * after wlan_dp_rx_tdls_packet() detects a TDLS frame (EtherType 0x890D)
+ * in the RX data path and posts a TDLS_CMD_STATS_DP_PKT message.
+ * The type, subtype, and reason_code are already mapped from the raw
+ * action_code and dot11_reason before this function is called.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
+			      struct wlan_objmgr_vdev *vdev,
+			      const uint8_t *macaddr,
+			      enum qdf_proto_dir dir,
+			      enum tdls_stats_type type,
+			      enum tdls_stats_subtype subtype,
+			      enum tdls_stats_reason_code reason_code);
+
+/**
  * tdls_stats_record_discovery_resp() - Record a TDLS discovery response stats
  *                                      entry.
  * @soc_obj: TDLS soc private object (provides stats_ctx).

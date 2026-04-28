@@ -721,6 +721,85 @@ static void tdls_handle_link_unforce(struct wlan_objmgr_vdev *vdev)
 	tdls_set_link_mode(&req);
 }
 
+QDF_STATUS tdls_process_stats_dp_pkt(struct tdls_dp_pkt_info *info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct tdls_soc_priv_obj *soc_obj;
+
+	if (!info) {
+		tdls_err("NULL tdls_dp_pkt_info");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(info->psoc);
+	if (!soc_obj || !soc_obj->stats_ctx) {
+		qdf_mem_free(info);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(info->psoc,
+						    info->vdev_id,
+						    WLAN_TDLS_NB_ID);
+	if (!vdev) {
+		qdf_mem_free(info);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Map raw action_code → stats type and subtype */
+	switch (info->action_code) {
+	case TDLS_SETUP_REQUEST:
+		info->type    = TDLS_STATS_SETUP;
+		info->subtype = TDLS_STATS_SUBTYPE_REQ;
+		break;
+	case TDLS_SETUP_RESPONSE:
+		info->type    = TDLS_STATS_SETUP;
+		info->subtype = TDLS_STATS_SUBTYPE_RESP;
+		break;
+	case TDLS_SETUP_CONFIRM:
+		info->type    = TDLS_STATS_SETUP;
+		info->subtype = TDLS_STATS_SUBTYPE_CONFIRM;
+		break;
+	case TDLS_TEARDOWN:
+		info->type    = TDLS_STATS_TEARDOWN;
+		info->subtype = TDLS_STATS_SUBTYPE_COMPLETE;
+		break;
+	case TDLS_DISCOVERY_REQUEST:
+		info->type    = TDLS_STATS_DISCOVERY;
+		info->subtype = TDLS_STATS_SUBTYPE_REQ;
+		break;
+	default:
+		info->type    = TDLS_STATS_SETUP;
+		info->subtype = TDLS_STATS_SUBTYPE_GENERAL;
+		break;
+	}
+
+	/*
+	 * Map raw dot11_reason → stats reason_code.
+	 * For Teardown frames the 802.11 reason code was extracted by the
+	 * DP layer; for all other frame types it defaults to 0 (GENERAL).
+	 */
+	if (info->action_code == TDLS_TEARDOWN) {
+		info->reason_code =
+			(info->dot11_reason == TDLS_TEARDOWN_PEER_UNREACHABLE) ?
+			TDLS_STATS_REASON_PEER_UNREACHABLE :
+			TDLS_STATS_REASON_TEARDOWN_UNSPECIFIED;
+	} else {
+		info->reason_code = TDLS_STATS_REASON_GENERAL;
+	}
+
+	tdls_stats_record_dp_pkt(soc_obj, vdev,
+				 info->peer_mac.bytes,
+				 info->dir,
+				 info->type,
+				 info->subtype,
+				 info->reason_code);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+	qdf_mem_free(info);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -809,6 +888,9 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_CMD_SET_LINK_UNFORCE:
 		tdls_handle_link_unforce(msg->bodyptr);
+		break;
+	case TDLS_CMD_STATS_DP_PKT:
+		tdls_process_stats_dp_pkt(msg->bodyptr);
 		break;
 	case TDLS_STATS_ENABLE:
 		wlan_tdls_stats_enable_cmd(msg->bodyptr);
