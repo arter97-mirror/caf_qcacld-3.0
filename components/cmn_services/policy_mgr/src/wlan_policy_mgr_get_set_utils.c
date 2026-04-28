@@ -13357,15 +13357,24 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sta_cnt %u, gc_cnt %u",
 			 sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
 
-	/* if sta_sap_scc_on_dfs_chan ini is set, DFS master capability is
-	 * assumed disabled in the driver.
+	/*
+	 * Dont allow SAP on DFS channel, if master mode is disabled
+	 * (implies sta_sap_scc_on_dfs_chan is 0), OR
+	 * sta_sap_scc_on_dfs_chan ini is PM_STA_SAP_ON_DFS_DEFAULT and
+	 * Any interface present on same mac as SAP's freq OR
+	 * sta_sap_scc_on_dfs_chan ini is notPM_STA_SAP_ON_DFS_MASTER_MODE_FLEX,
+	 * and no sta/cli or SCC STA/CLI present.
 	 */
 	if ((wlan_reg_get_channel_state_for_pwrmode(
 		pdev, ch_freq, REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS) &&
-	    !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false) &&
-	    sta_sap_scc_on_dfs_chan &&
-	    !policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id)) {
-		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
+	    (!policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id) ||
+	      (sta_sap_scc_on_dfs_chan == PM_STA_SAP_ON_DFS_DEFAULT &&
+	       policy_mgr_any_other_vdev_on_same_mac_as_freq(
+			psoc, ch_freq, vdev_id)) ||
+	      (sta_sap_scc_on_dfs_chan != PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
+	       !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false)))) {
+		policy_mgr_err("SAP not allowed on DFS channel if DFS master is disabled or sta_sap_scc_on_dfs_chan is %d sta_cnt %d gc_cnt %d",
+			       sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
 		return false;
 	}
 
