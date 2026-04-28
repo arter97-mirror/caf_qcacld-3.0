@@ -45,14 +45,25 @@
 QDF_STATUS ucfg_action_oui_init(void);
 
 /**
- * ucfg_action_oui_deinit() - Unregister notification handlers.
+ * ucfg_action_oui_deinit() - De-initialize action_oui component
  *
- * This function Unregisters action_oui notification handlers which are
- * invoked from psoc create/destroy handlers.
+ * This function gets called when dispatcher is going down and releases
+ * the allocated resources.
  *
  * Return: None
  */
 void ucfg_action_oui_deinit(void);
+
+/**
+ * ucfg_action_oui_is_dynamic() - Check if action OUI is dynamic
+ * @action_id: action id to check
+ *
+ * This function checks if the given action id is configured as dynamic
+ * in the action OUI component.
+ *
+ * Return: true if dynamic, false otherwise
+ */
+bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id);
 
 /**
  * ucfg_action_oui_psoc_enable() - Notify action oui psoc enable
@@ -453,6 +464,12 @@ ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 				uint8_t oui_ext_num)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_ACTION_OUI */
 

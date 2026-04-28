@@ -533,10 +533,13 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 				item);
 		qdf_mem_free(ext_priv);
 		ext_priv = NULL;
-		if (psoc_priv->total_extensions)
-			psoc_priv->total_extensions--;
-		else
-			action_oui_err("unexpected total_extensions 0");
+
+		if (!wlan_action_oui_is_dynamic(oui_priv->id)) {
+			if (psoc_priv->total_extensions)
+				psoc_priv->total_extensions--;
+			else
+				action_oui_err("unexpected total_extensions 0");
+		}
 
 		if (action_id >= ACTION_OUI_HOST_ONLY) {
 			if (!psoc_priv->host_only_extensions)
@@ -899,4 +902,13 @@ void wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext)
 				   &oui_ext->mac_exclusion.mac_addr_mask,
 				   1);
 	}
+}
+
+bool wlan_action_oui_is_dynamic(enum action_oui_id action_id)
+{
+	if (action_id >= ACTION_OUI_HOST_FW_EXT_START &&
+	    action_id < ACTION_OUI_HOST_ONLY)
+		return true;
+
+	return false;
 }

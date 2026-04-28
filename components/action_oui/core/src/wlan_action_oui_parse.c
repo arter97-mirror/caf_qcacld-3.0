@@ -575,6 +575,9 @@ action_oui_extension_store(struct action_oui_psoc_priv *psoc_priv,
 {
 	struct action_oui_extension_priv *ext_priv;
 	uint32_t total_num, max_num, i;
+	bool is_action_id_dynamic;
+
+	is_action_id_dynamic = wlan_action_oui_is_dynamic(oui_priv->id);
 
 	max_num = wlan_action_oui_max_ext_num(oui_priv->id);
 
@@ -600,7 +603,9 @@ action_oui_extension_store(struct action_oui_psoc_priv *psoc_priv,
 		ext_priv->extension = ext[i];
 		qdf_list_insert_back(&oui_priv->extension_list,
 				     &ext_priv->item);
-		psoc_priv->total_extensions++;
+
+		if (!is_action_id_dynamic)
+			psoc_priv->total_extensions++;
 		wlan_action_oui_extension_dump(&ext[i]);
 	}
 
@@ -864,8 +869,33 @@ exit:
 	return status;
 }
 
+static bool action_oui_id_valid(struct wlan_objmgr_psoc *psoc,
+				enum action_oui_id action_id)
+{
+	enum action_oui_id active_action_id;
+
+	switch (action_id) {
+	case ACTION_OUI_ALLOW_NSS_GREATER_THAN_2:
+	case ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2:
+		active_action_id = action_oui_get_active_action_id(
+					psoc,
+					ACTION_OUI_ARBITRATOR_TYPE_NSS);
+
+		if (active_action_id == ACTION_OUI_MAXIMUM_ID &&
+		    action_id == ACTION_OUI_ALLOW_NSS_GREATER_THAN_2)
+			return true;
+
+		if (active_action_id != action_id)
+			return false;
+
+		return true;
+	default:
+		return true;
+	}
+}
+
 QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
-			enum action_oui_id action_id)
+			   enum action_oui_id action_id)
 {
 	QDF_STATUS status;
 	struct action_oui_request *req;
@@ -885,6 +915,14 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	if (!psoc_priv->action_oui_enable) {
 		action_oui_debug("action_oui is not enable");
 		return QDF_STATUS_SUCCESS;
+	}
+
+	if (wlan_action_oui_is_dynamic(action_id)) {
+		if (!action_oui_id_valid(psoc_priv->psoc, action_id)) {
+			action_oui_debug("action_id %d is not valid",
+					 action_id);
+			return QDF_STATUS_SUCCESS;
+		}
 	}
 
 	extension_list = &oui_priv->extension_list;
@@ -909,8 +947,13 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	}
 
 	req->action_id = oui_priv->id;
+	req->is_action_oui_dynamic = wlan_action_oui_is_dynamic(action_id);
 	req->no_oui_extensions = no_oui_extensions;
-	req->total_no_oui_extensions = psoc_priv->max_extensions;
+	if (req->is_action_oui_dynamic)
+		req->total_no_oui_extensions = TOTAL_NO_OUI_EXT;
+	else
+		req->total_no_oui_extensions = psoc_priv->max_extensions;
+
 	req->is_action_oui_v2_enabled =
 		psoc_priv->is_action_oui_v2_enabled;
 

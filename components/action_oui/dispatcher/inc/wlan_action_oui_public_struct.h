@@ -303,6 +303,7 @@ struct action_oui_extension {
  * struct action_oui_request - Contains specific action oui information
  * @action_id: type of action from enum action_oui_info
  * @is_action_oui_v2_enabled: Is action oui v2 enabled
+ * @is_action_oui_dynamic: Indicates if the action OUI ID is dynamic
  * @no_oui_extensions: number of action oui extensions of type @action_id
  * @total_no_oui_extensions: total no of oui extensions from all
  * action oui types, this is just a total count needed by firmware
@@ -313,6 +314,7 @@ struct action_oui_extension {
 struct action_oui_request {
 	enum action_oui_id action_id;
 	bool is_action_oui_v2_enabled;
+	bool is_action_oui_dynamic;
 	uint32_t no_oui_extensions;
 	uint32_t total_no_oui_extensions;
 	struct action_oui_extension extension[];

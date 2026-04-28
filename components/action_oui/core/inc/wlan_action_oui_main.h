@@ -227,6 +227,18 @@ wlan_action_oui_max_ext_num(enum action_oui_id action_id)
  * Return: void
  */
 void wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext);
+
+/**
+ * wlan_action_oui_is_dynamic() - Check if action OUI ID is dynamic
+ * @action_id: action OUI ID to check
+ *
+ * This function checks if the given action OUI ID belongs to dynamic OUI
+ * category. Dynamic OUI IDs have variable data length and are identified
+ * by specific enum values (128 and 129).
+ *
+ * Return: true if action_id is 128 or 129, false otherwise
+ */
+bool wlan_action_oui_is_dynamic(enum action_oui_id action_id);
 #else
 static inline
 bool wlan_action_oui_search(struct wlan_objmgr_psoc *psoc,
@@ -270,6 +282,12 @@ bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc)
 static inline void
 wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext)
 {
+}
+
+static inline
+bool wlan_action_oui_is_dynamic(enum action_oui_id action_id)
+{
+	return false;
 }
 #endif
 #endif /* end  of _WLAN_ACTION_OUI_MAIN_H_ */
