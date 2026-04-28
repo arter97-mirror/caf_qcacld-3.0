@@ -71,6 +71,7 @@
 #include "wlan_qct_sys.h"
 #include <wlan_scan_ucfg_api.h>
 #include "wlan_scan_utils_api.h"
+#include "wlan_cm_roam_api.h"
 #include <wlan_dlm_api.h>
 #include <lim_assoc_utils.h>
 #include "wlan_mlme_ucfg_api.h"
@@ -10136,6 +10137,14 @@ void lim_fill_session_security_profile(struct pe_session *session,
 
 	session->sec_profile_num =
 		entry->neg_sec_info.sec_profile_num;
+}
+
+void lim_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
+					 struct pe_session *session)
+{
+	cm_update_session_security_profile(
+		psoc, session->vdev_id,
+		session->sec_profile_num);
 }
 
 void lim_populate_security_profile_ie(struct pe_session *pe_session,

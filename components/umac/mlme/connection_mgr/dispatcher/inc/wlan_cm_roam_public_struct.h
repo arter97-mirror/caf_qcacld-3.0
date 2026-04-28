@@ -719,6 +719,7 @@ struct sae_roam_auth_map {
  * returned whenever queried for roam_cfg_rt_params_enabled status.
  * @roam_scan_scheme: Signifies whether roam scan is performed on neighbor
  * report channels only
+ * @sec_profile_num: selected Security Profile number (-1 if not used)
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -777,6 +778,7 @@ struct rso_config {
 	bool is_aggressive_roaming_mode;
 	bool roam_cfg_rt_params_enabled;
 	uint32_t roam_scan_scheme;
+	int8_t sec_profile_num;
 };
 
 /**

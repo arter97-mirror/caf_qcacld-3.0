@@ -4845,6 +4845,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 				   &req->assoc_ie);
 
 	lim_fill_session_security_profile(session, req->entry);
+	lim_update_session_security_profile(mac_ctx->psoc, session);
 
 	status = lim_fill_crypto_params(mac_ctx, session, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -5496,6 +5497,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 				   req->assoc_ie.ptr, req->assoc_ie.len);
 	/* update assoc ie to cm */
 	cm_update_session_assoc_ie(mac_ctx->psoc, vdev_id, &req->assoc_ie);
+	lim_fill_session_security_profile(session_entry, req->entry);
+	lim_update_session_security_profile(mac_ctx->psoc, session_entry);
 
 	if (lim_is_rsn_profile(session_entry))
 		lim_fill_rsn_ie(mac_ctx, session_entry, req);

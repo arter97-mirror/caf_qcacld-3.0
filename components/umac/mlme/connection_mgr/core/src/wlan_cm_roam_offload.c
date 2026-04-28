@@ -27,6 +27,8 @@
 #include "wlan_cm_roam_offload.h"
 #include "wlan_cm_tgt_if_tx_api.h"
 #include "wlan_cm_roam_api.h"
+#include "wlan_cmn_ieee80211.h"
+#include "wlan_objmgr_vdev_obj.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_crypto_global_api.h"
 #include "wlan_psoc_mlme_api.h"
@@ -3277,6 +3279,105 @@ void wlan_add_supported_6ghz_channels(struct wlan_objmgr_psoc *psoc,
 	*num_chnl = (uint8_t)j;
 }
 
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+static void cm_strip_security_profile_ie(struct rso_config *rso_cfg)
+{
+	uint8_t sp_ext_id = WLAN_EXTN_ELEMID_SECURITY_PROFILE;
+
+	wlan_strip_ie(rso_cfg->assoc_ie.ptr,
+		      (uint16_t *)&rso_cfg->assoc_ie.len,
+		      WLAN_ELEMID_EXTN_ELEM, ONE_BYTE,
+		      &sp_ext_id, 1, NULL, 0);
+}
+
+static void
+cm_append_security_profile_ie(struct wlan_objmgr_vdev *vdev,
+			      struct rso_config *rso_cfg,
+			      struct wlan_roam_scan_offload_params *rso_mode_cfg,
+			      uint8_t vdev_id)
+{
+	uint8_t profile_num;
+	uint8_t sp_ie_buf[16];
+	uint8_t sp_ie_len = 0;
+	int32_t rsn_caps;
+	const uint8_t *rsnxe;
+	uint8_t reduced_rsn_caps = 0;
+	uint8_t num_bitmap_octets;
+	uint8_t bitmap_idx;
+
+	if (!wlan_vdev_get_security_profile_enabled(vdev) ||
+	    rso_cfg->sec_profile_num < 0 ||
+	    rso_cfg->sec_profile_num > 15)
+		return;
+
+	profile_num = (uint8_t)rso_cfg->sec_profile_num;
+	num_bitmap_octets = (uint8_t)(profile_num / 8) + 1;
+
+	/*
+	 * Reduced RSN Capabilities: reflect STA own capabilities,
+	 * not the AP values. Bit 0 = Extended Key ID support,
+	 * Bit 1 = OCVC support — derived from the vdev crypto params.
+	 */
+	rsn_caps = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (rsn_caps >= 0) {
+		if (rsn_caps & WLAN_CRYPTO_RSN_CAP_EXTENDED_KEY_ID)
+			reduced_rsn_caps |= BIT(0);
+		if (rsn_caps & WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED)
+			reduced_rsn_caps |= BIT(1);
+	}
+
+	/*
+	 * Build raw Security Profile IE:
+	 * [EID-Ext=0xA2][Reduced RSN Caps][bitmap_len|vendor_count]
+	 * [bitmap_byte(s)][Extended RSN Caps (optional)]
+	 */
+	sp_ie_buf[sp_ie_len++] = WLAN_EXTN_ELEMID_SECURITY_PROFILE;
+	sp_ie_buf[sp_ie_len++] = reduced_rsn_caps;
+	sp_ie_buf[sp_ie_len++] = num_bitmap_octets & 0xF;
+	/* Bitmap is little-endian: byte[N/8] bit[N%8] for profile N.
+	 * e.g. profile 9, num_bitmap_octets=2: byte[0]=0x00 byte[1]=0x02
+	 */
+	for (bitmap_idx = 0; bitmap_idx < num_bitmap_octets; bitmap_idx++) {
+		sp_ie_buf[sp_ie_len++] =
+			(profile_num / 8 == bitmap_idx) ?
+			BIT(profile_num % 8) : 0;
+	}
+
+	/*
+	 * Extended RSN Capabilities: use the STA own RSNXE from the
+	 * supplicant assoc IE buffer.
+	 */
+	rsnxe = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE,
+					 rso_cfg->assoc_ie.ptr,
+					 rso_cfg->assoc_ie.len);
+	if (rsnxe && rsnxe[1] > 0 &&
+	    sp_ie_len + rsnxe[1] <= sizeof(sp_ie_buf)) {
+		qdf_mem_copy(sp_ie_buf + sp_ie_len, rsnxe + 2, rsnxe[1]);
+		sp_ie_len += rsnxe[1];
+	} else if (rsnxe && rsnxe[1] > 0) {
+		mlme_debug("vdev %d: SP IE buf too small for RSNXE (%u+%u > %zu)",
+			   vdev_id, sp_ie_len, rsnxe[1], sizeof(sp_ie_buf));
+	}
+
+	wlan_cm_append_assoc_ies(rso_mode_cfg, WLAN_ELEMID_EXTN_ELEM,
+				 sp_ie_len, sp_ie_buf);
+	mlme_debug("vdev %d: Security Profile IE appended for roam, profile %d",
+		   vdev_id, profile_num);
+}
+#else
+static inline void cm_strip_security_profile_ie(struct rso_config *rso_cfg)
+{
+}
+
+static inline void
+cm_append_security_profile_ie(struct wlan_objmgr_vdev *vdev,
+			      struct rso_config *rso_cfg,
+			      struct wlan_roam_scan_offload_params *rso_mode_cfg,
+			      uint8_t vdev_id)
+{
+}
+#endif
+
 static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 			struct wlan_objmgr_vdev *vdev,
 			struct rso_config *rso_cfg,
@@ -3305,6 +3406,7 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 	wlan_strip_ie(rso_cfg->assoc_ie.ptr, (uint16_t *)&rso_cfg->assoc_ie.len,
 		      WLAN_ELEMID_VENDOR, ONE_BYTE, RSNO_OUI_SELECTION,
 		      RSNO_OUI_SIZE, NULL, 0);
+	cm_strip_security_profile_ie(rso_cfg);
 
 	rrm_cap_ie_data = wlan_cm_get_rrm_cap_ie_data();
 
@@ -3365,6 +3467,7 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 	if (mlme_obj->cfg.sta.qcn_ie_support)
 		wlan_cm_append_assoc_ies(rso_mode_cfg, WLAN_ELEMID_VENDOR,
 					 sizeof(qcn_ie), qcn_ie);
+	cm_append_security_profile_ie(vdev, rso_cfg, rso_mode_cfg, vdev_id);
 }
 
 static void
@@ -6755,6 +6858,32 @@ void cm_update_session_assoc_ie(struct wlan_objmgr_psoc *psoc,
 rel_vdev_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 }
+
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+void cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					int8_t sec_profile_num)
+{
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg)
+		goto rel_vdev_ref;
+
+	rso_cfg->sec_profile_num = sec_profile_num;
+
+rel_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+#endif /* WLAN_FEATURE_SECURITY_PROFILE */
 
 /**
  * cm_dlm_is_bssid_in_reject_list() - Check whether a BSSID is present in

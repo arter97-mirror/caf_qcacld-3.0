@@ -2025,6 +2025,7 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 	 */
 	rso_cfg->is_disable_btm = mlme_obj->cfg.lfr.disable_btm_cfg;
 	rso_cfg->roam_scan_scheme = ROAM_SCAN_FREQ_SCHEME_NONE;
+	rso_cfg->sec_profile_num = -1;
 
 	return status;
 }

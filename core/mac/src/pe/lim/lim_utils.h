@@ -4709,6 +4709,18 @@ void lim_fill_session_security_profile(struct pe_session *session,
 				       struct scan_cache_entry *entry);
 
 /**
+ * lim_update_session_security_profile() - Push Security Profile IE
+ * info from PE session into the roam offload config
+ * @psoc: psoc pointer
+ * @session: PE session
+ *
+ * Reads sec_profile_num from the PE session
+ * and forwards it to cm_update_session_security_profile().
+ */
+void lim_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
+					 struct pe_session *session);
+
+/**
  * lim_populate_security_profile_ie() - Populate Security Profile IE in
  * the (Re)Association Request frame
  * @pe_session: PE session
@@ -4740,6 +4752,12 @@ bool lim_validate_assoc_rsp_security_profile(
 static inline void
 lim_fill_session_security_profile(struct pe_session *session,
 				  struct scan_cache_entry *entry)
+{
+}
+
+static inline void
+lim_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
+				    struct pe_session *session)
 {
 }
 

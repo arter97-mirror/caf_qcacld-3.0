@@ -708,6 +708,19 @@ void cm_update_session_assoc_ie(struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id,
 				struct element_info *assoc_ie);
 
+#ifdef WLAN_FEATURE_SECURITY_PROFILE
+void cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					int8_t sec_profile_num);
+#else
+static inline void
+cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   int8_t sec_profile_num)
+{
+}
+#endif
+
 /**
  * wlan_cm_roam_invoke() - Validate and send Roam invoke req to CM
  * @pdev: Pdev pointer
