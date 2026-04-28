@@ -252,6 +252,42 @@ void wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext);
  * Return: true if action_id is 128 or 129, false otherwise
  */
 bool wlan_action_oui_is_dynamic(enum action_oui_id action_id);
+
+/**
+ * action_oui_get_active_action_id() - Get active action_id based on
+ * arbitrator type
+ * @psoc: pointer to psoc object
+ * @arbitrator_type: arbitrator type (NSS, etc.)
+ *
+ * This function checks which list is non-empty for the given arbitrator type
+ * and returns the corresponding action_id. For NSS arbitrator, it checks
+ *
+ * Return: action_oui_id if a non-empty list is found, ACTION_OUI_MAXIMUM_ID
+ *         if no active list is found or on error
+ */
+enum action_oui_id
+action_oui_get_active_action_id(
+			 struct wlan_objmgr_psoc *psoc,
+			 enum action_oui_arbitrator_type arbitrator_type);
+
+/**
+ * action_oui_get_nss_policy() - Get NSS arbitrator list match result
+ * @psoc: pointer to psoc object
+ * @attr: action OUI search attributes (contains AP info like OUI, MAC, etc.)
+ * @found_in_list: pointer to filled match result
+ * @list_type: pointer to filled list type
+ *
+ * This function identifies the active NSS arbitrator list and fills whether
+ * the AP is found in that list. The caller is responsible for applying the
+ * NSS min/max decision logic using the returned list type and match result.
+ *
+ * Return: void
+ */
+void
+action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
+			  struct action_oui_search_attr *attr,
+			  bool *found_in_list,
+			  uint32_t *list_type);
 #else
 static inline
 bool wlan_action_oui_search(struct wlan_objmgr_psoc *psoc,
@@ -302,6 +338,23 @@ static inline
 bool wlan_action_oui_is_dynamic(enum action_oui_id action_id)
 {
 	return false;
+}
+
+static inline enum action_oui_id
+action_oui_get_active_action_id(
+			struct wlan_objmgr_psoc *psoc,
+			enum action_oui_arbitrator_type arbitrator_type)
+{
+	return ACTION_OUI_MAXIMUM_ID;
+}
+
+static inline void
+action_oui_get_nss_policy(
+		   struct wlan_objmgr_psoc *psoc,
+		   struct action_oui_search_attr *attr,
+		   bool *found_in_list,
+		   uint32_t *list_type)
+{
 }
 #endif
 #endif /* end  of _WLAN_ACTION_OUI_MAIN_H_ */

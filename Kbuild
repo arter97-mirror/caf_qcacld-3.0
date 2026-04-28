@@ -1734,7 +1734,8 @@ ifeq ($(CONFIG_WLAN_FEATURE_ACTION_OUI), y)
 ACTION_OUI_OBJS := $(ACTION_OUI_DIR)/core/src/wlan_action_oui_main.o \
 		$(ACTION_OUI_DIR)/core/src/wlan_action_oui_parse.o \
 		$(ACTION_OUI_DIR)/dispatcher/src/wlan_action_oui_tgt_api.o \
-		$(ACTION_OUI_DIR)/dispatcher/src/wlan_action_oui_ucfg_api.o
+		$(ACTION_OUI_DIR)/dispatcher/src/wlan_action_oui_ucfg_api.o \
+		$(ACTION_OUI_DIR)/dispatcher/src/wlan_action_oui_api.o
 endif
 
 $(call add-wlan-objs,action_oui,$(ACTION_OUI_OBJS))

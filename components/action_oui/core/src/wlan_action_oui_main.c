@@ -1010,6 +1010,111 @@ bool wlan_action_oui_is_dynamic(enum action_oui_id action_id)
 	return false;
 }
 
+enum action_oui_id
+action_oui_get_active_action_id(
+			 struct wlan_objmgr_psoc *psoc,
+			 enum action_oui_arbitrator_type arbitrator_type)
+{
+	struct action_oui_psoc_priv *psoc_priv;
+	struct action_oui_priv *oui_priv;
+
+	if (!psoc) {
+		action_oui_err("psoc is NULL");
+		return ACTION_OUI_MAXIMUM_ID;
+	}
+
+	if (arbitrator_type >= ACTION_OUI_ARBITRATOR_TYPE_MAX) {
+		action_oui_err("Invalid arbitrator type: %d", arbitrator_type);
+		return ACTION_OUI_MAXIMUM_ID;
+	}
+
+	psoc_priv = action_oui_psoc_get_priv(psoc);
+	if (!psoc_priv) {
+		action_oui_err("psoc_priv is NULL");
+		return ACTION_OUI_MAXIMUM_ID;
+	}
+
+	switch (arbitrator_type) {
+	case ACTION_OUI_ARBITRATOR_TYPE_NSS:
+
+		/* Check if allow list is non-empty */
+		oui_priv = psoc_priv->oui_priv[ACTION_OUI_ALLOW_NSS_GREATER_THAN_2];
+		qdf_mutex_acquire(&oui_priv->extension_lock);
+		if (!qdf_list_empty(&oui_priv->extension_list)) {
+			qdf_mutex_release(&oui_priv->extension_lock);
+			action_oui_debug("NSS allow list is active");
+			return ACTION_OUI_ALLOW_NSS_GREATER_THAN_2;
+		}
+		qdf_mutex_release(&oui_priv->extension_lock);
+
+		/* Check if disallow list is non-empty */
+		oui_priv = psoc_priv->oui_priv[ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2];
+		qdf_mutex_acquire(&oui_priv->extension_lock);
+		if (!qdf_list_empty(&oui_priv->extension_list)) {
+			qdf_mutex_release(&oui_priv->extension_lock);
+			action_oui_debug("NSS disallow list is active");
+			return ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2;
+		}
+		qdf_mutex_release(&oui_priv->extension_lock);
+		break;
+
+	default:
+		action_oui_debug("Unknown arbitrator type: %d",
+				 arbitrator_type);
+		break;
+	}
+
+	action_oui_debug("No active list found for arbitrator type: %d",
+			 arbitrator_type);
+	return ACTION_OUI_MAXIMUM_ID;
+}
+
+void
+action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
+			  struct action_oui_search_attr *attr,
+			  bool *found_in_list,
+			  uint32_t *list_type)
+{
+	enum action_oui_id active_action_id;
+
+	ACTION_OUI_ENTER();
+
+	if (!psoc) {
+		action_oui_err("psoc is NULL");
+		return;
+	}
+
+	if (!attr) {
+		action_oui_err("attr is NULL");
+		return;
+	}
+
+	if (!found_in_list || !list_type) {
+		action_oui_err("found_in_list or list_type pointer is NULL");
+		return;
+	}
+
+	*found_in_list = false;
+	*list_type = ACTION_OUI_MAXIMUM_ID;
+
+	active_action_id = action_oui_get_active_action_id(
+					psoc,
+					ACTION_OUI_ARBITRATOR_TYPE_NSS);
+	if (active_action_id == ACTION_OUI_MAXIMUM_ID) {
+		action_oui_debug("No active NSS arbitrator list");
+		return;
+	}
+
+	*list_type = active_action_id;
+
+	*found_in_list = wlan_action_oui_search(psoc, attr, active_action_id);
+
+	action_oui_debug("NSS arbitrator result - list_type: %u found_in_list: %u",
+			 *list_type, *found_in_list);
+
+	ACTION_OUI_EXIT();
+}
+
 uint32_t
 wlan_action_oui_max_ext_num(enum action_oui_id action_id)
 {

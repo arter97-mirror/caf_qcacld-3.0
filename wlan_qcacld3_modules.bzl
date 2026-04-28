@@ -2003,6 +2003,7 @@ _conditional_srcs = {
             "components/action_oui/dispatcher/src/wlan_action_oui_ucfg_api.c",
             "components/target_if/action_oui/src/target_if_action_oui.c",
             "cmn/wmi/src/wmi_unified_action_oui_tlv.c",
+            "components/action_oui/dispatcher/src/wlan_action_oui_api.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_BMI": {

@@ -137,6 +137,15 @@ struct action_oui_mac_exclusion {
 #define ACTION_OUI_OPERATOR_OR  "||"
 
 /**
+ * enum action_oui_arbitrator_type - arbitrator type for action oui
+ * @ACTION_OUI_ARBITRATOR_TYPE_NSS: NSS arbitrator
+ * @ACTION_OUI_ARBITRATOR_TYPE_MAX: maximum arbitrator types
+ */
+enum action_oui_arbitrator_type {
+	ACTION_OUI_ARBITRATOR_TYPE_NSS = 0,
+	ACTION_OUI_ARBITRATOR_TYPE_MAX,
+};
+/**
  * enum action_oui_id - to identify type of action oui
  * @ACTION_OUI_CONNECT_1X1: for 1x1 connection only
  * @ACTION_OUI_ITO_EXTENSION: for extending inactivity time of station

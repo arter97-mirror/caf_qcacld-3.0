@@ -171,6 +171,28 @@ QDF_STATUS ucfg_action_oui_send_by_id(struct wlan_objmgr_psoc *psoc,
 				      enum action_oui_id id);
 
 /**
+ * ucfg_action_oui_restore_default_and_send() - Restore default and send
+ * action OUI to firmware
+ * @psoc: objmgr psoc object
+ * @action_id: type of action to be restored and sent
+ *
+ * This function performs a two-step operation: first it cleans up the action
+ * OUI configuration for the specified action ID (removing all existing OUI
+ * entries and associated configurations), then restores the default
+ * configuration,
+ * and finally sends the configuration to the firmware.
+ *
+ * This is a wrapper function which combines cleanup,
+ * restore default, and send operations.
+ *
+ * Return: QDF_STATUS_SUCCESS if restore and send is successful,
+ *         QDF_STATUS_E_INVAL on validation failure or error
+ */
+QDF_STATUS
+ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
+					 enum action_oui_id action_id);
+
+/**
  * ucfg_action_oui_get_config() - Get current action INI config
  * @psoc: objmgr psoc object
  * @action_id: type of action to get
