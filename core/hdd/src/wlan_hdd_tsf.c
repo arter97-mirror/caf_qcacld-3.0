@@ -2456,6 +2456,7 @@ static enum hdd_tsf_op_result hdd_tsf_sync_init(struct hdd_adapter *adapter)
 	struct hdd_context *hddctx;
 	struct net_device *net_dev;
 	uint64_t host_time, qtime;
+	int errno;
 
 	if (!adapter)
 		return HDD_TSF_OP_FAIL;
@@ -2505,8 +2506,13 @@ static enum hdd_tsf_op_result hdd_tsf_sync_init(struct hdd_adapter *adapter)
 	hdd_tsf_regular_gpio_pulse_init(adapter);
 
 	net_dev = adapter->dev;
-	if (net_dev && hdd_tsf_is_dbg_fs_set(hddctx))
-		device_create_file(&net_dev->dev, &dev_attr_tsf);
+	if (net_dev && hdd_tsf_is_dbg_fs_set(hddctx)) {
+		errno = device_create_file(&net_dev->dev, &dev_attr_tsf);
+		if (errno) {
+			hdd_err("Failed to create TSF sysfs file: %d", ret);
+			return HDD_TSF_OP_FAIL;
+		}
+	}
 	hdd_set_th_sync_status(adapter, true);
 
 	return HDD_TSF_OP_SUCC;
