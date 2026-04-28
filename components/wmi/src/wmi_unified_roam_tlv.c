@@ -1523,6 +1523,8 @@ convert_roam_trigger_scan_mode(enum roam_scan_freq_scheme scan_freq_scheme)
 		return ROAM_TRIGGER_SCAN_MODE_PARTIAL;
 	case ROAM_SCAN_FREQ_SCHEME_FULL_SCAN:
 		return ROAM_TRIGGER_SCAN_MODE_FULL;
+	case ROAM_SCAN_FREQ_SCHEME_NEIGHBOR_REPORT:
+		return ROAM_TRIGGER_SCAN_MODE_PARTIAL;
 	default:
 		return ROAM_TRIGGER_SCAN_MODE_NONE;
 	}
@@ -5924,14 +5926,21 @@ static QDF_STATUS send_roam_scan_offload_chan_list_cmd_tlv(
 			       (wmi_roam_chan_list_fixed_param));
 	chan_list_fp->vdev_id = rso_ch_info->vdev_id;
 	chan_list_fp->num_chan = chan_count;
-	if (rso_ch_info->chan_cache_type == WMI_CHANNEL_LIST_STATIC)
+
+	if (rso_ch_info->chan_cache_type == WMI_CHANNEL_LIST_NEIGHBOR_REPORT) {
+		/* Use neighbor report channel list type */
+		chan_list_fp->chan_list_type =
+			WMI_ROAM_SCAN_CHAN_LIST_TYPE_NEIGHBOR_REPORT;
+		wmi_debug("Using NEIGHBOUR_REPORT channel list type");
+	} else if (rso_ch_info->chan_cache_type == WMI_CHANNEL_LIST_STATIC) {
 		/* external app is controlling channel list */
 		chan_list_fp->chan_list_type =
 			WMI_ROAM_SCAN_CHAN_LIST_TYPE_STATIC;
-	else
+	} else {
 		/* umac supplied occupied channel list in LFR */
 		chan_list_fp->chan_list_type =
 			WMI_ROAM_SCAN_CHAN_LIST_TYPE_DYNAMIC;
+	}
 
 	buf_ptr += sizeof(wmi_roam_chan_list_fixed_param);
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,

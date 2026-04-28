@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,6 +74,8 @@ struct rssi_monitor_param {
 #define WMI_CHANNEL_LIST_DYNAMIC_FLUSH            3
 /* Occupied channel list can be learnt after update */
 #define WMI_CHANNEL_LIST_DYNAMIC_UPDATE           4
+/* Occupied channel list is restricted to Neighbor Report Response channels */
+#define WMI_CHANNEL_LIST_NEIGHBOR_REPORT          5
 
 /**
  * struct plm_req_params - plm req parameter

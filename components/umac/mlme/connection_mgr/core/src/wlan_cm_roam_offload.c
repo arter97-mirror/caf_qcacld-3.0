@@ -2769,6 +2769,9 @@ void cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
 			break;
 	}
 
+	if (rso_cfg->roam_scan_scheme == ROAM_SCAN_FREQ_SCHEME_NEIGHBOR_REPORT)
+		chan_info->chan_cache_type = WMI_CHANNEL_LIST_NEIGHBOR_REPORT;
+
 	mlme_debug("chan_cache_type:%d, No of chan:%d, chan: %s",
 		   chan_info->chan_cache_type,
 		   chan_info->chan_count, ch_cache_str);
