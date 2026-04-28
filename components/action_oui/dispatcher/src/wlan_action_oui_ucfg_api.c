@@ -226,6 +226,40 @@ exit:
 	return status;
 }
 
+QDF_STATUS
+ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
+					 enum action_oui_id action_id)
+{
+	QDF_STATUS status;
+	struct action_oui_psoc_priv *psoc_priv;
+
+	ACTION_OUI_ENTER();
+
+	if (!psoc) {
+		action_oui_err("psoc is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto exit;
+	}
+
+	/* Get psoc private structure */
+	psoc_priv = action_oui_psoc_get_priv(psoc);
+	if (!psoc_priv) {
+		action_oui_err("psoc priv is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto exit;
+	}
+
+	/* Call core API to restore default and send */
+	status = wlan_action_oui_restore_default_and_send(psoc_priv, action_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		action_oui_err("Failed to restore default and send action_oui id: %u",
+			       action_id);
+
+exit:
+	ACTION_OUI_EXIT();
+	return status;
+}
+
 bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 			    struct action_oui_search_attr *attr,
 			    enum action_oui_id action_id)

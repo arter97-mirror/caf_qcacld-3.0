@@ -109,17 +109,34 @@ bool wlan_action_oui_is_empty(struct wlan_objmgr_psoc *psoc,
 			      enum action_oui_id action_id);
 
 /**
- * wlan_action_oui_cleanup() - Remove all of existing oui entry.
+ * wlan_action_oui_cleanup() - Cleanup action OUI with special handling
  * @psoc_priv: action oui objmgr private context
- * @action_id: type of action to be removed
+ * @action_id: type of action to be cleaned up
  *
- * This is a wrapper function which invokes internal function to remove
- * all of existing oui entry.
+ * This function handles cleanup of action OUI entries. For Mutual exclusive
+ * list, it cleans up all the mutually exclusive lists.
+ * For other action IDs, it performs standard cleanup.
  *
- * Return: QDF_STATUS_SUCCESS If remove is successful.
+ * Return: QDF_STATUS
  */
 QDF_STATUS
 wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
+			enum action_oui_id action_id);
+
+/**
+ * wlan_action_oui_restore_default_and_send() - Restore default and send
+ * action OUI to firmware
+ * @psoc_priv: action oui objmgr private context
+ * @action_id: type of action to be restored and sent
+ *
+ * This function cleans up the action OUI configuration, restores default list,
+ * and sends the configuration to firmware.
+ *
+ * Return: QDF_STATUS_SUCCESS if restore and send is successful.
+ */
+QDF_STATUS
+wlan_action_oui_restore_default_and_send(
+			struct action_oui_psoc_priv *psoc_priv,
 			enum action_oui_id action_id);
 
 /**
@@ -213,12 +230,8 @@ wlan_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
  *
  * Return: QDF_STATUS.
  */
-static inline uint32_t
-wlan_action_oui_max_ext_num(enum action_oui_id action_id)
-{
-	return  action_id < ACTION_OUI_HOST_ONLY ?
-		ACTION_OUI_MAX_EXT_TO_FW : ACTION_OUI_MAX_EXT_HOST_ONLY;
-}
+uint32_t
+wlan_action_oui_max_ext_num(enum action_oui_id action_id);
 
 /**
  * wlan_action_oui_extension_dump() - Dump oui extension of action oui
@@ -256,8 +269,9 @@ bool wlan_action_oui_is_empty(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline QDF_STATUS
-wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
-			enum action_oui_id action_id)
+wlan_action_oui_restore_default_and_send(
+				struct action_oui_psoc_priv *psoc_priv,
+				enum action_oui_id action_id)
 {
 	return QDF_STATUS_SUCCESS;
 }

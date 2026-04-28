@@ -147,6 +147,7 @@ bool validate_and_convert_oui(uint8_t *token,
  * @token: data length string
  * @ext: pointer to container which holds hex value formed from input str
  * @action_token: next action to be parsed
+ * @action_id: action OUI ID
  *
  * This is an internal function invoked from action_oui_parse to validate
  * the data length string for action OUI inis, convert it to hex value and
@@ -158,9 +159,11 @@ bool validate_and_convert_oui(uint8_t *token,
 static bool
 validate_and_convert_data_length(uint8_t *token,
 				struct action_oui_extension *ext,
-				enum action_oui_token_type *action_token)
+				enum action_oui_token_type *action_token,
+				enum action_oui_id action_id)
 {
 	uint32_t token_len = qdf_str_len(token);
+	uint32_t max_data_length;
 	int ret;
 	uint8_t len = 0;
 
@@ -175,9 +178,15 @@ validate_and_convert_data_length(uint8_t *token,
 		return false;
 	}
 
-	if ((uint32_t)len > ACTION_OUI_MAX_DATA_LENGTH) {
+	/* Allow longer data length for dynamic action OUIs */
+	if (wlan_action_oui_is_dynamic(action_id))
+		max_data_length = ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY;
+	else
+		max_data_length = ACTION_OUI_MAX_DATA_LENGTH;
+
+	if ((uint32_t)len > max_data_length) {
 		action_oui_err("action OUI data len %d is more than %u",
-			       len, ACTION_OUI_MAX_DATA_LENGTH);
+			       len, max_data_length);
 		return false;
 	}
 
@@ -678,7 +687,8 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 
 		case ACTION_OUI_DATA_LENGTH_TOKEN:
 			valid = validate_and_convert_data_length(token, &ext,
-								&action_token);
+								&action_token,
+								action_id);
 			break;
 
 		case ACTION_OUI_DATA_TOKEN:

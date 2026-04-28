@@ -138,14 +138,20 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 			    enum action_oui_id action_id);
 
 /**
- * ucfg_action_oui_cleanup() - Remove all in existing oui entry.
+ * ucfg_action_oui_cleanup() - Cleanup action OUI configuration for given ID
  * @psoc: objmgr psoc object
- * @action_id: type of action to be removed
+ * @action_id: type of action to be cleaned up
  *
- * This is a wrapper function which invokes internal function to remove
- * all the existing oui entry.
+ * This function cleans up the action OUI configuration for the specified
+ * action ID. It removes all existing OUI entries and associated configurations
+ * for the given action. Some action IDs may require cleanup of multiple related
+ * configurations to ensure complete removal of all associated settings.
  *
- * Return: QDF_STATUS_SUCCESS If remove is successful.
+ * This is a wrapper function which invokes internal function to perform
+ * the cleanup operation.
+ *
+ * Return: QDF_STATUS_SUCCESS if cleanup is successful,
+ *         QDF_STATUS_E_INVAL on validation failure or cleanup error
  */
 QDF_STATUS
 ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
@@ -390,14 +396,19 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_action_oui_cleanup() - Remove all of existing oui entry
+ * ucfg_action_oui_cleanup() - Cleanup action OUI configuration for given ID
  * @psoc: objmgr psoc object
- * @action_id: type of action to be removed
+ * @action_id: type of action to be cleaned up
  *
- * This is a wrapper function which invokes internal function to remove
- * all the existing oui entry.
+ * This function cleans up the action OUI configuration for the specified
+ * action ID. It removes all existing OUI entries and associated configurations
+ * for the given action. Some action IDs may require cleanup of multiple related
+ * configurations to ensure complete removal of all associated settings.
  *
- * Return: QDF_STATUS_SUCCESS If remove is successful.
+ * This is a wrapper function which invokes internal function to perform
+ * the cleanup operation.
+ *
+ * Return: QDF_STATUS_SUCCESS (always successful in stub implementation)
  */
 static inline
 QDF_STATUS
@@ -420,6 +431,33 @@ ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 static inline
 QDF_STATUS ucfg_action_oui_send_by_id(struct wlan_objmgr_psoc *psoc,
 				      enum action_oui_id id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * ucfg_action_oui_restore_default_and_send() - Restore default and send
+ * action OUI to firmware
+ * @psoc: objmgr psoc object
+ * @action_id: type of action to be restored and sent
+ *
+ * Stub function when WLAN_FEATURE_ACTION_OUI is not enabled.
+ *
+ * This function performs a two-step operation: first it cleans up the action
+ * OUI configuration for the specified action ID (removing all existing OUI
+ * entries and associated configurations), then restores the default
+ * configuration,
+ * and finally sends the configuration to the firmware.
+ *
+ * This is a wrapper function which combines cleanup,
+ * restore default, and send operations.
+ *
+ * Return: QDF_STATUS_SUCCESS (always successful in stub implementation)
+ */
+static inline
+QDF_STATUS
+ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
+					 enum action_oui_id action_id)
 {
 	return QDF_STATUS_SUCCESS;
 }

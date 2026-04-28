@@ -38,6 +38,12 @@
 #define ACTION_OUI_MAX_STR_LEN 840
 
 /*
+ * Maximum number of action oui extensions supported for
+ * dynamic action ids category.
+ */
+#define ACTION_OUI_MAX_HOST_FW_EXT 30
+
+/*
  * Maximum number of action oui extensions supported in
  * each action oui category to F/W
  */

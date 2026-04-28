@@ -501,9 +501,9 @@ exit:
 	return found;
 }
 
-QDF_STATUS
-wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
-			enum action_oui_id action_id)
+static QDF_STATUS
+__wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
+			  enum action_oui_id action_id)
 {
 	struct action_oui_priv *oui_priv;
 	struct action_oui_extension_priv *ext_priv;
@@ -511,13 +511,7 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 	QDF_STATUS status;
 	qdf_list_node_t *node = NULL;
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID)
-		return QDF_STATUS_E_INVAL;
-
 	oui_priv = psoc_priv->oui_priv[action_id];
-	if (!oui_priv)
-		return QDF_STATUS_SUCCESS;
-
 	ext_list = &oui_priv->extension_list;
 	qdf_mutex_acquire(&oui_priv->extension_lock);
 	while (!qdf_list_empty(ext_list)) {
@@ -525,7 +519,8 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			action_oui_err("Invalid delete in action: %u",
 				       oui_priv->id);
-			break;
+			qdf_mutex_release(&oui_priv->extension_lock);
+			return QDF_STATUS_E_FAILURE;
 		}
 		ext_priv = qdf_container_of(
 				node,
@@ -551,6 +546,108 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 	qdf_mutex_release(&oui_priv->extension_lock);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
+			enum action_oui_id action_id)
+{
+	QDF_STATUS status;
+
+	if (!psoc_priv)
+		return QDF_STATUS_E_INVAL;
+
+	if (action_id >= ACTION_OUI_MAXIMUM_ID)
+		return QDF_STATUS_E_INVAL;
+
+	switch (action_id) {
+	case ACTION_OUI_ALLOW_NSS_GREATER_THAN_2:
+	case ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2:
+		/* Clear NSS allowlist*/
+		status = __wlan_action_oui_cleanup(
+					psoc_priv,
+					ACTION_OUI_ALLOW_NSS_GREATER_THAN_2);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			action_oui_debug("action oui cleanup failure for NSS allowlist");
+			return status;
+		}
+
+		/* Clear NSS denylist*/
+		status = __wlan_action_oui_cleanup(
+				     psoc_priv,
+				     ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			action_oui_debug("action oui cleanup failure for NSS denylist");
+			return status;
+		}
+		break;
+
+	default:
+		/* For other action OUI IDs, cleanup directly */
+		status = __wlan_action_oui_cleanup(psoc_priv, action_id);
+		break;
+	}
+
+	return status;
+}
+
+QDF_STATUS
+wlan_action_oui_restore_default_and_send(struct action_oui_psoc_priv *psoc_priv,
+					 enum action_oui_id action_id)
+{
+	QDF_STATUS status;
+
+	ACTION_OUI_ENTER();
+
+	if (!psoc_priv) {
+		action_oui_err("psoc_priv is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto exit;
+	}
+
+	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+		action_oui_err("Invalid action_oui id: %u", action_id);
+		status = QDF_STATUS_E_INVAL;
+		goto exit;
+	}
+
+	/* First cleanup the action OUI configuration */
+	status = wlan_action_oui_cleanup(psoc_priv, action_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		action_oui_err("Failed to cleanup action_oui id: %u",
+			       action_id);
+		goto exit;
+	}
+
+	/* Parse the default list if it's not empty */
+	if (qdf_str_len(psoc_priv->action_oui_str[action_id]) > 0) {
+		status = action_oui_parse_string(
+					psoc_priv->psoc,
+					psoc_priv->action_oui_str[action_id],
+					action_id);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			action_oui_err("Failed to parse default list for action_oui id: %u",
+				       action_id);
+			goto exit;
+		}
+		action_oui_debug("Parsed default list for action_oui id: %u",
+				 action_id);
+	}
+
+	/* Then send the configuration to firmware */
+	if (action_id < ACTION_OUI_HOST_ONLY) {
+		status = action_oui_send(psoc_priv, action_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			action_oui_err("Failed to send action_oui id: %u",
+				       action_id);
+	} else {
+		action_oui_debug("action_oui id %u is host only, skip send",
+				 action_id);
+	}
+
+exit:
+	ACTION_OUI_EXIT();
+	return status;
 }
 
 bool wlan_action_oui_is_empty(struct wlan_objmgr_psoc *psoc,
@@ -911,4 +1008,13 @@ bool wlan_action_oui_is_dynamic(enum action_oui_id action_id)
 		return true;
 
 	return false;
+}
+
+uint32_t
+wlan_action_oui_max_ext_num(enum action_oui_id action_id)
+{
+	if (wlan_action_oui_is_dynamic(action_id))
+		return ACTION_OUI_MAX_HOST_FW_EXT;
+	return  action_id < ACTION_OUI_HOST_ONLY ?
+		ACTION_OUI_MAX_EXT_TO_FW : ACTION_OUI_MAX_EXT_HOST_ONLY;
 }
