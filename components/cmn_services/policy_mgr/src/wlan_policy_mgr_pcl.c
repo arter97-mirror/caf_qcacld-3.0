@@ -1095,6 +1095,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
 	bool keep_6ghz_sta_cli_conn;
+	bool has_legacy_ap = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1119,6 +1120,14 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 			break;
 		}
 	}
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		    pm_conc_connection_list[i].in_use &&
+		    !WLAN_REG_IS_6GHZ_CHAN_FREQ(pm_conc_connection_list[i].freq)) {
+			has_legacy_ap = true;
+			break;
+		}
+	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	if (!sta_gc_6ghz_freq)
@@ -1137,6 +1146,10 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	 * VLP STA + SAP - Allowed with VLP Power
 	 * LPI STA + SAP - Allowed with VLP power if channel supports VLP.
 	 * LPI STA + SAP - Allowed with LPI power if gindoor_channel_support=1
+	 *
+	 * PSC check is skipped for non-PSC channels if a 2G/5G AP is already
+	 * active, because RNR (Reduced Neighbor Report) in the legacy AP beacon
+	 * enables clients to discover the 6GHz BSS on non-PSC channels.
 	 */
 	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
 	policy_mgr_debug("STA power type : %d", ap_pwr_type_6g);
@@ -1146,7 +1159,8 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 								pm_ctx->pdev);
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_list_org[i])) {
-			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) ||
+			if ((!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) &&
+			     !has_legacy_ap) ||
 			    keep_6ghz_sta_cli_conn)
 				continue;
 			if (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP)
