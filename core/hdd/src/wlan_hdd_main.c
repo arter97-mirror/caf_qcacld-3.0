@@ -15677,7 +15677,6 @@ wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev)
 
 	return NULL;
 }
-
 /**
  * hdd_indicate_mgmt_frame() - Wrapper to indicate management frame to
  * user space
@@ -20242,6 +20241,9 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_register_oem_data_rsp_callback(mac_handle,
 					   hdd_send_oem_data_rsp_msg);
 
+	sme_register_hlp_data_rsp_callback(mac_handle,
+					   hdd_send_hlp_data);
+
 	sme_register_mgmt_frame_ind_callback(mac_handle,
 					     hdd_indicate_mgmt_frame);
 	sme_set_tsfcb(mac_handle, hdd_get_tsf_cb, hdd_ctx);
@@ -20397,6 +20399,7 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	hdd_thermal_unregister_callbacks(hdd_ctx);
 	sme_deregister_oem_data_rsp_callback(mac_handle);
 	sme_multi_client_ll_rsp_deregister_callback(mac_handle);
+	sme_deregister_hlp_data_rsp_callback(mac_handle);
 
 	status = wma_deregister_qos_null_hdd_cb();
 	if (!QDF_IS_STATUS_SUCCESS(status))

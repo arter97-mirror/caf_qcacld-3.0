@@ -641,22 +641,15 @@ static void dp_softap_config_tx_pkt_tracing(struct wlan_dp_intf *dp_intf,
 }
 
 #ifdef WLAN_FEATURE_FILS_SK_SAP
-static inline
 void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf,
 			   qdf_nbuf_t netbuf)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 
-	dp_ctx->dp_ops.dp_fils_hlp_rx(dp_intf->intf_id,
+	dp_ctx->dp_ops.dp_fils_hlp_rx(dp_intf->def_link->link_id,
 				      dp_ctx->dp_ops.callback_ctx,
 				      netbuf);
 }
-#else
-static inline
-void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf,
-			   qdf_nbuf_t netbuf)
-{ }
-
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
@@ -810,7 +803,8 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link,
 			 QDF_NBUF_CB_PACKET_TYPE_DHCP)) {
 		dp_softap_inspect_dhcp_packet(dp_link, nbuf, QDF_TX);
 		if (QDF_IS_STATUS_SUCCESS(dp_softap_handle_hlp(dp_intf,
-							       dest_mac_addr)))
+							       dest_mac_addr,
+							       nbuf)))
 			return QDF_STATUS_SUCCESS;
 	}
 

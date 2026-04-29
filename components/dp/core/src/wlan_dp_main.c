@@ -246,7 +246,7 @@ QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
 }
 
 QDF_STATUS dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
-				struct qdf_mac_addr *addr)
+				struct qdf_mac_addr *addr, qdf_nbuf_t nbuf)
 {
 	struct fils_peer_hlp_node *hlp_node = NULL;
 

@@ -786,6 +786,21 @@ static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
 	INIT_WORK(&hdd_ctx->hlp_processing_work,
 		  hdd_hlp_work_queue);
 }
+
+/**
+ * hdd_send_hlp_data() - Send FILS HLP data to network stack
+ * @vdev_id: vdev id
+ * @hlp_data: Pointer to HLP data buffer
+ * @hlp_data_len: Length of HLP data
+ * @src_mac: Source MAC address
+ * @dst_mac: Destination MAC address
+ *
+ * Return: None
+ */
+void hdd_send_hlp_data(uint8_t vdev_id, uint8_t *hlp_data,
+		       uint16_t hlp_data_len, struct qdf_mac_addr *src_mac,
+		       struct qdf_mac_addr *dst_mac);
+
 #else
 static inline void hdd_fils_hlp_init(struct hdd_context *hdd_ctx)
 {}
@@ -798,6 +813,12 @@ static inline void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx,
 {}
 
 static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
+{}
+
+static inline void hdd_send_hlp_data(uint8_t vdev_id, uint8_t *hlp_data,
+				     uint16_t hlp_data_len,
+				     struct qdf_mac_addr *src_mac,
+				     struct qdf_mac_addr *dst_mac)
 {}
 #endif
 

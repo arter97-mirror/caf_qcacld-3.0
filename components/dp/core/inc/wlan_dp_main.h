@@ -280,12 +280,13 @@ QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
  * dp_softap_handle_hlp() - API to handle HLP msg received from upper layer
  * @dp_intf: DP interface
  * @addr: MAC address of Peer
+ * @nbuf: nbuf pointer
  *
  * Return: QDF_STATUS status in case of success else return error
  */
 
 QDF_STATUS dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
-				struct qdf_mac_addr *addr);
+				struct qdf_mac_addr *addr, qdf_nbuf_t nbuf);
 
 /**
  * dp_softap_hlp_init() - API to initialise context for hlp
@@ -316,7 +317,9 @@ dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf, struct qdf_mac_addr *addr)
 }
 
 static inline QDF_STATUS
-dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf, struct qdf_mac_addr *addr)
+dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
+		     struct qdf_mac_addr *addr,
+		     qdf_nbuf_t nbuf)
 {
 	return QDF_STATUS_E_FAILURE;
 }

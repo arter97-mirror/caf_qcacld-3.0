@@ -1635,9 +1635,15 @@ QDF_STATUS ucfg_dp_hlp_state_update(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr *peer_mac)
 {
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	struct fils_peer_hlp_node *hlp_node = NULL;
 
-	dp_intf = dp_get_vdev_priv_obj(vdev);
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+	dp_intf = dp_link->dp_intf;
 	if (unlikely(!dp_intf)) {
 		dp_err_rl("DP interface not found");
 		return QDF_STATUS_E_INVAL;

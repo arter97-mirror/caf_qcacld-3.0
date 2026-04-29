@@ -4048,6 +4048,48 @@ uint32_t sme_get_eht_ch_width(void)
 }
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * sme_register_hlp_data_rsp_callback() - Register HLP data response callback
+ * @mac_handle: Opaque handle to the global MAC context
+ * @callback: Callback function pointer for HLP frame indication
+ *
+ * Return: None
+ */
+void sme_register_hlp_data_rsp_callback(
+	mac_handle_t mac_handle,
+	void (*callback)(uint8_t vdev_id,
+			 uint8_t *hlp_data,
+			 uint16_t hlp_data_len,
+			 struct qdf_mac_addr *src_mac,
+			 struct qdf_mac_addr *dst_mac))
+{
+	struct mac_context *pmac = MAC_CONTEXT(mac_handle);
+
+	pmac->hlp_frame_ind_cb = callback;
+}
+
+/**
+ * sme_deregister_hlp_data_rsp_callback() - De-register HLP datarsp callback
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void  sme_deregister_hlp_data_rsp_callback(mac_handle_t mac_handle)
+{
+	struct mac_context *pmac;
+
+	if (!mac_handle) {
+		sme_err("mac_handle is not valid");
+		return;
+	}
+	pmac = MAC_CONTEXT(mac_handle);
+
+	pmac->hlp_frame_ind_cb = NULL;
+}
+
+#endif
+
 #ifdef FEATURE_OEM_DATA_SUPPORT
 /**
  * sme_register_oem_data_rsp_callback() - Register a routine of
@@ -15876,11 +15918,66 @@ error:
 
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
-				   uint8_t session_id,
+				   uint8_t vdev_id,
 				   uint8_t *hlp_rsp,
 				   uint16_t hlp_rsp_len)
 {
-	return QDF_STATUS_SUCCESS;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct sir_fils_hlp_msg *hlp_msg;
+	struct scheduler_msg sch_msg = {0};
+	struct csr_roam_session *csr_session;
+
+	qdf_status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
+	csr_session = CSR_GET_SESSION(mac, vdev_id);
+	if (!csr_session) {
+		sme_err("session %d not found", vdev_id);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto error;
+	}
+	hlp_msg = qdf_mem_malloc(sizeof(*hlp_msg));
+	if (!hlp_msg) {
+		qdf_status = QDF_STATUS_E_NOMEM;
+		goto error;
+	}
+
+	hlp_msg->length = sizeof(*hlp_msg);
+	hlp_msg->vdev_id = vdev_id;
+	hlp_msg->hlp_data_len = hlp_rsp_len;
+
+	hlp_msg->hlp_data = qdf_mem_malloc(hlp_msg->hlp_data_len);
+	if (!hlp_msg->hlp_data) {
+		qdf_mem_free(hlp_msg);
+		hlp_msg = NULL;
+		qdf_status = QDF_STATUS_E_NOMEM;
+		goto error;
+	}
+
+	qdf_mem_copy(hlp_msg->hlp_data, hlp_rsp, hlp_rsp_len);
+
+	sme_debug("HLP Data with Length = %d", hlp_rsp_len);
+	sch_msg.type = WNI_SME_HLP_RESPONSE;
+	sch_msg.bodyptr = hlp_msg;
+
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_PE,
+					    QDF_MODULE_ID_PE,
+					    &sch_msg);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		qdf_mem_free(hlp_msg->hlp_data);
+		hlp_msg->hlp_data = NULL;
+		qdf_mem_free(hlp_msg);
+		hlp_msg = NULL;
+		goto error;
+	}
+error:
+	sme_release_global_lock(&mac->sme);
+
+	return qdf_status;
+
 }
 #endif
 

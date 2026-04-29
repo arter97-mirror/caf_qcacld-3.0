@@ -987,6 +987,49 @@ void sme_deregister_oem_data_rsp_callback(mac_handle_t mac_handle)
 
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * sme_register_hlp_data_rsp_callback() - Register HLP data response callback
+ * @mac_handle: Opaque handle to the global MAC context
+ * @callback: Callback function pointer for HLP frame indication
+ *
+ * Return: None
+ */
+void sme_register_hlp_data_rsp_callback(
+	mac_handle_t mac_handle,
+	void (*callback)(uint8_t vdev_id,
+			 uint8_t *hlp_data,
+			 uint16_t hlp_data_len,
+			 struct qdf_mac_addr *src_mac,
+			 struct qdf_mac_addr *dst_mac));
+
+/**
+ * sme_deregister_hlp_data_rsp_callback() - De-register HLP datarsp callback
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_deregister_hlp_data_rsp_callback(mac_handle_t mac_handle);
+
+#else
+static inline
+void sme_register_hlp_data_rsp_callback(
+	mac_handle_t mac_handle,
+	void (*callback)(uint8_t vdev_id,
+			 uint8_t *hlp_data,
+			 uint16_t hlp_data_len,
+			 struct qdf_mac_addr *src_mac,
+			 struct qdf_mac_addr *dst_mac))
+{
+}
+
+static inline
+void sme_deregister_hlp_data_rsp_callback(mac_handle_t mac_handle)
+{
+}
+
+#endif
+
 QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
 					   uint8_t *pCountry);
 
@@ -3412,13 +3455,13 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
-				   uint8_t session_id,
+				   uint8_t vdev_id,
 				   uint8_t *hlp_rsp,
 				   uint16_t hlp_rsp_len);
 #else
 static inline
 QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
-				   uint8_t session_id,
+				   uint8_t vdev_id,
 				   uint8_t *hlp_rsp,
 				   uint16_t hlp_rsp_len)
 {

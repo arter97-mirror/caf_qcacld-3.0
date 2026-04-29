@@ -187,6 +187,21 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link,
 				struct cdp_tx_exception_metadata *tx_exc_param,
 				bool exception);
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+/**
+ * dp_softap_fils_hlp_rx() - Handle FILS HLP packet reception for SoftAP
+ * @dp_intf: Pointer to DP interface context
+ * @netbuf: Pointer to Network buffer
+ *
+ * Return: None
+ */
+void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t netbuf);
+#else
+static inline
+void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t netbuf)
+{ }
+#endif
+
 /**
  * dp_softap_tx_timeout() - TX timeout handler
  * @dp_intf: pointer to DP interface

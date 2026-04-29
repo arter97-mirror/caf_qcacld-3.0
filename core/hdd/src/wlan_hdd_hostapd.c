@@ -125,6 +125,7 @@
 #include "wlan_ll_sap_ucfg_api.h"
 #include "wlan_nan_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include <enet.h>
 #include <wlan_cfg80211.h>
 #include "osif_twt_ext_req.h"
 #ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
@@ -6394,6 +6395,22 @@ wlan_hdd_add_sap_obss_scan_ie(struct wlan_hdd_link_info *link_info,
 }
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+static inline void
+wlan_hdd_add_fils_indication_ie(struct wlan_hdd_link_info *link_info,
+				uint8_t *genie, uint16_t *total_ielen)
+{
+	wlan_hdd_add_extra_ie(link_info, genie, total_ielen,
+			      WLAN_ELEMID_FILS_INDICATION);
+}
+#else
+static inline void
+wlan_hdd_add_fils_indication_ie(struct wlan_hdd_link_info *link_info,
+				uint8_t *genie, uint16_t *total_ielen)
+{
+}
+#endif
+
 /**
  * hdd_update_11ax_apies() - update ap mode 11ax ies
  * @link_info: Pointer to link_info in adapter
@@ -6582,6 +6599,7 @@ wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 				      WLAN_ELEMID_WAPI);
 	}
 #endif
+	wlan_hdd_add_fils_indication_ie(link_info, genie, &total_ielen);
 	/* extract and add rrm ie from hostapd */
 	wlan_hdd_add_extra_ie(link_info, genie,
 			      &total_ielen, WLAN_ELEMID_RRM);
@@ -11140,5 +11158,81 @@ void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx, qdf_nbuf_t nbuf)
 			     &hlp_data_node->node);
 	qdf_spin_unlock_bh(&hdd_ctx->hdd_hlp_data_lock);
 	schedule_work(&hdd_ctx->hlp_processing_work);
+}
+
+void hdd_send_hlp_data(uint8_t vdev_id, uint8_t *hlp_data,
+		       uint16_t hlp_data_len, struct qdf_mac_addr *src_mac,
+		       struct qdf_mac_addr *dst_mac)
+{
+	struct sk_buff *skb;
+	uint16_t skb_len;
+	struct llc_snap_hdr_t *llc_hdr;
+	QDF_STATUS status;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			mac_ctx->psoc,
+			vdev_id,
+			WLAN_LEGACY_MAC_ID);
+
+	if (!vdev) {
+		hdd_err("vdev is NULL for vdev_id: %u", vdev_id);
+		return;
+	}
+	if (!hlp_data || !src_mac || !dst_mac ||
+	    hlp_data_len == 0 ||
+	    hlp_data_len > CM_FILS_MAX_HLP_DATA_LEN) {
+		hdd_err("Invalid hlp_data parameters");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	/* Calculate skb length */
+	skb_len = (2 * ETH_ALEN) + hlp_data_len;
+	skb = qdf_nbuf_alloc(NULL, skb_len, 0, 4, false);
+	if (!skb) {
+		hdd_err("HLP packet nbuf alloc fails");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	qdf_mem_copy(skb_put(skb, ETH_ALEN),
+		     dst_mac, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(skb_put(skb, ETH_ALEN),
+		     src_mac, QDF_MAC_ADDR_SIZE);
+
+	llc_hdr = (struct llc_snap_hdr_t *)hlp_data;
+	if (IS_SNAP(llc_hdr)) {
+		hlp_data += LLC_SNAP_HDR_OFFSET_ETHERTYPE;
+		hlp_data_len += LLC_SNAP_HDR_OFFSET_ETHERTYPE;
+	}
+
+	qdf_mem_copy(skb_put(skb, hlp_data_len), hlp_data, hlp_data_len);
+
+	/*
+	 * This HLP packet is formed from HLP info encapsulated
+	 * in assoc response frame which is AEAD encrypted.
+	 * Hence, this checksum validation can be set unnecessary.
+	 * i.e. network layer need not worry about checksum.
+	 */
+	skb->ip_summed = CHECKSUM_UNNECESSARY;
+
+	status = ucfg_dp_hlp_state_update(vdev, src_mac);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Setting Peer State to HLP fails");
+		qdf_nbuf_free(skb);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	status = ucfg_dp_rx_packet_cbk(vdev, (qdf_nbuf_t)skb);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Sending HLP packet fails");
+		qdf_nbuf_free(skb);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #endif
