@@ -641,7 +641,7 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 	entry.ts_ms       = qdf_get_time_of_the_day_ms();
 	qdf_mem_copy(entry.peer_mac, peer_mac, QDF_MAC_ADDR_SIZE);
 	entry.success     = success ? 0 : 1;
-	entry.is_sender   = 1;
+	entry.is_sender   = true;
 	entry.reason_code = TDLS_STATS_REASON_GENERAL;
 	entry.session_id  = vdev_id;
 	entry.type        = type;

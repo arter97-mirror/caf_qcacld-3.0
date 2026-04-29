@@ -226,8 +226,8 @@ enum tdls_stats_sm_evt {
  * @rssi:                RSSI in dBm (range -127 to 0).
  * @snr:                 Signal-to-noise ratio.
  * @channel:             Operating channel number.
- * @is_sender:           Sender flag (1 = local STA is the initiator).
- *                       Not applicable for Type-5 entries; set to 0.
+ * @is_sender:           Sender flag (true = local STA is the initiator).
+ *                       Not applicable for Type-5 entries; set to false.
  * @data_rate:           Wi-Fi data rate in units of 0.5 Mbps (range 0-9999).
  *                       Applicable for Type-5 entries only; not present in
  *                       wmi_tdls_data_stats and is derived by the host.
@@ -284,7 +284,7 @@ struct tdls_stats_entry {
 	int16_t  rssi;
 	int16_t  snr;
 	uint16_t channel;
-	uint8_t  is_sender;
+	bool     is_sender;
 
 	/*
 	 * Type-5 periodic data stats fields.

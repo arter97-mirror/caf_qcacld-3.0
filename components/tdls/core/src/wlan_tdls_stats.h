@@ -327,6 +327,9 @@ void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
  * @vdev:    VDEV on which the discovery response was received.
  * @macaddr: MAC address of the peer that sent the discovery response.
  * @rssi:    RSSI of the received discovery response frame.
+ * @success: true if the discovery was successful (RSSI threshold met and
+ *           setup request will be sent); false if the RSSI threshold was
+ *           not met and the link returns to IDLE.
  *
  * Populates a struct tdls_stats_entry with type=TDLS_STATS_DISCOVERY,
  * subtype=TDLS_STATS_SUBTYPE_RESP, is_sender=0 (we received it), and
@@ -336,7 +339,8 @@ void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
 void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
 				      struct wlan_objmgr_vdev *vdev,
 				      const uint8_t *macaddr,
-				      int8_t rssi);
+				      int8_t rssi,
+				      bool success);
 
 /**
  * tdls_stats_record_peer_teardown() - Record a TDLS teardown stats entry.

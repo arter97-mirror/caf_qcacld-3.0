@@ -1044,7 +1044,8 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
 	entry.type        = TDLS_STATS_IF_SETUP;
 	entry.subtype     = TDLS_STATS_SUBTYPE_GENERAL;
-	entry.is_sender   = 0;
+	entry.success     = 0;
+	entry.is_sender   = false;
 	entry.reason_code = TDLS_STATS_REASON_GENERAL;
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.rssi        = rssi;
@@ -1091,7 +1092,8 @@ void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
 	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
 	entry.type        = type;
 	entry.subtype     = subtype;
-	entry.is_sender   = (dir == QDF_TX) ? 1 : 0;
+	entry.success     = 0;
+	entry.is_sender   = (dir == QDF_TX) ? true : false;
 	entry.reason_code = reason_code;
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.channel     = wlan_get_operation_chan_freq(vdev);
@@ -1104,7 +1106,8 @@ void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
 void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
 				      struct wlan_objmgr_vdev *vdev,
 				      const uint8_t *macaddr,
-				      int8_t rssi)
+				      int8_t rssi,
+				      bool success)
 {
 	struct tdls_stats_entry entry = {0};
 
@@ -1118,7 +1121,8 @@ void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
 	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
 	entry.type        = TDLS_STATS_DISCOVERY;
 	entry.subtype     = TDLS_STATS_SUBTYPE_RESP;
-	entry.is_sender   = 0;
+	entry.success     = success ? 0 : 1;
+	entry.is_sender   = false;
 	entry.reason_code = TDLS_STATS_REASON_GENERAL;
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.rssi        = rssi;
@@ -1148,7 +1152,8 @@ void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
 	qdf_mem_copy(entry.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
 	entry.type        = TDLS_STATS_TEARDOWN;
 	entry.subtype     = TDLS_STATS_SUBTYPE_COMPLETE;
-	entry.is_sender   = 1;
+	entry.success     = 0;
+	entry.is_sender   = true;
 	entry.reason_code = reason_code;
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.channel     = wlan_get_operation_chan_freq(vdev);

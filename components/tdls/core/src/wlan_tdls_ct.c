@@ -724,9 +724,6 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 		return -EINVAL;
 	}
 
-	tdls_stats_record_discovery_resp(tdls_soc, tdls_vdev->vdev, mac,
-					 curr_peer->rssi);
-
 	if (!wlan_vdev_mlme_is_mlo_vdev(tdls_vdev->vdev)) {
 		if (tdls_vdev->discovery_sent_cnt)
 			tdls_vdev->discovery_sent_cnt--;
@@ -755,10 +752,23 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 					  TDLS_LINK_SUCCESS);
 
 	curr_peer->tdls_support = TDLS_CAP_SUPPORTED;
+	tdls_cfg = &tdls_vdev->threshold_config;
+
+	/*
+	 * Record discovery response stats.  Success is determined by whether
+	 * the peer is in DISCOVERING state and the RSSI meets the trigger
+	 * threshold — the same condition that drives the setup request below.
+	 */
+	tdls_stats_record_discovery_resp(tdls_soc, tdls_vdev->vdev, mac,
+					 curr_peer->rssi,
+					 (curr_peer->link_status ==
+					  TDLS_LINK_DISCOVERING) &&
+					 ((int32_t)curr_peer->rssi >
+					  (int32_t)tdls_cfg->rssi_trigger_threshold));
+
 	if (TDLS_LINK_DISCOVERING != curr_peer->link_status)
 		return status;
 
-	tdls_cfg = &tdls_vdev->threshold_config;
 	/*
 	 * Throughput threshold is already met. Make sure RSSI threshold is also
 	 * met before setting up TDLS link.
