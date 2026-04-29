@@ -104,17 +104,6 @@ bool
 smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx);
 
 /**
- * smd_is_roaming_in_progress() - Check if SMD roaming is ongoing for a vdev
- * @vdev: VDEV object manager
- *
- * Vdev-based wrapper around smd_roam_in_progress().
- *
- * Return: true if SMD roaming is in progress, false otherwise
- */
-bool
-smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
-
-/**
  * smd_uhr_link_recfg_send_request_frame() - API to send Link Recfg request
  * @recfg_ctx: Link reconfiguration context
  * @req: Link reconfiguration state request
@@ -240,12 +229,55 @@ QDF_STATUS
 smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 		       struct mlo_link_recfg_state_req *req);
 
+/**
+ * smd_add_prepared_target_links_in_smd_ctx() - Add prepared target links to SMD context
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration state request
+ *
+ * This function updates the SMD context with accepted target AP links from the
+ * ST Prep response. It filters links by status code (STATUS_SUCCESS only),
+ * populates target_bss_ctx->links_info[] array with link information including
+ * AP link address, self link address, vdev_id, link_id, channel frequency,
+ * and NSS capabilities. Updates smd_ctx->prepared_targets array and increments
+ * num_prepared counter.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+smd_add_prepared_target_links_in_smd_ctx(
+					struct mlo_link_recfg_context *recfg_ctx,
+					struct mlo_link_recfg_state_req *req);
+
 bool
 smd_link_recfg_has_active_vdev_for_add_link(
 				struct mlo_link_recfg_context *recfg_ctx,
 				struct mlo_link_recfg_state_req *req,
 				struct wlan_mlo_link_switch_req *link_sw_req);
+
+QDF_STATUS
+smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
+		 struct roam_offload_synch_ind *sync_ind);
+
+/**
+ * smd_is_roaming_in_progress() - Check if SMD roaming is active on a vdev.
+ * @vdev: vdev pointer
+ *
+ * Convenience wrapper over smd_roam_in_progress() that takes a vdev pointer
+ * instead of a recfg_ctx pointer. Used by cm_state_connected_entry() (T4)
+ * and other CM SM callers that only have a vdev reference.
+ *
+ * Return: true if smd_roam_in_progress flag is set, false otherwise
+ */
+bool
+smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
 #else
+static inline QDF_STATUS
+smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
+		 struct roam_offload_synch_ind *sync_ind)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline bool
 smd_link_recfg_has_active_vdev_for_add_link(
 				struct mlo_link_recfg_context *recfg_ctx,
@@ -258,6 +290,14 @@ smd_link_recfg_has_active_vdev_for_add_link(
 static inline QDF_STATUS
 smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 		       struct mlo_link_recfg_state_req *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+smd_add_prepared_target_links_in_smd_ctx(
+					struct mlo_link_recfg_context *recfg_ctx,
+					struct mlo_link_recfg_state_req *req)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

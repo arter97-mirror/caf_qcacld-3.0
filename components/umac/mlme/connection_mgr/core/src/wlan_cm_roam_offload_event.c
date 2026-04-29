@@ -163,7 +163,7 @@ cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct mlo_link_recfg_context *recfg_ctx;
 
-	if (!cm_ctx || !cm_ctx->vdev || !roam_event)
+	if (!cm_ctx || !cm_ctx->vdev)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	vdev = cm_ctx->vdev;
@@ -175,23 +175,24 @@ cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
 		return QDF_STATUS_E_NULL_VALUE;
 
 	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
-	recfg_ctx->num_vdev_repurpose_req = roam_event->num_vdev_repurpose_req;
-	recfg_ctx->tgt_ap_link_bitmap = roam_event->notif_params1;
+	if (roam_event) {
+		recfg_ctx->num_vdev_repurpose_req = roam_event->num_vdev_repurpose_req;
+		recfg_ctx->tgt_ap_link_bitmap = roam_event->notif_params1;
 
-	if (recfg_ctx->num_vdev_repurpose_req > 0) {
-		qdf_mem_copy(&recfg_ctx->vdev_repurpose_req,
-			     &roam_event->vdev_repurpose_req,
-			     sizeof(struct smd_vdev_repurpose_req) *
-			     recfg_ctx->num_vdev_repurpose_req);
-		recfg_ctx->smd_roam_in_progress = true;
-	}
-
-	if (roam_event->smd_transition_ie) {
-		recfg_ctx->smd_transition_ie.ie_len = roam_event->smd_transition_ie->ie_len;
-		if (recfg_ctx->smd_transition_ie.ie_len > 0) {
-			qdf_mem_copy(&recfg_ctx->smd_transition_ie.ie_data,
-				     &roam_event->smd_transition_ie->ie_data,
-				     recfg_ctx->smd_transition_ie.ie_len);
+		if (recfg_ctx->num_vdev_repurpose_req > 0) {
+			qdf_mem_copy(&recfg_ctx->vdev_repurpose_req,
+				     &roam_event->vdev_repurpose_req,
+				     sizeof(struct smd_vdev_repurpose_req) *
+				     recfg_ctx->num_vdev_repurpose_req);
+			recfg_ctx->smd_roam_in_progress = true;
+		}
+		if (roam_event->smd_transition_ie) {
+			recfg_ctx->smd_transition_ie.ie_len = roam_event->smd_transition_ie->ie_len;
+			if (recfg_ctx->smd_transition_ie.ie_len > 0) {
+				qdf_mem_copy(&recfg_ctx->smd_transition_ie.ie_data,
+					     &roam_event->smd_transition_ie->ie_data,
+					     recfg_ctx->smd_transition_ie.ie_len);
+			}
 		}
 	}
 	return QDF_STATUS_SUCCESS;

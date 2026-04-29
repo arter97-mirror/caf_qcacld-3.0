@@ -91,13 +91,13 @@ smd_link_recfg_find_link_info_with_active_vdev(
 	uint8_t j;
 
 	for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
-		link_info = &mlo_dev_ctx->link_ctx->links_info[j];
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[j];
 
 		if (!qdf_is_macaddr_equal(&link_add->self_link_addr,
 					  &link_info->link_addr)) {
 			mlo_err("link %d info self " QDF_MAC_ADDR_FMT " not equal ADD_LINK: " QDF_MAC_ADDR_FMT "",
 				link_info->link_id,
-				QDF_MAC_ADDR_REF(link_info->self_link_addr.bytes),
+				QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
 				QDF_MAC_ADDR_REF(link_add->self_link_addr.bytes));
 			continue;
 		}
@@ -121,7 +121,7 @@ smd_link_recfg_find_link_info_with_active_vdev(
 			continue;
 		}
 
-		if (!cm_is_vdev_connected(vdev)) {
+		if (!cm_is_vdev_connected(vdev) || cm_is_vdev_roaming(vdev)) {
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
 			continue;
 		}
@@ -238,7 +238,7 @@ smd_link_recfg_has_active_vdev_for_add_link(
 	 */
 	if (link_add_reject && link_add_accept) {
 		for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
-			link_info = &mlo_dev_ctx->link_ctx->links_info[j];
+			link_info = &mlo_dev_ctx->sta_ctx->links_info[j];
 
 			if (link_info->vdev_id == WLAN_INVALID_VDEV_ID)
 				continue;
@@ -320,6 +320,296 @@ smd_find_current_ap_link_info(struct wlan_objmgr_vdev *vdev, uint8_t del_vdev_id
 	}
 
 	return NULL;
+}
+
+/**
+ * smd_is_ap_link_in_prepared_targets() - Check if AP link exists in prepared targets
+ * @smd_ctx: SMD context
+ * @ap_link_addr: AP link address to check
+ *
+ * This function checks if the given AP link address exists in any of the
+ * prepared target BSS contexts stored in the SMD context.
+ *
+ * Return: true if AP link found in any prepared target, false otherwise
+ */
+static bool
+smd_is_ap_link_in_prepared_targets(struct smd_context *smd_ctx,
+				    struct qdf_mac_addr *ap_link_addr)
+{
+	uint8_t i, j;
+	struct wlan_mlo_sta *target_bss_ctx;
+	struct mlo_link_info *link_info;
+
+	if (!smd_ctx || !ap_link_addr)
+		return false;
+
+	/* Iterate through all prepared targets */
+	for (i = 0; i < smd_ctx->num_prepared && i < SMD_MAX_PREPARED_TARGETS; i++) {
+		if (!smd_ctx->prepared_targets[i].prepared)
+			continue;
+
+		target_bss_ctx = smd_ctx->prepared_targets[i].target_bss_ctx;
+		if (!target_bss_ctx)
+			continue;
+
+		/* Check all links in this target BSS */
+		for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
+			link_info = &target_bss_ctx->links_info[j];
+
+			if (qdf_is_macaddr_equal(&link_info->ap_link_addr,
+						 ap_link_addr)) {
+				mlo_debug("SMD: AP link " QDF_MAC_ADDR_FMT " found in prepared target %d",
+					  QDF_MAC_ADDR_REF(ap_link_addr->bytes), i);
+				return true;
+			}
+		}
+	}
+
+	mlo_debug("SMD: AP link " QDF_MAC_ADDR_FMT " NOT found in prepared targets",
+		  QDF_MAC_ADDR_REF(ap_link_addr->bytes));
+	return false;
+}
+
+/**
+ * smd_handle_multi_to_multi_link_roaming() - Handle multi-link to
+ * multi-link roaming during SMD exec phase
+ * @vdev: vdev object
+ * @smd_ctx: SMD context
+ * @recfg_ctx: Link reconfiguration context
+ * @recfg_req: Link reconfiguration request to be updated
+ *
+ * This function handles multi-link to multi-link roaming scenario by:
+ * 1. Copying vdev_repurpose_req to add_link_info (filtered by bringup_vdev flag)
+ * 2. Verifying AP links exist in prepared targets
+ * 3. Building delete link info based on current AP link information
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+smd_handle_multi_to_multi_link_roaming(
+	struct wlan_objmgr_vdev *vdev,
+	struct smd_context *smd_ctx,
+	struct mlo_link_recfg_context *recfg_ctx,
+	struct wlan_mlo_link_recfg_req *recfg_req)
+{
+	struct mlo_link_info *curr_link_info = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t i, idx;
+
+	if (!vdev || !smd_ctx || !recfg_ctx || !recfg_req) {
+		mlo_err("SMD: Invalid parameters for multi-to-multi roaming");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Check if we have prepared targets */
+	if (smd_ctx->num_prepared == 0 ||
+	    !smd_ctx->prepared_targets[0].prepared ||
+	    !smd_ctx->prepared_targets[0].target_bss_ctx) {
+		mlo_debug("SMD: No prepared targets available");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Copy vdev_repurpose_req to add_link_info and verify in prepared targets */
+	for (i = 0, idx = 0; i < recfg_ctx->num_vdev_repurpose_req &&
+	     idx < WLAN_MAX_ML_BSS_LINKS; i++) {
+		/* Only add links with bringup_vdev flag set */
+		if (!recfg_ctx->vdev_repurpose_req[i].bringup_vdev) {
+			mlo_debug("SMD: Skipping vdev_id=%u (bringup_vdev=0) BSSID=" QDF_MAC_ADDR_FMT,
+				  recfg_ctx->vdev_repurpose_req[i].vdev_id,
+				  QDF_MAC_ADDR_REF(recfg_ctx->vdev_repurpose_req[i].bssid.bytes));
+			continue;
+		}
+
+		/* Verify this AP link exists in prepared targets */
+		if (!smd_is_ap_link_in_prepared_targets(smd_ctx,
+							&recfg_ctx->vdev_repurpose_req[i].bssid)) {
+			mlo_err("SMD: AP link " QDF_MAC_ADDR_FMT " NOT found in prepared targets - ABORT",
+				QDF_MAC_ADDR_REF(recfg_ctx->vdev_repurpose_req[i].bssid.bytes));
+			return QDF_STATUS_E_INVAL;
+		}
+
+		qdf_copy_macaddr(&recfg_req->add_link_info.link[idx].ap_link_addr,
+				 &recfg_ctx->vdev_repurpose_req[i].bssid);
+		recfg_req->add_link_info.link[idx].vdev_id = recfg_ctx->vdev_repurpose_req[i].vdev_id;
+		recfg_req->add_link_info.num_links += 1;
+		recfg_req->add_link_info.link[idx].priority_index = i;
+
+		mlo_debug("SMD: Add Target Link Priority %u: vdev_id=%u BSSID=" QDF_MAC_ADDR_FMT " MLD=" QDF_MAC_ADDR_FMT,
+			  i,
+			  recfg_ctx->vdev_repurpose_req[i].vdev_id,
+			  QDF_MAC_ADDR_REF(recfg_ctx->vdev_repurpose_req[i].bssid.bytes),
+			  QDF_MAC_ADDR_REF(recfg_ctx->vdev_repurpose_req[i].mld_addr.bytes));
+		mlo_debug("SMD: Flags: bringup=%u cleanup=%u inactive_link_pre_stop=%u priority_index=%u",
+			  recfg_ctx->vdev_repurpose_req[i].bringup_vdev,
+			  recfg_ctx->vdev_repurpose_req[i].cleanup_vdev,
+			  recfg_ctx->vdev_repurpose_req[i].inactive_link_pre_stop,
+			  recfg_req->add_link_info.link[idx].priority_index);
+		idx++;
+	}
+
+	/* Build delete link info based on vdev_id */
+	for (i = 0, idx = 0; i < recfg_ctx->num_vdev_repurpose_req &&
+	     idx < WLAN_MAX_ML_BSS_LINKS; i++) {
+		curr_link_info = smd_find_current_ap_link_info(vdev,
+							       recfg_ctx->vdev_repurpose_req[i].vdev_id);
+		if (!curr_link_info) {
+			mlo_err("SMD: Link info not found for vdev id %d",
+				recfg_ctx->vdev_repurpose_req[i].vdev_id);
+			continue;
+		}
+
+		/* Skip if AP link addresses match (same link, not to be deleted) */
+		if (qdf_is_macaddr_equal(&curr_link_info->ap_link_addr,
+					 &recfg_ctx->vdev_repurpose_req[i].bssid)) {
+			mlo_debug("SMD: AP link address match for vdev %d, BSSID=" QDF_MAC_ADDR_FMT " - skip delete",
+				  recfg_ctx->vdev_repurpose_req[i].vdev_id,
+				  QDF_MAC_ADDR_REF(curr_link_info->ap_link_addr.bytes));
+			continue;
+		}
+
+		recfg_req->del_link_info.link[idx].vdev_id = recfg_ctx->vdev_repurpose_req[i].vdev_id;
+		recfg_req->del_link_info.link[idx].link_id = curr_link_info->link_id;
+		qdf_copy_macaddr(&recfg_req->del_link_info.link[idx].self_link_addr,
+				 &curr_link_info->link_addr);
+		qdf_copy_macaddr(&recfg_req->del_link_info.link[idx].ap_link_addr,
+				 &curr_link_info->ap_link_addr);
+
+		mlo_debug("SMD: Delete link_id=%d freq=%d BSSID=" QDF_MAC_ADDR_FMT " vdev_id=%d",
+			  curr_link_info->link_id,
+			  curr_link_info->chan_freq,
+			  QDF_MAC_ADDR_REF(curr_link_info->ap_link_addr.bytes),
+			  curr_link_info->vdev_id);
+
+		recfg_req->del_link_info.num_links += 1;
+		idx++;
+	}
+
+	return status;
+}
+
+/**
+ * smd_handle_multi_to_single_link_roaming() - Handle multi-link to single-link roaming
+ * @vdev: vdev object
+ * @smd_ctx: SMD context
+ * @recfg_ctx: Link reconfiguration context
+ * @recfg_req: Link reconfiguration request to be updated
+ *
+ * This function detects multi-to-single link roaming scenario by:
+ * 1. Counting active links in the target BSS (must be exactly 1)
+ * 2. Verifying that none of the vdev repurpose requests have bringup_vdev flag set
+ * If both conditions are met, it identifies the vdev marked for cleanup and updates the recfg_req:
+ * - Populates del_link_info with cleanup_vdev link information
+ * - Clears add_link_info (memset to 0)
+ *
+ * Return: true if multi-to-single roaming detected and handled, false otherwise
+ */
+static bool
+smd_handle_multi_to_single_link_roaming(
+	struct wlan_objmgr_vdev *vdev,
+	struct smd_context *smd_ctx,
+	struct mlo_link_recfg_context *recfg_ctx,
+	struct wlan_mlo_link_recfg_req *recfg_req)
+{
+	struct wlan_mlo_sta *target_bss_ctx = NULL;
+	struct mlo_link_info *link_info = NULL;
+	struct mlo_link_info *cleanup_link_info = NULL;
+	uint8_t i;
+	uint8_t target_link_count = 0;
+	uint8_t cleanup_vdev_id = WLAN_INVALID_VDEV_ID;
+	bool has_bringup_vdev = false;
+
+	if (!vdev || !smd_ctx || !recfg_ctx || !recfg_req) {
+		mlo_err("SMD: Invalid parameters for multi-to-single check");
+		return false;
+	}
+
+	/* Check if we have prepared targets */
+	if (smd_ctx->num_prepared == 0 ||
+	    !smd_ctx->prepared_targets[0].prepared ||
+	    !smd_ctx->prepared_targets[0].target_bss_ctx) {
+		mlo_debug("SMD: No prepared targets available");
+		return false;
+	}
+
+	target_bss_ctx = smd_ctx->prepared_targets[0].target_bss_ctx;
+
+	/* Count active links in target BSS */
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &target_bss_ctx->links_info[i];
+		if (!qdf_is_macaddr_zero(&link_info->ap_link_addr) &&
+		    link_info->link_id != WLAN_INVALID_LINK_ID) {
+			target_link_count++;
+		}
+	}
+
+	/* Check if target has exactly one link */
+	if (target_link_count != 1) {
+		mlo_debug("SMD: Not multi-to-single roaming, target has %d links",
+			  target_link_count);
+		return false;
+	}
+
+	/* Check if any vdev repurpose request has bringup_vdev flag set */
+	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req; i++) {
+		if (recfg_ctx->vdev_repurpose_req[i].bringup_vdev) {
+			has_bringup_vdev = true;
+			mlo_debug("SMD: Found bringup_vdev=1 for vdev_id=%u",
+				  recfg_ctx->vdev_repurpose_req[i].vdev_id);
+			break;
+		}
+	}
+
+	/* Multi-to-single roaming requires: target_link_count == 1 AND no bringup_vdev */
+	if (has_bringup_vdev) {
+		mlo_debug("SMD: Not multi-to-single roaming, has bringup_vdev set");
+		return false;
+	}
+
+	mlo_debug("SMD: Multi-link to Single-link roaming detected");
+
+	/* Find vdev marked for cleanup (cleanup_vdev == 1) */
+	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req; i++) {
+		if (recfg_ctx->vdev_repurpose_req[i].cleanup_vdev) {
+			cleanup_vdev_id = recfg_ctx->vdev_repurpose_req[i].vdev_id;
+			mlo_debug("SMD: Found cleanup vdev_id=%d", cleanup_vdev_id);
+			break;
+		}
+	}
+
+	if (cleanup_vdev_id == WLAN_INVALID_VDEV_ID) {
+		mlo_err("SMD: No cleanup vdev found in multi-to-single roaming");
+		return false;
+	}
+
+	/* Get current link info for cleanup vdev */
+	cleanup_link_info = smd_find_current_ap_link_info(vdev, cleanup_vdev_id);
+	if (!cleanup_link_info) {
+		mlo_err("SMD: Link info not found for cleanup vdev_id=%d",
+			cleanup_vdev_id);
+		return false;
+	}
+
+	/* Clear add_link_info */
+	qdf_mem_zero(&recfg_req->add_link_info,
+		     sizeof(struct wlan_mlo_link_recfg_info));
+	mlo_debug("SMD: Cleared add_link_info for multi-to-single roaming");
+
+	/* Populate del_link_info with cleanup vdev link information */
+	recfg_req->del_link_info.link[0].vdev_id = cleanup_vdev_id;
+	recfg_req->del_link_info.link[0].link_id = cleanup_link_info->link_id;
+	qdf_copy_macaddr(&recfg_req->del_link_info.link[0].self_link_addr,
+			 &cleanup_link_info->link_addr);
+	qdf_copy_macaddr(&recfg_req->del_link_info.link[0].ap_link_addr,
+			 &cleanup_link_info->ap_link_addr);
+	recfg_req->del_link_info.num_links = 1;
+
+	mlo_debug("SMD: Populated del_link_info - vdev_id=%d link_id=%d freq=%d BSSID=" QDF_MAC_ADDR_FMT,
+		  cleanup_vdev_id,
+		  cleanup_link_info->link_id,
+		  cleanup_link_info->chan_freq,
+		  QDF_MAC_ADDR_REF(cleanup_link_info->ap_link_addr.bytes));
+
+	return true;
 }
 
 QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
@@ -428,6 +718,7 @@ QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 	recfg_req.is_user_req = false;  /* SMD roaming is FW-initiated */
 	recfg_req.is_fw_ind_received = true; /* This is from FW roam event */
 	recfg_req.st_prep_link_recfg = true; /* This is for ST Prep req */
+	recfg_req.st_exec_link_recfg = false;
 
 	status = smd_update_channel_freq(psoc, &recfg_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -590,7 +881,7 @@ smd_link_recfg_assign_self_link_addr(
 	 */
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS &&
 	     idx < recfg_req->add_link_info.num_links; i++) {
-		link_info = &mlo_dev_ctx->link_ctx->links_info[i];
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
 		if (allocated_bitmap & (1 << i))
 			continue;
 
@@ -644,7 +935,7 @@ smd_link_recfg_assign_self_link_addr(
 		/* only checking the first one is enough */
 		if (link_add[idx].vdev_id == WLAN_INVALID_VDEV_ID)
 			break;
-		link_info = &mlo_dev_ctx->link_ctx->links_info[i];
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
 		if (allocated_bitmap & (1 << i))
 			continue;
 		if (link_info->vdev_id != link_add[idx].vdev_id)
@@ -763,8 +1054,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		mlo_link_recfg_set_tx_link_addr(recfg_ctx,
 						recfg_req,
 						&next->req,
-						curr_link_set &
-						~del_link_set);
+						curr_link_set);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlo_err("fail to set tx frame link addr status %d",
 				status);
@@ -787,7 +1077,8 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		next->req.del_link_info = recfg_req->del_link_info;
 		next->req.add_link_info = recfg_req->add_link_info;
 		next->abort_handler = NULL;
-	} else if (recfg_req->add_link_info.num_links &&
+	} else if ((recfg_req->add_link_info.num_links ||
+		recfg_req->del_link_info.num_links) &&
 		recfg_req->st_exec_link_recfg) {
 		/* Handle ST Exec Request to add Target AP links */
 		mlo_debug("Send ST Exec Request to add Target AP links");
@@ -804,7 +1095,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		next->abort_handler = NULL;
 		next++;
 		next->state = WLAN_LINK_RECFG_S_COMPLETED;
-		next->event = WLAN_LINK_RECFG_SM_EV_COMPLETED;
+		next->event = WLAN_LINK_RECFG_SM_EV_SMD_ROAM_COMPLETED;
 		next->req.del_link_info = recfg_req->del_link_info;
 		next->req.add_link_info = recfg_req->add_link_info;
 		next->abort_handler = NULL;
@@ -826,15 +1117,6 @@ smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx)
 	}
 
 	return recfg_ctx->smd_roam_in_progress;
-}
-
-bool
-smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
-{
-	if (!vdev || !vdev->mlo_dev_ctx)
-		return false;
-
-	return smd_roam_in_progress(vdev->mlo_dev_ctx->link_recfg_ctx);
 }
 
 struct wlan_mlo_link_recfg_bss_info *
@@ -913,6 +1195,8 @@ smd_update_del_link_info(
 			goto end;
 		}
 
+		qdf_mem_zero(&tran->req.del_link_info,
+			     sizeof(struct wlan_mlo_link_recfg_info));
 		// update del link info
 		tran->req.del_link_info.link[0].vdev_id = link_info->vdev_id;
 		qdf_copy_macaddr(&tran->req.del_link_info.link[0].self_link_addr,
@@ -946,18 +1230,19 @@ smd_st_prep_response_received(struct mlo_link_recfg_context *recfg_ctx,
 	 */
 	mlo_link_recfg_update_state_req_from_rsp(recfg_ctx, tran);
 
-	// TODO: Update the Accepted links in smd_ctx.
+	status = smd_add_prepared_target_links_in_smd_ctx(recfg_ctx,
+							  &tran->req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD prepared target update failed");
+		return status;
+	}
 
-	// update accepted links and check if delete link needs to be updated.
 	bss_info = smd_find_first_accepted_link(recfg_ctx, tran);
-
-	// Check if vdev id matches. del link info
-	smd_update_del_link_info(recfg_ctx, bss_info, tran);
-
+	if (bss_info)
+		smd_update_del_link_info(recfg_ctx, bss_info, tran);
 	/* Same PTK case, TODO add check for same ptk vs diff ptk */
 	mlo_link_recfg_store_key(recfg_ctx, &tran->req);
 
-	/* TODO: update added link mlo mgr */
 	return status;
 }
 
@@ -998,6 +1283,11 @@ smd_host_link_switch_validate_request(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (!req->smd_lnk_sw_trigger) {
+		mlo_err("Not SMD Link switch trigger");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1012,7 +1302,7 @@ smd_get_prepared_ap_link_info(struct wlan_objmgr_vdev *vdev,
 	    qdf_is_macaddr_zero(ap_link_addr))
 		return NULL;
 
-	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
 	     link_info_iter++) {
 		if (qdf_is_macaddr_equal(&link_info->ap_link_addr,
@@ -1038,9 +1328,293 @@ smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *sync_ind)
 {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_recfg_context *recfg_ctx;
+	struct smd_context *smd_ctx;
+	struct wlan_mlo_link_recfg_req recfg_req = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!vdev || !sync_ind) {
+		mlo_err("SMD: Invalid parameters");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlo_err("SMD: PSOC is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		mlo_err("SMD: MLO dev context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	if (!recfg_ctx) {
+		mlo_err("SMD: Link recfg context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (!smd_ctx) {
+		mlo_err("SMD: SMD context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!sync_ind->num_vdev_repurpose_req) {
+		mlo_debug("SMD: No vdev repurpose requests");
+		return status;
+	}
+
+	recfg_ctx->smd_roam_in_progress = true;
+	recfg_ctx->num_vdev_repurpose_req = sync_ind->num_vdev_repurpose_req;
+	qdf_mem_copy(&recfg_ctx->vdev_repurpose_req,
+		     &sync_ind->vdev_repurpose_req,
+		     sizeof(struct smd_vdev_repurpose_req) *
+		     recfg_ctx->num_vdev_repurpose_req);
+
+	mlo_debug("SMD: Roam sync started, num_vdev_repurpose_req=%u",
+		  recfg_ctx->num_vdev_repurpose_req);
+
+	qdf_mem_zero(&recfg_req, sizeof(struct wlan_mlo_link_recfg_req));
+
+	/* Check and handle multi-link to single-link roaming scenario */
+	if (smd_handle_multi_to_single_link_roaming(vdev, smd_ctx, recfg_ctx,
+						    &recfg_req)) {
+		mlo_debug("SMD: Multi-to-single link roaming handled, skipping normal flow");
+		goto end;
+	} else {
+		/* Handle multi-link to multi-link roaming scenario */
+		status = smd_handle_multi_to_multi_link_roaming(vdev, smd_ctx, recfg_ctx,
+								&recfg_req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("SMD: Multi-to-multi link roaming failed with status %d", status);
+			goto exit;
+		}
+	}
+
+end:
+	recfg_req.vdev_id = wlan_vdev_get_id(vdev);
+	recfg_req.is_user_req = false;  /* SMD roaming is FW-initiated */
+	recfg_req.is_fw_ind_received = true; /* This is from FW roam event */
+	recfg_req.st_prep_link_recfg = false; /* Reset ST Prep req */
+	recfg_req.st_exec_link_recfg = true; /* Set ST exec flag */
+
+	status = smd_update_channel_freq(psoc, &recfg_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD: Failed to find link freq for fw link recfg ind event");
+		goto exit;
+	}
+
+	mlo_debug("SMD: Triggering Link Reconfiguration SM");
+	status = mlo_link_recfg_sm_deliver_event(
+				mlo_dev_ctx,
+				WLAN_LINK_RECFG_SM_EV_SMD_ROAM_START,
+				sizeof(recfg_req), &recfg_req);
+exit:
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD: Roam sync failed with status %d", status);
+		recfg_ctx->smd_roam_in_progress = false;
+	}
 	return status;
+}
+
+QDF_STATUS
+smd_add_prepared_target_links_in_smd_ctx(
+					struct mlo_link_recfg_context *recfg_ctx,
+					struct mlo_link_recfg_state_req *req)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+	struct wlan_mlo_sta *target_bss_ctx = NULL;
+	struct mlo_link_info *link_info = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_mlo_link_recfg_bss_info *add_link;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct scan_cache_entry *scan_entry;
+	struct wlan_channel channel;
+	uint8_t i;
+	uint8_t link_idx;
+
+	if (!req || !recfg_ctx) {
+		mlo_err("Invalid parameters");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!req->add_link_info.num_links) {
+		mlo_debug("Add links is 0");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
+	if (!psoc) {
+		mlo_err("psoc is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_LINK_RECFG_ID);
+	if (!pdev) {
+		mlo_err("Invalid pdev");
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	mlo_dev_ctx = recfg_ctx->ml_dev;
+	if (!mlo_dev_ctx) {
+		mlo_err("MLO dev context is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (!smd_ctx) {
+		mlo_err("SMD context is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				psoc, recfg_ctx->curr_recfg_req.vdev_id,
+				WLAN_LINK_RECFG_ID);
+	if (!vdev) {
+		mlo_err("Invalid link recfg VDEV %d",
+			recfg_ctx->curr_recfg_req.vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	/* Check if we have space in prepared_targets array */
+	if (smd_ctx->num_prepared >= SMD_MAX_PREPARED_TARGETS) {
+		mlo_err("SMD prepared targets array is full: %d",
+			smd_ctx->num_prepared);
+		status = QDF_STATUS_E_NOMEM;
+		goto end;
+	}
+
+	/* Allocate target BSS context if not already present */
+	if (!smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx) {
+		target_bss_ctx = qdf_mem_malloc(sizeof(struct wlan_mlo_sta));
+		if (!target_bss_ctx) {
+			mlo_err("Failed to allocate target BSS context");
+			status = QDF_STATUS_E_NOMEM;
+			goto end;
+		}
+		smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx =
+			target_bss_ctx;
+	} else {
+		target_bss_ctx =
+			smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx;
+	}
+
+	/* Update added links with status code SUCCESS in target_bss_ctx->links_info */
+	for (i = 0, link_idx = 0; i < req->add_link_info.num_links &&
+	     i < WLAN_MAX_ML_BSS_LINKS && link_idx < WLAN_MAX_ML_BSS_LINKS;
+	     i++) {
+		add_link = &req->add_link_info.link[i];
+
+		/* Check link add status_code before update link info */
+		if (add_link->status_code != STATUS_SUCCESS) {
+			mlo_debug("link id %d add with failure status code %d",
+				  add_link->link_id,
+				  add_link->status_code);
+			continue;
+		}
+
+		/* Get scan entry for the added link */
+		scan_entry = wlan_scan_get_entry_by_bssid(pdev,
+							  &add_link->ap_link_addr);
+		if (!scan_entry) {
+			mlo_debug("add link " QDF_MAC_ADDR_FMT " scan entry not found",
+				  QDF_MAC_ADDR_REF(add_link->ap_link_addr.bytes));
+			continue;
+		}
+
+		/* Prepare channel information */
+		qdf_mem_zero(&channel, sizeof(channel));
+		channel.ch_freq = scan_entry->channel.chan_freq;
+		channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
+		channel.ch_phymode = scan_entry->phy_mode;
+		channel.ch_cfreq1 = scan_entry->channel.cfreq0;
+		channel.ch_cfreq2 = scan_entry->channel.cfreq1;
+		channel.ch_width =
+			wlan_mlme_get_ch_width_from_phymode(scan_entry->phy_mode);
+
+		if (channel.ch_width == CH_WIDTH_20MHZ)
+			channel.ch_cfreq1 = channel.ch_freq;
+
+		/* Update link info in target BSS context using separate index */
+		link_info = &target_bss_ctx->links_info[link_idx];
+
+		qdf_mem_copy(&link_info->ap_link_addr, &add_link->ap_link_addr,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&link_info->link_addr, &add_link->self_link_addr,
+			     QDF_MAC_ADDR_SIZE);
+
+		link_info->vdev_id = add_link->vdev_id;
+		link_info->link_id = add_link->link_id;
+		link_info->chan_freq = add_link->freq;
+		link_info->link_status_code = STATUS_SUCCESS;
+		link_info->cnx_tx_nss = add_link->cap_tx_nss;
+		link_info->cnx_rx_nss = add_link->cap_rx_nss;
+		link_info->is_link_active = false;
+		link_info->link_status_flags = 0;
+
+		mlo_debug("Updated target BSS link[%d]: link_id=%d vdev_id=%d freq=%d "
+			  "AP=" QDF_MAC_ADDR_FMT " Self=" QDF_MAC_ADDR_FMT " NSS=%dx%d",
+			  link_idx, link_info->link_id, link_info->vdev_id,
+			  link_info->chan_freq,
+			  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes),
+			  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+			  link_info->cnx_tx_nss, link_info->cnx_rx_nss);
+
+		util_scan_free_cache_entry(scan_entry);
+		link_idx++;
+	}
+
+	/* Update prepared target information */
+	smd_ctx->prepared_targets[smd_ctx->num_prepared].prepared = true;
+	smd_ctx->prepared_targets[smd_ctx->num_prepared].prep_timestamp =
+		qdf_get_system_timestamp();
+
+	/* Increment num_prepared counter */
+	smd_ctx->num_prepared++;
+	mlo_debug("SMD context updated: num_prepared=%d",
+		  smd_ctx->num_prepared);
+
+end:
+	if (vdev)
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+	if (pdev)
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_LINK_RECFG_ID);
+	/* Free allocated target_bss_ctx on error to avoid leak */
+	if (QDF_IS_STATUS_ERROR(status) && target_bss_ctx &&
+	    smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx == target_bss_ctx) {
+		qdf_mem_free(target_bss_ctx);
+		smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx = NULL;
+	}
+	return status;
+}
+
+bool
+smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!vdev)
+		return false;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
+		return false;
+
+	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
 }
 #endif
