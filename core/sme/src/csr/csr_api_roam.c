@@ -7361,6 +7361,8 @@ static void csr_roam_process_join_res(struct mac_context *mac_ctx,
 		return;
 	if (eCsrReassocSuccess == res) {
 		roam_info->reassoc = true;
+		csr_neighbor_roam_state_transition(mac_ctx,
+			eCSR_NEIGHBOR_ROAM_STATE_REASSOCIATED, session_id);
 		ind_qos = SME_QOS_CSR_REASSOC_COMPLETE;
 	} else {
 		roam_info->reassoc = false;
