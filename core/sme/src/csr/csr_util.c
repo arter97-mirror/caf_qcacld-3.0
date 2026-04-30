@@ -826,7 +826,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					     sap_ch_freq, vdev_id,
 					     cc_switch_mode);
 	} else if ((intf_ch_freq == sap_ch_freq) && (cc_switch_mode ==
-				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)) {
+				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) &&
+		    policy_mgr_is_hw_dbs_capable(mac_ctx->psoc)) {
 		status = policy_mgr_handle_go_sap_fav_channel(
 					mac_ctx->psoc, vdev_id,
 					sap_ch_freq, &intf_ch_freq);
