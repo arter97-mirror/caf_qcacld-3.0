@@ -769,6 +769,8 @@ struct wlan_mlme_wps_params {
  * @disable_bcn_prot: disable beacon protection for sap
  * @sap_ps_with_twt_enable: SAP power save with TWT
  * @mlo_sap_support_link_num: sap support link num
+ * @mlo_sap_mcst_ie_support: enable Maximum Channel Switch Time IE
+ *   in per-STA profiles of MLO beacons during DFS CAC
  * @is_dual_sap_sta_enable: Dual SAP + STA support
  * @sap_he_rx_mcs_map_160: SAP HE rx mcs map 160 config
  */
@@ -809,6 +811,9 @@ struct wlan_mlme_cfg_sap {
 	bool disable_bcn_prot;
 	bool sap_ps_with_twt_enable;
 	uint8_t mlo_sap_support_link_num;
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool mlo_sap_mcst_ie_support;
+#endif
 	bool is_dual_sap_sta_enable;
 	uint16_t sap_he_rx_mcs_map_160;
 };

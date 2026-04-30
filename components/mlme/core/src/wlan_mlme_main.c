@@ -2763,6 +2763,8 @@ static inline void mlme_init_sap_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	sap_cfg->mlo_sap_support_link_num =
 		cfg_get(psoc, CFG_MLO_SAP_SUPPORT_LINK_NUM);
+	sap_cfg->mlo_sap_mcst_ie_support =
+		cfg_get(psoc, CFG_MLO_SAP_MCST_IE_SUPPORT);
 }
 #else
 static inline void mlme_init_sap_mlo_cfg(struct wlan_objmgr_psoc *psoc,

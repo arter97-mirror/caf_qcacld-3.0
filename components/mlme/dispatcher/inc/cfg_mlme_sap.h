@@ -820,8 +820,34 @@
 				"supported mlo sap link number")
 
 #define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG CFG(CFG_MLO_SAP_SUPPORT_LINK_NUM)
+/*
+ * <ini>
+ * mlo_sap_mcst_ie_support - Enable MLO SAP MCST IE support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI enables MLO SAP to include Maximum Channel Switch Time IE
+ * in the ML IE of beacon/probe response during CAC phase, so that
+ * MLO STA can detect the CAC state and handle accordingly.
+ *
+ * Related: None
+ *
+ * Supported Feature: MLO DFS CAC
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_MLO_SAP_MCST_IE_SUPPORT CFG_INI_BOOL( \
+				"mlo_sap_mcst_ie_support", \
+				true, \
+				"Enable MLO SAP MCST IE support")
+
+#define CFG_MLO_SAP_MCST_IE_SUPPORT_CFG CFG(CFG_MLO_SAP_MCST_IE_SUPPORT)
 #else
 #define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
+#define CFG_MLO_SAP_MCST_IE_SUPPORT_CFG
 #endif
 
 #ifdef QCA_SUPPORT_WDS_EXTENDED
@@ -891,6 +917,7 @@
 	CFG(CFG_DISABLE_SAP_BCN_PROT) \
 	CFG(CFG_SAP_PS_WITH_TWT) \
 	CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG \
+	CFG_MLO_SAP_MCST_IE_SUPPORT_CFG \
 	CFG_SAP_ENABLE_WDS_EXT_CFG
 
 #endif /* __CFG_MLME_SAP_H */

@@ -3388,6 +3388,14 @@ QDF_STATUS
 wlan_mlme_update_mlo_recfg_info(struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id,
 				struct wlan_link_recfg_info *recfg_info);
+
+/**
+ * wlan_mlme_get_mlo_sap_mcst_ie_support() - Get MLO SAP MCST IE INI config
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if MLO SAP MCST IE support is enabled via INI
+ */
+bool wlan_mlme_get_mlo_sap_mcst_ie_support(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc)
@@ -3476,6 +3484,12 @@ wlan_mlme_get_mlo_prefer_percentage(
 				struct wlan_objmgr_psoc *psoc,
 				int8_t *mlo_prefer_percentage)
 {}
+
+static inline bool
+wlan_mlme_get_mlo_sap_mcst_ie_support(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 /**

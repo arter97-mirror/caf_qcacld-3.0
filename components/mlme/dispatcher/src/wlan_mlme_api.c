@@ -4653,6 +4653,16 @@ wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.sap_cfg.is_dual_sap_sta_enable;
 }
 
+bool wlan_mlme_get_mlo_sap_mcst_ie_support(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.sap_cfg.mlo_sap_mcst_ie_support;
+}
 #endif
 
 QDF_STATUS
