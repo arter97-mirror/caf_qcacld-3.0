@@ -13654,6 +13654,24 @@ static inline void wlan_hdd_send_mscs_action_frame(hdd_cb_handle context,
 }
 #endif
 
+#ifdef WLAN_HAPS_ENABLE
+static inline void wlan_hdd_update_qtime_sync_period(hdd_cb_handle context,
+						     uint32_t sync_interval)
+{
+	struct hdd_context *hdd_ctx = hdd_cb_handle_to_context(context);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	pld_set_tsf_sync_period(hdd_ctx->parent_dev, sync_interval);
+}
+#else
+static inline void wlan_hdd_update_qtime_sync_period(hdd_cb_handle context,
+						     uint32_t sync_interval)
+{
+}
+#endif
+
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
 defined(FEATURE_RX_LINKSPEED_ROAM_TRIGGER)
 void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
@@ -13743,6 +13761,9 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_fils_hlp_rx = hdd_fils_hlp_rx;
 	cb_obj.dp_get_ndev_by_vdev_id = wlan_hdd_get_netdev_by_vdev_id;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
+	cb_obj.wlan_dp_haps_update_qtime_sync_period =
+					wlan_hdd_update_qtime_sync_period;
+
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
 
@@ -14073,7 +14094,16 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 	int i;
 	qdf_time_t total, pause, unpause, curr_time, delta;
 	struct hdd_netif_queue_history *q_hist_ptr;
-	char q_status_buf[NUM_TX_QUEUES * HDD_NETDEV_TX_Q_STATE_STRLEN] = {0};
+	uint8_t num_tx_queues = adapter->dev->num_tx_queues;
+	char *q_status_buf;
+
+	q_status_buf = qdf_mem_malloc(sizeof(*q_status_buf) * num_tx_queues *
+				      HDD_NETDEV_TX_Q_STATE_STRLEN);
+	if (!q_status_buf) {
+		hdd_err("Mem alloc failure for queue status buffer - num_queues:%d mode:%d",
+			num_tx_queues, adapter->device_mode);
+		return;
+	}
 
 	hdd_nofl_debug("Netif queue operation statistics:");
 	hdd_nofl_debug("vdev_id %d device mode %d",
@@ -14127,7 +14157,7 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 			continue;
 		q_hist_ptr = &adapter->queue_oper_history[i];
 		wlan_hdd_dump_queue_history_state(q_hist_ptr,
-						  q_status_buf,
+						  num_tx_queues, q_status_buf,
 						  sizeof(q_status_buf));
 		hdd_nofl_debug("%2d%20u%50s%30s%10x  %s",
 			       i, qdf_system_ticks_to_msecs(
@@ -14141,6 +14171,8 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 				   adapter->queue_oper_history[i].pause_map,
 				   q_status_buf);
 	}
+
+	qdf_mem_free(q_status_buf);
 }
 
 void
