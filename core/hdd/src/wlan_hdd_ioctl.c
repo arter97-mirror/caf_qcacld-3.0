@@ -6873,6 +6873,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		return status;
 	}
 
+	wlan_set_sap_user_config_freq(vdev, chan_number);
+
 	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					       SME_CMD_START_BSS_TIMEOUT);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -6881,7 +6883,6 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		return qdf_status_to_os_return(status);
 	}
 
-	wlan_set_sap_user_config_freq(vdev, chan_number);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return 0;

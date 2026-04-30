@@ -35472,15 +35472,16 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 		return ret;
 	}
 
+	wlan_set_sap_user_config_freq(
+			vdev,
+			csa_params->chandef.chan->center_freq);
+
 	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					       SME_CMD_START_BSS_TIMEOUT);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("wait for qdf_event failed!!");
-	} else {
-		wlan_set_sap_user_config_freq(vdev,
-			csa_params->chandef.chan->center_freq);
+	else
 		hdd_debug("csa done");
-	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return ret;
