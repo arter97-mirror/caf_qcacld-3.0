@@ -357,7 +357,7 @@ static QDF_STATUS action_oui_send_config(struct wlan_objmgr_psoc *psoc)
 		}
 		status = action_oui_send(psoc_priv, id);
 		if (!QDF_IS_STATUS_SUCCESS(status))
-			action_oui_err("Failed to send: %u", id);
+			action_oui_debug("Failed to send: %u", id);
 	}
 
 exit:
