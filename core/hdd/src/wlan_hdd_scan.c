@@ -1487,8 +1487,9 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
-	int ret;
+	int ret = 0;
 	bool pno_offload_enabled;
+	struct wlan_hdd_link_info *link_info;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -1509,12 +1510,20 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 		hdd_debug("PnoOffload is not enabled!!!");
 		return -EINVAL;
 	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_SCAN_ID);
-	if (!vdev)
-		return -EINVAL;
-	ret = wlan_cfg80211_sched_scan_stop(vdev);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
+	/*
+	 * For MLO find the vdev on which PNO was enabled, as deflink might have
+	 * changed due to roaming/link switch.
+	 */
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		if (!link_info->vdev)
+			continue;
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_SCAN_ID);
+		if (!vdev)
+			continue;
+		if (ucfg_scan_get_pno_in_progress(vdev))
+			ret = wlan_cfg80211_sched_scan_stop(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
+	}
 
 	return ret;
 }
