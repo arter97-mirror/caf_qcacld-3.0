@@ -83,12 +83,12 @@ QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
 
 	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
 	if (!soc_obj) {
-		tdls_err("TDLS soc obj is NULL");
+		tdls_err("TDLS stats: soc obj is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	if (!soc_obj->stats_ctx) {
-		tdls_err("TDLS stats context is NULL");
+		tdls_err("TDLS stats: context is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -115,12 +115,12 @@ QDF_STATUS wlan_tdls_stats_notify_fw_cap(struct wlan_objmgr_psoc *psoc)
 
 	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
 	if (!soc_obj) {
-		tdls_err("TDLS soc obj is NULL");
+		tdls_err("TDLS stats: soc obj is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	if (!soc_obj->stats_ctx) {
-		tdls_err("TDLS stats context is NULL");
+		tdls_err("TDLS stats: context is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 

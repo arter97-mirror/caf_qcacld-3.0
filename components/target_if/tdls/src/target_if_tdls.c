@@ -337,9 +337,10 @@ target_if_tdls_register_event_handler(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	status = wmi_unified_register_event(wmi_handle,
+	status = wmi_unified_register_event_handler(wmi_handle,
 					    wmi_tdls_stats_event_id,
-					    target_if_tdls_stats_event_handler);
+					    target_if_tdls_stats_event_handler,
+					    WMI_RX_SERIALIZER_CTX);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("Failed to register tdls stats event handler");
 		wmi_unified_unregister_event(wmi_handle,
@@ -362,7 +363,8 @@ target_if_tdls_unregister_event_handler(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wmi_unified_unregister_event(wmi_handle, wmi_tdls_stats_event_id);
+	wmi_unified_unregister_event_handler(wmi_handle,
+					     wmi_tdls_stats_event_id);
 
 	return wmi_unified_unregister_event(wmi_handle,
 					    wmi_tdls_peer_event_id);

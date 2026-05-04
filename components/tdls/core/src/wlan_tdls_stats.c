@@ -149,17 +149,55 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	if (!db || !entry)
 		return QDF_STATUS_E_INVAL;
 
+	tdls_debug("TDLS stats: push peer=" QDF_MAC_ADDR_FMT
+		   " ts_ms=%llu type=%u subtype=%u success=%u reason=%u"
+		   " session=%u ch=%u rssi=%d snr=%d is_sender=%u"
+		   " data_rate=%u tx_ppdu_cum=%u tx_ppdu_fail=%u"
+		   " rx_ppdu_cum=%u rx_ppdu_fail=%u"
+		   " entries=%u/%u",
+		   QDF_MAC_ADDR_REF(entry->peer_mac),
+		   entry->ts_ms, entry->type, entry->subtype,
+		   entry->success, entry->reason_code,
+		   entry->session_id, entry->channel, entry->rssi, entry->snr,
+		   entry->is_sender,
+		   entry->data_rate,
+		   entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
+		   entry->rx_ppdus_cumulative, entry->rx_ppdu_failures,
+		   db->num_entries, db->max_entries);
+	if (entry->type == TDLS_STATS_DATA) {
+		uint8_t i;
+
+		for (i = 0; i < TDLS_STATS_MAX_MCS_COUNTERS; i++)
+			tdls_debug("TDLS stats: mcs[%u] tx=%u rx=%u",
+				   i, entry->tx_mcs_data_ppdu[i],
+				   entry->rx_mcs_data_ppdu[i]);
+	}
+
 	qdf_mutex_acquire(&db->lock);
 
 	/* Evict oldest entry if the cache is full */
 	if (db->num_entries >= db->max_entries) {
+		tdls_debug("TDLS stats: cache full (%u/%u), evicting oldest entry",
+			   db->num_entries, db->max_entries);
 		status = qdf_list_remove_front(&db->list, &old_ln);
 
-		if (QDF_IS_STATUS_SUCCESS(status) && old_ln) {
-			struct tdls_stats_node *old_node =
-				qdf_container_of(old_ln,
-						 struct tdls_stats_node, node);
-			qdf_mem_free(old_node);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			/*
+			 * qdf_list_remove_front() always sets old_ln to the
+			 * removed node on success; the extra NULL check below
+			 * is kept only as a safeguard.  If old_ln were NULL
+			 * after a successful removal the node would be
+			 * unreachable (leaked), so we must free it whenever
+			 * the removal succeeded regardless of the pointer
+			 * value.
+			 */
+			if (old_ln) {
+				struct tdls_stats_node *old_node =
+					qdf_container_of(
+						old_ln,
+						struct tdls_stats_node, node);
+				qdf_mem_free(old_node);
+			}
 			db->num_entries--;
 		}
 	}
@@ -175,6 +213,8 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	node->entry = *entry;
 	qdf_list_insert_back(&db->list, &node->node);
 	db->num_entries++;
+	tdls_debug("TDLS stats: entry cached, cache now has %u entries",
+		   db->num_entries);
 
 	qdf_mutex_release(&db->lock);
 
@@ -366,7 +406,7 @@ tdls_stats_handle_fw_cap_updated(struct tdls_stats_context *stats_ctx)
 	}
 
 	tdls_stats_sm_transition_to(stats_ctx, TDLS_STATS_S_INIT);
-	tdls_debug("TDLS stats SM: DISABLED -> INIT (FW cap confirmed, psoc %d)",
+	tdls_debug("TDLS stats: SM DISABLED -> INIT (FW cap confirmed, psoc %d)",
 		   stats_ctx->psoc_id);
 
 	return QDF_STATUS_SUCCESS;
@@ -511,6 +551,10 @@ static bool tdls_stats_state_init_event(void *ctx, uint16_t event,
 	case TDLS_STATS_EV_ENABLE_ACTIVE:
 		tdls_debug("TDLS stats: Cache is already flushed");
 		break;
+	case TDLS_STATS_EV_FW_CAP_UPDATED:
+		/* Already in INIT — FW cap was already confirmed; no-op */
+		tdls_debug("TDLS stats: FW_CAP_UPDATED in INIT state - no-op");
+		break;
 	default:
 		event_handled = false;
 		break;
@@ -577,7 +621,7 @@ static bool tdls_stats_state_enabling_event(void *ctx, uint16_t event,
 						QDF_MODULE_ID_TDLS,
 						QDF_MODULE_ID_TARGET_IF, &msg);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			tdls_err("post TDLS STATS ENABLE/DISABLE fail");
+			tdls_err("TDLS stats: post ENABLE/DISABLE msg failed");
 			event_handled = false;
 		}
 		break;
@@ -953,7 +997,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
 
 	*stats_ctx_out = stats_ctx;
 
-	tdls_debug("TDLS stats SM created, psoc %d, initial state DISABLED",
+	tdls_debug("TDLS stats: SM created, psoc %d, initial state DISABLED",
 		   stats_ctx->psoc_id);
 	return QDF_STATUS_SUCCESS;
 }
@@ -981,7 +1025,7 @@ QDF_STATUS tdls_stats_sm_destroy(struct tdls_stats_context *stats_ctx)
 
 	qdf_mem_free(stats_ctx);
 
-	tdls_debug("TDLS stats SM destroyed");
+	tdls_debug("TDLS stats: SM destroyed");
 	return QDF_STATUS_SUCCESS;
 }
 

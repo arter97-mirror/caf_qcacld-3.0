@@ -1707,14 +1707,14 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 
 	skb_len = hdd_tdls_stats_entry_skb_len();
 
-	hdd_debug("TDLS stats emit: dut=" QDF_MAC_ADDR_FMT " peer=" QDF_MAC_ADDR_FMT " type=%u subtype=%u success=%u is_sender=%u data_rate=%u(x100Kbps) ch=%u rssi=%d link_id=%u ts_ms=%llu tx_pkts=%u tx_fail=%u rx_pkts=%u rx_fail=%u",
+	hdd_debug("TDLS stats: emit dut=" QDF_MAC_ADDR_FMT " peer=" QDF_MAC_ADDR_FMT " type=%u subtype=%u success=%u reason=%u is_sender=%u data_rate=%u(x100Kbps) ch=%u rssi=%d link_id=%u session_id=%u ts_ms=%llu tx_pkts=%u tx_fail=%u rx_pkts=%u rx_fail=%u",
 		  QDF_MAC_ADDR_REF(dut_mac_addr.bytes),
 		  QDF_MAC_ADDR_REF(entry->peer_mac),
 		  entry->type, entry->subtype,
-		  entry->success, entry->is_sender,
+		  entry->success, entry->reason_code, entry->is_sender,
 		  (uint32_t)entry->data_rate * 5,
 		  (uint32_t)entry->channel, (int8_t)entry->rssi, link_id,
-		  entry->ts_ms,
+		  entry->session_id, entry->ts_ms,
 		  entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
 		  entry->rx_ppdus_cumulative, entry->rx_ppdu_failures);
 
@@ -1895,7 +1895,7 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 			    !entry->rx_mcs_data_ppdu[i])
 				continue;
 
-			hdd_debug("TDLS stats MCS[%u]: tx=%u rx=%u",
+			hdd_debug("TDLS stats: MCS[%u]: tx=%u rx=%u",
 				  i, entry->tx_mcs_data_ppdu[i],
 				  entry->rx_mcs_data_ppdu[i]);
 
