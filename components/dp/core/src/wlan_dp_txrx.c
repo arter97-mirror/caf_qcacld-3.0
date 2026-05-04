@@ -847,6 +847,9 @@ QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	struct dp_tx_rx_stats *stats;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	int cpu = qdf_get_smp_processor_id();
+	struct cdp_peer_output_param peer_info = {0};
+	uint16_t rt_hdr_len;
+	uint8_t *dest_mac;
 
 	stats = &dp_intf->dp_stats.tx_rx_stats;
 	++stats->per_cpu[cpu].tx_called;
@@ -895,6 +898,15 @@ QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 		dp_err_rl("TX function not registered by the data path");
 		goto drop_pkt_and_release_nbuf;
 	}
+
+	rt_hdr_len = qdf_nbuf_get_radiotap_len(nbuf);
+	qdf_nbuf_pull_head(nbuf, rt_hdr_len);
+	dest_mac = qdf_nbuf_ieee80211_get_dest_mac(nbuf);
+	qdf_nbuf_push_head(nbuf, rt_hdr_len);
+
+	cdp_peer_get_info_by_peer_addr(soc, dest_mac, dp_link->link_id,
+				       &peer_info);
+	dp_set_peer_txpt_idx(nbuf, &peer_info);
 
 	QDF_NBUF_CB_TX_VDEV_CTX(nbuf) = dp_link->link_id;
 
