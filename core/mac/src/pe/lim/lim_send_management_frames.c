@@ -9120,7 +9120,7 @@ lim_handle_sae_auth_retry(struct mac_context *mac_ctx, uint8_t vdev_id,
 	    (session->opmode != QDF_P2P_CLIENT_MODE))
 		return;
 
-	if (session->limMlmState == eLIM_MLM_WT_SAE_AUTH_STATE)
+	if (session->limMlmState == eLIM_MLM_WT_EXTERNAL_AUTH_STATE)
 		wlan_mlme_get_sae_auth_retry_count(mac_ctx->psoc, &retry_count);
 	else
 		wlan_mlme_get_sae_roam_auth_retry_count(mac_ctx->psoc,

@@ -286,7 +286,7 @@ typedef struct sLimTimers {
 	TX_TIMER g_lim_periodic_auth_retry_timer;
 
 	/* SAE authentication related timer */
-	TX_TIMER sae_auth_timer;
+	TX_TIMER external_auth_timer;
 
 	/* RRM sta stats response related timer */
 	TX_TIMER rrm_sta_stats_resp_timer;

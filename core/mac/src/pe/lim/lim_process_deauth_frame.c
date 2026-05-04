@@ -95,7 +95,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    !(lim_is_sb_disconnect_allowed(pe_session) ||
-	      (pe_session->limMlmState == eLIM_MLM_WT_SAE_AUTH_STATE &&
+	      (pe_session->limMlmState == eLIM_MLM_WT_EXTERNAL_AUTH_STATE &&
 	       pe_session->limSmeState == eLIM_SME_WT_AUTH_STATE))) {
 		/*Every 15th deauth frame will be logged in kmsg */
 		if (!(mac->lim.deauthMsgCnt & 0xF)) {
@@ -544,7 +544,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				QDF_MAC_ADDR_REF(addr));
 			break;
 
-		case eLIM_MLM_WT_SAE_AUTH_STATE:
+		case eLIM_MLM_WT_EXTERNAL_AUTH_STATE:
 			pe_debug("received Deauth frame state %X with "
 				 "reasonCode=%d from " QDF_MAC_ADDR_FMT,
 				 pe_session->limMlmState, rc,

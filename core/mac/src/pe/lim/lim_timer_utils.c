@@ -139,7 +139,7 @@ static bool lim_create_non_ap_timers(struct mac_context *mac)
 	 * authentication.
 	 */
 	if ((tx_timer_create(mac,
-		&mac->lim.lim_timers.sae_auth_timer,
+		&mac->lim.lim_timers.external_auth_timer,
 		"SAE AUTH Timer",
 		lim_timer_handler, SIR_LIM_AUTH_SAE_TIMEOUT,
 		SYS_MS_TO_TICKS(LIM_AUTH_SAE_TIMER_MS), 0,
@@ -279,7 +279,7 @@ err_timer:
 	tx_timer_delete(&mac->lim.lim_timers.gLimJoinFailureTimer);
 	tx_timer_delete(&mac->lim.lim_timers.gLimPeriodicJoinProbeReqTimer);
 	tx_timer_delete(&mac->lim.lim_timers.g_lim_periodic_auth_retry_timer);
-	tx_timer_delete(&mac->lim.lim_timers.sae_auth_timer);
+	tx_timer_delete(&mac->lim.lim_timers.external_auth_timer);
 	tx_timer_delete(&mac->lim.lim_timers.channel_vacate_timer);
 
 	if (mac->lim.gLimPreAuthTimerTable.pTable) {
@@ -692,16 +692,16 @@ void lim_deactivate_and_change_timer(struct mac_context *mac, uint32_t timerId)
 		}
 		break;
 
-	case eLIM_AUTH_SAE_TIMER:
+	case eLIM_EXTERNAL_AUTH_TIMER:
 		if (tx_timer_deactivate
-		   (&mac->lim.lim_timers.sae_auth_timer)
+		   (&mac->lim.lim_timers.external_auth_timer)
 		    != TX_SUCCESS)
 			pe_err("Unable to deactivate SAE auth timer");
 
 		/* Change timer to reactivate it in future */
 		val = SYS_MS_TO_TICKS(LIM_AUTH_SAE_TIMER_MS);
 
-		if (tx_timer_change(&mac->lim.lim_timers.sae_auth_timer,
+		if (tx_timer_change(&mac->lim.lim_timers.external_auth_timer,
 				    val, 0) != TX_SUCCESS)
 			pe_err("unable to change SAE auth timer");
 

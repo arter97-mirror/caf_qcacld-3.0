@@ -621,12 +621,12 @@ void lim_deactivate_timers(struct mac_context *mac_ctx)
 	}
 	tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
 
-	if (tx_timer_running(&lim_timer->sae_auth_timer)) {
+	if (tx_timer_running(&lim_timer->external_auth_timer)) {
 		pe_err("SAE Auth failure timer running call the timeout API");
 		/* Cleanup as if SAE auth timer expired */
 		lim_timer_handler(mac_ctx, SIR_LIM_AUTH_SAE_TIMEOUT);
 	}
-	tx_timer_deactivate(&lim_timer->sae_auth_timer);
+	tx_timer_deactivate(&lim_timer->external_auth_timer);
 
 	if (tx_timer_running(&lim_timer->rrm_sta_stats_resp_timer)) {
 		pe_err("sta stats resp timer running call the timeout API");
@@ -682,12 +682,12 @@ void lim_deactivate_timers_for_vdev(struct mac_context *mac_ctx,
 							  LIM_ASSOC);
 		}
 		break;
-	case eLIM_MLM_WT_SAE_AUTH_STATE:
-		if (tx_timer_running(&lim_timer->sae_auth_timer)) {
+	case eLIM_MLM_WT_EXTERNAL_AUTH_STATE:
+		if (tx_timer_running(&lim_timer->external_auth_timer)) {
 			pe_debug("Trigger SAE Auth failure timeout for vdev %d",
 				 vdev_id);
 			tx_timer_deactivate(
-				&lim_timer->sae_auth_timer);
+				&lim_timer->external_auth_timer);
 			lim_process_sae_auth_timeout(mac_ctx);
 		}
 		break;
@@ -793,7 +793,7 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 
 		tx_timer_delete(&lim_timer->gLimDeauthAckTimer);
 
-		tx_timer_delete(&lim_timer->sae_auth_timer);
+		tx_timer_delete(&lim_timer->external_auth_timer);
 		tx_timer_delete(&lim_timer->rrm_sta_stats_resp_timer);
 
 		tx_timer_delete(&lim_timer->channel_vacate_timer);

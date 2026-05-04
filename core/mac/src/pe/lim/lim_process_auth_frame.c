@@ -801,8 +801,9 @@ lim_check_and_trigger_pmf_sta_deletion(struct mac_context *mac,
  *
  * Return: None
  */
-static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
-		uint8_t *rx_pkt_info, struct pe_session *pe_session)
+static void
+lim_process_sae_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
+			   struct pe_session *pe_session)
 {
 	tpSirMacMgmtHdr mac_hdr;
 	uint32_t frame_len;
@@ -831,7 +832,7 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 			QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
-	    pe_session->limMlmState != eLIM_MLM_WT_SAE_AUTH_STATE)
+	    pe_session->limMlmState != eLIM_MLM_WT_EXTERNAL_AUTH_STATE)
 		pe_err("SAE auth response for STA in unexpected state %x",
 		       pe_session->limMlmState);
 
@@ -849,7 +850,7 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 		 */
 		pre_auth_node = lim_search_pre_auth_list(mac_ctx, mac_hdr->sa);
 		if (!pre_auth_node ||
-		    (pre_auth_node->mlmState != eLIM_MLM_WT_SAE_AUTH_STATE)) {
+		    (pre_auth_node->mlmState != eLIM_MLM_WT_EXTERNAL_AUTH_STATE)) {
 			if (pre_auth_node) {
 				pe_debug("Delete existing preauth node for SAE peer in state: %u "
 					 QDF_MAC_ADDR_FMT,
@@ -875,7 +876,7 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 			lim_get_sta_mld_address(pe_session->vdev, body_ptr,
 						frame_len, &peer_mld);
 			lim_external_auth_add_pre_auth_node(mac_ctx, mac_hdr,
-						eLIM_MLM_WT_SAE_AUTH_STATE,
+						eLIM_MLM_WT_EXTERNAL_AUTH_STATE,
 						&peer_mld);
 		} else {
 			/* case: when SAP receives Auth SAE 3rd frame with
@@ -940,8 +941,9 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 				    rx_flags);
 }
 #else
-static inline void  lim_process_sae_auth_frame(struct mac_context *mac_ctx,
-		uint8_t *rx_pkt_info, struct pe_session *pe_session)
+static inline void
+lim_process_sae_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
+			   struct pe_session *pe_session)
 {}
 #endif
 

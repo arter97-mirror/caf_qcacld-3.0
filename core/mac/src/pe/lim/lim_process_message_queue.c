@@ -88,13 +88,13 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 	uint8_t *rsn_ie_buf;
 
 	switch (session->limMlmState) {
-	case eLIM_MLM_WT_SAE_AUTH_STATE:
+	case eLIM_MLM_WT_EXTERNAL_AUTH_STATE:
 		/* SAE authentication is completed.
 		 * Restore from auth state
 		 */
-		if (tx_timer_running(&mac->lim.lim_timers.sae_auth_timer))
+		if (tx_timer_running(&mac->lim.lim_timers.external_auth_timer))
 			lim_deactivate_and_change_timer(mac,
-							eLIM_AUTH_SAE_TIMER);
+							eLIM_EXTERNAL_AUTH_TIMER);
 		lim_sae_auth_cleanup_retry(mac, session->vdev_id);
 		/* success */
 		if (sae_msg->sae_status == STATUS_SUCCESS) {

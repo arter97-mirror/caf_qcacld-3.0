@@ -174,7 +174,7 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
 	enum wlan_status_code proto_status_code;
 
 	session = pe_find_session_by_session_id(mac_ctx,
-			mac_ctx->lim.lim_timers.sae_auth_timer.sessionId);
+			mac_ctx->lim.lim_timers.external_auth_timer.sessionId);
 	if (!session) {
 		pe_err("Session does not exist for given session id");
 		return;
@@ -185,7 +185,7 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
 		session->limSmeState);
 
 	switch (session->limMlmState) {
-	case eLIM_MLM_WT_SAE_AUTH_STATE:
+	case eLIM_MLM_WT_EXTERNAL_AUTH_STATE:
 		lim_fill_status_code(SIR_MAC_MGMT_AUTH,
 				     mac_ctx->auth_ack_status,
 				     &proto_status_code);
@@ -751,18 +751,18 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		return qdf_status;
 
-	session->limMlmState = eLIM_MLM_WT_SAE_AUTH_STATE;
+	session->limMlmState = eLIM_MLM_WT_EXTERNAL_AUTH_STATE;
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
 		       session->limMlmState));
 
-	mac_ctx->lim.lim_timers.sae_auth_timer.sessionId =
+	mac_ctx->lim.lim_timers.external_auth_timer.sessionId =
 					session->peSessionId;
 
 	/* Activate SAE auth timer */
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
-			 session->peSessionId, eLIM_AUTH_SAE_TIMER));
-	if (tx_timer_activate(&mac_ctx->lim.lim_timers.sae_auth_timer)
+			 session->peSessionId, eLIM_EXTERNAL_AUTH_TIMER));
+	if (tx_timer_activate(&mac_ctx->lim.lim_timers.external_auth_timer)
 		    != TX_SUCCESS) {
 		pe_err("could not start Auth SAE timer");
 	}

@@ -3179,7 +3179,7 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 	 */
 	if (sta_pre_auth_ctx &&
 	    sta_pre_auth_ctx->authType == eSIR_AUTH_TYPE_SAE &&
-	    sta_pre_auth_ctx->mlmState == eLIM_MLM_WT_SAE_AUTH_STATE) {
+	    sta_pre_auth_ctx->mlmState == eLIM_MLM_WT_EXTERNAL_AUTH_STATE) {
 		pe_debug("Received assoc request frame while SAE authentication is in progress; Defer association request handling till SAE auth status is received");
 		lim_defer_sme_indication(mac_ctx, session, sub_type, sa,
 					 assoc_req, pmf_connection,
