@@ -827,6 +827,33 @@ void wlan_hdd_mod_fc_timer(struct hdd_adapter *adapter,
 }
 #endif /* QCA_HL_NETDEV_FLOW_CONTROL */
 
+#ifdef DRIVER_PASSTHRU_MODE
+static
+bool wlan_hdd_handle_passthru_txrx_pause(struct hdd_adapter *adapter,
+					 enum netif_action_type *action)
+{
+	if (adapter->device_mode != QDF_PASSTHRU_MODE)
+		return true;
+
+	if (*action != WLAN_NETIF_PRIORITY_QUEUE_ON &&
+	    *action != WLAN_NETIF_PRIORITY_QUEUE_OFF)
+		return false;
+
+	*action = (*action == WLAN_NETIF_PRIORITY_QUEUE_OFF) ?
+		   WLAN_STOP_ALL_NETIF_QUEUE :
+		   WLAN_WAKE_ALL_NETIF_QUEUE;
+
+	return true;
+}
+#else
+static inline
+bool wlan_hdd_handle_passthru_txrx_pause(struct hdd_adapter *adapter,
+					 enum netif_action_type *action)
+{
+	return true;
+}
+#endif
+
 /**
  * wlan_hdd_txrx_pause_cb() - pause callback from txrx layer
  * @vdev_id: vdev_id
@@ -850,6 +877,9 @@ void wlan_hdd_txrx_pause_cb(uint8_t vdev_id,
 		return;
 
 	adapter =  link_info->adapter;
+	if (!wlan_hdd_handle_passthru_txrx_pause(adapter, &action))
+		return;
+
 	wlan_hdd_mod_fc_timer(adapter, action);
 	wlan_hdd_netif_queue_control(adapter, action, reason);
 }
