@@ -52,6 +52,10 @@
 #include <wma.h>
 #include "wlan_objmgr_vdev_obj.h"
 #include "utils_mlo.h"
+#include "lim_utils.h"
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -1363,6 +1367,9 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
+	uint8_t rso_stop_req_bitmap;
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1487,6 +1494,20 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
 end:
+
+	if (status == QDF_STATUS_SUCCESS) {
+		osif_priv = wlan_vdev_get_ospriv(cm_ctx->vdev);
+		if (osif_priv && osif_priv->wdev) {
+			dev = osif_priv->wdev->netdev;
+		} else {
+			mlme_err("osif_priv is null");
+			return status;
+		}
+		ucfg_ipa_sw_routing_set(pdev, (qdf_netdev_t)dev,
+					QDF_STA_MODE, vdev_id,
+					roam_synch_data->bssid.bytes,
+					false);
+	}
 	return status;
 }
 
