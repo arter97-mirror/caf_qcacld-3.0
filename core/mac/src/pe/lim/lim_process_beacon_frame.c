@@ -1229,6 +1229,10 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
 	}
 
+	if (lim_is_session_uhr_capable(session))
+		lim_check_and_process_ecu_in_beacon(session, bcn_ptr,
+						    frame, frame_len);
+
 	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn_ptr);
 	if (QDF_IS_STATUS_SUCCESS(lim_check_for_ml_probe_req(session)))
 		goto end;

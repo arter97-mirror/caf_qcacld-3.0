@@ -34,6 +34,7 @@
 #include <lim_utils.h>
 #include <utils_mlo.h>
 #include "wlan_action_oui_api.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #ifdef WLAN_FEATURE_11BN_ECU
 /**
@@ -2329,3 +2330,157 @@ bool lim_is_emlsr_band_supported(struct pe_session *session)
 
 	return true;
 }
+
+#ifdef WLAN_FEATURE_11BN_ECU
+/**
+ * lim_process_partner_link_ecu_in_beacon() - Process ECU for a partner link
+ * @partner_session: PE session for the partner link
+ * @frame: Complete beacon frame (with MAC header)
+ * @frame_len: Length of the beacon frame
+ * @link_id: Partner link ID
+ *
+ * Return: QDF_STATUS_SUCCESS if the UHR Parameters Update IE was found and
+ *         parsed successfully, error code otherwise.
+ */
+static QDF_STATUS
+lim_process_partner_link_ecu_in_beacon(struct pe_session *partner_session,
+					uint8_t *frame, uint16_t frame_len,
+					uint8_t link_id)
+{
+	uint8_t *link_frame;
+	qdf_size_t link_frame_len = 0;
+	struct qdf_mac_addr link_bssid;
+	QDF_STATUS status;
+	uint8_t *ie_start;
+	uint8_t *ie_end;
+	uint16_t hdr_len = sizeof(tSirMacMgmtHdr);
+
+	if (!partner_session || !frame || frame_len <= hdr_len)
+		return QDF_STATUS_E_INVAL;
+
+	link_frame = qdf_mem_malloc(frame_len);
+	if (!link_frame)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_copy_macaddr(&link_bssid,
+			 (struct qdf_mac_addr *)partner_session->bssId);
+
+	status = util_gen_link_beacon(frame + hdr_len,
+				      frame_len - hdr_len,
+				      link_id, link_bssid,
+				      link_frame, frame_len,
+				      &link_frame_len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to gen link beacon for link_id %d, status %d",
+			 link_id, status);
+		qdf_mem_free(link_frame);
+		return status;
+	}
+
+	if (link_frame_len <= SIR_MAC_B_PR_SSID_OFFSET) {
+		qdf_mem_free(link_frame);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ie_start = link_frame + SIR_MAC_B_PR_SSID_OFFSET;
+	ie_end = link_frame + link_frame_len;
+	status = lim_process_ecu_in_beacon(ie_start, ie_end);
+
+	qdf_mem_free(link_frame);
+	return status;
+}
+
+void lim_check_and_process_ecu_in_beacon(struct pe_session *session,
+					 tSchBeaconStruct *bcn_ptr,
+					 uint8_t *frame,
+					 uint16_t frame_len)
+{
+	uint8_t link_id;
+	uint8_t ebpcc;
+	uint8_t *ie_start;
+	uint8_t *ie_end;
+	uint8_t i;
+	struct pe_session *partner_session;
+
+	if (!session || !bcn_ptr || !frame || !frame_len)
+		return;
+
+	if (!mlo_is_mld_sta(session->vdev))
+		return;
+
+	if (!bcn_ptr->mlo_ie.mlo_ie_present)
+		return;
+
+	if (frame_len <= SIR_MAC_B_PR_SSID_OFFSET)
+		return;
+
+	ie_start = frame + SIR_MAC_B_PR_SSID_OFFSET;
+	ie_end = frame + frame_len;
+
+	/* Process ECU for the current (assoc) link */
+	if (bcn_ptr->mlo_ie.mlo_ie.ecu_info.present) {
+		link_id = wlan_vdev_get_link_id(session->vdev);
+		ebpcc = bcn_ptr->mlo_ie.mlo_ie.ecu_info.param_change_count;
+
+		if (lim_check_ecu_happens(session->vdev, link_id, ebpcc)) {
+			pe_debug("ECU detected in beacon for link_id %d, ebpcc %d",
+				 link_id, ebpcc);
+			if (QDF_IS_STATUS_SUCCESS(
+				lim_process_ecu_in_beacon(ie_start, ie_end)))
+				mlo_set_ecu_ebpcc(session->vdev, link_id, ebpcc);
+		}
+	}
+
+	/*
+	 * Process ECU for partner links using per-STA ECU info already
+	 * extracted from the BV-MLE per-STA profiles by sir_parse_ecu_info_from_ml_ie().
+	 */
+	for (i = 0; i < bcn_ptr->mlo_ie.mlo_ie.num_persta_ecu_info; i++) {
+		if (!bcn_ptr->mlo_ie.mlo_ie.persta_ecu_info[i].ecu_info.present)
+			continue;
+
+		link_id = bcn_ptr->mlo_ie.mlo_ie.persta_ecu_info[i].link_id;
+		ebpcc = bcn_ptr->mlo_ie.mlo_ie.persta_ecu_info[i].ecu_info.param_change_count;
+
+		partner_session =
+			pe_find_partner_session_by_link_id(session, link_id);
+		if (!partner_session) {
+			pe_debug("No partner session for link_id %d", link_id);
+			continue;
+		}
+
+		if (lim_check_ecu_happens(partner_session->vdev,
+					  link_id, ebpcc)) {
+			pe_debug("ECU in per-STA profile for link_id %d, ebpcc %d",
+				 link_id, ebpcc);
+			/* Commit EBPCC only after successful processing */
+			if (QDF_IS_STATUS_SUCCESS(
+				lim_process_partner_link_ecu_in_beacon(
+					partner_session, frame,
+					frame_len, link_id)))
+				mlo_set_ecu_ebpcc(partner_session->vdev,
+						  link_id, ebpcc);
+		}
+		lim_mlo_release_vdev_ref(partner_session->vdev);
+	}
+}
+
+void lim_handle_ecu_in_probe_rsp(struct pe_session *session,
+				 struct wlan_objmgr_vdev *vdev,
+				 uint8_t link_id, uint8_t ebpcc_cnt,
+				 uint8_t *probe_ies, uint32_t probe_ies_len)
+{
+	if (!session) {
+		pe_err("session is null");
+		return;
+	}
+
+	if (!lim_check_ecu_happens(vdev, link_id, ebpcc_cnt))
+		return;
+
+	pe_debug("ECU detected for link_id %d, ebpcc %d", link_id, ebpcc_cnt);
+	if (QDF_IS_STATUS_SUCCESS(
+		lim_process_ecu_in_beacon(probe_ies, probe_ies + probe_ies_len)))
+		mlo_set_ecu_ebpcc(vdev, link_id, ebpcc_cnt);
+}
+#endif /* WLAN_FEATURE_11BN */

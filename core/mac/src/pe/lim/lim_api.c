@@ -5230,7 +5230,7 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	struct pe_session *partner_session;
 	struct qdf_mac_addr *reporting_bssid;
 	uint8_t reporting_chan_num, reporting_op_class, reporting_link_id;
-
+	uint8_t ebpcc_cnt = 0;
 
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
@@ -5300,11 +5300,14 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 		link_id = partner_info.partner_link_info[i].link_id;
 		status = lim_get_partner_link_info_from_rnr(rnr, link_id,
 							    &bpcc, &opclass,
-							    &chan);
+							    &chan, &ebpcc_cnt);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("no cu info in rnr for link id %d", link_id);
 			continue;
 		}
+
+		lim_handle_ecu_in_probe_rsp(session, vdev, link_id, ebpcc_cnt,
+					    probe_ies, probe_ies_len);
 
 		if (!lim_check_cu_happens(vdev, link_id, bpcc))
 			continue;
@@ -5314,11 +5317,6 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 									chan,
 									opclass);
 		link_probe_rsp.len = probe_rsp_len;
-		/* Todo:
-		 * it needs to use link_id as parameter to generate
-		 * specific probe rsp frame when api util_gen_link_probe_rsp
-		 * updated.
-		 */
 		status =
 		     util_gen_link_probe_rsp(probe_rsp, probe_rsp_len, link_id,
 					     sta_link_addr, link_probe_rsp.ptr,

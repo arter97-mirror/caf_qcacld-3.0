@@ -688,6 +688,47 @@ bool lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise
  */
 QDF_STATUS lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end);
+
+/**
+ * lim_check_and_process_ecu_in_beacon() - Check and process ECU in beacon
+ * @session: PE session pointer
+ * @bcn_ptr: Parsed beacon structure
+ * @frame: Raw beacon frame buffer
+ * @frame_len: Length of beacon frame
+ *
+ * Checks for Enhanced Critical Update (ECU) in beacon frames for both the
+ * current link (MLE Common Info EBPCC) and partner links (RNR TBTT EBPCC).
+ * Calls lim_process_ecu_in_beacon() when ECU is detected.
+ *
+ * Return: void
+ */
+void lim_check_and_process_ecu_in_beacon(struct pe_session *session,
+					 tSchBeaconStruct *bcn_ptr,
+					 uint8_t *frame,
+					 uint16_t frame_len);
+/**
+ * lim_handle_ecu_in_probe_rsp() - Handle ECU detection in probe response
+ * @session: PE session pointer for the link receiving the probe response
+ * @vdev: vdev object for the link
+ * @link_id: Link ID of the partner link being evaluated
+ * @ebpcc_cnt: Enhanced BSS Parameter Change Count from RNR TBTT info
+ * @probe_ies: Pointer to start of IE buffer in the probe response
+ * @probe_ies_len: Length of the IE buffer
+ *
+ * Checks whether an Enhanced Critical Update (ECU) has occurred for the
+ * given link by comparing @ebpcc_cnt against the stored value. If an ECU
+ * is detected, calls lim_process_ecu_in_beacon() to parse the UHR Parameter
+ * Update IE.
+ *
+ * Must be called before the BPCC gate so ECU is always evaluated
+ * independently of regular Critical Updates.
+ *
+ * Return: void
+ */
+void lim_handle_ecu_in_probe_rsp(struct pe_session *session,
+				 struct wlan_objmgr_vdev *vdev,
+				 uint8_t link_id, uint8_t ebpcc_cnt,
+				 uint8_t *probe_ies, uint32_t probe_ies_len);
 #else
 static inline bool
 lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
@@ -700,6 +741,22 @@ static inline QDF_STATUS
 lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+lim_check_and_process_ecu_in_beacon(struct pe_session *session,
+				    tSchBeaconStruct *bcn_ptr,
+				    uint8_t *frame,
+				    uint16_t frame_len)
+{
+}
+
+static inline void
+lim_handle_ecu_in_probe_rsp(struct pe_session *session,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t link_id, uint8_t ebpcc_cnt,
+			    uint8_t *probe_ies, uint32_t probe_ies_len)
+{
 }
 #endif /* WLAN_FEATURE_11BN_ECU */
 #endif

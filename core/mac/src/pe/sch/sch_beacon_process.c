@@ -619,6 +619,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	bool cu_flag = true;
 	bool is_power_constraint_abs = false;
 	bool change_in_sta_pwr_type = false;
+	uint8_t *frame = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	uint16_t frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
 	if (mlo_is_mld_sta(session->vdev)) {
 		if (!mlo_check_if_all_vdev_up(session->vdev)) {
@@ -637,6 +639,10 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
 		lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn);
 	}
+
+	if (lim_is_session_uhr_capable(session))
+		lim_check_and_process_ecu_in_beacon(session, bcn,
+						    frame, frame_len);
 
 	if (lim_is_session_eht_capable(session))
 		lim_process_beacon_eht_op(session, bcn);
