@@ -676,12 +676,30 @@ bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
  */
 bool lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
 			   uint8_t link_id, uint8_t new_ebpcc);
+
+/**
+ * lim_process_ecu_in_beacon() - Process Enhanced Critical Update in beacon
+ * @pos: Pointer to start of IE buffer
+ * @end: Pointer to end of IE buffer
+ *
+ * This function parses the UHR Parameter Update IE from beacon frames and
+ * extracts mode tuple information for Enhanced Critical Updates.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end);
 #else
 static inline bool
 lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
 		      uint8_t link_id, uint8_t new_ebpcc)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_11BN_ECU */
 #endif

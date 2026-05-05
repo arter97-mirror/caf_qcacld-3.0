@@ -6613,6 +6613,88 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_FEATURE_11BN_ECU
+/**
+ * sir_parse_ecu_info_from_ml_ie() - Extract ECU information from a Basic
+ *                                   variant Multi-Link element and store it
+ *                                   in the PE-layer ML IE container
+ * @mlo_ie: pointer to the sir_multi_link_ie that holds the ML IE state for
+ *          the current beacon or probe response being parsed
+ * @mlieseq: pointer to the start of the raw BV-MLE (including Element ID,
+ *           Length and Extension Element ID octets)
+ * @mlieseqlen: total byte length of the BV-MLE, including any fragment IEs
+ *
+ * Populates two ECU-related fields in @mlo_ie->mlo_ie:
+ *
+ * 1. ecu_info — filled by util_get_bvmlie_ecu_param_change_count(), which
+ *    walks the Common Info field looking for the Enhanced Critical Update
+ *    Information subfield (present when ML Control Presence Bitmap bit 7 is
+ *    set).  The 4-bit EBPCC and 3-bit CU Type values are stored along with a
+ *    present flag.  Defined in IEEE P802.11bn/D1.4 S9.4.2.323.2.3, p. 327.
+ *
+ * 2. persta_ecu_info[] / num_persta_ecu_info — filled by
+ *    util_get_bvmlie_persta_ecu_info(), which iterates the Per-STA Profile
+ *    subelements in the Link Info field and reads the Enhanced BPCC byte from
+ *    each STA Info field where STA Control bit 12 (Enhanced BSS Parameters
+ *    Change Count Present) is set.  Defined in IEEE P802.11bn/D1.4
+ *    S9.4.2.323.3, Table 9-bbf (Per-STA Profile subelement STA Control field
+ *    format), p. 351.
+ *
+ * num_persta_ecu_info is always reset to 0 before the per-STA walk so that
+ * stale entries from a prior frame are never carried forward.
+ *
+ * This function is a no-op when WLAN_FEATURE_11BN_ECU is not defined.
+ */
+static void
+sir_parse_ecu_info_from_ml_ie(struct sir_multi_link_ie *mlo_ie,
+			      uint8_t *mlieseq, qdf_size_t mlieseqlen)
+{
+	bool ecu_param_change_count_present;
+	uint8_t ecu_param_change_count;
+	uint8_t ecu_type;
+	struct mlo_persta_ecu_info persta_ecu_arr[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t num_persta = 0;
+	uint8_t i;
+	QDF_STATUS status;
+
+	status = util_get_bvmlie_ecu_param_change_count(
+			mlieseq, mlieseqlen,
+			&ecu_param_change_count_present,
+			&ecu_param_change_count,
+			&ecu_type);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	mlo_ie->mlo_ie.ecu_info.present = ecu_param_change_count_present;
+	mlo_ie->mlo_ie.ecu_info.param_change_count = ecu_param_change_count;
+	mlo_ie->mlo_ie.ecu_info.type = ecu_type;
+	mlo_ie->mlo_ie.ecu_info.all_updates_included = 0;
+
+	qdf_mem_zero(persta_ecu_arr, sizeof(persta_ecu_arr));
+	status = util_get_bvmlie_persta_ecu_info(mlieseq, mlieseqlen,
+						 persta_ecu_arr,
+						 &num_persta);
+	if (QDF_IS_STATUS_SUCCESS(status) && num_persta > 0) {
+		mlo_ie->mlo_ie.num_persta_ecu_info = num_persta;
+		for (i = 0; i < num_persta; i++) {
+			mlo_ie->mlo_ie.persta_ecu_info[i].link_id =
+				persta_ecu_arr[i].link_id;
+			mlo_ie->mlo_ie.persta_ecu_info[i].ecu_info.present =
+				persta_ecu_arr[i].ebpcc_present;
+			mlo_ie->mlo_ie.persta_ecu_info[i].ecu_info.param_change_count =
+				persta_ecu_arr[i].ebpcc;
+		}
+	}
+}
+#else
+static inline void
+sir_parse_ecu_info_from_ml_ie(struct sir_multi_link_ie *mlo_ie,
+			      uint8_t *mlieseq, qdf_size_t mlieseqlen)
+{
+}
+#endif /* WLAN_FEATURE_11BN_ECU */
+
 static QDF_STATUS
 sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 				     tDot11fBeacon *bcn_frm,
@@ -6678,6 +6760,8 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 			bcn_struct->mlo_ie.mlo_ie.bss_param_change_cnt_present =
 						bpcc_found;
 			bcn_struct->mlo_ie.mlo_ie.bss_param_change_count = bpcc;
+			sir_parse_ecu_info_from_ml_ie(&bcn_struct->mlo_ie,
+						      ml_ie, ml_ie_total_len);
 			bcn_struct->mlo_ie.mlo_ie_present = true;
 		}
 	}
@@ -13878,6 +13962,7 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 	mlo_ie_ptr->mlo_ie.bss_param_change_cnt_present =
 						bss_param_change_cnt_found;
 	mlo_ie_ptr->mlo_ie.bss_param_change_count = bss_param_change_cnt;
+	sir_parse_ecu_info_from_ml_ie(mlo_ie_ptr, ml_ie, ml_ie_total_len);
 	mlo_ie_ptr->mlo_ie_present = true;
 
 	return QDF_STATUS_SUCCESS;

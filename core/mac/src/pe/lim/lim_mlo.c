@@ -241,6 +241,493 @@ bool lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
 
 	return true;
 }
+
+/**
+ * lim_parse_uhr_mode_dps() - Parse DPS Operation Parameters from a UHR
+ *                            Parameter Update IE mode tuple
+ * @mode_params: pointer to the raw mode parameter bytes for this tuple
+ * @mode_length: number of valid bytes at @mode_params
+ * @dps: output structure to populate with parsed DPS parameters
+ *
+ * Parses the 4-octet DPS Operation Parameters field carried in a DPS mode
+ * tuple of the UHR Parameter Update IE into @dps.  Field offsets follow
+ * the WLAN_UHR_DPS_* constants defined in wlan_cmn_ieee80211.h which track
+ * IEEE P802.11bn/D1.4 Table 9-ccc (DPS Operation Parameters field format),
+ * p. 428.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if @mode_params
+ * or @dps is NULL, or if @mode_length is less than WLAN_UHR_DPS_OP_PARAM_LEN.
+ */
+static QDF_STATUS lim_parse_uhr_mode_dps(uint8_t *mode_params,
+					 uint8_t mode_length,
+					 struct wlan_uhr_dps_op_params *dps)
+{
+	uint32_t raw;
+
+	if (!mode_params || !dps)
+		return QDF_STATUS_E_INVAL;
+	if (mode_length < WLAN_UHR_DPS_OP_PARAM_LEN) {
+		pe_err("Insufficient DPS mode data, need %d, have %d",
+		       WLAN_UHR_DPS_OP_PARAM_LEN, mode_length);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_zero(dps, sizeof(*dps));
+	qdf_mem_copy(&raw, mode_params, sizeof(raw));
+	dps->dps_padding_delay =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_PADDING_DELAY_IDX,
+			     WLAN_UHR_DPS_PADDING_DELAY_BITS);
+	dps->dps_transition_delay =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_TRANS_DELAY_IDX,
+			     WLAN_UHR_DPS_TRANS_DELAY_BITS);
+	dps->icf_required =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_ICF_REQ_IDX,
+			     WLAN_UHR_DPS_ICF_REQ_BITS);
+	dps->parameterize_mode =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_PARAM_MODE_IDX,
+			     WLAN_UHR_DPS_PARAM_MODE_BITS);
+	dps->lc_mode_bandwidth =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_LC_BW_IDX,
+			     WLAN_UHR_DPS_LC_BW_BITS);
+	dps->lc_mode_nss =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_LC_NSS_IDX,
+			     WLAN_UHR_DPS_LC_NSS_BITS);
+	dps->lc_mode_mcs =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_LC_MCS_IDX,
+			     WLAN_UHR_DPS_LC_MCS_BITS);
+	dps->mobile_ap_dps_static_hcm =
+		QDF_GET_BITS(raw, WLAN_UHR_DPS_MOBILE_AP_HCM_IDX,
+			     WLAN_UHR_DPS_MOBILE_AP_HCM_BITS);
+	dps->present = true;
+	pe_debug("DPS: padding=%d trans=%d icf=%d param=%d lc_bw=%d lc_nss=%d lc_mcs=%d hcm=%d",
+		 dps->dps_padding_delay, dps->dps_transition_delay,
+		 dps->icf_required, dps->parameterize_mode,
+		 dps->lc_mode_bandwidth, dps->lc_mode_nss,
+		 dps->lc_mode_mcs, dps->mobile_ap_dps_static_hcm);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * lim_parse_uhr_mode_npca() - Parse NPCA Operation Parameters from a UHR
+ *                             Parameter Update IE mode tuple
+ * @mode_params: pointer to the raw mode parameter bytes for this tuple
+ * @mode_length: number of valid bytes at @mode_params
+ * @npca: output structure to populate with parsed NPCA parameters
+ *
+ * Parses the NPCA Operation Parameters field carried in an NPCA mode tuple of
+ * the UHR Parameter Update IE into @npca.  The mandatory base is 4 octets;
+ * when disabled_subchan_bmap_present is set a further 2-octet disabled
+ * subchannel bitmap is appended.  Field offsets follow the WLAN_UHR_NPCA_*
+ * constants defined in wlan_cmn_ieee80211.h which track IEEE P802.11bn/D1.4
+ * Table 9-ccd (NPCA Operation Parameters field format), p. 434.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if @mode_params
+ * or @npca is NULL, or if @mode_length is less than the required minimum.
+ */
+static QDF_STATUS lim_parse_uhr_mode_npca(uint8_t *mode_params,
+					  uint8_t mode_length,
+					  struct wlan_uhr_npca_op_params *npca)
+{
+	uint64_t raw = 0;
+
+	if (!mode_params || !npca)
+		return QDF_STATUS_E_INVAL;
+	if (mode_length < WLAN_UHR_NPCA_OP_PARAM_BASE_LEN) {
+		pe_err("Insufficient NPCA mode data, need %d, have %d",
+		       WLAN_UHR_NPCA_OP_PARAM_BASE_LEN, mode_length);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_zero(npca, sizeof(*npca));
+	qdf_mem_copy(&raw, mode_params, WLAN_UHR_NPCA_OP_PARAM_BASE_LEN);
+	npca->npca_primary_channel =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_PRIMARY_CH_IDX,
+			       WLAN_UHR_NPCA_PRIMARY_CH_BITS);
+	npca->npca_min_duration_threshold =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_MIN_DUR_TH_IDX,
+			       WLAN_UHR_NPCA_MIN_DUR_TH_BITS);
+	npca->npca_switch_delay =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_SWITCH_DELAY_IDX,
+			       WLAN_UHR_NPCA_SWITCH_DELAY_BITS);
+	npca->npca_switch_back_delay =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_SWITCHBACK_DELAY_IDX,
+			       WLAN_UHR_NPCA_SWITCHBACK_DELAY_BITS);
+	npca->initial_npca_qsrc =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_INIT_QSRC_IDX,
+			       WLAN_UHR_NPCA_INIT_QSRC_BITS);
+	npca->moplen_npca =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_MOPLEN_IDX,
+			       WLAN_UHR_NPCA_MOPLEN_BITS);
+	npca->disabled_subchan_bmap_present =
+		QDF_GET_BITS64(raw, WLAN_UHR_NPCA_DSBMP_PRESENT_IDX,
+			       WLAN_UHR_NPCA_DSBMP_PRESENT_BITS);
+	if (npca->disabled_subchan_bmap_present) {
+		if (mode_length < WLAN_UHR_NPCA_OP_PARAM_LEN) {
+			pe_err("Insufficient NPCA data for bitmap, need %d, have %d",
+			       WLAN_UHR_NPCA_OP_PARAM_LEN, mode_length);
+			return QDF_STATUS_E_INVAL;
+		}
+		raw = 0;
+		qdf_mem_copy(&raw, mode_params, WLAN_UHR_NPCA_OP_PARAM_LEN);
+		npca->disabled_subchannel_bitmap =
+			QDF_GET_BITS64(raw, WLAN_UHR_NPCA_DSBMP_IDX,
+				       WLAN_UHR_NPCA_DSBMP_BITS);
+	}
+	npca->present = true;
+	pe_debug("NPCA: primary_ch=%d switch_delay=%d switch_back=%d",
+		 npca->npca_primary_channel, npca->npca_switch_delay,
+		 npca->npca_switch_back_delay);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * lim_parse_uhr_mode_duo() - Parse DUO Operation Parameters from a UHR
+ *                            Parameter Update IE mode tuple
+ * @mode_params: pointer to the raw mode parameter bytes for this tuple
+ * @mode_length: number of valid bytes at @mode_params
+ * @duo: output structure to populate with parsed DUO parameters
+ *
+ * Parses the DUO (Dual Uplink/Downlink Operation) parameters carried in a
+ * DUO mode tuple of the UHR Parameter Update IE into @duo.  The mandatory
+ * minimum is 1 octet (max_standalone_du); a second octet carrying the OBSRP
+ * flag is optional and consumed when @mode_length > 1.  Field layout follows
+ * WLAN_UHR_DUO_OP_PARAM_MIN_LEN and the wlan_uhr_duo_mode_params struct which
+ * track IEEE P802.11bn/D1.4 Table 9-ccf (DUO Operation Parameters field
+ * format), p. 441.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if @mode_params
+ * or @duo is NULL, or if @mode_length is less than
+ * WLAN_UHR_DUO_OP_PARAM_MIN_LEN.
+ */
+static QDF_STATUS lim_parse_uhr_mode_duo(uint8_t *mode_params,
+					 uint8_t mode_length,
+					 struct wlan_uhr_duo_mode_params *duo)
+{
+	if (!mode_params || !duo)
+		return QDF_STATUS_E_INVAL;
+	if (mode_length < WLAN_UHR_DUO_OP_PARAM_MIN_LEN) {
+		pe_err("Insufficient DUO mode data");
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_zero(duo, sizeof(*duo));
+	duo->max_standalone_du = mode_params[0];
+	if (mode_length > 1)
+		duo->obsrp = mode_params[1];
+	duo->present = true;
+	pe_debug("DUO: max_standalone_du=%d obsrp=%d",
+		 duo->max_standalone_du, duo->obsrp);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * lim_parse_uhr_mode_p_edca() - Parse P-EDCA Operation Parameters from a
+ *                               UHR Parameter Update IE mode tuple
+ * @mode_params: pointer to the raw mode parameter bytes for this tuple
+ * @mode_length: number of valid bytes at @mode_params
+ * @p_edca: output structure to populate with parsed P-EDCA parameters
+ *
+ * Parses the 3-octet Parameterized-EDCA Operation Parameters field carried
+ * in a P-EDCA mode tuple of the UHR Parameter Update IE into @p_edca.
+ * Extracted fields include ECWmin, ECWmax, AIFSN, CW_DS, PSRC threshold and
+ * QSRC threshold.  Field offsets follow the WLAN_UHR_PEDCA_* constants
+ * defined in wlan_cmn_ieee80211.h which track IEEE P802.11bn/D1.4 Table 9-cch
+ * (P-EDCA Operation Parameters field format), p. 445.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if @mode_params
+ * or @p_edca is NULL, or if @mode_length is less than
+ * WLAN_UHR_PEDCA_OP_PARAM_LEN.
+ */
+static QDF_STATUS lim_parse_uhr_mode_p_edca(
+				uint8_t *mode_params,
+				uint8_t mode_length,
+				struct wlan_uhr_pedca_op_params *p_edca)
+{
+	uint32_t raw = 0;
+
+	if (!mode_params || !p_edca)
+		return QDF_STATUS_E_INVAL;
+	if (mode_length < WLAN_UHR_PEDCA_OP_PARAM_LEN) {
+		pe_err("Insufficient P-EDCA mode data, need %d, have %d",
+		       WLAN_UHR_PEDCA_OP_PARAM_LEN, mode_length);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_zero(p_edca, sizeof(*p_edca));
+	qdf_mem_copy(&raw, mode_params, WLAN_UHR_PEDCA_OP_PARAM_LEN);
+	p_edca->ecw_min =
+		QDF_GET_BITS(raw, WLAN_UHR_PEDCA_ECWMIN_IDX,
+			     WLAN_UHR_PEDCA_ECWMIN_BITS);
+	p_edca->ecw_max =
+		QDF_GET_BITS(raw, WLAN_UHR_PEDCA_ECWMAX_IDX,
+			     WLAN_UHR_PEDCA_ECWMAX_BITS);
+	p_edca->aifsn =
+		QDF_GET_BITS(raw, WLAN_UHR_PEDCA_AIFSN_IDX,
+			     WLAN_UHR_PEDCA_AIFSN_BITS);
+	p_edca->cw_ds =
+		QDF_GET_BITS(raw, WLAN_UHR_PEDCA_CWDS_IDX,
+			     WLAN_UHR_PEDCA_CWDS_BITS);
+	p_edca->psrc_threshold =
+		QDF_GET_BITS(raw, WLAN_UHR_PEDCA_PSRC_TH_IDX,
+			     WLAN_UHR_PEDCA_PSRC_TH_BITS);
+	p_edca->qsrc_threshold =
+		QDF_GET_BITS(raw, WLAN_UHR_PEDCA_QSRC_TH_IDX,
+			     WLAN_UHR_PEDCA_QSRC_TH_BITS);
+	p_edca->present = true;
+	pe_debug("P-EDCA: cwmin=%d cwmax=%d aifsn=%d cw_ds=%d",
+		 p_edca->ecw_min, p_edca->ecw_max,
+		 p_edca->aifsn, p_edca->cw_ds);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * lim_parse_uhr_mode_dbe() - Parse DBE Operation Parameters from a UHR
+ *                            Parameter Update IE mode tuple
+ * @mode_params: pointer to the raw mode parameter bytes for this tuple
+ * @mode_length: number of valid bytes at @mode_params
+ * @dbe: output structure to populate with parsed DBE parameters
+ *
+ * Parses the 3-octet DBE (Dynamic Bandwidth Extension) Operation Parameters
+ * field carried in a DBE mode tuple of the UHR Parameter Update IE into @dbe.
+ * Extracted fields include dbe_bandwidth, disabled_subchan_bmap_present and,
+ * when present, the 16-bit disabled subchannel bitmap.  Field offsets follow
+ * the WLAN_UHR_DBE_* constants defined in wlan_cmn_ieee80211.h which track
+ * IEEE P802.11bn/D1.4 Table 9-cck (DBE Operation Parameters field format),
+ * p. 452.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if @mode_params
+ * or @dbe is NULL, or if @mode_length is less than WLAN_UHR_DBE_OP_PARAM_LEN.
+ */
+static QDF_STATUS lim_parse_uhr_mode_dbe(uint8_t *mode_params,
+					 uint8_t mode_length,
+					 struct wlan_uhr_dbe_op_params *dbe)
+{
+	uint32_t raw = 0;
+
+	if (!mode_params || !dbe)
+		return QDF_STATUS_E_INVAL;
+	if (mode_length < WLAN_UHR_DBE_OP_PARAM_LEN) {
+		pe_err("Insufficient DBE mode data, need %d, have %d",
+		       WLAN_UHR_DBE_OP_PARAM_LEN, mode_length);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_zero(dbe, sizeof(*dbe));
+	qdf_mem_copy(&raw, mode_params, WLAN_UHR_DBE_OP_PARAM_LEN);
+	dbe->dbe_bandwidth =
+		QDF_GET_BITS(raw, WLAN_UHR_DBE_BW_IDX,
+			     WLAN_UHR_DBE_BW_BITS);
+	dbe->disabled_subchan_bmap_present =
+		QDF_GET_BITS(raw, WLAN_UHR_DBE_DSBMP_PRESENT_IDX,
+			     WLAN_UHR_DBE_DSBMP_PRESENT_BITS);
+	dbe->disabled_subchannel_bitmap =
+		QDF_GET_BITS(raw, WLAN_UHR_DBE_DSBMP_IDX,
+			     WLAN_UHR_DBE_DSBMP_BITS);
+	dbe->present = true;
+	pe_debug("DBE: bandwidth=%d bitmap=0x%04x",
+		 dbe->dbe_bandwidth, dbe->disabled_subchannel_bitmap);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * lim_parse_uhr_mode_tuple() - Dispatch mode-specific parser for one UHR
+ *                              Parameter Update IE mode tuple
+ * @tuple: pointer to a fully populated wlan_uhr_param_update_mode_tuple whose
+ *         mode_id, mode_enable, mode_update, mode_length and mode_params fields
+ *         have already been extracted from the raw IE by the caller
+ *
+ * Acts as the central dispatcher for per-mode UHR parameter parsing.
+ * Inspects @tuple->mode_id and calls the corresponding lim_parse_uhr_mode_*()
+ * helper.  For AP PUO (mode 5) and ELR Reception (mode 6) only the enable
+ * flag is logged since those modes carry no parameter bytes.  Unknown mode IDs
+ * are logged as warnings and QDF_STATUS_E_NOSUPPORT is returned; the caller
+ * treats this as non-fatal so that later tuples in the same IE are still
+ * processed.  Mode ID assignments follow IEEE P802.11bn/D1.4 Table 9-ccb
+ * (UHR Mode Tuple Control field), p. 426.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if @tuple is NULL
+ * or carries no mode parameters when one is expected, QDF_STATUS_E_NOSUPPORT
+ * for an unrecognised mode ID.
+ */
+static QDF_STATUS
+lim_parse_uhr_mode_tuple(struct wlan_uhr_param_update_mode_tuple *tuple)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_uhr_dps_op_params dps;
+	struct wlan_uhr_npca_op_params npca;
+	struct wlan_uhr_duo_mode_params duo;
+	struct wlan_uhr_pedca_op_params p_edca;
+	struct wlan_uhr_dbe_op_params dbe;
+
+	if (!tuple)
+		return QDF_STATUS_E_INVAL;
+	if (!tuple->mode_params || tuple->mode_length == 0) {
+		pe_debug("No mode parameters for mode_id=%d", tuple->mode_id);
+		return QDF_STATUS_SUCCESS;
+	}
+	switch (tuple->mode_id) {
+	case WLAN_UHR_MODE_DPS:
+		status = lim_parse_uhr_mode_dps(tuple->mode_params,
+						tuple->mode_length, &dps);
+		break;
+	case WLAN_UHR_MODE_NPCA:
+		status = lim_parse_uhr_mode_npca(tuple->mode_params,
+						 tuple->mode_length, &npca);
+		break;
+	case WLAN_UHR_MODE_DUO:
+		status = lim_parse_uhr_mode_duo(tuple->mode_params,
+						tuple->mode_length, &duo);
+		break;
+	case WLAN_UHR_MODE_P_EDCA:
+		status = lim_parse_uhr_mode_p_edca(tuple->mode_params,
+						   tuple->mode_length, &p_edca);
+		break;
+	case WLAN_UHR_MODE_DBE:
+		status = lim_parse_uhr_mode_dbe(tuple->mode_params,
+						tuple->mode_length, &dbe);
+		break;
+	case WLAN_UHR_MODE_AP_PUO:
+		pe_debug("AP PUO mode: %s",
+			 tuple->mode_enable ? "enabled" : "disabled");
+		break;
+	case WLAN_UHR_MODE_ELR_RECEPTION:
+		pe_debug("ELR Reception mode: %s",
+			 tuple->mode_enable ? "enabled" : "disabled");
+		break;
+	default:
+		pe_warn("Unknown UHR mode_id=%d", tuple->mode_id);
+		status = QDF_STATUS_E_NOSUPPORT;
+		break;
+	}
+	return status;
+}
+
+QDF_STATUS lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end)
+{
+	uint8_t *ie_ptr;
+	uint8_t *ie_data;
+	uint8_t tuple_idx = 0;
+	uint16_t remaining_len;
+	uint16_t ie_len;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_uhr_param_update_ie uhr_param_update;
+
+	if (!pos || !end || pos >= end) {
+		pe_err("Invalid input parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(&uhr_param_update, sizeof(uhr_param_update));
+
+	ie_ptr = (uint8_t *)pos;
+	while (ie_ptr < end) {
+		ie_ptr = (uint8_t *)wlan_get_ie_ptr_from_eid(
+					WLAN_ELEMID_EXTN_ELEM,
+					ie_ptr, end - ie_ptr);
+		if (!ie_ptr)
+			break;
+		if (ie_ptr[TAG_LEN_POS] >= 1 &&
+		    ie_ptr[2] == WLAN_EXTN_ELEMID_UHR_PARAM_UPDATE)
+			break;
+		ie_ptr += ie_ptr[TAG_LEN_POS] + MIN_IE_LEN;
+	}
+
+	if (!ie_ptr || ie_ptr >= end) {
+		pe_debug("UHR param update IE (ext_id=0x%02x) not found",
+			 WLAN_EXTN_ELEMID_UHR_PARAM_UPDATE);
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	ie_len = ie_ptr[TAG_LEN_POS];
+	if (ie_len < WLAN_UHR_PARAM_UPDATE_MIN_LEN) {
+		pe_err("Invalid UHR param update length: %d (need >= %d)",
+		       ie_len, WLAN_UHR_PARAM_UPDATE_MIN_LEN);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if ((ie_ptr + ie_len + MIN_IE_LEN) > end) {
+		pe_err("UHR param update IE truncated");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	uhr_param_update.countdown_timer =
+		ie_ptr[WLAN_UHR_PARAM_UPDATE_COUNTDOWN_OFFSET];
+	uhr_param_update.present = true;
+
+	ie_data = &ie_ptr[WLAN_UHR_PARAM_UPDATE_TUPLES_OFFSET];
+	remaining_len = ie_len - WLAN_UHR_PARAM_UPDATE_HDR_OVERHEAD;
+
+	while (remaining_len > 0 &&
+	       tuple_idx < WLAN_UHR_PARAM_UPDATE_MAX_TUPLES) {
+		struct wlan_uhr_param_update_mode_tuple *tuple =
+			&uhr_param_update.mode_tuples[tuple_idx];
+
+		if (remaining_len < WLAN_UHR_MODE_TUPLE_HDR_SIZE) {
+			pe_err_rl("Insufficient data for mode tuple %d, remaining %d",
+				  tuple_idx, remaining_len);
+			status = QDF_STATUS_E_INVAL;
+			break;
+		}
+
+		tuple->mode_id =
+			QDF_GET_BITS(ie_data[0],
+				     WLAN_UHR_MODE_TUPLE_CTRL_ID_IDX,
+				     WLAN_UHR_MODE_TUPLE_CTRL_ID_BITS);
+		tuple->mode_enable =
+			QDF_GET_BITS(ie_data[0],
+				     WLAN_UHR_MODE_TUPLE_CTRL_ENABLE_IDX,
+				     WLAN_UHR_MODE_TUPLE_CTRL_ENABLE_BITS);
+		tuple->mode_update =
+			QDF_GET_BITS(ie_data[0],
+				     WLAN_UHR_MODE_TUPLE_CTRL_UPDATE_IDX,
+				     WLAN_UHR_MODE_TUPLE_CTRL_UPDATE_BITS);
+		tuple->mode_length = ie_data[1];
+
+		ie_data += WLAN_UHR_MODE_TUPLE_HDR_SIZE;
+		remaining_len -= WLAN_UHR_MODE_TUPLE_HDR_SIZE;
+
+		if (tuple->mode_length > 0) {
+			if (remaining_len < tuple->mode_length) {
+				pe_err_rl("Insufficient data for mode params, tuple %d, need %d, have %d",
+					  tuple_idx, tuple->mode_length,
+					  remaining_len);
+				status = QDF_STATUS_E_INVAL;
+				break;
+			}
+			if (tuple->mode_length > WLAN_UHR_MODE_PARAMS_MAX_LEN) {
+				pe_err_rl("Mode params too large for tuple %d: %d > %d",
+					  tuple_idx, tuple->mode_length,
+					  WLAN_UHR_MODE_PARAMS_MAX_LEN);
+				status = QDF_STATUS_E_INVAL;
+				break;
+			}
+			qdf_mem_copy(tuple->mode_params_buf, ie_data,
+				     tuple->mode_length);
+			tuple->mode_params = tuple->mode_params_buf;
+			ie_data += tuple->mode_length;
+			remaining_len -= tuple->mode_length;
+		} else {
+			tuple->mode_params = NULL;
+		}
+
+		pe_debug("Mode tuple %d: id=%d enable=%d update=%d len=%d",
+			 tuple_idx, tuple->mode_id, tuple->mode_enable,
+			 tuple->mode_update, tuple->mode_length);
+
+		if (QDF_IS_STATUS_ERROR(lim_parse_uhr_mode_tuple(tuple)))
+			pe_warn("Failed to parse mode tuple %d (mode_id=%d)",
+				tuple_idx, tuple->mode_id);
+
+		tuple_idx++;
+	}
+
+	if (remaining_len > 0 && tuple_idx >= WLAN_UHR_PARAM_UPDATE_MAX_TUPLES)
+		pe_warn("UHR param update has more than %d mode tuples, ignoring remaining",
+			WLAN_UHR_PARAM_UPDATE_MAX_TUPLES);
+
+	uhr_param_update.mode_tuple_count = tuple_idx;
+
+	pe_debug("UHR param update parsed: countdown=%d, tuple_count=%d",
+		 uhr_param_update.countdown_timer,
+		 uhr_param_update.mode_tuple_count);
+
+	return status;
+}
 #endif
 
 /**
