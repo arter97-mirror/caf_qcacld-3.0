@@ -7214,6 +7214,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	enum policy_mgr_con_mode pm_con_mode;
 	struct qdf_mac_addr *link_mac;
 	bool is_mon_other_bss;
+	bool dfs_master_capable;
 
 	hdd_enter();
 
@@ -7413,6 +7414,24 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 								    config->chan_freq)) {
 		hdd_err("No SAP start on DFS channel");
 		ret = -EOPNOTSUPP;
+		goto error;
+	}
+
+	status = ucfg_mlme_get_dfs_master_capability(hdd_ctx->psoc,
+						     &dfs_master_capable);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get dfs master capable");
+		ret = -EINVAL;
+		goto error;
+	}
+
+	if (!dfs_master_capable &&
+	    policy_mgr_is_bonded_chan_dfs(hdd_ctx->psoc,
+					  config->ch_width_orig,
+					  config->ch_params.mhz_freq_seg1,
+					  config->chan_freq)) {
+		hdd_err("Failed to bringup SAP; Atleast one bonded channel is DFS");
+		ret = -EINVAL;
 		goto error;
 	}
 
