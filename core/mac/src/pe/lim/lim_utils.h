@@ -4378,6 +4378,20 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
  */
 bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr);
 
+/**
+ * lim_get_hmac_crypto_type()- This API returns crypto type based on akm suite
+ * used.
+ * @akm: akm used for authentication
+ *
+ * This API is used to get the crypto type when HMAC-hash() needs to
+ * be generated.
+ * Eg: PMK = HMAC-Hash(SNonce || ANonce, rMSK [ || DHss ])
+ *     Here HMAC-Hash will be either hmac(sha256) or hmac(sha384)
+ *
+ * Return: Crypto type
+ */
+const uint8_t *lim_get_hmac_crypto_type(uint8_t akm);
+
 #ifdef WLAN_FEATURE_11BN
 /**
  * lim_revise_req_uhr_cap_per_band() - Revise UHR caps as per operation band

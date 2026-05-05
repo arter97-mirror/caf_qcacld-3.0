@@ -955,6 +955,8 @@ struct dar_config {
  * @is_acs_sap: Sets to true if this is an ACS SAP
  * @uhr_config: UHR capability configuration
  * @dar_info: DAR feature info, e.g. DAR feature bitmap
+ * @kck: PTK KCK used to compute the MME MIC for 802.1X-in-Auth association
+ * @kck_len: length in bytes of the stored KCK
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -1043,6 +1045,10 @@ struct mlme_legacy_priv {
 	struct wlan_mlme_uhr_caps uhr_config;
 #endif
 	struct dar_config dar_info;
+#ifdef WLAN_FEATURE_11BI_SECURITY
+	uint8_t kck[MAX_KCK_LEN];
+	uint16_t kck_len;
+#endif
 };
 
 /**

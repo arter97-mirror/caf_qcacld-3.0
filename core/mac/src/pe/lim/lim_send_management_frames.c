@@ -3505,6 +3505,15 @@ static void lim_update_assoc_req_mcs_nss(struct pe_session *pe_session,
 /* EID(1) + LEN(1) + EXT_EID(1) + nonce data */
 #define LIM_NONCE_IE_LEN (1 + 1 + 1 + SIR_FILS_NONCE_LENGTH)
 
+/*
+ * MME MIC length is half the HMAC output length per IEEE 802.11bi 12-10:
+ * 16 octets for SHA-256, 24 octets for SHA-384.
+ */
+#define LIM_MME_MIC_LEN_SHA256 16
+#define LIM_MME_MIC_LEN_SHA384 24
+/* EID(1) + LEN(1) + largest MIC(24) */
+#define LIM_MME_IE_MAX_LEN (2 + LIM_MME_MIC_LEN_SHA384)
+
 #ifdef WLAN_FEATURE_11BI_SECURITY
 /*
  * PMKSA Privacy (bit 29) lives in capability octet index 3;
@@ -3718,6 +3727,170 @@ lim_restore_he_bw(struct pe_session *session, const tDot11fIEhe_cap *saved)
 }
 #endif /* WLAN_FEATURE_11AX */
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/**
+ * lim_build_mme_ie() - Build Management MIC Element for 802.1X-in-Auth assoc
+ * @mac_ctx: MAC context
+ * @pe_session: PE session
+ * @rsnx_ie: RSNXE stripped from the assoc IEs, may be NULL
+ * @mme_ie: caller-allocated buffer of at least LIM_MME_IE_MAX_LEN bytes
+ *
+ * Retrieves the PTK KCK, computes HMAC over AA || SPA || RSNE [|| RSNXE],
+ * and fills @mme_ie with the Management MIC IE.  The KCK stack buffer is
+ * zeroed before return to limit key material lifetime.
+ *
+ * Return: number of bytes written into @mme_ie (0, or 2 + MIC length)
+ */
+static uint8_t lim_build_mme_ie(struct mac_context *mac_ctx,
+				struct pe_session *pe_session,
+				const uint8_t *rsnx_ie,
+				uint8_t *mme_ie)
+{
+	uint8_t kck[MAX_KCK_LEN] = {0};
+	uint16_t kck_len = 0;
+	/* Buffer must hold the largest digest the selected HMAC can emit */
+	uint8_t mic[SHA384_DIGEST_SIZE] = {0};
+	uint8_t ap_addr[QDF_MAC_ADDR_SIZE];
+	const uint8_t *addr[4];
+	uint32_t len[4];
+	uint8_t elem_cnt = 0;
+	const uint8_t *rsn_ie;
+	uint32_t rsn_ie_len;
+	const uint8_t *rsnxe_ie_ptr = NULL;
+	uint32_t rsnxe_ie_len = 0;
+	int32_t hmac_ret;
+	const uint8_t *hmac_type;
+	bool is_sha384;
+	uint8_t mme_mic_len;
+	uint8_t mme_ie_len;
+	bool is_mlo_eht;
+	QDF_STATUS status;
+	int32_t auth_mode;
+
+	auth_mode = wlan_crypto_get_param(pe_session->vdev,
+					  WLAN_CRYPTO_PARAM_AUTH_MODE);
+	if (auth_mode < 0 ||
+	    !QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH))
+		return 0;
+
+	status = wlan_mlme_get_kck(pe_session->vdev, kck, &kck_len,
+				   sizeof(kck));
+	if (QDF_IS_STATUS_ERROR(status) || !kck_len) {
+		pe_debug("KCK missing/invalid, skip MME IE, status %d len %d",
+			 status, kck_len);
+		goto out;
+	}
+
+	/*
+	 * connected_akm is enum ani_akm_type; select the HMAC digest via the
+	 * ani-domain helper. Do NOT pass it to lim_get_hmac_crypto_type(),
+	 * which switches on eCSR_AUTH_TYPE_* (a different enum domain).
+	 */
+	is_sha384 = lim_is_sha384_akm(pe_session->connected_akm);
+	hmac_type = is_sha384 ? HMAC_SHA386_CRYPTO_TYPE :
+				HMAC_SHA256_CRYPTO_TYPE;
+	/* MME MIC is half the HMAC output: 24 for SHA-384, 16 for SHA-256 */
+	mme_mic_len = is_sha384 ? LIM_MME_MIC_LEN_SHA384 :
+				  LIM_MME_MIC_LEN_SHA256;
+
+	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN,
+					  pe_session->lim_join_req->rsnIE.rsnIEdata,
+					  pe_session->lim_join_req->rsnIE.length);
+	if (!rsn_ie) {
+		pe_debug("RSNE missing in assoc req, skip MME IE");
+		goto out;
+	}
+	rsn_ie_len = rsn_ie[TAG_LEN_POS] + MIN_IE_LEN;
+
+	if (rsnx_ie) {
+		rsnxe_ie_ptr = rsnx_ie;
+		rsnxe_ie_len = rsnx_ie[TAG_LEN_POS] + MIN_IE_LEN;
+	}
+
+	/* Build input for HMAC: AA || SPA || RSNE [|| RSNXE] */
+	is_mlo_eht = mlo_is_mld_sta(pe_session->vdev) &&
+		     lim_is_session_eht_capable(pe_session);
+
+	if (is_mlo_eht) {
+		struct wlan_objmgr_peer *peer;
+
+		peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc,
+						   pe_session->bssId,
+						   WLAN_LEGACY_MAC_ID);
+		if (peer) {
+			/*
+			 * Copy the MLD address out while the ref is held;
+			 * wlan_peer_mlme_get_mldaddr() returns a pointer into
+			 * the peer object, which must not be dereferenced after
+			 * the ref is released.
+			 */
+			qdf_mem_copy(ap_addr, wlan_peer_mlme_get_mldaddr(peer),
+				     QDF_MAC_ADDR_SIZE);
+			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+			addr[elem_cnt] = ap_addr;
+		} else {
+			addr[elem_cnt] = pe_session->bssId;
+		}
+	} else {
+		addr[elem_cnt] = pe_session->bssId;
+	}
+
+	pe_debug("ap_mac: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(addr[elem_cnt]));
+	len[elem_cnt++] = QDF_MAC_ADDR_SIZE;
+
+	addr[elem_cnt] = is_mlo_eht ?
+			 wlan_vdev_mlme_get_mldaddr(pe_session->vdev) :
+			 pe_session->self_mac_addr;
+	pe_debug("Self_mac: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(addr[elem_cnt]));
+	len[elem_cnt++] = QDF_MAC_ADDR_SIZE;
+
+	addr[elem_cnt] = rsn_ie;
+	len[elem_cnt++] = rsn_ie_len;
+	if (rsnxe_ie_ptr) {
+		addr[elem_cnt] = (uint8_t *)rsnxe_ie_ptr;
+		len[elem_cnt++] = rsnxe_ie_len;
+	}
+
+	hmac_ret = qdf_get_hmac_hash(hmac_type, kck, kck_len,
+				     elem_cnt, (uint8_t **)addr, len,
+				     (int8_t *)mic);
+	if (hmac_ret < 0) {
+		pe_debug("Failed to compute MME MIC, ret %d", hmac_ret);
+		goto out;
+	}
+
+	/* Build MME IE using the 11bi MIC element id (WLAN_ELEMID_MIC) */
+	mme_ie[0] = WLAN_ELEMID_MIC;
+	mme_ie[1] = mme_mic_len;
+	/* KeyID and IPN/BIPN set to 0 for assoc req MME */
+	qdf_mem_copy(&mme_ie[2], mic, mme_mic_len);
+	mme_ie_len = 2 + mme_mic_len;
+	pe_debug("MME IE added, rsn_len %d rsnxe_len %d mic_len %d",
+		 rsn_ie_len, rsnxe_ie_len, mme_mic_len);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   mme_ie, mme_ie_len);
+
+	qdf_mem_zero(mic, sizeof(mic));
+	qdf_mem_zero(kck, sizeof(kck));
+	return mme_ie_len;
+
+out:
+	qdf_mem_zero(mic, sizeof(mic));
+	qdf_mem_zero(kck, sizeof(kck));
+	return 0;
+}
+#else
+static inline uint8_t lim_build_mme_ie(struct mac_context *mac_ctx,
+				       struct pe_session *pe_session,
+				       const uint8_t *rsnx_ie,
+				       uint8_t *mme_ie)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3767,6 +3940,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	int8_t peer_rssi = 0;
 	uint8_t nonce_ie[LIM_NONCE_IE_LEN];
 	uint8_t nonce_ie_len = 0;
+	uint8_t mme_ie[LIM_MME_IE_MAX_LEN];
+	uint8_t mme_ie_len = 0;
 	bool is_band_2g, is_ml_ap = false;
 	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0, rsn_sel_ie_len = 0;
 	uint8_t *fils_hlp_ie = NULL;
@@ -4454,6 +4629,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 */
 	nonce_ie_len = lim_build_nonce_ie(pe_session, nonce_ie);
 
+	/*
+	 * If IEEE 802.1X over 802.11 is used, append Management MIC element
+	 * (MME) at the end of association request.
+	 */
+	mme_ie_len = lim_build_mme_ie(mac_ctx, pe_session, rsnx_ie, mme_ie);
+
 	status = dot11f_get_packed_assoc_request_size(mac_ctx, frm, &payload);
 	if (DOT11F_FAILED(status)) {
 		pe_err("Association Request packet size failure(0x%08x)",
@@ -4469,7 +4650,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		mbo_ie_len + adaptive_11r_ie_len +
 		vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
 		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len +
-		nonce_ie_len + smd_ie_len;
+		nonce_ie_len + mme_ie_len + smd_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -4580,6 +4761,13 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 		     adaptive_11r_ie, adaptive_11r_ie_len);
 	payload = payload + adaptive_11r_ie_len;
+
+	/* Add MME IE if applicable */
+	if (mme_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     mme_ie, mme_ie_len);
+		payload = payload + mme_ie_len;
+	}
 
 	/* Avoid adding any IE after vendor specific IE's */
 

@@ -22,6 +22,7 @@
 
 #include "wlan_cm_vdev_api.h"
 #include "wlan_mlme_main.h"
+#include "wlan_mlme_api.h"
 #include "wlan_cm_api.h"
 #include "wlan_p2p_api.h"
 #include "wlan_tdls_api.h"
@@ -359,6 +360,9 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	}
 
 	wlan_vdev_mlme_init_bss_oper_res_params(vdev);
+
+	/* Zero the stored PTK KCK so it does not outlive the session */
+	wlan_mlme_clear_kck(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }

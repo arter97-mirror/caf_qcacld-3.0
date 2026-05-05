@@ -1850,6 +1850,8 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 	mlme_deinit_wait_for_key_timer(&vdev_mlme->ext_vdev_ptr->wait_key_timer);
 	mlme_free_fils_info(&vdev_mlme->ext_vdev_ptr->connect_info);
 	mlme_cm_free_roam_stats_info(vdev_mlme->ext_vdev_ptr);
+	/* Scrub KCK key material before the backing memory is freed */
+	wlan_mlme_clear_kck(vdev_mlme->vdev);
 	qdf_mem_common_free(vdev_mlme->ext_vdev_ptr);
 	vdev_mlme->ext_vdev_ptr = NULL;
 }

@@ -59,7 +59,7 @@ static void lim_fils_data_dump(char *type, uint8_t *data, uint32_t len)
  *
  * Return: hash length
  */
-static int lim_get_crypto_digest_len(uint8_t *type)
+static int lim_get_crypto_digest_len(const uint8_t *type)
 {
 	if (!strcmp(type, HMAC_SHA386_CRYPTO_TYPE))
 		return SHA384_DIGEST_SIZE;
@@ -110,30 +110,6 @@ static uint8_t *lim_get_hash_crypto_type(uint8_t akm)
 	}
 }
 
-/**
- * lim_get_hmac_crypto_type()- This API returns crypto type based on akm suite
- * used.
- * @akm: akm used for authentication
- *
- * This API is used to get the crypto type when HMAC-hash() needs to
- * be generated.
- * Eg: PMK = HMAC-Hash(SNonce || ANonce, rMSK [ || DHss ])
- *     Here HMAC-Hash will be either hmac(sha256) or hmac(sha384)
- *
- * Return: Crypto type
- */
-static uint8_t *lim_get_hmac_crypto_type(uint8_t akm)
-{
-	switch (akm) {
-	case eCSR_AUTH_TYPE_FILS_SHA384:
-	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
-		return HMAC_SHA386_CRYPTO_TYPE;
-	case eCSR_AUTH_TYPE_FILS_SHA256:
-	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
-	default:
-		return HMAC_SHA256_CRYPTO_TYPE;
-	}
-}
 
 /**
  * lim_get_Q_length()- This API returns pmk length based on akm used
@@ -274,9 +250,11 @@ static int lim_get_ick_len(uint8_t akm)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS lim_get_key_from_prf(uint8_t *type, uint8_t *secret,
-		uint32_t secret_len, uint8_t *label, uint8_t *optional_data,
-		uint32_t optional_data_len, uint8_t *key, uint32_t keylen)
+static QDF_STATUS lim_get_key_from_prf(const uint8_t *type, uint8_t *secret,
+				       uint32_t secret_len, uint8_t *label,
+				       uint8_t *optional_data,
+				       uint32_t optional_data_len, uint8_t *key,
+				       uint32_t keylen)
 {
 	uint8_t count[2];
 	uint8_t *addr[4];

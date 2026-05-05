@@ -532,6 +532,67 @@ wlan_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
 			enum host_concurrent_ap_policy ap_cfg_policy);
 
 /**
+ * wlan_mlme_set_kck() - Store KCK in mlme_legacy_priv
+ * @vdev: pointer to vdev
+ * @kck: KCK buffer
+ * @kck_len: KCK length
+ *
+ * Return: QDF_STATUS
+ */
+#ifdef WLAN_FEATURE_11BI_SECURITY
+QDF_STATUS wlan_mlme_set_kck(struct wlan_objmgr_vdev *vdev,
+			     const uint8_t *kck, uint16_t kck_len);
+
+/**
+ * wlan_mlme_get_kck() - Retrieve KCK from mlme_legacy_priv
+ * @vdev: pointer to vdev
+ * @kck_buf: Buffer to store KCK
+ * @kck_len: Pointer to update with actual KCK length
+ * @max_len: Max length of provided buffer
+ *
+ * The caller must zero @kck_buf (e.g. via qdf_mem_zero()) as soon as it
+ * is done using the KCK, to limit how long the key material persists in
+ * caller-owned memory.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_get_kck(struct wlan_objmgr_vdev *vdev,
+			     uint8_t *kck_buf, uint16_t *kck_len,
+			     uint16_t max_len);
+
+/**
+ * wlan_mlme_clear_kck() - Zero and clear the stored KCK
+ * @vdev: pointer to vdev
+ *
+ * Must be called on disconnect / key delete to ensure KCK does not
+ * persist in memory after the session ends.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_clear_kck(struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS
+wlan_mlme_set_kck(struct wlan_objmgr_vdev *vdev,
+		  const uint8_t *kck, uint16_t kck_len)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_mlme_get_kck(struct wlan_objmgr_vdev *vdev,
+		  uint8_t *kck_buf, uint16_t *kck_len, uint16_t max_len)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_mlme_clear_kck(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
+/**
  * wlan_mlme_get_ap_policy() - Get ap config policy value
  * @vdev: pointer to vdev object
  *

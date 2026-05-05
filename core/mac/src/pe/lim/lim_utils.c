@@ -14572,6 +14572,35 @@ bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr)
 	return false;
 }
 
+const uint8_t *lim_get_hmac_crypto_type(uint8_t akm)
+{
+	switch (akm) {
+	/* 802.1X and PSK use HMAC-SHA1-128 */
+	case eCSR_AUTH_TYPE_RSN:
+	case eCSR_AUTH_TYPE_RSN_PSK:
+		return "hmac(sha1)";
+	case eCSR_AUTH_TYPE_FT_RSN:
+	case eCSR_AUTH_TYPE_FT_RSN_PSK:
+	case eCSR_AUTH_TYPE_RSN_8021X_SHA256:
+	case eCSR_AUTH_TYPE_RSN_PSK_SHA256:
+	case eCSR_AUTH_TYPE_SAE:
+	case eCSR_AUTH_TYPE_FT_SAE:
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA256:
+	case eCSR_AUTH_TYPE_FILS_SHA256:
+	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
+		return HMAC_SHA256_CRYPTO_TYPE;
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA384:
+	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
+	case eCSR_AUTH_TYPE_FILS_SHA384:
+	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
+	case eCSR_AUTH_TYPE_SAE_EXT_KEY:
+	case eCSR_AUTH_TYPE_FT_SAE_EXT_KEY:
+		return HMAC_SHA386_CRYPTO_TYPE;
+	default:
+		return HMAC_SHA256_CRYPTO_TYPE;
+	}
+}
+
 #ifdef WLAN_FEATURE_11BN_TEST_SAP
 QDF_STATUS lim_fill_complete_uhr_op_ie(struct pe_session *session,
 				       uint16_t total_len, uint8_t *target)

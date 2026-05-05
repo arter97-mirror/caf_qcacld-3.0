@@ -495,6 +495,106 @@ wlan_mlme_get_ap_policy(struct wlan_objmgr_vdev *vdev)
 	return mlme_priv->mlme_ap.ap_policy;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+QDF_STATUS wlan_mlme_set_kck(struct wlan_objmgr_vdev *vdev,
+			     const uint8_t *kck, uint16_t kck_len)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev || !kck) {
+		mlme_legacy_err("Invalid input: vdev or kck is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!kck_len || kck_len > sizeof(mlme_priv->kck)) {
+		mlme_legacy_err("Invalid kck_len %d", kck_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev_mlme is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = (struct mlme_legacy_priv *)vdev_mlme->ext_vdev_ptr;
+	if (!mlme_priv) {
+		mlme_legacy_err("mlme_priv is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(mlme_priv->kck, sizeof(mlme_priv->kck));
+	qdf_mem_copy(mlme_priv->kck, kck, kck_len);
+	mlme_priv->kck_len = kck_len;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_get_kck(struct wlan_objmgr_vdev *vdev,
+			     uint8_t *kck_buf, uint16_t *kck_len,
+			     uint16_t max_len)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev || !kck_buf || !kck_len) {
+		mlme_legacy_err("Invalid input");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev_mlme is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = (struct mlme_legacy_priv *)vdev_mlme->ext_vdev_ptr;
+	if (!mlme_priv) {
+		mlme_legacy_err("mlme_priv is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (mlme_priv->kck_len == 0) {
+		mlme_legacy_err("KCK not present");
+		return QDF_STATUS_E_EMPTY;
+	}
+
+	if (max_len < mlme_priv->kck_len) {
+		mlme_legacy_err("Buffer too small %d < %d", max_len,
+				mlme_priv->kck_len);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(kck_buf, mlme_priv->kck, mlme_priv->kck_len);
+	*kck_len = mlme_priv->kck_len;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_clear_kck(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_priv = (struct mlme_legacy_priv *)vdev_mlme->ext_vdev_ptr;
+	if (!mlme_priv)
+		return QDF_STATUS_E_INVAL;
+
+	qdf_mem_zero(mlme_priv->kck, sizeof(mlme_priv->kck));
+	mlme_priv->kck_len = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 QDF_STATUS wlan_mlme_get_prevent_link_down(struct wlan_objmgr_psoc *psoc,
 					   bool *prevent_link_down)
 {
