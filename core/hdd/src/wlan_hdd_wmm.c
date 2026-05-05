@@ -2757,8 +2757,22 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *adapter,
 	enum sme_qos_statustype sme_status;
 #endif
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_debug("Entered with handle 0x%x", handle);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_FWOL_NB_ID);
+	if (!vdev)
+		return HDD_WLAN_WMM_STATUS_INTERNAL_FAILURE;
+
+	if (ucfg_cm_is_vdev_roaming(vdev)) {
+		hdd_debug("Failed to setup ADDTS, as roaming in progress on vdev %d",
+			  wlan_vdev_get_id(vdev));
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_FWOL_NB_ID);
+		return HDD_WLAN_WMM_STATUS_INTERNAL_FAILURE;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_FWOL_NB_ID);
 
 	/* see if a context already exists with the given handle */
 	mutex_lock(&adapter->hdd_wmm_status.mutex);
