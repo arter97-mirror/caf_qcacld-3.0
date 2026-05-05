@@ -2263,6 +2263,25 @@ end:
 	return mlo_link_agnostic;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool wma_is_11bi_pmf_subtype(uint8_t subtype, uint8_t tx_flag)
+{
+	/*
+	 * ASSOC_REQ uses PMF only when HAL_USE_PMF is explicitly set (fc.wep
+	 * set by lim_set_protected_bit for 11bi). Guard against entering the
+	 * CCMP TX path for ASSOC_REQ on ordinary WPA3/PMF connections where
+	 * rmfEnabled is set but the frame is plaintext.
+	 */
+	return subtype == SIR_MAC_MGMT_ASSOC_REQ &&
+	       (tx_flag & HAL_USE_PMF);
+}
+#else
+static inline bool wma_is_11bi_pmf_subtype(uint8_t subtype, uint8_t tx_flag)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 eFrameType frmType, eFrameTxDir txDir, uint8_t tid,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
@@ -2343,7 +2362,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	if (((iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
 	    (frmType == TXRX_FRM_802_11_MGMT) &&
-	    (pFc->subType == SIR_MAC_MGMT_DISASSOC ||
+	    (wma_is_11bi_pmf_subtype(pFc->subType, tx_flag) ||
+	     pFc->subType == SIR_MAC_MGMT_DISASSOC ||
 	     pFc->subType == SIR_MAC_MGMT_DEAUTH ||
 	     pFc->subType == SIR_MAC_MGMT_ACTION)) {
 		struct ieee80211_frame *wh =

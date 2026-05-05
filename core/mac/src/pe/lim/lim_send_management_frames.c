@@ -4681,6 +4681,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	lim_populate_mac_header(mac_ctx, frame, WLAN_FC0_TYPE_MGMT,
 				SIR_MAC_MGMT_ASSOC_REQ, pe_session->bssId,
 				pe_session->self_mac_addr);
+	lim_set_protected_bit(mac_ctx, pe_session, pe_session->bssId,
+			      (tpSirMacMgmtHdr)frame);
+
 	/* That done, pack the Assoc Request: */
 	status = dot11f_pack_assoc_request(mac_ctx, frm,
 			frame + sizeof(tSirMacMgmtHdr), payload, &payload);
@@ -4804,6 +4807,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		pe_session->assocReqLen = payload;
 	}
 
+	mac_hdr = (tpSirMacMgmtHdr) frame;
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
 	    pe_session->opmode == QDF_P2P_GO_MODE)
@@ -4813,7 +4817,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	    pe_session->opmode == QDF_STA_MODE)
 		tx_flag |= HAL_USE_PEER_STA_REQUESTED_MASK;
 
-	mac_hdr = (tpSirMacMgmtHdr) frame;
+	if (mac_hdr->fc.wep)
+		tx_flag |= HAL_USE_PMF;
+
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
@@ -10141,7 +10147,8 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 	if (fc->subType == SIR_MAC_MGMT_AUTH) {
 		auth_algo = *(uint16_t *)(mb_msg->data +
 					sizeof(tSirMacMgmtHdr));
-		if (auth_algo == eSIR_AUTH_TYPE_SAE)
+		if (auth_algo == eSIR_AUTH_TYPE_SAE ||
+		    lim_is_ack_for_11bi_auth(auth_algo))
 			lim_handle_sae_auth_retry(mac_ctx, vdev_id,
 						  mb_msg->data, msg_len,
 						  mb_msg->cookie);

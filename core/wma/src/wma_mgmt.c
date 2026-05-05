@@ -4319,6 +4319,46 @@ wma_get_peer_pmf_status(tp_wma_handle wma, uint8_t *peer_mac)
 	return is_pmf_enabled;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool wma_is_11bi_assoc_resp(struct wma_txrx_node *iface,
+				   uint8_t mgt_type, uint8_t mgt_subtype)
+{
+	if (mgt_type != IEEE80211_FC0_TYPE_MGT ||
+	    mgt_subtype != MGMT_SUBTYPE_ASSOC_RESP)
+		return false;
+
+	if (!iface->vdev)
+		return false;
+
+	return wlan_crypto_vdev_has_auth_mode(iface->vdev,
+					      BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+	       wlan_crypto_vdev_has_auth_mode(iface->vdev,
+					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+
+static bool wma_is_11bi_rx_subtype(uint8_t mgt_subtype)
+{
+	/*
+	 * Coarse pre-filter: routes ASSOC_RESP into
+	 * wma_check_and_process_rmf_frame  which performs the fine-grained
+	 * per-vdev auth-mode check via wma_is_11bi_assoc_resp before any CCMP
+	 * processing.
+	 */
+	return mgt_subtype == MGMT_SUBTYPE_ASSOC_RESP;
+}
+#else
+static inline bool wma_is_11bi_assoc_resp(struct wma_txrx_node *iface,
+					  uint8_t mgt_type, uint8_t mgt_subtype)
+{
+	return false;
+}
+
+static inline bool wma_is_11bi_rx_subtype(uint8_t mgt_subtype)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /**
  * wma_check_and_process_rmf_frame() - Process the frame if it is of rmf type
  * @wma_handle: wma handle
@@ -4342,6 +4382,7 @@ wma_check_and_process_rmf_frame(tp_wma_handle wma_handle,
 	int status;
 	struct wma_txrx_node *iface;
 	struct ieee80211_frame *hdr = *wh;
+	uint8_t mgt_type, mgt_subtype;
 
 	iface = &(wma_handle->interfaces[vdev_id]);
 	if ((iface->type != WMI_VDEV_TYPE_NDI &&
@@ -4363,9 +4404,13 @@ wma_check_and_process_rmf_frame(tp_wma_handle wma_handle,
 		return 0;
 	}
 
+	mgt_type = hdr->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	mgt_subtype = hdr->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
 	if (qdf_is_macaddr_group((struct qdf_mac_addr *)(hdr->i_addr1)) ||
 	    qdf_is_macaddr_broadcast((struct qdf_mac_addr *)(hdr->i_addr1)) ||
 	    wma_get_peer_pmf_status(wma_handle, hdr->i_addr2) ||
+	    wma_is_11bi_assoc_resp(iface, mgt_type, mgt_subtype) ||
 	    ((iface->type == WMI_VDEV_TYPE_NDI ||
 	      iface->type == WMI_VDEV_TYPE_NAN) &&
 	     (hdr->i_fc[1] & IEEE80211_FC1_WEP))) {
@@ -4551,7 +4596,8 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 	mgt_subtype = (wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 
 	if (mgt_type == IEEE80211_FC0_TYPE_MGT &&
-	    (mgt_subtype == MGMT_SUBTYPE_DISASSOC ||
+	    (wma_is_11bi_rx_subtype(mgt_subtype) ||
+	     mgt_subtype == MGMT_SUBTYPE_DISASSOC ||
 	     mgt_subtype == MGMT_SUBTYPE_DEAUTH ||
 	     mgt_subtype == MGMT_SUBTYPE_ACTION)) {
 		if (wma_find_vdev_id_by_bssid(wma_handle, wh->i_addr3,

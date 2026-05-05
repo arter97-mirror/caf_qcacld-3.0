@@ -1809,6 +1809,24 @@ hdd_cm_is_seamless_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool hdd_cm_is_11bi_connection(struct hdd_station_ctx *sta_ctx,
+				      struct wlan_objmgr_vdev *vdev)
+{
+	return sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_EPPKE ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+#else
+static inline bool hdd_cm_is_11bi_connection(struct hdd_station_ctx *sta_ctx,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -1959,6 +1977,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	    (sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_NONE ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OPEN_SYSTEM ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SHARED_KEY ||
+	     hdd_cm_is_11bi_connection(sta_ctx, vdev) ||
 	     hdd_cm_is_fils_connection(rsp))))
 		is_auth_required = false;
 
