@@ -757,6 +757,10 @@ ifeq ($(CONFIG_CNSS_UTILS), m)
 CONFIG_CNSS_UTILS_MODULE := y
 endif
 
+ifeq ($(CONFIG_WCNSS_MEM_PRE_ALLOC), m)
+CONFIG_WCNSS_MEM_PRE_ALLOC_MODULE := y
+endif
+
 #Enable thermal throttle
 CONFIG_FW_THERMAL_THROTTLE := y
 
