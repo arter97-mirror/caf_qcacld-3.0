@@ -453,6 +453,25 @@ policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id);
 
 /**
+ * policy_mgr_is_bonded_chan_dfs() - check whether the given bonded
+ * channel configuration falls under DFS
+ * @psoc: pointer to psoc
+ * @ch_width: channel width of the operating channel
+ * @mhz_freq_seg1: center frequency of segment 1; used for 80+80 MHz
+ * @chan_freq: primary/operating channel frequency in MHz
+ *
+ * This API checks whether the given channel or bonded channel span
+ * includes DFS, based on the channel width and frequency segments.
+ *
+ * Return: true if the given bonded channel is DFS, else false.
+ */
+bool
+policy_mgr_is_bonded_chan_dfs(struct wlan_objmgr_psoc *psoc,
+			      enum phy_ch_width ch_width,
+			      qdf_freq_t mhz_freq_seg1,
+			      uint32_t chan_freq);
+
+/**
  * policy_mgr_update_dfs_master_dynamic_enabled() - update dfs master support
  * or not on AP interface when STA+SAP(GO) concurrency
  * @psoc: pointer to psoc
