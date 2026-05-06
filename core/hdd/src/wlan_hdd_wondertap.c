@@ -225,6 +225,21 @@ __wlan_hdd_wondertap_set_fixed_tx_rate(struct hdd_adapter *adapter,
 	return ret;
 }
 
+static void
+__wlan_hdd_wondertap_set_tx_rate_mask(struct hdd_adapter *adapter,
+				      const qdf_wondertap_tx_rate_mask_params_t *params)
+{
+	WMI_RATE_PREAMBLE preamble;
+
+	preamble =
+		wlan_hdd_convert_wonder_preamble_to_wmi(params->max_preamble);
+
+	g_wt_ctx->tx_rate_cfg.nss = params->max_nss;
+	g_wt_ctx->tx_rate_cfg.mcs = params->max_mcs;
+	g_wt_ctx->tx_rate_cfg.ch_width =
+	__wlan_hdd_convert_wt_bandwidth_to_phy_ch_width(params->max_bw);
+}
+
 static
 void __wlan_hdd_destroy_wondertap_intf(struct hdd_context *hdd_ctx,
 				       struct hdd_adapter *adapter)
@@ -549,9 +564,16 @@ skip_mlo_check:
 		goto delete_pe_session;
 	}
 
-	ret = __wlan_hdd_wondertap_set_fixed_tx_rate(adapter, &params->tx_rate);
-	if (ret)
-		goto delete_pe_session;
+	if (!params->rate_adaptation_enable) {
+		ret = __wlan_hdd_wondertap_set_fixed_tx_rate(adapter,
+							     &params->tx_rate);
+		if (ret)
+			goto delete_pe_session;
+	} else {
+		g_wt_ctx->is_peer_create_enabled = true;
+		__wlan_hdd_wondertap_set_tx_rate_mask(adapter,
+						      &params->tx_rate_mask);
+	}
 
 	sme_set_vdev_sw_retry(adapter->deflink->vdev_id,
 			      params->data_retry_limit,
@@ -1177,8 +1199,9 @@ wlan_hdd_wondertap_set_fixed_tx_rate(void *handle,
 		 params->preamble, params->bw, params->gi,
 		 params->nss, params->mcs);
 
-	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
-		hdd_debug("Incorrect handle received - rejecting set_fixed_tx_rate");
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic ||
+	    g_wt_ctx->is_peer_create_enabled) {
+		hdd_debug("rejecting set_fixed_tx_rate");
 		return -EINVAL;
 	}
 
@@ -1222,7 +1245,42 @@ static int
 wlan_hdd_wondertap_set_tx_rate_mask(void *handle,
 			const qdf_wondertap_tx_rate_mask_params_t *params)
 {
-	return -EPERM;
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	hdd_info("set tx rate mask max params - preamble:%d bw:%d nss:%d  mcs:%d",
+		 params->max_preamble, params->max_bw, params->max_nss,
+		 params->max_mcs);
+
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
+		hdd_debug("Incorrect handle received - rejecting set_tx_rate_mask");
+		return -EINVAL;
+	}
+
+	if (params->max_bw > WONDERTAP_RATE_BW_320 ||
+	    params->max_preamble > WONDERTAP_RATE_PREAMBLE_EHT ||
+	    !params->max_nss)
+		return -EINVAL;
+
+	hdd_ctx = g_wt_ctx->hdd_ctx;
+	wt_adapter = g_wt_ctx->wt_adapter;
+
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		goto stop_op;
+
+	__wlan_hdd_wondertap_set_tx_rate_mask(wt_adapter, params);
+
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 
 /**
@@ -1263,6 +1321,11 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	hdd_debug("passthru cap bitmap 0x%llx", hdd_ctx->passthru_cap_bitmap);
 	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT)
 		features->bits.channel_hopping = 1;
+
+	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_AMPDU_RA_CAP_BIT) {
+		features->bits.rate_adaptation = 1;
+		features->bits.ampdu_aggregation = 1;
+	}
 
 	return ret;
 }
