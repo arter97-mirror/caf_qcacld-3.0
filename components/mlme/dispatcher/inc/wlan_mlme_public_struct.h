@@ -1145,7 +1145,7 @@ struct wlan_mlme_eht_caps {
 #endif
 
 #ifdef WLAN_FEATURE_11BN
-#define WLAN_UHR_CAP_IE_MAX_LEN 16
+#define WLAN_UHR_CAP_IE_MAX_LEN 21
 
 /**
  * struct wlan_mlme_uhr_caps - UHR (Ultra High Reliability) capability info
@@ -1153,7 +1153,7 @@ struct wlan_mlme_eht_caps {
  * @dps_present: Dynamic Power Save support
  * @dps_assist_support: Dynamic Power Save assist support
  * @ap_static_hcm_support: AP static HCM (Host Connection Manager) support
- * @ml_power_mgmt: Multi-link power management
+ * @reserved_mac_b3: Reserved MAC caps (B3)
  * @npca_support: NPCA (Network-based Power Control Algorithm) support
  * @bsr_support: BSR (Buffer Status Report) support
  * @addn_mapped_tid_support: Additional mapped TID support
@@ -1175,16 +1175,11 @@ struct wlan_mlme_eht_caps {
  * @uhr_op_mode_param_update_timeout: UHR operating mode parameter
  *                                    update timeout
  * @param_update_adv_notify: Parameter update advance notification
- * @unused: Unused bits
  * @update_ind_in_tim: Update indication in TIM (Traffic Indication Map)
  * @bounded_ess: Bounded ESS (Extended Service Set)
  * @btm_assurance: BTM (BSS Transition Management) assurance
  * @cobf_support: COBF (Coordinated beamforming) support
- * @reserved: Reserved bits
- * @dbe_param: DBE parameters array
- * @num_data: Length of data
- * @data: UHR capability IE data. Element ID + length + extension element ID +
- *        UHR capability information
+ * @reserved_mac_b37_b47: Reserved MAC caps bits (B37-B47)
  * @max_nss_rx_ndp_sounding_80mhz: Maximum NSS for RX NDP sounding in 80MHz
  * @max_nss_rx_dl_mumimo_80mhz: Maximum NSS for RX downlink MU-MIMO in 80MHz
  * @max_nss_rx_ndp_sounding_160mhz: Maximum NSS for RX NDP sounding in 160MHz
@@ -1193,16 +1188,42 @@ struct wlan_mlme_eht_caps {
  * @max_nss_rx_ndp_sounding_320mhz: Maximum NSS for RX NDP sounding in 320MHz
  * @max_nss_total_rx_dl_mumimo_320mhz: Maximum total NSS for RX downlink
  *                                     MU-MIMO in 320MHz
- * @elr_rx_support: Extended Long Range RX support
- * @elr_tx_support: Extended Long Range TX support
- * @reserved2: Reserved bits
+ * @elr_tx_support: Extended Long Range TX support (B6)
+ * @elr_rx_support: Extended Long Range RX support (B7)
+ * @partial_bw_dl_mumimo_support: Partial BW DL MU-MIMO support (B8)
+ * @partial_bw_ul_mumimo_support: Partial BW UL MU-MIMO support (B9)
+ * @mcs15_support: MCS 15 support (B10)
+ * @two_x_ldpc_tx_support: 2xLDPC Tx support (B11)
+ * @two_x_ldpc_rx_support: 2xLDPC Rx support (B12)
+ * @ueqm_tx_support_max_nss_tx: UEQM Tx support and max Nss Tx (B13-B14)
+ * @ueqm_rx_support_max_nss_rx: UEQM Rx support and max Nss Rx (B15-B16)
+ * @reserved_phy_b17: Reserved (B17)
+ * @cobf_joint_sounding_support: Co-BF joint sounding support (B18)
+ * @im_tx_support: Interference Mitigation Tx support (B19)
+ * @im_rx_support: Interference Mitigation Rx support (B20)
+ * @co_sr_mode1_support: Co-SR Mode 1 support (B21)
+ * @co_sr_mode2_support: Co-SR Mode 2 support (B22)
+ * @dru_dbw20_pbw20_support: DRU DBW=20 in PBW=20 MHz support (B23)
+ * @dru_dbw40_pbw40_support: DRU DBW=40 in PBW=40 MHz support (B24)
+ * @dru_dbw80_pbw80_support: DRU DBW=80 in PBW=80 MHz support (B25)
+ * @dru_dbw80_pbw160_support: DRU DBW=80 in PBW=160 MHz support (B26)
+ * @dru_dbw80_pbw320_support: DRU DBW=80 in PBW=320 MHz support (B27)
+ * @dru_dbw20_pbw_ge80_support: DRU DBW=20 in PBW>=80 MHz support (B28)
+ * @dru_dbw40_pbw_ge80_support: DRU DBW=40 in PBW>=80 MHz support (B29)
+ * @dru_dbw60_pbw_ge80_support: DRU DBW=60 in PBW>=80 MHz support (B30)
+ * @dru_rru_hybrid_support: DRU+RRU hybrid mode support (B31)
+ * @reserved_phy_b32_b39: Reserved PHY bits (B32-B39)
+ * @dbe_param: DBE Capability Parameters (0, 1, 4, or 7 bytes)
+ * @num_data: Length of data
+ * @data: UHR capability IE data. Element ID + length + extension element ID +
+ *        UHR capability information
  */
 struct wlan_mlme_uhr_caps {
 	bool                   present;
 	uint16_t          dps_present:1;
 	uint16_t   dps_assist_support:1;
 	uint16_t ap_static_hcm_support:1;
-	uint16_t        ml_power_mgmt:1;
+	uint16_t      reserved_mac_b3:1;
 	uint16_t         npca_support:1;
 	uint16_t          bsr_support:1;
 	uint16_t addn_mapped_tid_support:1;
@@ -1223,26 +1244,46 @@ struct wlan_mlme_uhr_caps {
 	uint16_t txop_return_support_intxspg:1;
 	uint16_t uhr_op_mode_param_update_timeout:4;
 	uint16_t param_update_adv_notify:3;
-	uint16_t               unused:3;
-
 	uint16_t    update_ind_in_tim:5;
 	uint16_t          bounded_ess:1;
 	uint16_t        btm_assurance:1;
 	uint16_t         cobf_support:1;
-	uint8_t  dbe_param[8];
-
+	uint16_t reserved_mac_b37_b47:11;
 	uint16_t max_nss_rx_ndp_sounding_80mhz:1;
 	uint16_t max_nss_rx_dl_mumimo_80mhz:1;
 	uint16_t max_nss_rx_ndp_sounding_160mhz:1;
 	uint16_t max_nss_total_rx_dl_mumimo_160mhz:1;
 	uint16_t max_nss_rx_ndp_sounding_320mhz:1;
 	uint16_t max_nss_total_rx_dl_mumimo_320mhz:1;
-	uint16_t       elr_rx_support:1;
 	uint16_t       elr_tx_support:1;
-	uint16_t             reserved2:8;
+	uint16_t       elr_rx_support:1;
+	uint8_t  partial_bw_dl_mumimo_support:1;
+	uint8_t  partial_bw_ul_mumimo_support:1;
+	uint8_t  mcs15_support:1;
+	uint8_t  two_x_ldpc_tx_support:1;
+	uint8_t  two_x_ldpc_rx_support:1;
+	uint8_t  ueqm_tx_support_max_nss_tx:2;
+	uint8_t  ueqm_rx_support_max_nss_rx:2;
+	uint8_t  reserved_phy_b17:1;
+	uint8_t  cobf_joint_sounding_support:1;
+	uint8_t  im_tx_support:1;
+	uint8_t  im_rx_support:1;
+	uint8_t  co_sr_mode1_support:1;
+	uint8_t  co_sr_mode2_support:1;
+	uint8_t  dru_dbw20_pbw20_support:1;
+	uint8_t  dru_dbw40_pbw40_support:1;
+	uint8_t  dru_dbw80_pbw80_support:1;
+	uint8_t  dru_dbw80_pbw160_support:1;
+	uint8_t  dru_dbw80_pbw320_support:1;
+	uint8_t  dru_dbw20_pbw_ge80_support:1;
+	uint8_t  dru_dbw40_pbw_ge80_support:1;
+	uint8_t  dru_dbw60_pbw_ge80_support:1;
+	uint8_t  dru_rru_hybrid_support:1;
+	uint8_t  reserved_phy_b32_b39:8;
+	uint8_t  dbe_param[7];
 	uint16_t num_data;
 	uint8_t data[WLAN_UHR_CAP_IE_MAX_LEN];
-};
+} qdf_packed;
 #endif
 
 /**

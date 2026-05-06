@@ -6273,15 +6273,16 @@ populate_dot11f_uhr_caps_by_band(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
-		      uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
+uint8_t lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
+			 uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
 {
 	struct wlan_uhr_cap_info dot11_cap;
 	bool is_band_2g = false;
 	struct wlan_objmgr_vdev *vdev;
 	const uint8_t *ie = NULL;
 	uint8_t *p;
-	uint16_t w0 = 0, w1 = 0;
+	uint16_t w0 = 0, w1 = 0, w2 = 0;
+	uint64_t phy = 0;
 
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
@@ -6290,7 +6291,7 @@ void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 						    WLAN_MLME_SB_ID);
 	if (!vdev) {
 		pe_debug("Failed to get VDEV %d", vdev_id);
-		return;
+		return 0;
 	}
 
 	populate_dot11f_uhr_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
@@ -6299,15 +6300,18 @@ void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 	ie = wlan_get_ext_ie_ptr_from_ext_id(UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE,
 					     ie_start, num_bytes);
 	if (!ie)
-		return;
+		return 0;
 
 	p = (uint8_t *)&ie[2 + UHR_CAP_OUI_SIZE];
+
+	if ((ie_start + num_bytes) - p <
+	    WLAN_UHR_CAP_MAC_FIXED_FIELD_LEN + WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN)
+		return 0;
 
 	/* Word 0: dps_present..duo_support */
 	w0 |= (uint16_t)(dot11_cap.dps_present & 0x1) << 0;
 	w0 |= (uint16_t)(dot11_cap.dps_assist_support & 0x1) << 1;
 	w0 |= (uint16_t)(dot11_cap.ap_static_hcm_support & 0x1) << 2;
-	w0 |= (uint16_t)(dot11_cap.ml_power_mgmt & 0x1) << 3;
 	w0 |= (uint16_t)(dot11_cap.npca_support & 0x1) << 4;
 	w0 |= (uint16_t)(dot11_cap.bsr_support & 0x1) << 5;
 	w0 |= (uint16_t)(dot11_cap.addn_mapped_tid_support & 0x1) << 6;
@@ -6332,37 +6336,105 @@ void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 	w1 |= (uint16_t)(dot11_cap.txop_return_support_intxspg & 0x1) << 5;
 	w1 |= (uint16_t)(dot11_cap.uhr_op_mode_param_update_timeout & 0x0F) << 6;
 	w1 |= (uint16_t)(dot11_cap.param_update_adv_notify & 0x07) << 10;
+	/* update_ind_in_tim B29-B31 (low 3 bits) at w1[13:15] */
+	w1 |= (uint16_t)(dot11_cap.update_ind_in_tim & 0x07) << 13;
 	*p++ = w1 & 0xff;
 	*p++ = (w1 >> 8) & 0xff;
+
+	/* Word 2: B32-B47
+	 * update_ind_in_tim B32-B33 (high 2 bits) at w2[1:0]
+	 * bounded_ess B34 at w2[2], btm_assurance B35 at w2[3]
+	 * cobf_support B36 at w2[4], B37-B47 reserved = 0
+	 */
+	w2 |= (uint16_t)((dot11_cap.update_ind_in_tim >> 3) & 0x03) << 0;
+	w2 |= (uint16_t)(dot11_cap.bounded_ess & 0x1) << 2;
+	w2 |= (uint16_t)(dot11_cap.btm_assurance & 0x1) << 3;
+	w2 |= (uint16_t)(dot11_cap.cobf_support & 0x1) << 4;
+	*p++ = w2 & 0xff;
+	*p++ = (w2 >> 8) & 0xff;
+
+	/* PHY Capabilities Information (5 octets, B0-B39) */
+	phy |= (uint64_t)(dot11_cap.max_nss_rx_ndp_sounding_80mhz & 0x1) << 0;
+	phy |= (uint64_t)(dot11_cap.max_nss_rx_dl_mumimo_80mhz & 0x1) << 1;
+	phy |= (uint64_t)(dot11_cap.max_nss_rx_ndp_sounding_160mhz & 0x1) << 2;
+	phy |= (uint64_t)(dot11_cap.max_nss_total_rx_dl_mumimo_160mhz & 0x1) << 3;
+	phy |= (uint64_t)(dot11_cap.max_nss_rx_ndp_sounding_320mhz & 0x1) << 4;
+	phy |= (uint64_t)(dot11_cap.max_nss_total_rx_dl_mumimo_320mhz & 0x1) << 5;
+	phy |= (uint64_t)(dot11_cap.elr_tx_support & 0x1) << 6;
+	phy |= (uint64_t)(dot11_cap.elr_rx_support & 0x1) << 7;
+	phy |= (uint64_t)(dot11_cap.partial_bw_dl_mumimo_support & 0x1) << 8;
+	phy |= (uint64_t)(dot11_cap.partial_bw_ul_mumimo_support & 0x1) << 9;
+	phy |= (uint64_t)(dot11_cap.mcs15_support & 0x1) << 10;
+	phy |= (uint64_t)(dot11_cap.two_x_ldpc_tx_support & 0x1) << 11;
+	phy |= (uint64_t)(dot11_cap.two_x_ldpc_rx_support & 0x1) << 12;
+	phy |= (uint64_t)(dot11_cap.ueqm_tx_support_max_nss_tx & 0x3) << 13;
+	phy |= (uint64_t)(dot11_cap.ueqm_rx_support_max_nss_rx & 0x3) << 15;
+	/* B17 reserved = 0 */
+	phy |= (uint64_t)(dot11_cap.cobf_joint_sounding_support & 0x1) << 18;
+	phy |= (uint64_t)(dot11_cap.im_tx_support & 0x1) << 19;
+	phy |= (uint64_t)(dot11_cap.im_rx_support & 0x1) << 20;
+	phy |= (uint64_t)(dot11_cap.co_sr_mode1_support & 0x1) << 21;
+	phy |= (uint64_t)(dot11_cap.co_sr_mode2_support & 0x1) << 22;
+	phy |= (uint64_t)(dot11_cap.dru_dbw20_pbw20_support & 0x1) << 23;
+	phy |= (uint64_t)(dot11_cap.dru_dbw40_pbw40_support & 0x1) << 24;
+	phy |= (uint64_t)(dot11_cap.dru_dbw80_pbw80_support & 0x1) << 25;
+	phy |= (uint64_t)(dot11_cap.dru_dbw80_pbw160_support & 0x1) << 26;
+	phy |= (uint64_t)(dot11_cap.dru_dbw80_pbw320_support & 0x1) << 27;
+	phy |= (uint64_t)(dot11_cap.dru_dbw20_pbw_ge80_support & 0x1) << 28;
+	phy |= (uint64_t)(dot11_cap.dru_dbw40_pbw_ge80_support & 0x1) << 29;
+	phy |= (uint64_t)(dot11_cap.dru_dbw60_pbw_ge80_support & 0x1) << 30;
+	phy |= (uint64_t)(dot11_cap.dru_rru_hybrid_support & 0x1) << 31;
+	/* B32-B39 reserved = 0 */
+	phy = qdf_cpu_to_le64(phy);
+	qdf_mem_copy(p, &phy, WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN);
+	p += WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN;
+
+	/* DBE Capability Parameters (variable: 1, 4, or 7 bytes) */
+	if (dot11_cap.dbe_support) {
+		uint8_t dbe_ctrl = dot11_cap.dbe_param[0];
+		uint8_t mcs160_present = (dbe_ctrl >> 3) & 0x1;
+		uint8_t mcs320_present = (dbe_ctrl >> 4) & 0x1;
+		uint8_t dbe_len = 1 + (mcs160_present ? 3 : 0) +
+				  (mcs320_present ? 3 : 0);
+
+		if ((ie_start + num_bytes) - p < dbe_len)
+			goto done;
+		qdf_mem_copy(p, dot11_cap.dbe_param, dbe_len);
+		p += dbe_len;
+	}
+done:
+
+	return (uint8_t)(p - ((uint8_t *)&ie[2 + UHR_CAP_OUI_SIZE]));
 }
 
 #define UHR_CAP_OUI_LEN 3
 QDF_STATUS lim_send_uhr_caps_ie(struct mac_context *mac_ctx, uint8_t vdev_id)
 {
-	uint8_t uhr_cap_total_len = DOT11F_IE_UHR_CAP_MIN_LEN + UHR_CAP_OUI_LEN;
 	QDF_STATUS status_2g, status_5g;
-	uint8_t uhr_caps_2g[DOT11F_IE_UHR_CAP_MIN_LEN + UHR_CAP_OUI_LEN] = {0};
-
-	uint8_t uhr_caps_5g[DOT11F_IE_UHR_CAP_MIN_LEN + UHR_CAP_OUI_LEN] = {0};
+	uint8_t uhr_caps_2g[WLAN_UHR_CAP_IE_MAX_LEN + 2] = {0};
+	uint8_t uhr_caps_5g[WLAN_UHR_CAP_IE_MAX_LEN + 2] = {0};
+	uint8_t ie_payload_len;
 
 	uhr_caps_2g[0] = DOT11F_EID_UHR_CAP;
-	uhr_caps_2g[1] = DOT11F_IE_UHR_CAP_MIN_LEN;
-
 	qdf_mem_copy(&uhr_caps_2g[2], UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE);
-
-	lim_set_uhr_caps(mac_ctx,  uhr_caps_2g, uhr_cap_total_len,
-			 CDS_BAND_2GHZ, vdev_id);
+	ie_payload_len = lim_set_uhr_caps(mac_ctx, uhr_caps_2g,
+					  sizeof(uhr_caps_2g),
+					  CDS_BAND_2GHZ, vdev_id);
+	if (!ie_payload_len)
+		return QDF_STATUS_E_FAILURE;
+	uhr_caps_2g[1] = UHR_CAP_OUI_SIZE + ie_payload_len;
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_UHR_CAP,
 				CDS_BAND_2GHZ, &uhr_caps_2g[2],
 				uhr_caps_2g[1] + 1);
 
 	uhr_caps_5g[0] = DOT11F_EID_UHR_CAP;
-	uhr_caps_5g[1] = DOT11F_IE_UHR_CAP_MIN_LEN;
-
 	qdf_mem_copy(&uhr_caps_5g[2], UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE);
-
-	lim_set_uhr_caps(mac_ctx, uhr_caps_5g, uhr_cap_total_len,
-			 CDS_BAND_5GHZ, vdev_id);
+	ie_payload_len = lim_set_uhr_caps(mac_ctx, uhr_caps_5g,
+					  sizeof(uhr_caps_5g),
+					  CDS_BAND_5GHZ, vdev_id);
+	if (!ie_payload_len)
+		return QDF_STATUS_E_FAILURE;
+	uhr_caps_5g[1] = UHR_CAP_OUI_SIZE + ie_payload_len;
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_UHR_CAP,
 				CDS_BAND_5GHZ, &uhr_caps_5g[2],
 				uhr_caps_5g[1] + 1);
@@ -9728,10 +9800,10 @@ void lim_decide_uhr_op(struct mac_context *mac_ctx, uint32_t *mlme_uhr_ops,
 		return;
 	}
 
-	pe_debug("UHR parsed: dps:%d npca:%d pedca:%d dbe:%d dbe_bw:%u opinfo_len:%u",
+	pe_debug("UHR parsed: dps:%d npca:%d pedca:%d dbe:%d dbe_bw:%u",
 		 uhr_op_ie->dps_enabled, uhr_op_ie->npca_enabled,
 		 uhr_op_ie->p_edca_enabled, uhr_op_ie->dbe_enabled,
-		 uhr_op_ie->dbe_bandwidth, uhr_op_ie->uhr_op_info_len);
+		 uhr_op_ie->dbe_bandwidth);
 }
 
 void lim_update_usr_uhr_cap(struct mac_context *mac_ctx,

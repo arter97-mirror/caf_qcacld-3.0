@@ -4450,10 +4450,10 @@ QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,
  * @band: 2g or 5g band
  * @vdev_id: vdev id
  *
- * Return: None
+ * Return: number of MAC+PHY+DBE payload bytes written (0 on error)
  */
-void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
-		      uint32_t num_bytes, uint8_t band, uint8_t vdev_id);
+uint8_t lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
+			 uint32_t num_bytes, uint8_t band, uint8_t vdev_id);
 
 /**
  * lim_send_uhr_caps_ie() - gets UHR capability and send to firmware via wma
@@ -4537,10 +4537,11 @@ lim_fill_complete_uhr_cap_ie(struct pe_session *session,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline void
+static inline uint8_t
 lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 		 uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
 {
+	return 0;
 }
 
 static inline QDF_STATUS
