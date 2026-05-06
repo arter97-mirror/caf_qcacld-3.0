@@ -2099,6 +2099,11 @@ struct hdd_tx_powerboost {
 };
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+#define WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT BIT(0)
+#define WLAN_HDD_PASSTHRU_AMPDU_RA_CAP_BIT BIT(1)
+#endif
+
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
  * @psoc: object manager psoc context
@@ -2312,6 +2317,7 @@ struct hdd_tx_powerboost {
  * @tx_pb: Tx powerboost context
  * @tas_enabled: Indicate if TAS has enabled
  * @tas_send_to_fw: Indicate if TAS has sent to FW
+ * @passthru_cap_bitmap: passthru capability bitmap
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2625,6 +2631,9 @@ struct hdd_context {
 #if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
 	bool tas_enabled;
 	bool tas_send_to_fw;
+#endif
+#ifdef DRIVER_PASSTHRU_MODE
+	uint64_t passthru_cap_bitmap;
 #endif
 };
 

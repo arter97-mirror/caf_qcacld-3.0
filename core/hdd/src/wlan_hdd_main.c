@@ -2068,6 +2068,25 @@ hdd_update_mlo_per_link_stats_capability(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+static void hdd_update_passthru_capability(struct hdd_context *hdd_ctx,
+					   struct wma_tgt_services *cfg)
+{
+	if (cfg->is_passthru_chan_hop_supported)
+		hdd_ctx->passthru_cap_bitmap |=
+					WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT;
+
+	if (cfg->is_passthru_ampdu_ra_supported)
+		hdd_ctx->passthru_cap_bitmap |=
+					WLAN_HDD_PASSTHRU_AMPDU_RA_CAP_BIT;
+}
+#else
+static inline void hdd_update_passthru_capability(struct hdd_context *hdd_ctx,
+						  struct wma_tgt_services *cfg)
+{
+}
+#endif
+
 static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 				    struct wma_tgt_services *cfg)
 {
@@ -2167,6 +2186,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	hdd_update_fw_tdls_wideband_capability(hdd_ctx, cfg);
 	ucfg_psoc_mlme_set_11be_capab(hdd_ctx->psoc, cfg->en_11be);
 	hdd_update_mlo_per_link_stats_capability(hdd_ctx, cfg);
+	hdd_update_passthru_capability(hdd_ctx, cfg);
 }
 
 /**

@@ -5550,6 +5550,24 @@ static void wma_nan_set_pairing_feature(void)
 }
 #endif /* WLAN_FEATURE_NAN */
 
+#ifdef DRIVER_PASSTHRU_MODE
+static void wma_get_passthru_support(struct wmi_unified *wmi_handle,
+				     struct wma_tgt_services *cfg)
+{
+	cfg->is_passthru_chan_hop_supported =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_passthru_vdev_chan_hop_schedule_support);
+	cfg->is_passthru_ampdu_ra_supported =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_passthru_vdev_ampdu_ra_support);
+}
+#else
+static inline void wma_get_passthru_support(struct wmi_unified *wmi_handle,
+					    struct wma_tgt_services *cfg)
+{
+}
+#endif
+
 /**
  * wma_update_target_services() - update target services from wma handle
  * @wmi_handle: Unified wmi handle
@@ -5702,6 +5720,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);
 	wma_get_n_link_mlo_support(wmi_handle, cfg);
 	wma_get_mlo_tid_to_link_mapping_support(wmi_handle, cfg);
+	wma_get_passthru_support(wmi_handle, cfg);
 }
 
 /**
