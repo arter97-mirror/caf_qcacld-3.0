@@ -2208,6 +2208,19 @@ wlan_get_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id);
 
 /**
+ * wlan_get_link_removed_flag_by_link_id() - Get link removed flag by link_id
+ * @vdev: Base link's vdev object
+ * @link_id: Link ID to check
+ *
+ * This function checks if a specific link (identified by link_id) has been
+ * marked for removal. It works for both active links and standby links.
+ *
+ * Return: true if link is marked for removal, false otherwise
+ */
+bool wlan_get_link_removed_flag_by_link_id(struct wlan_objmgr_vdev *vdev,
+					   uint8_t link_id);
+
+/**
  * wlan_drop_mgmt_frame_on_link_removal() - Check mgmt frame
  * allow dropped due to link removal
  * @vdev: pointer to vdev

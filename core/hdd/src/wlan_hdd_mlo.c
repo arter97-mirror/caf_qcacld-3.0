@@ -1131,6 +1131,14 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
+		/* Check if link is marked for removal */
+		if (wlan_get_link_removed_flag_by_link_id(
+				vdev, sta_ctx->conn_info.ieee_link_id)) {
+			hdd_debug("link: %d marked for removal, skip",
+				  sta_ctx->conn_info.ieee_link_id);
+			continue;
+		}
+
 		ml_link_info = mlo_mgr_get_ap_link_by_link_id(
 				mlo_ctx,
 				sta_ctx->conn_info.ieee_link_id);

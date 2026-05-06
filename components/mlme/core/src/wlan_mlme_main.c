@@ -3080,6 +3080,26 @@ bool wlan_get_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return is_mlo_link_removed;
 }
 
+bool wlan_get_link_removed_flag_by_link_id(struct wlan_objmgr_vdev *vdev,
+					   uint8_t link_id)
+{
+	bool is_mlo_link_removed = false;
+	struct mlo_link_info *link_info;
+
+	if (!mlo_is_mld_sta(vdev))
+		return false;
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx, link_id);
+	if (link_info)
+		is_mlo_link_removed =
+			!!qdf_atomic_test_bit(LS_F_AP_REMOVAL_BIT,
+					      &link_info->link_status_flags);
+	else
+		mlme_legacy_err("link info null, id %d", link_id);
+
+	return is_mlo_link_removed;
+}
+
 static QDF_STATUS
 wlan_set_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev, bool removed)
 {
