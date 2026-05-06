@@ -1238,7 +1238,6 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	int ret;
-	struct wmi_unified *wmi_handle;
 
 	if (!hdd_ctx)
 		return -EBUSY;
@@ -1256,14 +1255,11 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	features->bits.custom_data_retry_limit = 1;
 	features->bits.frame_type_filter = 1;
 	features->bits.sta_coexist = 1;
-	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
-	if (wmi_handle)
-		features->bits.channel_hopping = wmi_service_enabled(wmi_handle,
-			wmi_service_passthru_vdev_chan_hop_schedule_support);
-	else
-		hdd_err("wmi_handle is NULL, CH hopping is not set");
-
 	features->maximum_channel_switch_time_us = 50000;
+
+	hdd_debug("passthru cap bitmap 0x%llx", hdd_ctx->passthru_cap_bitmap);
+	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT)
+		features->bits.channel_hopping = 1;
 
 	return ret;
 }

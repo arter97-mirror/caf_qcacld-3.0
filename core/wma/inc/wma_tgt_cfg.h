@@ -63,6 +63,8 @@
  * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  * @en_mlo_tid_to_link_support: Get tid to link fw support
  * @en_11bn: enable 11bn
+ * @is_passthru_chan_hop_supported: passthru channel hop capability
+ * @is_passthru_ampdu_ra_supported: passthru ampdu and ra capability
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -128,6 +130,10 @@ struct wma_tgt_services {
 	bool en_mlo_tid_to_link_support;
 #endif
 	bool en_11bn;
+#ifdef DRIVER_PASSTHRU_MODE
+	bool is_passthru_chan_hop_supported;
+	bool is_passthru_ampdu_ra_supported;
+#endif
 };
 
 /**
