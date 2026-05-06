@@ -801,6 +801,8 @@ int wlan_hdd_wondertap_init(void **handle,
 	g_wt_ctx = wt_ctx;
 	mutex_unlock(&g_wt_ctx_mutex);
 
+	qdf_spinlock_create(&wt_ctx->peer_tbl_lock);
+
 	status = qdf_runtime_lock_init(&wt_ctx->wondertap_rtpm_lock);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("passthrough mode rtpm lock creation failed");
@@ -867,6 +869,7 @@ create_wake_lock_failed:
 	qdf_runtime_lock_deinit(&wt_ctx->wondertap_rtpm_lock);
 
 create_rtpm_lock_failed:
+	qdf_spinlock_destroy(&wt_ctx->peer_tbl_lock);
 	mutex_lock(&g_wt_ctx_mutex);
 	qdf_event_destroy(&wt_ctx->wondertap_vdev_event);
 	g_wt_ctx = NULL;
@@ -972,6 +975,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
 	qdf_wake_lock_destroy(&wt_ctx->wondertap_wakelock);
 	qdf_runtime_lock_deinit(&wt_ctx->wondertap_rtpm_lock);
+	qdf_spinlock_destroy(&wt_ctx->peer_tbl_lock);
 
 	mutex_lock(&g_wt_ctx_mutex);
 	/*
@@ -1504,6 +1508,67 @@ void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
 		qdf_event_set(&g_wt_ctx->wondertap_vdev_event);
 
 	mutex_unlock(&g_wt_ctx_mutex);
+}
+
+bool hdd_passthru_is_peer_create_allowed(void)
+{
+	bool is_peer_create_allowed = false;
+
+	if (!g_wt_ctx || !g_wt_ctx->is_peer_create_enabled)
+		return is_peer_create_allowed;
+
+	qdf_spinlock_acquire(&g_wt_ctx->peer_tbl_lock);
+	is_peer_create_allowed = (g_wt_ctx->num_peers >=
+				  WLAN_PASSTHRU_MAX_PEER) ? false : true;
+	qdf_spinlock_release(&g_wt_ctx->peer_tbl_lock);
+
+	return is_peer_create_allowed;
+}
+
+void hdd_passthru_check_n_create_peer(struct qdf_mac_addr *peer_mac)
+{
+	struct passthru_peer_tbl_entry *peer_tbl;
+	struct hdd_wondertap_peer_setup params = {0};
+	bool trigger_peer_create = false;
+	uint8_t i;
+
+	if (!g_wt_ctx)
+		return;
+
+	qdf_spinlock_acquire(&g_wt_ctx->peer_tbl_lock);
+	peer_tbl = g_wt_ctx->peer_tbl;
+
+	for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		if (qdf_is_macaddr_zero(&peer_tbl[i].mac_addr)) {
+			trigger_peer_create = true;
+			break;
+		}
+
+		if (qdf_is_macaddr_equal(peer_mac,
+					 &peer_tbl[i].mac_addr) &&
+		    peer_tbl[i].peer_status != PASSTHRU_PEER_SETUP_NOT_DONE)
+			break;
+	}
+
+	if (!trigger_peer_create) {
+		qdf_spinlock_release(&g_wt_ctx->peer_tbl_lock);
+		return;
+	}
+
+	g_wt_ctx->num_peers++;
+	qdf_copy_macaddr(&peer_tbl[i].mac_addr, peer_mac);
+	peer_tbl[i].peer_status = PASSTHRU_PEER_SETUP_IN_PROGRESS;
+
+	hdd_debug("Trigger passthru peer create for " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_mac->bytes));
+
+	qdf_spinlock_release(&g_wt_ctx->peer_tbl_lock);
+
+	qdf_copy_macaddr((struct qdf_mac_addr *)&params.peer_addr,
+			 &peer_tbl[i].mac_addr);
+	params.vdev_id = g_wt_ctx->wt_adapter->deflink->vdev_id;
+
+	wlan_hdd_wondertap_peer_setup(g_wt_ctx->hdd_ctx, &params);
 }
 
 /**
