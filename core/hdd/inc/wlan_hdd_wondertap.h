@@ -25,6 +25,7 @@ struct hdd_wondertap_tx_rate_cfg {
 	uint32_t dot11_mode;
 	uint8_t gi_val;
 	uint8_t nss;
+	uint8_t mcs;
 };
 
 #define WLAN_PASSTHRU_MAX_PEER 7
