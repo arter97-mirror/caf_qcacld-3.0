@@ -729,7 +729,7 @@ QDF_STATUS lim_fils_cleanup(struct pe_session *pe_session,
 		pe_debug("FILS hlp timeout work clean up done vdev: %d peer:"
 			QDF_MAC_ADDR_FMT,
 			pe_session->vdev_id,
-			QDF_MAC_ADDR_REF(mac_addr));
+			QDF_MAC_ADDR_REF((const uint8_t *)mac_addr));
 	}
 
 	return QDF_STATUS_SUCCESS;
