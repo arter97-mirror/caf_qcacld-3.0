@@ -248,15 +248,67 @@ smd_add_prepared_target_links_in_smd_ctx(
 					struct mlo_link_recfg_context *recfg_ctx,
 					struct mlo_link_recfg_state_req *req);
 
+/**
+ * smd_link_recfg_has_active_vdev_for_add_link() - Check if active vdev exists for add link
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration state request
+ * @link_sw_req: Link switch request to be populated
+ *
+ * This function checks if any of the target AP's accepted add links has an active
+ * vdev (connected on an old deleted link). If found, it triggers a host-initiated
+ * link switch with reason MLO_LINK_SWITCH_REASON_HOST_ADD_LINK to disconnect and
+ * reconnect the vdev to the new link. The function also handles link rejection
+ * scenarios where a rejected link's vdev can be reassigned to an accepted link.
+ *
+ * Return: true if active vdev found and link_sw_req populated, false otherwise
+ */
 bool
 smd_link_recfg_has_active_vdev_for_add_link(
 				struct mlo_link_recfg_context *recfg_ctx,
 				struct mlo_link_recfg_state_req *req,
 				struct wlan_mlo_link_switch_req *link_sw_req);
 
+/**
+ * smd_fw_roam_sync() - Handle firmware roam sync indication for SMD roaming
+ * @vdev: VDEV object
+ * @sync_ind: Roam offload sync indication from firmware
+ *
+ * This function handles the firmware roam sync indication during SMD roaming.
+ * It processes vdev repurpose requests from the sync indication, determines
+ * the roaming scenario (multi-to-single or multi-to-multi link roaming), and
+ * triggers the Link Reconfiguration State Machine with appropriate add/delete
+ * link information. For multi-to-single roaming, it clears add_link_info and
+ * populates del_link_info. For multi-to-multi roaming, it builds both add and
+ * delete link lists based on current and target AP link information.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
 QDF_STATUS
 smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		 struct roam_offload_synch_ind *sync_ind);
+
+/**
+ * smd_roam_link_recfg_set_tx_link_addr() - Set transmit link address for link reconfiguration
+ * @recfg_ctx: Link reconfiguration context
+ * @recfg_req: Link reconfiguration request
+ * @req: Link reconfiguration state request to be updated with peer MAC
+ * @candidate_link_set: Bitmap of candidate links for transmission
+ *
+ * This function determines which link should be used to send the link
+ * reconfiguration action frame during SMD roaming. It iterates through
+ * the MLO device's link information, filters out links marked for AP removal,
+ * and selects an active roaming vdev whose link_id matches the candidate_link_set.
+ * If no active link is found, it falls back to a standby link. The selected
+ * link's AP MAC address is stored in req->peer_mac for frame transmission.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_INVAL if no valid peer MAC found
+ */
+QDF_STATUS
+smd_roam_link_recfg_set_tx_link_addr(
+			struct mlo_link_recfg_context *recfg_ctx,
+			struct wlan_mlo_link_recfg_req *recfg_req,
+			struct mlo_link_recfg_state_req *req,
+			uint32_t candidate_link_set);
 
 /**
  * smd_is_roaming_in_progress() - Check if SMD roaming is active on a vdev.
@@ -271,6 +323,16 @@ smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 bool
 smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
 #else
+static inline QDF_STATUS
+smd_roam_link_recfg_set_tx_link_addr(
+			struct mlo_link_recfg_context *recfg_ctx,
+			struct wlan_mlo_link_recfg_req *recfg_req,
+			struct mlo_link_recfg_state_req *req,
+			uint32_t candidate_link_set)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline QDF_STATUS
 smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		 struct roam_offload_synch_ind *sync_ind)

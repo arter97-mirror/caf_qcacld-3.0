@@ -1052,10 +1052,10 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		next->req.add_link_info = recfg_req->add_link_info;
 		next->req.recfg_type = recfg_req->recfg_type;
 		status =
-		mlo_link_recfg_set_tx_link_addr(recfg_ctx,
-						recfg_req,
-						&next->req,
-						curr_link_set);
+		smd_roam_link_recfg_set_tx_link_addr(recfg_ctx,
+						     recfg_req,
+						     &next->req,
+						     curr_link_set);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlo_err("fail to set tx frame link addr status %d",
 				status);
@@ -1591,16 +1591,118 @@ smd_add_prepared_target_links_in_smd_ctx(
 		  smd_ctx->num_prepared);
 
 end:
+	if (QDF_IS_STATUS_ERROR(status)) {
+		/* Free allocated target_bss_ctx on error */
+		if (target_bss_ctx &&
+		    smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx == target_bss_ctx) {
+			qdf_mem_free(target_bss_ctx);
+			smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx = NULL;
+		}
+	}
+
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
 	if (pdev)
 		wlan_objmgr_pdev_release_ref(pdev, WLAN_LINK_RECFG_ID);
-	/* Free allocated target_bss_ctx on error to avoid leak */
-	if (QDF_IS_STATUS_ERROR(status) && target_bss_ctx &&
-	    smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx == target_bss_ctx) {
-		qdf_mem_free(target_bss_ctx);
-		smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx = NULL;
+	return status;
+}
+
+QDF_STATUS
+smd_roam_link_recfg_set_tx_link_addr(
+			struct mlo_link_recfg_context *recfg_ctx,
+			struct wlan_mlo_link_recfg_req *recfg_req,
+			struct mlo_link_recfg_state_req *req,
+			uint32_t candidate_link_set)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_info *link_info;
+	uint8_t i;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct qdf_mac_addr standby_link_peer_mac;
+
+	qdf_zero_macaddr(&standby_link_peer_mac);
+
+	/* decide which link will be used to send action frame */
+	mlo_dev_ctx = mlo_link_recfg_get_mlo_ctx(recfg_ctx);
+	if (!mlo_dev_ctx) {
+		mlo_err("mlo_ctx null");
+		return QDF_STATUS_E_INVAL;
 	}
+
+	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
+	if (!psoc) {
+		mlo_err("psoc null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_LINK_RECFG_ID);
+	if (!pdev) {
+		mlo_err("Invalid pdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!smd_roam_in_progress(recfg_ctx)) {
+		mlo_err("SMD roaming is not in progress");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_LINK_RECFG_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		mlo_err("[DBG] vdev id %d link id %d, candidate_link_set %d",
+			link_info->vdev_id, link_info->link_id, candidate_link_set);
+
+		if (link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		if (qdf_atomic_test_bit(
+				LS_F_AP_REMOVAL_BIT,
+				&link_info->link_status_flags)) {
+			mlo_debug("skip ap link addr: " QDF_MAC_ADDR_FMT " link flag 0x%x",
+				  QDF_MAC_ADDR_REF(req->peer_mac.bytes),
+				  (uint32_t)link_info->link_status_flags);
+			continue;
+		}
+
+		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
+			if ((1 << link_info->link_id) & candidate_link_set)
+				standby_link_peer_mac =
+					link_info->ap_link_addr;
+			continue;
+		}
+
+		if (!cm_is_vdevid_roaming(pdev, link_info->vdev_id)) {
+			mlo_debug("vdevid is not roaming %d", link_info->vdev_id);
+			continue;
+		}
+
+		if ((1 << link_info->link_id) & candidate_link_set) {
+			req->peer_mac = link_info->ap_link_addr;
+			mlo_debug("selected tx ap link addr: " QDF_MAC_ADDR_FMT "",
+				  QDF_MAC_ADDR_REF(req->peer_mac.bytes));
+			break;
+		}
+	}
+
+	if (i == WLAN_MAX_ML_BSS_LINKS) {
+		if (!qdf_is_macaddr_zero(&standby_link_peer_mac)) {
+			req->peer_mac = standby_link_peer_mac;
+			mlo_debug("selected tx ap link addr: " QDF_MAC_ADDR_FMT " - standby",
+				  QDF_MAC_ADDR_REF(req->peer_mac.bytes));
+		} else {
+			status = QDF_STATUS_E_INVAL;
+			mlo_debug("no found valid peer mac");
+		}
+	}
+
+	if (pdev)
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_LINK_RECFG_ID);
+
 	return status;
 }
 
