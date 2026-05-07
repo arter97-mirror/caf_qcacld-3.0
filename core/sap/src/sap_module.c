@@ -1678,8 +1678,10 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 						 sap_context->vdev_id) ||
 		    (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
 		     !channel_bonding_mode) ||
-		    (policy_mgr_get_sap_force_20mhz_for_country_id(mac->psoc,
-								   (qdf_freq_t)chan_freq)))
+		    (policy_mgr_get_sap_force_20mhz_for_country_id(
+						mac->psoc,
+						sap_context->vdev,
+						(qdf_freq_t)chan_freq)))
 			ch_width = CH_WIDTH_20MHZ;
 		else
 			ch_width = wlansap_get_max_bw_by_phymode(sap_context);
