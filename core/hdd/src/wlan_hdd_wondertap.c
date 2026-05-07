@@ -1573,6 +1573,212 @@ void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
 	mutex_unlock(&g_wt_ctx_mutex);
 }
 
+#define WLAN_CHAN_HOP_STATUS_WAIT_TIME_MS 1000
+
+/**
+ * struct hdd_chan_hop_status_priv - Channel hop status private context
+ * @response: Response structure from firmware
+ * @status: Operation status (0 on success, negative on error)
+ *
+ * Private data structure for osif_request to handle synchronous
+ * channel hop status request.
+ */
+struct hdd_chan_hop_status_priv {
+	struct vdev_chan_hop_status_response response;
+	int status;
+};
+
+/**
+ * hdd_chan_hop_status_resp_cb() - Channel hop status response callback
+ * @ctx: osif_request context
+ * @response_ptr: Response structure pointer
+ *
+ * Callback invoked by WMA layer when channel hop status event is received.
+ * Stores the response and completes the osif_request to wake waiting thread.
+ */
+static void hdd_chan_hop_status_resp_cb(void *ctx, void *response_ptr)
+{
+	struct osif_request *request;
+	struct hdd_chan_hop_status_priv *priv;
+	struct vdev_chan_hop_status_response *response = response_ptr;
+
+	request = osif_request_get(ctx);
+	if (!request) {
+		hdd_err("Obsolete chan_hop_status request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+	if (response) {
+		priv->response = *response;
+		priv->status = 0;
+	} else {
+		priv->status = -EINVAL;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+/**
+ * wlan_hdd_wondertap_get_channel_status_report() - Get channel status report
+ * @handle: Wondertap handle
+ * @report: Report structure to fill (pre-allocated by Wonder driver)
+ *
+ * Retrieves channel hopping statistics from firmware and converts to
+ * wondertap format. This is a synchronous operation that blocks until
+ * firmware responds or timeout occurs.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_wondertap_get_channel_status_report(
+	void *handle,
+	qdf_wondertap_channel_status_report_t *report)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	struct osif_vdev_sync *vdev_sync;
+	struct vdev_chan_hop_status_req req = {0};
+	struct osif_request *request;
+	struct hdd_chan_hop_status_priv *priv;
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	void *cookie;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_CHAN_HOP_STATUS_WAIT_TIME_MS,
+	};
+	QDF_STATUS status;
+	int errno;
+	uint32_t i;
+
+	hdd_enter();
+
+	/* Validate wondertap context and handle */
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
+		hdd_err("Incorrect handle received - rejecting get_channel_status");
+		return -EINVAL;
+	}
+
+	if (!report) {
+		hdd_err("Invalid report pointer");
+		return -EINVAL;
+	}
+
+	hdd_ctx = g_wt_ctx->hdd_ctx;
+	wt_adapter = g_wt_ctx->wt_adapter;
+
+	/* Validate HDD context */
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	psoc = hdd_ctx->psoc;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle ||
+	    !wmi_service_enabled(wmi_handle,
+				 wmi_service_vdev_chan_hop_status_report)) {
+		hdd_err("wmi_service_vdev_chan_hop_status_report not supported");
+		return -ENOTSUPP;
+	}
+	/* Start vdev operation */
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	/* Allocate osif_request for synchronous operation */
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("osif request alloc failure");
+		errno = -ENOMEM;
+		goto stop_op;
+	}
+	cookie = osif_request_cookie(request);
+
+	/* Prepare request */
+	req.vdev_id = wt_adapter->deflink->vdev_id;
+
+	/* Send command to firmware */
+	status = wma_vdev_get_chan_hop_status(&req,
+					      hdd_chan_hop_status_resp_cb,
+					      cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send get chan hop status command: %d",
+			status);
+		errno = qdf_status_to_os_return(status);
+		goto osif_req_put;
+	}
+
+	/* Wait for response with timeout */
+	errno = osif_request_wait_for_response(request);
+	if (errno) {
+		hdd_err("get chan hop status timed out");
+		goto osif_req_put;
+	}
+
+	/* Get response from private data */
+	priv = osif_request_priv(request);
+	errno = priv->status;
+	if (errno) {
+		hdd_err("get chan hop status operation failed: %d", errno);
+		goto osif_req_put;
+	}
+
+	/* Convert response to wondertap format */
+	report->current_channel_hopping_request_tsf =
+		priv->response.hopping_request_tsf;
+	report->current_channel_index =
+		priv->response.current_channel_index;
+	report->channel_status_len = priv->response.num_slots;
+
+	hdd_debug("hopping_request_tsf=0x%x, current_channel_index=%d, num_slots=%d",
+		  priv->response.hopping_request_tsf,
+		  priv->response.current_channel_index,
+		  priv->response.num_slots);
+
+	hdd_debug("Converting %d channel status entries",
+		  report->channel_status_len);
+
+	/* Copy slot information with type conversions */
+	for (i = 0; i < priv->response.num_slots; i++) {
+		report->status[i].channel_switch_tsf =
+			priv->response.slot_info[i].channel_switch_tsf;
+		report->status[i].freq =
+			priv->response.slot_info[i].freq;
+		report->status[i].channel_start_tsf =
+			priv->response.slot_info[i].channel_start_tsf;
+		report->status[i].channel_end_tsf =
+			priv->response.slot_info[i].channel_end_tsf;
+		/* Convert u32 to u16 for traffic indices */
+		report->status[i].tx_traffic_index =
+			(uint16_t)priv->response.slot_info[i].tx_traffic_index;
+		report->status[i].rx_traffic_index =
+			(uint16_t)priv->response.slot_info[i].rx_traffic_index;
+
+		hdd_debug("Slot %d: freq=%d, channel_switch_tsf=0x%x, channel_start_tsf=0x%x, channel_end_tsf=0x%x, tx_idx=%d, rx_idx=%d",
+			  i, report->status[i].freq,
+			  report->status[i].channel_switch_tsf,
+			  report->status[i].channel_start_tsf,
+			  report->status[i].channel_end_tsf,
+			  report->status[i].tx_traffic_index,
+			  report->status[i].rx_traffic_index);
+	}
+
+	hdd_info("Successfully retrieved %d channel status entries",
+		 report->channel_status_len);
+
+osif_req_put:
+	osif_request_put(request);
+
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	hdd_exit();
+	return errno;
+}
+
 bool hdd_passthru_is_peer_create_allowed(void)
 {
 	bool is_peer_create_allowed = false;
@@ -1651,6 +1857,8 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.get_capabilities = wlan_hdd_wondertap_get_capabilities,
 	.channel_schedule_request = wlan_hdd_wondertap_set_chan_sched,
 	.get_mac_tsf = wlan_hdd_wondertap_get_mac_tsf,
+	.get_channel_status_report =
+		wlan_hdd_wondertap_get_channel_status_report,
 };
 
 /**

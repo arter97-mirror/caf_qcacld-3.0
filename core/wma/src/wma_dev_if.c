@@ -1653,6 +1653,42 @@ wma_passthru_get_tsf_timer(struct ocb_get_tsf_timer_param *req,
 	return status;
 }
 
+QDF_STATUS
+wma_vdev_get_chan_hop_status(struct vdev_chan_hop_status_req *req,
+			     wma_chan_hop_status_cb cb, void *ctx)
+{
+	tp_wma_handle wma_handle;
+	QDF_STATUS status;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle) {
+		wma_err("WMA handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!req) {
+		wma_err("Invalid request parameter");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Store callback and context for response handling */
+	wma_handle->chan_hop_status_cb = cb;
+	wma_handle->chan_hop_status_cb_ctx = ctx;
+
+	/* Send command to firmware via WMI */
+	status = wmi_unified_vdev_get_chan_hop_status(wma_handle->wmi_handle,
+						      req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("vdev_id: %d get chan hop status send failed",
+			req->vdev_id);
+		/* Clear callback on failure */
+		wma_handle->chan_hop_status_cb = NULL;
+		wma_handle->chan_hop_status_cb_ctx = NULL;
+	}
+
+	return status;
+}
+
 /**
  * wma_add_passthru_sta() - process add sta request in passthru mode
  * @wma: wma handle
