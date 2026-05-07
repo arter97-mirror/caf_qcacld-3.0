@@ -6567,6 +6567,58 @@ lim_shift_arr_index(uint8_t *arr, uint8_t curr_index, uint8_t arr_len)
 	return;
 }
 
+/**
+ * lim_filter_supp_op_class_by_bw() - Remove operating classes exceeding FW
+ * max bandwidth from the raw Supported Operating Classes IE buffer.
+ * @mac_ctx: Pointer to Global MAC structure
+ * @op_class_buf: Pointer to the op class list in the raw IE buffer
+ * @op_class_len: Pointer to the IE length field (modified in-place)
+ *
+ * Iterates the raw op class list and removes any entry whose bandwidth
+ * exceeds the HW-advertised maximum bandwidth, using
+ * lim_shift_arr_index() to compact the array in-place. Must be called
+ * before dot11f_unpack_ie_supp_operating_classes.
+ *
+ * Return: None
+ */
+static void lim_filter_supp_op_class_by_bw(struct mac_context *mac_ctx,
+					   uint8_t *op_class_buf,
+					   uint8_t *op_class_len)
+{
+	enum phy_ch_width max_bw;
+	uint16_t max_bw_mhz;
+	uint16_t op_class_bw;
+	char buf[128] = {0};
+	int buf_len = 0;
+	bool removed = false;
+	uint8_t i = 0;
+
+	max_bw = wlan_mlme_get_max_bw();
+	max_bw_mhz = wlan_reg_get_bw_value(max_bw);
+
+	while (i < *op_class_len) {
+		op_class_bw = wlan_reg_get_op_class_width(mac_ctx->pdev,
+							  op_class_buf[i],
+							  true);
+		if (op_class_bw > max_bw_mhz) {
+			if (buf_len < sizeof(buf) - 1)
+				buf_len += qdf_scnprintf(buf + buf_len,
+							 sizeof(buf) - buf_len,
+							 "%u ", op_class_buf[i]);
+			lim_shift_arr_index(op_class_buf, i, *op_class_len);
+			(*op_class_len)--;
+			removed = true;
+			/* Recheck same index after shift */
+		} else {
+			i++;
+		}
+	}
+
+	if (removed)
+		pe_debug("Max FW BW: %d MHz, removed op classes: %s",
+			 max_bw_mhz, buf);
+}
+
 QDF_STATUS lim_strip_supp_op_class_update_struct(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
 		tDot11fIESuppOperatingClasses *dst, bool eht_capable)
@@ -6608,6 +6660,12 @@ QDF_STATUS lim_strip_supp_op_class_update_struct(struct mac_context *mac_ctx,
 			}
 		}
 	}
+
+	/* Remove op classes exceeding FW max bandwidth */
+	lim_filter_supp_op_class_by_bw(mac_ctx,
+				       &extracted_buff[2],
+				       &extracted_buff[1]);
+
 	/* update the extracted supp op class to struct*/
 	if (DOT11F_PARSE_SUCCESS != dot11f_unpack_ie_supp_operating_classes(
 	    mac_ctx, &extracted_buff[2], extracted_buff[1], dst, false)) {
