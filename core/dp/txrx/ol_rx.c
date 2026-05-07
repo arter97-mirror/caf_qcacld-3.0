@@ -1834,7 +1834,7 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 			qdf_dp_trace_log_pkt(peer->vdev->vdev_id,
 				head_buf, QDF_RX,
 				QDF_TRACE_DEFAULT_PDEV_ID,
-				peer->vdev->qdf_opmode);
+				peer->vdev->qdf_opmode, 0);
 			DPTRACE(qdf_dp_trace(head_buf,
 				QDF_DP_TRACE_RX_OFFLOAD_HTT_PACKET_PTR_RECORD,
 				QDF_TRACE_DEFAULT_PDEV_ID,
