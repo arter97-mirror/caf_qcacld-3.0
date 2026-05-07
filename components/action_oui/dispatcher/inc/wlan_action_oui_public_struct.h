@@ -172,6 +172,7 @@ enum action_oui_arbitrator_type {
  *                                     build present.
  * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
  * @ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P: Force tx null frame on p2p Go
+ * @ACTION_OUI_MAXIMUM_STATIC_ID: Static length OUI end placeholder
  * @ACTION_OUI_HOST_FW_EXT_START: Dynamic length OUI start here- placeholder
  * @ACTION_OUI_ALLOW_NSS_GREATER_THAN_2: Allow NSS > 2 for specified APs
  * @ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2: Disallow NSS > 2 for specified APs
@@ -216,6 +217,7 @@ enum action_oui_id {
 	ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ = 17,
 	ACTION_OUI_DISABLE_DYNAMIC_SMPS = 18,
 	ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P = 19,
+	ACTION_OUI_MAXIMUM_STATIC_ID,
 
 	/* 0-127 is reserved for action ids for which the data is static.
 	 * Size of the data is fixed and is not configurable.

@@ -842,7 +842,7 @@ action_oui_parse_string(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		goto exit;
 	}

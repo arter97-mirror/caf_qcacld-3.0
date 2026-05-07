@@ -115,7 +115,7 @@ ucfg_action_oui_get_config(struct wlan_objmgr_psoc *psoc,
 		action_oui_err("psoc priv is NULL");
 		return "";
 	}
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		return "";
 	}
@@ -141,7 +141,7 @@ ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 
 	ACTION_OUI_ENTER();
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		goto exit;
 	}
@@ -181,6 +181,8 @@ QDF_STATUS ucfg_action_oui_send(struct wlan_objmgr_psoc *psoc)
 	}
 
 	for (id = 0; id < ACTION_OUI_MAXIMUM_ID; id++) {
+		if (!wlan_action_oui_id_valid(id))
+			continue;
 		if (id >= ACTION_OUI_HOST_ONLY)
 			break;
 		status = action_oui_send(psoc_priv, id);

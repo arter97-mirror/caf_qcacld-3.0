@@ -247,6 +247,18 @@ uint32_t
 wlan_action_oui_max_ext_num(enum action_oui_id action_id);
 
 /**
+ * wlan_action_oui_id_valid() - Check if action OUI ID is valid
+ * @action_id: action OUI ID to validate
+ *
+ * This function validates if the given action OUI ID is a valid/supported
+ * action OUI type. It checks against all defined action OUI IDs including
+ * firmware-only, host-only, and dynamic action OUI types.
+ *
+ * Return: true if action_id is valid, false otherwise
+ */
+bool wlan_action_oui_id_valid(enum action_oui_id action_id);
+
+/**
  * wlan_action_oui_extension_dump() - Dump oui extension of action oui
  * @oui_ext: action oui extension
  *
@@ -351,6 +363,12 @@ wlan_is_nss_allowlist_denylist_config_supported(struct wlan_objmgr_psoc *psoc)
 static inline void
 wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext)
 {
+}
+
+static inline
+bool wlan_action_oui_id_valid(enum action_oui_id action_id)
+{
+	return false;
 }
 
 static inline

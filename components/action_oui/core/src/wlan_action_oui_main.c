@@ -46,6 +46,11 @@ action_oui_allocate(struct action_oui_psoc_priv *psoc_priv)
 	uint32_t j;
 
 	for (i = 0; i < ACTION_OUI_MAXIMUM_ID; i++) {
+		if (!wlan_action_oui_id_valid(i)) {
+			psoc_priv->oui_priv[i] = NULL;
+			continue;
+		}
+
 		oui_priv = qdf_mem_malloc(sizeof(*oui_priv));
 		if (!oui_priv) {
 			action_oui_err("Mem alloc failed for oui_priv id: %u",
@@ -99,6 +104,10 @@ action_oui_destroy(struct action_oui_psoc_priv *psoc_priv)
 	psoc_priv->host_only_extensions = 0;
 
 	for (i = 0; i < ACTION_OUI_MAXIMUM_ID; i++) {
+		/* Only destroy if it's a valid action OUI ID */
+		if (!wlan_action_oui_id_valid(i))
+			continue;
+
 		oui_priv = psoc_priv->oui_priv[i];
 		psoc_priv->oui_priv[i] = NULL;
 		if (!oui_priv)
@@ -304,6 +313,10 @@ static void action_oui_parse_config(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 	for (id = 0; id < ACTION_OUI_MAXIMUM_ID; id++) {
+		/* Only parse for valid action OUI IDs */
+		if (!wlan_action_oui_id_valid(id))
+			continue;
+
 		str = psoc_priv->action_oui_str[id];
 		if (!qdf_str_len(str))
 			continue;
@@ -349,6 +362,9 @@ static QDF_STATUS action_oui_send_config(struct wlan_objmgr_psoc *psoc)
 	}
 
 	for (id = 0; id < ACTION_OUI_MAXIMUM_ID; id++) {
+		if (!wlan_action_oui_id_valid(id))
+			continue;
+
 		if (id >= ACTION_OUI_HOST_ONLY)
 			continue;
 		if (id == ACTION_OUI_CONNECT_1X1 &&
@@ -484,7 +500,7 @@ bool wlan_action_oui_search(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		goto exit;
 	}
@@ -557,7 +573,7 @@ wlan_action_oui_cleanup(struct action_oui_psoc_priv *psoc_priv,
 	if (!psoc_priv)
 		return QDF_STATUS_E_INVAL;
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID)
+	if (!wlan_action_oui_id_valid(action_id))
 		return QDF_STATUS_E_INVAL;
 
 	switch (action_id) {
@@ -605,7 +621,7 @@ wlan_action_oui_restore_default_and_send(struct action_oui_psoc_priv *psoc_priv,
 		goto exit;
 	}
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		status = QDF_STATUS_E_INVAL;
 		goto exit;
@@ -661,7 +677,7 @@ bool wlan_action_oui_is_empty(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		goto exit;
 	}
@@ -947,7 +963,7 @@ wlan_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
+	if (!wlan_action_oui_id_valid(action_id)) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1145,4 +1161,15 @@ wlan_action_oui_max_ext_num(enum action_oui_id action_id)
 		return ACTION_OUI_MAX_HOST_FW_EXT;
 	return  action_id < ACTION_OUI_HOST_ONLY ?
 		ACTION_OUI_MAX_EXT_TO_FW : ACTION_OUI_MAX_EXT_HOST_ONLY;
+}
+
+bool wlan_action_oui_id_valid(enum action_oui_id action_id)
+{
+	if ((action_id >= ACTION_OUI_CONNECT_1X1 &&
+	     action_id < ACTION_OUI_MAXIMUM_STATIC_ID) ||
+	    (action_id >= ACTION_OUI_HOST_FW_EXT_START &&
+	     action_id < ACTION_OUI_MAXIMUM_ID))
+		return true;
+
+	return false;
 }
