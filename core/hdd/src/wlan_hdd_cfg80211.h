@@ -57,6 +57,7 @@ struct wlan_hdd_link_info;
 #define RATE_TYPE_LEGACY 0
 #define RATE_TYPE_MCS 1
 #define RATE_MCS13 13
+#define RATE_MCS15 15
 
 /* 2GHz band legacy rates */
 #define RATE_1 1

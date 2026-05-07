@@ -26129,13 +26129,17 @@ static uint8_t wlan_hdd_rate_value_to_rate_index(uint8_t rate_type,
 
 		} else if (band_index == NL80211_BAND_5GHZ ||
 			   band_index == NL80211_BAND_6GHZ) {
-			if (cck_5g_tx && rate_value == RATE_1)
+			if (cck_5g_tx && rate_value == RATE_1 &&
+			    band_index == NL80211_BAND_5GHZ)
 				return 24;
-			else if (cck_5g_tx && rate_value == RATE_2)
+			else if (cck_5g_tx && rate_value == RATE_2 &&
+				 band_index == NL80211_BAND_5GHZ)
 				return 25;
-			else if (cck_5g_tx && rate_value == RATE_5_5)
+			else if (cck_5g_tx && rate_value == RATE_5_5 &&
+				 band_index == NL80211_BAND_5GHZ)
 				return 26;
-			else if (cck_5g_tx && rate_value == RATE_11)
+			else if (cck_5g_tx && rate_value == RATE_11 &&
+				 band_index == NL80211_BAND_5GHZ)
 				return 27;
 			else if (rate_value == RATE_6)
 				return 0;
@@ -26161,6 +26165,8 @@ static uint8_t wlan_hdd_rate_value_to_rate_index(uint8_t rate_type,
 			return rate_value + NUM_LEGACY_RATES_2G;
 		} else if (band_index == NL80211_BAND_5GHZ ||
 			   band_index == NL80211_BAND_6GHZ) {
+			if (rate_value > RATE_MCS15)
+				return INVALID_RATE;
 			return rate_value + NUM_LEGACY_RATES_5G_6G;
 		}
 	}
