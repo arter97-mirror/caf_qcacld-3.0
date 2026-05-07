@@ -120,6 +120,10 @@ enum tdls_stats_subtype {
  * @TDLS_STATS_REASON_BT_COEX:              Bluetooth coexistence constraint.
  * @TDLS_STATS_REASON_BSS_CHANNEL_SWITCH:    BSS channel switch (CSA).
  * @TDLS_STATS_REASON_DEAUTH_LEAVING:        Deauthentication / STA leaving.
+ * @TDLS_STATS_REASON_USER_INITIATED_CH_SWITCH: TDLS channel switch initiated
+ *                                            by the local user/host.
+ * @TDLS_STATS_REASON_PEER_INITIATED_CH_SWITCH: TDLS channel switch initiated
+ *                                            by the remote peer.
  * @TDLS_STATS_REASON_UNKNOWN:               Unknown or unrecognised reason.
  *
  * Carried in struct tdls_stats_entry::reason_code.  Applicable primarily
@@ -137,6 +141,8 @@ enum tdls_stats_reason_code {
 	TDLS_STATS_REASON_BT_COEX               = 8,
 	TDLS_STATS_REASON_BSS_CHANNEL_SWITCH    = 9,
 	TDLS_STATS_REASON_DEAUTH_LEAVING        = 10,
+	TDLS_STATS_REASON_USER_INITIATED_CH_SWITCH = 11,
+	TDLS_STATS_REASON_PEER_INITIATED_CH_SWITCH = 12,
 	TDLS_STATS_REASON_UNKNOWN               = 255,
 };
 

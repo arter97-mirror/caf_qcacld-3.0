@@ -1490,6 +1490,14 @@ static bool tdls_stats_reason_to_qca(uint8_t reason_code, uint8_t *qca_reason)
 		*qca_reason =
 			QCA_WLAN_TDLS_STATS_REASON_CODE_DEAUTHENTICATED_LEAVING;
 		return true;
+	case TDLS_STATS_REASON_USER_INITIATED_CH_SWITCH:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_USER_INITIATED_CH_SWITCH;
+		return true;
+	case TDLS_STATS_REASON_PEER_INITIATED_CH_SWITCH:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_PEER_INITIATED_CH_SWITCH;
+		return true;
 	default:
 		/* TDLS_STATS_REASON_GENERAL and TDLS_STATS_REASON_UNKNOWN
 		 * have no QCA equivalent
