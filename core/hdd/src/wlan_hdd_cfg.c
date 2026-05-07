@@ -50,6 +50,7 @@
 #include "cfg_ucfg_api.h"
 #include "hdd_dp_cfg.h"
 #include <wma_api.h>
+#include "wma.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cmn.h"
@@ -1339,6 +1340,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 	uint8_t enable2x2;
 	mac_handle_t mac_handle;
 	uint8_t vht_enable_mimo = WLAN_MIMO_CAP_DISABLE;
+	enum phy_ch_width ch_width = CH_WIDTH_80MHZ;
 
 	if (tx_nss > hdd_ctx->num_rf_chains || rx_nss > hdd_ctx->num_rf_chains) {
 		hdd_err("Cannot support tx nss = %u, rx nss = %u greater than num rf chains = %u",
@@ -1430,24 +1432,39 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (wma_get_vht_ch_width() >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		ch_width = CH_WIDTH_160MHZ;
+
 	if (tx_nss == 1 && rx_nss == 2) {
 		/* 1x2 */
 		rx_supp_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE, true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							NSS_2x2_MODE,
+							true);
 		tx_supp_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							NSS_1x1_MODE,
+							true);
 	} else if (enable2x2) {
 		/* 2x2 */
 		rx_supp_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE, true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							NSS_2x2_MODE,
+							true);
 		tx_supp_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE, true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							NSS_2x2_MODE,
+							true);
 	} else {
 		/* 1x1 */
 		rx_supp_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							NSS_1x1_MODE,
+							true);
 		tx_supp_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							NSS_1x1_MODE,
+							true);
 	}
 
 	/* Update Rx Highest Long GI data Rate */

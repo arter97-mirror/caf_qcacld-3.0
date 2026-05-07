@@ -1765,11 +1765,15 @@ void lim_extract_ht_caps_txrx_nss(uint8_t *mcs_set, uint8_t *tx_nss,
 void lim_update_dot11f_vht_caps_for_nss(tDot11fIEVHTCaps *vht_cap,
 					uint8_t tx_nss, uint8_t rx_nss)
 {
+	enum phy_ch_width ch_width;
+
 	vht_cap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(tx_nss);
 	vht_cap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(rx_nss);
-	vht_cap->txSupDataRate = VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true);
-	vht_cap->rxHighSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true);
+	ch_width = (vht_cap->supportedChannelWidthSet >= VHT_CAP_160_SUPP) ?
+			CH_WIDTH_160MHZ : CH_WIDTH_80MHZ;
+	pe_debug("ch_width %d", ch_width);
+	vht_cap->txSupDataRate = VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width, tx_nss, true);
+	vht_cap->rxHighSupDataRate = VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width, rx_nss, true);
 }
 
 void lim_sym_dot11f_vht_mcs_nss(tDot11fIEVHTCaps *vht_cap,

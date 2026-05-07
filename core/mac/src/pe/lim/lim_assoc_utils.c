@@ -1336,11 +1336,13 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	/* Fill the supported Tx/Rx data rate based on current NSS */
 	if (peer_vht_caps->rxHighSupDataRate)
 		rates->vhtTxHighestDataRate =
-			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true),
+			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+								tx_nss, true),
 				peer_vht_caps->rxHighSupDataRate);
 	if (peer_vht_caps->txSupDataRate)
 		rates->vhtRxHighestDataRate =
-			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true),
+			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+								rx_nss, true),
 				peer_vht_caps->txSupDataRate);
 
 	pe_debug("RxMCSMap %x TxMCSMap %x", rates->vhtRxMCSMap,

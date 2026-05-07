@@ -9581,15 +9581,20 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 			vht_mcs =
 				(tSirVhtMcsInfo *)&p_ie[2 +
 				sizeof(tSirMacVHTCapabilityInfo)];
+
 			vht_mcs->rxMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
 			u_vht_data_rate_info.u_value = vht_mcs->rxHighest;
 			u_vht_data_rate_info.vht_rx_supp_rate.rxSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(
+					vht_cap->supportedChannelWidthSet >= VHT_CAP_160_SUPP ?
+					CH_WIDTH_160MHZ : CH_WIDTH_80MHZ, i, true);
 			vht_mcs->rxHighest = u_vht_data_rate_info.u_value;
 			vht_mcs->txMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
 			u_vht_data_rate_info.u_value = vht_mcs->txHighest;
 			u_vht_data_rate_info.vht_tx_supp_rate.txSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(
+					vht_cap->supportedChannelWidthSet >= VHT_CAP_160_SUPP ?
+					CH_WIDTH_160MHZ : CH_WIDTH_80MHZ, i, true);
 			vht_mcs->txHighest = u_vht_data_rate_info.u_value;
 		}
 		msg.type = WMA_SET_PDEV_IE_REQ;

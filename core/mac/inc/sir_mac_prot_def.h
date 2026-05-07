@@ -106,25 +106,49 @@
 #define SIR_MAC_MAX_SUPPORTED_MCS_SET    16
 
 static const uint32_t vht_supported_datarate_bw80_gi400ns[] = {
-	[NSS_1x1_MODE - 1] = 390,
-	[NSS_2x2_MODE - 1] = 780,
-	[NSS_3x3_MODE - 1] = 1170,
-	[NSS_4x4_MODE - 1] = 1560,
-};
-
-static const uint32_t vht_supported_datarate_bw80_gi800ns[] = {
 	[NSS_1x1_MODE - 1] = 433,
 	[NSS_2x2_MODE - 1] = 866,
 	[NSS_3x3_MODE - 1] = 1300,
 	[NSS_4x4_MODE - 1] = 1733,
 };
 
-#define VHT_GET_DATARATE_FOR_NSS_AND_GI(_nss, _is_gi400ns) \
-	(_is_gi400ns) ? \
-	vht_supported_datarate_bw80_gi400ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
-						    (_nss)) - 1] : \
-	vht_supported_datarate_bw80_gi800ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
-						    (_nss)) - 1]
+static const uint32_t vht_supported_datarate_bw80_gi800ns[] = {
+	[NSS_1x1_MODE - 1] = 390,
+	[NSS_2x2_MODE - 1] = 780,
+	[NSS_3x3_MODE - 1] = 1170,
+	[NSS_4x4_MODE - 1] = 1560,
+};
+
+static const uint32_t vht_supported_datarate_bw160_gi400ns[] = {
+	[NSS_1x1_MODE - 1] = 866,
+	[NSS_2x2_MODE - 1] = 1733,
+	[NSS_3x3_MODE - 1] = 2340,
+	[NSS_4x4_MODE - 1] = 3466,
+};
+
+static const uint32_t vht_supported_datarate_bw160_gi800ns[] = {
+	[NSS_1x1_MODE - 1] = 780,
+	[NSS_2x2_MODE - 1] = 1560,
+	[NSS_3x3_MODE - 1] = 2106,
+	[NSS_4x4_MODE - 1] = 3120,
+};
+
+#define VHT_GET_DATARATE_FOR_NSS_AND_GI(_ch_width, _nss, _is_gi400ns) \
+	((_ch_width) == CH_WIDTH_160MHZ) ? \
+		((_is_gi400ns) ? \
+			vht_supported_datarate_bw160_gi400ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
+								      (_nss)) - 1] : \
+			vht_supported_datarate_bw160_gi800ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
+								      (_nss)) - 1]) : \
+		((_is_gi400ns) ? \
+			vht_supported_datarate_bw80_gi400ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
+								     (_nss)) - 1] : \
+			vht_supported_datarate_bw80_gi800ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
+								     (_nss)) - 1])
+
+/* Backward compatibility wrapper - defaults to 80MHz bandwidth */
+#define VHT_GET_DATARATE_FOR_NSS_AND_GI_LEGACY(_nss, _is_gi400ns) \
+	VHT_GET_DATARATE_FOR_NSS_AND_GI(CH_WIDTH_80MHZ, (_nss), (_is_gi400ns))
 
 #define VHT_CAP_NO_160M_SUPP 0
 #define VHT_CAP_160_SUPP 1

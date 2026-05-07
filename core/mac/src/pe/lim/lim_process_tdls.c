@@ -1061,6 +1061,7 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 	qdf_size_t val_len;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	bool is_wideband;
+	enum phy_ch_width ch_width;
 
 	is_wideband =
 		wlan_cfg80211_tdls_is_fw_wideband_capable(pe_session->vdev);
@@ -1150,12 +1151,20 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 				vht_cap_info->rx_supp_data_rate;
 			vhtCap->txMCSMap = vht_cap_info->tx_mcs_map;
 			vhtCap->txSupDataRate = vht_cap_info->tx_supp_data_rate;
+
+			ch_width = (vhtCap->supportedChannelWidthSet >= VHT_CAP_160_SUPP) ?
+					CH_WIDTH_160MHZ : CH_WIDTH_80MHZ;
+
 			vhtCap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
 			vhtCap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
 			vhtCap->txSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true);
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+								nss,
+								true);
 			vhtCap->rxHighSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true);
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+								nss,
+								true);
 		} else {
 			vhtCap->present = 0;
 		}

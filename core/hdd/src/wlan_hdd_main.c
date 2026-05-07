@@ -2707,11 +2707,21 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not update vht capabilities");
 
+	/* Determine channel width for data rate selection:
+	 * CH_WIDTH_160MHZ (3) if 160MHz or 80+80MHz is supported,
+	 * CH_WIDTH_80MHZ (2) otherwise (default 80MHz)
+	 */
+	ch_width = (vht_cfg->supp_chan_width &
+		    ((1 << CH_WIDTH_160MHZ) | (1 << CH_WIDTH_80P80MHZ))) ?
+		    CH_WIDTH_160MHZ : CH_WIDTH_80MHZ;
+
 	tx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_tx_chains,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							cfg->max_tx_chains,
 							true);
 	rx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_rx_chains,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							cfg->max_rx_chains,
 							true);
 
 	status = ucfg_mlme_cfg_set_vht_rx_supp_data_rate(hdd_ctx->psoc,
@@ -2726,11 +2736,16 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 
 	/* Update the real highest data rate to wiphy */
 	if (vht_cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
+		if (ch_width > CH_WIDTH_80MHZ)
+			ch_width = CH_WIDTH_80MHZ;
+
 		tx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_tx_chains,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							cfg->max_tx_chains,
 							false);
 		rx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_rx_chains,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
+							cfg->max_rx_chains,
 							false);
 	}
 
