@@ -1646,12 +1646,13 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 	struct nlattr *entries_attr, *entry_attr, *mcs_attr, *mcs_entry;
 	uint32_t i;
 	uint32_t skb_len;
-	uint8_t link_id;
+	uint8_t link_id = WLAN_INVALID_LINK_ID;
 	uint8_t qca_type;
 	uint8_t qca_subtype;
 	uint8_t qca_role;
 	uint8_t qca_reason;
-	bool is_mlo;
+	bool is_mlo = false;
+	struct qdf_mac_addr dut_mac_addr;
 	int attr;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -1665,6 +1666,36 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 	if (!adapter) {
 		hdd_err("TDLS stats: no STA/P2P-client adapter found");
 		return;
+	}
+
+	/*
+	 * Determine the DUT MAC address to report:
+	 *   - MLO session  : use the MLD address of the vdev
+	 *   - non-MLO session: use the self (link) MAC address of the vdev
+	 * Also capture link_id for MLO sessions so we can emit it later
+	 * without a second vdev look-up.
+	 */
+	link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							 entry->session_id,
+							 WLAN_OSIF_ID);
+	if (link_vdev) {
+		is_mlo = wlan_vdev_mlme_is_mlo_vdev(link_vdev);
+		if (is_mlo) {
+			qdf_mem_copy(dut_mac_addr.bytes,
+				     wlan_vdev_mlme_get_mldaddr(link_vdev),
+				     QDF_MAC_ADDR_SIZE);
+			link_id = wlan_vdev_get_link_id(link_vdev);
+		} else {
+			qdf_mem_copy(dut_mac_addr.bytes,
+				     wlan_vdev_mlme_get_macaddr(link_vdev),
+				     QDF_MAC_ADDR_SIZE);
+		}
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_OSIF_ID);
+	} else {
+		/* Fallback: vdev not found, use deflink address */
+		qdf_mem_copy(dut_mac_addr.bytes,
+			     adapter->deflink->link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
 	}
 
 	skb_len = hdd_tdls_stats_entry_skb_len();
@@ -1691,10 +1722,13 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 	if (!entry_attr)
 		goto fail;
 
-	/* DUT MAC address (local interface MAC) */
+	/*
+	 * DUT MAC address:
+	 *   MLO     -> MLD address
+	 *   non-MLO -> self (link) MAC address
+	 */
 	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_DUT_MAC_ADDR;
-	if (nla_put(skb, attr, QDF_MAC_ADDR_SIZE,
-		    adapter->deflink->link_addr.bytes))
+	if (nla_put(skb, attr, QDF_MAC_ADDR_SIZE, dut_mac_addr.bytes))
 		goto fail;
 
 	/* Peer MAC address */
@@ -1812,22 +1846,10 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	/* MLO link ID — derive from vdev using session_id as vdev_id */
-	link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-				psoc, entry->session_id,
-				WLAN_OSIF_ID);
-	if (link_vdev) {
-		link_id = wlan_vdev_get_link_id(link_vdev);
-		is_mlo = wlan_vdev_mlme_is_mlo_vdev(link_vdev);
-		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_OSIF_ID);
-
-		if (!is_mlo)
-			link_id = WLAN_INVALID_LINK_ID;
-
-		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LINK_ID;
-		if (nla_put_u8(skb, attr, link_id))
-			goto fail;
-	}
+	/* MLO link ID — cached from the early vdev lookup above */
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LINK_ID;
+	if (nla_put_u8(skb, attr, link_id))
+		goto fail;
 
 	/*
 	 * Timestamp: entry stores milliseconds since boot; vendor attr
