@@ -3664,6 +3664,42 @@ int wma_passthru_get_tsf_timer_resp_handler(ol_scn_t scn, uint8_t *event_buf,
 }
 
 static
+int wma_vdev_chan_hop_status_resp_handler(ol_scn_t scn, uint8_t *event_buf,
+					  uint32_t len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)scn;
+	struct vdev_chan_hop_status_response response = {0};
+	QDF_STATUS status;
+
+	if (!scn || !event_buf) {
+		wma_err("scn: 0x%pK, data: 0x%pK", scn, event_buf);
+		return -EINVAL;
+	}
+
+	/* Use the WMI extract function to parse the event */
+	status = wmi_extract_vdev_chan_hop_status(wma_handle->wmi_handle,
+						  event_buf, &response);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to extract channel hop status");
+		return -EINVAL;
+	}
+
+	wma_debug("Channel hop status: vdev_id=%d, num_slots=%d, hopping_request_tsf=%u, current_channel_index=%u",
+		  response.vdev_id, response.num_slots,
+		  response.hopping_request_tsf, response.current_channel_index);
+
+	if (wma_handle->chan_hop_status_cb)
+		wma_handle->chan_hop_status_cb
+			(wma_handle->chan_hop_status_cb_ctx,
+			 &response);
+
+	wma_handle->chan_hop_status_cb = NULL;
+	wma_handle->chan_hop_status_cb_ctx = NULL;
+
+	return 0;
+}
+
+static
 void wma_register_passthru_events(tp_wma_handle wma_handle)
 {
 	QDF_STATUS status;
@@ -3673,6 +3709,14 @@ void wma_register_passthru_events(tp_wma_handle wma_handle)
 					    wma_passthru_get_tsf_timer_resp_handler);
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("Failed to register Passthru TSF resp event cb");
+
+	status =
+	wmi_unified_register_event(wma_handle->wmi_handle,
+				   wmi_vdev_chan_hop_status_report_event_id,
+				   wma_vdev_chan_hop_status_resp_handler);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to register chan hop status event cb");
 }
 #else
 static inline
