@@ -16155,6 +16155,128 @@ hdd_fill_vdev_up_nss_chains_limits(struct wlan_hdd_link_info *link_info,
 	return QDF_STATUS_SUCCESS;
 }
 
+static int hdd_get_per_band_nss_chains_value(
+		struct wlan_hdd_link_info *link_info,
+		uint32_t attr_id)
+{
+	struct wlan_mlme_nss_chains limits = { 0 };
+	struct wlan_mlme_nss_chains *dyn;
+	QDF_STATUS status;
+	enum nss_chains_band_info band;
+	uint8_t val;
+
+	status = hdd_fill_vdev_up_nss_chains_limits(link_info, &limits);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to fill NSS/chain limits");
+		return -EINVAL;
+	}
+
+	dyn = ucfg_mlme_get_dynamic_vdev_config(link_info->vdev);
+	if (!dyn) {
+		hdd_err("Failed to get dynamic vdev config");
+		return -EINVAL;
+	}
+
+	switch (attr_id) {
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		val = QDF_MIN(limits.tx_nss[band], dyn->tx_nss[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		val = QDF_MIN(limits.rx_nss[band], dyn->rx_nss[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		val = QDF_MIN(limits.tx_nss[band], dyn->tx_nss[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		val = QDF_MIN(limits.rx_nss[band], dyn->rx_nss[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		val = QDF_MIN(limits.num_tx_chains[band],
+			      dyn->num_tx_chains[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ:
+		band = NSS_CHAINS_BAND_2GHZ;
+		val = QDF_MIN(limits.num_rx_chains[band],
+			      dyn->num_rx_chains[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		val = QDF_MIN(limits.num_tx_chains[band],
+			      dyn->num_tx_chains[band]);
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ:
+		band = NSS_CHAINS_BAND_5GHZ;
+		val = QDF_MIN(limits.num_rx_chains[band],
+			      dyn->num_rx_chains[band]);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return val;
+}
+
+static int hdd_get_connected_nss_chains_value(
+		struct wlan_hdd_link_info *link_info,
+		uint32_t id, uint8_t *value)
+{
+	uint32_t id_2g, id_5g;
+	int v2g, v5g;
+
+	if (!value)
+		return -EINVAL;
+
+	switch (id) {
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS:
+		id_2g = QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ;
+		id_5g = QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ;
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS:
+		id_2g = QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ;
+		id_5g = QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ;
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS:
+		id_2g = QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ;
+		id_5g = QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ;
+		break;
+
+	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS:
+		id_2g = QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ;
+		id_5g = QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	v2g = hdd_get_per_band_nss_chains_value(link_info, id_2g);
+	if (v2g < 0)
+		return v2g;
+
+	v5g = hdd_get_per_band_nss_chains_value(link_info, id_5g);
+	if (v5g < 0)
+		return v5g;
+
+	*value = QDF_MAX((uint8_t)v2g, (uint8_t)v5g);
+
+	return 0;
+}
+
 static int hdd_get_nss_chains_config(struct wlan_hdd_link_info *link_info,
 				     struct sk_buff *skb,
 				     uint32_t id)
@@ -16165,16 +16287,25 @@ static int hdd_get_nss_chains_config(struct wlan_hdd_link_info *link_info,
 	uint8_t value = 0;
 	int ret = 0;
 
-	if (hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_err("Rejecting as interface is in connected state");
-		return -EINVAL;
-	}
-
 	if (!hdd_ctx->dynamic_nss_chains_support) {
 		hdd_err("Dynamic nss chain update is not supported");
 		return -EOPNOTSUPP;
 	}
 
+	if (hdd_is_vdev_in_conn_state(link_info)) {
+		ret = hdd_get_connected_nss_chains_value(link_info, id, &value);
+		if (ret)
+			return ret;
+
+		if (nla_put_u8(skb, id, value)) {
+			hdd_err("nla_put_u8 failed for attr %u", id);
+			return -EMSGSIZE;
+		}
+
+		return 0;
+	}
+
+	/* Not connected case: use dynamic vdev config directly */
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Failed to get vdev reference");
@@ -16193,44 +16324,43 @@ static int hdd_get_nss_chains_config(struct wlan_hdd_link_info *link_info,
 		value = QDF_MAX(dyn->tx_nss[NSS_CHAINS_BAND_2GHZ],
 				dyn->tx_nss[NSS_CHAINS_BAND_5GHZ]);
 		break;
+
 	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS:
 		value = QDF_MAX(dyn->rx_nss[NSS_CHAINS_BAND_2GHZ],
 				dyn->rx_nss[NSS_CHAINS_BAND_5GHZ]);
 		break;
+
 	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS:
 		value = QDF_MAX(dyn->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
 				dyn->num_tx_chains[NSS_CHAINS_BAND_5GHZ]);
 		break;
+
 	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS:
 		value = QDF_MAX(dyn->num_rx_chains[NSS_CHAINS_BAND_2GHZ],
 				dyn->num_rx_chains[NSS_CHAINS_BAND_5GHZ]);
 		break;
+
 	default:
 		ret = -EINVAL;
 		goto put_vdev;
 	}
 
 	if (nla_put_u8(skb, id, value)) {
-		hdd_err("nla_put failure");
-		ret = -EINVAL;
+		hdd_err("nla_put_u8 failed for attr %u", id);
+		ret = -EMSGSIZE;
 	}
 
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-
 	return ret;
 }
 
 static int hdd_get_per_band_nss_chains_config(struct wlan_hdd_link_info *link_info,
 					      struct sk_buff *skb,
-					      uint32_t id)
+					      uint32_t attr_id)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	struct wlan_mlme_nss_chains limits = {0};
-	struct wlan_mlme_nss_chains *dyn;
-	QDF_STATUS status;
-	uint8_t value = 0;
-	enum nss_chains_band_info band;
+	int ret;
 
 	if (!hdd_is_vdev_in_conn_state(link_info)) {
 		hdd_err("Not in connected state");
@@ -16238,66 +16368,17 @@ static int hdd_get_per_band_nss_chains_config(struct wlan_hdd_link_info *link_in
 	}
 
 	if (!hdd_ctx->dynamic_nss_chains_support) {
-		hdd_err("Dynamic nss chain update is not supported");
+		hdd_err("Dynamic NSS/chain update is not supported");
 		return -EOPNOTSUPP;
 	}
 
-	status = hdd_fill_vdev_up_nss_chains_limits(link_info, &limits);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to fill limits");
-		return -EINVAL;
-	}
+	ret = hdd_get_per_band_nss_chains_value(link_info, attr_id);
+	if (ret < 0)
+		return ret;
 
-	dyn = ucfg_mlme_get_dynamic_vdev_config(link_info->vdev);
-	if (!dyn) {
-		hdd_err("Failed to get dynamic config");
-		return -EINVAL;
-	}
-
-	switch (id) {
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ:
-		band = NSS_CHAINS_BAND_2GHZ;
-		value = QDF_MIN(limits.tx_nss[band], dyn->tx_nss[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ:
-		band = NSS_CHAINS_BAND_2GHZ;
-		value = QDF_MIN(limits.rx_nss[band], dyn->rx_nss[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ:
-		band = NSS_CHAINS_BAND_5GHZ;
-		value = QDF_MIN(limits.tx_nss[band], dyn->tx_nss[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ:
-		band = NSS_CHAINS_BAND_5GHZ;
-		value = QDF_MIN(limits.rx_nss[band], dyn->rx_nss[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ:
-		band = NSS_CHAINS_BAND_2GHZ;
-		value = QDF_MIN(limits.num_tx_chains[band],
-				dyn->num_tx_chains[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ:
-		band = NSS_CHAINS_BAND_2GHZ;
-		value = QDF_MIN(limits.num_rx_chains[band],
-				dyn->num_rx_chains[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ:
-		band = NSS_CHAINS_BAND_5GHZ;
-		value = QDF_MIN(limits.num_tx_chains[band],
-				dyn->num_tx_chains[band]);
-		break;
-	case QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ:
-		band = NSS_CHAINS_BAND_5GHZ;
-		value = QDF_MIN(limits.num_rx_chains[band],
-				dyn->num_rx_chains[band]);
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (nla_put_u8(skb, id, value)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
+	if (nla_put_u8(skb, attr_id, ret)) {
+		hdd_err("nla_put_u8 failed for attr %u", attr_id);
+		return -EMSGSIZE;
 	}
 
 	return 0;
@@ -16633,7 +16714,7 @@ hdd_parse_vendor_nss_chains_per_band_req(struct wlan_mlme_nss_chains *req,
 		tx_5g = nla_get_u8(tb[tx_5g_attr]);
 		attr_count++;
 	}
-	if (tb[tx_5g_attr]) {
+	if (tb[rx_5g_attr]) {
 		rx_5g = nla_get_u8(tb[rx_5g_attr]);
 		attr_count++;
 	}
@@ -16950,33 +17031,32 @@ hdd_validate_and_apply_nss_chains_req(struct wlan_hdd_link_info *link_info,
 	return status;
 }
 
-static int hdd_config_vendor_nss_chains_per_band(struct wlan_hdd_link_info *link_info,
-						 struct nlattr *tb[])
+/**
+ * hdd_apply_nss_chains_vdev_up_req() - Apply NSS/chains config to
+ *                                      a connected vdev
+ * @link_info: pointer to link info
+ * @req: NSS/chains request with per-band fields already populated
+ *
+ * Shared helper used by both hdd_config_vendor_nss_chains (band-agnostic path)
+ * and hdd_config_vendor_nss_chains_per_band (per-band path) to apply an
+ * NSS/chains configuration to a vdev that is in connected/started state.
+ *
+ * Steps:
+ *  1. Fetch hardware capability limits for the connected vdev
+ *  2. Resolve non-forced fields against those limits
+ *  3. Validate and push the final config to firmware via SME
+ *
+ * Return: 0 on success, otherwise an errno
+ */
+static int
+hdd_apply_nss_chains_vdev_up_req(struct wlan_hdd_link_info *link_info,
+				 struct wlan_mlme_nss_chains *req)
 {
-	uint8_t ll_lt_sap_vdev_id;
-	struct wlan_mlme_nss_chains req = {0};
 	struct wlan_mlme_nss_chains limits = {0};
-	struct wlan_objmgr_vdev *vdev;
-	enum wlan_vendor_nss_chains_req_type nss_req_type, chains_req_type;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-
-	nss_req_type =
-		hdd_parse_vendor_nss_chains_per_band_req(&req, tb,
-						WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS);
-	chains_req_type =
-		hdd_parse_vendor_nss_chains_per_band_req(&req, tb,
-						WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS);
-
-	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE &&
-	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE)
-		return 0;
-
-	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID &&
-	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID) {
-		hdd_err("Invalid NSS/Chain configuration");
-		return -EINVAL;
-	}
+	uint8_t ll_lt_sap_vdev_id;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		hdd_err("Invalid hdd_ctx");
@@ -17021,12 +17101,12 @@ static int hdd_config_vendor_nss_chains_per_band(struct wlan_hdd_link_info *link
 		goto vdev_ref;
 
 	status = hdd_resolve_vdev_up_non_force_nss_chains_fields(link_info,
-								 &req, &limits);
+								 req, &limits);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_ref;
 
 	status = hdd_validate_and_apply_nss_chains_req(link_info,
-						       &req, &limits);
+						       req, &limits);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_ref;
 
@@ -17037,6 +17117,35 @@ static int hdd_config_vendor_nss_chains_per_band(struct wlan_hdd_link_info *link
 vdev_ref:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return -EINVAL;
+}
+
+static int hdd_config_vendor_nss_chains_per_band(
+		struct wlan_hdd_link_info *link_info,
+		struct nlattr *tb[])
+{
+	enum wlan_vendor_nss_chains_req_type nss_req_type, chains_req_type;
+	struct wlan_mlme_nss_chains req = {0};
+
+	nss_req_type =
+		hdd_parse_vendor_nss_chains_per_band_req(
+				&req, tb,
+				WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS);
+	chains_req_type =
+		hdd_parse_vendor_nss_chains_per_band_req(
+				&req, tb,
+				WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS);
+
+	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE &&
+	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE)
+		return 0;
+
+	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID &&
+	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID) {
+		hdd_err("Invalid NSS/Chain configuration");
+		return -EINVAL;
+	}
+
+	return hdd_apply_nss_chains_vdev_up_req(link_info, &req);
 }
 
 static QDF_STATUS
@@ -17171,8 +17280,8 @@ static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 	}
 
 	if (hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_err("Can't update nss values in connected state");
-		goto vdev_ref;
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return hdd_apply_nss_chains_vdev_up_req(link_info, &req);
 	}
 
 	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits,
