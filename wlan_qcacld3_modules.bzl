@@ -2979,7 +2979,7 @@ def define_dist(target, variant, chipsets):
             strip_prefix = strip_prefix.files_only(),
         )
         pkg_install(
-            name = "{}_modules_dist".format(tvc),
+            name = "{}_wlan_qcacld3_modules_dist".format(tvc),
             srcs = [":{}_dist_files".format(tvc)],
             destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         )
@@ -2993,7 +2993,7 @@ def define_dist(target, variant, chipsets):
         )
 
         pkg_install(
-            name = "{}_all_modules_dist".format(tv),
+            name = "{}_wlan_qcacld3_all_modules_dist".format(tv),
             srcs = [":{}_dist_files".format(tv)],
             destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         )
