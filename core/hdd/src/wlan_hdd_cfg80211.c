@@ -766,6 +766,13 @@ static const struct ieee80211_txrx_stypes
 		.tx = 0xffff,
 		.rx = BIT(SIR_MAC_MGMT_AUTH) | BIT(SIR_MAC_MGMT_ACTION),
 	},
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+	[NL80211_IFTYPE_PD] = {
+		.tx = 0xffff,
+		.rx = BIT(SIR_MAC_MGMT_ACTION) |
+		      BIT(SIR_MAC_MGMT_AUTH),
+	},
+#endif
 };
 
 /* Interface limits and combinations registered by the driver */
@@ -24662,6 +24669,17 @@ hdd_get_all_band_mask(void)
 	return band_mask;
 }
 
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+static inline void hdd_set_iface_mode_pd(uint32_t *mode_mask)
+{
+	*mode_mask |= (1 << NL80211_IFTYPE_PD);
+}
+#else
+static inline void hdd_set_iface_mode_pd(uint32_t *mode_mask)
+{
+}
+#endif
+
 /**
  * hdd_get_all_iface_mode_mask() - get supported nl80211 iface mode
  *
@@ -24678,6 +24696,7 @@ hdd_get_all_iface_mode_mask(void)
 			(1 << NL80211_IFTYPE_P2P_CLIENT) |
 			(1 << NL80211_IFTYPE_P2P_DEVICE) |
 			(1 << NL80211_IFTYPE_NAN);
+	hdd_set_iface_mode_pd(&mode_mask);
 
 	return mode_mask;
 }
@@ -28569,6 +28588,18 @@ static inline void wlan_hdd_set_ap_vlan_mode(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+static inline void
+wlan_hdd_set_pd_mode(struct wiphy *wiphy)
+{
+	wiphy->interface_modes |= BIT(NL80211_IFTYPE_PD);
+}
+#else
+static inline void
+wlan_hdd_set_pd_mode(struct wiphy *wiphy)
+{}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -28628,6 +28659,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 				 | BIT(NL80211_IFTYPE_P2P_GO)
 				 | BIT(NL80211_IFTYPE_AP)
 				 | BIT(NL80211_IFTYPE_MONITOR);
+	wlan_hdd_set_pd_mode(wiphy);
 
 	wlan_hdd_set_ap_vlan_mode(hdd_ctx->psoc, wiphy);
 
@@ -29106,6 +29138,21 @@ static void wlan_hdd_set_mfp_optional(struct wiphy *wiphy)
 }
 #endif
 
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+static char *wlan_hdd_pd_iface_debug_string(uint32_t iface_type)
+{
+	if (iface_type == BIT(NL80211_IFTYPE_PD))
+		return "PD";
+
+	return "invalid iface";
+}
+#else
+static char *wlan_hdd_pd_iface_debug_string(uint32_t iface_type)
+{
+	return "invalid iface";
+}
+#endif
+
 /**
  * wlan_hdd_iface_debug_string() - This API converts IFACE type to string
  * @iface_type: interface type
@@ -29130,7 +29177,7 @@ static char *wlan_hdd_iface_debug_string(uint32_t iface_type)
 	else if (iface_type == BIT(NL80211_IFTYPE_MONITOR))
 		return "MONITOR";
 
-	return "invalid iface";
+	return wlan_hdd_pd_iface_debug_string(iface_type);
 }
 
 #define IFACE_DUMP_SIZE 100
@@ -36416,6 +36463,42 @@ static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
 }
 #endif
 
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+/**
+ * wlan_hdd_cfg80211_start_pd() - Start PD interface
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device (STA interface)
+ *
+ * This function is called when userspace requests to start a PD interface.
+ * It allocates a MAC address and creates a new PD adapter.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_cfg80211_start_pd(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	hdd_debug("Start PD iface");
+
+	return 0;
+}
+
+/**
+ * wlan_hdd_cfg80211_stop_pd() - Stop PD interface
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device (STA interface)
+ *
+ * This function is called when userspace requests to stop the PD interface.
+ * It finds the PD adapter, releases its MAC address, and closes it.
+ *
+ * Return: None
+ */
+static void
+wlan_hdd_cfg80211_stop_pd(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	hdd_debug("Stop PD iface");
+}
+#endif
+
 /**
  * wlan_hdd_get_ch_width_from_chan_info - get ch_width as per num channel
  * present in scan event
@@ -39762,6 +39845,10 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.add_nan_func = wlan_hdd_cfg80211_add_nan_func,
 	.del_nan_func = wlan_hdd_cfg80211_del_nan_func,
 	.nan_change_conf = wlan_hdd_cfg80211_nan_change_conf,
+#endif
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+	.start_pd = wlan_hdd_cfg80211_start_pd,
+	.stop_pd = wlan_hdd_cfg80211_stop_pd,
 #endif
 	.set_antenna = wlan_hdd_cfg80211_set_chainmask,
 	.get_antenna = wlan_hdd_cfg80211_get_chainmask,

@@ -1471,6 +1471,60 @@ static void wlan_hdd_set_nan_if_type(struct hdd_adapter *adapter)
 }
 #endif
 
+#if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+/**
+ * wlan_hdd_convert_pd_type() - Convert nl type to qdf type
+ * @nl_type: NL80211 interface type
+ * @out_qdf_type: QDF type for the given nl_type
+ *
+ * Convert nl type to QDF type
+ *
+ * Return: QDF_STATUS_SUCCESS if converted, failure otherwise.
+ */
+static QDF_STATUS wlan_hdd_convert_pd_type(enum nl80211_iftype nl_type,
+					   enum QDF_OPMODE *out_qdf_type)
+{
+	if (nl_type == NL80211_IFTYPE_PD) {
+		*out_qdf_type = QDF_PD_MODE;
+		return QDF_STATUS_SUCCESS;
+	}
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
+ * wlan_hdd_convert_pd_qdf_mode_to_nl_type() - Convert qdf type to nl type
+ * @nl_type: NL80211 interface type
+ * @qdf_type: QDF type
+ *
+ * Convert QDF type to nl type
+ *
+ * Return: QDF_STATUS_SUCCESS if converted, failure otherwise.
+ */
+static QDF_STATUS wlan_hdd_convert_pd_qdf_mode_to_nl_type(
+						enum nl80211_iftype *nl_type,
+						enum QDF_OPMODE qdf_type)
+{
+	if (qdf_type == QDF_PD_MODE) {
+		*nl_type = NL80211_IFTYPE_PD;
+		return QDF_STATUS_SUCCESS;
+	}
+	return QDF_STATUS_E_INVAL;
+}
+#else
+static QDF_STATUS wlan_hdd_convert_pd_type(enum nl80211_iftype nl_type,
+					   enum QDF_OPMODE *out_qdf_type)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
+static QDF_STATUS wlan_hdd_convert_pd_qdf_mode_to_nl_type(
+						enum nl80211_iftype *nl_type,
+						enum QDF_OPMODE qdf_type)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
 QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 				    enum QDF_OPMODE *out_qdf_type)
 {
@@ -1515,6 +1569,9 @@ QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 		fallthrough;
 	default:
 		status = wlan_hdd_convert_nan_type(nl_type, out_qdf_type);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			break;
+		status = wlan_hdd_convert_pd_type(nl_type, out_qdf_type);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			break;
 		hdd_err("Invalid nl80211 interface type %d", nl_type);
@@ -1566,6 +1623,10 @@ static QDF_STATUS hdd_qdf_to_nl_iface_type(enum nl80211_iftype *nl_type,
 	default:
 		status = wlan_hdd_convert_nan_qdf_mode_to_nl_type(nl_type,
 								  qdf_type);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			break;
+		status = wlan_hdd_convert_pd_qdf_mode_to_nl_type(nl_type,
+								 qdf_type);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			break;
 		hdd_err("Invalid qdf %d", qdf_type);
@@ -4257,6 +4318,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 		}
 		fallthrough;
 	case QDF_OCB_MODE:
+	case QDF_PD_MODE:
 	case QDF_NAN_DISC_MODE:
 		ret = hdd_start_station_adapter(adapter);
 		if (ret)
@@ -7907,8 +7969,9 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	dev->tx_queue_len = HDD_NETDEV_TX_QUEUE_LEN;
 	adapter->wdev.wiphy = hdd_ctx->wiphy;
 
-	if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc) &&
-	    session_type == QDF_NAN_DISC_MODE) {
+	if (session_type == QDF_PD_MODE ||
+	    (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc) &&
+	     session_type == QDF_NAN_DISC_MODE)) {
 		adapter->wdev.netdev = NULL;
 		qdf_mem_copy(adapter->wdev.address, mac_addr,
 			     sizeof(tSirMacAddr));
@@ -10115,6 +10178,18 @@ static void hdd_adapter_init_link_info(struct hdd_adapter *adapter)
 	}
 }
 
+#if defined(WLAN_FEATURE_RTT_11AZ_SUPPORT) && defined(CFG80211_PD_SUPPORT)
+static inline void
+wlan_hdd_set_pd_if_type(struct hdd_adapter *adapter)
+{
+	adapter->wdev.iftype = NL80211_IFTYPE_PD;
+}
+#else
+static inline void
+wlan_hdd_set_pd_if_type(struct hdd_adapter *adapter)
+{}
+#endif
+
 /**
  * hdd_open_adapter() - open and setup the hdd adapter
  * @hdd_ctx: global hdd context
@@ -10196,6 +10271,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 	case QDF_MONITOR_MODE:
 	case QDF_NAN_DISC_MODE:
 	case QDF_PASSTHRU_MODE:
+	case QDF_PD_MODE:
 		adapter = hdd_alloc_station_adapter(hdd_ctx, mac_addr,
 						    name_assign_type,
 						    iface_name, session_type);
@@ -10208,8 +10284,9 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 		ndev = adapter->dev;
 
-		if (session_type != QDF_NAN_DISC_MODE ||
-		    !ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		if (session_type != QDF_PD_MODE &&
+		    (session_type != QDF_NAN_DISC_MODE ||
+		     !ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))) {
 			status = ucfg_dp_create_intf(
 						hdd_ctx->psoc,
 						&adapter->mac_addr,
@@ -10227,13 +10304,16 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			adapter->wdev.iftype = NL80211_IFTYPE_MONITOR;
 		else if (QDF_NAN_DISC_MODE == session_type)
 			wlan_hdd_set_nan_if_type(adapter);
+		else if (QDF_PD_MODE == session_type)
+			wlan_hdd_set_pd_if_type(adapter);
 		else
 			adapter->wdev.iftype = NL80211_IFTYPE_STATION;
 
 		adapter->device_mode = session_type;
 
-		if (session_type == QDF_NAN_DISC_MODE &&
-		    ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
+		if (session_type == QDF_PD_MODE ||
+		    (session_type == QDF_NAN_DISC_MODE &&
+		     ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)))
 			goto update_adapter;
 
 		/*

@@ -973,6 +973,16 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	case QDF_STA_MODE:
 	case QDF_MONITOR_MODE:
 		break;
+	case QDF_PD_MODE:
+		if (policy_mgr_get_connection_count_with_mlo(hdd_ctx->psoc) > 1) {
+			hdd_err("PMSR not allowed when concurrency exists");
+			return ERR_PTR(-EAGAIN);
+		}
+
+		if (hdd_is_roaming_in_progress(hdd_ctx))
+			return ERR_PTR(-EAGAIN);
+
+		break;
 	case QDF_NAN_DISC_MODE:
 		if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
 			break;
@@ -1058,9 +1068,15 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 			mode = QDF_P2P_DEVICE_MODE;
 		}
 
-		device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
-		if (!device_address)
-			return ERR_PTR(-EINVAL);
+		if (mode == QDF_PD_MODE) {
+			device_address = (uint8_t *)params->macaddr;
+			hdd_debug("PD_MODE : mac_addr: " QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(device_address));
+		} else {
+			device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
+			if (!device_address)
+				return ERR_PTR(-EINVAL);
+		}
 
 		if (policy_mgr_mlo_sap_concurrency_allow(hdd_ctx->psoc) &&
 		    (QDF_SAP_MODE == mode || QDF_STA_MODE == mode))
