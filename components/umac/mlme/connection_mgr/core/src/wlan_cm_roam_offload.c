@@ -6579,7 +6579,10 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	 */
 	cm_store_sae_single_pmk_to_global_cache(psoc, pdev, vdev);
 
-	wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
+	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) &&
+	    !MLME_IS_ROAMING_IN_PROG(psoc, vdev_id))
+		wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
+
 	wlan_cm_roam_state_change(pdev, vdev_id,
 				  WLAN_ROAM_RSO_ENABLED,
 				  REASON_CTX_INIT);
