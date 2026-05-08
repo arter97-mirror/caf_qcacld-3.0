@@ -5337,7 +5337,6 @@ cm_roam_switch_to_roam_start(struct wlan_objmgr_pdev *pdev,
 	case WLAN_ROAM_RSO_ENABLED:
 		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAMING_IN_PROG);
 		break;
-
 	case WLAN_ROAM_RSO_STOPPED:
 		/*
 		 * When supplicant has disabled roaming, roam invoke triggered
@@ -5354,7 +5353,19 @@ cm_roam_switch_to_roam_start(struct wlan_objmgr_pdev *pdev,
 		fallthrough;
 	case WLAN_ROAM_INIT:
 	case WLAN_ROAM_DEINIT:
-	case WLAN_ROAM_SYNCH_IN_PROG:
+	case WLAN_ROAM_SYNCH_IN_PROG: {
+		bool is_host_4way_hs_supported =
+			wlan_psoc_nif_fw_ext2_cap_get(
+				psoc, WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
+
+		if (is_host_4way_hs_supported) {
+			mlme_set_roam_state(psoc, vdev_id,
+					    WLAN_ROAMING_IN_PROG);
+			break;
+		}
+
+		fallthrough;
+	}
 	default:
 		mlme_err("ROAM: Roaming start received in invalid state: %d",
 			 cur_state);
