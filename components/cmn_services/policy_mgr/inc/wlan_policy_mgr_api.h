@@ -362,6 +362,34 @@ policy_mgr_get_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 					   bool *use_sap_original_bw);
 
 /**
+ * policy_mgr_is_roamed_eapol_in_progress() - Check if STA roam based
+ * EAPOL in progress
+ * @psoc: PSOC object
+ *
+ * This function checks if any STA vdev is currently in
+ * ROAM_IN_PROG or ROAM_SYNCH_IN_PROG state,
+ * which indicates that 4-way handshake is pending after roaming.
+ *
+ * Return: true if any STA is in ROAM_SYNCH_IN_PROG, false otherwise
+ */
+bool policy_mgr_is_roamed_eapol_in_progress(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_trigger_deferred_sap_restart() - Trigger deferred SAP restart
+ * @psoc: PSOC object
+ * @vdev_id: vdev idx
+ * @is_roam: flag to distinguish between roam and initial connect
+ *
+ * This function checks if SAP restart is deferred, and if so, triggers
+ * the SAP restart and clears the deferral flag. This should be called
+ * after 4-way handshake completion (key installation).
+ *
+ * Return: None
+ */
+void policy_mgr_trigger_deferred_sap_restart(struct wlan_objmgr_psoc *psoc,
+					     uint32_t vdev_id,
+					     bool is_roam);
+/**
  * policy_mgr_get_dfs_sta_sap_go_scc_movement() - returns SAP / GO's movement
  * in STA+SAP DFS SCC concurrency to whether SAP / GO should be moved first
  * or not.

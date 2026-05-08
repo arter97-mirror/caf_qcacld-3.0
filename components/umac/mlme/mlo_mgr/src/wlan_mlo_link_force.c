@@ -62,6 +62,9 @@ void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    uint8_t *ml_num_link,
 			    uint32_t *ml_link_bitmap);
 
+/* QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_MIXED */
+#define CONTROL_MODE_MIXED	       2
+
 static uint32_t
 ml_nlink_set_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
@@ -4740,8 +4743,13 @@ ml_nlink_validate_request(struct wlan_objmgr_psoc *psoc,
 				  source, request->force_active_num);
 			return false;
 		}
+
+		/* Avoid check for CONTROL_MODE_MIXED, as force_active_num
+		 * will come from userspace and fw expects to set all the link.
+		 */
 		if (request->force_active_num > 1 &&
-		    combined->force_inactive_num) {
+		    combined->force_inactive_num &&
+		    request->link_ctrl_mode != CONTROL_MODE_MIXED) {
 			link_bitmap = ~request->force_active_num_bitmap &
 				combined->force_inactive_num_bitmap;
 			if (!link_bitmap) {
@@ -6034,6 +6042,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 						SET_LINK_FROM_VENDOR_CMD);
 		break;
 	case LINK_CONTROL_MODE_USER:
+		req.link_ctrl_mode = data->evt.vendor.link_ctrl_mode;
 		req.mode = data->evt.vendor.mode;
 		req.reason = data->evt.vendor.reason;
 		req.force_active_bitmap = data->evt.vendor.link_bitmap;
@@ -6048,6 +6057,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 						   SET_LINK_FROM_VENDOR_CMD);
 		break;
 	case LINK_CONTROL_MODE_MIXED:
+		req.link_ctrl_mode = data->evt.vendor.link_ctrl_mode;
 		req.mode = data->evt.vendor.mode;
 		req.reason = data->evt.vendor.reason;
 		req.force_active_num = data->evt.vendor.link_num;

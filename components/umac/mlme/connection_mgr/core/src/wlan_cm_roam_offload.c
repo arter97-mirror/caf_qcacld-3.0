@@ -4876,9 +4876,21 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 		else
 			new_roam_state = WLAN_ROAM_RSO_ENABLED;
 
-		mlme_set_roam_state(psoc, vdev_id, new_roam_state);
+		/*
+		 * Check if host 4-way handshake supported.
+		 * If enabled, we need to send RSO config to FW after key
+		 * installation, so break out of switch to continue with
+		 * RSO command sending logic below.
+		 * If disabled (legacy behavior), return early as before.
+		 */
+		if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
+						   WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE)) {
+			mlme_set_roam_state(psoc, vdev_id, new_roam_state);
+			return QDF_STATUS_SUCCESS;
+		}
 
-		return QDF_STATUS_SUCCESS;
+		rso_command = ROAM_SCAN_OFFLOAD_UPDATE_CFG;
+		break;
 	case WLAN_ROAM_SYNCH_IN_PROG:
 		if (reason == REASON_ROAM_ABORT) {
 			mlme_debug("Roam synch in progress, drop Roam abort");
@@ -6420,12 +6432,10 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	 */
 	cm_store_sae_single_pmk_to_global_cache(psoc, pdev, vdev);
 
-	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
-		wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
-		wlan_cm_roam_state_change(pdev, vdev_id,
-					  WLAN_ROAM_RSO_ENABLED,
-					  REASON_CTX_INIT);
-	}
+	wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
+	wlan_cm_roam_state_change(pdev, vdev_id,
+				  WLAN_ROAM_RSO_ENABLED,
+				  REASON_CTX_INIT);
 }
 
 void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,

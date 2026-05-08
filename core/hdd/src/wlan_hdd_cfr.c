@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -225,6 +224,26 @@ nl80211_chan_width convert_ucode_bw_to_nl_bw(uint8_t bw)
 	}
 }
 
+static uint8_t
+convert_ucode_ltf_to_vendor_ltf(uint8_t ltf_type)
+{
+	switch (ltf_type) {
+	case 0:
+		return QCA_WLAN_VENDOR_CFR_LTF_TYPE_LEGACY;
+	case 1:
+		return QCA_WLAN_VENDOR_CFR_LTF_TYPE_HT;
+	case 2:
+		return QCA_WLAN_VENDOR_CFR_LTF_TYPE_VHT;
+	case 3:
+		return QCA_WLAN_VENDOR_CFR_LTF_TYPE_HE;
+	case 4:
+		return QCA_WLAN_VENDOR_CFR_LTF_TYPE_EHT;
+	default:
+		hdd_err("Invalid ltf type");
+		return QCA_WLAN_VENDOR_CFR_LTF_TYPE_LEGACY;
+	}
+}
+
 static int
 hdd_cfr_nl_put_phy_info(struct sk_buff *vendor_event,
 			struct cfr_enhanced_event_data *event_data)
@@ -302,6 +321,8 @@ hdd_cfr_nl_put_phy_info(struct sk_buff *vendor_event,
 		return -EINVAL;
 	}
 
+	event_data->ltf_type =
+		convert_ucode_ltf_to_vendor_ltf(event_data->ltf_type);
 	if (nla_put_u8(vendor_event,
 		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE,
 		       event_data->ltf_type)) {
@@ -1907,7 +1928,7 @@ wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
 release_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
 	if (ret)
-		wlan_cfg80211_reset_cfr(pcfr, 0);
+		wlan_cfg80211_stop_enh_cfr_v3(vdev, 0);
 	return ret;
 }
 

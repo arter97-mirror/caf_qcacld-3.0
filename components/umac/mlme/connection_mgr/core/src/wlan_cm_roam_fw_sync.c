@@ -1433,6 +1433,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	uint8_t vdev_id;
 	uint8_t rso_stop_req_bitmap;
 	enum roam_offload_state rso_cmd = WLAN_ROAM_RSO_ENABLED;
+	bool is_host_4way_hs_supported = false;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1544,6 +1545,9 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 						   WLAN_ROAM_DEINIT,
 						   REASON_ROAM_HANDOFF_DONE);
 
+	is_host_4way_hs_supported =
+		wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
 		if (policy_mgr_is_chan_switch_in_progress(psoc) ||
 		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))
@@ -1551,7 +1555,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  rso_cmd, REASON_CONNECT);
-	} else
+	} else if (!is_host_4way_hs_supported) {
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by
@@ -1567,6 +1571,8 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_STOPPED,
 					  REASON_DISCONNECTED);
+	}
+
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
 
