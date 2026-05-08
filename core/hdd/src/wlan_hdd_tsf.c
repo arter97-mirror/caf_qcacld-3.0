@@ -3090,6 +3090,11 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 
 	wlan_hdd_tsf_reg_update_details(adapter, ptsf);
 
+	if (!qdf_atomic_read(&hddctx->tsf.cap_tsf_flag)) {
+		hdd_info("TSF update skipped: capture inactive");
+		return -EINVAL;
+	}
+
 	tsf = &adapter->tsf;
 	tsf->cur_target_time = ((uint64_t)ptsf->tsf_high << 32 |
 			 ptsf->tsf_low);
