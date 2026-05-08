@@ -3715,7 +3715,13 @@ static bool lim_validate_vht_mcs_for_bw(uint16_t rx_mcs_map,
  *
  * This function validates the VHT MCS maps and calculates the AP's maximum
  * supported channel width based on the VHT Capabilities IE
- * (supportedChannelWidthSet field).
+ * (supportedChannelWidthSet and extended_nss_bw_supp fields).
+ *
+ * Per IEEE 802.11-2020, when supportedChannelWidthSet = 0 but
+ * extended_nss_bw_supp != 0, the AP supports 160 MHz with reduced NSS
+ * (Extended NSS BW / 4x2 mode). In this case the 160 MHz center frequency
+ * is signalled via the HT Operation IE Channel Center Frequency Segment 2
+ * field, not via the VHT Operation IE CCFS1 field.
  *
  * Return: AP max channel width on success, CH_WIDTH_INVALID if MCS maps
  *         are invalid (all spatial streams disabled).
@@ -3735,6 +3741,23 @@ enum phy_ch_width lim_get_vht_ap_max_ch_width(tDot11fIEVHTCaps *vht_caps)
 
 	switch (claimed_ch_width) {
 	case LIM_VHT_CAP_CH_WIDTH_80MHZ:
+		/*
+		 * Per IEEE 802.11-2020, when supportedChannelWidthSet = 0
+		 * but vht_extended_nss_bw_cap = 1 and
+		 * extended_nss_bw_supp != 0, the AP supports 160 MHz with
+		 * reduced NSS (Extended NSS BW / 4x2 mode).
+		 * The actual 160 MHz center frequency is indicated
+		 * via the HT Operation IE Channel Center Frequency Segment 2
+		 * field (not VHT Operation CCFS1). This mirrors the logic in
+		 * lim_extract_vht_bw_params() which reads chan_center_freq_seg1
+		 * from HTInfo.chan_center_freq_seg2 under the same condition.
+		 */
+		if (vht_caps->vht_extended_nss_bw_cap &&
+		    vht_caps->extended_nss_bw_supp)
+			ap_max_ch_width = CH_WIDTH_160MHZ;
+		else
+			ap_max_ch_width = CH_WIDTH_80MHZ;
+		break;
 	case LIM_VHT_CAP_CH_WIDTH_80P80MHZ:
 		ap_max_ch_width = CH_WIDTH_80MHZ;
 		break;
