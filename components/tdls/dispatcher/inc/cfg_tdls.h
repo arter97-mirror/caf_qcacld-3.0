@@ -641,7 +641,7 @@
  * gEnableTDLSStats - Enable TDLS stats reporting feature.
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to enable/disable the TDLS stats reporting feature.
  * When enabled, the driver collects and reports TDLS connection statistics
@@ -659,7 +659,7 @@
  */
 #define CFG_TDLS_STATS_ENABLE CFG_INI_BOOL( \
 	"gEnableTDLSStats", \
-	0, \
+	1, \
 	"Enable TDLS stats reporting feature")
 
 /*
