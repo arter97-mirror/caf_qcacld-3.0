@@ -623,6 +623,13 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 			    wlan_vdev_get_id(tdls_vdev->vdev),
 			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 
+		/*
+		 * Record teardown stats before indicating to supplicant.
+		 */
+		tdls_stats_record_peer_teardown(tdls_soc, vdev,
+						curr_peer->peer_mac.bytes,
+						TDLS_STATS_REASON_GENERAL);
+
 		/* Indicate teardown to supplicant */
 		status = tdls_indicate_teardown(
 					tdls_vdev, curr_peer,

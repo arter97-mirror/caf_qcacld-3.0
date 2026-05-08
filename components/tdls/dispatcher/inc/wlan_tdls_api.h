@@ -259,10 +259,13 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
  * @type: stats event type (enum tdls_stats_type)
  * @subtype: stats event subtype (enum tdls_stats_subtype)
  * @success: true if tx completed successfully, false otherwise
+ * @reason_code: teardown reason code (enum tdls_stats_reason_code);
+ *               use TDLS_STATS_REASON_GENERAL for non-teardown frames
  *
  * Populates a struct tdls_stats_entry with timestamp, peer MAC, RSSI
- * (looked up via tdls_find_peer), session ID, type/subtype, and success
- * flag, then delivers it to the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * (looked up via tdls_find_peer), session ID, type/subtype, success
+ * flag, and reason_code, then delivers it to the TDLS stats SM via
+ * TDLS_STATS_EV_NEW_EVENT.
  *
  * Return: None
  */
@@ -271,7 +274,8 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 				       const uint8_t *peer_mac,
 				       uint8_t type,
 				       uint8_t subtype,
-				       bool success);
+				       bool success,
+				       uint8_t reason_code);
 
 /**
  * wlan_tdls_teardown_links_for_non_dbs() - notify TDLS module to teardown
@@ -437,7 +441,8 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 				       const uint8_t *peer_mac,
 				       uint8_t type,
 				       uint8_t subtype,
-				       bool success)
+				       bool success,
+				       uint8_t reason_code)
 {}
 
 static inline

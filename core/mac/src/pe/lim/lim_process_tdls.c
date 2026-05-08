@@ -142,6 +142,15 @@ static const uint8_t tdls_setup_cnf_frm_hdr[] = {
 };
 
 /*
+ * TDLS Teardown is sent as a data frame with 89-0d EtherType.
+ * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
+ *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_TEARDOWN(0x03)
+ */
+static const uint8_t tdls_teardown_frm_hdr[] = {
+	0x89, 0x0d, 0x02, 0x0c, 0x03,
+};
+
+/*
  * TDLS Discovery Response is sent as a public action management frame
  * (802.11 MGMT). Its action body starts at sizeof(tSirMacMgmtHdr).
  * Pattern: ACTION_CATEGORY_PUBLIC (0x04) | TDLS_DISCOVERY_RESPONSE (0x0e)
@@ -614,6 +623,7 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 	bool is_tdls_setup_request_frm = false;
 	bool is_tdls_setup_response_frm = false;
 	bool is_tdls_setup_confirm_frm = false;
+	bool is_tdls_teardown_frm = false;
 	uint8_t *peer_mac = NULL;
 	uint8_t *src_mac = NULL;
 
@@ -653,6 +663,12 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 				TDLS_ETHR_HDR_LEN),
 				tdls_setup_cnf_frm_hdr,
 				sizeof(tdls_setup_cnf_frm_hdr));
+
+			is_tdls_teardown_frm =
+				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
+				TDLS_ETHR_HDR_LEN),
+				tdls_teardown_frm_hdr,
+				sizeof(tdls_teardown_frm_hdr));
 
 			if (is_tdls_discvory_frm &&
 			    tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
@@ -699,8 +715,10 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 		     is_tdls_discovery_response_frm ||
 		     is_tdls_setup_request_frm ||
 		     is_tdls_setup_response_frm ||
-		     is_tdls_setup_confirm_frm)) {
+		     is_tdls_setup_confirm_frm ||
+		     is_tdls_teardown_frm)) {
 			uint8_t type, subtype;
+			uint8_t stats_reason = TDLS_STATS_REASON_GENERAL;
 			bool tx_ok = (tx_complete ==
 				      WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
 
@@ -716,6 +734,41 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 			} else if (is_tdls_setup_response_frm) {
 				type    = TDLS_STATS_SETUP;
 				subtype = TDLS_STATS_SUBTYPE_RESP;
+			} else if (is_tdls_teardown_frm) {
+				type    = TDLS_STATS_TEARDOWN;
+				subtype = TDLS_STATS_SUBTYPE_COMPLETE;
+				/*
+				 * Parse the 802.11 reason code from the
+				 * teardown frame and map it to the stats
+				 * reason code enum.
+				 * Frame layout after Ethernet header:
+				 *   [EtherType(2)][PAYLOAD_TYPE(1)]
+				 *   [CATEGORY(1)][ACTION(1)][reason(2)]
+				 * The 5-byte tdls_teardown_frm_hdr covers
+				 * bytes 0-4; reason code is at bytes 5-6.
+				 */
+				if (buf &&
+				    qdf_nbuf_len(buf) >=
+				    (TDLS_ETHR_HDR_LEN +
+				     sizeof(tdls_teardown_frm_hdr) +
+				     sizeof(uint16_t))) {
+					const uint8_t *rp =
+						(const uint8_t *)
+						qdf_nbuf_data(buf) +
+						TDLS_ETHR_HDR_LEN +
+						sizeof(tdls_teardown_frm_hdr);
+					uint16_t dot11_reason =
+						(uint16_t)(rp[0] |
+							   (rp[1] << 8));
+
+					if (dot11_reason ==
+					    REASON_TDLS_PEER_UNREACHABLE)
+						stats_reason =
+						TDLS_STATS_REASON_PEER_UNREACHABLE;
+					else
+						stats_reason =
+						TDLS_STATS_REASON_TEARDOWN_UNSPECIFIED;
+				}
 			} else {
 				type    = TDLS_STATS_SETUP;
 				subtype = TDLS_STATS_SUBTYPE_CONFIRM;
@@ -724,7 +777,8 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 			wlan_tdls_record_mgmt_tx_complete(
 				mac_ctx->psoc,
 				mac_ctx->lim.tdls_frm_session_id,
-				peer_mac, type, subtype, tx_ok);
+				peer_mac, type, subtype, tx_ok,
+				stats_reason);
 		}
 
 		lim_send_sme_mgmt_tx_completion(mac_ctx,
@@ -733,13 +787,13 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 		mac_ctx->lim.tdls_frm_session_id = NO_SESSION;
 	}
 
-	pe_debug("tdls_frm_session_id: %x tx_complete: %x peer:" QDF_MAC_ADDR_FMT " self:" QDF_MAC_ADDR_FMT " is_discovery:%d is_discovery_rsp:%d is_setup_req:%d is_setup_rsp:%d is_setup_cnf:%d",
+	pe_debug("tdls_frm_session_id: %x tx_complete: %x peer:" QDF_MAC_ADDR_FMT " self:" QDF_MAC_ADDR_FMT " is_discovery:%d is_discovery_rsp:%d is_setup_req:%d is_setup_rsp:%d is_setup_cnf:%d is_teardown:%d",
 		 mac_ctx->lim.tdls_frm_session_id, tx_complete,
 		 QDF_MAC_ADDR_REF(peer_mac),
 		 QDF_MAC_ADDR_REF(src_mac),
 		 is_tdls_discvory_frm, is_tdls_discovery_response_frm,
 		 is_tdls_setup_request_frm, is_tdls_setup_response_frm,
-		 is_tdls_setup_confirm_frm);
+		 is_tdls_setup_confirm_frm, is_tdls_teardown_frm);
 
 	if (buf)
 		qdf_nbuf_free(buf);

@@ -623,7 +623,8 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 				       const uint8_t *peer_mac,
 				       uint8_t type,
 				       uint8_t subtype,
-				       bool success)
+				       bool success,
+				       uint8_t reason_code)
 {
 	struct tdls_soc_priv_obj *soc_obj;
 	struct wlan_objmgr_vdev *vdev;
@@ -642,7 +643,7 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(entry.peer_mac, peer_mac, QDF_MAC_ADDR_SIZE);
 	entry.success     = success ? 0 : 1;
 	entry.is_sender   = true;
-	entry.reason_code = TDLS_STATS_REASON_GENERAL;
+	entry.reason_code = reason_code;
 	entry.session_id  = vdev_id;
 	entry.type        = type;
 	entry.subtype     = subtype;

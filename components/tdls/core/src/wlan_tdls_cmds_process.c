@@ -36,6 +36,7 @@
 #include "wlan_tdls_mgmt.h"
 #include "wlan_tdls_cmds_process.h"
 #include "wlan_tdls_tgt_api.h"
+#include "wlan_tdls_stats.h"
 #include "wlan_policy_mgr_api.h"
 #include "nan_ucfg_api.h"
 #include "wlan_mlme_main.h"
@@ -2517,6 +2518,16 @@ QDF_STATUS tdls_process_should_teardown(struct wlan_objmgr_vdev *vdev,
 		else
 			reason = TDLS_TEARDOWN_PEER_UNSPEC_REASON;
 
+		/*
+		 * Record teardown stats before indicating to supplicant.
+		 * Map the 802.11 reason code to the TDLS stats reason code.
+		 */
+		tdls_stats_record_peer_teardown(
+			soc_obj, vdev, curr_peer->peer_mac.bytes,
+			(reason == TDLS_TEARDOWN_PEER_UNREACHABLE) ?
+			TDLS_STATS_REASON_PEER_UNREACHABLE :
+			TDLS_STATS_REASON_TEARDOWN_UNSPECIFIED);
+
 		tdls_indicate_teardown(vdev_obj, curr_peer, reason);
 	} else {
 		tdls_err("TDLS link is not connected, ignore %s",
@@ -2653,6 +2664,14 @@ static int tdls_teardown_links(struct tdls_soc_priv_obj *soc_obj, uint32_t mode)
 		tdls_debug("Indicate TDLS teardown peer bssid "
 			   QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(
 			   curr_peer->peer_mac.bytes));
+		/*
+		 * Record teardown stats before indicating to supplicant.
+		 * This is an antenna switch-driven teardown.
+		 */
+		tdls_stats_record_peer_teardown(
+			soc_obj, curr_peer->vdev_priv->vdev,
+			curr_peer->peer_mac.bytes,
+			TDLS_STATS_REASON_GENERAL);
 		status = tdls_indicate_teardown(curr_peer->vdev_priv,
 						curr_peer,
 						TDLS_TEARDOWN_PEER_UNSPEC_REASON);
