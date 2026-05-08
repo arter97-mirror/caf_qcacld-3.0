@@ -3561,6 +3561,21 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_SETUP_LINK_RECONFIG_SUPPORT
 endif
 
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_ROC_ADDR_FILTER" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+endif
+
+found = $(shell if grep -qF "(*add_key)(struct wiphy *wiphy, struct wireless_dev *wdev," $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi; # ) )
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
+endif
+
+found = $(shell if grep -qF "NL80211_CMD_START_PD" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_PD_SUPPORT
+endif
+
 ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP), y)
 CONFIG_WLAN_DP_MLO_DEV_CTX := y
 CONFIG_QCA_DP_TX_FW_METADATA_V2 := y
