@@ -1998,6 +1998,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
         },
         {
+            "pattern": "NL80211_EXT_FEATURE_ROC_ADDR_FILTER",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC",
+        },
+        {
+            "pattern": "(*add_key)(struct wiphy *wiphy, struct wireless_dev *wdev,",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV",
+        },
+        {
             "pattern": "struct link_station_parameters",
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_LINK_STA_PARAMS_PRESENT",
@@ -2016,6 +2026,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "pattern": "NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
             "file": "include/uapi/linux/nl80211.h",
             "flag": "CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
+        },
+        {
+            "pattern": "NL80211_CMD_START_PD",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_PD_SUPPORT",
         },
     ]
 

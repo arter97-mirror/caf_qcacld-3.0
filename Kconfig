@@ -79,6 +79,18 @@ config ATH_11AC_TXCOMPACT
 	bool "Enable ath 11ac tx compact support"
 	default n
 
+config CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
+	bool "Enable CONFIG_CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV"
+	default n
+
+config CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+	bool "Enable CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC"
+	default n
+
+config CFG80211_PD_SUPPORT
+	bool "Enable CFG80211_PD_SUPPORT"
+	default n
+
 config WLAN_NAPI
 	bool "Enable NAPI - datapath rx"
 	default n
