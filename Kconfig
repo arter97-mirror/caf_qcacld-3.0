@@ -2348,6 +2348,10 @@ config LITHIUM
 	bool "Enable LITHIUM"
 	default n
 
+config DP_RX_IRQ_AFFINITY
+	bool "Enable DP_RX_IRQ_AFFINITY"
+	default n
+
 config QCA6750_HEADERS_DEF
 	bool "Enable QCA6750_HEADERS_DEF"
 	default n
