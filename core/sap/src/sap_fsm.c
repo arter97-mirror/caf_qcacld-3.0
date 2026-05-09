@@ -4036,6 +4036,8 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 				sap_post_cac_chan_switch_info(t_sap_ctx,
 							      ch_switch_info->target_chan_freq,
 							      &sap_ctx->ch_params);
+				t_sap_ctx->is_chan_change_inprogress = true;
+				continue;
 			}
 
 			t_sap_ctx->is_chan_change_inprogress = true;

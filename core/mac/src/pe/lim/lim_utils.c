@@ -4737,6 +4737,47 @@ release_ref:
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * lim_start_cac_radar_csa() - start CSA beacon countdown after radar in CAC
+ * @session: PE session
+ *
+ * When radar is detected on an MLO SAP DFS channel while CAC is running,
+ * this function starts ap_ecsa_timer so that 10 beacons with a decreasing
+ * CSA count (10 → 1) are transmitted before the channel-change handoff.
+ */
+static void lim_start_cac_radar_csa(struct pe_session *session)
+{
+	uint32_t bcn_int_ms;
+
+	/* Beacon interval in TU → ms */
+	bcn_int_ms = session->beaconParams.beaconInterval
+		     ? SYS_TU_TO_MS(session->beaconParams.beaconInterval)
+		     : MLME_CFG_BEACON_INTERVAL_DEF;
+
+	session->cac_radar_csa_in_progress = true;
+
+	pe_debug("vdev %d: start CSA timer, count=%d, bcn_int=%u ms mcstie_send_in_cac %d",
+		 session->vdev_id, session->gLimChannelSwitch.switchCount,
+		 bcn_int_ms, session->mcstie_send_in_cac);
+
+	qdf_mc_timer_stop(&session->ap_ecsa_timer);
+	if (QDF_IS_STATUS_ERROR(qdf_mc_timer_start(&session->ap_ecsa_timer,
+						   bcn_int_ms)))
+		pe_err("vdev %d: failed to start ap_ecsa_timer",
+		       session->vdev_id);
+}
+
+/**
+ * lim_set_cac_chan_switch_info() - Update PE session channel switch fields
+ * @mac_ctx: pointer to Global Mac Structure
+ * @params: channel switch parameters from SAP
+ *
+ * Handles SIR_LIM_SET_CAC_CHAN_SWITCH_INFO message posted by SAP.
+ * Updates gLimChannelSwitch fields (target freq, primary channel, bandwidth,
+ * sec_ch_offset, dfsIncludeChanSwIe) in the PE session.
+ * switchCount is read from the g_sap_chanswitch_beacon_cnt INI value and
+ * switchMode is read from the gSapChannelSwitchMode INI value.
+ */
 void lim_set_cac_chan_switch_info(struct mac_context *mac_ctx,
 				  struct sap_cac_chan_switch_params *params)
 {
@@ -4788,6 +4829,8 @@ void lim_set_cac_chan_switch_info(struct mac_context *mac_ctx,
 	pe_debug("vdev %d: CAC chan switch info set freq=%d bw=%d count=%d mode=%d",
 		 params->vdev_id, params->target_freq, params->ch_width,
 		 switch_count, session->gLimChannelSwitch.switchMode);
+
+	lim_start_cac_radar_csa(session);
 }
 #endif /* WLAN_FEATURE_MULTI_LINK_SAP */
 
@@ -11474,7 +11517,10 @@ void lim_process_ap_ecsa_timeout(void *data)
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						  WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
 
-	if (csa_tx_offload)
+	/* For CAC-radar CSA path always do the host-driven countdown,
+	 * regardless of the csa_tx_offload firmware capability.
+	 */
+	if (csa_tx_offload && !session->cac_radar_csa_in_progress)
 		return;
 
 	/* Stop the timer if already running */
@@ -11524,6 +11570,12 @@ void lim_process_ap_ecsa_timeout(void *data)
 			lim_process_ap_ecsa_timeout(session);
 		}
 	} else {
+		/* Countdown complete: clear CAC-radar flag if set */
+		if (session->cac_radar_csa_in_progress) {
+			pe_debug("vdev %d: CAC-radar CSA done, triggering channel change",
+				 session->vdev_id);
+			session->cac_radar_csa_in_progress = false;
+		}
 		lim_send_csa_tx_complete(session->vdev_id);
 		/* Clear CSA IE count and update beacon */
 		lim_send_dfs_chan_sw_ie_update(mac_ctx, session);
