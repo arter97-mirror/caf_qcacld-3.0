@@ -29876,6 +29876,16 @@ static inline void wlan_hdd_set_nan_cap(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+static void wlan_hdd_set_remain_on_channel(struct wiphy *wiphy)
+{
+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_ROC_ADDR_FILTER);
+}
+#else
+static void wlan_hdd_set_remain_on_channel(struct wiphy *wiphy)
+{}
+#endif
+
 /*
  * In this function, wiphy structure is updated after QDF
  * initialization. In wlan_hdd_cfg80211_init, only the
@@ -29961,6 +29971,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	if (wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc))
 		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PROBE_AP);
 #endif
+	wlan_hdd_set_remain_on_channel(wiphy);
 	wlan_hdd_set_nan_cap(hdd_ctx);
 }
 
@@ -30239,7 +30250,7 @@ void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *adapter)
 
 	/* P2P Public Action */
 	sme_deregister_mgmt_frame(mac_handle, SME_SESSION_ID_ANY, type,
-				  (uint8_t *) P2P_PUBLIC_ACTION_FRAME,
+				  (uint8_t *)P2P_PUBLIC_ACTION_FRAME_TYPE,
 				  P2P_PUBLIC_ACTION_FRAME_SIZE);
 
 	/* P2P Action */

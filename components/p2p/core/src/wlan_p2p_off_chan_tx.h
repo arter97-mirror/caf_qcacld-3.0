@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,8 @@
 #include <qdf_types.h>
 #include <qdf_mc_timer.h>
 #include <qdf_list.h>
+#include "wlan_p2p_roc.h"
+#include "wlan_p2p_main.h"
 
 #define P2P_EID_VENDOR                          0xdd
 #define P2P_ACTION_VENDOR_SPECIFIC_CATEGORY     0x7F

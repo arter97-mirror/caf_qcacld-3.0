@@ -60,6 +60,7 @@
 #include "wlan_twt_ucfg_ext_cfg.h"
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_api.h"
+#include "wlan_p2p_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -173,11 +174,12 @@ wlan_hdd_get_sta_vdev_for_p2p_dev(struct wlan_objmgr_psoc *psoc,
 	return vdev;
 }
 
+#define MAX_REMAIN_ON_CHANNEL_DURATION (2000)
 static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 						 struct wireless_dev *wdev,
 						 struct ieee80211_channel *chan,
 						 unsigned int duration,
-						 u64 *cookie)
+						 u64 *cookie, const u8 *rx_addr)
 {
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -241,6 +243,12 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 
+	if (rx_addr)
+		wlan_p2p_request_random_mac(psoc, wlan_vdev_get_id(vdev),
+					    (uint8_t *)rx_addr,
+					    chan->center_freq, *cookie,
+					    duration);
+
 	hdd_debug("ROC req: vdev %d adapter device mode %d vdev device mode %d opmode %d",
 		  wlan_vdev_get_id(vdev), adapter->device_mode,
 		  wlan_vdev_mlme_get_opmode(vdev), opmode);
@@ -252,6 +260,29 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	return qdf_status_to_os_return(status);
 }
 
+#ifdef CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					struct ieee80211_channel *chan,
+					unsigned int duration, u64 *cookie,
+					const u8 *rx_addr)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_remain_on_channel(wiphy, wdev, chan,
+						      duration, cookie,
+						      rx_addr);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
 int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					struct ieee80211_channel *chan,
@@ -265,12 +296,13 @@ int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_remain_on_channel(wiphy, wdev, chan,
-						      duration, cookie);
+						      duration, cookie, NULL);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
 }
+#endif
 
 static int
 __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
@@ -313,6 +345,9 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	hdd_debug("Cancel RoC req: vdev:%d adapter_device_mode:%d vdev_device_mode:%d",
 		  wlan_vdev_get_id(vdev), adapter->device_mode,
 		  wlan_vdev_mlme_get_opmode(vdev));
+	wlan_p2p_random_mac_handle_tx_done(adapter->hdd_ctx->psoc,
+					   wlan_vdev_get_id(vdev), cookie, 0);
+
 	status = wlan_cfg80211_cancel_roc(vdev, cookie, adapter->device_mode);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 

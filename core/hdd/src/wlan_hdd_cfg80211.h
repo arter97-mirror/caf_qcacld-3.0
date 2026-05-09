@@ -154,7 +154,7 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #define GAS_COMEBACK_RSP "\x04\x0d"
 #define GAS_COMEBACK_RSP_SIZE 2
 
-#define P2P_PUBLIC_ACTION_FRAME "\x04\x09\x50\x6f\x9a\x09"
+#define P2P_PUBLIC_ACTION_FRAME_TYPE "\x04\x09\x50\x6f\x9a\x09"
 #define P2P_PUBLIC_ACTION_FRAME_SIZE 6
 
 #define P2P_ACTION_FRAME "\x7f\x50\x6f\x9a\x09"

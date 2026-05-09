@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -250,6 +250,46 @@ wlan_p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
 QDF_STATUS
 wlan_p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 			uint64_t rnd_cookie);
+
+/**
+ * wlan_p2p_request_random_mac() - request random mac mgmt tx
+ * @soc: soc
+ * @vdev_id: vdev id
+ * @mac: mac addr
+ * @freq: freq
+ * @rnd_cookie: cookie to be returned
+ * @duration: timeout value
+ *
+ * This function will request to save random mac addr entry to psoc random
+ * mac addr list. The cookie will be generated for every success request.
+ * If it is new added entry, it will request to set filter in target.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_p2p_request_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			    uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
+			    uint32_t duration);
+
+/**
+ * wlan_p2p_random_mac_handle_tx_done() - del mac filter from given vdev rand
+ * mac list when mgmt tx done
+ * @soc: soc object
+ * @vdev_id: vdev id
+ * @rnd_cookie: random mac mgmt tx cookie
+ * @duration: timeout value to flush the addr in target.
+ *
+ * This function will del the mac addr filter from vdev random mac addr list
+ * when random mac mgmt rx done. If there is no reference to mac addr, it
+ * will set a clear timer to flush it in target finally.
+ *
+ * Return: QDF_STATUS_SUCCESS - del successfully.
+ *		other : failed to del the mac address entry.
+ */
+QDF_STATUS
+wlan_p2p_random_mac_handle_tx_done(struct wlan_objmgr_psoc *soc,
+				   uint32_t vdev_id, uint64_t rnd_cookie,
+				   uint32_t duration);
 
 /**
  * wlan_p2p_is_sta_vdev_usage_allowed_for_p2p_dev() - Public API wrapper for
