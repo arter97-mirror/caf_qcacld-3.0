@@ -33313,6 +33313,7 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 			    struct qdf_mac_addr *mac_address)
 {
 	uint8_t link_id;
+	bool is_link_vdev, is_link_roam_auth_connected;
 
 	if (!adapter)
 		return false;
@@ -33320,31 +33321,26 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return false;
 
+	if (adapter->device_mode != QDF_STA_MODE)
+		return false;
+
+	is_link_vdev = wlan_vdev_mlme_is_mlo_link_vdev(vdev);
+	is_link_roam_auth_connected = is_link_vdev &&
+		mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
+						  wlan_vdev_get_id(vdev));
+
 	/*
-	 * Skip deferral for an already-connected vdev, except for the
-	 * MLO link vdev roam-auth-connected case which still needs the
-	 * deferred key install handled below.
+	 * Defer key install unless the vdev is already connected and this
+	 * isn't the MLO link vdev roam-auth-connected case.
 	 */
-	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    wlan_cm_is_vdev_connected(vdev) &&
-	    (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
-	     !mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
-						 wlan_vdev_get_id(vdev))))
+	if (wlan_cm_is_vdev_connected(vdev) && !is_link_roam_auth_connected)
 		return false;
 
 	link_id = wlan_vdev_get_link_id(vdev);
+	hdd_debug("MLO:Defer set keys for link_id %d", link_id);
+	mlo_defer_set_keys(vdev, link_id, true);
 
-	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    ((!wlan_cm_is_vdev_connected(vdev)) ||
-	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
-	     mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
-					       wlan_vdev_get_id(vdev))))) {
-		hdd_debug("MLO:Defer set keys for link_id %d", link_id);
-		mlo_defer_set_keys(vdev, link_id, true);
-		return true;
-	}
-
-	return false;
+	return true;
 }
 
 #else

@@ -90,6 +90,7 @@ mlo_update_for_multi_link_roam(struct wlan_objmgr_psoc *psoc,
 	mlo_update_connect_req_links(vdev, true);
 
 end:
+	mlo_clear_sta_key_mgmt(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 }
 
