@@ -1617,6 +1617,7 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			break;
 		dst_cfg->roam_inactive_data_packet_count = 0;
 		dst_cfg->roam_scan_inactivity_time = 0;
+		rso_cfg->roam_scan_scheme = ROAM_SCAN_FREQ_SCHEME_NONE;
 		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled)
 			cm_roam_update_cfg(psoc, vdev_id,
 					   REASON_ROAM_CONTROL_CONFIG_ENABLED);
