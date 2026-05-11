@@ -871,12 +871,13 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_roam_sync_info *roaming_info;
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct cm_roam_values_copy config;
-	uint8_t mdie_present;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int32_t akm;
+	uint8_t mdie_present;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	bool is_host_4way_hs_supported = false;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
@@ -901,6 +902,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	}
 
 	roaming_info = rsp->connect_rsp.roaming_info;
+	is_host_4way_hs_supported = wlan_psoc_nif_fw_ext2_cap_get(
+				      psoc, WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 	akm = wlan_crypto_get_param(vdev,
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
 
@@ -926,8 +929,9 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	 * eapol. So the session->psk_pmk will be stale in PMKSA cached
 	 * SAE/OWE roaming case.
 	 */
-
 	if (roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
+	    (roaming_info->auth_status == ROAM_AUTH_STATUS_CONNECTED &&
+	     is_host_4way_hs_supported) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE) ||
@@ -965,9 +969,7 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					   MOBILITY_DOMAIN, &config);
 		mdie_present = config.bool_value;
 
-		if (cm_lookup_pmkid_using_bssid(psoc,
-						vdev_id,
-						pmkid_cache)) {
+		if (cm_lookup_pmkid_using_bssid(psoc, vdev_id, pmkid_cache)) {
 			/*
 			 * Consider two APs: AP1, AP2
 			 * Both APs configured with EAP 802.1x security mode
