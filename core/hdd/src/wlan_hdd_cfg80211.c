@@ -12420,8 +12420,10 @@ hdd_latency_level_event_handler_cb(const struct latency_level_data *event_data,
 
 	hdd_enter();
 
-	if (wlan_hdd_validate_context(hdd_ctx))
+	if (!hdd_ctx) {
+		hdd_err("Invalid HDD context");
 		return;
+	}
 
 	if (!event_data) {
 		hdd_err("Invalid latency level event data");
