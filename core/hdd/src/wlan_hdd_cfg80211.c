@@ -26727,7 +26727,7 @@ static int pack_rx_rate_stats_struct(
 
 	/* Calculate total buffer size across all cores */
 	total_size = 0;
-	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	for (current_core = 0; current_core < cp_stats->num_power_stats;
 	     current_core++) {
 		total_rates = 0;
 		for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
@@ -26735,9 +26735,8 @@ static int pack_rx_rate_stats_struct(
 			    current_core)
 				total_rates++;
 		}
-		if (total_rates > 0)
-			total_size += sizeof(wifi_rx_rate_stats) +
-				      (sizeof(wifi_rate_info) * total_rates);
+		total_size += sizeof(wifi_rx_rate_stats) +
+			      (sizeof(wifi_rate_info) * total_rates);
 	}
 
 	if (total_size == 0)
@@ -26752,7 +26751,7 @@ static int pack_rx_rate_stats_struct(
 
 	/* Fill each core's data sequentially */
 	ptr = buf;
-	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	for (current_core = 0; current_core < cp_stats->num_power_stats;
 	     current_core++) {
 		total_rates = 0;
 		for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
@@ -26761,30 +26760,30 @@ static int pack_rx_rate_stats_struct(
 				total_rates++;
 		}
 
-		if (total_rates == 0)
-			continue;
-
+		/* Always pack struct for this core, even if no data */
 		rx_stats = (wifi_rx_rate_stats *)ptr;
 		rx_stats->core_index = current_core;
 		rx_stats->num_rates = total_rates;
 
-		rate_idx = 0;
-		for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
-			if (cp_stats->rx_rate_stats[i].core_index !=
-			    current_core)
-				continue;
+		if (total_rates > 0) {
+			rate_idx = 0;
+			for (i = 0; i < cp_stats->num_rx_rate_stats; i++) {
+				if (cp_stats->rx_rate_stats[i].core_index !=
+				    current_core)
+					continue;
 
-			rx_stats->rates[rate_idx].rate_index =
-				cp_stats->rx_rate_stats[i].rate_index;
-			rx_stats->rates[rate_idx].band =
-				cp_stats->rx_rate_stats[i].band;
-			rx_stats->rates[rate_idx].bw =
-				cp_stats->rx_rate_stats[i].bw;
-			rx_stats->rates[rate_idx].nss =
-				cp_stats->rx_rate_stats[i].nss;
-			rx_stats->rates[rate_idx].count =
-				cp_stats->rx_rate_stats[i].count;
-			rate_idx++;
+				rx_stats->rates[rate_idx].rate_index =
+					cp_stats->rx_rate_stats[i].rate_index;
+				rx_stats->rates[rate_idx].band =
+					cp_stats->rx_rate_stats[i].band;
+				rx_stats->rates[rate_idx].bw =
+					cp_stats->rx_rate_stats[i].bw;
+				rx_stats->rates[rate_idx].nss =
+					cp_stats->rx_rate_stats[i].nss;
+				rx_stats->rates[rate_idx].count =
+					cp_stats->rx_rate_stats[i].count;
+				rate_idx++;
+			}
 		}
 
 		core_size = sizeof(wifi_rx_rate_stats) +
@@ -26837,17 +26836,16 @@ static int pack_tx_rate_stats_struct(
 
 	/* Calculate total buffer size across all cores */
 	total_size = 0;
-	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	for (current_core = 0; current_core < cp_stats->num_power_stats;
 	     current_core++) {
 		total_rates = 0;
 		for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
 			if (cp_stats->tx_rate_stats[i].core_index ==
 			    current_core)
-				total_rates++;
+			total_rates++;
 		}
-		if (total_rates > 0)
-			total_size += sizeof(wifi_tx_rate_stats) +
-				      (sizeof(wifi_rate_info) * total_rates);
+		total_size += sizeof(wifi_tx_rate_stats) +
+			      (sizeof(wifi_rate_info) * total_rates);
 	}
 
 	if (total_size == 0)
@@ -26862,7 +26860,7 @@ static int pack_tx_rate_stats_struct(
 
 	/* Fill each core's data sequentially */
 	ptr = buf;
-	for (current_core = 0; current_core < POWER_STATS_MAX_NUM_CORES;
+	for (current_core = 0; current_core < cp_stats->num_power_stats;
 	     current_core++) {
 		total_rates = 0;
 		for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
@@ -26871,32 +26869,32 @@ static int pack_tx_rate_stats_struct(
 				total_rates++;
 		}
 
-		if (total_rates == 0)
-			continue;
 
+		/* Always pack struct for this core, even if no data */
 		tx_stats = (wifi_tx_rate_stats *)ptr;
 		tx_stats->core_index = current_core;
 		tx_stats->num_rates = total_rates;
 
-		rate_idx = 0;
-		for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
-			if (cp_stats->tx_rate_stats[i].core_index !=
-			    current_core)
-				continue;
+		if (total_rates > 0) {
+			rate_idx = 0;
+			for (i = 0; i < cp_stats->num_tx_rate_stats; i++) {
+				if (cp_stats->tx_rate_stats[i].core_index !=
+				    current_core)
+					continue;
 
-			tx_stats->rates[rate_idx].rate_index =
-				cp_stats->tx_rate_stats[i].rate_index;
-			tx_stats->rates[rate_idx].band =
-				cp_stats->tx_rate_stats[i].band;
-			tx_stats->rates[rate_idx].bw =
-				cp_stats->tx_rate_stats[i].bw;
-			tx_stats->rates[rate_idx].nss =
-				cp_stats->tx_rate_stats[i].nss;
-			tx_stats->rates[rate_idx].count =
-				cp_stats->tx_rate_stats[i].count;
-			rate_idx++;
+				tx_stats->rates[rate_idx].rate_index =
+					cp_stats->tx_rate_stats[i].rate_index;
+				tx_stats->rates[rate_idx].band =
+					cp_stats->tx_rate_stats[i].band;
+				tx_stats->rates[rate_idx].bw =
+					cp_stats->tx_rate_stats[i].bw;
+				tx_stats->rates[rate_idx].nss =
+					cp_stats->tx_rate_stats[i].nss;
+				tx_stats->rates[rate_idx].count =
+					cp_stats->tx_rate_stats[i].count;
+				rate_idx++;
+			}
 		}
-
 		core_size = sizeof(wifi_tx_rate_stats) +
 			    (sizeof(wifi_rate_info) * total_rates);
 		ptr += core_size;
