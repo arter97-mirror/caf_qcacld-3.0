@@ -417,12 +417,14 @@ bool lim_is_emlsr_band_supported(struct pe_session *session);
  * @bpcc: pointer to save BSS parameters change count
  * @opclass: pointer to save opclass
  * @chan: Pointer to save chan index.
+ * @ebpcc_cnt: pointer to save Enhanced BSS Parameter Change Count (optional)
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
-					      uint8_t *opclass, uint8_t *chan);
+					      uint8_t *opclass, uint8_t *chan,
+					      uint8_t *ebpcc_cnt);
 
 /**
  * lim_mlo_link_add_join_continue() - link add continue after link recfg
@@ -642,7 +644,8 @@ bool lim_is_emlsr_band_supported(struct pe_session *session)
 static inline
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
-					      uint8_t *opclass, uint8_t *chan)
+					      uint8_t *opclass, uint8_t *chan,
+					      uint8_t *ebpcc_cnt)
 {
 	return QDF_STATUS_E_INVAL;
 }
@@ -661,4 +664,24 @@ bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
 	return true;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BN_ECU
+/**
+ * lim_check_ecu_happens() - check whether Enhanced Critical Update happens
+ * @vdev: vdev object
+ * @link_id: Link ID to check EBPCC for
+ * @new_ebpcc: the new Enhanced BSS Parameter Change Count
+ *
+ * Return: bool - true if ECU happens, false otherwise
+ */
+bool lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
+			   uint8_t link_id, uint8_t new_ebpcc);
+#else
+static inline bool
+lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
+		      uint8_t link_id, uint8_t new_ebpcc)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BN_ECU */
 #endif

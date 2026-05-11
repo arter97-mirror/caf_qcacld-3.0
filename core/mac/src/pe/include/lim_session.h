@@ -213,6 +213,57 @@ struct ext_mld_capab_and_op {
 	uint16_t reserved:8;
 };
 
+#ifdef WLAN_FEATURE_11BN_ECU
+/**
+ * struct enhanced_critical_update_info - ECU info from ML element
+ * @present: ECU info present flag
+ * @param_change_count: ECU parameter change count
+ * @type: ECU type
+ * @all_updates_included: all updates included flag
+ */
+struct enhanced_critical_update_info {
+	bool present;
+	uint8_t param_change_count:4;
+	uint8_t type:3;
+	uint8_t all_updates_included:1;
+};
+
+/**
+ * struct persta_ecu_info_entry - Per-STA ECU info entry
+ * @link_id: link ID of the STA
+ * @ecu_info: ECU info for this STA
+ */
+struct persta_ecu_info_entry {
+	uint8_t link_id;
+	struct enhanced_critical_update_info ecu_info;
+};
+
+/**
+ * struct lim_ecu_info - ECU parameters extracted from a single RNR TBTT entry
+ * @enhanced_bss_param_change_cnt: EBPCC from bits 3:0 of the ECU byte
+ * @critical_update_type: ECU type from bits 6:4 (1 = UHR Parameter Update)
+ * @enhanced_all_updates_included: all-updates flag from bit 7
+ * @valid: true when critical_update_type is a recognised value
+ */
+struct lim_ecu_info {
+	uint8_t enhanced_bss_param_change_cnt:4;
+	uint8_t critical_update_type:3;
+	uint8_t enhanced_all_updates_included:1;
+	bool valid;
+} qdf_packed;
+
+#define ECU_TYPE_UHR_PARAM_UPDATE    1
+
+/* Bit positions and widths within the ECU Parameters subfield (802.11bn) */
+#define ECU_EBPCC_BIT_POS           0
+#define ECU_EBPCC_BIT_WIDTH         4
+#define ECU_CU_TYPE_BIT_POS         4
+#define ECU_CU_TYPE_BIT_WIDTH       3
+#define ECU_ALL_UPDATES_BIT_POS     7
+#define ECU_ALL_UPDATES_BIT_WIDTH   1
+
+#endif
+
 /**
  * struct wlan_mlo_ie - wlan ML IE info
  * @type: the variant of the ML IE
@@ -240,6 +291,9 @@ struct ext_mld_capab_and_op {
  * @ext_mld_capab_and_op_info: structure of ext_mld_capab_and operations
  * @num_sta_profile: the number of sta profile
  * @sta_profile: structure of wlan_mlo_sta_profile
+ * @ecu_info: ECU info for this link
+ * @num_persta_ecu_info: number of per-STA ECU info entries
+ * @persta_ecu_info: per-STA ECU info entries
  * @num_data: the length of data
  * @data: the ML IE data, includes element ID + length + extension element ID +
  * multi-link control and common info.
@@ -269,6 +323,11 @@ struct wlan_mlo_ie {
 	struct ext_mld_capab_and_op ext_mld_capab_and_op_info;
 	uint16_t num_sta_profile;
 	struct wlan_mlo_sta_profile sta_profile[WLAN_MAX_ML_BSS_LINKS + 1];
+#ifdef WLAN_FEATURE_11BN_ECU
+	struct enhanced_critical_update_info ecu_info;
+	uint8_t num_persta_ecu_info;
+	struct persta_ecu_info_entry persta_ecu_info[WLAN_MAX_ML_BSS_LINKS];
+#endif
 	uint16_t num_data;
 	uint8_t data[WLAN_MLO_IE_COM_MAX_LEN];
 };

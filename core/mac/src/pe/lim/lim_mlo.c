@@ -35,9 +35,70 @@
 #include <utils_mlo.h>
 #include "wlan_action_oui_api.h"
 
+#ifdef WLAN_FEATURE_11BN_ECU
+/**
+ * lim_get_ecu_info_from_rnr() - extract ECU info from an RNR TBTT entry
+ * @data: pointer to the start of the TBTT information field
+ * @tbtt_len: TBTT Information Length from the neighbor AP info header
+ * @ebpcc_cnt: output — set to the EBPCC value when ECU type is recognised
+ *
+ * Reads the ECU Parameters subfield and writes the Enhanced BSS Parameter
+ * Change Count to @ebpcc_cnt when critical_update_type equals
+ * ECU_TYPE_UHR_PARAM_UPDATE. Unrecognised types are silently dropped.
+ *
+ * Return: void
+ */
+static void lim_get_ecu_info_from_rnr(const uint8_t *data,
+				      uint8_t tbtt_len,
+				      uint8_t *ebpcc_cnt)
+{
+	uint8_t raw_ecu_byte;
+	struct lim_ecu_info ecu_info;
+
+	if (!data || !ebpcc_cnt)
+		return;
+
+	if (tbtt_len < TBTT_NEIGHBOR_AP_BSSID_S_SSID_BSS_PARAM_20MHZ_PSD_MLD_PARAM_ECU)
+		return;
+
+	raw_ecu_byte = data[TBTT_NEIGHBOR_AP_BSSID_S_SSID_BSS_PARAM_20MHZ_PSD_MLD_PARAM];
+	ecu_info.enhanced_bss_param_change_cnt = QDF_GET_BITS(
+						raw_ecu_byte,
+						ECU_EBPCC_BIT_POS,
+						ECU_EBPCC_BIT_WIDTH);
+	ecu_info.critical_update_type = QDF_GET_BITS(
+						raw_ecu_byte,
+						ECU_CU_TYPE_BIT_POS,
+						ECU_CU_TYPE_BIT_WIDTH);
+	ecu_info.enhanced_all_updates_included = QDF_GET_BITS(
+						raw_ecu_byte,
+						ECU_ALL_UPDATES_BIT_POS,
+						ECU_ALL_UPDATES_BIT_WIDTH);
+	ecu_info.valid = false;
+
+	if (ecu_info.critical_update_type == ECU_TYPE_UHR_PARAM_UPDATE) {
+		*ebpcc_cnt = ecu_info.enhanced_bss_param_change_cnt;
+		ecu_info.valid = true;
+		pe_debug("ECU info from RNR: ebpcc=%d, type=%d, all_updates=%d",
+			 *ebpcc_cnt, ecu_info.critical_update_type,
+			 ecu_info.enhanced_all_updates_included);
+	} else if (ecu_info.critical_update_type != 0) {
+		pe_debug("Unrecognized ECU type=%d in RNR, ignoring",
+			 ecu_info.critical_update_type);
+	}
+}
+#else
+static void lim_get_ecu_info_from_rnr(const uint8_t *data,
+				      uint8_t tbtt_len,
+				      uint8_t *ebpcc_cnt)
+{
+}
+#endif /* WLAN_FEATURE_11BN_ECU */
+
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
-					      uint8_t *opclass, uint8_t *chan)
+					      uint8_t *opclass, uint8_t *chan,
+					      uint8_t *ebpcc_cnt)
 
 {
 	const uint8_t *data, *rnr_end;
@@ -50,6 +111,9 @@ QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 
 	if (!rnr)
 		return QDF_STATUS_E_INVAL;
+
+	if (ebpcc_cnt)
+		*ebpcc_cnt = 0;
 
 	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;
 	data = rnr + PAYLOAD_START_POS;
@@ -89,6 +153,8 @@ QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					pe_debug("rnr bpcc %d, chan %d, opclass %d, linkid %d",
 						 *bpcc, *chan, *opclass,
 						 linkid);
+					lim_get_ecu_info_from_rnr(
+						data, tbtt_len, ebpcc_cnt);
 					return QDF_STATUS_SUCCESS;
 				}
 			}
@@ -152,6 +218,30 @@ bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
 
 	return true;
 }
+
+#ifdef WLAN_FEATURE_11BN_ECU
+bool lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
+			   uint8_t link_id, uint8_t new_ebpcc)
+{
+	uint8_t ebpcc;
+	QDF_STATUS status;
+
+	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return false;
+
+	status = mlo_get_ecu_ebpcc(vdev, link_id, &ebpcc);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	pe_debug_rl("vdev_id %d link_id %d new_ebpcc %d old_ebpcc %d",
+		    wlan_vdev_get_id(vdev), link_id, new_ebpcc, ebpcc);
+
+	if (new_ebpcc == ebpcc)
+		return false;
+
+	return true;
+}
+#endif
 
 /**
  * lim_send_mlo_ie_update() - mlo ie is changed, populate new beacon template
