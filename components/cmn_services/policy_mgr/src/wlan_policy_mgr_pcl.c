@@ -4939,7 +4939,25 @@ enum policy_mgr_four_connection_mode
 		policy_mgr_get_index_for_4sap_sbs(pm_ctx,
 						  &index,
 						  freq_list_sap);
-	else
+	else if (num_ml_sta == 2 && count_sap == 2 &&
+		 policy_mgr_is_current_hwmode_dbs(psoc)) {
+		qdf_freq_t combined_freq[4] = {
+			freq_list_sap[0], freq_list_sap[1],
+			freq_list[ml_sta_idx[0]], freq_list[ml_sta_idx[1]]
+		};
+		/* dbs logic same as 4 sap */
+		policy_mgr_get_index_for_4sap_dbs(pm_ctx, &index,
+						  combined_freq);
+	} else if (num_ml_sta == 2 && count_sap == 2 &&
+		   policy_mgr_is_current_hwmode_sbs(psoc)) {
+		qdf_freq_t combined_freq[4] = {
+			freq_list_sap[0], freq_list_sap[1],
+			freq_list[ml_sta_idx[0]], freq_list[ml_sta_idx[1]]
+		};
+		/* sbs logic same as 4 sap */
+		policy_mgr_get_index_for_4sap_sbs(pm_ctx, &index,
+						  combined_freq);
+	} else
 		index =  PM_MAX_FOUR_CONNECTION_MODE;
 
 	policy_mgr_debug(
