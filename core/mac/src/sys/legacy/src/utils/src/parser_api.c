@@ -1567,12 +1567,16 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
 			pDot11f->supportedChannelWidthSet = 0;
-		} else {
-			if (pe_session->ch_width <= CH_WIDTH_80MHZ)
-				pDot11f->supportedChannelWidthSet = 0;
-		}
+
+		if (pe_session->ch_width < CH_WIDTH_80MHZ ||
+		    (pe_session->ch_width == CH_WIDTH_80MHZ &&
+		     wlan_mlme_get_max_curr_bw(
+				mac->pdev,
+				pe_session->curr_op_freq,
+				CH_WIDTH_160MHZ) < CH_WIDTH_160MHZ))
+			pDot11f->supportedChannelWidthSet = 0;
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -8368,7 +8372,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		    session->opmode == QDF_P2P_CLIENT_MODE) {
 			max_ch_width = wlan_mlme_get_max_curr_bw(mac_ctx->pdev,
 								 freq,
-								 ch_width);
+								 CH_WIDTH_160MHZ);
 			if ((ch_width == CH_WIDTH_80MHZ) &&
 			    (max_ch_width >= CH_WIDTH_160MHZ))
 				ch_width = CH_WIDTH_160MHZ;
