@@ -26511,6 +26511,86 @@ wlan_hdd_cfg80211_flow_classify_report_cmd(struct wiphy *wiphy,
 
 	return errno;
 }
+
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+static inline int
+__wlan_hdd_cfg80211_predictive_roaming_stats_cmd(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     const void *data,
+					     int data_len)
+{
+	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_GLOBAL_MODE curr_mode;
+	int errno;
+
+	curr_mode = hdd_get_conparam();
+	if (QDF_GLOBAL_FTM_MODE == curr_mode ||
+	    QDF_GLOBAL_MONITOR_MODE == curr_mode) {
+		hdd_err("Command not allowed in FTM/MONITOR mode");
+		return -EINVAL;
+	}
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
+		return errno;
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_err_rl("Invalid device_mode: %d", adapter->device_mode);
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	status = os_if_dp_process_predictive_roam_req(wiphy, vdev,
+						      data, data_len);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_predictive_roaming_stats_cmd - Request predictive
+ * roaming stats
+ *
+ * @wiphy: wiphy handle
+ * @wdev: wdev handle
+ * @data: user layer input
+ * @data_len: length of user layer input
+ *
+ * return: 0 success, EINVAL failure
+ */
+static inline int
+wlan_hdd_cfg80211_predictive_roaming_stats_cmd(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data, int data_len)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_predictive_roaming_stats_cmd(wiphy,
+								 wdev,
+								 data,
+								 data_len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
+}
+#endif
 #endif
 
 /**
@@ -29824,6 +29904,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		vendor_command_policy(wlan_hdd_gvp_info_policy,
 				      QCA_WLAN_VENDOR_ATTR_GVP_MAX)
 	},
+	FEATURE_PREDICTIVE_ROAM_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

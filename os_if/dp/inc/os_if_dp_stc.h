@@ -57,6 +57,37 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1];
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_STATUS,   \
 	},
 
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+extern const struct nla_policy
+predictive_roam_stats_policy[QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX  + 1];
+
+#define FEATURE_PREDICTIVE_ROAM_COMMANDS					\
+	{									\
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,			\
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_PREDICTIVE_ROAMING,	\
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |				\
+			WIPHY_VENDOR_CMD_NEED_NETDEV,				\
+		.doit = wlan_hdd_cfg80211_predictive_roaming_stats_cmd,		\
+		vendor_command_policy(predictive_roam_stats_policy,		\
+				QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX)	\
+	},
+
+QDF_STATUS os_if_dp_process_predictive_roam_req(struct wiphy *wiphy,
+						struct wlan_objmgr_vdev *vdev,
+						const void *data, int data_len);
+
+#else
+#define FEATURE_PREDICTIVE_ROAM_COMMANDS
+
+static inline
+QDF_STATUS os_if_dp_process_predictive_roam_req(struct wiphy *wiphy,
+						struct wlan_objmgr_vdev *vdev,
+						const void *data, int data_len)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 /**
  * os_if_dp_flow_classify_result() - Handler to process flow classify result
  * @wiphy: wiphy handle
@@ -80,6 +111,7 @@ void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj);
 #define FEATURE_FLOW_CLASSIFY_COMMANDS
 #define FEATURE_FLOW_STATS_EVENTS
 #define FEATURE_FLOW_REPORT_EVENTS
+#define FEATURE_PREDICTIVE_ROAM_COMMANDS
 
 static inline
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,

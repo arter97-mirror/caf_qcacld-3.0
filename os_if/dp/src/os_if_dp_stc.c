@@ -19,6 +19,8 @@
 #include <wlan_osif_priv.h>
 #include "qdf_trace.h"
 #include "wlan_dp_ucfg_api.h"
+#include "cdp_txrx_ctrl.h"
+#include "cdp_txrx_host_stats.h"
 
 /* Short names for QCA vendor attributes */
 #define FLOW_CLASSIFY_RESULT_FLOW_TUPLE		\
@@ -29,6 +31,11 @@
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_UL_TID
 #define FLOW_CLASSIFY_RESULT_INSIGHTS		\
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_INSIGHTS
+
+#define PREDICTIVE_ROAM_OPERATION_TYPE		\
+		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_OPERATION_TYPE
+#define PREDICTIVE_ROAM_MAX			\
+		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX
 
 const struct nla_policy
 flow_tuple_policy[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1] = {
@@ -59,6 +66,13 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1] 
 	[FLOW_CLASSIFY_RESULT_UL_TID] = {.type = NLA_U8},
 	[FLOW_CLASSIFY_RESULT_INSIGHTS] = {.type = NLA_NESTED},
 };
+
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+const struct nla_policy
+predictive_roam_stats_policy[PREDICTIVE_ROAM_MAX  + 1] = {
+	[PREDICTIVE_ROAM_OPERATION_TYPE] = {.type = NLA_U8},
+};
+#endif
 
 #define NS_PER_MS 1000000
 #define NS_PER_US 1000
@@ -134,6 +148,77 @@ os_if_dp_parse_classify_insights(struct nlattr *tb_attr,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+static QDF_STATUS
+os_if_dp_set_feature_predictive_roam_stats(struct wlan_objmgr_vdev *vdev,
+					  uint8_t operation_type)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	uint8_t enable;
+
+	if (!soc) {
+		osif_err("Predictive roam: SOC context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	enable = operation_type == QCA_PREDICTIVE_ROAM_ENABLE;
+
+	osif_info("Predictive roam stats %s for vdev_id: %u",
+		  enable ? "enable" : "disable", vdev_id);
+
+	cdp_set_vdev_predictive_roaming_stats(soc, vdev_id, enable);
+	cdp_enable_ul_delay(soc, vdev_id, enable);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS os_if_dp_process_predictive_roam_req(struct wiphy *wiphy,
+						struct wlan_objmgr_vdev *vdev,
+						const void *data, int data_len)
+{
+	struct nlattr *tb[PREDICTIVE_ROAM_MAX + 1];
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	uint8_t operation_type;
+
+	if (!ucfg_dp_cfg_is_stc_enabled()) {
+		osif_warn("STC not enabled, predictive roaming not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	if (!ucfg_dp_stc_predictive_roaming_enabled(psoc)) {
+		osif_warn("Predictive roaming not enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	if (wlan_cfg80211_nla_parse(tb, PREDICTIVE_ROAM_MAX,
+				    data, data_len, predictive_roam_stats_policy)) {
+		osif_err("Invalid attr");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!tb[PREDICTIVE_ROAM_OPERATION_TYPE]) {
+		osif_err("Predictive roam operation type is not filled");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	operation_type = nla_get_u8(tb[PREDICTIVE_ROAM_OPERATION_TYPE]);
+
+	switch (operation_type) {
+	case QCA_PREDICTIVE_ROAM_ENABLE:
+	case QCA_PREDICTIVE_ROAM_DISABLE:
+		osif_info("Predictive roam operation received: %u",
+			  operation_type);
+		return os_if_dp_set_feature_predictive_roam_stats(vdev,
+								   operation_type);
+	default:
+		osif_err("Unsupported predictive roam operation type: %u",
+			 operation_type);
+		return QDF_STATUS_E_INVAL;
+	}
+}
+#endif
 
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 					 int data_len)
@@ -1333,3 +1418,11 @@ void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 	cb_obj->send_flow_report_event = os_if_dp_send_flow_report_event;
 	cb_obj->send_flow_status_event = os_if_dp_send_flow_status_event;
 }
+
+#undef FLOW_CLASSIFY_RESULT_FLOW_TUPLE
+#undef FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE
+#undef FLOW_CLASSIFY_RESULT_UL_TID
+#undef FLOW_CLASSIFY_RESULT_INSIGHTS
+
+#undef PREDICTIVE_ROAM_OPERATION_TYPE
+#undef PREDICTIVE_ROAM_MAX
