@@ -3344,6 +3344,13 @@ void ucfg_dp_txrx_set_default_affinity(struct wlan_objmgr_psoc *psoc)
 	wlan_dp_lb_set_default_affinity(dp_ctx);
 }
 
+#ifdef FEATURE_STATIC_IRQ_AFFINITY
+void ucfg_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc)
+{
+	wlan_dp_static_irq_affinity_set(psoc);
+}
+#endif /* FEATURE_STATIC_IRQ_AFFINITY */
+
 QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return wlan_dp_txrx_attach_target(soc, pdev_id);

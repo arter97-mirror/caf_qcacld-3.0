@@ -380,7 +380,8 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	/* If DP affinity override is enabled skip
 	 * other affinity settings
 	 */
-	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg))
+	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg) ||
+	    wlan_dp_cfg_is_static_irq_affinity_enabled(&dp_ctx->dp_cfg))
 		return;
 
 	dp_info("cpu mask for load balance %*pbl ",

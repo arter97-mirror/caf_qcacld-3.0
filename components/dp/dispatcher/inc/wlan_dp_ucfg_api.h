@@ -1743,6 +1743,21 @@ void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc);
 void ucfg_dp_txrx_set_default_affinity(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_dp_static_irq_affinity_set() - Pin TX/RX ring IRQs to fixed CPUs
+ * @psoc: psoc handle
+ *
+ * Must be called after cds_dp_open() so the SOC handle is available.
+ * Return: None
+ */
+#ifdef FEATURE_STATIC_IRQ_AFFINITY
+void ucfg_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc);
+#else
+static inline void
+ucfg_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc)
+{}
+#endif /* FEATURE_STATIC_IRQ_AFFINITY */
+
+/**
  * ucfg_dp_txrx_attach_target() - DP target attach
  * @soc: DP SoC handle
  * @pdev_id: DP pdev id

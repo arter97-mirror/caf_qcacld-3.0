@@ -662,6 +662,142 @@ static void dp_ini_tcp_settings(struct wlan_dp_psoc_cfg *config,
 }
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
+#ifdef FEATURE_STATIC_IRQ_AFFINITY
+/**
+ * wlan_dp_static_irq_affinity_set() - Pin TX/RX ring IRQs to fixed CPUs
+ * @psoc: psoc handle
+ *
+ * Called unconditionally at driver open regardless of whether
+ * WLAN_DP_LOAD_BALANCE_SUPPORT is enabled.  Assigns each REO destination
+ * ring and each TX completion ring to a distinct CPU via round-robin
+ * within their respective INI cpumasks:
+ *   dp_rx_intr_cpumask      - allowed CPUs for REO (RX) ring IRQs
+ *   dp_tx_comp_intr_cpumask - allowed CPUs for TX completion ring IRQs
+ *
+ * When load-balance is enabled, the LB flow-balance sub-system migrates
+ * flows between REO rings via FST steering but skips the IRQ-rebalance
+ * step, so the pinning set here is never overwritten by the periodic LB
+ * handler.  The two mechanisms are complementary: static IRQ pinning
+ * ensures IRQ and NAPI thread stay on the same CPU (no cache-line
+ * bouncing); flow balance ensures even load distribution across rings.
+ *
+ * Return: None
+ */
+void wlan_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint32_t rx_cpumask;
+	uint32_t tx_cpumask;
+	uint32_t rx_grp_bitmap;
+	uint32_t tx_grp_bitmap;
+	uint32_t cpu_mask;
+	int grp_idx;
+	int reo_idx;
+	int tx_ring_idx;
+	int bit_idx;
+	int bit, cnt;
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	if (!soc) {
+		dp_err("Unable to get dp_soc");
+		return;
+	}
+
+	rx_cpumask = dp_ctx->dp_cfg.dp_rx_intr_cpumask;
+	tx_cpumask = dp_ctx->dp_cfg.dp_tx_comp_intr_cpumask;
+	rx_grp_bitmap = cdp_get_rx_rings_grp_bitmap(soc);
+	tx_grp_bitmap = cdp_get_tx_rings_grp_bitmap(soc);
+
+	if (!rx_cpumask && !tx_cpumask)
+		return;
+
+	dp_info("Static IRQ affinity: rx_mask=0x%x tx_mask=0x%x rx_grp=0x%x tx_grp=0x%x",
+		rx_cpumask, tx_cpumask, rx_grp_bitmap, tx_grp_bitmap);
+
+	/*
+	 * Per-REO-ring CPU assignment via round-robin within rx_cpumask:
+	 *   REO 0 -> CPU0, REO 1 -> CPU1, REO 2 -> CPU2, REO 3 -> CPU3
+	 *   (with dp_rx_intr_cpumask=0xf on a 4-core platform)
+	 *
+	 * Both the IRQ and the NAPI thread are pinned to the same CPU to
+	 * avoid cache-line bouncing between them.
+	 */
+	if (rx_cpumask) {
+		reo_idx = 0;
+
+		for_each_set_bit(grp_idx, (unsigned long *)&rx_grp_bitmap,
+				 BITS_PER_TYPE(uint32_t)) {
+			bit_idx = reo_idx % hweight32(rx_cpumask);
+			cnt = 0;
+
+			cpu_mask = 0;
+			for_each_set_bit(bit, (unsigned long *)&rx_cpumask,
+					 BITS_PER_TYPE(uint32_t)) {
+				if (cnt++ == bit_idx) {
+					cpu_mask = BIT(bit);
+					break;
+				}
+			}
+
+			dp_debug("REO ring %d (grp %d) -> cpu_mask=0x%x",
+				 reo_idx, grp_idx, cpu_mask);
+			hif_set_grp_affinity_cpumaskwise(dp_ctx->hif_handle,
+							 BIT(grp_idx),
+							 cpu_mask, cpu_mask);
+			reo_idx++;
+		}
+	}
+
+	/*
+	 * Per-TX-completion-ring CPU assignment via round-robin within
+	 * tx_cpumask:
+	 *   TX 0 -> CPU0, TX 1 -> CPU1, TX 2 -> CPU2, TX 3 -> CPU3
+	 *   (with dp_tx_comp_intr_cpumask=0xf on a 4-core platform)
+	 *
+	 * tx_ring_idx increments consecutively so gaps in tx_grp_bitmap do not
+	 * skew the distribution.
+	 */
+	if (tx_cpumask) {
+		tx_ring_idx = 0;
+
+		for_each_set_bit(grp_idx, (unsigned long *)&tx_grp_bitmap,
+				 BITS_PER_TYPE(uint32_t)) {
+			bit_idx = tx_ring_idx % hweight32(tx_cpumask);
+			cnt = 0;
+
+			cpu_mask = 0;
+			for_each_set_bit(bit, (unsigned long *)&tx_cpumask,
+					 BITS_PER_TYPE(uint32_t)) {
+				if (cnt++ == bit_idx) {
+					cpu_mask = BIT(bit);
+					break;
+				}
+			}
+
+			dp_debug("TX comp ring %d (grp %d) -> cpu_mask=0x%x",
+				 tx_ring_idx, grp_idx, cpu_mask);
+			hif_set_grp_affinity_cpumaskwise(dp_ctx->hif_handle,
+							 BIT(grp_idx),
+							 cpu_mask, 0);
+			tx_ring_idx++;
+		}
+	}
+}
+
+void dp_static_irq_affinity_cfg_init(struct wlan_dp_psoc_cfg *config,
+				     struct wlan_objmgr_psoc *psoc)
+{
+	config->dp_rx_intr_cpumask = cfg_get(psoc, CFG_DP_RX_INTR_CPUMASK);
+	config->dp_tx_comp_intr_cpumask =
+			cfg_get(psoc, CFG_DP_TX_COMP_INTR_CPUMASK);
+}
+#endif /* FEATURE_STATIC_IRQ_AFFINITY */
+
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
 /**
  * dp_ini_load_balance() - Initialize INIs concerned about load balance
@@ -1722,6 +1858,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_ndp_bw_flow_ctrl_cfg_init(config, psoc);
 
 	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
+	dp_static_irq_affinity_cfg_init(config, psoc);
 	config->dp_rx_thread_affinity_mask =
 				cfg_get(psoc, CFG_DP_RX_THREAD_AFFINITY_MASK);
 	dp_haps_cfg_update(config, psoc);

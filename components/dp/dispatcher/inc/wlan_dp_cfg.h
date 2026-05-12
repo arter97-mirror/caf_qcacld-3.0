@@ -1745,6 +1745,74 @@
 		     CFG_VALUE_OR_DEFAULT, \
 		     "DP interrupt affinity control")
 
+#ifdef FEATURE_STATIC_IRQ_AFFINITY
+#define WLAN_CFG_DP_RX_INTR_CPUMASK 0
+#define WLAN_CFG_DP_RX_INTR_CPUMASK_MIN 0
+#define WLAN_CFG_DP_RX_INTR_CPUMASK_MAX 0xFF
+
+/*
+ * <ini>
+ * dp_rx_intr_cpumask - cpumask for static REO (RX) ring interrupt affinity
+ * @Min: 0
+ * @Max: 0xFF
+ * @Default: 0
+ *
+ * Bitmask of CPUs to statically pin REO (RX) ring interrupts.
+ * When non-zero, skips the periodic affinity manager and load balancer
+ * updates to preserve the fixed per-ring pinning set at driver open.
+ * Set to 0 to disable static IRQ affinity (kernel default affinity applies).
+ *
+ * Supported modes: All modes
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DP_RX_INTR_CPUMASK \
+	CFG_INI_UINT("dp_rx_intr_cpumask", \
+		     WLAN_CFG_DP_RX_INTR_CPUMASK_MIN, \
+		     WLAN_CFG_DP_RX_INTR_CPUMASK_MAX, \
+		     WLAN_CFG_DP_RX_INTR_CPUMASK, \
+		     CFG_VALUE_OR_DEFAULT, \
+		     "cpumask for static REO (RX) interrupt affinity")
+
+#define WLAN_CFG_DP_TX_COMP_INTR_CPUMASK 0
+#define WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MIN 0
+#define WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MAX 0xFF
+
+/*
+ * <ini>
+ * dp_tx_comp_intr_cpumask - cpumask for WLAN TX completion interrupts
+ * @Min: 0
+ * @Max: 0xFF
+ * @Default: 0
+ *
+ * Bitmask of CPUs to statically pin TX completion ring interrupts.
+ * When non-zero, skips the periodic affinity manager and load balancer
+ * updates to preserve the fixed per-ring pinning set at driver open.
+ * Set to 0 to disable static IRQ affinity (kernel default affinity applies).
+ *
+ * Supported modes: All modes
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DP_TX_COMP_INTR_CPUMASK \
+	CFG_INI_UINT("dp_tx_comp_intr_cpumask", \
+		     WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MIN, \
+		     WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MAX, \
+		     WLAN_CFG_DP_TX_COMP_INTR_CPUMASK, \
+		     CFG_VALUE_OR_DEFAULT, \
+		     "cpumask for static TX completion interrupt affinity")
+
+#define CFG_DP_STATIC_IRQ_AFFINITY \
+	CFG(CFG_DP_RX_INTR_CPUMASK) \
+	CFG(CFG_DP_TX_COMP_INTR_CPUMASK)
+#else
+#define CFG_DP_STATIC_IRQ_AFFINITY
+#endif /* FEATURE_STATIC_IRQ_AFFINITY */
+
 #define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK 0
 #define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MIN 0
 #define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MAX 0x3FF
@@ -2014,6 +2082,7 @@
 	CFG_DP_DYNAMIC_RESOURCE_MGMT \
 	CFG(CFG_DP_IPA_DEBUG_ENABLE) \
 	CFG(CFG_DP_IRQ_AFFINITY_MASK) \
+	CFG_DP_STATIC_IRQ_AFFINITY \
 	CFG_DP_AFFN_OVERRIDE_MGMT \
 	CFG(CFG_DP_RX_THREAD_AFFINITY_MASK) \
 	CFG_DP_HAPS

@@ -1133,6 +1133,7 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	}
 
 	ucfg_dp_txrx_set_default_affinity(psoc);
+	ucfg_dp_static_irq_affinity_set(psoc);
 
 	dp_config.enable_rx_threads =
 		(cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) ?

@@ -1747,7 +1747,8 @@ static inline void dp_set_affinity_wrapper(
 	enum tput_level prev_tput_level,
 	enum pld_bus_width_type next_vote_level)
 {
-	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg)) {
+	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg) ||
+	    wlan_dp_cfg_is_static_irq_affinity_enabled(&dp_ctx->dp_cfg)) {
 		wlan_dp_affn_override_handler(dp_ctx, total_packets);
 	} else {
 		if (dp_ctx->cur_vote_level != next_vote_level) {
@@ -2208,7 +2209,8 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	 * via affinity manager and load balancer is to be
 	 * avoided.
 	 */
-	if (!wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg)) {
+	if (!(wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg) ||
+	      wlan_dp_cfg_is_static_irq_affinity_enabled(&dp_ctx->dp_cfg))) {
 		hif_affinity_mgr_set_affinity(hif_ctx);
 		wlan_dp_lb_compute_stats_average(dp_ctx, tput_level);
 	}

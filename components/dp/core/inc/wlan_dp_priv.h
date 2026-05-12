@@ -200,6 +200,9 @@ struct dp_affn_override_params {
  * @stc_enable: STC enable bitmask (bit0=feature enable, bit7=skip prealloc)
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
  * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
+ * @dp_rx_intr_cpumask: CPU mask for static RX interrupt affinity
+ * @dp_tx_comp_intr_cpumask: CPU mask for static TX completion interrupt
+ * affinity
  * @dp_rx_thread_affinity_mask: DP rx thread affinity mask (o for disable)
  * @is_ndp_bw_flow_ctrl_enabled: Indicates whether NDP bw flow ctrl is enabled
  * @haps_config: Store the HAPS power save config
@@ -303,6 +306,10 @@ struct wlan_dp_psoc_cfg {
 	bool stc_rtpm_control;
 #endif
 	uint32_t dp_irq_affinity_mask;
+#ifdef FEATURE_STATIC_IRQ_AFFINITY
+	uint32_t dp_rx_intr_cpumask;
+	uint32_t dp_tx_comp_intr_cpumask;
+#endif
 	uint32_t dp_rx_thread_affinity_mask;
 #ifdef NDP_TX_BW_FLOW_CTRL
 	bool is_ndp_bw_flow_ctrl_enabled;

@@ -2862,6 +2862,18 @@ config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
 	default n
 
+config FEATURE_STATIC_IRQ_AFFINITY
+	bool "Enable FEATURE_STATIC_IRQ_AFFINITY"
+	default n
+	help
+	This option enables static IRQ affinity for TX completion and RX
+	(REO) rings.  When enabled, dp_rx_intr_cpumask and
+	dp_tx_comp_intr_cpumask INI parameters pin each ring's IRQ to a
+	fixed CPU at driver open, preventing migration and cross-CPU cache
+	invalidation.
+
+	Choose y to enable the support.
+
 config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
 	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE"
 	default n

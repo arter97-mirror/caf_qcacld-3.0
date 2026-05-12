@@ -253,6 +253,48 @@ static inline void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
 {}
 #endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 
+/**
+ * wlan_dp_static_irq_affinity_set() - Pin REO and TX-comp ring IRQs to
+ * fixed CPUs.  Called unconditionally at driver open regardless of whether
+ * WLAN_DP_LOAD_BALANCE_SUPPORT is enabled.
+ *
+ * When load-balance is enabled the LB flow-balance sub-system migrates
+ * flows between REO rings (FST steering) but deliberately skips the IRQ
+ * rebalance step, so the static CPU pinning set here is never overwritten
+ * by the periodic load-balance handler.
+ *
+ * @psoc: psoc handle
+ *
+ * Return: None
+ */
+#ifdef FEATURE_STATIC_IRQ_AFFINITY
+void wlan_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc);
+
+static inline bool
+wlan_dp_cfg_is_static_irq_affinity_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->dp_tx_comp_intr_cpumask || dp_cfg->dp_rx_intr_cpumask;
+}
+
+void dp_static_irq_affinity_cfg_init(struct wlan_dp_psoc_cfg *config,
+				     struct wlan_objmgr_psoc *psoc);
+#else
+static inline void
+wlan_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc)
+{}
+
+static inline bool
+wlan_dp_cfg_is_static_irq_affinity_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+static inline void
+dp_static_irq_affinity_cfg_init(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{}
+#endif /* FEATURE_STATIC_IRQ_AFFINITY */
+
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 /**
  * dp_get_hlp_by_peeraddr() - API to Get HLP node from MAC address
