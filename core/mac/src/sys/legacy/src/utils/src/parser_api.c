@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3863,9 +3864,11 @@ sir_parse_beacon_ie(struct mac_context *mac,
 		pBeaconStruct->channelNumber = pBies->HTInfo.primaryChannel;
 	}
 
-	if (pBies->RSN.present) {
+	if (pBies->RSNOpaque.present) {
 		pBeaconStruct->rsnPresent = 1;
-		convert_rsn(mac, &pBeaconStruct->rsn, &pBies->RSN);
+		convert_rsn_opaque(mac, &pBeaconStruct->rsn, &pBies->RSNOpaque);
+	} else {
+		pe_debug("RSN IE is not present");
 	}
 
 	if (pBies->WPA.present) {
@@ -4189,9 +4192,10 @@ sir_convert_beacon_frame2_struct(struct mac_context *mac,
 		pe_debug_rl("In Beacon No Channel info");
 	}
 
-	if (pBeacon->RSN.present) {
+	if (pBeacon->RSNOpaque.present) {
 		pBeaconStruct->rsnPresent = 1;
-		convert_rsn(mac, &pBeaconStruct->rsn, &pBeacon->RSN);
+		convert_rsn_opaque(mac, &pBeaconStruct->rsn,
+				   &pBeacon->RSNOpaque);
 	}
 
 	if (pBeacon->WPA.present) {

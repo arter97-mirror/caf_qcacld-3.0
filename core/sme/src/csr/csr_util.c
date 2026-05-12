@@ -2841,11 +2841,10 @@ bool csr_lookup_pmkid(struct mac_context *mac, uint32_t sessionId,
 }
 
 static void csr_update_key_mgmt_crypto_param(struct wlan_objmgr_vdev *vdev,
-					     tDot11fIERSN ap_rsn)
+				struct wlan_crypto_params *ap_crypto_params)
 {
 	int32_t key_mgmt = 0;
 	int32_t neg_akm;
-	int32_t ap_akm;
 
 	neg_akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (neg_akm < 0) {
@@ -2853,11 +2852,8 @@ static void csr_update_key_mgmt_crypto_param(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	SET_PARAM(ap_akm,
-		  wlan_crypto_rsn_suite_to_keymgmt(ap_rsn.akm_suite[0]));
-
 	/* Intersect crypto AKM and candidate AP's AKM */
-	neg_akm &= ap_akm;
+	neg_akm &= ap_crypto_params->key_mgmt;
 	if (neg_akm <= 0) {
 		sme_err("Invalid AKM suite after intersection with AP's AKM");
 		return;
@@ -2923,11 +2919,10 @@ static void csr_update_key_mgmt_crypto_param(struct wlan_objmgr_vdev *vdev,
 }
 
 static void csr_update_ucast_cipher_crypto_param(struct wlan_objmgr_vdev *vdev,
-						 tDot11fIERSN ap_rsn)
+					struct wlan_crypto_params *ap_crypto_params)
 {
 	int32_t ucastcipherset = 0;
 	int32_t neg_ucastcipher;
-	int32_t ap_ucastcipher;
 
 	neg_ucastcipher = wlan_crypto_get_param(vdev,
 						WLAN_CRYPTO_PARAM_UCAST_CIPHER);
@@ -2936,11 +2931,8 @@ static void csr_update_ucast_cipher_crypto_param(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	SET_PARAM(ap_ucastcipher,
-		  wlan_crypto_rsn_suite_to_cipher(ap_rsn.pwise_cipher_suites[0]));
-
 	/* Intersect crypto cipherset and candidate AP's cipherset */
-	neg_ucastcipher &= ap_ucastcipher;
+	neg_ucastcipher &= ap_crypto_params->ucastcipherset;
 	if (neg_ucastcipher <= 0) {
 		sme_err("Invalid unicast cipherset after Intersection with AP's UC");
 		return;
@@ -2982,14 +2974,27 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	tDot11fBeaconIEs *local_ap_ie = ap_ie;
 	uint16_t rsn_cap = 0, self_rsn_cap, orig_rsn_cap;
 	int32_t rsn_val, orig_rsn_val;
+	struct wlan_crypto_params ap_crypto_params;
 
 	if (!local_ap_ie &&
 	    (!QDF_IS_STATUS_SUCCESS(csr_get_parsed_bss_description_ies
 	     (mac, pSirBssDesc, &local_ap_ie))))
 		return ie_len;
 
-	/* get AP RSN cap */
-	qdf_mem_copy(&rsn_cap, local_ap_ie->RSN.RSN_Cap, sizeof(rsn_cap));
+	if (wlan_get_crypto_params_from_opaquersn(&ap_crypto_params,
+					   local_ap_ie->RSNOpaque.data,
+					   local_ap_ie->RSNOpaque.num_data)
+			!= QDF_STATUS_SUCCESS) {
+		sme_err("Failed to get RSN Caps");
+		return ie_len;
+	}
+
+	if (ap_crypto_params.rsn_caps) {
+		/* get AP RSN cap */
+		qdf_mem_copy(&rsn_cap, &ap_crypto_params.rsn_caps,
+			     sizeof(rsn_cap));
+	}
+
 	if (!ap_ie && local_ap_ie)
 		/* locally allocated */
 		qdf_mem_free(local_ap_ie);
@@ -3046,8 +3051,8 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_ORIG_RSN_CAP,
 				   orig_rsn_cap);
 
-	csr_update_key_mgmt_crypto_param(vdev, local_ap_ie->RSN);
-	csr_update_ucast_cipher_crypto_param(vdev, local_ap_ie->RSN);
+	csr_update_key_mgmt_crypto_param(vdev, &ap_crypto_params);
+	csr_update_ucast_cipher_crypto_param(vdev, &ap_crypto_params);
 
 	/*
 	 * TODO: Add support for Adaptive 11r connection after
@@ -3167,6 +3172,7 @@ static void csr_get_mc_mgmt_cipher(struct mac_context *mac,
 	struct rsn_caps rsn_caps;
 	tDot11fBeaconIEs *local_ap_ie = ap_ie;
 	uint8_t grp_mgmt_arr[CSR_RSN_MAX_MULTICAST_CYPHERS][CSR_RSN_OUI_SIZE];
+	struct wlan_crypto_params crypto_params;
 
 	if (!profile->MFPEnabled)
 		return;
@@ -3176,7 +3182,19 @@ static void csr_get_mc_mgmt_cipher(struct mac_context *mac,
 				    (mac, bss, &local_ap_ie))))
 		return;
 
-	qdf_mem_copy(&rsn_caps, local_ap_ie->RSN.RSN_Cap, sizeof(rsn_caps));
+	if (wlan_get_crypto_params_from_opaquersn(&crypto_params,
+					   local_ap_ie->RSNOpaque.data,
+					   local_ap_ie->RSNOpaque.num_data)
+			!= QDF_STATUS_SUCCESS) {
+		sme_err("Failed to get RSN Caps");
+		return;
+	}
+
+	if (crypto_params.rsn_caps) {
+		/* get AP RSN cap */
+		qdf_mem_copy(&rsn_caps, &crypto_params.rsn_caps,
+			     sizeof(rsn_caps));
+	}
 
 	if (!ap_ie && local_ap_ie)
 		/* locally allocated */
