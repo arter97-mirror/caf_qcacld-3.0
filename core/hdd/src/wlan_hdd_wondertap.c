@@ -570,6 +570,7 @@ skip_mlo_check:
 		if (ret)
 			goto delete_pe_session;
 	} else {
+		g_wt_ctx->is_peer_create_enabled = true;
 		__wlan_hdd_wondertap_set_tx_rate_mask(adapter,
 						      &params->tx_rate_mask);
 	}
@@ -1321,6 +1322,11 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	hdd_debug("passthru cap bitmap 0x%llx", hdd_ctx->passthru_cap_bitmap);
 	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT)
 		features->bits.channel_hopping = 1;
+
+	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_AMPDU_RA_CAP_BIT) {
+		features->bits.rate_adaptation = 1;
+		features->bits.ampdu_aggregation = 1;
+	}
 
 	return ret;
 }
