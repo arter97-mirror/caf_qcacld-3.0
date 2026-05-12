@@ -603,6 +603,7 @@ struct wlan_dp_stc_classified_flow_table {
  * @rtpm_control_flow_cnt: Total flows of traffic types affecting RTPM
  * @rtpm_control: RTPM control enable check
  * @tcam_client_available: TCAM client available check
+ * @predictive_roaming_enabled: Flag to indicate if predictive roaming is enabled
  * @peer_tc: per peer active traffic context
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
@@ -624,6 +625,7 @@ struct wlan_dp_stc {
 	uint16_t rtpm_control_flow_cnt;
 	bool rtpm_control;
 	bool tcam_client_available;
+	bool predictive_roaming_enabled;
 	struct wlan_dp_stc_peer_traffic_context peer_tc[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table *sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
@@ -1260,6 +1262,20 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx);
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx);
+
+static inline bool
+wlan_dp_stc_is_predictive_roaming_enabled(
+				struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc *dp_stc;
+
+	if (!dp_ctx)
+		return false;
+
+	dp_stc = dp_ctx->dp_stc;
+
+	return dp_stc ? dp_stc->predictive_roaming_enabled : false;
+}
 #else
 static inline struct wlan_dp_stc *
 wlan_dp_get_stc(struct wlan_dp_psoc_context *dp_ctx)
@@ -1384,6 +1400,12 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 static inline QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool
+wlan_dp_stc_is_predictive_roaming_enabled(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return false;
 }
 #endif
 /* Function Declaration - END */

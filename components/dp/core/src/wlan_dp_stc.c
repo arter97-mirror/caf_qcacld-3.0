@@ -3456,6 +3456,35 @@ void wlan_dp_stc_dump_periodic_stats(struct wlan_dp_psoc_context *dp_ctx)
 	wlan_dp_stc_print_classified_table_compact(dp_ctx);
 }
 
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+static bool
+wlan_dp_stc_is_predictive_roaming_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+	bool fw_support, host_support;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		dp_err("Invalid WMI handle");
+		return false;
+	}
+
+	fw_support = wmi_service_enabled(wmi_handle,
+				   wmi_service_predictive_roaming);
+	host_support = cfg_get(psoc, CFG_DP_WLAN_PREDICTIVE_ROAMING);
+	dp_info("STC: Predictive roaming support host: %d fw: %d",
+						host_support, fw_support);
+
+	return host_support && fw_support;
+}
+#else
+static bool
+wlan_dp_stc_is_predictive_roaming_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 static bool
 wlan_dp_stc_is_traffic_context_supported(struct wlan_objmgr_psoc *psoc)
 {
@@ -3586,6 +3615,12 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_stc->tcam_client_available =
 			wlan_dp_stc_is_traffic_context_supported(dp_ctx->psoc);
 	dp_info("STC: TCAM client support: %u", dp_stc->tcam_client_available);
+
+	dp_stc->predictive_roaming_enabled =
+			wlan_dp_stc_is_predictive_roaming_supported(
+							dp_ctx->psoc);
+	dp_info("STC: predictive_roaming_enabled: %u",
+				dp_stc->predictive_roaming_enabled);
 
 	dp_stc->rtpm_control =
 		wlan_dp_cfg_is_stc_rtpm_control_enabled(&dp_ctx->dp_cfg);

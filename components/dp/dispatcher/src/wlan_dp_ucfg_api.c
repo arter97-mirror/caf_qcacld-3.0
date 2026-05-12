@@ -59,6 +59,7 @@
 #ifdef FEATURE_DAL_DP_SUPPORT
 #include "cdp_txrx_bus.h"
 #endif
+#include "wlan_dp_stc.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline
@@ -3664,4 +3665,21 @@ void ucfg_dp_spm_set_logmask(struct wlan_objmgr_psoc *psoc, uint32_t mask)
 
 	wlan_dp_spm_set_logmask(dp_ctx, mask);
 }
+
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+bool
+ucfg_dp_stc_predictive_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return false;
+	}
+
+	return wlan_dp_stc_is_predictive_roaming_enabled(dp_ctx);
+}
+#endif
+
 #endif

@@ -2242,6 +2242,17 @@ ucfg_telemetry_start_opm_stats(struct wlan_objmgr_vdev *vdev,
 			       uint32_t periodicity);
 QDF_STATUS
 ucfg_telemetry_stop_opm_stats(struct wlan_objmgr_vdev *vdev);
+
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+bool ucfg_dp_stc_predictive_roaming_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+ucfg_dp_stc_predictive_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 #else
 static inline QDF_STATUS
 ucfg_telemetry_start_opm_stats(struct wlan_objmgr_vdev *vdev,
@@ -2254,6 +2265,12 @@ static inline QDF_STATUS
 ucfg_telemetry_stop_opm_stats(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool
+ucfg_dp_stc_predictive_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif /* WLAN_DP_FEATURE_STC */
 
