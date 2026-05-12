@@ -39,6 +39,8 @@
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_TX_RETRIES
 #define PREDICTIVE_ROAM_BW_PKT_COUNT		\
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_BW_PKT_COUNT
+#define PREDICTIVE_ROAM_UL_DELAY		\
+		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX_AVG_UL_DELAY
 #define PREDICTIVE_ROAM_MAX			\
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX
 
@@ -198,6 +200,9 @@ static uint32_t os_if_get_predictive_roam_stats_nla_len(void)
 		      CDP_PEER_BW_MAX * (nla_total_size(sizeof(uint8_t)) +
 				      nla_total_size(sizeof(uint64_t)));
 
+	/* UL delay */
+	nl_buf_len += nla_total_size(sizeof(uint32_t));
+
 	return nl_buf_len;
 }
 
@@ -293,7 +298,7 @@ os_if_dp_handle_predictive_roam_get_stats(struct wiphy *wiphy,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
-	uint32_t nl_buf_len, tx_retries;
+	uint32_t nl_buf_len, ul_delay, tx_retries;
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 	struct sk_buff *skb;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -327,6 +332,15 @@ os_if_dp_handle_predictive_roam_get_stats(struct wiphy *wiphy,
 	if (!skb) {
 		osif_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	ul_delay = ucfg_dp_conn_info_get_ul_delay_max(vdev);
+	if (nla_put_u32(skb,
+			PREDICTIVE_ROAM_UL_DELAY,
+			ul_delay)) {
+		osif_err("ul_delay pack error");
+		status = QDF_STATUS_E_FAILURE;
+		goto free_skb;
 	}
 
 	status = os_if_fill_tx_bw_stats(soc, vdev_id, skb);
@@ -1642,4 +1656,5 @@ void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 #undef PREDICTIVE_ROAM_OPERATION_TYPE
 #undef PREDICTIVE_ROAM_TX_RETRIES
 #undef PREDICTIVE_ROAM_BW_PKT_COUNT
+#undef PREDICTIVE_ROAM_UL_DELAY
 #undef PREDICTIVE_ROAM_MAX

@@ -418,11 +418,16 @@ struct wlan_dp_sta_info {
 	enum dhcp_nego_status dhcp_nego_status;
 };
 
+#define WLAN_DP_UL_DELAY_WINDOW_SIZE 10
+
 struct wlan_dp_conn_info {
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
 	uint8_t proxy_arp_service;
 	uint8_t is_authenticated;
+	uint32_t ul_delay_win[WLAN_DP_UL_DELAY_WINDOW_SIZE];
+	uint8_t ul_delay_win_idx;
+	uint8_t ul_delay_win_filled;
 };
 
 /**
