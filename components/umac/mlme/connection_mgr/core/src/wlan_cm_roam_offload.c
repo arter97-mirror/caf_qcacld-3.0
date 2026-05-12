@@ -1621,6 +1621,21 @@ cm_roam_fill_11w_params(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BN
+static void
+cm_update_uhr_score_params(struct scoring_param *req_score_params,
+			   struct weight_cfg *weight_config)
+{
+	req_score_params->uhr_caps_weightage =
+			weight_config->uhr_caps_weightage;
+}
+#else
+static void
+cm_update_uhr_score_params(struct scoring_param *req_score_params,
+			   struct weight_cfg *weight_config)
+{}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
 cm_update_mlo_score_params(struct scoring_param *req_score_params,
@@ -1819,6 +1834,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		req_score_params->sta_sap_mcc_weightage = 0;
 
 	cm_update_mlo_score_params(req_score_params, weight_config);
+	cm_update_uhr_score_params(req_score_params, weight_config);
 
 	/* TODO: update scoring params corresponding to ML scoring */
 	req_score_params->bw_index_score =

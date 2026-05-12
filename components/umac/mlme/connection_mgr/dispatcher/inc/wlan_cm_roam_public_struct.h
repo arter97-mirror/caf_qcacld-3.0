@@ -1108,6 +1108,7 @@ struct ap_profile {
  * individually manage the calculated scores for candidates in 5 GHz band
  * @band_6g_weightage: 6 GHz band weight value in percentage used to
  * individually manage the calculated scores for candidates in 6 GHz band
+ * @uhr_caps_weightage: UHR caps weightage out of total score in %
  */
 struct scoring_param {
 	uint32_t disable_bitmap;
@@ -1145,6 +1146,9 @@ struct scoring_param {
 	uint32_t band_2g_weightage;
 	uint32_t band_5g_weightage;
 	uint32_t band_6g_weightage;
+#ifdef WLAN_FEATURE_11BN
+	uint8_t uhr_caps_weightage;
+#endif
 };
 
 /**

@@ -5245,6 +5245,24 @@ send_roam_scan_mode_cmd:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BN
+static void
+send_update_uhr_roam_params(wmi_roam_cnd_scoring_param *score_param,
+			    struct ap_profile_params *ap_profile)
+{
+	score_param->uhr_weightage_pcnt =
+				ap_profile->param.uhr_caps_weightage;
+	wmi_debug("11bn score params weightage: UHR %d",
+		  score_param->uhr_weightage_pcnt);
+}
+#else
+static void
+send_update_uhr_roam_params(wmi_roam_cnd_scoring_param *score_param,
+			    struct ap_profile_params *ap_profile)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
 send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
@@ -5564,6 +5582,7 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	score_param->mcc_score_factor_pcnt =
 			ap_profile->param.sta_sap_mcc_weightage;
 	send_update_mlo_roam_params(score_param, ap_profile);
+	send_update_uhr_roam_params(score_param, ap_profile);
 	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d sta_sap_mcc_pcnt %d",
 		  score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		  score_param->ht_weightage_pcnt,
