@@ -837,6 +837,33 @@ bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
 }
 
 /**
+ * is_primary_sta_disconnected - return disconnection status
+ * of primary STA(wlan0)
+ *
+ * Return: true if disconnected, false otherwise
+ */
+#define PRIMARY_STA_INTERFACE_NAME "wlan0"
+static
+bool is_primary_sta_disconnected(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter;
+
+	adapter = hdd_get_adapter_by_iface_name(hdd_ctx,
+				PRIMARY_STA_INTERFACE_NAME);
+	if (!adapter) {
+		hdd_debug("adapter is NULL for primary STA");
+		return false;
+	}
+
+	if (!__hdd_is_link_info_valid(adapter->link_info)) {
+		hdd_debug("adapter link_info is NULL for primary STA");
+		return false;
+	}
+
+	return hdd_cm_is_disconnected(adapter->link_info);
+}
+
+/**
  * __wlan_hdd_add_virtual_intf() - Add virtual interface
  * @wiphy: wiphy pointer
  * @name: User-visible name of the interface
@@ -858,6 +885,8 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = NULL;
 	bool p2p_dev_addr_admin = false;
+	bool primary_sta_mlo_capab = false;
+	bool mlo_sap_concurrency_allow = false;
 	enum QDF_OPMODE mode;
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
@@ -998,9 +1027,29 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		if (!device_address)
 			return ERR_PTR(-EINVAL);
 
-		if (policy_mgr_mlo_sap_concurrency_allow(hdd_ctx->psoc) &&
-		    (QDF_SAP_MODE == mode || QDF_STA_MODE == mode))
+		/*
+		 * separate SAP mode and STA mode as STA has additional logical
+		 */
+		mlo_sap_concurrency_allow =
+				policy_mgr_mlo_sap_concurrency_allow(hdd_ctx->psoc);
+		if (mlo_sap_concurrency_allow && QDF_SAP_MODE == mode) {
 			create_params.is_ml_adapter = true;
+		}
+
+		if (mlo_sap_concurrency_allow && QDF_STA_MODE == mode) {
+			primary_sta_mlo_capab =
+				hdd_ctx->config->enable_primary_sta_mlo_cap;
+			/* Per OEM requirement: if primary_sta_mlo_capab = false
+			 * that means wlan0 disable MLO, wlan1 should
+			 * enable MLO when wlan0 is disconnected.
+			 */
+			if (primary_sta_mlo_capab ||
+			    is_primary_sta_disconnected(hdd_ctx)) {
+				create_params.is_ml_adapter = true;
+			} else {
+				hdd_debug("MLO capability disabled for STA");
+			}
+		}
 
 		adapter = hdd_open_adapter(hdd_ctx, mode, name,
 					   device_address,

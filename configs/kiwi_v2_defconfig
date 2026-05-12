@@ -15,6 +15,11 @@ endif
 
 ifeq ($(CONFIG_ARCH_SA525), y)
 CONFIG_MOBILE_ROUTER := y
+CONFIG_WLAN_SYSFS := y
+# Enable crash_injection Debug Builds Only
+ifneq ($(TARGET_BUILD_VARIANT),user)
+CONFIG_WLAN_DEBUG_CRASH_INJECT := y
+endif
 endif
 
 include $(WLAN_ROOT)/configs/default_defconfig
