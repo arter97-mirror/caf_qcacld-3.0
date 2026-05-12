@@ -11750,6 +11750,8 @@ hdd_convert_roam_invoke_reason(enum roam_invoke_reason invoke)
 		return QCA_WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE;
 	case WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE:
 		return QCA_WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE;
+	case WLAN_ROAM_STATS_INVOKE_REASON_PREDICTIVE:
+		return QCA_WLAN_ROAM_STATS_INVOKE_REASON_PREDICTIVE;
 	default:
 		hdd_err("Invalid invoke reason received: %d", invoke);
 		break;

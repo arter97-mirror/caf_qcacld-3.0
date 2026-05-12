@@ -2150,11 +2150,13 @@ static bool is_freq_allowed_for_roam(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
+		    u8 num_chan, qdf_freq_t *chan_freq_list,
 		    enum wlan_cm_source source)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
+	u8 i;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -2169,24 +2171,67 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (chan_freq && !is_freq_allowed_for_roam(vdev, chan_freq)) {
-		mlme_rl_debug("vdev:%d, source:%d, allowed_bands:0x%x, freq:%d NOT allowed to roam",
-			      vdev_id, source,
-			      wlan_cm_get_roam_band_value(psoc, vdev),
-			      chan_freq);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_E_FAILURE;
+	if (num_chan && chan_freq_list) {
+		/*
+		 * OOQROAM path - validate each freq in the list
+		 * against the configured roam band
+		 */
+		mlme_debug("[DISPATCHER][OOQROAM] vdev:%d source:%d num_chan:%d",
+			   vdev_id, source, num_chan);
+
+		for (i = 0; i < num_chan; i++) {
+			if (!is_freq_allowed_for_roam(vdev,
+						      chan_freq_list[i])) {
+				mlme_debug("[DISPATCHER][OOQROAM] vdev:%d freq:%d NOT allowed, skipping",
+					   vdev_id, chan_freq_list[i]);
+				/* shift remaining freqs left to remove invalid */
+				chan_freq_list[i] =
+					chan_freq_list[num_chan - 1];
+				num_chan--;
+				i--;
+			} else {
+				mlme_debug("[DISPATCHER][OOQROAM] vdev:%d freq[%d]:%d allowed",
+					   vdev_id, i, chan_freq_list[i]);
+			}
+		}
+
+		if (!num_chan) {
+			mlme_err("[DISPATCHER][OOQROAM] vdev:%d no valid freqs after band filter",
+				 vdev_id);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		mlme_debug("[DISPATCHER][OOQROAM] vdev:%d valid num_chan:%d forwarding to core",
+			   vdev_id, num_chan);
+	} else {
+		/*
+		 * FASTREASSOC path - validate single chan_freq
+		 * existing logic unchanged
+		 */
+		if (chan_freq && !is_freq_allowed_for_roam(vdev, chan_freq)) {
+			mlme_rl_debug("vdev:%d, source:%d, allowed_bands:0x%x, freq:%d NOT allowed to roam",
+				      vdev_id, source,
+				      wlan_cm_get_roam_band_value(psoc, vdev),
+				      chan_freq);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		if (bssid)
+			mlme_debug("[DISPATCHER][FASTREASSOC] vdev:%d source:%d freq:%d bssid:" QDF_MAC_ADDR_FMT,
+				   vdev_id, source, chan_freq,
+				   QDF_MAC_ADDR_REF(bssid->bytes));
 	}
 
-	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
-		   vdev_id, source, chan_freq, QDF_MAC_ADDR_REF(bssid->bytes));
 	status = mlo_link_recfg_validate_roam_invoke(psoc, vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return status;
 	}
 
-	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq, source);
+	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq,
+				      num_chan, chan_freq_list, source);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
 	return status;
@@ -2271,7 +2316,7 @@ QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 
 	req = msg->bodyptr;
 	status = wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
-				     CM_ROAMING_FW);
+			     0, NULL, CM_ROAMING_FW);
 	qdf_mem_free(req);
 
 	return status;
@@ -5587,6 +5632,20 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					continue;
 				wlan_cm_update_roam_stats_info(psoc, stats_info, i);
 				continue;
+			}
+
+			if (stats_info->trigger[i].trigger_reason ==
+			    ROAM_TRIGGER_REASON_FORCED &&
+			    stats_info->trigger[i].user_trig_data.invoke_reason ==
+			    WLAN_ROAM_STATS_INVOKE_REASON_PREDICTIVE) {
+				mlme_debug("Predictive roam: triggering disconnect on vdev %u",
+					   stats_info->vdev_id);
+				wlan_cm_update_roam_stats_info(psoc, stats_info, i);
+				wlan_cm_disconnect(vdev, CM_ROAM_DISCONNECT,
+						   REASON_PREDICTIVE_ROAM_FAILURE,
+						   NULL);
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+				goto out;
 			}
 
 			cm_roam_stats_print_trigger_info(

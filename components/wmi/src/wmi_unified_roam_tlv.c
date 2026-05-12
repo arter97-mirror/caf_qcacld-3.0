@@ -1635,7 +1635,12 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_mac_addr *bssid_list;
 	wmi_tlv_buf_len_param *buf_len_tlv;
 
-	args_tlv_len = (4 * WMI_TLV_HDR_SIZE) + sizeof(uint32_t) +
+	/* for OOQROAM num_chan channels, for FASTREASSOC single channel */
+	u8 num_chan_tlv = roaminvoke->num_chan ? roaminvoke->num_chan : 1;
+	u8 i;
+
+	args_tlv_len = (4 * WMI_TLV_HDR_SIZE) +
+			(num_chan_tlv * sizeof(uint32_t)) +
 			sizeof(wmi_mac_addr) + sizeof(wmi_tlv_buf_len_param) +
 			roundup(roaminvoke->frame_len, sizeof(uint32_t));
 	len = sizeof(wmi_roam_invoke_cmd_fixed_param) + args_tlv_len;
@@ -1674,6 +1679,22 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 		cmd->flags |=
 			(1 << WMI_ROAM_INVOKE_FLAG_FULL_SCAN_IF_NO_CANDIDATE);
 		cmd->reason = ROAM_INVOKE_REASON_NUD_FAILURE;
+	} else if (roaminvoke->num_chan && roaminvoke->chan_freq_list[0]) {
+		/*
+		 * OOQROAM path - scan given channel list
+		 * no specific BSSID, firmware picks best AP
+		 * from given channels based on scoring algorithm
+		 */
+		cmd->num_chan = roaminvoke->num_chan;
+		cmd->num_bssid = 0;
+		cmd->roam_scan_mode = WMI_ROAM_INVOKE_SCAN_MODE_FIXED_CH;
+		cmd->flags |=
+			(1 << WMI_ROAM_INVOKE_FLAG_FULL_SCAN_IF_NO_CANDIDATE) |
+			(1 <<
+			 WMI_ROAM_INVOKE_FLAG_SELECT_CANDIDATE_CONSIDER_SCORE);
+		cmd->reason = ROAM_INVOKE_REASON_PREDICTIVE;
+		wmi_debug("[WMI][OOQROAM] vdev:%d num_chan:%d scan mode:%d",
+			  cmd->vdev_id, cmd->num_chan, cmd->roam_scan_mode);
 	} else if (qdf_is_macaddr_broadcast(&roaminvoke->target_bssid)) {
 		cmd->num_chan = 0;
 		cmd->num_bssid = 0;
@@ -1689,11 +1710,30 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 	}
 
 	buf_ptr += sizeof(wmi_roam_invoke_cmd_fixed_param);
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
-		       (sizeof(u_int32_t)));
-	channel_list = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-	*channel_list = roaminvoke->ch_freq;
-	buf_ptr += sizeof(uint32_t) + WMI_TLV_HDR_SIZE;
+
+	if (roaminvoke->num_chan && roaminvoke->chan_freq_list[0]) {
+		/*
+		 * OOQROAM path - fill all channel freqs into TLV
+		 */
+
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			       (roaminvoke->num_chan * sizeof(uint32_t)));
+		channel_list = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
+		for (i = 0; i < roaminvoke->num_chan; i++) {
+			channel_list[i] = roaminvoke->chan_freq_list[i];
+			wmi_debug("[WMI][OOQROAM] chan_freq_list[%d] = %d",
+				  i, channel_list[i]);
+		}
+		buf_ptr += (roaminvoke->num_chan * sizeof(uint32_t)) +
+			    WMI_TLV_HDR_SIZE;
+	} else {
+		/* FASTREASSOC path - single channel */
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			       (sizeof(u_int32_t)));
+		channel_list = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
+		*channel_list = roaminvoke->ch_freq;
+		buf_ptr += sizeof(uint32_t) + WMI_TLV_HDR_SIZE;
+	}
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
 		       (sizeof(wmi_mac_addr)));
 	bssid_list = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
@@ -1721,11 +1761,11 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 		     roaminvoke->frame_buf,
 		     roaminvoke->frame_len);
 
-	wmi_debug("flag:%d, MODE:%d, ap:%d, dly:%d, n_ch:%d, n_bssid:%d, ch_freq:%d, is_same_bss:%d",
+	wmi_debug("flag:%d, MODE:%d, ap:%d, dly:%d, n_ch:%d, n_bssid:%d, ch_freq:%d, is_same_bss:%d reason:%d",
 		  cmd->flags, cmd->roam_scan_mode,
 		  cmd->roam_ap_sel_mode, cmd->roam_delay,
 		  cmd->num_chan, cmd->num_bssid, roaminvoke->ch_freq,
-		  roaminvoke->is_same_bssid);
+		  roaminvoke->is_same_bssid, cmd->reason);
 
 	wmi_mtrace(WMI_ROAM_INVOKE_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
