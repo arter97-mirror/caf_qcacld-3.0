@@ -3071,6 +3071,24 @@ config WLAN_TX_POWERBOOST
 	bool "Enable WLAN_TX_POWERBOOST"
 	default n
 
+config WLAN_PREDICTIVE_ROAMING
+	bool "Enable WLAN_PREDICTIVE_ROAMING"
+	depends on WLAN_DP_FEATURE_STC
+	default n
+	help
+	  Enable predictive roaming feature for WLAN station mode.
+	  This feature monitors real-time traffic statistics such as
+	  UL delay, TX retries, NSS and bandwidth packet counts, and
+	  TX PHY rate to proactively trigger roaming decisions before
+	  connection quality degrades. It exposes vendor commands to
+	  userspace to enable/disable stats collection and retrieve
+	  the collected metrics for roaming evaluation.
+
+	  Depends on WLAN_DP_FEATURE_STC because predictive roaming
+	  decisions are made only after traffic classification, which
+	  is performed by the STC (Smart Traffic Classifier)
+	  framework.
+
 config CNSS_ETM_TRACE
 	bool "Enable CNSS_ETM_TRACE"
 	default n
