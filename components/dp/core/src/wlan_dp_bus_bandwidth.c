@@ -2457,6 +2457,69 @@ static inline void dp_bus_bw_update_ul_delay(struct wlan_dp_psoc_context *dp_ctx
 }
 #endif
 
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+/**
+ * dp_bus_bw_update_tx_phy_rate() - Sample tx phy rate stats for predictive
+ *  roaming and record this interval's average into the rolling window
+ * @dp_ctx: handle to DP context
+ * @dp_intf: handle to DP interface
+ * @vdev: handle to vdev object
+ *
+ * Returns: None
+ */
+static void dp_bus_bw_update_tx_phy_rate(struct wlan_dp_psoc_context *dp_ctx,
+					 struct wlan_dp_intf *dp_intf,
+					 struct wlan_objmgr_vdev *vdev)
+{
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_dp_conn_info *conn_info = &dp_intf->def_link->conn_info;
+	QDF_STATUS status;
+	uint64_t phy_rate_sum = 0, delta_sum;
+	uint64_t phy_rate_cnt = 0, delta_cnt;
+	uint32_t phy_rate_avg;
+
+	if (dp_intf->device_mode != QDF_STA_MODE ||
+	    !cdp_is_vdev_predictive_roaming_stats_enabled(
+					soc, dp_intf->def_link->link_id))
+		return;
+
+	status = cdp_get_tx_phy_rate_stats(soc, dp_intf->def_link->link_id,
+					   &phy_rate_sum, &phy_rate_cnt);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	/* Cumulative counters can go backwards if the peer object was
+	 * recreated (e.g. reassociation) without conn_info being reset;
+	 * treat that as a fresh baseline instead of underflowing.
+	 */
+	if (phy_rate_sum < conn_info->prev_phy_rate_sum ||
+	    phy_rate_cnt < conn_info->prev_phy_rate_cnt) {
+		conn_info->prev_phy_rate_sum = phy_rate_sum;
+		conn_info->prev_phy_rate_cnt = phy_rate_cnt;
+		return;
+	}
+
+	delta_sum = phy_rate_sum - conn_info->prev_phy_rate_sum;
+	delta_cnt = phy_rate_cnt - conn_info->prev_phy_rate_cnt;
+
+	conn_info->prev_phy_rate_sum = phy_rate_sum;
+	conn_info->prev_phy_rate_cnt = phy_rate_cnt;
+
+	/* No new tx completions this interval, nothing to record */
+	if (!delta_cnt)
+		return;
+
+	phy_rate_avg = (uint32_t)(delta_sum / delta_cnt);
+	ucfg_dp_conn_info_record_tx_phy_rate_sample(vdev, phy_rate_avg);
+}
+#else
+static inline void dp_bus_bw_update_tx_phy_rate(struct wlan_dp_psoc_context *dp_ctx,
+						struct wlan_dp_intf *dp_intf,
+						struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 /**
  * __dp_bus_bw_work_handler() - Bus bandwidth work handler
  * @dp_ctx: handle to DP context
@@ -2554,6 +2617,7 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 		cdp_process_ul_delay(soc, dp_intf->def_link->link_id);
 		dp_dump_periodic_stats(dp_intf, dp_ctx);
 		dp_bus_bw_update_ul_delay(dp_ctx, dp_intf, vdev);
+		dp_bus_bw_update_tx_phy_rate(dp_ctx, dp_intf, vdev);
 
 		ret = A_ERROR;
 		fwd_tx_packets = 0;
