@@ -46,6 +46,7 @@
 #include "cdp_txrx_host_stats.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_eht.h"
+#include "wlan_hdd_uhr.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_mlo_mgr_peer.h"
@@ -8062,6 +8063,7 @@ static void wlan_hdd_fill_os_rate_info(enum tx_rate_info rate_flags,
 	hdd_set_rate_bw(os_rate, HDD_RATE_BW_20);
 	os_rate->mcs = mcs_index;
 
+	wlan_hdd_fill_os_uhr_rateflags(os_rate, rate_flags);
 	wlan_hdd_fill_os_eht_rateflags(os_rate, rate_flags, dcm,
 				       guard_interval);
 	wlan_hdd_fill_os_he_rateflags(os_rate, rate_flags, dcm, guard_interval);
@@ -8607,8 +8609,8 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
 		os_rate->flags |= RATE_INFO_FLAGS_VHT_MCS;
 	else if (preamble == DOT11_AX)
 		os_rate->flags |= RATE_INFO_FLAGS_HE_MCS;
-	else
-		wlan_hdd_refill_os_eht_rateflags(os_rate, preamble);
+	else if (!wlan_hdd_refill_os_eht_rateflags(os_rate, preamble))
+		wlan_hdd_refill_os_uhr_rateflags(os_rate, preamble);
 }
 
 /* EAPOL/ARP legacy rate, unit 100kbps */

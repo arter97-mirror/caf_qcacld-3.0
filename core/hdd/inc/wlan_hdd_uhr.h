@@ -94,5 +94,38 @@ static inline void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
 {
 }
 #endif
-#endif /* WLAN_HDD_UHR_H */
 
+#if defined(WLAN_FEATURE_11BN)
+/**
+ * wlan_hdd_fill_os_uhr_rateflags() - Fill UHR related rate_info
+ * @os_rate: rate info for os
+ * @rate_flags: rate flags
+ *
+ * Return: none
+ */
+void wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
+				    enum tx_rate_info rate_flags);
+
+/**
+ * wlan_hdd_refill_os_uhr_rateflags() - Refill UHR rate flag
+ * @os_rate: rate info for os
+ * @preamble: preamble type used to determine UHR mode
+ *
+ * Return: true if preamble is UHR, false otherwise
+ */
+bool wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate,
+				      uint8_t preamble);
+#else
+static inline void
+wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
+			       enum tx_rate_info rate_flags)
+{
+}
+
+static inline bool
+wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate, uint8_t preamble)
+{
+	return false;
+}
+#endif
+#endif /* WLAN_HDD_UHR_H */

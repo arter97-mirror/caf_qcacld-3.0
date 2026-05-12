@@ -498,11 +498,15 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 	}
 }
 
-void
+bool
 wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble)
 {
-	if (preamble == DOT11_BE)
+	if (preamble == DOT11_BE) {
 		os_rate->flags |= RATE_INFO_FLAGS_EHT_MCS;
+		return true;
+	}
+
+	return false;
 }
 
 void

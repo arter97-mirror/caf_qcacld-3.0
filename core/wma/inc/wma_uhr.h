@@ -19,6 +19,26 @@
 #include "wlan_cmn_ieee80211.h"
 
 #if defined(WLAN_FEATURE_11BN)
+#define MAX_UHR_DCM_INDEX 2
+
+/**
+ * struct index_uhr_data_rate_type - UHR data rate type
+ * @beacon_rate_index: Beacon rate index
+ * @supported_uhr20_rate: uhr20 rate
+ * @supported_uhr40_rate: uhr40 rate
+ * @supported_uhr80_rate: uhr80 rate
+ * @supported_uhr160_rate: uhr160 rate
+ * @supported_uhr320_rate: uhr320 rate
+ */
+struct index_uhr_data_rate_type {
+	uint8_t beacon_rate_index;
+	uint32_t supported_uhr20_rate[MAX_UHR_DCM_INDEX][3];
+	uint32_t supported_uhr40_rate[MAX_UHR_DCM_INDEX][3];
+	uint32_t supported_uhr80_rate[MAX_UHR_DCM_INDEX][3];
+	uint32_t supported_uhr160_rate[MAX_UHR_DCM_INDEX][3];
+	uint32_t supported_uhr320_rate[MAX_UHR_DCM_INDEX][3];
+};
+
 /*
  * wma_uhr_update_tgt_services() - update tgt cfg to indicate 11bn support
  * @wmi_handle: pointer to WMI handle
@@ -75,6 +95,27 @@ static inline bool wma_is_peer_uhr_capable(tpAddStaParams params)
  */
 bool wma_get_bss_uhr_capable(struct bss_params *add_bss);
 
+/**
+ * wma_match_uhr_rate() - get UHR rate matching with nss
+ * @raw_rate: raw rate from fw
+ * @rate_flags: rate flags
+ * @nss: nss
+ * @dcm: dcm
+ * @guard_interval: guard interval
+ * @mcs_rate_flag: mcs rate flags (output — set to matched UHR BW flag)
+ * @p_index: index for matched rate
+ *
+ * Reuses EHT rate tables since UHR MCS/NSS/BW is identical to EHT.
+ *
+ * Return: matched rate if found, else 0
+ */
+uint32_t wma_match_uhr_rate(uint16_t raw_rate,
+			    enum tx_rate_info rate_flags,
+			    uint8_t *nss, uint8_t *dcm,
+			    enum txrate_gi *guard_interval,
+			    enum tx_rate_info *mcs_rate_flag,
+			    uint8_t *p_index);
+
 static
 inline bool wma_is_uhr_phymode_supported(enum wlan_phymode bss_phymode)
 {
@@ -108,6 +149,17 @@ static inline
 bool wma_get_bss_uhr_capable(struct bss_params *add_bss)
 {
 	return false;
+}
+
+static inline
+uint32_t wma_match_uhr_rate(uint16_t raw_rate,
+			    enum tx_rate_info rate_flags,
+			    uint8_t *nss, uint8_t *dcm,
+			    enum txrate_gi *guard_interval,
+			    enum tx_rate_info *mcs_rate_flag,
+			    uint8_t *p_index)
+{
+	return 0;
 }
 
 static inline bool wma_is_uhr_phymode_supported(enum wlan_phymode bss_phymode)

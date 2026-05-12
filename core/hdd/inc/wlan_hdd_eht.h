@@ -175,9 +175,9 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
  *
  * Fill out os ETH MCS rate flag according to preamble.
  *
- * Return: none
+ * Return: true if preamble is EHT, false otherwise
  */
-void
+bool
 wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble);
 
 /**
@@ -192,9 +192,10 @@ wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble);
 void
 wlan_hdd_refill_os_eht_bw(struct rate_info *os_rate, enum rx_tlv_bw bw);
 #else
-static inline void
+static inline bool
 wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble)
 {
+	return false;
 }
 
 static inline void

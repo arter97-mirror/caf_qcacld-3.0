@@ -109,6 +109,11 @@ enum stats_req_type {
  * @TX_RATE_EHT80: EHT 80 rates
  * @TX_RATE_EHT160: EHT 160 rates
  * @TX_RATE_EHT320: EHT 320 rates
+ * @TX_RATE_UHR20: UHR 20 rates
+ * @TX_RATE_UHR40: UHR 40 rates
+ * @TX_RATE_UHR80: UHR 80 rates
+ * @TX_RATE_UHR160: UHR 160 rates
+ * @TX_RATE_UHR320: UHR 320 rates
  */
 enum tx_rate_info {
 	TX_RATE_LEGACY = 0x1,
@@ -129,6 +134,13 @@ enum tx_rate_info {
 	TX_RATE_EHT80 = 0x8000,
 	TX_RATE_EHT160 = 0x10000,
 	TX_RATE_EHT320 = 0x20000,
+#ifdef WLAN_FEATURE_11BN
+	TX_RATE_UHR20  = 0x40000,
+	TX_RATE_UHR40  = 0x80000,
+	TX_RATE_UHR80  = 0x100000,
+	TX_RATE_UHR160 = 0x200000,
+	TX_RATE_UHR320 = 0x400000,
+#endif
 };
 
 /**

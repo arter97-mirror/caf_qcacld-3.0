@@ -73,6 +73,7 @@
 #include "wlan_cp_stats_utils_api.h"
 #endif /* FEATURE_SNR_STATS */
 #include "wma_eht.h"
+#include "wma_uhr.h"
 #include <target_if_spatial_reuse.h>
 #include "wlan_dp_ucfg_api.h"
 #include "cfg_hif.h"
@@ -684,6 +685,12 @@ uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
 		  raw_rate, rate_flags, is_he_mcs_12_13_supported, *nss);
 
 	*mcs_rate_flag = rate_flags;
+
+	match_rate = wma_match_uhr_rate(raw_rate, rate_flags,
+					nss, dcm, guard_interval,
+					mcs_rate_flag, &index);
+	if (match_rate)
+		goto rate_found;
 
 	match_rate = wma_match_eht_rate(raw_rate, rate_flags,
 					nss, dcm, guard_interval,

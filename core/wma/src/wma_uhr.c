@@ -591,4 +591,502 @@ bool wma_get_bss_uhr_capable(struct bss_params *add_bss)
 {
 	return add_bss->uhr_capable;
 }
+
+/* MCS Based UHR rate table — identical values to EHT (same MCS/NSS/BW set) */
+/* MCS parameters with Nss = 1 */
+static const struct index_uhr_data_rate_type uhr_mcs_nss1[] = {
+/* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
+	{0,  {{86,   81,   73}, {0} }, /* UHR20 */
+	     {{172,  163,  146}, {0} }, /* UHR40 */
+	     {{360,  340,  306}, {0} }, /* UHR80 */
+	     {{721,  681,  613}, {0} }, /* UHR160 */
+	     {{1441,  1361,  1225}, {0} } }, /* UHR320 */
+	{1,  {{172,  163,  146 }, {0} },
+	     {{344,  325,  293 }, {0} },
+	     {{721,  681,  613 }, {0} },
+	     {{1441, 1361, 1225}, {0} },
+	     {{2882, 2722, 2450}, {0} } },
+	{2,  {{258,  244,  219 }, {0} },
+	     {{516,  488,  439 }, {0} },
+	     {{1081, 1021, 919 }, {0} },
+	     {{2162, 2042, 1838}, {0} },
+	     {{4324, 4083, 3675}, {0} } },
+	{3,  {{344,  325,  293 }, {0} },
+	     {{688,  650,  585 }, {0} },
+	     {{1441, 1361, 1225}, {0} },
+	     {{2882, 2722, 2450}, {0} },
+	     {{5765, 5444, 4900}, {0} } },
+	{4,  {{516,  488,  439 }, {0} },
+	     {{1032, 975,  878 }, {0} },
+	     {{2162, 2042, 1838}, {0} },
+	     {{4324, 4083, 3675}, {0} },
+	     {{8647, 8167, 7350}, {0} } },
+	{5,  {{688,  650,  585 }, {0} },
+	     {{1376, 1300, 1170}, {0} },
+	     {{2882, 2722, 2450}, {0} },
+	     {{5765, 5444, 4900}, {0} },
+	     {{11529, 10889, 9800}, {0} } },
+	{6,  {{774,  731,  658 }, {0} },
+	     {{1549, 1463, 1316}, {0} },
+	     {{3243, 3063, 2756}, {0} },
+	     {{6485, 6125, 5513}, {0} },
+	     {{12971, 12250, 11025}, {0} } },
+	{7,  {{860,  813,  731 }, {0} },
+	     {{1721, 1625, 1463}, {0} },
+	     {{3603, 3403, 3063}, {0} },
+	     {{7206, 6806, 6125}, {0} },
+	     {{14412, 13611, 12250}, {0} } },
+	{8,  {{1032, 975,  878 }, {0} },
+	     {{2065, 1950, 1755}, {0} },
+	     {{4324, 4083, 3675}, {0} },
+	     {{8647, 8167, 7350}, {0} },
+	     {{17294, 16333, 14700}, {0} } },
+	{9,  {{1147, 1083, 975 }, {0} },
+	     {{2294, 2167, 1950}, {0} },
+	     {{4804, 4537, 4083}, {0} },
+	     {{9608, 9074, 8167}, {0} },
+	     {{19216, 18148, 16333}, {0} } },
+	{10, {{1290, 1219, 1097}, {0} },
+	     {{2581, 2438, 2194}, {0} },
+	     {{5404, 5104, 4594}, {0} },
+	     {{10809, 10208, 9188}, {0} },
+	     {{21618, 20417, 18375}, {0} } },
+	{11, {{1434, 1354, 1219}, {0} },
+	     {{2868, 2708, 2438}, {0} },
+	     {{6005, 5671, 5104}, {0} },
+	     {{12010, 11342, 10208}, {0} },
+	     {{24020, 22685, 20417}, {0} } },
+	{12, {{1549, 1463, 1316}, {0} },
+	     {{3097, 2925, 2633}, {0} },
+	     {{6485, 6125, 5513}, {0} },
+	     {{12971, 12250, 11025}, {0} },
+	     {{25941, 24500, 22050}, {0} } },
+	{13, {{1721, 1625, 1463}, {0} },
+	     {{3441, 3250, 2925}, {0} },
+	     {{7206, 6806, 6125}, {0} },
+	     {{14412, 13611, 12250}, {0} },
+	     {{28824, 27222, 24500}, {0} } },
+};
+
+/* MCS parameters with Nss = 2 */
+static const struct index_uhr_data_rate_type uhr_mcs_nss2[] = {
+/* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
+	{0,  {{172,   162,   146 }, {0} }, /* UHR20 */
+	     {{344,   326,   292 }, {0} }, /* UHR40 */
+	     {{720,   680,   612 }, {0} }, /* UHR80 */
+	     {{1442, 1362, 1226},   {0} }, /* UHR160 */
+	     {{2882, 2722, 2450},   {0} } }, /* UHR320 */
+	{1,  {{344,   326,   292 }, {0} },
+	     {{688,   650,   586 }, {0} },
+	     {{1442,  1362,  1226}, {0} },
+	     {{2882, 2722, 2450},   {0} },
+	     {{5764, 5444, 4900},   {0} } },
+	{2,  {{516,   488,   438 }, {0} },
+	     {{1032,  976,   878 }, {0} },
+	     {{2162,  2042,  1838}, {0} },
+	     {{4324, 4084, 3676}, {0} },
+	     {{8648, 8166, 7350}, {0} } },
+	{3,  {{688,   650,   586 }, {0} },
+	     {{1376,  1300,  1170}, {0} },
+	     {{2882,  2722,  2450}, {0} },
+	     {{5764, 5444, 4900}, {0} },
+	     {{11530, 10888, 9800}, {0} } },
+	{4,  {{1032,  976,   878 }, {0} },
+	     {{2064,  1950,  1756}, {0} },
+	     {{4324,  4083,  36756}, {0} },
+	     {{8648, 8166, 7350}, {0} },
+	     {{17294, 16334, 14700}, {0} } },
+	{5,  {{1376,  1300,  1170}, {0} },
+	     {{2752,  2600,  2340}, {0} },
+	     {{5764,  5444,  4900}, {0} },
+	     {{11530, 10888, 9800}, {0} },
+	     {{23058, 21778, 19600}, {0} } },
+	{6,  {{1548,  1462,  1316}, {0} },
+	     {{3098,  2926,  2632}, {0} },
+	     {{6486,  6126,  5512}, {0} },
+	     {{12970, 12250, 11026}, {0} },
+	     {{25942, 24500, 22050}, {0} } },
+	{7,  {{1720,  1626,  1462}, {0} },
+	     {{3442,  3250,  2926}, {0} },
+	     {{7206,  6806,  61256}, {0} },
+	     {{14412, 13612, 12250}, {0} },
+	     {{28824, 27222, 24500}, {0} } },
+	{8,  {{2064,  1950,  1756}, {0} },
+	     {{4130,  3900,  3510}, {0} },
+	     {{8648,  8166,  7350}, {0} },
+	     {{17294, 16334, 14700}, {0} },
+	     {{34588, 32666, 29400}, {0} } },
+	{9,  {{2294,  2166,  1950}, {0} },
+	     {{4588,  4334,  3900}, {0} },
+	     {{9608,  9074,  8166}, {0} },
+	     {{19216, 18148, 16334}, {0} },
+	     {{38432, 36296, 32666}, {0} } },
+	{10, {{2580,  2438,  2194}, {0} },
+	     {{5162,  4876,  4388}, {0} },
+	     {{10808, 10208, 9188}, {0} },
+	     {{21618, 20416, 18376}, {0} },
+	     {{43236, 40834, 36750}, {0} } },
+	{11, {{2868,  2708,  2438}, {0} },
+	     {{5736,  5416,  4876}, {0} },
+	     {{12010, 11342, 10208}, {0} },
+	     {{24020, 22686, 20416}, {0} },
+	     {{48040, 45370, 40834}, {0} } },
+	{12, {{3098,  2926,  2632}, {0} },
+	     {{6194,  5850,  5266}, {0} },
+	     {{12970, 12250, 11026}, {0} },
+	     {{25942, 24500, 22050}, {0} },
+	     {{51882, 49000, 44100}, {0} } },
+	{13, {{3442,  3250,  2926}, {0} },
+	     {{6882,  6500,  5850}, {0} },
+	     {{14412, 13611, 12250}, {0} },
+	     {{28824, 27222, 24500}, {0} },
+	     {{57648, 54444, 49000}, {0} } }
+};
+
+/* MCS parameters with Nss = 3 */
+static const struct index_uhr_data_rate_type uhr_mcs_nss3[] = {
+/* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
+	{0,  {{258,   243,   219}, {0} }, /* UHR20 */
+	     {{516,   489,   438}, {0} }, /* UHR40 */
+	     {{1080,  1020,  918}, {0} }, /* UHR80 */
+	     {{2163,  2043,  1839}, {0} }, /* UHR160 */
+	     {{4323,  4083,  3675}, {0} } }, /* UHR320 */
+	{1,  {{516,   489,   438}, {0} },
+	     {{1032,  975,   879}, {0} },
+	     {{2163,  2043,  1839}, {0} },
+	     {{4323,  4083,  3675}, {0} },
+	     {{8646,  8166,  7350}, {0} } },
+	{2,  {{774,   732,   657}, {0} },
+	     {{1548,  1464,  1317}, {0} },
+	     {{3243,  3063,  2757}, {0} },
+	     {{6486,  6126,  5514}, {0} },
+	     {{12972, 12249, 11025}, {0} } },
+	{3,  {{1032,  975,   879}, {0} },
+	     {{2064,  1950,  1755}, {0} },
+	     {{4323,  4083,  3675}, {0} },
+	     {{8646,  8166,  7350}, {0} },
+	     {{17295, 16332, 14700}, {0} } },
+	{4,  {{1548,  1464,  1317}, {0} },
+	     {{3096,  2925,  2634}, {0} },
+	     {{6486,  6126,  5514}, {0} },
+	     {{12972, 12249, 11025}, {0} },
+	     {{25941, 24501, 22050}, {0} } },
+	{5,  {{2064, 1950, 1755}, {0} },
+	     {{4128, 3900, 3510}, {0} },
+	     {{8646, 8166, 7350}, {0} },
+	     {{17295, 16332, 14700}, {0} },
+	     {{34587, 32667, 29400}, {0} } },
+	{6,  {{2322, 2193, 1974}, {0} },
+	     {{4647, 4389, 3948}, {0} },
+	     {{9729, 9189, 8268}, {0} },
+	     {{19455, 18375, 16539}, {0} },
+	     {{38913, 36750, 33075}, {0} } },
+	{7,  {{2580, 2439, 2193}, {0} },
+	     {{5163, 4875, 4389}, {0} },
+	     {{10809, 10209, 9189}, {0} },
+	     {{21618, 20418, 18375}, {0} },
+	     {{43236, 40833, 36750}, {0} } },
+	{8,  {{3096, 2925, 2634}, {0} },
+	     {{6195, 5850, 5265}, {0} },
+	     {{12972, 12249, 11025}, {0} },
+	     {{25941, 24501, 22050}, {0} },
+	     {{51882, 48999, 44100}, {0} } },
+	{9,  {{3441, 3249, 2925}, {0} },
+	     {{6882, 6501, 5850}, {0} },
+	     {{14412, 13611, 12249}, {0} },
+	     {{28824, 27222, 24501}, {0} },
+	     {{57648, 54444, 48999}, {0} } },
+	{10, {{3870, 3657, 3291}, {0} },
+	     {{7743, 7314, 6582}, {0} },
+	     {{16212, 15312, 13782}, {0} },
+	     {{32427, 30624, 27564}, {0} },
+	     {{64854, 61251, 55125}, {0} } },
+	{11, {{4302, 4062, 3657}, {0} },
+	     {{8604, 8124, 7314}, {0} },
+	     {{18015, 17013, 15312}, {0} },
+	     {{36030, 34029, 30624}, {0} },
+	     {{72060, 68055, 61251}, {0} } },
+	{12, {{4647, 4389, 3948}, {0} },
+	     {{9291, 8775, 7899}, {0} },
+	     {{19455, 18375, 16539}, {0} },
+	     {{38913, 36750, 33075}, {0} },
+	     {{77823, 73500, 66150}, {0} } },
+	{13, {{5163, 4875, 4389}, {0} },
+	     {{10323, 9750, 8775}, {0} },
+	     {{21618, 20418, 18375}, {0} },
+	     {{43236, 40833, 36750}, {0} },
+	     {{86472, 81666, 73500}, {0} } },
+};
+
+/* MCS parameters with Nss = 4 */
+static const struct index_uhr_data_rate_type uhr_mcs_nss4[] = {
+/* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
+	{0,  {{344,   324,   292}, {0} }, /* UHR20 */
+	     {{688,   652,   584}, {0} }, /* UHR40 */
+	     {{1440,  1360,  1224}, {0} }, /* UHR80 */
+	     {{2884,  2724,  2452}, {0} }, /* UHR160 */
+	     {{5764,  5444,  4900}, {0} } }, /* UHR320 */
+	{1,  {{688,   652,   584}, {0} },
+	     {{1376,  1300,  1172}, {0} },
+	     {{2884,  2724,  2452}, {0} },
+	     {{5764,  5444,  4900}, {0} },
+	     {{11528, 10888, 9800}, {0} } },
+	{2,  {{1032,  976,   876}, {0} },
+	     {{2064,  1952,  1756}, {0} },
+	     {{4324,  4084,  3676}, {0} },
+	     {{8648,  8168,  7352}, {0} },
+	     {{17296, 16332, 14700}, {0} } },
+	{3,  {{1376,  1300,  1172}, {0} },
+	     {{2752,  2600,  2340}, {0} },
+	     {{5764,  5444,  4900}, {0} },
+	     {{11528, 10888, 9800}, {0} },
+	     {{23060, 21776, 19600}, {0} } },
+	{4,  {{2064,  1952,  1756}, {0} },
+	     {{4128,  3900,  3512}, {0} },
+	     {{8648,  8168,  7352}, {0} },
+	     {{17296, 16332, 14700}, {0} },
+	     {{34588, 32668, 29400}, {0} } },
+	{5,  {{2752, 2600, 2340}, {0} },
+	     {{5504, 5200, 4680}, {0} },
+	     {{11528, 10888, 9800}, {0} },
+	     {{23060, 21776, 19600}, {0} },
+	     {{46116, 43556, 39200}, {0} } },
+	{6,  {{3096, 2924, 2632}, {0} },
+	     {{6196, 5852, 5264}, {0} },
+	     {{12972, 12252, 11024}, {0} },
+	     {{25940, 24500, 22052}, {0} },
+	     {{51884, 49000, 44100}, {0} } },
+	{7,  {{3440, 3250, 2924}, {0} },
+	     {{6884, 6500, 5852}, {0} },
+	     {{14412, 13612, 12252}, {0} },
+	     {{28824, 27224, 24500}, {0} },
+	     {{57648, 54444, 49000}, {0} } },
+	{8,  {{4128, 3900, 3512}, {0} },
+	     {{8260, 7800, 7020}, {0} },
+	     {{17296, 16332, 14700}, {0} },
+	     {{34588, 32668, 29400}, {0} },
+	     {{69176, 65332, 58800}, {0} } },
+	{9,  {{4588, 4332, 3900}, {0} },
+	     {{9176, 8668, 7800}, {0} },
+	     {{19216, 18148, 16332}, {0} },
+	     {{38432, 36296, 32668}, {0} },
+	     {{76864, 72592, 65332}, {0} } },
+	{10, {{5160, 4876, 4388}, {0} },
+	     {{10324, 9752, 8776}, {0} },
+	     {{21616, 20416, 18376}, {0} },
+	     {{43236, 40832, 36752}, {0} },
+	     {{86472, 81668, 73500}, {0} } },
+	{11, {{5736, 5416, 4876}, {0} },
+	     {{11472, 10832, 9752}, {0} },
+	     {{24020, 22684, 20416}, {0} },
+	     {{48040, 45372, 40832}, {0} },
+	     {{96080, 90740, 81668}, {0} } },
+	{12, {{6196, 5852, 5264}, {0} },
+	     {{12388, 11700, 10532}, {0} },
+	     {{25940, 24500, 22052}, {0} },
+	     {{51884, 49000, 44100}, {0} },
+	     {{103764, 98000, 88200}, {0} } },
+	{13, {{6884, 6500, 5852}, {0} },
+	     {{13764, 13000, 11700}, {0} },
+	     {{28824, 27224, 24500}, {0} },
+	     {{57648, 54444, 49000}, {0} },
+	     {{115296, 108888, 98000}, {0} } },
+};
+
+/**
+ * wma_match_uhr_rate_320() - match raw_rate against the UHR320 rate set
+ * @raw_rate: raw rate from fw
+ * @index: MCS index into the UHR rate tables
+ * @dcm_index: DCM index into the UHR rate tables
+ * @nss: nss (output on match)
+ * @guard_interval: guard interval (output on match)
+ *
+ * Return: matched rate if found, else 0
+ */
+static uint32_t wma_match_uhr_rate_320(uint16_t raw_rate, uint8_t index,
+				       uint8_t dcm_index, uint8_t *nss,
+				       enum txrate_gi *guard_interval)
+{
+	const uint32_t *nss_rate[4];
+
+	nss_rate[0] = &uhr_mcs_nss1[index].supported_uhr320_rate[dcm_index][0];
+	nss_rate[1] = &uhr_mcs_nss2[index].supported_uhr320_rate[dcm_index][0];
+	nss_rate[2] = &uhr_mcs_nss3[index].supported_uhr320_rate[dcm_index][0];
+	nss_rate[3] = &uhr_mcs_nss4[index].supported_uhr320_rate[dcm_index][0];
+
+	return wma_mcs_rate_match(raw_rate, 1, nss_rate, nss, guard_interval);
+}
+
+/**
+ * wma_match_uhr_rate_160() - match raw_rate against the UHR160 rate set
+ * @raw_rate: raw rate from fw
+ * @index: MCS index into the UHR rate tables
+ * @dcm_index: DCM index into the UHR rate tables
+ * @nss: nss (output on match)
+ * @guard_interval: guard interval (output on match)
+ *
+ * Return: matched rate if found, else 0
+ */
+static uint32_t wma_match_uhr_rate_160(uint16_t raw_rate, uint8_t index,
+				       uint8_t dcm_index, uint8_t *nss,
+				       enum txrate_gi *guard_interval)
+{
+	const uint32_t *nss_rate[4];
+
+	nss_rate[0] = &uhr_mcs_nss1[index].supported_uhr160_rate[dcm_index][0];
+	nss_rate[1] = &uhr_mcs_nss2[index].supported_uhr160_rate[dcm_index][0];
+	nss_rate[2] = &uhr_mcs_nss3[index].supported_uhr160_rate[dcm_index][0];
+	nss_rate[3] = &uhr_mcs_nss4[index].supported_uhr160_rate[dcm_index][0];
+
+	return wma_mcs_rate_match(raw_rate, 1, nss_rate, nss, guard_interval);
+}
+
+/**
+ * wma_match_uhr_rate_80() - match raw_rate against the UHR80 rate set
+ * @raw_rate: raw rate from fw
+ * @index: MCS index into the UHR rate tables
+ * @dcm_index: DCM index into the UHR rate tables
+ * @nss: nss (output on match)
+ * @guard_interval: guard interval (output on match)
+ *
+ * Return: matched rate if found, else 0
+ */
+static uint32_t wma_match_uhr_rate_80(uint16_t raw_rate, uint8_t index,
+				      uint8_t dcm_index, uint8_t *nss,
+				      enum txrate_gi *guard_interval)
+{
+	const uint32_t *nss_rate[4];
+
+	nss_rate[0] = &uhr_mcs_nss1[index].supported_uhr80_rate[dcm_index][0];
+	nss_rate[1] = &uhr_mcs_nss2[index].supported_uhr80_rate[dcm_index][0];
+	nss_rate[2] = &uhr_mcs_nss3[index].supported_uhr80_rate[dcm_index][0];
+	nss_rate[3] = &uhr_mcs_nss4[index].supported_uhr80_rate[dcm_index][0];
+
+	return wma_mcs_rate_match(raw_rate, 1, nss_rate, nss, guard_interval);
+}
+
+/**
+ * wma_match_uhr_rate_40() - match raw_rate against the UHR40 rate set
+ * @raw_rate: raw rate from fw
+ * @index: MCS index into the UHR rate tables
+ * @dcm_index: DCM index into the UHR rate tables
+ * @nss: nss (output on match)
+ * @guard_interval: guard interval (output on match)
+ *
+ * Return: matched rate if found, else 0
+ */
+static uint32_t wma_match_uhr_rate_40(uint16_t raw_rate, uint8_t index,
+				      uint8_t dcm_index, uint8_t *nss,
+				      enum txrate_gi *guard_interval)
+{
+	const uint32_t *nss_rate[4];
+
+	nss_rate[0] = &uhr_mcs_nss1[index].supported_uhr40_rate[dcm_index][0];
+	nss_rate[1] = &uhr_mcs_nss2[index].supported_uhr40_rate[dcm_index][0];
+	nss_rate[2] = &uhr_mcs_nss3[index].supported_uhr40_rate[dcm_index][0];
+	nss_rate[3] = &uhr_mcs_nss4[index].supported_uhr40_rate[dcm_index][0];
+
+	return wma_mcs_rate_match(raw_rate, 1, nss_rate, nss, guard_interval);
+}
+
+/**
+ * wma_match_uhr_rate_20() - match raw_rate against the UHR20 rate set
+ * @raw_rate: raw rate from fw
+ * @index: MCS index into the UHR rate tables
+ * @dcm_index: DCM index into the UHR rate tables
+ * @nss: nss (output on match)
+ * @guard_interval: guard interval (output on match)
+ *
+ * Return: matched rate if found, else 0
+ */
+static uint32_t wma_match_uhr_rate_20(uint16_t raw_rate, uint8_t index,
+				      uint8_t dcm_index, uint8_t *nss,
+				      enum txrate_gi *guard_interval)
+{
+	const uint32_t *nss_rate[4];
+
+	nss_rate[0] = &uhr_mcs_nss1[index].supported_uhr20_rate[dcm_index][0];
+	nss_rate[1] = &uhr_mcs_nss2[index].supported_uhr20_rate[dcm_index][0];
+	nss_rate[2] = &uhr_mcs_nss3[index].supported_uhr20_rate[dcm_index][0];
+	nss_rate[3] = &uhr_mcs_nss4[index].supported_uhr20_rate[dcm_index][0];
+
+	return wma_mcs_rate_match(raw_rate, 1, nss_rate, nss, guard_interval);
+}
+
+uint32_t wma_match_uhr_rate(uint16_t raw_rate,
+			    enum tx_rate_info rate_flags,
+			    uint8_t *nss, uint8_t *dcm,
+			    enum txrate_gi *guard_interval,
+			    enum tx_rate_info *mcs_rate_flag,
+			    uint8_t *p_index)
+{
+	uint8_t index;
+	uint8_t dcm_index_max = 1;
+	uint8_t dcm_index;
+	uint32_t match_rate = 0;
+
+	*p_index = 0;
+
+	if (!(rate_flags & (TX_RATE_UHR320 | TX_RATE_UHR160 | TX_RATE_UHR80 |
+			    TX_RATE_UHR40  | TX_RATE_UHR20)))
+		return 0;
+
+	for (index = 0; index < QDF_ARRAY_SIZE(uhr_mcs_nss1); index++) {
+		dcm_index_max = IS_MCS_HAS_DCM_RATE(index) ? 2 : 1;
+		for (dcm_index = 0; dcm_index < dcm_index_max; dcm_index++) {
+			if (rate_flags & TX_RATE_UHR320) {
+				match_rate = wma_match_uhr_rate_320(
+						raw_rate, index, dcm_index,
+						nss, guard_interval);
+				if (match_rate)
+					goto rate_found;
+			}
+			if (rate_flags & TX_RATE_UHR160) {
+				match_rate = wma_match_uhr_rate_160(
+						raw_rate, index, dcm_index,
+						nss, guard_interval);
+				if (match_rate)
+					goto rate_found;
+			}
+			if (rate_flags & (TX_RATE_UHR80 | TX_RATE_UHR160)) {
+				match_rate = wma_match_uhr_rate_80(
+						raw_rate, index, dcm_index,
+						nss, guard_interval);
+				if (match_rate) {
+					*mcs_rate_flag &= ~TX_RATE_UHR160;
+					goto rate_found;
+				}
+			}
+			if (rate_flags & (TX_RATE_UHR40 | TX_RATE_UHR80 |
+					  TX_RATE_UHR160)) {
+				match_rate = wma_match_uhr_rate_40(
+						raw_rate, index, dcm_index,
+						nss, guard_interval);
+				if (match_rate) {
+					*mcs_rate_flag &= ~(TX_RATE_UHR80 |
+							    TX_RATE_UHR160);
+					goto rate_found;
+				}
+			}
+			if (rate_flags & (TX_RATE_UHR80 | TX_RATE_UHR40 |
+					  TX_RATE_UHR20 | TX_RATE_UHR160)) {
+				match_rate = wma_match_uhr_rate_20(
+						raw_rate, index, dcm_index,
+						nss, guard_interval);
+				if (match_rate) {
+					*mcs_rate_flag &= TX_RATE_UHR20;
+					goto rate_found;
+				}
+			}
+		}
+	}
+
+rate_found:
+	if (match_rate) {
+		if (dcm_index == 1)
+			*dcm = 1;
+		*p_index = index;
+	}
+	return match_rate;
+}
 #endif /* WLAN_FEATURE_11BN */

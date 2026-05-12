@@ -194,6 +194,59 @@ int hdd_set_11bn_rate_code(struct hdd_adapter *adapter, uint16_t rate_code)
 
 	return ret;
 }
+
+void wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
+				    enum tx_rate_info rate_flags)
+{
+	enum tx_rate_info bw;
+
+	if (!(rate_flags & (TX_RATE_UHR80 | TX_RATE_UHR40 |
+	    TX_RATE_UHR20 | TX_RATE_UHR160 | TX_RATE_UHR320)))
+		return;
+
+	/* as fw not yet report ofdma to host, so don't
+	 * fill RATE_INFO_BW_UHR_RU.
+	 */
+	if (rate_flags & TX_RATE_UHR320)
+		bw = TX_RATE_UHR320;
+	else if (rate_flags & TX_RATE_UHR160)
+		bw = TX_RATE_UHR160;
+	else if (rate_flags & TX_RATE_UHR80)
+		bw = TX_RATE_UHR80;
+	else if (rate_flags & TX_RATE_UHR40)
+		bw = TX_RATE_UHR40;
+	else
+		bw = TX_RATE_UHR20;
+
+	switch (bw) {
+	case TX_RATE_UHR320:
+		hdd_set_rate_bw(os_rate, HDD_RATE_BW_320);
+		break;
+	case TX_RATE_UHR160:
+		hdd_set_rate_bw(os_rate, HDD_RATE_BW_160);
+		break;
+	case TX_RATE_UHR80:
+		hdd_set_rate_bw(os_rate, HDD_RATE_BW_80);
+		break;
+	case TX_RATE_UHR40:
+		hdd_set_rate_bw(os_rate, HDD_RATE_BW_40);
+		break;
+	default:
+		break;
+	}
+
+	os_rate->flags |= RATE_INFO_FLAGS_UHR_MCS;
+}
+
+bool wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate,
+				      uint8_t preamble)
+{
+	if (preamble == DOT11_BN) {
+		os_rate->flags |= RATE_INFO_FLAGS_UHR_MCS;
+		return true;
+	}
+	return false;
+}
 #endif
 
 #if defined(WLAN_FEATURE_11BN_TEST_SAP)
