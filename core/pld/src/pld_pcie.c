@@ -1017,7 +1017,7 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	info->board_id = cnss_info.board_id;
 	info->soc_id = cnss_info.soc_id;
 	info->fw_version = cnss_info.fw_version;
-	strlcpy(info->fw_build_timestamp, cnss_info.fw_build_timestamp,
+	strscpy(info->fw_build_timestamp, cnss_info.fw_build_timestamp,
 		sizeof(info->fw_build_timestamp));
 	info->device_version.family_number =
 		cnss_info.device_version.family_number;
@@ -1031,7 +1031,7 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 		info->dev_mem_info[i].start = cnss_info.dev_mem_info[i].start;
 		info->dev_mem_info[i].size = cnss_info.dev_mem_info[i].size;
 	}
-	strlcpy(info->fw_build_id, cnss_info.fw_build_id,
+	strscpy(info->fw_build_id, cnss_info.fw_build_id,
 		sizeof(info->fw_build_id));
 
 	return 0;
