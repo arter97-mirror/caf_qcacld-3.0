@@ -14,7 +14,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlo_mgr_public_structs.h"
 #include "wlan_mlo_mgr_sta.h"
-#include <wlan_cm_roam_i.h>
+#include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include <include/wlan_mlme_cmn.h>
@@ -1082,6 +1082,7 @@ smd_uhr_link_recfg_send_request_frame(
 	args.category = ACTION_CATEGORY_PROTECTED_UHR;
 	args.action = UHR_LINK_RECONFIG_REQUEST;
 	args.arg1 = mlo_link_recfg_dialog_token(recfg_ctx, req);
+	args.arg2 = UHR_TYPECODE_ST_PREPARATION;
 
 	peer = wlan_objmgr_get_peer_by_mac(recfg_ctx->psoc,
 					   (uint8_t *)&req->peer_mac,
@@ -2004,5 +2005,21 @@ smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 		return false;
 
 	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
+}
+
+QDF_STATUS smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
+				struct roam_offload_synch_ind *sync_ind)
+{
+	QDF_STATUS status;
+
+	if (sync_ind->num_vdev_repurpose_req) {
+		status = smd_fw_roam_sync(vdev, sync_ind);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("SMD exec handling failed");
+			return status;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif

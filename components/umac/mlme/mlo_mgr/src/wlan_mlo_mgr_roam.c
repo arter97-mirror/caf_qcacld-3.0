@@ -33,9 +33,7 @@
 #include <utils_mlo.h>
 #include <wlan_mlo_mgr_peer.h>
 #include "wlan_mlo_link_force.h"
-#ifdef WLAN_FEATURE_11BN_SMD
 #include "wlan_smd_roam.h"
-#endif
 #include "wlan_scan_api.h"
 #include "lim_api.h"
 
@@ -565,15 +563,11 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	 */
 	if (sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED)
 		return QDF_STATUS_SUCCESS;
-#ifdef WLAN_FEATURE_11BN_SMD
-	if (sync_ind->num_vdev_repurpose_req) {
-		status = smd_fw_roam_sync(vdev, sync_ind);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlo_err("SMD exec handling failed");
-			return status;
-		}
-	}
-#endif
+
+	status = smd_handle_roam_sync(vdev, sync_ind);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
 	for (i = 0; i < sync_ind->num_setup_links; i++) {
 		if (vdev_id == sync_ind->ml_link[i].vdev_id)
 			continue;

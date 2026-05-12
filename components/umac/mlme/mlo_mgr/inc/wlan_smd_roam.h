@@ -288,6 +288,20 @@ smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		 struct roam_offload_synch_ind *sync_ind);
 
 /**
+ * smd_handle_roam_sync() - Handle SMD roam sync for vdev repurpose requests
+ * @vdev: VDEV object
+ * @sync_ind: Roam offload sync indication from firmware
+ *
+ * This function checks if vdev repurpose requests are present in the sync
+ * indication and invokes smd_fw_roam_sync() to process them.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
+		     struct roam_offload_synch_ind *sync_ind);
+
+/**
  * smd_roam_link_recfg_set_tx_link_addr() - Set transmit link address for link reconfiguration
  * @recfg_ctx: Link reconfiguration context
  * @recfg_req: Link reconfiguration request
@@ -338,6 +352,13 @@ smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		 struct roam_offload_synch_ind *sync_ind)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
+		     struct roam_offload_synch_ind *sync_ind)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline bool
