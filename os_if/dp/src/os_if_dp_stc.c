@@ -21,6 +21,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "cdp_txrx_ctrl.h"
 #include "cdp_txrx_host_stats.h"
+#include "wlan_cm_roam_api.h"
 
 /* Short names for QCA vendor attributes */
 #define FLOW_CLASSIFY_RESULT_FLOW_TUPLE		\
@@ -34,6 +35,8 @@
 
 #define PREDICTIVE_ROAM_OPERATION_TYPE		\
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_OPERATION_TYPE
+#define PREDICTIVE_ROAM_TX_RETRIES		\
+		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_TX_RETRIES
 #define PREDICTIVE_ROAM_MAX			\
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX
 
@@ -150,6 +153,86 @@ os_if_dp_parse_classify_insights(struct nlattr *tb_attr,
 }
 
 #ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+static uint32_t os_if_get_predictive_roam_stats_nla_len(void)
+{
+	uint32_t nl_buf_len = NLMSG_HDRLEN;
+
+	/* Tx Retries */
+	nl_buf_len += nla_total_size(sizeof(uint32_t));
+
+	return nl_buf_len;
+}
+
+static QDF_STATUS
+os_if_dp_handle_predictive_roam_get_stats(struct wiphy *wiphy,
+						  struct wlan_objmgr_vdev *vdev,
+						  struct nlattr **tb)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t vdev_id;
+	uint32_t nl_buf_len, tx_retries;
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	struct sk_buff *skb;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	int ret;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_DP_ID);
+	if (!pdev) {
+		osif_err("pdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (!cdp_is_vdev_predictive_roaming_stats_enabled(soc, vdev_id)) {
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+		osif_warn("Predictive roaming stats not enabled for vdev %u",
+			  vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wlan_cm_roaming_in_progress(pdev, vdev_id)) {
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+		osif_warn("Roaming is in progress, Retry later");
+		return QDF_STATUS_E_FAILURE;
+	}
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+
+	nl_buf_len = os_if_get_predictive_roam_stats_nla_len();
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
+						       nl_buf_len);
+	if (!skb) {
+		osif_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = cdp_get_tx_retries(soc, vdev_id, &tx_retries);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("cdp_get_tx_retries error");
+		goto free_skb;
+	}
+
+	if (nla_put_u32(skb,
+			PREDICTIVE_ROAM_TX_RETRIES,
+			tx_retries)) {
+		osif_err("tx_retries pack error");
+		status = QDF_STATUS_E_FAILURE;
+		goto free_skb;
+	}
+
+	ret = wlan_cfg80211_vendor_cmd_reply(skb);
+	if (ret) {
+		osif_err("wlan_cfg80211_vendor_cmd_reply failed, ret: %d", ret);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+free_skb:
+	wlan_cfg80211_vendor_free_skb(skb);
+	return status;
+}
+
 static QDF_STATUS
 os_if_dp_set_feature_predictive_roam_stats(struct wlan_objmgr_vdev *vdev,
 					  uint8_t operation_type)
@@ -206,6 +289,9 @@ QDF_STATUS os_if_dp_process_predictive_roam_req(struct wiphy *wiphy,
 	operation_type = nla_get_u8(tb[PREDICTIVE_ROAM_OPERATION_TYPE]);
 
 	switch (operation_type) {
+	case QCA_PREDICTIVE_ROAM_GET_STATS:
+		return os_if_dp_handle_predictive_roam_get_stats(wiphy, vdev,
+								 tb);
 	case QCA_PREDICTIVE_ROAM_ENABLE:
 	case QCA_PREDICTIVE_ROAM_DISABLE:
 		osif_info("Predictive roam operation received: %u",
@@ -1425,4 +1511,5 @@ void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 #undef FLOW_CLASSIFY_RESULT_INSIGHTS
 
 #undef PREDICTIVE_ROAM_OPERATION_TYPE
+#undef PREDICTIVE_ROAM_TX_RETRIES
 #undef PREDICTIVE_ROAM_MAX
