@@ -1886,7 +1886,7 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE,
 				      QDF_WAKE_TIME_UNDEFINED);
 		hdd_lpc_disable_powersave(hdd_ctx);
-		qdf_runtime_pm_prevent_suspend(
+		qdf_runtime_pm_prevent_suspend_sync(
 			&hdd_ctx->runtime_context.monitor_mode);
 	}
 
