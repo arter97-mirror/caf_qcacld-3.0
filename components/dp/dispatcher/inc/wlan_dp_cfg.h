@@ -1571,9 +1571,38 @@
 	CFG_INI_BOOL("dp_stc_rtpm_control", true, \
 		     "Enable/Disable RTPM control by STC module")
 
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+/*
+ * <ini>
+ * wlan_predictive_roaming - Enable or disable the Predictive Roaming feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to Enable or disable the Predictive Roaming feature
+ *
+ * Supported Feature: STA mode
+ *
+ * Usage: Internal
+ *
+ * Related: dp_stc_enable (requires WLAN_DP_FEATURE_STC to be enabled)
+ *
+ * </ini>
+ */
+#define CFG_DP_WLAN_PREDICTIVE_ROAMING \
+	CFG_INI_BOOL("wlan_predictive_roaming", false, \
+		     "Enable/Disable Predictive Roaming")
+
+#define CFG_DP_PREDICTIVE_ROAMING \
+	CFG(CFG_DP_WLAN_PREDICTIVE_ROAMING)
+#else
+#define CFG_DP_PREDICTIVE_ROAMING
+#endif
+
 #define CFG_DP_STC \
 	CFG(CFG_DP_STC_ENABLE) \
-	CFG(CFG_DP_STC_RTPM_CONTROL)
+	CFG(CFG_DP_STC_RTPM_CONTROL) \
+	CFG_DP_PREDICTIVE_ROAMING
 #else
 #define CFG_DP_STC
 #endif
