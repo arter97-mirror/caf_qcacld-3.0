@@ -6245,6 +6245,126 @@ static QDF_STATUS lim_send_vht_caps_ie(struct mac_context *mac_ctx,
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_FEATURE_11BN
+static inline QDF_STATUS
+populate_dot11f_uhr_caps_by_band(struct mac_context *mac_ctx,
+				 bool is_2g, struct wlan_uhr_cap_info *uhr_cap,
+				 struct pe_session *session)
+{
+	pe_debug("is_2g %d", is_2g);
+	if (is_2g)
+		qdf_mem_copy(uhr_cap,
+			     &mac_ctx->uhr_cap_2g,
+			     sizeof(struct wlan_uhr_cap_info));
+	else
+		qdf_mem_copy(uhr_cap,
+			     &mac_ctx->uhr_cap_5g,
+			     sizeof(struct wlan_uhr_cap_info));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
+		      uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
+{
+	struct wlan_uhr_cap_info dot11_cap;
+	bool is_band_2g = false;
+	struct wlan_objmgr_vdev *vdev;
+	const uint8_t *ie = NULL;
+	uint8_t *p;
+	uint16_t w0 = 0, w1 = 0;
+
+	if (band == CDS_BAND_2GHZ)
+		is_band_2g = true;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		pe_debug("Failed to get VDEV %d", vdev_id);
+		return;
+	}
+
+	populate_dot11f_uhr_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+
+	ie = wlan_get_ext_ie_ptr_from_ext_id(UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE,
+					     ie_start, num_bytes);
+	if (!ie)
+		return;
+
+	p = (uint8_t *)&ie[2 + UHR_CAP_OUI_SIZE];
+
+	/* Word 0: dps_present..duo_support */
+	w0 |= (uint16_t)(dot11_cap.dps_present & 0x1) << 0;
+	w0 |= (uint16_t)(dot11_cap.dps_assist_support & 0x1) << 1;
+	w0 |= (uint16_t)(dot11_cap.ap_static_hcm_support & 0x1) << 2;
+	w0 |= (uint16_t)(dot11_cap.ml_power_mgmt & 0x1) << 3;
+	w0 |= (uint16_t)(dot11_cap.npca_support & 0x1) << 4;
+	w0 |= (uint16_t)(dot11_cap.bsr_support & 0x1) << 5;
+	w0 |= (uint16_t)(dot11_cap.addn_mapped_tid_support & 0x1) << 6;
+	w0 |= (uint16_t)(dot11_cap.eotsp_support & 0x1) << 7;
+	w0 |= (uint16_t)(dot11_cap.dso_support & 0x1) << 8;
+	w0 |= (uint16_t)(dot11_cap.p_edca_support & 0x1) << 9;
+	w0 |= (uint16_t)(dot11_cap.dbe_support & 0x1) << 10;
+	w0 |= (uint16_t)(dot11_cap.ul_lli_support & 0x1) << 11;
+	w0 |= (uint16_t)(dot11_cap.p2p_lli_support & 0x1) << 12;
+	w0 |= (uint16_t)(dot11_cap.puo_support & 0x1) << 13;
+	w0 |= (uint16_t)(dot11_cap.ap_puo_support & 0x1) << 14;
+	w0 |= (uint16_t)(dot11_cap.duo_support & 0x1) << 15;
+	*p++ = w0 & 0xff;
+	*p++ = (w0 >> 8) & 0xff;
+
+	/* Word 1: ul_mu_data_disable_rx_support..param_update_adv_notify */
+	w1 |= (uint16_t)(dot11_cap.ul_mu_data_disable_rx_support & 0x1) << 0;
+	w1 |= (uint16_t)(dot11_cap.aom_support & 0x1) << 1;
+	w1 |= (uint16_t)(dot11_cap.ifcs_support & 0x1) << 2;
+	w1 |= (uint16_t)(dot11_cap.uhr_trs_support & 0x1) << 3;
+	w1 |= (uint16_t)(dot11_cap.txspg_support & 0x1) << 4;
+	w1 |= (uint16_t)(dot11_cap.txop_return_support_intxspg & 0x1) << 5;
+	w1 |= (uint16_t)(dot11_cap.uhr_op_mode_param_update_timeout & 0x0F) << 6;
+	w1 |= (uint16_t)(dot11_cap.param_update_adv_notify & 0x07) << 10;
+	*p++ = w1 & 0xff;
+	*p++ = (w1 >> 8) & 0xff;
+}
+
+#define UHR_CAP_OUI_LEN 3
+QDF_STATUS lim_send_uhr_caps_ie(struct mac_context *mac_ctx, uint8_t vdev_id)
+{
+	uint8_t uhr_cap_total_len = DOT11F_IE_UHR_CAP_MIN_LEN + UHR_CAP_OUI_LEN;
+	QDF_STATUS status_2g, status_5g;
+	uint8_t uhr_caps_2g[DOT11F_IE_UHR_CAP_MIN_LEN + UHR_CAP_OUI_LEN] = {0};
+
+	uint8_t uhr_caps_5g[DOT11F_IE_UHR_CAP_MIN_LEN + UHR_CAP_OUI_LEN] = {0};
+
+	uhr_caps_2g[0] = DOT11F_EID_UHR_CAP;
+	uhr_caps_2g[1] = DOT11F_IE_UHR_CAP_MIN_LEN;
+
+	qdf_mem_copy(&uhr_caps_2g[2], UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE);
+
+	lim_set_uhr_caps(mac_ctx,  uhr_caps_2g, uhr_cap_total_len,
+			 CDS_BAND_2GHZ, vdev_id);
+	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_UHR_CAP,
+				CDS_BAND_2GHZ, &uhr_caps_2g[2],
+				uhr_caps_2g[1] + 1);
+
+	uhr_caps_5g[0] = DOT11F_EID_UHR_CAP;
+	uhr_caps_5g[1] = DOT11F_IE_UHR_CAP_MIN_LEN;
+
+	qdf_mem_copy(&uhr_caps_5g[2], UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE);
+
+	lim_set_uhr_caps(mac_ctx, uhr_caps_5g, uhr_cap_total_len,
+			 CDS_BAND_5GHZ, vdev_id);
+	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_UHR_CAP,
+				CDS_BAND_5GHZ, &uhr_caps_5g[2],
+				uhr_caps_5g[1] + 1);
+
+	if (QDF_IS_STATUS_ERROR(status_2g) || QDF_IS_STATUS_ERROR(status_5g))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN */
+
 QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 				 enum mlme_dot11_mode dot11_mode,
 				 enum QDF_OPMODE device_mode)
@@ -6253,6 +6373,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 	QDF_STATUS status_vht = QDF_STATUS_SUCCESS;
 	QDF_STATUS status_he = QDF_STATUS_SUCCESS;
 	QDF_STATUS status_eht = QDF_STATUS_SUCCESS;
+	QDF_STATUS status_uhr = QDF_STATUS_SUCCESS;
 	struct pe_session *session;
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
@@ -6288,11 +6409,16 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 						  vdev_id);
 	}
 
+	if (IS_DOT11_MODE_UHR(dot11_mode)) {
+		status_uhr = lim_send_uhr_caps_ie(mac_ctx, vdev_id);
+	}
+
 end:
 	if (QDF_IS_STATUS_SUCCESS(status_ht) &&
 	    QDF_IS_STATUS_SUCCESS(status_vht) &&
 	    QDF_IS_STATUS_SUCCESS(status_he) &&
-	    QDF_IS_STATUS_SUCCESS(status_eht))
+	    QDF_IS_STATUS_SUCCESS(status_eht) &&
+	    QDF_IS_STATUS_SUCCESS(status_uhr))
 		return QDF_STATUS_SUCCESS;
 
 	return QDF_STATUS_E_FAILURE;

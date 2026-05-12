@@ -4386,6 +4386,31 @@ void lim_update_session_uhr_capable(struct pe_session *session, bool val);
  */
 QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,
 					uint16_t total_len, uint8_t *target);
+
+/**
+ * lim_set_uhr_caps() - update UHR caps to be sent to FW as part of scan IE
+ * @mac: pointer to MAC
+ * @ie_start: pointer to start of IE buffer
+ * @num_bytes: length of IE buffer
+ * @band: 2g or 5g band
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
+		      uint32_t num_bytes, uint8_t band, uint8_t vdev_id);
+
+/**
+ * lim_send_uhr_caps_ie() - gets UHR capability and send to firmware via wma
+ * @mac_ctx: global mac context
+ * @vdev_id: vdev for which IE is targeted
+ *
+ * This function gets UHR capability and send to firmware via wma
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_send_uhr_caps_ie(struct mac_context *mac_ctx,
+				uint8_t vdev_id);
 #else
 static inline void
 lim_update_sta_uhr_capable(struct mac_context *mac,
@@ -4453,6 +4478,18 @@ lim_update_session_uhr_capable(struct pe_session *session, bool val)
 static inline QDF_STATUS
 lim_fill_complete_uhr_cap_ie(struct pe_session *session,
 			     uint16_t total_len, uint8_t *target)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
+		 uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
+{
+}
+
+static inline QDF_STATUS
+lim_send_uhr_caps_ie(struct mac_context *mac_ctx, uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
