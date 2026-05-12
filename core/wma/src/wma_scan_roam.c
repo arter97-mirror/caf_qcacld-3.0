@@ -213,6 +213,9 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		if (chan_list->eht_en)
 			chan_p->allow_eht = 1;
 
+		if (chan_list->uhr_en)
+			chan_p->allow_uhr = 1;
+
 		if (chan_list->chanParam[i].half_rate)
 			chan_p->half_rate = 1;
 		else if (chan_list->chanParam[i].quarter_rate)

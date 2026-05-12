@@ -2136,6 +2136,7 @@ typedef struct sSirUpdateChan {
 	uint8_t vht_24_en;
 	bool he_en;
 	bool eht_en;
+	bool uhr_en;
 	QDF_FLEX_ARRAY(tSirUpdateChanParam, chanParam);
 } tSirUpdateChanList, *tpSirUpdateChanList;
 

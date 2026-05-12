@@ -1178,6 +1178,14 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 		mac->roam.configParam.uCfgDot11Mode))
 		pChanList->eht_en = true;
 #endif
+#ifdef WLAN_FEATURE_11BN
+	if ((mac->roam.configParam.uCfgDot11Mode == eCSR_CFG_DOT11_MODE_AUTO) ||
+	    CSR_IS_CFG_DOT11_PHY_MODE_11BN(
+		mac->roam.configParam.uCfgDot11Mode) ||
+	    CSR_IS_CFG_DOT11_PHY_MODE_11BN_ONLY(
+		mac->roam.configParam.uCfgDot11Mode))
+		pChanList->uhr_en = true;
+#endif
 
 	pChanList->numChan = num_channel;
 	mlme_store_fw_scan_channels(mac->psoc, pChanList);
