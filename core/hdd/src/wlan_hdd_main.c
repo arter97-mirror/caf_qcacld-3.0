@@ -12146,6 +12146,18 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	cfg80211_del_sta(&adapter->wdev, mac, GFP_KERNEL);
+}
+#else
+static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	cfg80211_del_sta(adapter->dev, mac, GFP_KERNEL);
+}
+#endif
+
 #if defined MSM_PLATFORM && (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
 /**
  * hdd_stop_p2p_go() - call cfg80211 API to stop P2P GO
@@ -12187,9 +12199,7 @@ static void hdd_delete_sta(struct hdd_adapter *adapter)
 
 	hdd_debug("[SSR] send restart supplicant");
 	/* event supplicant to restart */
-	cfg80211_del_sta(adapter->dev,
-			 (const u8 *)&bcast_mac.bytes[0],
-			 GFP_KERNEL);
+	_hdd_delete_sta(adapter, (const u8 *)&bcast_mac.bytes[0]);
 }
 #endif
 
