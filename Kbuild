@@ -4058,6 +4058,7 @@ endif
 #normally, TDLS negative behavior is not needed
 ccflags-$(CONFIG_QCOM_TDLS) += -DFEATURE_WLAN_TDLS
 ccflags-$(CONFIG_QCOM_TDLS) += -DWLAN_FEATURE_TDLS_CONCURRENCIES
+ccflags-$(CONFIG_QCOM_TDLS) += -DFEATURE_TDLS_STATS_VENDOR_EVENTS
 
 ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM)))
 ccflags-$(CONFIG_QCOM_TDLS) += -DTDLS_WOW_ENABLED
