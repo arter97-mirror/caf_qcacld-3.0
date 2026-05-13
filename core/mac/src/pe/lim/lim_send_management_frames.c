@@ -8973,11 +8973,12 @@ lim_handle_sae_auth_retry(struct mac_context *mac_ctx, uint8_t vdev_id,
 
 	val = mac_ctx->mlme_cfg->timeouts.sae_auth_failure_timeout;
 
-	tx_timer_change(
+	if (tx_timer_change(
 		&mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer,
-		SYS_MS_TO_TICKS(val), 0);
-	/* Activate Auth Retry timer */
-	if (tx_timer_activate(
+		SYS_MS_TO_TICKS(val), 0) != TX_SUCCESS) {
+		pe_err("failed to configure auth retry timer");
+		return;
+	} else if (tx_timer_activate(
 	    &mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer) !=
 	    TX_SUCCESS) {
 		pe_err("failed to start periodic auth retry timer");
