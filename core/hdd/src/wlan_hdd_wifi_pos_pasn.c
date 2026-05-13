@@ -29,12 +29,21 @@
 #include "qdf_trace.h"
 #include "qdf_types.h"
 #include "wlan_hdd_wifi_pos_pasn.h"
+#include "os_if_wifi_pos.h"
 #include "wifi_pos_pasn_api.h"
 #include "wifi_pos_ucfg_i.h"
 #include "wlan_crypto_global_api.h"
-#include "wifi_pos_ucfg_i.h"
 #include "wlan_nl_to_crypto_params.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wifi_pos_api.h"
+#include "wifi_pos_utils_i.h"
+#include "wmi_unified_param.h"
+#include "wlan_cfg80211.h"
+#include "wlan_objmgr_vdev_obj.h"
+#include "wma.h"
+#include "wlan_p2p_api.h"
+#include "wlan_policy_mgr_api.h"
+#include "wlan_mlme_ucfg_api.h"
 
 const struct nla_policy
 wifi_pos_pasn_auth_status_policy[QCA_WLAN_VENDOR_ATTR_MAX + 1] = {
@@ -761,6 +770,502 @@ wlan_hdd_cfg80211_set_secure_ranging_context(struct wiphy *wiphy,
 
 	return errno;
 }
+
+#if defined(WLAN_FEATURE_RTT_11AZ_SUPPORT) && defined(CFG80211_PD_SUPPORT)
+static enum mlme_dot11_mode
+hdd_pmsr_preamble_to_dot11_mode(enum nl80211_preamble preamble)
+{
+	switch (preamble) {
+	case NL80211_PREAMBLE_HT:
+		return MLME_DOT11_MODE_11N;
+	case NL80211_PREAMBLE_VHT:
+		return MLME_DOT11_MODE_11AC;
+	case NL80211_PREAMBLE_HE:
+		return MLME_DOT11_MODE_11AX;
+	default:
+		return MLME_DOT11_MODE_11N;
+	}
+}
+
+/**
+ * hdd_pmsr_preamble_to_wmi() - Map NL80211 preamble to WMI preamble
+ * @preamble: NL80211 preamble value
+ *
+ * Return: WMI_HOST_RATE_PREAMBLE value
+ */
+static u32 hdd_pmsr_preamble_to_wmi(enum nl80211_preamble preamble)
+{
+	switch (preamble) {
+	case NL80211_PREAMBLE_HT:
+		return WMI_HOST_RATE_PREAMBLE_HT;
+	case NL80211_PREAMBLE_VHT:
+		return WMI_HOST_RATE_PREAMBLE_VHT;
+	case NL80211_PREAMBLE_HE:
+		return WMI_HOST_RATE_PREAMBLE_HE;
+	default:
+		return WMI_HOST_RATE_PREAMBLE_OFDM;
+	}
+}
+
+/**
+ * __wlan_hdd_cfg80211_start_pmsr() - Start peer measurement request (inner)
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @req: PMSR request from cfg80211
+ *
+ * Builds and sends WMI_RTT_PEER_MEAS_REQ_CMDID to firmware.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int __wlan_hdd_cfg80211_start_pmsr(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct cfg80211_pmsr_request *req)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_adapter *pd_adapter = NULL;
+	struct wmi_rtt_peer_meas_req_cmd_params *params;
+	struct wlan_objmgr_vdev *vdev;
+	u32 n_peers = req->n_peers;
+	u32 i;
+	int ret;
+	QDF_STATUS status;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (!adapter->deflink)
+		return -EINVAL;
+
+	if (policy_mgr_get_connection_count_with_mlo(hdd_ctx->psoc) > 1) {
+		wifi_pos_err("PMSR not allowed when concurrency exists");
+		return -EAGAIN;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
+						    adapter->deflink->vdev_id,
+						    WLAN_WIFI_POS_OSIF_ID);
+	if (vdev) {
+		if (ucfg_mlme_is_chan_switch_in_progress(vdev)) {
+			wifi_pos_err("channel switch is in progress");
+			wlan_objmgr_vdev_release_ref(
+				vdev, WLAN_WIFI_POS_OSIF_ID);
+			return -EAGAIN;
+		}
+		wlan_objmgr_vdev_release_ref(vdev,
+					     WLAN_WIFI_POS_OSIF_ID);
+	}
+
+	if (!n_peers)
+		return -EINVAL;
+
+	wlan_p2p_del_random_mac(hdd_ctx->psoc, adapter->deflink->vdev_id, 0);
+
+	pd_adapter = hdd_get_adapter(hdd_ctx, QDF_PD_MODE);
+	if (!pd_adapter)
+		return -EINVAL;
+
+	pd_adapter->pmsr_req.cookie = req->cookie;
+	pd_adapter->pmsr_req.vdev_id = adapter->deflink->vdev_id;
+	pd_adapter->pmsr_req.nl_port_id = req->nl_portid;
+	pd_adapter->pmsr_req.req_id = (u32)(req->cookie & 0xFFFFFFFF);
+
+	params = qdf_mem_malloc(sizeof(*params));
+	if (!params) {
+		qdf_mem_zero(&pd_adapter->pmsr_req,
+			     sizeof(pd_adapter->pmsr_req));
+		return -ENOMEM;
+	}
+
+	params->peers = qdf_mem_malloc(n_peers * sizeof(*params->peers));
+	if (!params->peers) {
+		qdf_mem_free(params);
+		qdf_mem_zero(&pd_adapter->pmsr_req,
+			     sizeof(pd_adapter->pmsr_req));
+		return -ENOMEM;
+	}
+
+	params->req_id = (u32)(req->cookie & 0xFFFFFFFF);
+	params->vdev_id = adapter->deflink->vdev_id;
+	params->timeout = 0; /* no timeout */
+	params->n_peers = n_peers;
+
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)req->mac_addr_mask)) {
+		u8 r_mac[QDF_MAC_ADDR_SIZE];
+
+		params->mac_addr_randomization = true;
+
+		qdf_get_random_bytes(r_mac, QDF_MAC_ADDR_SIZE);
+		r_mac[0] = (r_mac[0] & 0xfe) | 0x02;
+
+		for (i = 0; i < QDF_MAC_ADDR_SIZE; i++) {
+			params->random_mac_addr[i] =
+				(req->mac_addr[i] & req->mac_addr_mask[i]) |
+				(r_mac[i] & ~req->mac_addr_mask[i]);
+		}
+	} else {
+		params->mac_addr_randomization = false;
+	}
+
+	wifi_pos_debug("req_id:%d vdev:%d timeout:%d n_peers:%d randomization:%d",
+		       params->req_id, params->vdev_id, params->timeout,
+		       params->n_peers, params->mac_addr_randomization);
+
+	for (i = 0; i < n_peers; i++) {
+		struct cfg80211_pmsr_request_peer *peer = &req->peers[i];
+		struct wmi_rtt_peer_meas_req_peer_params *p = &params->peers[i];
+		const struct cfg80211_pmsr_ftm_request_peer *ftm = &peer->ftm;
+		enum phy_ch_width ch_width;
+		enum mlme_dot11_mode dot11_mode;
+
+		qdf_mem_copy(p->dest_mac, peer->addr, QDF_MAC_ADDR_SIZE);
+
+		/* Channel parameters */
+		if (!peer->chandef.chan) {
+			wifi_pos_err("NULL chan for peer %d", i);
+			ret = -EINVAL;
+			goto free_params;
+		}
+		p->ch_freq = peer->chandef.chan->center_freq;
+		p->ch_freq_seg1 = peer->chandef.center_freq1;
+		p->ch_freq_seg2 = peer->chandef.center_freq2;
+		ch_width = wlan_cfg80211_get_phy_ch_width(peer->chandef.width);
+		p->ch_width = ch_width;
+		dot11_mode = hdd_pmsr_preamble_to_dot11_mode(ftm->preamble);
+		p->ch_phymode =
+			wma_chan_phy_mode(peer->chandef.chan->center_freq,
+					  ch_width, dot11_mode);
+
+		p->preamble = hdd_pmsr_preamble_to_wmi(ftm->preamble);
+		p->burst_period = ftm->burst_period;
+		p->min_time_between_measurements =
+			ftm->min_time_between_measurements;
+		p->max_time_between_measurements =
+			ftm->max_time_between_measurements;
+
+		p->report_ap_tsf = 0;
+		p->pd_request =
+			(ftm->request_type == NL80211_PMSR_FTM_REQ_TYPE_PD);
+
+		p->ftm_requested = ftm->requested;
+		p->asap_mode = ftm->asap;
+		p->lci_req = ftm->request_lci;
+		p->loc_civic_req = ftm->request_civicloc;
+		p->tb_ranging = ftm->trigger_based;
+		p->ntb_ranging = ftm->non_trigger_based;
+		p->i2r_lmr_feedback = ftm->lmr_feedback;
+		p->rsta_role = ftm->rsta;
+
+		p->num_burst_exp = ftm->num_bursts_exp;
+		p->burst_duration = ftm->burst_duration;
+		p->ftms_per_burst = ftm->ftms_per_burst;
+		p->ftmr_retries = ftm->ftmr_retries;
+
+		p->nominal_time = ftm->nominal_time;
+		p->measurements_per_aw = ftm->ftms_per_burst;
+		p->aw_duration = ftm->availability_window;
+		p->suppress_range_results = ftm->pd_suppress_range_results;
+
+		wifi_pos_debug("freq:%d cfreq1:%d cfreq2:%d ch_width:%d dot11_mode:%d phy_mode:%d preamble:%d burst_period:%d min_time:%d max_time:%d, report_tsf:%d pd_req:%d",
+			       p->ch_freq, p->ch_freq_seg1, p->ch_freq_seg2,
+			       ch_width, dot11_mode, p->ch_phymode,
+			       p->preamble, p->burst_period,
+			       p->min_time_between_measurements,
+			       p->max_time_between_measurements,
+			       p->report_ap_tsf, p->pd_request);
+		wifi_pos_debug("ftm_requested:%d asap_mode:%d lci_req:%d loc_civic_req:%d tb_ranging:%d ntb:%d i2r_lmr:%d rsta_role:%d num_burst:%d burst_duration:%d ftms_per_burst:%d ftmr_retries:%d",
+			       p->ftm_requested, p->asap_mode, p->lci_req,
+			       p->loc_civic_req, p->tb_ranging, p->ntb_ranging,
+			       p->i2r_lmr_feedback, p->rsta_role,
+			       p->num_burst_exp, p->burst_duration,
+			       p->ftms_per_burst, p->ftmr_retries);
+		wifi_pos_debug("nominal_time:%d meas_per_aw:%d aw_dur:%d suppress_results:%d",
+			       p->nominal_time, p->measurements_per_aw,
+			       p->aw_duration, p->suppress_range_results);
+	}
+
+	status = wifi_pos_send_rtt_peer_meas_req(hdd_ctx->psoc, params);
+	qdf_mem_free(params->peers);
+	qdf_mem_free(params);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send RTT peer meas req: %d", status);
+		qdf_mem_zero(&pd_adapter->pmsr_req,
+			     sizeof(pd_adapter->pmsr_req));
+		return qdf_status_to_os_return(status);
+	}
+
+	/* Mark valid only after FW accepted the request */
+	pd_adapter->pmsr_req.is_valid = true;
+
+	return 0;
+
+free_params:
+	qdf_mem_free(params->peers);
+	qdf_mem_free(params);
+	qdf_mem_zero(&pd_adapter->pmsr_req, sizeof(pd_adapter->pmsr_req));
+
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_start_pmsr() - Start peer measurement request
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @req: PMSR request from cfg80211
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_start_pmsr(struct wiphy *wiphy,
+				 struct wireless_dev *wdev,
+				 struct cfg80211_pmsr_request *req)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *sta_adapter;
+	struct wireless_dev *sta_wdev = wdev;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return -EINVAL;
+	}
+
+	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!sta_adapter || !sta_adapter->wdev.netdev) {
+		hdd_err("No Sta adapter");
+		return -EINVAL;
+	}
+
+	sta_wdev = &sta_adapter->wdev;
+
+	errno = osif_vdev_sync_op_start(sta_wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_start_pmsr(wiphy, sta_wdev, req);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * __wlan_hdd_cfg80211_abort_pmsr() - Abort peer measurement request (inner)
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @req: PMSR request from cfg80211
+ *
+ * Sends WMI_RTT_PEER_MEAS_CANCEL_CMDID and frees the active pmsr_req.
+ */
+static void __wlan_hdd_cfg80211_abort_pmsr(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   struct cfg80211_pmsr_request *req)
+{
+	struct wlan_objmgr_psoc *psoc = wifi_pos_get_psoc();
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *pd_adapter;
+	uint32_t req_id;
+	QDF_STATUS status;
+
+	if (!psoc) {
+		wifi_pos_err("null psoc");
+		return;
+	}
+
+	wlan_objmgr_psoc_get_ref(psoc, WLAN_WIFI_POS_OSIF_ID);
+
+	req_id = (u32)(req->cookie & 0xFFFFFFFF);
+	status = wifi_pos_send_rtt_peer_meas_cancel(psoc, req_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to send RTT cancel cmd: %d", status);
+
+	if (hdd_ctx) {
+		pd_adapter = hdd_get_adapter(hdd_ctx, QDF_PD_MODE);
+		if (pd_adapter) {
+			if (pd_adapter->pmsr_req.is_valid)
+				qdf_mem_zero(&pd_adapter->pmsr_req,
+					     sizeof(pd_adapter->pmsr_req));
+		} else {
+			hdd_err("No PD adapter");
+		}
+	} else {
+		hdd_err("hdd_ctx is NULL");
+	}
+
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_WIFI_POS_OSIF_ID);
+}
+
+/**
+ * wlan_hdd_cfg80211_abort_pmsr() - Abort peer measurement request
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @req: PMSR request from cfg80211
+ */
+void wlan_hdd_cfg80211_abort_pmsr(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  struct cfg80211_pmsr_request *req)
+{
+	struct osif_vdev_sync *vdev_sync;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *sta_adapter;
+	struct wireless_dev *sta_wdev = wdev;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
+
+	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!sta_adapter || !sta_adapter->wdev.netdev) {
+		hdd_err("No Sta adapter");
+		return;
+	}
+
+	sta_wdev = &sta_adapter->wdev;
+	if (osif_vdev_sync_op_start(sta_wdev->netdev, &vdev_sync))
+		return;
+
+	__wlan_hdd_cfg80211_abort_pmsr(wiphy, sta_wdev, req);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+}
+
+/**
+ * wlan_hdd_wifi_pos_get_pmsr_req() - get PMSR req
+ * @wiphy: Pointer to wiphy
+ * @req: Pointer to PMSR request to fill
+ *
+ * Return: wireless_dev pointer on success, NULL on failure
+ */
+struct wireless_dev *wlan_hdd_wifi_pos_get_pmsr_req(
+					struct wiphy *wiphy,
+					struct cfg80211_pmsr_request *req)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *pd_adapter;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return NULL;
+	}
+
+	pd_adapter = hdd_get_adapter(hdd_ctx, QDF_PD_MODE);
+	if (!pd_adapter || !pd_adapter->pmsr_req.is_valid) {
+		hdd_debug("No active pmsr_req (concurrency teardown or no session)");
+		return NULL;
+	}
+
+	req->cookie = pd_adapter->pmsr_req.cookie;
+	req->nl_portid = pd_adapter->pmsr_req.nl_port_id;
+
+	return &pd_adapter->wdev;
+}
+
+/**
+ * wlan_hdd_wifi_pos_pmsr_complete() - Wrapper function to complete PMSR
+ * @hdd_ctx: Pointer to hdd_context
+ *
+ * Retrieves the PD adapter, constructs the cfg80211_pmsr_request from its
+ * saved state, and calls cfg80211_pmsr_complete() to notify the kernel.
+ * Called on SSR (QDF_PD_MODE stop) or when concurrency prevents continuation.
+ */
+void wlan_hdd_wifi_pos_pmsr_complete(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *pd_adapter;
+	struct wlan_objmgr_psoc *psoc;
+	struct cfg80211_pmsr_request req = {0};
+	u32 req_id;
+	QDF_STATUS status;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
+
+	pd_adapter = hdd_get_adapter(hdd_ctx, QDF_PD_MODE);
+	if (!pd_adapter || !pd_adapter->pmsr_req.is_valid)
+		return;
+
+	hdd_debug("Completing PMSR req_id:%u cookie:0x%llx vdev:%u",
+		  pd_adapter->pmsr_req.req_id,
+		  pd_adapter->pmsr_req.cookie,
+		  pd_adapter->pmsr_req.vdev_id);
+
+	req.cookie = pd_adapter->pmsr_req.cookie;
+	req.nl_portid = pd_adapter->pmsr_req.nl_port_id;
+	req_id = pd_adapter->pmsr_req.req_id;
+
+	/* Invalidate the req before completing to avoid re-entry */
+	pd_adapter->pmsr_req.is_valid = false;
+
+	if (!cds_is_driver_recovering()) {
+		psoc = wifi_pos_get_psoc();
+		if (psoc) {
+			wlan_objmgr_psoc_get_ref(psoc, WLAN_WIFI_POS_OSIF_ID);
+			status = wifi_pos_send_rtt_peer_meas_cancel(
+					psoc, req_id);
+			if (QDF_IS_STATUS_ERROR(status))
+				hdd_err("Failed to send RTT cancel cmd: %d",
+					status);
+			wlan_objmgr_psoc_release_ref(psoc,
+						     WLAN_WIFI_POS_OSIF_ID);
+		} else {
+			hdd_warn("wifi_pos psoc not available, skipping RTT cancel");
+		}
+	}
+
+	cfg80211_pmsr_complete(&pd_adapter->wdev, &req, GFP_KERNEL);
+	/* Zero out remaining fields; is_valid was already cleared above */
+	qdf_mem_zero(&pd_adapter->pmsr_req, sizeof(pd_adapter->pmsr_req));
+}
+
+static void wlan_hdd_wifi_pos_pmsr_req_clear(struct wiphy *wiphy)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *pd_adapter;
+
+	if (!hdd_ctx)
+		return;
+
+	pd_adapter = hdd_get_adapter(hdd_ctx, QDF_PD_MODE);
+	if (!pd_adapter)
+		return;
+
+	hdd_debug("Clearing PMSR req_id:%u cookie:0x%llx vdev:%u on final result",
+		  pd_adapter->pmsr_req.req_id,
+		  pd_adapter->pmsr_req.cookie,
+		  pd_adapter->pmsr_req.vdev_id);
+
+	qdf_mem_zero(&pd_adapter->pmsr_req, sizeof(pd_adapter->pmsr_req));
+}
+
+static void
+wlan_hdd_wifi_pos_pmsr_complete_on_concurrency(struct wlan_objmgr_psoc *psoc)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	wlan_hdd_wifi_pos_pmsr_complete(hdd_ctx);
+}
+
+static struct osif_wifi_pos_legacy_ops hdd_wifi_pos_legacy_ops = {
+	.get_pmsr_req_legacy_cb = wlan_hdd_wifi_pos_get_pmsr_req,
+	.pmsr_complete_cb = wlan_hdd_wifi_pos_pmsr_complete_on_concurrency,
+	.pmsr_req_clear_cb = wlan_hdd_wifi_pos_pmsr_req_clear,
+};
+
+void wlan_hdd_wifi_pos_register_legacy_cb(void)
+{
+	osif_wifi_pos_set_legacy_cb(&hdd_wifi_pos_legacy_ops);
+}
+
+void wlan_hdd_wifi_pos_unregister_legacy_cb(void)
+{
+	osif_wifi_pos_reset_legacy_cb();
+}
+#endif
 
 #if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 bool wlan_hdd_is_pd_iface(struct wireless_dev *wdev)

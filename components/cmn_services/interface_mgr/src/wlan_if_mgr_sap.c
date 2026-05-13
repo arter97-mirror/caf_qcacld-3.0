@@ -37,6 +37,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_ll_sap_api.h"
 #include <wlan_cfr_ucfg_api.h>
+#include "wifi_pos_ucfg_api.h"
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
@@ -100,6 +101,7 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	/* abort p2p roc before starting the BSS for sync event */
 	ucfg_p2p_cleanup_roc_by_psoc(psoc);
 	ucfg_cfr_send_stop(vdev, 0);
+	ucfg_wifi_pos_pmsr_complete_on_concurrency(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }

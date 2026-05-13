@@ -77,6 +77,58 @@ wlan_hdd_cfg80211_set_secure_ranging_context(struct wiphy *wiphy,
 #if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 
 /**
+ * wlan_hdd_cfg80211_start_pmsr() - Start peer measurement request
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @req: PMSR request
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_start_pmsr(struct wiphy *wiphy,
+				 struct wireless_dev *wdev,
+				 struct cfg80211_pmsr_request *req);
+
+/**
+ * wlan_hdd_cfg80211_abort_pmsr() - Abort peer measurement request
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @req: PMSR request
+ */
+void wlan_hdd_cfg80211_abort_pmsr(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  struct cfg80211_pmsr_request *req);
+
+/**
+ * wlan_hdd_wifi_pos_get_pmsr_req() - get PMSR req
+ * @wiphy: Pointer to wiphy
+ * @req: Pointer to PMSR request to fill
+ *
+ * Return: wireless_dev pointer on success, NULL on failure
+ */
+struct wireless_dev *wlan_hdd_wifi_pos_get_pmsr_req(
+					struct wiphy *wiphy,
+					struct cfg80211_pmsr_request *req);
+
+/**
+ * wlan_hdd_wifi_pos_pmsr_complete() - Notify cfg80211 that PMSR is complete
+ * @hdd_ctx: Pointer to hdd_context
+ *
+ * Completes any pending PMSR on the PD adapter. Safe to call when no PMSR
+ * is in progress (checks is_valid internally).
+ */
+void wlan_hdd_wifi_pos_pmsr_complete(struct hdd_context *hdd_ctx);
+
+/**
+ * wlan_hdd_wifi_pos_register_legacy_cb() - Register HDD legacy callbacks
+ */
+void wlan_hdd_wifi_pos_register_legacy_cb(void);
+
+/**
+ * wlan_hdd_wifi_pos_unregister_legacy_cb() - Unregister HDD legacy callbacks
+ */
+void wlan_hdd_wifi_pos_unregister_legacy_cb(void);
+
+/**
  * wlan_hdd_is_pd_iface() - is PD interface
  * @wdev: pointer to wireless dev
  *
@@ -84,6 +136,19 @@ wlan_hdd_cfg80211_set_secure_ranging_context(struct wiphy *wiphy,
  */
 bool wlan_hdd_is_pd_iface(struct wireless_dev *wdev);
 #else
+static inline void wlan_hdd_wifi_pos_register_legacy_cb(void)
+{
+}
+
+static inline void wlan_hdd_wifi_pos_unregister_legacy_cb(void)
+{
+}
+
+static inline
+void wlan_hdd_wifi_pos_pmsr_complete(struct hdd_context *hdd_ctx)
+{
+}
+
 static inline
 bool wlan_hdd_is_pd_iface(struct wireless_dev *wdev)
 {

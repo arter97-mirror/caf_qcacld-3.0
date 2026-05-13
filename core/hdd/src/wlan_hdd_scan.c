@@ -48,6 +48,7 @@
 #include "wlan_utility.h"
 #include "wlan_hdd_object_manager.h"
 #include "nan_ucfg_api.h"
+#include "wifi_pos_ucfg_api.h"
 #include "wlan_dp_api.h"
 #include "wlan_osif_priv.h"
 #include "wlan_hdd_main.h"
@@ -695,11 +696,14 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	if ((QDF_P2P_CLIENT_MODE == adapter->device_mode ||
-	     QDF_P2P_DEVICE_MODE == adapter->device_mode) &&
-	    !ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc)) {
-		/* Disable NAN Discovery if enabled */
-		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
+	if (QDF_P2P_CLIENT_MODE == adapter->device_mode ||
+	    QDF_P2P_DEVICE_MODE == adapter->device_mode) {
+		/* Abort ongoing PMSR to avoid P2P discovery failure */
+		ucfg_wifi_pos_pmsr_complete_on_concurrency(hdd_ctx->psoc);
+
+		if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
+			/* Disable NAN Discovery if enabled */
+			ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
 	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&

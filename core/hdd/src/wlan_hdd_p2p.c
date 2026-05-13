@@ -63,10 +63,44 @@
 #include "wlan_p2p_api.h"
 #include "wlan_hdd_wifi_pos_pasn.h"
 #include "wlan_hdd_wmm.h"
+#include "wifi_pos_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
 #define MAX_MUS_VAL       (INT_MAX / 1024)
+
+static struct wireless_dev *
+wlan_hdd_p2p_get_pd_wdev_by_mac(const uint8_t *mac_addr)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct hdd_adapter *pd_adapter;
+
+	if (!hdd_ctx || !mac_addr)
+		return NULL;
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return NULL;
+
+	pd_adapter = hdd_get_adapter_by_macaddr(hdd_ctx, (uint8_t *)mac_addr);
+	if (pd_adapter && wlan_hdd_is_pd_iface(&pd_adapter->wdev))
+		return &pd_adapter->wdev;
+
+	return NULL;
+}
+
+static struct osif_p2p_legacy_ops hdd_p2p_legacy_ops = {
+	.osif_get_pd_wdev_by_mac_addr_cb = wlan_hdd_p2p_get_pd_wdev_by_mac,
+};
+
+void wlan_hdd_p2p_register_legacy_cb(void)
+{
+	osif_p2p_set_legacy_cb(&hdd_p2p_legacy_ops);
+}
+
+void wlan_hdd_p2p_unregister_legacy_cb(void)
+{
+	osif_p2p_reset_legacy_cb();
+}
 
 /* Clean up RoC context at hdd_stop_adapter*/
 void
@@ -240,6 +274,12 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_P2P_ID);
 		return -EBUSY;
 	}
+
+	if (adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE ||
+	    adapter->device_mode == QDF_P2P_DEVICE_MODE)
+		/* Abort ongoing PMSR to avoid P2P discovery failure */
+		ucfg_wifi_pos_pmsr_complete_on_concurrency(psoc);
 
 	/* Disable NAN Discovery if enabled */
 	if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
@@ -559,6 +599,10 @@ int wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	if (wlan_hdd_is_pd_iface(wdev)) {
 		struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 		struct hdd_adapter *sta_adapter;
+
+		errno = wlan_hdd_validate_context(hdd_ctx);
+		if (errno)
+			return errno;
 
 		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 		if (sta_adapter && sta_adapter->wdev.netdev)

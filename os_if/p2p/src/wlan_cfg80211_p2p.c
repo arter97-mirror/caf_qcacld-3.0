@@ -127,6 +127,28 @@ p2p_noa_attr_policy[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1] = {
 #define DST_MAC_ADDRESS_OFFSET 4
 #define MGMT_FRAME_MATCH_LEN 6
 
+static struct osif_p2p_legacy_ops *osif_p2p_legacy_ops;
+
+static struct wireless_dev *
+osif_p2p_get_pd_wdev_by_mac(const uint8_t *mac_addr)
+{
+	if (!osif_p2p_legacy_ops ||
+	    !osif_p2p_legacy_ops->osif_get_pd_wdev_by_mac_addr_cb)
+		return NULL;
+
+	return osif_p2p_legacy_ops->osif_get_pd_wdev_by_mac_addr_cb(mac_addr);
+}
+
+void osif_p2p_set_legacy_cb(struct osif_p2p_legacy_ops *osif_legacy_ops)
+{
+	osif_p2p_legacy_ops = osif_legacy_ops;
+}
+
+void osif_p2p_reset_legacy_cb(void)
+{
+	osif_p2p_legacy_ops = NULL;
+}
+
 /**
  * wlan_p2p_rx_callback() - Callback for rx mgmt frame
  * @user_data: pointer to soc object
@@ -244,17 +266,10 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct vdev_osif_priv *osif_priv;
-	struct wireless_dev *wdev;
-	struct hdd_adapter *pd_adapter = NULL;
+	struct wireless_dev *wdev, *pd_wdev = NULL;
 	bool is_success;
 	uint8_t *src_macaddr;
 	struct qdf_mac_addr p2p_mac_addr = {0};
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
-		return;
-	}
 
 	psoc = user_data;
 	if (!psoc) {
@@ -273,15 +288,15 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 	wlan_mlme_get_p2p_device_mac_addr(vdev, &p2p_mac_addr);
 	src_macaddr = &(tx_cnf->buf[SRC_MAC_ADDRESS_OFFSET]);
 	if (src_macaddr)
-		pd_adapter = hdd_get_adapter_by_macaddr(hdd_ctx, src_macaddr);
+		pd_wdev = osif_p2p_get_pd_wdev_by_mac(src_macaddr);
 
 	if (ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc) &&
 	    src_macaddr &&
 	    (qdf_mem_cmp(src_macaddr, p2p_mac_addr.bytes,
 			 QDF_MAC_ADDR_SIZE) == 0)) {
 		wdev = osif_vdev_mgr_get_p2p_wdev();
-	} else if (pd_adapter && wlan_hdd_is_pd_iface(&pd_adapter->wdev)) {
-		wdev = &pd_adapter->wdev;
+	} else if (pd_wdev) {
+		wdev = pd_wdev;
 	} else {
 		osif_priv = wlan_vdev_get_ospriv(vdev);
 		if (!osif_priv) {

@@ -41,6 +41,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_ll_sap_api.h"
 #include <wlan_cfr_ucfg_api.h>
+#include "wifi_pos_ucfg_api.h"
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
@@ -114,6 +115,7 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 		ucfg_nan_check_and_disable_unsupported_ndi(psoc,
 							   false);
 	ucfg_cfr_send_stop(vdev, 0);
+	ucfg_wifi_pos_pmsr_complete_on_concurrency(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }

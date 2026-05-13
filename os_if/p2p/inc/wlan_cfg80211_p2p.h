@@ -30,6 +30,31 @@ struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 struct ieee80211_channel;
 struct hdd_adapter;
+struct wireless_dev;
+
+/**
+ * struct osif_p2p_legacy_ops - P2P legacy callbacks
+ * @osif_get_pd_wdev_by_mac_addr_cb: Callback to get PD wdev by MAC address
+ */
+struct osif_p2p_legacy_ops {
+	struct wireless_dev *
+		(*osif_get_pd_wdev_by_mac_addr_cb)(const uint8_t *mac_addr);
+};
+
+/**
+ * osif_p2p_set_legacy_cb() - Sets legacy callbacks to osif
+ * @osif_legacy_ops: Function pointer to legacy ops structure
+ *
+ * Return: void
+ */
+void osif_p2p_set_legacy_cb(struct osif_p2p_legacy_ops *osif_legacy_ops);
+
+/**
+ * osif_p2p_reset_legacy_cb() - Resets legacy callbacks to osif
+ *
+ * Return: void
+ */
+void osif_p2p_reset_legacy_cb(void);
 
 /**
  * p2p_psoc_enable() - psoc API to enable p2p component

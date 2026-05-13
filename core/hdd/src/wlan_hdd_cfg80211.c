@@ -33929,20 +33929,42 @@ static int __wlan_hdd_cfg80211_set_pmsr_key(struct wiphy *wiphy,
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	bool is_ltf_key_seed_required = (params->ltf_keyseed_len &&
 					 params->ltf_keyseed);
+	bool is_rtt_pasn_peer_exist = false;
 
-	/* wait for add peer completion & then install pairwise & LTF keyseed */
-	status = wlan_hdd_cfg80211_create_pmsr_peer(
-			psoc, vdev, (struct qdf_mac_addr *)mac_addr);
-	if (QDF_IS_STATUS_ERROR(status))
-		return qdf_status_to_os_return(status);
-
-	/* Check if peer got created */
 	peer = wlan_objmgr_get_peer_by_mac(psoc, (uint8_t *)mac_addr,
 					   WLAN_WIFI_POS_OSIF_ID);
-	if (!peer)
-		return -EINVAL;
+	if (peer) {
+		if (wlan_peer_get_peer_type(peer) == WLAN_PEER_RTT_PASN) {
+			hdd_debug("PASN peer " QDF_MAC_ADDR_FMT " exists",
+				  QDF_MAC_ADDR_REF(mac_addr));
+			is_rtt_pasn_peer_exist = true;
+		}
 
-	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+	}
+
+	if (!is_rtt_pasn_peer_exist) {
+		/*
+		 * Wait for add peer completion & then install pairwise &
+		 * LTF keyseed.
+		 */
+		status = wlan_hdd_cfg80211_create_pmsr_peer(
+				psoc, vdev, (struct qdf_mac_addr *)mac_addr);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err_rl("vdev:%d Failed to create PMSR peer",
+				   wlan_vdev_get_id(vdev));
+			errno = qdf_status_to_os_return(status);
+			return errno;
+		}
+
+		/* Check if peer got created */
+		peer = wlan_objmgr_get_peer_by_mac(psoc, (uint8_t *)mac_addr,
+						   WLAN_WIFI_POS_OSIF_ID);
+		if (!peer)
+			return -EINVAL;
+
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+	}
 
 	crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
 	if (!crypto_key)
@@ -34021,8 +34043,11 @@ static int wlan_hdd_cfg80211_set_pmsr_key(struct wiphy *wiphy,
 	if (!adapter || !adapter->wdev.netdev)
 		return -EINVAL;
 
+	if (!adapter->deflink)
+		return -EINVAL;
+
 	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
-		return errno;
+		return -EINVAL;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev)

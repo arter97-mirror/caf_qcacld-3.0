@@ -70,6 +70,20 @@ int hdd_set_p2p_opps(struct net_device *dev, uint8_t *command);
 int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command);
 
 /**
+ * wlan_hdd_p2p_register_legacy_cb() - Register HDD legacy callbacks with OSIF
+ *
+ * Return: None
+ */
+void wlan_hdd_p2p_register_legacy_cb(void);
+
+/**
+ * wlan_hdd_p2p_unregister_legacy_cb() - Unregister HDD legacy callbacks
+ *
+ * Return: None
+ */
+void wlan_hdd_p2p_unregister_legacy_cb(void);
+
+/**
  * hdd_set_p2p_noa_fill_params() - Convert P2P NOA params to usecs and assign to
  * struct p2p_ps_config
  * @adapter: adapter context

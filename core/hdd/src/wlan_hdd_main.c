@@ -79,6 +79,7 @@
 #include "wlan_hdd_cfg80211.h"
 #include "wlan_hdd_ext_scan.h"
 #include "wlan_hdd_p2p.h"
+#include "wlan_hdd_wifi_pos_pasn.h"
 #include <linux/rtnetlink.h>
 #include "sap_api.h"
 #include <sap_internal.h>
@@ -12584,6 +12585,9 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 		case QDF_NDI_MODE:
 			hdd_ndi_start(adapter->dev->name, 0);
 			break;
+		case QDF_PD_MODE:
+			wlan_hdd_wifi_pos_pmsr_complete(hdd_ctx);
+			break;
 		default:
 			break;
 		}
@@ -22667,6 +22671,8 @@ QDF_STATUS hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ocb_psoc_enable(psoc);
 	disa_psoc_enable(psoc);
 	nan_psoc_enable(psoc);
+	wlan_hdd_p2p_register_legacy_cb();
+	wlan_hdd_wifi_pos_register_legacy_cb();
 	p2p_psoc_enable(psoc);
 	ucfg_interop_issues_ap_psoc_enable(psoc);
 	policy_mgr_psoc_enable(psoc);
@@ -22690,6 +22696,8 @@ void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	policy_mgr_psoc_disable(psoc);
 	ucfg_interop_issues_ap_psoc_disable(psoc);
 	p2p_psoc_disable(psoc);
+	wlan_hdd_wifi_pos_unregister_legacy_cb();
+	wlan_hdd_p2p_unregister_legacy_cb();
 	nan_psoc_disable(psoc);
 	disa_psoc_disable(psoc);
 	ocb_psoc_disable(psoc);
