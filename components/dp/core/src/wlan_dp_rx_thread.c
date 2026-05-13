@@ -1409,7 +1409,7 @@ QDF_STATUS dp_rx_tm_resume(struct dp_rx_tm_handle *rx_tm_hdl)
 			continue;
 		dp_debug("calling thread %d to resume", i);
 
-		/* postively reset event_flag for DP_RX_THREADS_SUSPENDING
+		/* positively reset event_flag for DP_RX_THREADS_SUSPENDING
 		 * state
 		 */
 		qdf_clear_bit(RX_SUSPEND_EVENT,
@@ -1439,7 +1439,7 @@ QDF_STATUS dp_rx_refill_thread_resume(struct dp_rx_refill_thread *refill_thread)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/* postively reset event_flag for DP_RX_REFILL_THREAD_SUSPENDING
+	/* positively reset event_flag for DP_RX_REFILL_THREAD_SUSPENDING
 	 * state
 	 */
 	qdf_clear_bit(RX_REFILL_SUSPEND_EVENT,

@@ -2358,10 +2358,10 @@ static bool lim_is_pmkid_found_for_peer(struct mac_context *mac_ctx,
 
 /**
  * lim_find_p2p_address_from_assoc_req() - This function finds P2P interface
- * address from assocaition request
- * @assoc_req: Assocaition request
+ * address from association request
+ * @assoc_req: Association request
  *
- * This API find P2P address by parsing P2P IE from assocaition request.
+ * This API find P2P address by parsing P2P IE from association request.
  * Return: pointer to P2P address
  */
 static uint8_t *lim_find_p2p_address_from_assoc_req(tpSirAssocReq assoc_req)
@@ -2383,7 +2383,7 @@ static uint8_t *lim_find_p2p_address_from_assoc_req(tpSirAssocReq assoc_req)
  * lim_is_sae_peer_allowed() - This function check PMKID for valid peer
  * @mac_ctx: MAC context
  * session: Pointer to PE session
- * @assoc_req: Assocaition request
+ * @assoc_req: Association request
  * @rsn_ie: RSN IE
  * @sa: Source address from association request
  * @mac_status_code: MAC status code

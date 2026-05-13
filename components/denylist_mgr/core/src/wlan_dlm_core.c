@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -628,7 +628,7 @@ dlm_handle_avoid_list(struct dlm_reject_ap *entry,
 	/* Clear the monitor list bit if the AP was present in monitor list */
 	entry->driver_monitorlist = false;
 
-	/* Increment bad bssid counter as NUD failure happenend with this ap */
+	/* Increment bad bssid counter as NUD failure happened with this ap */
 	entry->bad_bssid_counter++;
 
 	/* If bad bssid counter has reached threshold, move it to denylist */

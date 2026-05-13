@@ -56,7 +56,7 @@
 #if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
 /**
  * struct dp_rtpm_tput_policy_context - RTPM throughput policy context
- * @rtpm_lock: lock use for QDF rutime PM prevent/allow APIs
+ * @rtpm_lock: lock use for QDF runtime PM prevent/allow APIs
  * @high_tput_vote: atomic variable to keep track of voting
  */
 struct dp_rtpm_tput_policy_context {
@@ -442,7 +442,7 @@ struct fisa_pkt_hist {
  * @cumulative_l4_checksum: Cumulative L4 checksum
  * @adjusted_cumulative_ip_length: Cumulative IP length
  * @cur_aggr: Current aggregate length of flow
- * @napi_flush_cumulative_l4_checksum: Cumulative L4 chekcsum for current
+ * @napi_flush_cumulative_l4_checksum: Cumulative L4 checksum for current
  *				       NAPI flush
  * @napi_flush_cumulative_ip_length: Cumulative IP length
  * @last_skb: The last skb aggregated in the FISA flow

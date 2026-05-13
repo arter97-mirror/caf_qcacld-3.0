@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * 2011-2016 Qualcomm Atheros, Inc.
  * Qualcomm Atheros, Inc. has chosen to take madwifi subject to the BSD license and terms.
@@ -448,7 +448,7 @@ typedef enum {
  * @ns_rx_deauth:          rx deauthentication
  * @ns_rx_action:          rx action
  * @ns_rx_unauth:          rx on unauthorized port
- * @ns_rx_unencrypted:     rx unecrypted w/ privacy
+ * @ns_rx_unencrypted:     rx unencrypted w/ privacy
  * @ns_tx_data:            tx data frames
  * @ns_tx_data_success: tx data frames successfully transmitted (unicast only)
  * @ns_tx_wme:          tx data per AC
@@ -1276,7 +1276,7 @@ struct ieee80211_acs_dbg {
 
 struct wlan_cfg8011_genric_params {
 	unsigned int command; /* attribute 17*/
-	unsigned int value;   /* attriute 18 */
+	unsigned int value;   /* attribute 18 */
 	void *data;          /* attribute 19 */
 	unsigned int data_len;
 	unsigned int length; /* attribute 20 */

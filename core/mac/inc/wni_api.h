@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -184,7 +184,7 @@ enum eWniMsgTypes {
 	eWNI_SME_CSA_RESTART_REQ = SIR_SME_MSG_TYPES_BEGIN + 148,
 	eWNI_SME_CSA_RESTART_RSP = SIR_SME_MSG_TYPES_BEGIN + 149,
 	WNI_SME_CFG_ACTION_FRM_HE_TB_PPDU = SIR_SME_MSG_TYPES_BEGIN + 150,
-	/* To indicate Hidden ssid start complition to upper layer */
+	/* To indicate Hidden ssid start completion to upper layer */
 	eWNI_SME_HIDDEN_SSID_RESTART_RSP = SIR_SME_MSG_TYPES_BEGIN + 151,
 	eWNI_SME_FW_STATUS_IND = SIR_SME_MSG_TYPES_BEGIN + 152,
 	eWNI_SME_STA_CSA_CONTINUE_REQ = SIR_SME_MSG_TYPES_BEGIN + 153,

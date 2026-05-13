@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -84,7 +84,7 @@ static int wlan_hdd_config_get(struct hdd_context *hdd_ctx,
 }
 
 /**
- * __wlan_hdd_read_config_debugfs() - function to get ini conifg
+ * __wlan_hdd_read_config_debugfs() - function to get ini config
  * @file: file pointer
  * @buf: buffer
  * @count: count
@@ -109,7 +109,7 @@ static ssize_t __wlan_hdd_read_config_debugfs(struct file *file,
 }
 
 /**
- * wlan_hdd_read_config_debugfs() - wrapper function to get ini conifg
+ * wlan_hdd_read_config_debugfs() - wrapper function to get ini config
  * @file: file pointer
  * @buf: buffer
  * @count: count

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +23,7 @@
  * hdd_sysfs_pktlog_create(): Initialize pktlog specific sysfs file
  * @driver_kobject: Driver Kobject
  *
- * Function to initialize pktlog specific mode syfs files.
+ * Function to initialize pktlog specific mode sysfs files.
  *
  * Return: NONE
  */
@@ -32,7 +33,7 @@ void hdd_sysfs_pktlog_create(struct kobject *driver_kobject);
  * hdd_sysfs_pktlog_destroy(): Remove pktlog sysfs file
  * @driver_kobject: Driver Kobject
  *
- * Function to remove pktlog specific mode syfs files.
+ * Function to remove pktlog specific mode sysfs files.
  *
  * Return: NONE
  */

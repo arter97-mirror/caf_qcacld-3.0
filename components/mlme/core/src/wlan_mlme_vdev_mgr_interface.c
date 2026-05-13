@@ -1948,7 +1948,7 @@ static QDF_STATUS mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
  * @data: event data
  * @is_disconnect_legacy_only: flag to indicate legacy disconnect
  *
- * montior mode no connected peers, only do VDEV state transition.
+ * monitor mode no connected peers, only do VDEV state transition.
  *
  * Return: QDF_STATUS
  */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -88,7 +88,7 @@ enum dlm_reject_ap_type {
  * @REASON_UNKNOWN: Unknown reason
  * @REASON_NUD_FAILURE: NUD failure happened with this BSSID
  * @REASON_STA_KICKOUT: STA kickout happened with this BSSID
- * @REASON_ROAM_HO_FAILURE: HO failure happenend with this BSSID
+ * @REASON_ROAM_HO_FAILURE: HO failure happened with this BSSID
  * @REASON_ASSOC_REJECT_POOR_RSSI: assoc rsp with reason 71 received from
  * AP.
  * @REASON_ASSOC_REJECT_OCE: OCE assoc reject received from the AP.

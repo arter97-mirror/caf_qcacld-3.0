@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,7 @@
  * hdd_sysfs_pm_cinfo_create(): Initialize pm_cinfo specific sysfs
  * @driver_kobject: Driver Kobject
  *
- * Function to initialize pm_cinfo specific mode syfs files.
+ * Function to initialize pm_cinfo specific mode sysfs files.
  *
  * Return: NONE
  */
@@ -33,7 +33,7 @@ void hdd_sysfs_pm_cinfo_create(struct kobject *driver_kobject);
  * hdd_sysfs_pm_cinfo_destroy(): Remove pm_cinfo sysfs file
  * @driver_kobject: Driver Kobject
  *
- * Function to remove pm_cinfo specific mode syfs files.
+ * Function to remove pm_cinfo specific mode sysfs files.
  *
  * Return: NONE
  */

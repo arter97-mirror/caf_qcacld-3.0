@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -658,7 +658,7 @@ static int hdd_clear_sr_stats(struct hdd_context *hdd_ctx, uint8_t mac_id)
  * @adapter: hdd adapter
  * @sr_ctrl: sr ctrl ie
  *
- * Return: true if provided mode supports SR else flase
+ * Return: true if provided mode supports SR else false
  */
 static bool hdd_check_mode_support_for_sr(struct hdd_adapter *adapter,
 					  uint8_t sr_ctrl)
@@ -820,7 +820,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			}
 		}
 		/**
-		 * As per currenct implementation from userspace same
+		 * As per current implementation from userspace same
 		 * PD threshold value is configured for both SRG and
 		 * NON-SRG and fw will decide further based on BSS color
 		 * So only SRG param is parsed and set as pd threshold

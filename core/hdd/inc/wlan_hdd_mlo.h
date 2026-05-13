@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -97,7 +97,7 @@ struct hdd_adapter_create_param {
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 /**
  * struct hdd_mlo_adapter_info - Mlo specific adapter information
- * @is_ml_adapter: Whether this is the main ml adaper attached to netdev
+ * @is_ml_adapter: Whether this is the main ml adapter attached to netdev
  * @is_link_adapter: Whether this a link adapter without netdev
  * @associate_with_ml_adapter: adapter which shares the vdev object with the ml
  * adapter
@@ -378,7 +378,7 @@ QDF_STATUS hdd_mlo_mgr_register_osif_ops(void);
  * hdd_mlo_mgr_unregister_osif_ops() - Deregister OSIF ops with
  * global MLO manager
  *
- * Deregister the calbacks registered with global MLO manager for OSIF
+ * Deregister the callbacks registered with global MLO manager for OSIF
  *
  * Return: QDF_STATUS
  */

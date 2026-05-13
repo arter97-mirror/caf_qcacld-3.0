@@ -2513,7 +2513,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 						   RSO_CHANNEL_SWITCH);
 
 	if (mlo_is_any_link_disconnecting(session_entry->vdev)) {
-		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
+		pe_info_rl("Ignore CSA, vdev is in not in connected state");
 		goto send_event;
 	}
 

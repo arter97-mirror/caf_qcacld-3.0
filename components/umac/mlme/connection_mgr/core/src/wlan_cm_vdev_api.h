@@ -438,7 +438,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp);
 
 /**
- * cm_is_vdevid_connected() - check if vdev_id is in conneted state
+ * cm_is_vdevid_connected() - check if vdev_id is in connected state
  * @pdev: pdev pointer
  * @vdev_id: vdev ID
  *
@@ -447,7 +447,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
- * cm_is_vdevid_active() - check if vdev_id is in conneted/roaming state
+ * cm_is_vdevid_active() - check if vdev_id is in connected/roaming state
  * @pdev: pdev pointer
  * @vdev_id: vdev ID
  *

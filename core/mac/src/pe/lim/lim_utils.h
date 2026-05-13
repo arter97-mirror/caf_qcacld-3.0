@@ -1188,7 +1188,7 @@ lim_get_mld_info_sta(struct cm_peer_create_req *req,
  * @vdev_id: vdev id
  * @cfg: config setting
  *
- * Preapres the vendor action frame and send action frame in HE TB PPDU
+ * Prepares the vendor action frame and send action frame in HE TB PPDU
  * configuration to FW.
  *
  * Return: QDF_STATUS
@@ -3158,7 +3158,7 @@ QDF_STATUS lim_get_capability_info(struct mac_context *mac, uint16_t *pCap,
  * @mac_ctx: mac context
  * @channel_freq: channel frequency MHz
  * @ch_bandwidth: channel bandwidth
- * @offset: second channel offfset
+ * @offset: second channel offset
  *
  * This API can get the operating class based on channel freq,
  * bandwidth and second channel offset.

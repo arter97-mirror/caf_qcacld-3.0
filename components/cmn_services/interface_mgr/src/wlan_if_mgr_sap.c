@@ -193,7 +193,7 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	 * Due to audio share glitch with P2P GO caused by
 	 * roam scan on concurrent interface, disable
 	 * roaming if "p2p_disable_roam" ini is enabled.
-	 * Donot re-enable roaming again on other STA interface
+	 * Do not re-enable roaming again on other STA interface
 	 * if p2p GO is active on any vdev.
 	 */
 	if (cfg_p2p_is_roam_config_disabled(psoc) &&

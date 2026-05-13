@@ -6529,7 +6529,7 @@ static void hdd_fill_sinfo_eht_rate_info(struct rate_info *rate_info,
  * hdd_is_eht_flag_set() - Check if EHT flag is set
  * @rate_info: Pointer to rate info
  *
- * Return: Return true if EHT flag is set, else return flase
+ * Return: Return true if EHT flag is set, else return false
  */
 static bool hdd_is_eht_flag_set(struct rate_info *rate_info)
 {
@@ -9767,7 +9767,7 @@ int wlan_hdd_get_rcpi(struct hdd_adapter *adapter,
 	adapter->rcpi.mac_addr = priv->mac_addr;
 	adapter->rcpi.rcpi = priv->rcpi;
 	if (qdf_mem_cmp(&mac_addr, &priv->mac_addr, sizeof(mac_addr))) {
-		hdd_err("mis match of mac addr from call-back");
+		hdd_err("mismatch of mac addr from call-back");
 		status = -EINVAL;
 		goto out;
 	}

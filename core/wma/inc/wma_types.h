@@ -595,7 +595,7 @@ void wma_tx_abort(uint8_t vdev_id);
  * @tx_frame: frame buffer
  * @frmLen: frame length
  * @frmType: frame type
- * @txDir: tx diection
+ * @txDir: tx direction
  * @tid: TID
  * @tx_frm_download_comp_cb: tx download callback handler
  * @pData: tx packet

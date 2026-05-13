@@ -660,9 +660,9 @@ static void pmo_core_set_resume_dtim(struct wlan_objmgr_psoc *psoc)
 /**
  * pmo_unpause_all_vdev() - unpause all vdev
  * @psoc: objmgr psoc handle
- * @psoc_ctx: pmo psoc contaxt
+ * @psoc_ctx: pmo psoc context
  *
- * unpause all vdev aftter resume/coming out of wow mode
+ * unpause all vdev after resume/coming out of wow mode
  *
  * Return: none
  */

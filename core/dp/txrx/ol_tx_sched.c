@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -523,7 +523,7 @@ struct ol_tx_sched_wrr_adv_category_info_t {
  */
 /*                                            WRR           send
  *                                           skip  credit  limit credit disc
- *                                            wts  thresh (frms) reserv  wts
+ *                                            wts  thresh (frms) reserve  wts
  */
 #ifdef HIF_SDIO
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VO,           1,     17,    24,     0,  1);
@@ -1104,7 +1104,7 @@ ol_tx_sched_init_wrr_adv(
 }
 
 
-/* WMM parameters are suppposed to be passed when associate with AP.
+/* WMM parameters are supposed to be passed when associate with AP.
  * According to AIFS+CWMin, the function maps each queue to one of four default
  * settings of the scheduler, ie. VO, VI, BE, or BK.
  */

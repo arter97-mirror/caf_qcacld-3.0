@@ -554,7 +554,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				 pe_session->limMlmState, rc,
 				 QDF_MAC_ADDR_REF(addr));
 
-			/* this will be treated as SAE authenticaton failure
+			/* this will be treated as SAE authentication failure
 			 * and connect failure to userspace.
 			 */
 			lim_process_sae_auth_msg(mac_ctx, pe_session, addr);

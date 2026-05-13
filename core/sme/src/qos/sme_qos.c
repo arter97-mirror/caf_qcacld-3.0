@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2061,7 +2061,7 @@ static enum sme_qos_statustype sme_qos_internal_release_req(struct mac_context *
 						 * Please note that the
 						 * (aggregated) tspec for
 						 * upstream flows is sent out by
-						 * the susequent logic.
+						 * the subsequent logic.
 						 */
 						cmd.command =
 							SME_QOS_RESEND_REQ;
@@ -6249,7 +6249,7 @@ static QDF_STATUS sme_qos_del_ts_ind_fnp(struct mac_context *mac, tListElem *pEn
  * the success for the requested flow & notify all the other flows
  * running on the same AC that QoS params got modified
  *
- * Return:  QDF_STATUS enumaration
+ * Return:  QDF_STATUS enumeration
  */
 static QDF_STATUS
 sme_qos_reassoc_success_ev_fnp(struct mac_context *mac_ctx,

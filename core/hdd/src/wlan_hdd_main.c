@@ -876,7 +876,7 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 						0, &ch_params,
 						REG_CURRENT_PWR_MODE);
 	if (ch_params.ch_width == CH_WIDTH_MAX) {
-		hdd_err("failed to get max bandwdith for %d", chan_freq);
+		hdd_err("failed to get max bandwidth for %d", chan_freq);
 		return -EINVAL;
 	}
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
@@ -10556,7 +10556,7 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 
 	status = hdd_monitor_mode_vdev_status(adapter);
 	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err_rl("stop failed montior mode");
+		hdd_err_rl("stop failed monitor mode");
 
 	status = qdf_event_reset(&adapter->qdf_monitor_mode_vdev_stop_event);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -10598,7 +10598,7 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 	hdd_adapter_deregister_fc(adapter);
 	status = hdd_disable_monitor_mode();
 	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err_rl("datapath reset failed for montior mode");
+		hdd_err_rl("datapath reset failed for monitor mode");
 
 	ucfg_mlme_is_imps_enabled(hdd_ctx->psoc, &is_imps_enabled);
 	hdd_set_idle_ps_config(hdd_ctx, is_imps_enabled);
@@ -10628,7 +10628,7 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 	if (mode == QDF_SAP_MODE) {
 		wlan_hdd_scan_abort(link_info);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
-		/* Diassociate with all the peers before stop ap post */
+		/* Disassociate with all the peers before stop ap post */
 		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
 					link_info->link_flags)) {
 			if (wlan_hdd_del_station(adapter, NULL))
@@ -11183,7 +11183,7 @@ static inline bool wlan_hdd_is_mon_channel_bw_valid(enum phy_ch_width ch_width)
 #endif
 
 /*
- * wlan_hdd_mon_adjust_freq_seq() - Check and update frequecy sequence
+ * wlan_hdd_mon_adjust_freq_seq() - Check and update frequency sequence
  * @adapter: adapter handle
  * mon_link_info: Monitor link info handle
  *
@@ -11280,7 +11280,7 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 			}
 
 			if (hdd_get_conparam() != QDF_GLOBAL_MONITOR_MODE) {
-				hdd_err("Curret mode is not Global monitor mode");
+				hdd_err("Current mode is not Global monitor mode");
 				return -EINVAL;
 			}
 
@@ -18383,7 +18383,7 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 		goto cds_disable;
 
 	/*
-	 * Donot disable rx offload on concurrency for lithium and
+	 * Do not disable rx offload on concurrency for lithium and
 	 * beryllium based targets
 	 */
 	if (!hdd_ctx->is_wifi3_0_target)
@@ -19222,7 +19222,7 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 
 	errno = hdd_initialize_mac_address(hdd_ctx);
 	if (errno) {
-		hdd_err("MAC initializtion failed: %d", errno);
+		hdd_err("MAC initialization failed: %d", errno);
 		goto unregister_wiphy;
 	}
 
@@ -22185,7 +22185,7 @@ EXPORT_SYMBOL(hdd_driver_load);
 #endif
 
 /**
- * hdd_distroy_wifi_root_obj_sysfs_files() - Distroy wifi root object sysfs
+ * hdd_distroy_wifi_root_obj_sysfs_files() - Destroy wifi root object sysfs
  * files and wifi root object
  *
  * Return: none
@@ -22370,7 +22370,7 @@ static void hdd_sysfs_cleanup(void)
  * wlan_init_sysfs() - Creates the sysfs to be invoked when the fs is
  * ready
  *
- * This is creates the syfs entry boot_wlan. Which shall be invoked
+ * This is creates the sysfs entry boot_wlan. Which shall be invoked
  * when the filesystem is ready.
  *
  * QDF API cannot be used here since this function is called even before
