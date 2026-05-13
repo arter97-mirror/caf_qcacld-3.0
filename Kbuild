@@ -1281,7 +1281,13 @@ FTM_OBJS := $(FTM_DISP_SRC)/wlan_ftm_init_deinit.o \
 	    $(FTM_CORE_SRC)/wlan_ftm_svc.o \
 	    $(TARGET_IF_FTM_SRC)/target_if_ftm.o
 
-ifeq ($(QCA_WIFI_FTM_NL80211), y)
+ifeq ($(CONFIG_NL80211_TESTMODE), y)
+	CONFIG_QCA_WIFI_FTM_NL80211 := y
+endif
+
+ifeq ($(CONFIG_QCA_WIFI_FTM_NL80211), y)
+FTM_OBJS += $(OS_IF_FTM_SRC)/wlan_cfg80211_ftm.o
+else ifeq ($(QCA_WIFI_FTM_NL80211), y)
 FTM_OBJS += $(OS_IF_FTM_SRC)/wlan_cfg80211_ftm.o
 endif
 
