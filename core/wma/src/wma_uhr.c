@@ -49,7 +49,8 @@ static void wma_convert_uhr_cap(struct wlan_uhr_cap_info *uhr_cap,
 	uhr_cap->dps_assist_support = WMI_UHRCAP_MAC_DPS_ASSIS_GET(mac_cap);
 	uhr_cap->ap_static_hcm_support =
 			WMI_UHRCAP_MAC_DPS_AP_HCM_GET(mac_cap);
-	uhr_cap->ml_power_mgmt = WMI_UHRCAP_MAC_MULTI_LINK_PM_GET(mac_cap);
+	/* MAC bit 3 is reserved */
+	uhr_cap->ml_power_mgmt = 0;
 	uhr_cap->npca_support = WMI_UHRCAP_MAC_NPCA_GET(mac_cap);
 	uhr_cap->bsr_support = WMI_UHRCAP_MAC_BSR_GET(mac_cap);
 	uhr_cap->addn_mapped_tid_support =
@@ -300,7 +301,7 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 	WMI_UHRCAP_MAC_DPS_ASSIS_SET(mac_cap, uhr_cap->dps_assist_support);
 	WMI_UHRCAP_MAC_DPS_AP_HCM_SET(
 			mac_cap, uhr_cap->ap_static_hcm_support);
-	WMI_UHRCAP_MAC_MULTI_LINK_PM_SET(mac_cap, uhr_cap->ml_power_mgmt);
+	/* MAC bit 3 is reserved. Do not set it. */
 	WMI_UHRCAP_MAC_NPCA_SET(
 			mac_cap, uhr_cap->npca_support);
 	WMI_UHRCAP_MAC_BSR_SET(mac_cap, uhr_cap->bsr_support);
