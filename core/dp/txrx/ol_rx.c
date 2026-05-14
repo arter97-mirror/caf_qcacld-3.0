@@ -1780,7 +1780,7 @@ ol_rx_in_order_deliver(struct ol_txrx_vdev_t *vdev,
 			QDF_DP_TRACE_RX_TXRX_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(msdu),
-			sizeof(qdf_nbuf_data(msdu)), QDF_RX));
+			qdf_nbuf_len(msdu), QDF_RX));
 
 		OL_RX_PEER_STATS_UPDATE(peer, msdu);
 		OL_RX_ERR_STATISTICS_1(vdev->pdev, vdev, peer, rx_desc,
@@ -1839,7 +1839,7 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 				QDF_DP_TRACE_RX_OFFLOAD_HTT_PACKET_PTR_RECORD,
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(head_buf),
-				sizeof(qdf_nbuf_data(head_buf)), QDF_RX));
+				qdf_nbuf_len(head_buf), QDF_RX));
 			ol_rx_data_process(peer, head_buf);
 		} else {
 			buf = head_buf;

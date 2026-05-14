@@ -768,7 +768,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	DPTRACE(qdf_dp_trace(nbuf, QDF_DP_TRACE_TX_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,
 			     qdf_nbuf_data_addr(nbuf),
-			     sizeof(qdf_nbuf_data(nbuf)),
+			     qdf_nbuf_len(nbuf),
 			     QDF_TX));
 
 	if (!dp_intf_is_tx_allowed(nbuf, dp_link, soc,
@@ -883,7 +883,7 @@ QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	DPTRACE(qdf_dp_trace(nbuf, QDF_DP_TRACE_TX_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,
 			     qdf_nbuf_data_addr(nbuf),
-			     sizeof(qdf_nbuf_data(nbuf)),
+			     qdf_nbuf_len(nbuf),
 			     QDF_TX));
 
 	if (dp_nbuf_nontso_linearize(nbuf) != QDF_STATUS_SUCCESS) {
@@ -2151,7 +2151,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
 				     qdf_nbuf_data_addr(nbuf),
-				     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
+				     qdf_nbuf_len(nbuf), QDF_RX));
 
 		DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
 					      QDF_DP_TRACE_RX_PACKET_RECORD,
@@ -2325,7 +2325,7 @@ QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_nbuf)
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
 				     qdf_nbuf_data_addr(nbuf),
-				     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
+				     qdf_nbuf_len(nbuf), QDF_RX));
 
 		DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
 					      QDF_DP_TRACE_RX_PACKET_RECORD,
