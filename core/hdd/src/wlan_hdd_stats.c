@@ -8469,7 +8469,6 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	struct stats_event *stats;
 	struct hdd_fw_txrx_stats txrx_stats = {0};
 	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
-	int errno = 0;
 	uint8_t *peer_addr;
 
 	if (hdd_stats->class_a_stat.is_tx_rate_version_checked &&
@@ -8483,10 +8482,11 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 
 	peer_addr = link_info->session.station.conn_info.bssid.bytes;
 	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(link_info->vdev,
-							     peer_addr,
-							     &errno);
-	if (errno)
+							     peer_addr);
+	if (!stats) {
+		hdd_err_rl("Failed to get peer_stats");
 		return;
+	}
 
 	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
 	hdd_stats->class_a_stat.tx_rate_version = txrx_stats.tx_rate.version;
