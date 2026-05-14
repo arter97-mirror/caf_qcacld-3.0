@@ -298,36 +298,98 @@ smd_link_recfg_has_active_vdev_for_add_link(
 
 /**
  * smd_fw_roam_sync() - Handle firmware roam sync indication for SMD roaming
- * @vdev: VDEV object
- * @sync_ind: Roam offload sync indication from firmware
+ * @vdev: Assoc VDEV object on which FW roam sync was received
+ * @sync_ind: Roam offload sync indication from firmware carrying vdev
+ *            repurpose requests and target AP link information
  *
- * This function handles the firmware roam sync indication during SMD roaming.
- * It processes vdev repurpose requests from the sync indication, determines
- * the roaming scenario (multi-to-single or multi-to-multi link roaming), and
- * triggers the Link Reconfiguration State Machine with appropriate add/delete
- * link information. For multi-to-single roaming, it clears add_link_info and
- * populates del_link_info. For multi-to-multi roaming, it builds both add and
- * delete link lists based on current and target AP link information.
+ * Called from cm_fw_roam_sync_req() when wlan_is_smd_roam_sync() returns true.
+ * Processes vdev repurpose requests from the sync indication, determines the
+ * roaming scenario (multi-to-single or multi-to-multi link), and populates
+ * cached_recfg_req with add/delete link information for the Link Recfg SM.
+ * For multi-to-single roaming, clears add_link_info and populates del_link_info.
+ * For multi-to-multi roaming, builds both add and delete link lists based on
+ * current and target AP link information. Returns QDF_STATUS_E_PENDING when SM
+ * execution is deferred; caller must invoke smd_trigger_link_recfg_sm() after
+ * releasing the CM lock.
  *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_PENDING if SM execution
+ *         is deferred, or error code otherwise
  */
 QDF_STATUS
 smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		 struct roam_offload_synch_ind *sync_ind);
 
 /**
- * smd_handle_roam_sync() - Handle SMD roam sync for vdev repurpose requests
- * @vdev: VDEV object
+ * wlan_is_smd_roam_sync() - Check if a ROAM_SYNC event is for SMD execution
  * @sync_ind: Roam offload sync indication from firmware
  *
- * This function checks if vdev repurpose requests are present in the sync
- * indication and invokes smd_fw_roam_sync() to process them.
+ * Returns true when the sync indication carries vdev repurpose requests,
+ * meaning SMD execution must handle the link switches. The LFR3 per-link
+ * sync path must be skipped in this case.
  *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ * Return: true if SMD roam sync, false otherwise
+ */
+bool
+wlan_is_smd_roam_sync(struct roam_offload_synch_ind *sync_ind);
+
+/**
+ * wlan_smd_roam_sync_status() - Normalize status after cm_fw_roam_sync_req()
+ * @status: Status returned by cm_fw_roam_sync_req()
+ *
+ * E_PENDING from cm_fw_roam_sync_req() means SMD async execution started
+ * successfully. Convert it to SUCCESS so mlo_fw_roam_sync_req() does not
+ * clear the link bmap and does not unblock PM prematurely.
+ *
+ * Return: QDF_STATUS_SUCCESS if status was E_PENDING, original status otherwise
  */
 QDF_STATUS
-smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
-		     struct roam_offload_synch_ind *sync_ind);
+wlan_smd_roam_sync_status(QDF_STATUS status);
+
+/**
+ * smd_trigger_link_recfg_sm() - Trigger Link Recfg SM after CM lock release
+ * @vdev: Assoc vdev pointer
+ *
+ * Called from cm_fw_roam_sync_req() after cm_sm_deliver_event() returns
+ * E_PENDING, at which point the CM SM lock is already released. Delivers
+ * WLAN_LINK_RECFG_SM_EV_SMD_ROAM_START using the cached_recfg_req that was
+ * built by smd_fw_roam_sync() under the CM lock.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+smd_trigger_link_recfg_sm(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * smd_handle_cm_roam_sync_pending() - Handle E_PENDING from cm_sm_deliver_event
+ * @vdev: Assoc vdev pointer
+ * @status: Status returned by cm_sm_deliver_event(ROAM_SYNC)
+ *
+ * Called in cm_fw_roam_sync_req() immediately after cm_sm_deliver_event()
+ * returns (CM lock is already released at this point). If status is
+ * E_PENDING it means smd_fw_roam_sync() deferred SM execution; this
+ * function checks smd_roam_in_progress and calls smd_trigger_link_recfg_sm().
+ *
+ * Return: true if E_PENDING was handled (caller should skip RSO stop and
+ *         return), false otherwise.
+ */
+bool
+smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
+				QDF_STATUS status);
+
+/**
+ * smd_exec_complete() - Complete SMD roaming execution
+ * @psoc: Psoc pointer
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * Called from the EV_SMD_ROAM_COMPLETED handler after the last ADD_LINK
+ * completes. Clears SMD flags, frees cached_sync_ind, and delivers
+ * WLAN_CM_SM_EV_ROAM_DONE to the assoc vdev to transition it to CONNECTED.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+smd_exec_complete(struct wlan_objmgr_psoc *psoc,
+		  struct mlo_link_recfg_context *recfg_ctx);
 
 /**
  * smd_roam_link_recfg_set_tx_link_addr() - Set transmit link address for link reconfiguration
@@ -379,14 +441,26 @@ static inline QDF_STATUS
 smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		 struct roam_offload_synch_ind *sync_ind)
 {
-	return QDF_STATUS_E_NOSUPPORT;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool
+smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
+				QDF_STATUS status)
+{
+	return false;
+}
+
+static inline bool
+wlan_is_smd_roam_sync(struct roam_offload_synch_ind *sync_ind)
+{
+	return false;
 }
 
 static inline QDF_STATUS
-smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
-		     struct roam_offload_synch_ind *sync_ind)
+wlan_smd_roam_sync_status(QDF_STATUS status)
 {
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 static inline bool

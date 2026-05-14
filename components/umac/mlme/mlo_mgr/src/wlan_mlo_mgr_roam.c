@@ -397,41 +397,55 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!sync_ind)
 		return QDF_STATUS_E_FAILURE;
 
-	for (i = 0; i < sync_ind->num_setup_links; i++)
-		mlo_update_for_multi_link_roam(psoc, vdev_id,
-					       sync_ind->ml_link[i].vdev_id);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
 
-	if (!sync_ind->num_setup_links) {
-		mlo_debug("MLO_ROAM: Roamed to Legacy");
-		is_non_mlo_ap = true;
-		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
-	} else if (sync_ind->num_setup_links == 1 ||
-		sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
-		mlo_debug("MLO_ROAM: Roamed to single link MLO");
-		mlo_set_single_link_ml_roaming(psoc, vdev_id, true);
-	} else {
-		mlo_debug("MLO_ROAM: Roamed to MLO with %d links",
-			  sync_ind->num_setup_links);
-		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
+	if (!vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (!wlan_is_smd_roam_sync(sync_ind)) {
+		/* LFR3 path only: connect_req_links bmap + single-link flag +
+		 * MAC address update + cross-vdev roam flag.
+		 * Skipped for SMD: ml_link[] data is not used, topology detection
+		 * from num_setup_links would be wrong for per-link ROAM_SYNC events,
+		 * and MAC management is handled by the Link Recfg SM connect flow.
+		 */
+		for (i = 0; i < sync_ind->num_setup_links; i++)
+			mlo_update_for_multi_link_roam(psoc, vdev_id,
+						       sync_ind->ml_link[i].vdev_id);
+
+		if (!sync_ind->num_setup_links) {
+			mlo_debug("MLO_ROAM: Roamed to Legacy");
+			is_non_mlo_ap = true;
+			mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
+		} else if (sync_ind->num_setup_links == 1 ||
+			sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
+			mlo_debug("MLO_ROAM: Roamed to single link MLO");
+			mlo_set_single_link_ml_roaming(psoc, vdev_id, true);
+		} else {
+			mlo_debug("MLO_ROAM: Roamed to MLO with %d links",
+				  sync_ind->num_setup_links);
+			mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
+		}
+
+		status = mlo_roam_update_vdev_macaddr(psoc, sync_ind,
+						      vdev_id, is_non_mlo_ap);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+			return status;
+		}
 	}
 
-	status = mlo_roam_update_vdev_macaddr(psoc, sync_ind,
-					      vdev_id, is_non_mlo_ap);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
-
+	/* Common for both LFR3 and SMD */
 	ml_nlink_conn_change_notify(
 		psoc, vdev_id, ml_nlink_roam_sync_start_evt, NULL);
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_SB_ID);
-	if (vdev) {
-		cm_update_scan_mlme_for_mlo_roam(vdev);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
-	}
-
 	wlan_cm_set_cross_vdev_roam(vdev);
+	cm_update_scan_mlme_for_mlo_roam(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+
 	status = cm_fw_roam_sync_req(psoc, vdev_id, event, event_data_len);
+	status = wlan_smd_roam_sync_status(status);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_clear_link_bmap(psoc, vdev_id);
@@ -546,8 +560,9 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	 * 2. When roamed to single link, num_setup_links = 1
 	 * 3. Roamed to AP with auth_status = ROAMED_AUTH_STATUS_CONNECTED
 	 */
-	if (sync_ind->num_setup_links < 2 ||
-	    sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
+	if (!wlan_is_smd_roam_sync(sync_ind) &&
+	    (sync_ind->num_setup_links < 2 ||
+	    sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED)) {
 		mlme_debug("Roam auth status %d", sync_ind->auth_status);
 		mlo_update_vdev_after_roam(psoc, vdev_id,
 					   sync_ind->num_setup_links);
@@ -558,16 +573,23 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	    g_mlo_ctx->osif_ops->mlo_roam_osif_update_deflink)
 		g_mlo_ctx->osif_ops->mlo_roam_osif_update_deflink(vdev,
 								  vdev_id);
+
+	status = smd_fw_roam_sync(vdev, sync_ind);
+	if (status == QDF_STATUS_E_PENDING)
+		/* SMD async execution started; Link Recfg SM takes over.
+		 * Skip LFR3 per-link for-loop — assoc vdev stays in ROAM_SYNC.
+		 */
+		return QDF_STATUS_E_PENDING;
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
 	/* If EAPOL is offloaded to supplicant, link vdev/s are not up
 	 * at FW, in that case complete roam sync on assoc vdev
 	 * link vdev will be initialized after set key is complete.
 	 */
 	if (sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED)
 		return QDF_STATUS_SUCCESS;
-
-	status = smd_handle_roam_sync(vdev, sync_ind);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
 
 	for (i = 0; i < sync_ind->num_setup_links; i++) {
 		if (vdev_id == sync_ind->ml_link[i].vdev_id)

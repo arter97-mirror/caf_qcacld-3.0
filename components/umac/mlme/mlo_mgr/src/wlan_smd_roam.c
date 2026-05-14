@@ -147,6 +147,81 @@ smd_link_recfg_find_link_info_with_active_vdev(
 }
 
 /**
+ * smd_alloc_copy_roam_sync_ind() - Deep copy roam sync indication into recfg_ctx
+ * @recfg_ctx: Link reconfiguration context
+ * @sync_ind: Source roam sync indication from WMI
+ *
+ * sync_ind is freed by target_if_cm_roam_sync_event() after roam_sync_event()
+ * returns, regardless of status. This function makes a deep copy into
+ * recfg_ctx->cached_sync_ind so the Link Recfg SM can use it asynchronously.
+ *
+ * Deep copy handles:
+ *   - struct body: full qdf_mem_copy
+ *   - ric_tspec_data: allocated and copied if ric_data_len > 0
+ *   - add_bss_params: set to NULL (not needed by SMD link switches)
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+smd_alloc_copy_roam_sync_ind(struct mlo_link_recfg_context *recfg_ctx,
+			     struct roam_offload_synch_ind *sync_ind)
+{
+	recfg_ctx->cached_sync_ind = qdf_mem_malloc(sizeof(*sync_ind));
+	if (!recfg_ctx->cached_sync_ind) {
+		mlo_err("SMD: failed to alloc cached_sync_ind");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(recfg_ctx->cached_sync_ind, sync_ind, sizeof(*sync_ind));
+
+	/* Deep copy ric_tspec_data if present */
+	recfg_ctx->cached_sync_ind->ric_tspec_data = NULL;
+	if (sync_ind->ric_tspec_data && sync_ind->ric_data_len) {
+		recfg_ctx->cached_sync_ind->ric_tspec_data =
+				qdf_mem_malloc(sync_ind->ric_data_len);
+		if (!recfg_ctx->cached_sync_ind->ric_tspec_data) {
+			mlo_err("SMD: failed to alloc ric_tspec_data copy");
+			qdf_mem_free(recfg_ctx->cached_sync_ind);
+			recfg_ctx->cached_sync_ind = NULL;
+			return QDF_STATUS_E_NOMEM;
+		}
+		qdf_mem_copy(recfg_ctx->cached_sync_ind->ric_tspec_data,
+			     sync_ind->ric_tspec_data, sync_ind->ric_data_len);
+	}
+
+	/* add_bss_params has no associated length field and is not
+	 * needed by SMD link switches — set to NULL to prevent use
+	 * of a dangling pointer after the original sync_ind is freed.
+	 */
+	recfg_ctx->cached_sync_ind->add_bss_params = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * smd_free_cached_sync_ind() - Free the deep copy of roam sync indication
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * Frees all memory allocated by smd_alloc_copy_roam_sync_ind():
+ * first the ric_tspec_data buffer (if any), then the struct itself.
+ * Safe to call even if cached_sync_ind is NULL.
+ */
+static void
+smd_free_cached_sync_ind(struct mlo_link_recfg_context *recfg_ctx)
+{
+	if (!recfg_ctx->cached_sync_ind)
+		return;
+
+	if (recfg_ctx->cached_sync_ind->ric_tspec_data) {
+		qdf_mem_free(recfg_ctx->cached_sync_ind->ric_tspec_data);
+		recfg_ctx->cached_sync_ind->ric_tspec_data = NULL;
+	}
+
+	qdf_mem_free(recfg_ctx->cached_sync_ind);
+	recfg_ctx->cached_sync_ind = NULL;
+}
+
+/**
  * smd_validate_repurpose_smd_addr() - Validate SMD address in vdev
  * repurpose request
  * @recfg_ctx: Link reconfiguration context
@@ -900,7 +975,7 @@ smd_roam_prep_ml_to_sl_ml_handler(
 		if (!link_vdev)
 			continue;
 
-		if (cm_is_vdev_connected(link_vdev) || cm_is_vdev_roaming(vdev))
+		if (cm_is_vdev_connected(link_vdev) || cm_is_vdev_roaming(link_vdev))
 			curr_active_links++;
 
 		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
@@ -1427,7 +1502,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		recfg_req->del_link_info.num_links) &&
 		recfg_req->st_exec_link_recfg) {
 		/* Handle ST Exec Request to add Target AP links */
-		mlo_debug("Send ST Exec Request to add Target AP links");
+		mlo_debug("Handle ST Exec Request to add Target AP links");
 		recfg_req->recfg_type = link_recfg_st_exec_add_link;
 		next->req.recfg_type = recfg_req->recfg_type;
 		next->state = WLAN_LINK_RECFG_S_DEL_LINK;
@@ -1595,6 +1670,30 @@ void
 smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
 			bool success)
 {
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
+	if (!psoc) {
+		mlo_err("psoc is null");
+		return;
+	}
+
+	if (!success) {
+		mlo_err("SMD: link recfg completed with failure, aborting");
+		recfg_ctx->smd_roam_in_progress = false;
+		recfg_ctx->st_exec_in_progress = false;
+		smd_free_cached_sync_ind(recfg_ctx);
+		return;
+	}
+
+	/* All link switches complete — deliver ROAM_DONE to assoc vdev */
+	status = smd_exec_complete(psoc, recfg_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("SMD: smd_exec_complete failed: %d", status);
+
+	/* Free the cached copy of sync_ind after the event is delivered */
+	smd_free_cached_sync_ind(recfg_ctx);
 }
 
 void
@@ -1775,22 +1874,18 @@ smd_get_prep_ap_link_info(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 			    struct roam_offload_synch_ind *sync_ind)
 {
-	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct mlo_link_recfg_context *recfg_ctx;
-	struct smd_context *smd_ctx;
-	struct wlan_mlo_link_recfg_req recfg_req = {0};
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS status;
 
 	if (!vdev || !sync_ind) {
 		mlo_err("SMD: Invalid parameters");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		mlo_err("SMD: PSOC is NULL");
-		return QDF_STATUS_E_INVAL;
+	if (!sync_ind->num_vdev_repurpose_req) {
+		mlo_debug("SMD: No vdev repurpose requests");
+		return QDF_STATUS_SUCCESS;
 	}
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
@@ -1805,74 +1900,37 @@ QDF_STATUS smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	smd_ctx = mlo_dev_ctx->smd_ctx;
-	if (!smd_ctx) {
-		mlo_err("SMD: SMD context is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!sync_ind->num_vdev_repurpose_req) {
-		mlo_debug("SMD: No vdev repurpose requests");
-		return status;
+	/* Deep copy sync_ind into recfg_ctx — sync_ind is freed by the
+	 * WMI event handler after roam_sync_event() returns.
+	 */
+	if (QDF_IS_STATUS_ERROR(smd_alloc_copy_roam_sync_ind(recfg_ctx,
+							     sync_ind))) {
+		mlo_err("SMD: failed to copy sync_ind");
+		return QDF_STATUS_E_NOMEM;
 	}
 
 	recfg_ctx->smd_roam_in_progress = true;
+	recfg_ctx->st_exec_in_progress = true;
 	recfg_ctx->num_vdev_repurpose_req = sync_ind->num_vdev_repurpose_req;
 	qdf_mem_copy(&recfg_ctx->vdev_repurpose_req,
 		     &sync_ind->vdev_repurpose_req,
 		     sizeof(struct smd_vdev_repurpose_req) *
 		     recfg_ctx->num_vdev_repurpose_req);
 
+	mlo_debug("SMD: Data copied, num_vdev_repurpose_req=%u, returning E_PENDING",
+		  recfg_ctx->num_vdev_repurpose_req);
+
 	status = smd_validate_repurpose_smd_addr(recfg_ctx, mlo_dev_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlo_err("SMD: SMD address does not match");
+		smd_free_cached_sync_ind(recfg_ctx);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	mlo_debug("SMD: Roam sync started, num_vdev_repurpose_req=%u",
-		  recfg_ctx->num_vdev_repurpose_req);
-
-	qdf_mem_zero(&recfg_req, sizeof(struct wlan_mlo_link_recfg_req));
-
-	/* Check and handle multi-link to single-link roaming scenario */
-	if (smd_handle_multi_to_single_link_roaming(vdev, smd_ctx, recfg_ctx,
-						    &recfg_req)) {
-		mlo_debug("SMD: Multi-to-single link roaming handled, skipping normal flow");
-		goto end;
-	} else {
-		/* Handle multi-link to multi-link roaming scenario */
-		status = smd_handle_multi_to_multi_link_roaming(vdev, smd_ctx, recfg_ctx,
-								&recfg_req);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlo_err("SMD: Multi-to-multi link roaming failed with status %d", status);
-			goto exit;
-		}
-	}
-
-end:
-	recfg_req.vdev_id = wlan_vdev_get_id(vdev);
-	recfg_req.is_user_req = false;  /* SMD roaming is FW-initiated */
-	recfg_req.is_fw_ind_received = true; /* This is from FW roam event */
-	recfg_req.st_prep_link_recfg = false; /* Reset ST Prep req */
-	recfg_req.st_exec_link_recfg = true; /* Set ST exec flag */
-
-	status = smd_update_channel_freq(psoc, &recfg_req);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlo_err("SMD: Failed to find link freq for fw link recfg ind event");
-		goto exit;
-	}
-
-	mlo_debug("SMD: Triggering Link Reconfiguration SM");
-	status = mlo_link_recfg_sm_deliver_event(
-				mlo_dev_ctx,
-				WLAN_LINK_RECFG_SM_EV_SMD_ROAM_START,
-				sizeof(recfg_req), &recfg_req);
-exit:
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlo_err("SMD: Roam sync failed with status %d", status);
-		recfg_ctx->smd_roam_in_progress = false;
-	}
-	return status;
+	/* recfg_req will be built from recfg_ctx in smd_trigger_link_recfg_sm()
+	 * after the CM lock is released by the caller.
+	 */
+	return QDF_STATUS_E_PENDING;
 }
 
 QDF_STATUS
@@ -2170,20 +2228,164 @@ smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
 }
 
-QDF_STATUS smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
-				struct roam_offload_synch_ind *sync_ind)
+QDF_STATUS smd_trigger_link_recfg_sm(struct wlan_objmgr_vdev *vdev)
 {
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_recfg_context *recfg_ctx;
+	struct smd_context *smd_ctx;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlo_link_recfg_req recfg_req = {0};
 	QDF_STATUS status;
 
-	if (sync_ind->num_vdev_repurpose_req) {
-		status = smd_fw_roam_sync(vdev, sync_ind);
+	if (!vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx) {
+		mlo_err("SMD: mlo_dev_ctx or recfg_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (!smd_ctx) {
+		mlo_err("SMD: smd_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlo_err("SMD: psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Build recfg_req from the vdev_repurpose_req already stored in
+	 * recfg_ctx by smd_fw_roam_sync().
+	 */
+	if (smd_handle_multi_to_single_link_roaming(vdev, smd_ctx, recfg_ctx,
+						    &recfg_req)) {
+		mlo_debug("SMD: Multi-to-single link roaming scenario");
+	} else {
+		status = smd_handle_multi_to_multi_link_roaming(vdev, smd_ctx,
+								recfg_ctx,
+								&recfg_req);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			mlo_err("SMD exec handling failed");
-			return status;
+			mlo_err("SMD: multi-link roaming setup failed %d", status);
+			goto fail;
 		}
 	}
 
-	return QDF_STATUS_SUCCESS;
+	recfg_req.vdev_id = wlan_vdev_get_id(vdev);
+	recfg_req.is_user_req = false;
+	recfg_req.is_fw_ind_received = true;
+	recfg_req.st_prep_link_recfg = false;
+	recfg_req.st_exec_link_recfg = true;
+
+	status = smd_update_channel_freq(psoc, &recfg_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD: Failed to find link freq %d", status);
+		goto fail;
+	}
+
+	mlo_debug("SMD: Triggering Link Reconfiguration SM (CM lock released)");
+	return mlo_link_recfg_sm_deliver_event(
+				mlo_dev_ctx,
+				WLAN_LINK_RECFG_SM_EV_SMD_ROAM_START,
+				sizeof(recfg_req), &recfg_req);
+
+fail:
+	recfg_ctx->smd_roam_in_progress = false;
+	recfg_ctx->st_exec_in_progress = false;
+	smd_free_cached_sync_ind(recfg_ctx);
+	return status;
+}
+
+bool smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
+				     QDF_STATUS status)
+{
+	QDF_STATUS trigger_status;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (status != QDF_STATUS_E_PENDING)
+		return false;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (mlo_dev_ctx && mlo_dev_ctx->link_recfg_ctx &&
+	    smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx)) {
+		trigger_status = smd_trigger_link_recfg_sm(vdev);
+		if (QDF_IS_STATUS_ERROR(trigger_status)) {
+			mlo_err("SMD: trigger_link_recfg_sm failed: %d",
+				trigger_status);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+QDF_STATUS
+smd_exec_complete(struct wlan_objmgr_psoc *psoc,
+			struct mlo_link_recfg_context *recfg_ctx)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct roam_offload_synch_ind *sync_ind;
+	uint32_t sync_ind_len;
+	QDF_STATUS status;
+
+	if (!recfg_ctx) {
+		mlo_err("SMD: recfg_ctx is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_dev_ctx = recfg_ctx->ml_dev;
+	if (!mlo_dev_ctx) {
+		mlo_err("SMD: mlo_dev_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				psoc, recfg_ctx->curr_recfg_req.vdev_id,
+				WLAN_MLO_MGR_ID);
+	if (!vdev) {
+		mlo_err("link vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	sync_ind = recfg_ctx->cached_sync_ind;
+	sync_ind_len = sync_ind ? sizeof(*sync_ind) : 0;
+
+	recfg_ctx->smd_roam_in_progress = false;
+	recfg_ctx->st_exec_in_progress = false;
+
+	wlan_cm_tgt_send_roam_sync_complete_cmd(psoc,
+						recfg_ctx->curr_recfg_req.vdev_id);
+
+	/* mlrc_sm_lock may be held by caller; assoc CM lock is NOT held.
+	 * cm_sm_deliver_event acquires assoc CM lock internally — safe.
+	 * Caller (smd_link_recfg_complete) frees cached_sync_ind after return.
+	 */
+	status = cm_sm_deliver_event(vdev,
+				     WLAN_CM_SM_EV_ROAM_DONE,
+				     sync_ind_len, sync_ind);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("SMD: ROAM_DONE delivery failed: %d", status);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+
+	return status;
+}
+
+bool wlan_is_smd_roam_sync(struct roam_offload_synch_ind *sync_ind)
+{
+	return sync_ind && sync_ind->num_vdev_repurpose_req > 0;
+}
+
+QDF_STATUS wlan_smd_roam_sync_status(QDF_STATUS status)
+{
+	if (status == QDF_STATUS_E_PENDING)
+		return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 uint32_t

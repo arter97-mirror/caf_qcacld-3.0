@@ -46,6 +46,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_smd_roam.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_mlo_link_force.h"
 #include <wlan_psoc_mlme_api.h>
@@ -145,6 +146,9 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_SYNC,
 				     event_data_len, event);
 
+	if (smd_handle_cm_roam_sync_pending(vdev, status))
+		goto done;
+
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Roam sync was not handled");
 		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
@@ -152,6 +156,7 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 					  REASON_ROAM_SYNCH_FAILED);
 	}
 
+done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 
 	return status;
