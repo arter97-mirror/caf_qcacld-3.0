@@ -3491,6 +3491,123 @@ lim_process_switch_channel_join_link_add(
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * lim_uhr_nontx_mbssid_redirect_probe_to_tx_ap() - Redirect join probe to TX AP
+ *   for UHR MBSSID non-TX AP connection.
+ *
+ * @mac_ctx:       Global MAC context
+ * @session_entry: PE session for the non-TX MBSSID connection
+ * @bss:           BSS descriptor of the non-TX AP being joined
+ *
+ * UHR CAP IE is absent from beacons and present only in probe responses. For
+ * UHR sessions the probe is redirected to the TX AP BSSID (trans_bssid).
+ *
+ * Caller contract: NSS setup and MLO manager update must be performed before
+ * calling this function (using session->bssId = non-TX BSSID). This function
+ * then swaps session->bssId to trans_bssid, starts timers, and sends the
+ * probe request to the TX AP.
+ *
+ * BSSID swap: pe_find_session_by_bssid() matches incoming frames against
+ * session->bssId. Temporarily replacing it with trans_bssid ensures that
+ * (a) lim_send_probe_req_mgmt_frame() addresses the TX AP, and (b) the TX
+ * AP's probe response is routed back to this session. The original non-TX
+ * BSSID is saved in session->saved_nontx_bssid and restored by the probe
+ * response handler before JOIN_CNF is posted.
+ *
+ * Return:
+ *   QDF_STATUS_SUCCESS    - UHR probe sent; caller must return immediately.
+ *   QDF_STATUS_E_FAILURE  - Timer activation failed; caller must goto error.
+ *   QDF_STATUS_E_NOSUPPORT - Session is not UHR-capable; caller must fall
+ *                            through to the existing skip-probe path.
+ */
+static QDF_STATUS
+lim_uhr_nontx_mbssid_redirect_probe_to_tx_ap(struct mac_context *mac_ctx,
+					     struct pe_session *session_entry,
+					     struct bss_description *bss)
+{
+	if (!lim_is_session_uhr_capable(session_entry))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	pe_debug("vdev %d: UHR MBSSID non-TX: redirect probe to TX AP "
+		 QDF_MAC_ADDR_FMT,
+		 session_entry->vdev_id,
+		 QDF_MAC_ADDR_REF(bss->mbssid_info.trans_bssid));
+
+	/*
+	 * Swap session->bssId to trans_bssid so that the TX AP probe response
+	 * is routed back to this session by pe_find_session_by_bssid().
+	 * Restored in lim_handle_uhr_tx_ap_probe_rsp() before JOIN_CNF.
+	 * Note: MLO mgr update and NSS setup are done by the caller before
+	 * this function is invoked, using session->bssId = non-TX BSSID.
+	 */
+	qdf_mem_copy(session_entry->saved_nontx_bssid, session_entry->bssId,
+		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(session_entry->bssId, bss->mbssid_info.trans_bssid,
+		     QDF_MAC_ADDR_SIZE);
+
+	/*
+	 * Update bcn_filter->sta_bssid to TX AP BSSID so that
+	 * pe_filter_bcn_probe_frame() passes the TX AP probe response.
+	 * Without this update, the filter uses the non-TX BSSID and
+	 * silently drops the TX AP probe response.
+	 */
+	lim_set_bcn_probe_filter(mac_ctx, session_entry, 0);
+
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
+			 session_entry->peSessionId, eLIM_JOIN_FAIL_TIMER));
+	if (tx_timer_activate(&mac_ctx->lim.lim_timers.gLimJoinFailureTimer)
+			!= TX_SUCCESS) {
+		pe_err("vdev %d: UHR MBSSID: couldn't activate join failure timer",
+		       session_entry->vdev_id);
+		/* Undo BSSID swap and filter update on failure */
+		qdf_mem_copy(session_entry->bssId,
+			     session_entry->saved_nontx_bssid,
+			     QDF_MAC_ADDR_SIZE);
+		lim_set_bcn_probe_filter(mac_ctx, session_entry, 0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	lim_process_bcn_tpe_and_set_tpc(mac_ctx, session_entry);
+
+	lim_send_probe_req_mgmt_frame(
+		mac_ctx, session_entry,
+		&session_entry->lim_join_req->addIEScan.length,
+		session_entry->lim_join_req->addIEScan.addIEdata);
+
+	session_entry->uhr_nontx_mbssid_probe_to_tx_ap = true;
+
+	mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId =
+		session_entry->peSessionId;
+	lim_deactivate_and_change_timer(mac_ctx,
+					eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
+	if (tx_timer_activate(
+			&mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer)
+			!= TX_SUCCESS) {
+		pe_err("vdev %d: UHR MBSSID: Periodic JoinReq timer activate failed",
+		       session_entry->vdev_id);
+		lim_deactivate_and_change_timer(mac_ctx, eLIM_JOIN_FAIL_TIMER);
+		qdf_mem_copy(session_entry->bssId,
+			     session_entry->saved_nontx_bssid,
+			     QDF_MAC_ADDR_SIZE);
+		lim_set_bcn_probe_filter(mac_ctx, session_entry, 0);
+		session_entry->uhr_nontx_mbssid_probe_to_tx_ap = false;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	session_entry->join_probe_cnt++;
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+lim_uhr_nontx_mbssid_redirect_probe_to_tx_ap(struct mac_context *mac_ctx,
+					     struct pe_session *session_entry,
+					     struct bss_description *bss)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BN */
+
 /**
  * lim_process_switch_channel_join_req() -Initiates probe request
  *
@@ -3621,6 +3738,20 @@ static void lim_process_switch_channel_join_req(
 							       session_entry);
 		if (QDF_IS_STATUS_ERROR(mlo_status))
 			goto error;
+
+		/*
+		 * For UHR MBSSID non-TX AP, redirect the probe to the TX AP
+		 * BSSID to acquire full UHR CAP and UHR OP IEs which are absent
+		 * from beacons. For non-UHR sessions this returns E_NOSUPPORT
+		 * and we fall through to post JOIN_CNF immediately.
+		 */
+		mlo_status = lim_uhr_nontx_mbssid_redirect_probe_to_tx_ap(
+						mac_ctx, session_entry, bss);
+		if (mlo_status == QDF_STATUS_SUCCESS)
+			return;
+		if (mlo_status == QDF_STATUS_E_FAILURE)
+			goto error;
+		/* QDF_STATUS_E_NOSUPPORT: non-UHR session, fall through */
 
 		session_entry->limMlmState = eLIM_MLM_JOINED_STATE;
 		join_cnf.sessionId = session_entry->peSessionId;

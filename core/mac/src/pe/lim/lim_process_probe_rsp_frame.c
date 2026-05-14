@@ -44,6 +44,8 @@
 #include "lim_mlo.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "parser_api.h"
+#include <wlan_mlme_api.h>
+#include "wlan_scan_utils_api.h"
 
 /**
  * lim_validate_ie_information_in_probe_rsp_frame () - validates ie
@@ -320,6 +322,113 @@ lim_validate_probe_rsp_mld_addr(struct pe_session *session,
 	return true;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * lim_handle_uhr_tx_ap_probe_rsp() - Handle TX AP probe response during
+ *   UHR MBSSID non-TX AP connection.
+ *
+ * @mac_ctx:       Global MAC context
+ * @session_entry: PE session for the non-TX AP being joined
+ * @probe_rsp:     Parsed probe response frame
+ * @ie_start:      Probe response IE pointer
+ * @ie_len:        Probe response len
+ *
+ * When joining a UHR MBSSID non-TX AP, the join probe was redirected to the
+ * TX AP (trans_bssid) since the TX AP's UHR CAP IE is only present in probe
+ * responses. This handler intercepts the TX AP probe response, extracts the
+ * UHR IEs, stops the join timers, restores the non-TX BSSID, and posts
+ * JOIN_CNF to proceed to authentication against the non-TX AP.
+ *
+ * Must be called before lim_update_mlo_mgr_prb_info() to prevent the TX AP
+ * frame from being silently dropped in MLO sessions.
+ *
+ * Return: true if handled (caller must goto mem_free), false otherwise.
+ */
+static bool
+lim_handle_uhr_tx_ap_probe_rsp(struct mac_context *mac_ctx,
+			       struct pe_session *session_entry,
+			       tSirProbeRespBeacon *probe_rsp,
+			       uint8_t *ie_start,
+			       uint32_t ie_len)
+{
+	struct qdf_mac_addr nontx_bssid;
+	tLimMlmJoinCnf join_cnf;
+
+	if (session_entry->limMlmState != eLIM_MLM_WT_JOIN_BEACON_STATE ||
+	    !session_entry->uhr_nontx_mbssid_probe_to_tx_ap)
+		return false;
+
+	pe_debug("vdev %d: UHR MBSSID non-TX: TX AP probe rsp, extracting UHR IEs",
+		 session_entry->vdev_id);
+
+	/* UHR CAP intersection happens at assoc response time */
+	if (!probe_rsp->uhr_cap_ie.present)
+		pe_warn("vdev %d: TX AP probe rsp missing UHR CAP IE",
+			session_entry->vdev_id);
+
+	/* Extract full UHR OP IE from TX AP probe response */
+	if (probe_rsp->uhr_op_ie.present) {
+		qdf_mem_copy(&session_entry->uhr_op_ie, &probe_rsp->uhr_op_ie,
+			     sizeof(session_entry->uhr_op_ie));
+		pe_debug("vdev %d: UHR OP updated from TX AP: dps=%d npca=%d dbe=%d pedca=%d",
+			 session_entry->vdev_id,
+			 probe_rsp->uhr_op_ie.dps_enabled,
+			 probe_rsp->uhr_op_ie.npca_enabled,
+			 probe_rsp->uhr_op_ie.dbe_enabled,
+			 probe_rsp->uhr_op_ie.p_edca_enabled);
+	}
+
+	/*
+	 * Edge case: session->dot11mode was EHT because the non-TX profile
+	 * excluded UHR OP via non-inheritance, but the TX AP probe rsp
+	 * confirms UHR capability. Upgrade the session to UHR mode.
+	 */
+	if (!IS_DOT11_MODE_UHR(session_entry->dot11mode) &&
+	    probe_rsp->uhr_op_ie.present) {
+		pe_debug("vdev %d: UHR MBSSID: upgrading dot11mode EHT -> UHR",
+			 session_entry->vdev_id);
+		session_entry->dot11mode = MLME_DOT11_MODE_11BN;
+		lim_update_session_uhr_capable(session_entry, true);
+		lim_copy_join_req_uhr_cap(session_entry);
+	}
+
+	lim_deactivate_and_change_timer(mac_ctx, eLIM_JOIN_FAIL_TIMER);
+	lim_deactivate_and_change_timer(mac_ctx,
+					eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
+
+	/* Update non-TX scan entry with full UHR IEs from TX probe rsp */
+	qdf_mem_copy(&nontx_bssid, session_entry->saved_nontx_bssid,
+		     QDF_MAC_ADDR_SIZE);
+	util_scan_update_nontx_entry_uhr_ies(mac_ctx->pdev, &nontx_bssid,
+					     ie_start, ie_len);
+
+	/* Restore non-TX BSSID before posting JOIN_CNF */
+	qdf_mem_copy(session_entry->bssId, session_entry->saved_nontx_bssid,
+		     QDF_MAC_ADDR_SIZE);
+	session_entry->uhr_nontx_mbssid_probe_to_tx_ap = false;
+	/* Restore filter->sta_bssid back to non-TX BSSID */
+	lim_set_bcn_probe_filter(mac_ctx, session_entry, 0);
+
+	session_entry->limMlmState    = eLIM_MLM_JOINED_STATE;
+	join_cnf.sessionId      = session_entry->peSessionId;
+	join_cnf.resultCode     = eSIR_SME_SUCCESS;
+	join_cnf.protStatusCode = STATUS_SUCCESS;
+	lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF, (uint32_t *)&join_cnf);
+	return true;
+}
+#else
+static inline bool
+lim_handle_uhr_tx_ap_probe_rsp(struct mac_context *mac_ctx,
+			       struct pe_session *session_entry,
+			       tSirProbeRespBeacon *probe_rsp,
+			       uint8_t *ie_start,
+			       uint32_t ie_len)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BN */
+
 /**
  * lim_process_probe_rsp_frame() - processes received Probe Response frame
  * @mac_ctx: Pointer to Global MAC structure
@@ -404,6 +513,17 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	}
 
 	if (!lim_validate_probe_rsp_mld_addr(session_entry, probe_rsp))
+		goto mem_free;
+
+	/*
+	 * UHR MBSSID non-TX AP: if we are waiting for a TX AP probe rsp,
+	 * handle it here before any MLO or session checks that may filter
+	 * by BSSID. Returns true and completes the join if handled.
+	 * ie_start = body + 12 skips the fixed-length probe response header
+	 * (timestamp 8B + beacon interval 2B + capability 2B).
+	 */
+	if (lim_handle_uhr_tx_ap_probe_rsp(mac_ctx, session_entry, probe_rsp,
+					   body + 12, frame_len - 12))
 		goto mem_free;
 
 	status =

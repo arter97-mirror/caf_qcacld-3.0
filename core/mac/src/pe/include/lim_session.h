@@ -765,6 +765,8 @@ struct punc_chan_info {
  * @ap_uhr_cap: UHR capabilities advertised by the AP
  * @passthru_pending_create_only: one-shot flag set before
  *   lim_add_sta() for passthru NEW action, cleared after
+ * @uhr_nontx_mbssid_probe_to_tx_ap: probe req sent to TX AP BSSID
+ * @saved_nontx_bssid: saved non-TX BSSID during UHR MBSSID probe redirect
  */
 struct pe_session {
 	uint8_t available;
@@ -1120,6 +1122,9 @@ struct pe_session {
 	uint16_t uhr_op_ie_len;
 	uint16_t uhr_cap_ie_len;
 	struct wlan_uhr_cap_info ap_uhr_cap;
+	/* UHR MBSSID non-TX AP probe redirect state */
+	bool uhr_nontx_mbssid_probe_to_tx_ap;
+	tSirMacAddr saved_nontx_bssid;
 #endif
 #ifdef DRIVER_PASSTHRU_MODE
 	/* one-shot flag set before lim_add_sta(NEW), cleared after */
