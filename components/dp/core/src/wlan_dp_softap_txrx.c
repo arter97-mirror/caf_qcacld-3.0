@@ -636,7 +636,7 @@ static void dp_softap_config_tx_pkt_tracing(struct wlan_dp_intf *dp_intf,
 	DPTRACE(qdf_dp_trace(nbuf, QDF_DP_TRACE_TX_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,
 			     qdf_nbuf_data_addr(nbuf),
-			     sizeof(qdf_nbuf_data(nbuf)),
+			     qdf_nbuf_len(nbuf),
 			     QDF_TX));
 }
 
@@ -1150,7 +1150,7 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *link_ctx, qdf_nbuf_t rx_buf)
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
 				     qdf_nbuf_data_addr(nbuf),
-				     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
+				     qdf_nbuf_len(nbuf), QDF_RX));
 		DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
 					      QDF_DP_TRACE_RX_PACKET_RECORD,
 					      0, QDF_RX));

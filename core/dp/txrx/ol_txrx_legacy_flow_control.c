@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -303,7 +303,7 @@ ol_tx_vdev_pause_queue_append(struct ol_txrx_vdev_t *vdev,
 			QDF_DP_TRACE_TXRX_QUEUE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(msdu_list),
-			sizeof(qdf_nbuf_data(msdu_list)), QDF_TX));
+			qdf_nbuf_len(msdu_list), QDF_TX));
 
 		vdev->ll_pause.txq.depth++;
 		if (!vdev->ll_pause.txq.head) {
