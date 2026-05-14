@@ -7724,6 +7724,10 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 	}
 
 	roam_invoke_req->vdev_id = vdev_id;
+
+	if (req->roam_req.req.source == CM_ROAMING_STA_SAP_MCC)
+		roam_invoke_req->skip_full_scan = true;
+
 	if (roam_req->req.forced_roaming) {
 		roam_invoke_req->forced_roaming = true;
 		goto send_cmd;
