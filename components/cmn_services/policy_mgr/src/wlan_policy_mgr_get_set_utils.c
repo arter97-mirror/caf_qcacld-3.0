@@ -13137,7 +13137,9 @@ bool policy_mgr_is_sap_target_freq_mcc_with_sta(struct wlan_objmgr_psoc *psoc,
 		return false;
 
 	vdev_mode = policy_mgr_get_mode_by_vdev_id(psoc, vdev_id);
-	if (vdev_mode != PM_SAP_MODE && vdev_mode != PM_P2P_GO_MODE)
+	if (vdev_mode != PM_SAP_MODE &&
+	    (vdev_mode != PM_P2P_GO_MODE ||
+	     !policy_mgr_concurrent_beaconing_sessions_running(psoc)))
 		return false;
 
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, sta_freq_list,
