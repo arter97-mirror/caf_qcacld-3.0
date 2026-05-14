@@ -1165,6 +1165,9 @@ typedef struct {
 	A_INT32 wow_wakeup_reason;
 	uint8_t wow_wakeup_vdev_id;
 	bool wow_wakeup_reason_valid;
+#ifdef CONFIG_NO_QMI
+	struct wma_athdiag_wmi_sync athdiag_sync;
+#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**

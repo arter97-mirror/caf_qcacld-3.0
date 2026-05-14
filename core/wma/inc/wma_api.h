@@ -1098,4 +1098,92 @@ void wma_acquire_key_op_wakelock(void);
  */
 void wma_release_key_op_wakelock(void);
 
+#ifdef CONFIG_NO_QMI
+/* Timeout for waiting for WMI_ATHDIAG_READ_WRITE_EVENTID response (ms) */
+#define WMA_ATHDIAG_WMI_TIMEOUT_MS  100
+
+/**
+ * struct wma_athdiag_wmi_sync - Synchronization for athdiag WMI operations
+ *
+ * @athdiag_event:  completion signaled by the WMI event handler
+ * @data:           caller's output buffer pointer; valid for the lifetime of
+ *                  the in-flight operation
+ * @data_len:       size of caller's output buffer
+ * @fw_status:      status code returned by firmware (0 = success)
+ * @athdiag_lock:   serializes concurrent callers; held for the full duration
+ *                  of setup, WMI send, and event wait. The event handler does
+ *                  NOT acquire this lock — taking it there would deadlock
+ *                  since
+ *                  the caller holds it while sleeping on athdiag_event.
+ * @pending:        atomic flag; non-zero while an operation is in flight.
+ *                  Written by both the caller and the event handler without
+ *                  the lock, so must be an atomic type.
+ */
+struct wma_athdiag_wmi_sync {
+	qdf_event_t athdiag_event;
+	uint8_t *data;
+	uint32_t data_len;
+	uint32_t fw_status;
+	qdf_mutex_t athdiag_lock;
+	qdf_atomic_t pending;
+};
+
+/**
+ * wma_athdiag_read_write() - WMI-based athdiag read/write
+ * @offset: target register/memory address
+ * @memtype: memory region type
+ * @datalen: number of bytes to read/write
+ * @buf: data buffer (output for read, input for write)
+ * @is_write: true for write operation, false for read
+ *
+ * Sends WMI_ATHDIAG_READ_WRITE_CMDID and blocks until firmware
+ * responds with WMI_ATHDIAG_READ_WRITE_EVENTID or timeout occurs.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF status failure codes otherwise.
+ */
+QDF_STATUS wma_athdiag_read_write(uint32_t offset, uint32_t memtype,
+				  uint32_t datalen, uint8_t *buf,
+				  bool is_write);
+
+/**
+ * wma_athdiag_register_event_handler() - Register athdiag WMI event handler
+ * @handle: WMA Handle
+ *
+ * Registers WMI_ATHDIAG_READ_WRITE_EVENTID handler and initializes
+ * the sync primitives used by wma_athdiag_read_write().
+ *
+ * Return: 0 or other error codes.
+ */
+QDF_STATUS wma_athdiag_register_event_handler(WMA_HANDLE handle);
+
+/**
+ * wma_athdiag_unregister_event_handler() - Unregister athdiag WMI event handler
+ * @handle: WMA Handle
+ *
+ * Unregisters WMI_ATHDIAG_READ_WRITE_EVENTID handler and destroys
+ * the sync primitives initialized by wma_athdiag_register_event_handler().
+ *
+ * Return: None
+ */
+void wma_athdiag_unregister_event_handler(WMA_HANDLE handle);
+#else
+static inline QDF_STATUS wma_athdiag_read_write(uint32_t offset,
+						uint32_t memtype,
+						uint32_t datalen,
+						uint8_t *buf, bool is_write)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wma_athdiag_register_event_handler(WMA_HANDLE handle)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void wma_athdiag_unregister_event_handler(WMA_HANDLE handle)
+{
+}
+#endif /* CONFIG_NO_QMI */
+
 #endif /* WMA_API_H */

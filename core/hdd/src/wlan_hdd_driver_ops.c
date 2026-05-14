@@ -90,6 +90,37 @@ static inline void hdd_remove_pm_qos(struct device *dev)
 	pld_remove_pm_qos(dev);
 }
 
+#ifdef CONFIG_NO_QMI
+/**
+ * hdd_hif_athdiag_read_write() - HIF callback for athdiag read/write via WMI
+ * @offset: target register/memory address
+ * @memtype: memory region type
+ * @datalen: number of bytes to read/write
+ * @buf: data buffer (output for read, input for write)
+ * @is_write: true for write operation, false for read
+ *
+ * Return: 0 or other error codes.
+ */
+static int hdd_hif_athdiag_read_write(uint32_t offset, uint32_t memtype,
+				      uint32_t datalen, uint8_t *buf,
+				      bool is_write)
+{
+	QDF_STATUS status;
+
+	status = wma_athdiag_read_write(offset, memtype, datalen, buf,
+					is_write);
+
+	return qdf_status_to_os_return(status);
+}
+#else
+static inline int hdd_hif_athdiag_read_write(uint32_t offset,
+					     uint32_t memtype, uint32_t datalen,
+					     uint8_t *buf, bool is_write)
+{
+	return -EOPNOTSUPP;
+}
+#endif /* CONFIG_NO_QMI */
+
 /**
  * hdd_get_bandwidth_level() - get current bandwidth level
  * @data: Context
@@ -399,6 +430,7 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 		hdd_dp_prealloc_get_multi_pages;
 	cbk->prealloc_put_multi_pages =
 		hdd_dp_prealloc_put_multi_pages;
+	cbk->athdiag_read_write = hdd_hif_athdiag_read_write;
 }
 
 #ifdef HIF_DETECTION_LATENCY_ENABLE

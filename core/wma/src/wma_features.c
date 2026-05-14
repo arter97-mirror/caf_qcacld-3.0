@@ -5835,6 +5835,261 @@ QDF_STATUS wma_sar_register_event_handlers(WMA_HANDLE handle)
 						  WMA_RX_WORK_CTX);
 }
 
+#ifdef CONFIG_NO_QMI
+QDF_STATUS wma_athdiag_read_write(uint32_t offset, uint32_t memtype,
+				  uint32_t datalen, uint8_t *buf, bool is_write)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	struct wmi_athdiag_read_write_cmd_params params = {0};
+	QDF_STATUS status;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if (!wma_handle) {
+		wma_err("WMA handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (wmi_validate_handle(wma_handle->wmi_handle)) {
+		wma_err("WMI handle is invalid");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * Hold athdiag_lock across setup, WMI send, and event wait to
+	 * serialize concurrent callers. The event handler does not take
+	 * this lock.
+	 */
+	qdf_mutex_acquire(&wma_handle->athdiag_sync.athdiag_lock);
+
+	wma_handle->athdiag_sync.data = buf;
+	wma_handle->athdiag_sync.data_len = datalen;
+	wma_handle->athdiag_sync.fw_status = 0;
+	qdf_atomic_set(&wma_handle->athdiag_sync.pending, 1);
+	qdf_event_reset(&wma_handle->athdiag_sync.athdiag_event);
+
+	params.offset   = offset;
+	params.mem_type = memtype;
+	params.data_length = datalen;
+	params.is_write = is_write ? 1 : 0;
+	params.data     = buf;
+
+	wma_debug("athdiag %s via WMI: offset=0x%x memtype=%u datalen=%u",
+		  is_write ? "write" : "read", offset, memtype, datalen);
+
+	status = wmi_unified_athdiag_read_write_cmd(wma_handle->wmi_handle,
+						    &params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to send athdiag %s cmd: %d",
+			is_write ? "write" : "read", status);
+		qdf_atomic_set(&wma_handle->athdiag_sync.pending, 0);
+		qdf_mutex_release(&wma_handle->athdiag_sync.athdiag_lock);
+		return status;
+	}
+
+	/*
+	 * Block until wma_athdiag_read_write_event_handler() signals
+	 * completion after receiving WMI_ATHDIAG_READ_WRITE_EVENTID
+	 * from firmware. This applies to both read and write operations
+	 * to ensure firmware acknowledgment before returning to the caller.
+	 */
+	status = qdf_wait_single_event(&wma_handle->athdiag_sync.athdiag_event,
+				       WMA_ATHDIAG_WMI_TIMEOUT_MS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("athdiag %s WMI event timed out (offset=0x%x)",
+			is_write ? "write" : "read", offset);
+		qdf_atomic_set(&wma_handle->athdiag_sync.pending, 0);
+		wma_handle->athdiag_sync.fw_status = 0;
+		ret = status;
+		goto out;
+	}
+
+	if (wma_handle->athdiag_sync.fw_status) {
+		wma_err("athdiag %s failed: fw_status=%u offset=0x%x",
+			is_write ? "write" : "read",
+			wma_handle->athdiag_sync.fw_status, offset);
+		ret = QDF_STATUS_E_IO;
+	}
+
+out:
+	qdf_mutex_release(&wma_handle->athdiag_sync.athdiag_lock);
+	return ret;
+}
+
+/**
+ * wma_athdiag_read_write_event_handler() - handle
+ * WMI_ATHDIAG_READ_WRITE_EVENTID
+ * @handle: wma handle
+ * @evt_buf: event buffer
+ * @len: length of event buffer
+ *
+ * Copies firmware data into the caller's buffer and signals
+ * athdiag_sync.athdiag_event to unblock wma_athdiag_read_write().
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wma_athdiag_read_write_event_handler(void *handle,
+						uint8_t *evt_buf,
+						uint32_t len)
+{
+	tp_wma_handle wma_handle;
+	wmi_unified_t wmi_handle;
+	struct wmi_athdiag_read_write_event_params params;
+	QDF_STATUS status;
+
+	wma_debug("handle:%pK event:%pK len:%u", handle, evt_buf, len);
+
+	wma_handle = handle;
+	if (wma_validate_handle(wma_handle))
+		return -EINVAL;
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return -EINVAL;
+
+	status = wmi_unified_extract_athdiag_read_write_event(wmi_handle,
+							      evt_buf,
+							      &params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to extract athdiag read/write event: %d",
+			status);
+		if (qdf_atomic_read(&wma_handle->athdiag_sync.pending)) {
+			wma_handle->athdiag_sync.fw_status = 1;
+			qdf_atomic_set(&wma_handle->athdiag_sync.pending, 0);
+			qdf_event_set(&wma_handle->athdiag_sync.athdiag_event);
+		}
+		return -EINVAL;
+	}
+
+	wma_debug("athdiag event: is_write=%d status=%d data_len=%u",
+		  params.is_write, params.status,
+		  params.data_length);
+
+	/*
+	 * pending != 0 means a valid operation is in flight.
+	 * If zero, the sender already timed out; discard stale event.
+	 */
+	if (qdf_atomic_read(&wma_handle->athdiag_sync.pending)) {
+		if (!params.is_write) {
+			/* For read: copy firmware data into caller's buffer */
+			if (params.status != 0) {
+				wma_err("athdiag read fw error: status=%u",
+					params.status);
+				wma_handle->athdiag_sync.fw_status =
+							params.status;
+			} else if (!params.data) {
+				wma_err("athdiag read: fw returned NULL data pointer");
+				wma_handle->athdiag_sync.fw_status = 1;
+			} else if (params.data_length >
+				   wma_handle->athdiag_sync.data_len) {
+				wma_err("athdiag read: fw len %u exceeds buf %u",
+					params.data_length,
+					wma_handle->athdiag_sync.data_len);
+				wma_handle->athdiag_sync.fw_status = 1;
+			} else {
+				memcpy(wma_handle->athdiag_sync.data,
+				       params.data, params.data_length);
+				wma_debug("athdiag read: copied %u bytes to caller buf",
+					  params.data_length);
+				wma_handle->athdiag_sync.fw_status = 0;
+			}
+		} else {
+			/* For write: set fw_status and log acknowledgment */
+			wma_handle->athdiag_sync.fw_status = params.status;
+			if (params.status != 0)
+				wma_err("athdiag write fw error: status=%u",
+					params.status);
+			else
+				wma_debug("athdiag write: firmware acknowledged successfully");
+		}
+		qdf_atomic_set(&wma_handle->athdiag_sync.pending, 0);
+		qdf_event_set(&wma_handle->athdiag_sync.athdiag_event);
+	}
+
+	return 0;
+}
+
+/**
+ * wma_athdiag_register_event_handler() - Register athdiag WMI event handler
+ * @handle: WMA Handle
+ *
+ * Registers WMI_ATHDIAG_READ_WRITE_EVENTID handler and initializes
+ * the sync primitives used by wma_athdiag_read_write().
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS wma_athdiag_register_event_handler(WMA_HANDLE handle)
+{
+	tp_wma_handle wma_handle = handle;
+	wmi_unified_t wmi_handle;
+	QDF_STATUS status;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	status = qdf_mutex_create(&wma_handle->athdiag_sync.athdiag_lock);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to create athdiag mutex");
+		goto err_mutex_create;
+	}
+
+	status = qdf_event_create(&wma_handle->athdiag_sync.athdiag_event);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to create athdiag event");
+		goto err_event_create;
+	}
+
+	wma_handle->athdiag_sync.data = NULL;
+	wma_handle->athdiag_sync.data_len = 0;
+	wma_handle->athdiag_sync.fw_status = 0;
+	qdf_atomic_init(&wma_handle->athdiag_sync.pending);
+
+	status = wmi_unified_register_event_handler(
+					wmi_handle,
+					wmi_athdiag_read_write_eventid,
+					wma_athdiag_read_write_event_handler,
+					WMA_RX_WORK_CTX);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to register athdiag WMI event handler");
+		goto err_register_event_handler;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+err_register_event_handler:
+	qdf_event_destroy(&wma_handle->athdiag_sync.athdiag_event);
+err_event_create:
+	qdf_mutex_destroy(&wma_handle->athdiag_sync.athdiag_lock);
+err_mutex_create:
+	return status;
+}
+
+/**
+ * wma_athdiag_unregister_event_handler() - Unregister athdiag WMI event handler
+ * @handle: WMA Handle
+ *
+ * Unregisters WMI_ATHDIAG_READ_WRITE_EVENTID handler and destroys
+ * the sync primitives initialized by wma_athdiag_register_event_handler().
+ *
+ * Return: None
+ */
+void wma_athdiag_unregister_event_handler(WMA_HANDLE handle)
+{
+	tp_wma_handle wma_handle = handle;
+
+	if (wma_validate_handle(wma_handle))
+		return;
+
+	wmi_unified_unregister_event_handler(wma_handle->wmi_handle,
+					     wmi_athdiag_read_write_eventid);
+	qdf_event_destroy(&wma_handle->athdiag_sync.athdiag_event);
+	qdf_mutex_destroy(&wma_handle->athdiag_sync.athdiag_lock);
+}
+#endif /* CONFIG_NO_QMI */
+
 QDF_STATUS wma_get_sar_limit(WMA_HANDLE handle,
 			     wma_sar_cb callback, void *context)
 {

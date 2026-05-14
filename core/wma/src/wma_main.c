@@ -4272,6 +4272,13 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_register_mws_coex_events(wma_handle);
 	wma_register_passthru_events(wma_handle);
 	wma_trace_init();
+
+	qdf_status = wma_athdiag_register_event_handler(wma_handle);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("Failed to register athdiag event handler");
+		goto err_dbglog_init;
+	}
+
 	return QDF_STATUS_SUCCESS;
 
 err_dbglog_init:
@@ -5327,6 +5334,8 @@ QDF_STATUS wma_close(void)
 	qdf_status = qdf_mutex_destroy(&wma_handle->radio_stats_lock);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		wma_err("Failed to destroy radio stats mutex");
+
+	wma_athdiag_unregister_event_handler(wma_handle);
 
 	if (wma_handle->pdev) {
 		wlan_objmgr_pdev_release_ref(wma_handle->pdev,
