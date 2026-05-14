@@ -977,13 +977,14 @@ cleanup:
 }
 
 int osif_twt_send_requestor_enable_cmd(struct wlan_objmgr_psoc *psoc,
-				       uint8_t pdev_id)
+				       uint8_t pdev_id, uint8_t vdev_id)
 {
 	struct twt_enable_param req = {0};
 	int ret = 0;
 	QDF_STATUS status;
 
 	req.pdev_id = pdev_id;
+	req.vdev_id = vdev_id;
 	req.ext_conf_present = true;
 
 	status = ucfg_twt_set_requestor_enable_cmd_in_progress(psoc);
@@ -1011,11 +1012,13 @@ int osif_twt_send_responder_enable_cmd(struct wlan_objmgr_psoc *psoc,
 }
 
 int osif_twt_send_requestor_disable_cmd(struct wlan_objmgr_psoc *psoc,
-					uint8_t pdev_id, uint32_t reason)
+					uint8_t pdev_id, uint32_t reason,
+					uint8_t vdev_id)
 {
 	struct twt_disable_param req = {0};
 
 	req.pdev_id = pdev_id;
+	req.vdev_id = vdev_id;
 	req.ext_conf_present = true;
 	req.dis_reason_code = reason;
 
@@ -1191,7 +1194,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	if (congestion_timeout) {
 		reason = HOST_TWT_DISABLE_REASON_CHANGE_CONGESTION_TIMEOUT;
 		ret = osif_twt_send_requestor_disable_cmd(psoc, mac_id,
-							  reason);
+							  reason, vdev_id);
 		if (ret) {
 			osif_err("Failed to disable TWT");
 			return -EOPNOTSUPP;
@@ -1199,7 +1202,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	}
 	ucfg_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, 0);
 
-	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id);
+	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id, vdev_id);
 	if (ret) {
 		osif_err("Failed to Enable TWT");
 		ret = -EOPNOTSUPP;
@@ -1779,7 +1782,8 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 		osif_debug("Concurrency exist on STA/P2P CLI vdev");
 		if (twt_arg->p2p_r2_mode || twt_arg->pcc_mode) {
 			status = osif_twt_send_requestor_enable_cmd(psoc,
-								    mac_id);
+								    mac_id,
+								    vdev_id);
 		} else {
 			if (policy_mgr_current_concurrency_is_mcc(psoc))
 				reason =
@@ -1790,7 +1794,8 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 
 			status = osif_twt_send_requestor_disable_cmd(psoc,
 								     mac_id,
-								     reason);
+								     reason,
+								     vdev_id);
 		}
 		if (QDF_IS_STATUS_ERROR(status)) {
 			osif_err("TWT requestor cmd to fw failed");
@@ -1879,7 +1884,8 @@ osif_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 		fallthrough;
 	case QDF_STA_MODE:
 		osif_debug("Concurrency exist on STA/P2P CLI vdev");
-		status = osif_twt_send_requestor_enable_cmd(psoc, mac_id);
+		status = osif_twt_send_requestor_enable_cmd(psoc, mac_id,
+							    vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			osif_err("TWT requestor enable cmd to fw failed");
 			return;
@@ -1944,7 +1950,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 			mac_id = policy_mgr_mode_get_macid_by_vdev_id(
 					pdev->pdev_objmgr.wlan_psoc,
 					vdev_id_list[0]);
-			osif_twt_send_requestor_enable_cmd(psoc, mac_id);
+			osif_twt_send_requestor_enable_cmd(psoc, mac_id,
+							   vdev_id_list[0]);
 		} else if (sap_count || (p2p_go_count &&
 			   (osif_twt_is_p2p_go_wfd_r2_mode(psoc) ||
 			    osif_twt_is_p2p_go_in_pcc_mode(psoc)))) {
@@ -1967,7 +1974,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 
 			reason = HOST_TWT_DISABLE_REASON_NONE;
 			osif_twt_send_requestor_disable_cmd(psoc, mac_id,
-							    reason);
+							    reason,
+							    vdev_id_list[0]);
 			ucfg_twt_cfg_get_responder(psoc, &twt_res_cfg);
 			status = osif_twt_send_responder_disable_per_vdev(
 								psoc,

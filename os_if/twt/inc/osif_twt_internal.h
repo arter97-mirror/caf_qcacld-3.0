@@ -44,11 +44,12 @@ struct twt_conc_context {
  * target
  * @psoc: pointer to global psoc structure
  * @mac_id: mac id
+ * @vdev_id: vdev id (WLAN_INVALID_VDEV_ID for pdev-level fallback)
  *
  * Return: errno
  */
 int osif_twt_send_requestor_enable_cmd(struct wlan_objmgr_psoc *psoc,
-				       uint8_t mac_id);
+				       uint8_t mac_id, uint8_t vdev_id);
 
 /**
  * osif_twt_send_responder_enable_cmd() - Send TWT responder enable command to
@@ -67,11 +68,13 @@ int osif_twt_send_responder_enable_cmd(struct wlan_objmgr_psoc *psoc,
  * @psoc: pointer to global psoc structure
  * @mac_id: mac id
  * @reason: disable reason code
+ * @vdev_id: vdev id (WLAN_INVALID_VDEV_ID for pdev-level fallback)
  *
  * Return: errno
  */
 int osif_twt_send_requestor_disable_cmd(struct wlan_objmgr_psoc *psoc,
-					uint8_t mac_id, uint32_t reason);
+					uint8_t mac_id, uint32_t reason,
+					uint8_t vdev_id);
 
 /**
  * osif_twt_send_responder_disable_cmd() - Send TWT responder disable command
@@ -109,14 +112,15 @@ void osif_twt_teardown_in_ps_disable(struct wlan_objmgr_psoc *psoc,
 #else
 static inline
 int osif_twt_send_requestor_disable_cmd(struct wlan_objmgr_psoc *psoc,
-					uint8_t pdev_id, uint32_t reason)
+					uint8_t pdev_id, uint32_t reason,
+					uint8_t vdev_id)
 {
 	return 0;
 }
 
 static inline
 int osif_twt_send_requestor_enable_cmd(struct wlan_objmgr_psoc *psoc,
-				       uint8_t pdev_id)
+				       uint8_t pdev_id, uint8_t vdev_id)
 {
 	return 0;
 }
@@ -141,4 +145,3 @@ void osif_twt_teardown_in_ps_disable(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 #endif /* _OSIF_TWT_INTERNAL_H_ */
-
