@@ -1655,7 +1655,7 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
  * version supported and the operations table.
  */
 static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
-	.ver = WONDER_VERSION_1_6_1,
+	.ver = WONDER_VERSION_1_6_4,
 	.wonder_ops = &wlan_drv_wondertap_ops,
 };
 
