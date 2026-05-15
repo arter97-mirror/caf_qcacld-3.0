@@ -496,5 +496,12 @@ smd_link_recfg_assign_self_link_addr(
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline QDF_STATUS
+smd_validate_repurpose_smd_addr(struct mlo_link_recfg_context *recfg_ctx,
+				struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif /* WLAN_FEATURE_11BN_SMD */
 #endif

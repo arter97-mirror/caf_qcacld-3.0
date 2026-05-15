@@ -146,6 +146,57 @@ smd_link_recfg_find_link_info_with_active_vdev(
 	return NULL;
 }
 
+/**
+ * smd_validate_repurpose_smd_addr() - Validate SMD address in vdev
+ * repurpose request
+ * @recfg_ctx: Link reconfiguration context
+ * @mlo_dev_ctx: MLO device context
+ *
+ * Compares the smd_addr in recfg_ctx->vdev_repurpose_req[0] against the
+ * smd_identifier stored in mlo_dev_ctx->smd_ctx. Logs an error and returns
+ * failure if they do not match.
+ *
+ * Return: QDF_STATUS_SUCCESS if addresses match, error otherwise
+ */
+static QDF_STATUS
+smd_validate_repurpose_smd_addr(struct mlo_link_recfg_context *recfg_ctx,
+				struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	uint8_t i;
+
+	if (!recfg_ctx || !mlo_dev_ctx) {
+		mlo_err("SMD: Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!recfg_ctx->num_vdev_repurpose_req) {
+		mlo_err("SMD: No vdev repurpose requests");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!mlo_dev_ctx->smd_ctx) {
+		mlo_err("SMD: smd_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req &&
+	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (!qdf_is_macaddr_equal(
+				&recfg_ctx->vdev_repurpose_req[i].smd_addr,
+				&mlo_dev_ctx->smd_ctx->smd_identifier)) {
+			mlo_err("SMD: vdev_repurpose_req[%u] smd_addr "
+				QDF_MAC_ADDR_FMT " != smd_identifier "
+				QDF_MAC_ADDR_FMT,
+				i,
+				QDF_MAC_ADDR_REF(recfg_ctx->vdev_repurpose_req[i].smd_addr.bytes),
+				QDF_MAC_ADDR_REF(mlo_dev_ctx->smd_ctx->smd_identifier.bytes));
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool
 smd_link_recfg_has_active_vdev_for_add_link(
 				struct mlo_link_recfg_context *recfg_ctx,
@@ -979,6 +1030,12 @@ QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	status = smd_validate_repurpose_smd_addr(recfg_ctx, mlo_dev_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD: SMD address does not match");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	mlo_debug("SMD: Roaming started, num_vdev_repurpose_req=%u",
 		  recfg_ctx->num_vdev_repurpose_req);
 
@@ -1765,6 +1822,12 @@ QDF_STATUS smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 		     &sync_ind->vdev_repurpose_req,
 		     sizeof(struct smd_vdev_repurpose_req) *
 		     recfg_ctx->num_vdev_repurpose_req);
+
+	status = smd_validate_repurpose_smd_addr(recfg_ctx, mlo_dev_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD: SMD address does not match");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	mlo_debug("SMD: Roam sync started, num_vdev_repurpose_req=%u",
 		  recfg_ctx->num_vdev_repurpose_req);
