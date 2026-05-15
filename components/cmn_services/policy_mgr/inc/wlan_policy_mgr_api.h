@@ -1290,16 +1290,6 @@ QDF_STATUS policy_mgr_set_pcl(struct wlan_objmgr_psoc *psoc,
 			      bool clear_vdev_pcl);
 
 /**
- * policy_mgr_check_and_disconnect_gc_on_last_dfs_freq()
- * @psoc: PSOC object information
- *
- * This function is used to issue disconnect for P2P client on STA connected DFS
- * channel when STA moves out of DFS channel.
- */
-void
-policy_mgr_check_and_disconnect_gc_on_last_dfs_freq(struct wlan_objmgr_psoc *psoc);
-
-/**
  * policy_mgr_incr_active_session() - increments the number of active sessions
  * @psoc: PSOC object information
  * @mode:	Adapter mode

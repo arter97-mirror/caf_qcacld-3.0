@@ -606,9 +606,6 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	ml_nlink_conn_change_notify(
 		psoc, vdev_id, ml_nlink_connection_updated_evt, NULL);
 
-	if (op_mode == QDF_STA_MODE)
-		policy_mgr_check_and_disconnect_gc_on_last_dfs_freq(psoc);
-
 	return QDF_STATUS_SUCCESS;
 }
 

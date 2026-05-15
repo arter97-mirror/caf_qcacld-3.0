@@ -20739,8 +20739,7 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	/* Modify the PCL for STA connected indoor channels if STA and peer SCC
 	 * is allowed on STA connected indoor/dfs channel.
 	 */
-	if (intf_mode == PM_P2P_CLIENT_MODE ||
-	    intf_mode == PM_P2P_GO_MODE)
+	if (intf_mode == PM_P2P_GO_MODE)
 		policy_mgr_modify_pcl_sta_p2p_indoor_dfs_scc(hdd_ctx->psoc,
 							     w_pcl, &pcl_len);
 
