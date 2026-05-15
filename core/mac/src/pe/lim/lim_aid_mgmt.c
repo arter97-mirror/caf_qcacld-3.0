@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2016, 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -53,7 +53,18 @@ static void lim_init_peer_idxpool_legacy(struct mac_context *mac,
 					 struct pe_session *pe_session)
 {
 	uint8_t i;
-	uint8_t max_assoc_sta = mac->lim.max_sta_of_pe_session;
+	uint8_t max_assoc_sta;
+
+	if (!mac) {
+		pe_err("mac_ctx is null");
+		return;
+	}
+
+	max_assoc_sta = mac->lim.max_sta_of_pe_session;
+	if (!pe_session->gpLimPeerIdxpool) {
+		pe_err("peer idx pool is null");
+		return;
+	}
 
 	pe_session->gpLimPeerIdxpool[0] = 0;
 
