@@ -5622,6 +5622,24 @@ policy_mgr_handle_link_removal_on_standby(struct wlan_objmgr_vdev *vdev,
 					  struct ml_rv_info *reconfig_info);
 
 /**
+ * policy_mgr_handle_link_removal_on_standby_host() - Handle host-initiated
+ * link removal for MLO STA standby links
+ * @vdev: assoc vdev (mlo_vdev)
+ * @removal_link_bitmap: bitmask of IEEE link IDs to force-inactive
+ *
+ * Handle link removal for ML STA standby links triggered by host
+ * (e.g. regulatory band/country change). Guards against double-removal
+ * via LS_F_AP_REMOVAL_BIT and sends force link command to target.
+ * Caller is responsible for notifying cfg80211 after this call.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_handle_link_removal_on_standby_host(
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t removal_link_bitmap);
+
+/**
  * policy_mgr_is_mlo_sap_concurrency_allowed() - Check for mlo sap allowed
  *                                               concurrency combination
  * @psoc: PSOC object information

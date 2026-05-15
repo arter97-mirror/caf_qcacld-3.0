@@ -9821,6 +9821,69 @@ policy_mgr_handle_link_removal_on_standby(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+QDF_STATUS
+policy_mgr_handle_link_removal_on_standby_host(
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t removal_link_bitmap)
+{
+	struct mlo_link_info *link_info;
+	uint32_t confirmed_bitmap = 0;
+	uint8_t i;
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		policy_mgr_err("invalid vdev or mlo_dev_ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		policy_mgr_err("psoc is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (!(removal_link_bitmap & BIT(i)))
+			continue;
+
+		link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
+							   i);
+		if (!link_info) {
+			policy_mgr_err("link info null, id %d", i);
+			continue;
+		}
+		policy_mgr_debug("host removal vdev %d link %d flag 0x%x BSSID " QDF_MAC_ADDR_FMT,
+				 link_info->vdev_id, i,
+				 (uint32_t)link_info->link_status_flags,
+				 QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+
+		if (qdf_atomic_test_and_set_bit(LS_F_AP_REMOVAL_BIT,
+						&link_info->link_status_flags))
+			continue;
+
+		confirmed_bitmap |= BIT(i);
+	}
+
+	if (!confirmed_bitmap)
+		return QDF_STATUS_SUCCESS;
+
+	status = policy_mgr_mlo_sta_set_nlink(
+			psoc, wlan_vdev_get_id(vdev),
+			MLO_LINK_FORCE_REASON_LINK_REMOVAL,
+			MLO_LINK_FORCE_MODE_INACTIVE,
+			0,
+			confirmed_bitmap,
+			0,
+			0);
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
+	else if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("status %d", status);
+
+	return status;
+}
+
 void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc;
