@@ -2350,13 +2350,6 @@ QDF_STATUS tdls_process_remove_force_peer(struct tdls_oper_request *req)
 		tdls_set_peer_link_status(peer, TDLS_LINK_TEARING,
 					  TDLS_LINK_UNSPECIFIED);
 
-	if (soc_obj->tdls_dp_vdev_update)
-		soc_obj->tdls_dp_vdev_update(
-				&soc_obj->soc,
-				wlan_vdev_get_id(vdev),
-				soc_obj->tdls_update_dp_vdev_flags,
-				false);
-
 	if (soc_obj->tdls_event_cb) {
 		qdf_mem_copy(ind.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
 		ind.vdev = vdev;

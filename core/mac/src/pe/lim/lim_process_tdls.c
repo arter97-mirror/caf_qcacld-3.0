@@ -4526,6 +4526,11 @@ static void lim_check_aid_and_delete_peer(struct mac_context *p_mac,
 	size_t aid_bitmap_size = sizeof(session_entry->peerAIDBitmap);
 	struct qdf_mac_addr mac_addr;
 	QDF_STATUS status;
+	struct tdls_soc_priv_obj *tdls_soc;
+
+	/* Get TDLS soc object for DP notification */
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(session_entry->vdev);
+
 	/*
 	 * Check all the set bit in peerAIDBitmap and delete the peer
 	 * (with that aid) entry from the hash table and add the aid
@@ -4544,6 +4549,19 @@ static void lim_check_aid_and_delete_peer(struct mac_context *p_mac,
 
 			pe_err("Deleting "QDF_MAC_ADDR_FMT,
 			       QDF_MAC_ADDR_REF(stads->staAddr));
+
+			/*
+			 * Notify DP to decrement counter.
+			 * Link state is hardcoded as TEARING since this is
+			 * common deletion path for CSA, roaming, link switch.
+			 */
+			if (tdls_soc && tdls_soc->tdls_dp_vdev_update) {
+				tdls_soc->tdls_dp_vdev_update(
+					&tdls_soc->soc,
+					session_entry->smeSessionId,
+					tdls_soc->tdls_update_dp_vdev_flags,
+					false);
+			}
 
 			if (!wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
 				lim_send_deauth_mgmt_frame(

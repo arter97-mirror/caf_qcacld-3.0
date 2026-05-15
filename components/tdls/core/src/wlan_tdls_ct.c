@@ -842,13 +842,6 @@ QDF_STATUS tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
 		    wlan_vdev_get_id(tdls_vdev->vdev), reason,
 		    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 
-	if (tdls_soc->tdls_dp_vdev_update)
-		tdls_soc->tdls_dp_vdev_update(
-				&tdls_soc->soc,
-				wlan_vdev_get_id(tdls_vdev->vdev),
-				tdls_soc->tdls_update_dp_vdev_flags,
-				false);
-
 	indication.reason = reason;
 	indication.vdev = tdls_vdev->vdev;
 	qdf_mem_copy(indication.peer_mac, curr_peer->peer_mac.bytes,
