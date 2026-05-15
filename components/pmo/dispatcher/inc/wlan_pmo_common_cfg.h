@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -128,7 +128,7 @@
  * CFG_PMO_ENABLE_IGMP_OFFLOAD - Enable/disable igmp offload
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to enable/disable igmp offload feature to fw.
  *
@@ -138,7 +138,7 @@
  */
 #define CFG_PMO_ENABLE_IGMP_OFFLOAD CFG_INI_BOOL( \
 	"igmp_offload_enable", \
-	0, \
+	1, \
 	"Enable/disable IGMP offload")
 
 /*
