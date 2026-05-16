@@ -6050,12 +6050,10 @@ QDF_STATUS
 cm_csr_disconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_cm_discon_rsp *rsp)
 {
-	bool send_vdev_ies_to_fw = false;
 	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct wlan_mlme_nss_chains vdev_startup_cfg;
 	enum QDF_OPMODE vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
 
 	/*
@@ -6084,30 +6082,14 @@ cm_csr_disconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * to reset back to self cap
 	 */
 	if (mlme_obj->cfg.obss_ht40.is_override_ht20_40_24g) {
-		send_vdev_ies_to_fw = true;
 		wlan_cm_set_force_20mhz_in_24ghz(vdev, true);
-	}
-
-	if (rsp->req.req.source != CM_MLO_LINK_SWITCH_DISCONNECT) {
-		if (wlan_cm_check_mlo_roam_auth_status(vdev)) {
-			qdf_mem_copy(mlme_get_dynamic_vdev_config(vdev),
-				     mlme_get_ini_vdev_config(vdev),
-				     sizeof(struct wlan_mlme_nss_chains));
-		} else {
-			wlan_mlme_fetch_psoc_nss_chain_params_for_mode(mac_ctx->psoc,
-								       &vdev_startup_cfg,
-								       vdev_opmode,
-								       WLAN_MAX_VDEV_CHAINS,
-								       WLAN_MLME_CFG_SRC_STARTUP);
-
-			sme_store_nss_chains_cfg_in_vdev(vdev,
-							 &vdev_startup_cfg);
-			send_vdev_ies_to_fw = true;
-		}
-	}
-
-	if (send_vdev_ies_to_fw)
 		sme_set_vdev_ies_per_band(mac_handle, vdev_id, vdev_opmode);
+	}
+
+	if (rsp->req.req.source != CM_MLO_LINK_SWITCH_DISCONNECT)
+		qdf_mem_copy(mlme_get_dynamic_vdev_config(vdev),
+			     mlme_get_ini_vdev_config(vdev),
+			     sizeof(struct wlan_mlme_nss_chains));
 
 	return QDF_STATUS_SUCCESS;
 }

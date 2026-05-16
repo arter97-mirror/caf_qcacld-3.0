@@ -4245,6 +4245,17 @@ void hdd_update_macaddr(struct hdd_context *hdd_ctx,
 void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * hdd_cm_connect_start_notify() - HDD connect start notification callback
+ * @vdev_id: VDEV ID
+ *
+ * Applies OUI-aware NSS/chains config to the vdev and its MLO partners at
+ * connect start.
+ *
+ * Return: None
+ */
+void hdd_cm_connect_start_notify(uint8_t vdev_id);
+
+/**
  * wlan_hdd_set_roaming_state() - Enable or disable roaming
  * on all STAs except the input one
  * @cur_link_info: Current link info pointer in HDD adapter

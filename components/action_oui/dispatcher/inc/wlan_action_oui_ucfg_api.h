@@ -171,6 +171,13 @@ QDF_STATUS
 ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 			enum action_oui_id action_id);
 
+static inline enum action_oui_id
+ucfg_action_oui_get_active_action_id(struct wlan_objmgr_psoc *psoc,
+				     enum action_oui_arbitrator_type arbitrator_type)
+{
+	return action_oui_get_active_action_id(psoc, arbitrator_type);
+}
+
 /**
  * ucfg_action_oui_send_by_id() - Send action oui for action id
  * @psoc: objmgr psoc object
@@ -468,6 +475,13 @@ ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 			enum action_oui_id action_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline enum action_oui_id
+ucfg_action_oui_get_active_action_id(struct wlan_objmgr_psoc *psoc,
+				     enum action_oui_arbitrator_type arbitrator_type)
+{
+	return ACTION_OUI_MAXIMUM_ID;
 }
 
 /**

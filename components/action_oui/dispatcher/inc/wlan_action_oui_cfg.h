@@ -1044,8 +1044,6 @@
  * default value.
  * If no OUI set (empty string), then no default list is applied.
  *
- * Special value "ffffff 00 00" means ALL APs will be matched.
- *
  * Supported Feature: Action OUIs
  *
  * Usage: Internal
@@ -1056,7 +1054,7 @@
 	"gActionOUIDefaultNSSList", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"ffffff 00 00", \
+	"", \
 	"Used to specify default NSS list OUIs")
 
 	/*

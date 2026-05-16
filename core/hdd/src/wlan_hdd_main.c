@@ -8369,6 +8369,41 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	return ret;
 }
 
+static void
+hdd_restore_vdev_nss_chains_and_ies(struct wlan_objmgr_vdev *vdev, void *arg)
+{
+	struct hdd_context *hdd_ctx = arg;
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	hdd_store_nss_chains_cfg_in_vdev(vdev);
+	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, vdev_id, opmode);
+}
+
+void hdd_cm_connect_start_notify(uint8_t vdev_id)
+{
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	mlo_iterate_ml_vdev_list(vdev,
+				 hdd_restore_vdev_nss_chains_and_ies,
+				 hdd_ctx, true);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+}
+
 void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_hdd_link_info *link_info;
@@ -8376,6 +8411,8 @@ void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlme_nss_chains vdev_ini_cfg;
 	struct hdd_context *hdd_ctx;
 	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+	enum action_oui_id active_id;
+	enum wlan_mlme_cfg_nss_src cfg_src;
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info)
@@ -8386,15 +8423,20 @@ void hdd_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev)
 	if (adapter->user_nss_ctx) {
 		vdev_ini_cfg =
 			*(struct wlan_mlme_nss_chains *)adapter->user_nss_ctx;
-	} else {
-		wlan_mlme_fetch_psoc_nss_chain_params_for_mode(
-						hdd_ctx->psoc,
-						&vdev_ini_cfg,
-						opmode,
-						hdd_ctx->num_rf_chains,
-						WLAN_MLME_CFG_SRC_STARTUP);
+		goto update_vdev;
 	}
 
+	active_id = ucfg_action_oui_get_active_action_id(hdd_ctx->psoc,
+							 ACTION_OUI_ARBITRATOR_TYPE_NSS);
+	cfg_src = (active_id != ACTION_OUI_MAXIMUM_ID) ?
+		  WLAN_MLME_CFG_SRC_GLOBAL : WLAN_MLME_CFG_SRC_STARTUP;
+
+	wlan_mlme_fetch_psoc_nss_chain_params_for_mode(hdd_ctx->psoc,
+						       &vdev_ini_cfg, opmode,
+						       hdd_ctx->num_rf_chains,
+						       cfg_src);
+
+update_vdev:
 	/* Store the nss chain config into the vdev */
 	sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
 }

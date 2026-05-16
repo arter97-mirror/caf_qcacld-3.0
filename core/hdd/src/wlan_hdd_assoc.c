@@ -3985,6 +3985,7 @@ void hdd_cm_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
 
 struct osif_cm_ops osif_ops = {
 	.connect_active_notify_cb = hdd_cm_connect_active_notify,
+	.connect_start_notify_cb  = hdd_cm_connect_start_notify,
 	.connect_complete_cb = hdd_cm_connect_complete,
 	.disconnect_complete_cb = hdd_cm_disconnect_complete,
 	.netif_queue_control_cb = hdd_cm_netif_queue_control,
