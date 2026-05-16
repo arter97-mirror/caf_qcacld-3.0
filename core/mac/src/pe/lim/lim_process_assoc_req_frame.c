@@ -99,12 +99,17 @@ static void lim_convert_supported_channels(struct mac_context *mac_ctx,
 		chan_freq = wlan_reg_legacy_chan_to_freq(mac_ctx->pdev,
 			first_ch_no);
 
-		if (REG_BAND_5G == lim_get_rf_band(chan_freq))
+		if (REG_BAND_5G == lim_get_rf_band(chan_freq)) {
 			channel_offset =  SIR_11A_FREQUENCY_OFFSET;
-		else if (REG_BAND_2G == lim_get_rf_band(chan_freq))
+			if (!(assoc_ind->supported_band & BIT(REG_BAND_5G)))
+				assoc_ind->supported_band |= BIT(REG_BAND_5G);
+		} else if (REG_BAND_2G == lim_get_rf_band(chan_freq)) {
 			channel_offset = SIR_11B_FREQUENCY_OFFSET;
-		else
+			if (!(assoc_ind->supported_band & BIT(REG_BAND_2G)))
+				assoc_ind->supported_band |= BIT(REG_BAND_2G);
+		} else {
 			continue;
+		}
 
 		for (j = 1; j < chn_count; j++) {
 			next_ch_no += channel_offset;
@@ -126,8 +131,8 @@ static void lim_convert_supported_channels(struct mac_context *mac_ctx,
 		assoc_ind->supportedChannels.numChnl);
 
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   assoc_req->supportedChannels.supportedChannels,
-			   assoc_req->supportedChannels.length);
+			   assoc_ind->supportedChannels.channelList,
+			   assoc_ind->supportedChannels.numChnl);
 }
 
 /**
@@ -3717,11 +3722,12 @@ bool lim_fill_lim_assoc_ind_params(
 
 	lim_fill_assoc_ind_info(mac_ctx, session_entry, assoc_req,
 				assoc_ind, sta_ds);
-	pe_debug("ch_width: %d vht_cap %d ht_cap %d chan_info %d center_freq1 %d",
+	pe_debug("ch_width: %d vht_cap %d ht_cap %d chan_info %d center_freq1 %d supp_bands 0x%x",
 		 session_entry->ch_width,
 		 session_entry->vhtCapability, session_entry->htCapability,
 		 assoc_ind->chan_info.info,
-		 assoc_ind->chan_info.band_center_freq1);
+		 assoc_ind->chan_info.band_center_freq1,
+		 assoc_ind->supported_band);
 	assoc_ind->he_caps_present = assoc_req->he_cap.present;
 	assoc_ind->eht_caps_present = assoc_req->eht_cap.present;
 	assoc_ind->is_sae_authenticated =
