@@ -1529,6 +1529,71 @@ static QDF_STATUS wlan_hdd_convert_pd_qdf_mode_to_nl_type(
 }
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+static QDF_STATUS
+wlan_hdd_convert_nan_data_type(enum nl80211_iftype nl_type,
+			       struct hdd_context *hdd_ctx,
+			       enum QDF_OPMODE *out_qdf_type)
+{
+	if (nl_type != NL80211_IFTYPE_NAN_DATA)
+		return QDF_STATUS_E_INVAL;
+
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
+		return QDF_STATUS_E_INVAL;
+
+	*out_qdf_type = QDF_NDI_MODE;
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_convert_nan_data_qdf_mode_to_nl_type(enum nl80211_iftype *nl_type,
+					      enum QDF_OPMODE qdf_type)
+{
+	if (qdf_type == QDF_NDI_MODE) {
+		*nl_type = NL80211_IFTYPE_NAN_DATA;
+		return QDF_STATUS_SUCCESS;
+	}
+	return QDF_STATUS_E_INVAL;
+}
+#else
+static inline QDF_STATUS
+wlan_hdd_convert_nan_data_type(enum nl80211_iftype nl_type,
+			       struct hdd_context *hdd_ctx,
+			       enum QDF_OPMODE *out_qdf_type)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
+static inline QDF_STATUS
+wlan_hdd_convert_nan_data_qdf_mode_to_nl_type(enum nl80211_iftype *nl_type,
+					      enum QDF_OPMODE qdf_type)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
+/**
+ * wlan_hdd_set_nan_data_if_type() - Set the NAN data iftype
+ * @adapter: pointer to HDD adapter
+ *
+ * Set NL80211_IFTYPE_NAN_DATA to wdev iftype for NDI adapters.
+ * Falls back to NL80211_IFTYPE_STATION on kernels that do not
+ * define NL80211_IFTYPE_NAN_DATA.
+ *
+ * Return: None
+ */
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+static void wlan_hdd_set_nan_data_if_type(struct hdd_adapter *adapter)
+{
+	adapter->wdev.iftype = NL80211_IFTYPE_NAN_DATA;
+}
+#else
+static void wlan_hdd_set_nan_data_if_type(struct hdd_adapter *adapter)
+{
+	adapter->wdev.iftype = NL80211_IFTYPE_STATION;
+}
+#endif
+
 QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 				    enum QDF_OPMODE *out_qdf_type)
 {
@@ -1572,6 +1637,10 @@ QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 		}
 		fallthrough;
 	default:
+		status = wlan_hdd_convert_nan_data_type(nl_type, hdd_ctx,
+							out_qdf_type);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			break;
 		status = wlan_hdd_convert_nan_type(nl_type, out_qdf_type);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			break;
@@ -1625,6 +1694,10 @@ static QDF_STATUS hdd_qdf_to_nl_iface_type(enum nl80211_iftype *nl_type,
 		*nl_type = NL80211_IFTYPE_WDS;
 		break;
 	default:
+		status = wlan_hdd_convert_nan_data_qdf_mode_to_nl_type(nl_type,
+								       qdf_type);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			break;
 		status = wlan_hdd_convert_nan_qdf_mode_to_nl_type(nl_type,
 								  qdf_type);
 		if (QDF_IS_STATUS_SUCCESS(status))
@@ -10475,6 +10548,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			wlan_hdd_set_nan_if_type(adapter);
 		else if (QDF_PD_MODE == session_type)
 			wlan_hdd_set_pd_if_type(adapter);
+		else if (QDF_NDI_MODE == session_type)
+			wlan_hdd_set_nan_data_if_type(adapter);
 		else
 			adapter->wdev.iftype = NL80211_IFTYPE_STATION;
 

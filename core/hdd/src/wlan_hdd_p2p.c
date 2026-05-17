@@ -1004,6 +1004,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 			return ERR_PTR(-EAGAIN);
 
 		break;
+	case QDF_NDI_MODE:
 	case QDF_NAN_DISC_MODE:
 		if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
 			break;
