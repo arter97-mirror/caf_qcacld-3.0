@@ -1049,6 +1049,47 @@ static const struct ieee80211_iface_limit
 	},
 };
 
+#if defined(WLAN_FEATURE_NAN) && \
+	defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+/* NAN + NDP disc combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_nan_ndp_iface_limit[] = {
+	{
+		/* NAN */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN)
+	},
+	{
+		/* NDP */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN_DATA),
+	},
+};
+
+/* STA + NAN + NDP combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_nan_ndp_iface_limit[] = {
+	{
+		/* STA */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* NAN */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN)
+	},
+	{
+		/* NDP */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN_DATA),
+	},
+};
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE &&
+	* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	*/
+
 /* STA + SAP + SAP + P2P combination */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sta_sap_sap_p2p_iface_limit[] = {
@@ -1206,6 +1247,25 @@ static struct ieee80211_iface_combination
 		.n_limits = ARRAY_SIZE(wlan_hdd_sap_nan_iface_limit),
 		.beacon_int_infra_match = true,
 	},
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+	/* NAN + NDP */
+	{
+		.limits = wlan_hdd_nan_ndp_iface_limit,
+		.max_interfaces = 2,
+		.num_different_channels = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_nan_ndp_iface_limit),
+	},
+	/* STA + NAN + NDP */
+	{
+		.limits = wlan_hdd_sta_nan_ndp_iface_limit,
+		.max_interfaces = 3,
+		.num_different_channels = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_nan_ndp_iface_limit),
+	},
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE &&
+	* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	*/
 #endif /* WLAN_FEATURE_NAN */
 	/* STA + STA + SAP + SAP */
 	{
@@ -30794,6 +30854,137 @@ wlan_hdd_remove_sta_p2p_nan_conc(
 	return 0;
 }
 
+#if defined(WLAN_FEATURE_NAN) && \
+	defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+#define WLAN_HDD_NAN_NDP_NUM_INTERFACES 2
+#define WLAN_HDD_STA_NAN_NDP_NUM_INTERFACES 3
+
+/**
+ * wlan_hdd_is_nan_ndp_entry() - Check if a single combination entry
+ * represents a NAN + NDP 2-interface concurrency.
+ * @entry: pointer to a single ieee80211_iface_combination entry to inspect
+ *
+ * Return: true if the entry has max_interfaces == 2 and contains both
+ * NL80211_IFTYPE_NAN and NL80211_IFTYPE_NAN_DATA limit entries,
+ * false otherwise.
+ */
+static inline bool
+wlan_hdd_is_nan_ndp_entry(const struct ieee80211_iface_combination *entry)
+{
+	int j;
+	bool nan = false, ndp = false;
+
+	if (!entry ||
+	    entry->max_interfaces != WLAN_HDD_NAN_NDP_NUM_INTERFACES ||
+	    !entry->n_limits || !entry->limits)
+		return false;
+
+	for (j = 0; j < entry->n_limits; j++) {
+		if (entry->limits[j].types == BIT(NL80211_IFTYPE_NAN))
+			nan = true;
+		else if (entry->limits[j].types == BIT(NL80211_IFTYPE_NAN_DATA))
+			ndp = true;
+	}
+
+	return nan && ndp;
+}
+
+/**
+ * wlan_hdd_is_sta_nan_ndp_concurrency_present() - This API checks whether STA,
+ * NAN and NDP present in the interface combination
+ * @combination: interface combination array to refer
+ * @idx: index for interface combination array
+ *
+ * Return: true if STA, NAN and NDP interface is present otherwise false
+ */
+static bool wlan_hdd_is_sta_nan_ndp_concurrency_present(
+	struct ieee80211_iface_combination *combination, uint8_t idx)
+{
+	int j = 0;
+	bool nan_present = false;
+	bool sta_present = false;
+	bool ndp_present = false;
+
+	if (combination[idx].max_interfaces !=
+	    WLAN_HDD_STA_NAN_NDP_NUM_INTERFACES)
+		return false;
+
+	if (!combination[idx].n_limits || !combination[idx].limits)
+		return false;
+
+	for (j = 0; j < combination[idx].n_limits; j++) {
+		if (combination[idx].limits[j].types ==
+		    BIT(NL80211_IFTYPE_NAN))
+			nan_present = true;
+		else if (combination[idx].limits[j].types ==
+			 BIT(NL80211_IFTYPE_STATION))
+			sta_present = true;
+		else if (combination[idx].limits[j].types ==
+			 BIT(NL80211_IFTYPE_NAN_DATA))
+			ndp_present = true;
+	}
+
+	return (nan_present && sta_present && ndp_present);
+}
+
+/**
+ * wlan_hdd_remove_nan_ndp_conc() - Remove NAN + NDP 2-iface combination
+ * @combination: interface combination array to modify
+ * @filled: number of entries currently in the combination array
+ *
+ * Searches for the NAN + NDP 2-interface combination entry and removes it
+ * by shifting subsequent entries down. Called when the STA + NAN + NDP
+ * 3-interface combination supersedes the standalone NAN + NDP entry.
+ *
+ * Return: 1 if an entry was removed, 0 otherwise
+ */
+static uint8_t
+wlan_hdd_remove_nan_ndp_conc(struct ieee80211_iface_combination *combination,
+			     uint8_t filled)
+{
+	uint8_t i = 0;
+	bool found = false;
+
+	for (i = 0; i < filled; i++) {
+		if (wlan_hdd_is_nan_ndp_entry(&combination[i])) {
+			found = true;
+			break;
+		}
+	}
+
+	if (found) {
+		for (; i < filled - 1; i++)
+			combination[i] = combination[i + 1];
+		return 1;
+	}
+
+	return 0;
+}
+#else
+static inline bool
+wlan_hdd_is_nan_ndp_entry(const struct ieee80211_iface_combination *entry)
+{
+	return false;
+}
+
+static inline bool
+wlan_hdd_is_sta_nan_ndp_concurrency_present(
+	struct ieee80211_iface_combination *combination, uint8_t idx)
+{
+	return false;
+}
+
+static inline uint8_t
+wlan_hdd_remove_nan_ndp_conc(struct ieee80211_iface_combination *combination,
+			     uint8_t filled)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE &&
+	* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	*/
+
 /**
  * wlan_hdd_is_iface_nan() - This API checks whether NAN interface is present
  * in the interface combination
@@ -30839,6 +31030,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	uint8_t num;
 	QDF_STATUS status;
 	bool is_nan_allowed;
+	bool is_nan_ndp, is_sta_nan_ndp;
 	struct wmi_unified *wmi_handle;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
@@ -30982,6 +31174,31 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 								      j);
 			else
 				continue;
+		}
+
+		is_nan_ndp = wlan_hdd_is_nan_ndp_entry(
+					&wlan_hdd_iface_combination[i]);
+		is_sta_nan_ndp =
+			wlan_hdd_is_sta_nan_ndp_concurrency_present(
+					wlan_hdd_iface_combination, i);
+
+		/*
+		 * Don't add NAN + NDP and STA + NAN + NDP to the
+		 * final list when FW doesn't support NAN standard mode
+		 */
+		if (!ucfg_nan_is_fw_support_standard_mode(
+						hdd_ctx->psoc) &&
+		    (is_nan_ndp || is_sta_nan_ndp)) {
+			hdd_debug("Skipping NAN+NDP combination[%d]: FW NAN standard mode not supported",
+				  i);
+			continue;
+		}
+
+		/* STA + NAN + NDP concurrency is present */
+		if (is_sta_nan_ndp) {
+			/* Remove NAN NDP 2-iface sub concurrency */
+			j -= wlan_hdd_remove_nan_ndp_conc(
+					hdd_ctx->combination, j);
 		}
 
 		hdd_ctx->combination[j] = wlan_hdd_iface_combination[i];
