@@ -751,7 +751,9 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 			}
 
 			status = nan_discovery_pre_enable(req->pdev,
-						  req->social_chan_2g_freq);
+					  req->social_chan_2g_freq ?
+					  req->social_chan_2g_freq :
+					  req->social_chan_5g_freq);
 			if (QDF_IS_STATUS_SUCCESS(status)) {
 				len = sizeof(struct nan_enable_req) +
 					req->params.request_data_len;

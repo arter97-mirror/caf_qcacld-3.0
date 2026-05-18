@@ -3700,30 +3700,49 @@ end:
 static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 					struct nlattr **tb, uint8_t vdev_id)
 {
-	uint32_t chan_freq_2g, chan_freq_5g = 0;
+	uint32_t chan_freq_2g = 0, chan_freq_5g = 0;
 	uint32_t buf_len;
 	QDF_STATUS status;
 	uint32_t fine_time_meas_cap;
 	struct nan_enable_req *nan_req;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
-	if (!tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ]) {
-		osif_err("NAN Social channel for 2.4Gz is unavailable!");
-		return -EINVAL;
-	}
-	chan_freq_2g =
-		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ]);
+	if (tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ])
+		chan_freq_2g =
+			nla_get_u32(tb[
+				QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ]);
+	else
+		osif_debug("NAN Social channel for 2.4GHz not provided, defaulting to 0");
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ])
 		chan_freq_5g =
 			nla_get_u32(tb[
 				QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ]);
+	else
+		osif_debug("NAN Social channel for 5GHz not provided, defaulting to 0");
 
-	if (!wlan_reg_is_24ghz_ch_freq(chan_freq_2g) ||
-	    !wlan_reg_is_freq_enabled(pdev, chan_freq_2g, REG_CURRENT_PWR_MODE) ||
-	    !ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id)) {
-		osif_err("NAN Enable not allowed at this moment for channel %d",
+	if (chan_freq_2g &&
+	    (!wlan_reg_is_24ghz_ch_freq(chan_freq_2g) ||
+	     !wlan_reg_is_freq_enabled(pdev, chan_freq_2g,
+				       REG_CURRENT_PWR_MODE) ||
+	     !ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id))) {
+		osif_err("NAN Enable not allowed at this moment for 2.4GHz channel %d",
 			 chan_freq_2g);
+		chan_freq_2g = 0;
+	}
+
+	if (chan_freq_5g &&
+	    (!wlan_reg_is_5ghz_ch_freq(chan_freq_5g) ||
+	     !wlan_reg_is_freq_enabled(pdev, chan_freq_5g,
+				       REG_CURRENT_PWR_MODE) ||
+	     !ucfg_is_nan_enable_allowed(psoc, chan_freq_5g, vdev_id))) {
+		osif_err("NAN Enable not allowed at this moment for 5GHz channel %d",
+			 chan_freq_5g);
+		chan_freq_5g = 0;
+	}
+
+	if (!chan_freq_2g && !chan_freq_5g) {
+		osif_err("NAN Enable needs at least one of 2.4GHz/5GHz social channel");
 		return -EINVAL;
 	}
 
