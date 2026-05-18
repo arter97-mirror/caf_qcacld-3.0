@@ -23,7 +23,7 @@
 #ifndef __WLAN_DP_STC_H__
 #define __WLAN_DP_STC_H__
 
-#include "wlan_dp_main.h"
+#include "wlan_dp_priv.h"
 #include "wlan_dp_spm.h"
 
 /* Macros used by STC logmask */
@@ -637,6 +637,9 @@ struct wlan_dp_stc {
 /* Function Declaration - START */
 
 #ifdef WLAN_DP_FEATURE_STC
+
+#define WLAN_DP_STC_PTR(dp_ctx) ((dp_ctx)->stc_ctx.dp_stc)
+
 /**
  * wlan_dp_get_stc() - Get STC from DP context
  * @dp_ctx: DP component global context
@@ -646,7 +649,7 @@ struct wlan_dp_stc {
 static inline struct wlan_dp_stc *
 wlan_dp_get_stc(struct wlan_dp_psoc_context *dp_ctx)
 {
-	return dp_ctx->dp_stc;
+	return WLAN_DP_STC_PTR(dp_ctx);
 }
 
 /**
@@ -1272,11 +1275,90 @@ wlan_dp_stc_is_predictive_roaming_enabled(
 	if (!dp_ctx)
 		return false;
 
-	dp_stc = dp_ctx->dp_stc;
+	dp_stc = WLAN_DP_STC_PTR(dp_ctx);
 
 	return dp_stc ? dp_stc->predictive_roaming_enabled : false;
 }
+
+/**
+ * wlan_dp_stc_ctx_init() - Initialise the always-present STC runtime context
+ * @dp_ctx: DP context
+ *
+ * Initialises state to DP_STC_STATE_DISABLED and creates the deferred
+ * stc_state_work item. STC is NOT started automatically — it starts
+ * only when a START vendor command is received.
+ * Called once from dp_allocate_ctx().
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS wlan_dp_stc_ctx_init(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_ctx_deinit() - Destroy the STC runtime context
+ * @dp_ctx: DP context
+ *
+ * Cancels and destroys the deferred stc_state_work item.
+ * Called once from dp_free_ctx().
+ */
+void wlan_dp_stc_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_pdev_create_handler() - Handle pdev-create for STC
+ * @dp_ctx: DP context
+ *
+ * Does nothing except gate on INI config — waits for a START vendor
+ * command before STC starts.
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS wlan_dp_stc_pdev_create_handler(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_pdev_detach_handler() - Handle pdev-detach for STC
+ * @dp_ctx: DP context
+ *
+ * Cancels any in-flight stc_state_work and calls wlan_dp_stc_detach().
+ * Unconditionally resets state to DISABLED — ideally only ENABLING/DISABLING
+ * need normalisation, but there is no vendor command to send STOP before
+ * idle shutdown so all states are reset to ensure a clean next pdev create.
+ * No-op if STC is not enabled in config.
+ */
+void wlan_dp_stc_pdev_detach_handler(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_flow_stats_policy() - Handle async flow stats policy request
+ * @type: Type of async stats — QCA_ASYNC_STATS_TYPE_FLOW_STATS triggers
+ *        runtime STC enable/disable; all other types are forwarded to the
+ *        STC policy handler
+ * @action: QCA_ASYNC_STATS_ACTION_START or QCA_ASYNC_STATS_ACTION_STOP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_dp_flow_stats_policy(enum qca_async_stats_type type,
+				     enum qca_async_stats_action action);
 #else
+static inline QDF_STATUS
+wlan_dp_stc_ctx_init(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_dp_stc_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline QDF_STATUS
+wlan_dp_stc_pdev_create_handler(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_dp_stc_pdev_detach_handler(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
 static inline struct wlan_dp_stc *
 wlan_dp_get_stc(struct wlan_dp_psoc_context *dp_ctx)
 {

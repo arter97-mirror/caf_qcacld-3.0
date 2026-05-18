@@ -90,6 +90,8 @@ QDF_STATUS dp_allocate_ctx(void)
 	qdf_list_create(&dp_ctx->intf_list, 0);
 	TAILQ_INIT(&dp_ctx->inactive_dp_link_list);
 	wlan_dp_spm_flow_table_attach(dp_ctx);
+	if (QDF_IS_STATUS_ERROR(wlan_dp_stc_ctx_init(dp_ctx)))
+		dp_info("Failed to init STC context");
 	dp_ctx->monitor_flag = 0;
 
 	dp_attach_ctx(dp_ctx);
@@ -104,6 +106,7 @@ void dp_free_ctx(void)
 	dp_ctx =  dp_get_context();
 
 	wlan_dp_spm_flow_table_detach(dp_ctx);
+	wlan_dp_stc_ctx_deinit(dp_ctx);
 	qdf_spinlock_destroy(&dp_ctx->dp_link_del_lock);
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
@@ -2409,7 +2412,7 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 	 * 2) FISA will not start before pdev create, so its safe to attach
 	 * STC after FISA, though there is a dependency on FISA.
 	 */
-	if (QDF_IS_STATUS_ERROR(wlan_dp_stc_attach(dp_ctx)))
+	if (QDF_IS_STATUS_ERROR(wlan_dp_stc_pdev_create_handler(dp_ctx)))
 		wlan_dp_spm_flow_table_detach(dp_ctx);
 
 	return status;
@@ -3389,7 +3392,7 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	 * STC detach must be done before FISA detach, since STC uses the
 	 * FISA table.
 	 */
-	wlan_dp_stc_detach(dp_ctx);
+	wlan_dp_stc_pdev_detach_handler(dp_ctx);
 	wlan_dp_rx_fisa_detach(dp_ctx);
 	return cdp_pdev_detach(soc, pdev_id, force);
 }

@@ -984,6 +984,32 @@ struct dp_direct_link_context {
 
 #ifdef WLAN_DP_FEATURE_STC
 struct wlan_dp_stc;
+
+/**
+ * enum wlan_dp_stc_state - STC runtime state machine states
+ * @DP_STC_STATE_DISABLED:  STC fully stopped; pdev up, waiting for START cmd
+ * @DP_STC_STATE_ENABLED:   STC fully running
+ * @DP_STC_STATE_ENABLING:  Enable work is scheduled or executing
+ * @DP_STC_STATE_DISABLING: Disable work is scheduled or executing
+ */
+enum wlan_dp_stc_state {
+	DP_STC_STATE_DISABLED  = 0,
+	DP_STC_STATE_ENABLED   = 1,
+	DP_STC_STATE_ENABLING  = 2,
+	DP_STC_STATE_DISABLING = 3,
+};
+
+/**
+ * struct wlan_dp_stc_ctx - STC runtime context, always present in dp_ctx
+ * @state: atomic state machine, see enum wlan_dp_stc_state
+ * @stc_state_work: deferred work item for enable/disable operations
+ * @dp_stc: STC module context; NULL when STC is disabled
+ */
+struct wlan_dp_stc_ctx {
+	qdf_atomic_t state;
+	qdf_work_t stc_state_work;
+	struct wlan_dp_stc *dp_stc;
+};
 #endif
 
 /**
@@ -1067,7 +1093,7 @@ struct wlan_dp_stc;
  * @svc_ctx: service class context
  * @lb_data: wlan load balance data structure
  * @cpuhp_event_handle: event handle for cpu hotplug
- * @dp_stc: STC context
+ * @stc_ctx: STC runtime state context
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
  * @o_flow_rec_freelist: Flow records freelist
@@ -1198,7 +1224,7 @@ struct wlan_dp_psoc_context {
 	struct qdf_cpuhp_handler *cpuhp_event_handle;
 #endif
 #ifdef WLAN_DP_FEATURE_STC
-	struct wlan_dp_stc *dp_stc;
+	struct wlan_dp_stc_ctx stc_ctx;
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_context *spm_ctx;

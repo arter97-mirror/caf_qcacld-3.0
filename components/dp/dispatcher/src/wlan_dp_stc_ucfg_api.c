@@ -27,7 +27,7 @@ QDF_STATUS ucfg_dp_flow_classify_result(
 QDF_STATUS ucfg_dp_flow_stats_policy(enum qca_async_stats_type type,
 				     enum qca_async_stats_action action)
 {
-	return wlan_dp_stc_handle_flow_stats_policy(type, action);
+	return wlan_dp_flow_stats_policy(type, action);
 }
 
 uint32_t ucfg_dp_stc_get_logmask(struct wlan_objmgr_psoc *psoc)

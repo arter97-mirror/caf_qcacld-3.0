@@ -27,6 +27,7 @@
 #include "dp_internal.h"
 #include "wlan_dp_prealloc.h"
 #include <cdp_txrx_ctrl.h>
+#include <cdp_txrx_peer_ops.h>
 
 #ifdef WLAN_DP_FEATURE_STC
 
@@ -2883,14 +2884,6 @@ wlan_dp_stc_handle_flow_stats_policy(enum qca_async_stats_type type,
 
 	dp_info("STC: type %d action %d", type, action);
 	switch (type) {
-	case QCA_ASYNC_STATS_TYPE_FLOW_STATS:
-		if (action == QCA_ASYNC_STATS_ACTION_START)
-			dp_stc->send_flow_stats = 1;
-		else if (action == QCA_ASYNC_STATS_ACTION_STOP)
-			dp_stc->send_flow_stats = 0;
-		else
-			return QDF_STATUS_E_INVAL;
-		break;
 	case QCA_ASYNC_STATS_TYPE_CLASSIFIED_FLOW_STATS:
 		if (action == QCA_ASYNC_STATS_ACTION_START)
 			dp_stc->send_classified_flow_stats = 1;
@@ -3529,7 +3522,7 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
 		dp_info("STC: feature not enabled via cfg");
-		dp_ctx->dp_stc = NULL;
+		WLAN_DP_STC_PTR(dp_ctx) = NULL;
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
@@ -3590,7 +3583,7 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 			       WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT);
 	}
 
-	dp_ctx->dp_stc = dp_stc;
+	WLAN_DP_STC_PTR(dp_ctx) = dp_stc;
 	dp_stc->dp_ctx = dp_ctx;
 
 	/* Init timer */
@@ -3644,7 +3637,7 @@ rx_flow_table_alloc_fail:
 	dp_context_free_mem(soc, DP_STC_SAMPLING_TABLE_TYPE, s_table);
 sampling_table_alloc_fail:
 	dp_context_free_mem(soc, DP_STC_CONTEXT_TYPE, dp_stc);
-	dp_ctx->dp_stc = NULL;
+	WLAN_DP_STC_PTR(dp_ctx) = NULL;
 
 	return status;
 }
@@ -3680,8 +3673,399 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 			    dp_stc->sampling_flow_table);
 	dp_context_free_mem(soc, DP_STC_CONTEXT_TYPE, dp_stc);
 
-	dp_ctx->dp_stc = NULL;
+	WLAN_DP_STC_PTR(dp_ctx) = NULL;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_dp_stc_cleanup_tx_flows() - Clear STC state from TX flows
+ * @dp_ctx: DP context
+ *
+ * Iterates through all TX flows and clears STC-related flags to ensure
+ * clean state after STC disable. This prevents stale STC state from
+ * affecting flows after STC is disabled.
+ *
+ * Return: None
+ */
+static void wlan_dp_stc_cleanup_tx_flows(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_spm_flow_info *tx_flow;
+	uint16_t flow_id;
+	uint32_t count = 0;
+
+	if (!dp_ctx->gl_flow_recs) {
+		dp_info("STC: TX flow records not available");
+		return;
+	}
+
+	for (flow_id = 0; flow_id < WLAN_DP_SPM_FLOW_REC_TBL_MAX; flow_id++) {
+		tx_flow = &dp_ctx->gl_flow_recs[flow_id];
+
+		if (!tx_flow->is_populated)
+			continue;
+
+		/* Clear STC-related flags */
+		tx_flow->selected_to_sample = 0;
+		tx_flow->classified = DP_STC_CLASSIFIED_INIT;
+		tx_flow->track_flow_stats = 0;
+		tx_flow->c_flow_id = 0;
+		tx_flow->ul_tid = 0;
+		tx_flow->inactivity_timeout = 0;
+		count++;
+	}
+
+	dp_info("STC: Cleaned up %u TX flows", count);
+}
+
+/**
+ * wlan_dp_stc_cleanup_rx_flows() - Clear STC state from RX flows
+ * @dp_ctx: DP context
+ *
+ * Iterates through all RX flows and clears STC-related flags to ensure
+ * clean state after STC disable. This prevents stale STC state from
+ * affecting flows after STC is disabled.
+ *
+ * Return: None
+ */
+static void wlan_dp_stc_cleanup_rx_flows(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
+	struct dp_fisa_rx_sw_ft *rx_flow;
+	uint16_t flow_id;
+	uint32_t count = 0;
+
+	if (!fst) {
+		dp_info("STC: RX FST not available");
+		return;
+	}
+
+	for (flow_id = 0; flow_id < fst->max_entries; flow_id++) {
+		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, flow_id);
+
+		if (!rx_flow->is_populated)
+			continue;
+
+		/* Clear STC-related flags */
+		rx_flow->selected_to_sample = 0;
+		rx_flow->classified = DP_STC_CLASSIFIED_INIT;
+		rx_flow->track_flow_stats = 0;
+		rx_flow->c_flow_id = 0;
+		rx_flow->inactivity_timeout = 0;
+		count++;
+	}
+
+	dp_info("STC: Cleaned up %u RX flows", count);
+}
+
+/**
+ * wlan_dp_stc_notify_classified_flows_cleanup() - Send FW DELETE notifications
+ * @dp_ctx: DP context
+ *
+ * Iterates through classified flow table and sends DELETE notification to
+ * firmware for each active classified flow. This ensures firmware is aware
+ * that STC is being disabled and can clean up its own state.
+ *
+ * Return: None
+ */
+static void wlan_dp_stc_notify_classified_flows_cleanup(
+					struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
+	struct wlan_dp_stc_classified_flow_table *c_table;
+	struct wlan_dp_stc_classified_flow_entry *c_entry;
+	uint16_t c_id;
+	uint32_t count = 0;
+
+	if (!dp_stc) {
+		dp_info("STC: Context not available for FW notification");
+		return;
+	}
+
+	c_table = dp_stc->classified_flow_table;
+	if (!c_table) {
+		dp_info("STC: Classified flow table not available");
+		return;
+	}
+
+	for (c_id = 0; c_id < DP_STC_CLASSIFIED_TABLE_FLOW_MAX; c_id++) {
+		c_entry = &c_table->entries[c_id];
+
+		if (qdf_atomic_read(&c_entry->state) !=
+		    WLAN_DP_STC_CLASSIFIED_FLOW_STATE_ADDED)
+			continue;
+
+		/* Send DELETE notification to firmware */
+		wlan_dp_stc_send_flow_status(dp_stc, c_entry,
+					     QCA_FLOW_STATUS_UPDATE_DELETE);
+		count++;
+	}
+
+	dp_info("STC: Sent DELETE notifications for %u classified flows",
+		count);
+}
+
+/**
+ * wlan_dp_stc_runtime_disable() - Clean up flows, detach STC, update state
+ * @dp_ctx: DP context
+ *
+ * Called from wlan_dp_stc_runtime_work_handler() when state is DISABLING.
+ * Cleans up TX/RX flow state, sends firmware DELETE notifications for
+ * classified flows, and calls detach to stop timers and free all resources.
+ * Sets state to DISABLED on success, ENABLED on failure.
+ */
+static void wlan_dp_stc_runtime_disable(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
+	QDF_STATUS status;
+
+	if (!dp_stc) {
+		dp_err("STC: dp_stc is NULL");
+		qdf_atomic_set(&stc_ctx->state,
+			       DP_STC_STATE_DISABLED);
+		return;
+	}
+
+	dp_info("STC: Disable started");
+
+	/* Stop periodic work and sampling timer before touching flow state
+	 * to avoid concurrent access during cleanup.
+	 */
+	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
+	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
+
+	wlan_dp_stc_cleanup_tx_flows(dp_ctx);
+	wlan_dp_stc_cleanup_rx_flows(dp_ctx);
+	wlan_dp_stc_notify_classified_flows_cleanup(dp_ctx);
+	status = wlan_dp_stc_detach(dp_ctx);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		dp_info("STC: Disable completed");
+		qdf_atomic_set(&stc_ctx->state,
+			       DP_STC_STATE_DISABLED);
+	} else {
+		dp_err("STC: failed, status %d", status);
+		qdf_atomic_set(&stc_ctx->state,
+			       DP_STC_STATE_ENABLED);
+	}
+}
+
+/**
+ * wlan_dp_stc_sync_active_peers() - Sync peer_tc state for already-connected
+ *                                    peers after STC runtime re-enable
+ * @dp_ctx: DP context
+ *
+ * After runtime disable + re-enable, dp_stc->peer_tc[] is freshly zeroed.
+ * Walk all possible peer_ids; for those that are active in the DP layer,
+ * restore peer_tc[peer_id].valid = 1 so that subsequent unmap events are
+ * handled correctly.
+ */
+static void wlan_dp_stc_sync_active_peers(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
+	ol_txrx_soc_handle soc = dp_ctx->cdp_soc;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
+	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
+	QDF_STATUS status;
+	uint8_t vdev_id;
+	uint16_t peer_id;
+	uint8_t count = 0;
+
+	if (!dp_stc)
+		return;
+
+	for (peer_id = 0; peer_id < DP_STC_MAX_PEERS; peer_id++) {
+		status = cdp_get_peer_mac_from_peer_id(soc, peer_id, peer_mac);
+		if (QDF_IS_STATUS_ERROR(status))
+			continue;
+
+		status = cdp_peer_get_vdevid(soc, peer_mac, &vdev_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			vdev_id = 0;
+
+		peer_tc = &dp_stc->peer_tc[peer_id];
+		peer_tc->peer_id = peer_id;
+		peer_tc->vdev_id = vdev_id;
+		qdf_mem_copy(peer_tc->mac_addr.bytes, peer_mac,
+			     QDF_MAC_ADDR_SIZE);
+		peer_tc->valid = 1;
+		count++;
+	}
+
+	dp_info("STC: synced %u active peers", count);
+}
+
+static void wlan_dp_stc_runtime_enable(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
+	QDF_STATUS status;
+
+	dp_info("STC: Enable started");
+
+	status = wlan_dp_stc_attach(dp_ctx);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		dp_info("STC: Enable completed");
+		wlan_dp_stc_sync_active_peers(dp_ctx);
+		qdf_atomic_set(&stc_ctx->state,
+			       DP_STC_STATE_ENABLED);
+	} else {
+		dp_err("STC: failed, status %d", status);
+		qdf_atomic_set(&stc_ctx->state,
+			       DP_STC_STATE_DISABLED);
+	}
+}
+
+/**
+ * wlan_dp_stc_runtime_work_handler() - Deferred worker for STC enable/disable
+ * @arg: pointer to wlan_dp_stc_ctx embedded in dp_ctx
+ *
+ * Reads state and delegates to wlan_dp_stc_runtime_enable() or
+ * wlan_dp_stc_runtime_disable() accordingly.
+ */
+static void wlan_dp_stc_runtime_work_handler(void *arg)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = (struct wlan_dp_stc_ctx *)arg;
+	struct wlan_dp_psoc_context *dp_ctx =
+		qdf_container_of(stc_ctx, struct wlan_dp_psoc_context, stc_ctx);
+	uint8_t state = qdf_atomic_read(&stc_ctx->state);
+
+	dp_info("STC: state %d", state);
+
+	if (state == DP_STC_STATE_ENABLING)
+		wlan_dp_stc_runtime_enable(dp_ctx);
+	else if (state == DP_STC_STATE_DISABLING)
+		wlan_dp_stc_runtime_disable(dp_ctx);
+}
+
+QDF_STATUS wlan_dp_stc_ctx_init(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
+
+	qdf_atomic_init(&stc_ctx->state);
+	return qdf_create_work(0, &stc_ctx->stc_state_work,
+			       wlan_dp_stc_runtime_work_handler, stc_ctx);
+}
+
+void wlan_dp_stc_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
+
+	dp_info("STC: deinit");
+
+	qdf_cancel_work(&stc_ctx->stc_state_work);
+	qdf_destroy_work(0, &stc_ctx->stc_state_work);
+}
+
+QDF_STATUS wlan_dp_stc_pdev_create_handler(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
+
+	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
+		dp_info("STC: Feature not enabled in config");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Wait for START vendor command before enabling STC. */
+	dp_info("STC: state %d, waiting for START cmd",
+		qdf_atomic_read(&stc_ctx->state));
+	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_dp_stc_pdev_detach_handler(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
+
+	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg))
+		return;
+
+	dp_info("STC: state %d", qdf_atomic_read(&stc_ctx->state));
+
+	/* Cancel any in-flight work. stc_state_work is not destroyed here —
+	 * it lives for the psoc lifetime and remains re-schedulable for the
+	 * next pdev create. It is destroyed only in wlan_dp_stc_ctx_deinit().
+	 */
+	qdf_cancel_work(&stc_ctx->stc_state_work);
+
+	/* Ideally only ENABLING/DISABLING need normalisation, but there is no
+	 * vendor command to send STOP before idle shutdown. Reset to DISABLED
+	 * unconditionally so the next pdev create starts from a clean state.
+	 */
+	qdf_atomic_set(&stc_ctx->state, DP_STC_STATE_DISABLED);
+
+	wlan_dp_stc_detach(dp_ctx);
+}
+
+/**
+ * wlan_dp_stc_apply_runtime_action() - Apply START/STOP action to STC state
+ * @stc_ctx: STC runtime context
+ * @action: requested action (START or STOP)
+ *
+ * Reads current state and transitions it:
+ *   DISABLED -> START : set ENABLING, schedule work, return SUCCESS
+ *   ENABLED -> STOP : set DISABLING, schedule work, return SUCCESS
+ *   ENABLED -> START : already enabled, return SUCCESS
+ *   DISABLED -> STOP : already disabled, return SUCCESS
+ *   ENABLING -> START : enable already in progress, return SUCCESS
+ *   DISABLING -> STOP : disable already in progress, return SUCCESS
+ *   ENABLING -> STOP : return E_AGAIN (retry after enable completes)
+ *   DISABLING -> START : return E_AGAIN (retry after disable completes)
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_dp_stc_apply_runtime_action(struct wlan_dp_stc_ctx *stc_ctx,
+				 enum qca_async_stats_action action)
+{
+	uint8_t cur_state = qdf_atomic_read(&stc_ctx->state);
+
+	dp_info("STC: cur_state %d action %d",
+		cur_state, action);
+
+	switch (cur_state) {
+	case DP_STC_STATE_DISABLED:
+		if (action == QCA_ASYNC_STATS_ACTION_START) {
+			qdf_atomic_set(&stc_ctx->state,
+				       DP_STC_STATE_ENABLING);
+			dp_info("STC: state DISABLED -> ENABLING, enable work scheduled");
+			qdf_sched_work(0, &stc_ctx->stc_state_work);
+		}
+		break;
+	case DP_STC_STATE_ENABLED:
+		if (action == QCA_ASYNC_STATS_ACTION_STOP) {
+			qdf_atomic_set(&stc_ctx->state,
+				       DP_STC_STATE_DISABLING);
+			dp_info("STC: state ENABLED -> DISABLING, disable work scheduled");
+			qdf_sched_work(0, &stc_ctx->stc_state_work);
+		}
+		break;
+	case DP_STC_STATE_ENABLING:
+		return action == QCA_ASYNC_STATS_ACTION_START ?
+			QDF_STATUS_SUCCESS : QDF_STATUS_E_AGAIN;
+	case DP_STC_STATE_DISABLING:
+		return action == QCA_ASYNC_STATS_ACTION_STOP ?
+			QDF_STATUS_SUCCESS : QDF_STATUS_E_AGAIN;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_dp_flow_stats_policy(enum qca_async_stats_type type,
+				     enum qca_async_stats_action action)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	switch (type) {
+	case QCA_ASYNC_STATS_TYPE_FLOW_STATS:
+		if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
+			dp_err("STC: Feature not enabled in config");
+			return QDF_STATUS_E_NOSUPPORT;
+		}
+		return wlan_dp_stc_apply_runtime_action(&dp_ctx->stc_ctx,
+							action);
+	default:
+		return wlan_dp_stc_handle_flow_stats_policy(type, action);
+	}
 }
 #endif
