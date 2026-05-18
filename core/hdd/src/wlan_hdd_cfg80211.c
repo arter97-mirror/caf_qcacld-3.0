@@ -18598,12 +18598,21 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_disable_runtime_pm_for_user(hdd_ctx);
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure HE testbed defaults %d", cfg_val);
-		if (!cfg_val)
+		if (!cfg_val) {
 			sme_reset_he_caps(hdd_ctx->mac_handle,
 					  link_info->vdev_id);
-		else
+			hdd_adapter_for_each_active_link_info(adapter, link_info) {
+				sme_set_smps_cfg(link_info->vdev_id,
+						HDD_STA_SMPS_PARAM_DYNAMIC_BW_SWITCH,
+						0);
+				sme_set_smps_cfg(link_info->vdev_id,
+						HDD_STA_SMPS_PARAM_DYNAMIC_MODE_SWITCH,
+						0);
+			}
+		} else {
 			sme_set_he_testbed_def(hdd_ctx->mac_handle,
 					       link_info->vdev_id);
+		}
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_ACTION_TX_TB_PPDU;
