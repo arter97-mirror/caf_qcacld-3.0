@@ -8890,6 +8890,10 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO] = {.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL] = {
 		.type = NLA_U16 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL] = {
+		.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE] = {
+		.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UDP_QOS_UPGRADE] = {
 		.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS] = {.type = NLA_U8 },
@@ -10741,6 +10745,8 @@ hdd_vendor_opm_to_pmo_opm(enum qca_wlan_vendor_opm_mode opm_mode)
 		return PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
 	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
 		return PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED;
+	case QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED:
+		return PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED;
 	default:
 		hdd_debug("Invalid opm_mode: %d", opm_mode);
 		return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
@@ -10755,6 +10761,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev;
 	enum qca_wlan_vendor_opm_mode opm_mode;
 	struct pmo_ps_params ps_params = {0};
+	struct pmo_ps_params curr_ps_params = {0};
 	struct nlattr *power_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER];
 	struct nlattr *opm_attr =
@@ -10763,6 +10770,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO];
 	struct nlattr *spec_wake_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL];
+	struct nlattr *ps_opm_level_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL];
+	struct nlattr *ps_latency_tolerance_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE];
 	int ret;
 
 	hdd_enter_dev(adapter->dev);
@@ -10793,14 +10804,33 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
+		if (!ps_opm_level_attr || !ps_latency_tolerance_attr) {
+			hdd_err_rl("Invalid Latency enabled OPM attributes");
+			return -EINVAL;
+		}
+	}
+
 	ret = hdd_set_power_config(hdd_ctx, adapter, &opm_mode);
 	if (ret)
 		return ret;
 
 	ps_params.opm_mode = hdd_vendor_opm_to_pmo_opm(opm_mode);
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return 0;
+	}
+
+	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED))
+		ucfg_pmo_get_ps_params(vdev, &curr_ps_params);
+
 	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
 		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
 		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
+		ps_params.ps_opm_level = curr_ps_params.ps_opm_level;
 
 		if (!ps_params.ps_ito)
 			return -EINVAL;
@@ -10811,19 +10841,36 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 
 		ret = hdd_set_power_config_params(hdd_ctx, adapter,
 						  ps_params.ps_ito,
+						  ps_params.ps_opm_level,
 						  ps_params.spec_wake);
 
 		if (ret)
 			return ret;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is null");
-		return 0;
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
+		ps_params.ps_opm_level = nla_get_u8(ps_opm_level_attr);
+		ps_params.spec_wake = nla_get_u16(ps_latency_tolerance_attr);
+		ps_params.ps_ito = curr_ps_params.ps_ito;
+
+		if (!ps_params.ps_opm_level)
+			return -EINVAL;
+
+		hdd_debug("ps_opm_level %d latency_tolerance %d opm_mode %d",
+			  ps_params.ps_opm_level, ps_params.spec_wake,
+			  ps_params.opm_mode);
+
+		ret = hdd_set_power_config_params(hdd_ctx, adapter,
+						  ps_params.ps_ito,
+						  ps_params.ps_opm_level,
+						  ps_params.spec_wake);
+
+		if (ret)
+			return ret;
 	}
 
-	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED))
 		ucfg_pmo_set_ps_params(vdev, &ps_params);
 	else
 		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
@@ -31320,16 +31367,20 @@ __wlan_hdd_cfg80211_update_connect_params(struct wiphy *wiphy,
 	mac_handle = hdd_ctx->mac_handle;
 
 	if (changed & UPDATE_ASSOC_IE) {
-		assoc_ie.len = req->ie_len;
-		assoc_ie.ptr = (uint8_t *)req->ie;
-		/*
-		 * Update this assoc IE received from user space to
-		 * umac. RSO command will pick up the assoc
-		 * IEs to be sent to firmware from the umac.
-		 */
-		ucfg_cm_update_session_assoc_ie(hdd_ctx->psoc,
+		if (!hdd_cm_is_vdev_roaming(adapter->deflink)) {
+			assoc_ie.len = req->ie_len;
+			assoc_ie.ptr = (uint8_t *)req->ie;
+			/*
+			 * Update this assoc IE received from user space to
+			 * umac. RSO command will pick up the assoc
+			 * IEs to be sent to firmware from the umac.
+			 */
+			ucfg_cm_update_session_assoc_ie(
+						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
 						&assoc_ie);
+		} else
+			hdd_debug("skip assoc ie during roam");
 	}
 
 	if ((changed & UPDATE_FILS_ERP_INFO) ||

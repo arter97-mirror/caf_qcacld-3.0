@@ -8,11 +8,6 @@
 
 #include "wlan_dp_priv.h"
 
-typedef enum {
-	STATE_UNPAUSE = 0,
-	STATE_PAUSE
-} haps_state;
-
 #ifdef WLAN_HAPS_ENABLE
 
 #define HAPS_TRY_AGAIN_TIME_NS 200000
@@ -32,10 +27,6 @@ void dp_vdev_haps_attach(struct cdp_soc *psoc, struct wlan_dp_intf *dp_intf,
 			 uint8_t vdev_id);
 
 void dp_vdev_haps_detach(struct wlan_dp_intf *dp_intf);
-
-void dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, haps_state new_state,
-			qdf_ktime_t timeout, bool is_one_shot,
-			bool is_direct_reg_write);
 
 void dp_haps_init(struct wlan_objmgr_psoc *psoc);
 
