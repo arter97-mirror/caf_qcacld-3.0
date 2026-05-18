@@ -8313,8 +8313,14 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		 * BIT 0: 2 GHz link
 		 * BIT 1: 5 GHz link
 		 * BIT 2: 6 GHz link
+		 * Populate MLO log params only for assoc/reassoc frames,
+		 * skip for auth frames.
 		 */
-		if (frame_data->band) {
+		if (frame_data->band &&
+		    (frame_data->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
+		     frame_data->subtype == MGMT_SUBTYPE_ASSOC_RESP ||
+		     frame_data->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
+		     frame_data->subtype == MGMT_SUBTYPE_REASSOC_RESP)) {
 			is_mlo = true;
 			status =
 			wlan_populate_roam_mld_log_param(vdev,
