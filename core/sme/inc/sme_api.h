@@ -3714,6 +3714,34 @@ struct omi_ctrl_tx {
 };
 
 /**
+ * gvp_ctrl_params - structure to hold GVP control parameters
+ * @ez_enter: EZ enter or exit indication
+ * @avoid_start_freq: channel start frequency to avoid in EZ (Exclusion Zone)
+ * @avoid_end_freq: channel end frequency to avoid in EZ (Exclusion Zone)
+ * @gvp_tx_power: GVP tx power level in EZ
+ */
+struct gvp_ctrl_params {
+	uint8_t ez_enter;
+	uint32_t avoid_start_freq;
+	uint32_t avoid_end_freq;
+	uint8_t gvp_tx_power;
+};
+
+/**
+ * sme_set_gvp_oper_params() - Process GVP operation parameters from userspace
+ * and set new tx power and update set_tpc command to FW
+ * @mac_handle: Pointer to mac handle
+ * @vdev_id: vdev id
+ * @gvp_data: GVP control data
+ * @gvp_oper_control: GVP operation control
+ *
+ * Return: 0 on success else err code
+ */
+int sme_set_gvp_oper_params(mac_handle_t mac_handle, uint8_t vdev_id,
+			    struct gvp_ctrl_params *gvp_data,
+			    uint8_t gvp_oper_control);
+
+/**
  * sme_notify_hw_mode_change() - Notify hardware mode change
  *
  * This function sends a notification message to PE module about hardware

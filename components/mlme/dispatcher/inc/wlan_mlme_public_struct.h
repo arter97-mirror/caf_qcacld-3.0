@@ -2802,6 +2802,7 @@ struct mlme_power_usage {
  * @current_tx_power_level: current tx power level
  * @local_power_constraint: local power constraint
  * @skip_tpe: option to not consider TPE values in 2.4G/5G bands
+ * @gvp_op_control: control to enable/disable GVP operation
  */
 struct wlan_mlme_power {
 	struct mlme_max_tx_power_24 max_tx_power_24;
@@ -2814,6 +2815,7 @@ struct wlan_mlme_power {
 	uint8_t current_tx_power_level;
 	uint8_t local_power_constraint;
 	bool skip_tpe;
+	uint8_t gvp_op_control;
 };
 
 /**

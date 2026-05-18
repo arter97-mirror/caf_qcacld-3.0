@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -172,6 +172,41 @@
 						true, \
 						"consider TPE IE in tx power")
 
+/*
+ * <ini>
+ * gvp_oper_control - GVP operation control
+ * @Min: 0
+ * @Max: 2
+ * @Default: 0
+ *
+ * Configure GVPS operation control. This ini is used to set the GVP operation
+ * mode which determines how the device should adjust its transmit power.
+ * 0 - GVP operation disabled: The device will not adjust its transmit power
+ * based on GVP information.
+ * 1 - Switch operating channel to an allowed channel within the EZ (Exclusion
+ * Zone) and set tx power to GVP limit: The device will switch to an allowed
+ * channel within the EZ and set its transmit power to the GVP limit when it
+ * receives GVP information indicating that it has entered an EZ.
+ * 2 - Stay on current channel and fallback to VLP mode and reduce the tx power
+ * to VLP (Very Low Power) when in EZ when it receives GVP information
+ * indicating that it has entered an EZ.
+ *
+ * Related: Transmit power calculation (TPC)
+ *
+ * Supported Feature: Geofence-based transmit power control (GVP)
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_GVP_OPER_CONTROL CFG_INI_UINT( \
+		"gvp_oper_control", \
+		0, \
+		2, \
+		0, \
+		CFG_VALUE_OR_DEFAULT, \
+		"GVP operation control")
+
 #define CFG_MLME_POWER_ALL \
 	CFG(CFG_MAX_TX_POWER_2_4) \
 	CFG(CFG_MAX_TX_POWER_5) \
@@ -180,6 +215,7 @@
 	CFG(CFG_SET_TXPOWER_LIMIT5G) \
 	CFG(CFG_CURRENT_TX_POWER_LEVEL) \
 	CFG(CFG_LOCAL_POWER_CONSTRAINT) \
-	CFG(CFG_SKIP_TPE_CONSIDERATION)
+	CFG(CFG_SKIP_TPE_CONSIDERATION) \
+	CFG(CFG_GVP_OPER_CONTROL)
 
 #endif /* __CFG_MLME_POWER_H */

@@ -4736,6 +4736,14 @@ mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mlme_get_gvp_op_control() - Get GVP operation control preference
+ * @psoc: pointer to psoc object
+ *
+ * Return: 1 if channel change required, 2 if fallback to VLP, 0 if GVP disabled
+ */
+uint8_t wlan_mlme_get_gvp_op_control(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_is_data_stall_recovery_fw_supported() - Check if data stall
  * recovery is supported by fw
  * @psoc: pointer to psoc object
