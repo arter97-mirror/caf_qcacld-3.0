@@ -409,7 +409,7 @@ __wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
 	tdls_stats_attr = tb[id];
 
 	if (!tdls_stats_attr) {
-		hdd_err("TDLS stats enable/disable NOT specified");
+		hdd_err_rl("TDLS stats enable/disable NOT specified");
 		return -EINVAL;
 	}
 
@@ -1715,16 +1715,29 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 
 	skb_len = hdd_tdls_stats_entry_skb_len();
 
-	hdd_debug("TDLS stats: emit dut=" QDF_MAC_ADDR_FMT " peer=" QDF_MAC_ADDR_FMT " type=%u subtype=%u success=%u reason=%u is_sender=%u data_rate=%u(x100Kbps) ch=%u rssi=%d link_id=%u session_id=%u ts_ms=%llu tx_pkts=%u tx_fail=%u rx_pkts=%u rx_fail=%u",
+	hdd_debug("TDLS stats: emit dut=" QDF_MAC_ADDR_FMT " peer=" QDF_MAC_ADDR_FMT " type=%u subtype=%u success=%u reason=%u is_sender=%u ch=%u rssi=%d link_id=%u session_id=%u ts_ms=%llu",
 		  QDF_MAC_ADDR_REF(dut_mac_addr.bytes),
 		  QDF_MAC_ADDR_REF(entry->peer_mac),
 		  entry->type, entry->subtype,
 		  entry->success, entry->reason_code, entry->is_sender,
-		  (uint32_t)entry->data_rate * 5,
 		  (uint32_t)entry->channel, (int8_t)entry->rssi, link_id,
-		  entry->session_id, entry->ts_ms,
-		  entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
-		  entry->rx_ppdus_cumulative, entry->rx_ppdu_failures);
+		  entry->session_id, entry->ts_ms);
+	if (entry->type == TDLS_STATS_DATA) {
+		char mcs_buf[192];
+		uint32_t i;
+		int pos = 0;
+
+		for (i = 0; i < TDLS_STATS_MAX_MCS_COUNTERS; i++)
+			pos += scnprintf(mcs_buf + pos, sizeof(mcs_buf) - pos,
+					 "[%u]%u/%u ", i,
+					 entry->tx_mcs_data_ppdu[i],
+					 entry->rx_mcs_data_ppdu[i]);
+		hdd_debug("TDLS stats: data_rate=%u Mbps tx_pkts=%u tx_fail=%u rx_pkts=%u rx_fail=%u mcs tx/rx: %s",
+			  (uint32_t)entry->data_rate,
+			  entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
+			  entry->rx_ppdus_cumulative, entry->rx_ppdu_failures,
+			  mcs_buf);
+	}
 
 	skb = wlan_cfg80211_vendor_event_alloc(
 				hdd_ctx->wiphy,
@@ -1810,13 +1823,10 @@ void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
 	/*
 	 * Type-5 (DATA) periodic stats — Optional; only applicable for DATA
 	 * entries.  All fields are set to 0 for non-DATA entries.
-	 *
-	 * Data rate: entry stores 0.5 Mbps units; vendor attr expects
-	 * 100 Kbps units.  Multiply by 5 (0.5 Mbps = 500 Kbps = 5 × 100 Kbps).
 	 */
 	if (entry->type == TDLS_STATS_DATA) {
 		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_DATA_RATE;
-		if (nla_put_u32(skb, attr, (uint32_t)entry->data_rate * 5))
+		if (nla_put_u32(skb, attr, (uint32_t)entry->data_rate * 10))
 			goto fail;
 
 		/* TX PPDUs (cumulative) */

@@ -149,36 +149,10 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	if (!db || !entry)
 		return QDF_STATUS_E_INVAL;
 
-	tdls_debug("TDLS stats: push peer=" QDF_MAC_ADDR_FMT
-		   " ts_ms=%llu type=%u subtype=%u success=%u reason=%u"
-		   " session=%u ch=%u rssi=%d snr=%d is_sender=%u"
-		   " data_rate=%u tx_ppdu_cum=%u tx_ppdu_fail=%u"
-		   " rx_ppdu_cum=%u rx_ppdu_fail=%u"
-		   " entries=%u/%u",
-		   QDF_MAC_ADDR_REF(entry->peer_mac),
-		   entry->ts_ms, entry->type, entry->subtype,
-		   entry->success, entry->reason_code,
-		   entry->session_id, entry->channel, entry->rssi, entry->snr,
-		   entry->is_sender,
-		   entry->data_rate,
-		   entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
-		   entry->rx_ppdus_cumulative, entry->rx_ppdu_failures,
-		   db->num_entries, db->max_entries);
-	if (entry->type == TDLS_STATS_DATA) {
-		uint8_t i;
-
-		for (i = 0; i < TDLS_STATS_MAX_MCS_COUNTERS; i++)
-			tdls_debug("TDLS stats: mcs[%u] tx=%u rx=%u",
-				   i, entry->tx_mcs_data_ppdu[i],
-				   entry->rx_mcs_data_ppdu[i]);
-	}
-
 	qdf_mutex_acquire(&db->lock);
 
 	/* Evict oldest entry if the cache is full */
 	if (db->num_entries >= db->max_entries) {
-		tdls_debug("TDLS stats: cache full (%u/%u), evicting oldest entry",
-			   db->num_entries, db->max_entries);
 		status = qdf_list_remove_front(&db->list, &old_ln);
 
 		if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -213,10 +187,31 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	node->entry = *entry;
 	qdf_list_insert_back(&db->list, &node->node);
 	db->num_entries++;
-	tdls_debug("TDLS stats: entry cached, cache now has %u entries",
-		   db->num_entries);
 
 	qdf_mutex_release(&db->lock);
+
+	tdls_debug("TDLS stats: push peer=" QDF_MAC_ADDR_FMT " ts_ms=%llu type=%u subtype=%u success=%u reason=%u session=%u ch=%u rssi=%d is_sender=%u entries=%u",
+		   QDF_MAC_ADDR_REF(entry->peer_mac),
+		   entry->ts_ms, entry->type, entry->subtype,
+		   entry->success, entry->reason_code,
+		   entry->session_id, entry->channel, entry->rssi,
+		   entry->is_sender, db->num_entries);
+	if (entry->type == TDLS_STATS_DATA) {
+		char mcs_buf[192];
+		uint8_t i;
+		int pos = 0;
+
+		for (i = 0; i < TDLS_STATS_MAX_MCS_COUNTERS; i++)
+			pos += scnprintf(mcs_buf + pos, sizeof(mcs_buf) - pos,
+					 "[%u]%u/%u ", i,
+					 entry->tx_mcs_data_ppdu[i],
+					 entry->rx_mcs_data_ppdu[i]);
+		tdls_debug("TDLS stats: data_rate=%u tx_ppdu_cum=%u tx_ppdu_fail=%u rx_ppdu_cum=%u rx_ppdu_fail=%u mcs tx/rx: %s",
+			   entry->data_rate,
+			   entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
+			   entry->rx_ppdus_cumulative, entry->rx_ppdu_failures,
+			   mcs_buf);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -871,13 +866,27 @@ void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev)
 	}
 
 	/*
-	 * Query current STA connection count and MCC status via the policy
-	 * manager.  These are the same APIs used by tdls_set_ct_mode() and
-	 * tdls_is_concurrency_allowed() for consistency.
+	 * For MLO, tdls_stats_handle_sta_connection() is invoked once per
+	 * link vdev.  The policy manager counts the MLD as 1 logical STA so
+	 * both calls would satisfy sta_count==1 && !is_mcc, causing two WMI
+	 * enable=1 commands.  Only the assoc (primary) vdev should send the
+	 * command; skip the secondary link vdev.
 	 */
-	sta_count = policy_mgr_mode_specific_connection_count(psoc,
-							      PM_STA_MODE,
-							      NULL);
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		tdls_debug("TDLS stats: skip WMI for MLO link vdev (vdev_id=%u)",
+			   wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	/*
+	 * Query current STA connection count and MCC status via the policy
+	 * manager.  Use the MLO-aware variant so that an MLO dual-link STA
+	 * (which registers two PM_STA_MODE entries) is counted as 1 logical
+	 * STA, matching the same fix applied in tdls_is_concurrency_allowed()
+	 */
+	sta_count =
+		policy_mgr_mode_specific_connection_count_with_mlo(psoc,
+								   PM_STA_MODE);
 	is_mcc = policy_mgr_is_mcc_on_any_sta_vdev(psoc);
 
 	if (sta_count == 1 && !is_mcc) {
@@ -1240,7 +1249,8 @@ tdls_stats_record_peers_teardown_loop(struct tdls_soc_priv_obj *soc_obj,
 	uint8_t peer_vdev_id;
 	struct wlan_objmgr_vdev *vdev;
 
-	for (staidx = 0; staidx < soc_obj->max_num_tdls_sta; staidx++) {
+	for (staidx = 0; staidx < soc_obj->max_num_tdls_sta &&
+	     staidx < WLAN_TDLS_STA_MAX_NUM; staidx++) {
 		if (!soc_obj->tdls_conn_info[staidx].valid_entry)
 			continue;
 

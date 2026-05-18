@@ -629,7 +629,7 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 	struct tdls_soc_priv_obj *soc_obj;
 	struct wlan_objmgr_vdev *vdev;
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
-	struct tdls_peer *peer;
+	struct tdls_peer *peer = NULL;
 	struct tdls_stats_entry entry = {0};
 
 	if (!psoc || !peer_mac)
@@ -648,19 +648,32 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 	entry.type        = type;
 	entry.subtype     = subtype;
 
-	/* Get RSSI and operating channel from the vdev */
+	/* Set channel and attempt peer lookup on the frame-submission vdev. */
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						     WLAN_TDLS_NB_ID);
 	if (vdev) {
 		entry.channel = wlan_get_operation_chan_freq(vdev);
-
 		tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
-		if (tdls_vdev_obj) {
+		if (tdls_vdev_obj)
 			peer = tdls_find_peer(tdls_vdev_obj, peer_mac);
-			if (peer)
-				entry.rssi = peer->rssi;
-		}
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+	}
+
+	/*
+	 * For MLO, tdls_frm_session_id may point to the default DP link vdev
+	 * while the TDLS peer is registered on a different link's vdev.
+	 * Fall back to a psoc-wide search so that RSSI
+	 * and channel are populated correctly.
+	 */
+	if (!peer)
+		peer = tdls_find_all_peer(soc_obj, peer_mac);
+
+	if (peer) {
+		entry.rssi = peer->rssi;
+		if (peer->vdev_priv)
+			entry.channel =
+				wlan_get_operation_chan_freq(
+						peer->vdev_priv->vdev);
 	}
 
 	wlan_tdls_stats_sm_deliver_event(soc_obj->stats_ctx,

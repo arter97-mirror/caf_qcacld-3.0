@@ -717,6 +717,16 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 		     is_tdls_setup_response_frm ||
 		     is_tdls_setup_confirm_frm ||
 		     is_tdls_teardown_frm)) {
+			pe_debug("tdls_frm_session_id: %x tx_complete: %x peer:" QDF_MAC_ADDR_FMT " self:" QDF_MAC_ADDR_FMT " is_discovery:%d is_discovery_rsp:%d is_setup_req:%d is_setup_rsp:%d is_setup_cnf:%d is_teardown:%d",
+				 mac_ctx->lim.tdls_frm_session_id, tx_complete,
+				 QDF_MAC_ADDR_REF(peer_mac),
+				 QDF_MAC_ADDR_REF(src_mac),
+				 is_tdls_discvory_frm,
+				 is_tdls_discovery_response_frm,
+				 is_tdls_setup_request_frm,
+				 is_tdls_setup_response_frm,
+				 is_tdls_setup_confirm_frm,
+				 is_tdls_teardown_frm);
 			uint8_t type, subtype;
 			uint8_t stats_reason = TDLS_STATS_REASON_GENERAL;
 			bool tx_ok = (tx_complete ==
@@ -787,13 +797,9 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 		mac_ctx->lim.tdls_frm_session_id = NO_SESSION;
 	}
 
-	pe_debug("tdls_frm_session_id: %x tx_complete: %x peer:" QDF_MAC_ADDR_FMT " self:" QDF_MAC_ADDR_FMT " is_discovery:%d is_discovery_rsp:%d is_setup_req:%d is_setup_rsp:%d is_setup_cnf:%d is_teardown:%d",
+	pe_debug("tdls_frm_session_id: %x tx_complete: %x is_discovery:%d",
 		 mac_ctx->lim.tdls_frm_session_id, tx_complete,
-		 QDF_MAC_ADDR_REF(peer_mac),
-		 QDF_MAC_ADDR_REF(src_mac),
-		 is_tdls_discvory_frm, is_tdls_discovery_response_frm,
-		 is_tdls_setup_request_frm, is_tdls_setup_response_frm,
-		 is_tdls_setup_confirm_frm, is_tdls_teardown_frm);
+		 is_tdls_discvory_frm);
 
 	if (buf)
 		qdf_nbuf_free(buf);

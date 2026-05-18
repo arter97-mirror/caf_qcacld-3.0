@@ -27,8 +27,6 @@
 #include <wlan_tdls_tgt_api.h>
 #include "../../core/src/wlan_tdls_main.h"
 #include "../../core/src/wlan_tdls_stats.h"
-#include <qdf_trace.h>
-#include <wlan_mgmt_txrx_utils_api.h>
 #include "../../core/src/wlan_tdls_cmds_process.h"
 #include "../../core/src/wlan_tdls_ct.h"
 #include "../../core/src/wlan_tdls_mgmt.h"

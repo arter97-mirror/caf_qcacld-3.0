@@ -284,8 +284,8 @@ void tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx);
  * @macaddr: MAC address of the newly added peer.
  * @rssi:    Last known RSSI for the peer (0 if not yet measured).
  *
- * Populates a struct tdls_stats_entry with type=TDLS_STATS_SETUP,
- * subtype=TDLS_STATS_SUBTYPE_REQ, is_sender=0 (responder), and delivers
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_IF_SETUP,
+ * subtype=TDLS_STATS_SUBTYPE_GENERAL, is_sender=0 (responder), and delivers
  * it to the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
  * No-op if soc_obj->stats_ctx is NULL.
  */
@@ -353,7 +353,7 @@ void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
  *               but is below the idle threshold.
  *
  * Populates a struct tdls_stats_entry with type=TDLS_STATS_TEARDOWN,
- * subtype=TDLS_STATS_SUBTYPE_GENERAL, is_sender=1, and delivers it to
+ * subtype=TDLS_STATS_SUBTYPE_COMPLETE, is_sender=1, and delivers it to
  * the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
  * No-op if soc_obj->stats_ctx is NULL.
  */
