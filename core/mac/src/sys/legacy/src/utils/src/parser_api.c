@@ -8953,7 +8953,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 			ch_width = wlan_get_bw_for_mcs_set(ch_width,
 							MLME_DOT11_MODE_11AX,
 							mac_ctx->pdev,
-							freq);
+							freq, 0);
 		}
 	}
 

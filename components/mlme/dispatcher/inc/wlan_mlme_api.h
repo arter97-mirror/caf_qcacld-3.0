@@ -5590,18 +5590,24 @@ enum phy_ch_width wlan_mlme_get_max_bw(void);
  * @dot11_mode: 802.11 mode (HT/VHT/HE/EHT)
  * @pdev: pdev pointer
  * @freq: channel frequency
+ * @punct_bitmap: puncture bitmap of the operating channel (0 if none)
  *
  * This API determines the appropriate bandwidth for MCS rate configuration
  * by considering the current channel width, maximum supported bandwidth,
  * and the 802.11 mode. It ensures firmware is populated with the highest
  * possible MCS rates for potential bandwidth upgrades.
  *
+ * The punct_bitmap must be passed for EHT peers so the regulatory channel
+ * width derivation does not treat statically-punctured subchannels as
+ * disabled and incorrectly downgrade the reported bandwidth.
+ *
  * Return: Channel width to use for MCS rate configuration
  */
 enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
 					  enum mlme_dot11_mode dot11_mode,
 					  struct wlan_objmgr_pdev *pdev,
-					  uint32_t freq);
+					  uint32_t freq,
+					  uint16_t punct_bitmap);
 
 /**
  * wlan_mlme_get_sta_ch_width() - Get current operating

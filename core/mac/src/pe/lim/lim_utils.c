@@ -6451,7 +6451,7 @@ lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
 	    session->opmode == QDF_P2P_CLIENT_MODE) {
 		bw = wlan_get_bw_for_mcs_set(ch_width, dot11_mode,
 					     mac_ctx->pdev,
-					     session->curr_op_freq);
+					     session->curr_op_freq, 0);
 	} else if ((session->opmode == QDF_SAP_MODE ||
 		    session->opmode == QDF_P2P_GO_MODE) &&
 		   (ch_width != session->ch_width) &&

@@ -1196,7 +1196,7 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 	}
 	ch_width_for_mcs_rates = wlan_get_bw_for_mcs_set(params->ch_width,
 							 MLME_DOT11_MODE_11AX,
-							 pdev, freq);
+							 pdev, freq, 0);
 	if (params->ch_width > CH_WIDTH_80MHZ ||
 	    IS_TDLS_PEER(params->staType) ||
 	    ch_width_for_mcs_rates > CH_WIDTH_80MHZ) {

@@ -2103,7 +2103,7 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 		}
 		max_ch_width = wlan_get_bw_for_mcs_set(assoc_ch_width,
 						session_entry->dot11mode, pdev,
-						lim_ch_switch->sw_target_freq);
+						lim_ch_switch->sw_target_freq, 0);
 
 		/* Allow CSA if it represents a bandwidth upgrade */
 		if (assoc_ch_width < ch_params.ch_width &&

@@ -1590,7 +1590,8 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
 					  enum mlme_dot11_mode dot11_mode,
 					  struct wlan_objmgr_pdev *pdev,
-					  uint32_t freq)
+					  uint32_t freq,
+					  uint16_t punct_bitmap)
 {
 	enum phy_ch_width mcs_bw, max_ch_width;
 	enum phy_ch_width dot_11_bw = CH_WIDTH_20MHZ;
@@ -1625,6 +1626,13 @@ enum phy_ch_width wlan_get_bw_for_mcs_set(enum phy_ch_width ch_width,
 		ch_width = mcs_bw;
 
 	ch_params.ch_width = ch_width;
+	/*
+	 * Pass the operating puncture bitmap so the regulatory channel width
+	 * derivation treats statically-punctured subchannels as intentionally
+	 * punctured (not disabled), preventing incorrect bandwidth downgrade
+	 * for EHT SAP peers operating with a non-zero puncture pattern.
+	 */
+	wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
 	wlan_reg_set_channel_params_for_pwrmode(pdev, freq,
 						0, &ch_params,
 						REG_CURRENT_PWR_MODE);

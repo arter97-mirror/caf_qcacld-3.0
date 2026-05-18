@@ -1126,12 +1126,12 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 			eht_cap->triggered_mu_bf_full_bw_fb_and_dl_mumimo);
 	WMI_EHTCAP_PHY_20MHZ_ONLY_MRU_SUPP_SET(phy_cap,
 			eht_cap->mru_support_20mhz);
-
 	peer->peer_eht_mcs_count = 0;
 	rates = &params->supportedRates;
 	ch_width_for_mcs_rates = wlan_get_bw_for_mcs_set(params->ch_width,
 							 MLME_DOT11_MODE_11BE,
-							 pdev, freq);
+							 pdev, freq,
+							 peer->puncture_bitmap);
 
 	/*
 	 * Convert eht mcs to firmware understandable format
