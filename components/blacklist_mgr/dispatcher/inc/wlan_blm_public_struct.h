@@ -52,7 +52,7 @@ enum dlm_reject_ap_source {
 struct dlm_rssi_disallow_params {
 	uint32_t retry_delay;
 	int8_t expected_rssi;
-	qdf_time_t received_time;
+	uint64_t received_time;
 	uint32_t original_timeout;
 	enum dlm_reject_ap_source source;
 };
@@ -142,7 +142,7 @@ struct reject_ap_config_params {
 	int32_t expected_rssi;
 	enum dlm_reject_ap_reason reject_reason;
 	enum dlm_reject_ap_source source;
-	qdf_time_t received_time;
+	uint64_t received_time;
 	uint32_t original_timeout;
 };
 

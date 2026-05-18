@@ -892,7 +892,7 @@ QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 		 * and hence there is a check to see if the requests are atleast
 		 * 1 second apart.
 		 */
-		current_time = (uint64_t)qdf_mc_timer_get_system_time();
+		current_time = qdf_mc_timer_get_system_time();
 		sme_debug("prev scan triggered before %llu ms, totalchannels %d",
 				current_time - rrm_scan_timer,
 				sme_rrm_ctx->channelList.numOfChannels);
@@ -903,7 +903,7 @@ QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 			req->scan_req.idle_time = 1;
 		}
 
-		rrm_scan_timer = (uint64_t)qdf_mc_timer_get_system_time();
+		rrm_scan_timer = qdf_mc_timer_get_system_time();
 
 		/* set requestType to full scan */
 		req->scan_req.chan_list.num_chan =

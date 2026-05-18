@@ -147,7 +147,7 @@ lim_collect_bss_description(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(pHdr->bssId), pBssDescr->rssi,
 		pBssDescr->rssi_raw);
 
-	pBssDescr->received_time = (uint64_t)qdf_mc_timer_get_system_time();
+	pBssDescr->received_time = qdf_mc_timer_get_system_time();
 	pBssDescr->tsf_delta = WMA_GET_RX_TSF_DELTA(pRxPacketInfo);
 	pBssDescr->seq_ctrl = pHdr->seqControl;
 
