@@ -298,6 +298,7 @@ typedef enum {
 	/* Channel switch started indication from lower layers */
 	eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND = 51,
 	eCSR_ROAM_DFS_NOL_REMOVE = 52,
+	eCSR_ROAM_EXTERNAL_AUTH_REQUEST = 53,
 
 } eRoamCmdStatus;
 
@@ -553,6 +554,7 @@ struct csr_roam_info {
 	uint32_t chan_info_freq;
 #endif
 	struct switch_channel_ind *pSirSmeSwitchChInd;
+	struct wlan_external_auth_params ext_auth_info;
 	bool is_fils_connection;
 	uint8_t vht_mcs_10_11_supp;
 	uint16_t he_mcs_12_13_map;

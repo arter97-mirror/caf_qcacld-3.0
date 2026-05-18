@@ -777,7 +777,8 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
+#if defined(WLAN_FEATURE_11BI_SECURITY) && \
+	defined(CFG80211_80211BI_AUTH_SUPPORT)
 static
 QDF_STATUS lim_initiate_external_auth_req(struct mac_context *mac_ctx,
 					  struct pe_session *session,

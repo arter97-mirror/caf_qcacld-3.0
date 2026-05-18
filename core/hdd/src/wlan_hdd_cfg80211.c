@@ -107,6 +107,7 @@
 #include <cdp_txrx_ctrl.h>
 #include "wlan_pmo_ucfg_api.h"
 #include "os_if_wifi_pos.h"
+#include "wlan_osif_priv.h"
 #include "wlan_utility.h"
 #include "wlan_reg_ucfg_api.h"
 #include "wifi_pos_api.h"
@@ -2264,6 +2265,10 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE,
 	},
+#endif
+#if defined(WLAN_FEATURE_11BI_SECURITY) && \
+		defined(CFG80211_80211BI_AUTH_SUPPORT)
+	FEATURE_EXTERNAL_AUTHENTICATION_EVENT
 #endif
 	FEATURE_TDLS_VENDOR_EVENTS
 };
@@ -26766,6 +26771,205 @@ static int wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
 
 	return errno;
 }
+
+#if defined(WLAN_FEATURE_11BI_SECURITY) && \
+	defined(CFG80211_80211BI_AUTH_SUPPORT)
+#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT                  \
+[QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX] = {            \
+	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
+	.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,     \
+},
+
+#define WLAN_EXTERNAL_AUTH_INDEX QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX
+static int
+wlan_send_external_auth_start_event(struct wireless_dev *wdev,
+				    struct wlan_external_auth_params *params)
+{
+	struct sk_buff *skb;
+	uint16_t vendor_buffer_len = 0;
+	int ret = 0;
+	uint8_t vdev_id = params->vdev_id;
+	uint32_t akm, pairwise, group, group_mgmt, auth_algo = 0;
+
+	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION */
+	vendor_buffer_len += nla_total_size(sizeof(u32));
+
+	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID */
+	vendor_buffer_len += nla_total_size(params->ssid.length);
+
+	/*
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AKM
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PAIRWISE_CIPHER
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_CIPHER
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_MGMT_CIPHER
+	 */
+	vendor_buffer_len += 5 * nla_total_size(sizeof(u32));
+
+	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MLD_ADDR */
+	vendor_buffer_len += 2 * nla_total_size(ETH_ALEN);
+
+	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB */
+	vendor_buffer_len += nla_total_size(sizeof(u16));
+
+	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA */
+	if (params->rsnxe_len)
+		vendor_buffer_len += nla_total_size(params->rsnxe_len);
+
+	skb = wlan_cfg80211_vendor_event_alloc(wdev->wiphy, wdev,
+					       vendor_buffer_len,
+					       WLAN_EXTERNAL_AUTH_INDEX,
+					       qdf_mem_malloc_flags());
+	if (!skb) {
+		hdd_err("%s: Failed to allocate skb\n", __func__);
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION,
+			QCA_WLAN_VENDOR_EXTERNAL_AUTH_START)) {
+		hdd_err("vdev:%d Failed to fill Action", vdev_id);
+		goto free_skb;
+	}
+
+	if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID,
+		    params->ssid.length, params->ssid.ssid)) {
+		hdd_err("vdev:%d Failed to fill SSID", vdev_id);
+		goto free_skb;
+	}
+
+	if (params->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)
+		auth_algo = NL80211_AUTHTYPE_IEEE8021X;
+	else if (params->auth_algo == eSIR_AUTH_TYPE_EPPKE)
+		auth_algo = NL80211_AUTHTYPE_EPPKE;
+
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO,
+			auth_algo)) {
+		hdd_err("vdev:%d Failed to fill Auth algo", vdev_id);
+		goto free_skb;
+	}
+
+	akm = wlan_crypto_get_secure_akm_available(params->akm);
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AKM,
+			osif_crypto_to_nl_suites(akm))) {
+		hdd_err("vdev:%d Failed to fill AKM", vdev_id);
+		goto free_skb;
+	}
+
+	pairwise = wlan_crypto_get_cipher_from_bitmap(params->pairwise_cipher);
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PAIRWISE_CIPHER,
+			osif_crypto_cipher_to_nl_suites(pairwise))) {
+		hdd_err("vdev:%d Failed to fill pairwise cipher", vdev_id);
+		goto free_skb;
+	}
+
+	group = wlan_crypto_get_cipher_from_bitmap(params->group_cipher);
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_CIPHER,
+			osif_crypto_cipher_to_nl_suites(group))) {
+		hdd_err("vdev:%d Failed to fill Grp Cipher", vdev_id);
+		goto free_skb;
+	}
+
+	group_mgmt =
+		wlan_crypto_get_cipher_from_bitmap(params->group_mgmt_cipher);
+	if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_MGMT_CIPHER,
+			osif_crypto_cipher_to_nl_suites(group_mgmt))) {
+		hdd_err("vdev:%d Failed to fill Grp Mgmt Cipher", vdev_id);
+		goto free_skb;
+	}
+
+	if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID,
+		    ETH_ALEN, params->bssid.bytes)) {
+		hdd_err("vdev:%d Failed to fill bssid", vdev_id);
+		goto free_skb;
+	}
+
+	if (!qdf_is_macaddr_zero(&params->mld_addr)) {
+		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR,
+			    ETH_ALEN, params->mld_addr.bytes)) {
+			hdd_err("vdev:%d Failed to fill MLD address", vdev_id);
+			goto free_skb;
+		}
+
+		hdd_debug("vdev:%d MLD_addr: " QDF_MAC_ADDR_FMT,
+			  vdev_id, QDF_MAC_ADDR_REF(params->mld_addr.bytes));
+	} else {
+		hdd_err("MLD addr is zero");
+	}
+
+	if (nla_put_u16(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB,
+			params->rsn_capab)) {
+		hdd_err("vdev:%d Failed to fill RSN Capabilities", vdev_id);
+		goto free_skb;
+	}
+
+	if (params->rsnxe_len &&
+	    nla_put(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA,
+		    params->rsnxe_len, params->rsnxe_data)) {
+		hdd_err("vdev:%d Failed to fill RSNX IE", vdev_id);
+		goto free_skb;
+	}
+
+	if (params->rsnxe_len) {
+		hdd_debug("External auth: RSNXE Dump");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   params->rsnxe_data, params->rsnxe_len);
+	}
+
+	hdd_debug("vdev:%d Initiate external auth to userspace (akm: 0x%x) auth_algo:%d pairwise:0x%x group:0x%x gp_mgmt:0x%x rsn_cap:0x%x",
+		  vdev_id, osif_crypto_to_nl_suites(akm),
+		  params->auth_algo,
+		  osif_crypto_cipher_to_nl_suites(pairwise),
+		  osif_crypto_cipher_to_nl_suites(group),
+		  osif_crypto_cipher_to_nl_suites(group_mgmt),
+		  params->rsn_capab);
+
+	cfg80211_vendor_event(skb, qdf_mem_malloc_flags());
+
+	/* skb is consumed by cfg80211_vendor_event, no need to free it here */
+	return ret;
+
+free_skb:
+	wlan_cfg80211_vendor_free_skb(skb);
+
+	return -EINVAL;
+}
+
+QDF_STATUS
+wlan_hdd_external_auth_callback(struct wlan_hdd_link_info *link_info,
+				struct wlan_external_auth_params *params)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_osif_priv *osif_priv;
+	struct wireless_dev *wdev;
+	int ret;
+
+	hdd_enter();
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wdev = osif_priv->wdev;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	ret = wlan_send_external_auth_start_event(wdev, params);
+	if (ret) {
+		hdd_err("Failed to initiate external auth eventt");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hdd_exit();
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
 
 const struct nla_policy wlan_hdd_action_oui_cap_policy[
 		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_MAX + 1] = {

@@ -3608,6 +3608,13 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 		if (roam_info)
 			wlan_hdd_sae_callback(link_info, roam_info);
 		break;
+	case eCSR_ROAM_EXTERNAL_AUTH_REQUEST:
+		if (roam_info)
+			wlan_hdd_external_auth_callback(link_info,
+							&roam_info->ext_auth_info);
+		else
+			hdd_err("roam info is null");
+		break;
 	default:
 		break;
 	}

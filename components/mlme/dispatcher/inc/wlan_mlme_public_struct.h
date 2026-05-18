@@ -3501,4 +3501,68 @@ enum sap_invalid_chan_reason_code {
 	CHAN_INDOOR_NOT_ALLOWED,
 	CHAN_NOT_IN_ACS_CONFIG,
 };
+
+/**
+ * struct wlan_external_auth_params - Parameters for external authentication
+ * @vdev_id: Vdev identifier
+ * @ssid: SSID of the AP/network. This is used for both authentication
+ * request events (driver to userspace) and authentication responses
+ * (userspace to driver).
+ * @bssid: BSSID (MAC address) of the peer AP/network. This is a mandatory
+ * attribute for authentication requests and responses.
+ * @mld_addr: MLD (Multi-Link Device) address of the peer. This is indicated
+ * by the driver to enable MLO during authentication offload to userspace.
+ * Userspace should use the interface address (on which the authentication
+ * request event reported) as its own MLD address. Driver expects MLD
+ * addresses in RA, TA, and BSSID fields of authentication frames when MLO
+ * is enabled.
+ * @pmkid: PMKID (Pairwise Master Key Identifier) used for authentication.
+ * This is a 16-byte byte array.
+ * @auth_algo: Authentication algorithm to be used, as defined by
+ * %enum nl80211_auth_type
+ * @akm: AKM (Authentication Key Management) suite of the respective
+ * authentication, as defined by WPA_AKM_* macros.
+ * @pairwise_cipher: Pairwise cipher suite of the respective authentication,
+ * as defined by WPA_CIPHER_* macros.
+ * @group_cipher: Bitfield of allowed group ciphers, as defined by WPA_CIPHER_*
+ * macros. If 0, no constraint is used for the cipher.
+ * @group_mgmt_cipher: Bitfield of allowed group management ciphers,
+ * typically WPA_CIPHER_AES_128_CMAC and WPA_CIPHER_BIP_* values.
+ * If 0, no constraint is used for the cipher.
+ * @status_code: Status code for the authentication operation. Userspace
+ * indicates the status to the driver using this attribute. %WLAN_STATUS_SUCCESS
+ * indicates successful authentication; %WLAN_STATUS_UNSPECIFIED_FAILURE
+ * can be used if userspace cannot provide a more specific failure code.
+ * This attribute is typically used only for authentication response commands
+ * (userspace to driver).
+ * @kck: Key Confirmation Key
+ * @kck_len: Length of the Key Confirmation Key
+ * @rsn_capab: RSN capabilities
+ * @rsnxe_len: Length of RSN Extension Element (RSNXE)
+ * @rsnxe_data: RSN Extension Element (RSNXE) data
+ *
+ * This structure encapsulates the parameters used for the
+ * external authentication vendor command/event.
+ * It serves as a common data carrier for both requests from the driver to
+ * userspace (to initiate or abort authentication) and responses from userspace
+ * to the driver (to indicate authentication status).
+ */
+struct wlan_external_auth_params {
+	uint8_t vdev_id;
+	struct wlan_ssid ssid;
+	struct qdf_mac_addr bssid;
+	struct qdf_mac_addr mld_addr;
+	uint8_t pmkid[PMKID_LEN];
+	uint32_t auth_algo;
+	uint32_t akm;
+	uint32_t pairwise_cipher;
+	uint32_t group_cipher;
+	uint32_t group_mgmt_cipher;
+	uint16_t status_code;
+	uint8_t kck[64];
+	uint8_t kck_len;
+	uint16_t rsn_capab;
+	uint8_t rsnxe_len;
+	uint8_t rsnxe_data[WLAN_MAX_IE_LEN + 2];
+};
 #endif
