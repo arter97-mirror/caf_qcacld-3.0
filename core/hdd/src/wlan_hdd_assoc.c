@@ -2725,7 +2725,8 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 	    adapter->device_mode == QDF_STA_MODE &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_NONE &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM &&
-	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY) {
+	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(link_info->vdev)) {
 
 		if (!hdd_handle_ipa_sta_mlo_conn(link_info, sta_ctx, &mac_addr))
 			goto set_peer_auth;
