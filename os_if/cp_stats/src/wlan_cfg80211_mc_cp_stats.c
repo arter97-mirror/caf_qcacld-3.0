@@ -1565,8 +1565,7 @@ station_adv_stats_cb_fail:
 
 struct stats_event *
 wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
-					     const uint8_t *mac_addr,
-					     int *errno)
+					     const uint8_t *mac_addr)
 {
 	void *cookie;
 	QDF_STATUS status;
@@ -1574,6 +1573,7 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 	struct osif_request *request;
 	struct request_info info = {0};
 	bool pending;
+	int errno = 0;
 	struct wlan_objmgr_psoc *psoc = NULL;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*priv),
@@ -1589,14 +1589,12 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 
 	out = qdf_mem_malloc(sizeof(*out));
 	if (!out) {
-		*errno = -ENOMEM;
 		return NULL;
 	}
 
 	request = osif_request_alloc(&params);
 	if (!request) {
 		qdf_mem_free(out);
-		*errno = -ENOMEM;
 		return NULL;
 	}
 
@@ -1612,13 +1610,12 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 						     &info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		osif_err("Failed to send stats request status: %d", status);
-		*errno = qdf_status_to_os_return(status);
 		goto get_peer_stats_fail;
 	}
 
-	*errno = osif_request_wait_for_response(request);
-	if (*errno) {
-		osif_err("wait failed or timed out ret: %d", *errno);
+	errno = osif_request_wait_for_response(request);
+	if (errno) {
+		osif_err("wait failed or timed out ret: %d", errno);
 		ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_PEER_STATS_INFO_EXT,
 						   &info, &pending);
 		goto get_peer_stats_fail;
@@ -1629,7 +1626,6 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 		osif_err("Peer stats info ext %d:%pK",
 			 priv->num_peer_stats_info_ext,
 			 priv->peer_stats_info_ext);
-		*errno = -EINVAL;
 		goto get_peer_stats_fail;
 	}
 
@@ -1662,11 +1658,13 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 		.dealloc = wlan_cfg80211_mc_cp_stats_dealloc,
 	};
 
-	out = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(vdev,
-							   mac_addr,
-							   errno);
-	if (*errno)
+	out = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(vdev, mac_addr);
+
+	if (!out) {
+		hdd_err_rl("Failed to get peer_stats");
+		*errno = -EINVAL;
 		return NULL;
+	}
 
 	request = osif_request_alloc(&params);
 	if (!request) {

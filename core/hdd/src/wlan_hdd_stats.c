@@ -207,7 +207,11 @@ static int rssi_mcs_tbl[][MAX_RSSI_MCS_INDEX] = {
 	/* 40 */
 	{-79, -76, -74, -71, -67, -63, -62, -61, -56, -54, -49, -45, -43, -39},
 	/* 80 */
-	{-76, -73, -71, -68, -64, -60, -59, -58, -53, -51, -46, -42, -46, -36}
+	{-76, -73, -71, -68, -64, -60, -59, -58, -53, -51, -46, -42, -46, -36},
+	/* 160 */
+	{-73, -70, -68, -65, -61, -57, -56, -55, -50, -48, -43, -39, -43, -33},
+	/* 320 */
+	{-70, -67, -65, -62, -58, -54, -53, -52, -47, -45, -40, -36, -40, -30}
 };
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
@@ -8469,7 +8473,6 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	struct stats_event *stats;
 	struct hdd_fw_txrx_stats txrx_stats = {0};
 	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
-	int errno = 0;
 	uint8_t *peer_addr;
 
 	if (hdd_stats->class_a_stat.is_tx_rate_version_checked &&
@@ -8483,10 +8486,11 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 
 	peer_addr = link_info->session.station.conn_info.bssid.bytes;
 	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(link_info->vdev,
-							     peer_addr,
-							     &errno);
-	if (errno)
+							     peer_addr);
+	if (!stats) {
+		hdd_err_rl("Failed to get peer_stats");
 		return;
+	}
 
 	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
 	hdd_stats->class_a_stat.tx_rate_version = txrx_stats.tx_rate.version;
