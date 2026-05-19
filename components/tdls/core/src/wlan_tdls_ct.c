@@ -437,10 +437,10 @@ void tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 {
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
 	struct tdls_soc_priv_obj *tdls_soc_obj;
-	uint8_t mac_cnt;
-	uint8_t valid_mac_entries;
 	struct tdls_conn_tracker_mac_table *mac_table;
 	struct wlan_objmgr_peer *bss_peer;
+	uint8_t mac_cnt;
+	uint8_t valid_mac_entries;
 
 	if (QDF_STATUS_SUCCESS != tdls_get_vdev_objects(vdev, &tdls_vdev_obj,
 							&tdls_soc_obj))
@@ -479,27 +479,19 @@ void tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 
 	bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_TDLS_NB_ID);
 	if (bss_peer) {
+		uint8_t *peer_mld_addr = wlan_peer_mlme_get_mldaddr(bss_peer);
+
 		if (!qdf_mem_cmp(bss_peer->macaddr, mac_addr,
 				 QDF_MAC_ADDR_SIZE)) {
 			wlan_objmgr_peer_release_ref(bss_peer, WLAN_TDLS_NB_ID);
 			return;
+		} else if (peer_mld_addr &&
+			   !qdf_mem_cmp(peer_mld_addr, mac_addr,
+					QDF_MAC_ADDR_SIZE)) {
+			wlan_objmgr_peer_release_ref(bss_peer, WLAN_TDLS_NB_ID);
+			return;
 		}
 		wlan_objmgr_peer_release_ref(bss_peer, WLAN_TDLS_NB_ID);
-	} else if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		QDF_STATUS status;
-		struct qdf_mac_addr bss_mld_addr = {0};
-
-		/*
-		 * For MLO connection, the data packets will be received with
-		 * MLD address and validating it against the link address might
-		 * cause issues when link address doesn't match with the MLD
-		 * address
-		 * Skip adding TDLS mac table entry for MLD address
-		 */
-		status = wlan_vdev_get_bss_peer_mld_mac(vdev, &bss_mld_addr);
-		if (QDF_IS_STATUS_SUCCESS(status) &&
-		    qdf_is_macaddr_equal(mac_addr, &bss_mld_addr))
-			return;
 	}
 
 	qdf_spin_lock_bh(&tdls_soc_obj->tdls_ct_spinlock);
@@ -532,10 +524,10 @@ void tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 {
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
 	struct tdls_soc_priv_obj *tdls_soc_obj;
-	uint8_t mac_cnt;
-	uint8_t valid_mac_entries;
 	struct tdls_conn_tracker_mac_table *mac_table;
 	struct wlan_objmgr_peer *bss_peer;
+	uint8_t mac_cnt;
+	uint8_t valid_mac_entries;
 
 	if (QDF_STATUS_SUCCESS != tdls_get_vdev_objects(vdev, &tdls_vdev_obj,
 							&tdls_soc_obj))
@@ -570,27 +562,19 @@ void tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 		return;
 	bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_TDLS_NB_ID);
 	if (bss_peer) {
+		uint8_t *peer_mld_addr = wlan_peer_mlme_get_mldaddr(bss_peer);
+
 		if (!qdf_mem_cmp(bss_peer->macaddr, mac_addr,
 				 QDF_MAC_ADDR_SIZE)) {
 			wlan_objmgr_peer_release_ref(bss_peer, WLAN_TDLS_NB_ID);
 			return;
+		} else if (peer_mld_addr &&
+			   !qdf_mem_cmp(peer_mld_addr, mac_addr,
+					QDF_MAC_ADDR_SIZE)) {
+			wlan_objmgr_peer_release_ref(bss_peer, WLAN_TDLS_NB_ID);
+			return;
 		}
 		wlan_objmgr_peer_release_ref(bss_peer, WLAN_TDLS_NB_ID);
-	} else if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		QDF_STATUS status;
-		struct qdf_mac_addr bss_mld_addr = {0};
-
-		/*
-		 * For MLO connection, the data packets will be received with
-		 * MLD address and validating it against the link address might
-		 * cause issues when link address doesn't match with the MLD
-		 * address
-		 * Skip adding TDLS mac table entry for MLD address
-		 */
-		status = wlan_vdev_get_bss_peer_mld_mac(vdev, &bss_mld_addr);
-		if (QDF_IS_STATUS_SUCCESS(status) &&
-		    qdf_is_macaddr_equal(mac_addr, &bss_mld_addr))
-			return;
 	}
 
 	qdf_spin_lock_bh(&tdls_soc_obj->tdls_ct_spinlock);
