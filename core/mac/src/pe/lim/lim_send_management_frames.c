@@ -6340,6 +6340,12 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 				qdf_status);
 			/* Pkt will be freed up by the callback */
 		}
+
+		/*
+		 * If ack is not required, update the Disassoc tx vdev_id as the
+		 * disconnect sent vdev
+		 */
+		lim_update_disconnect_vdev_id(mac, pe_session->vdev_id);
 	}
 } /* End lim_send_disassoc_mgmt_frame. */
 
@@ -6599,6 +6605,12 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 				qdf_status);
 			/* Pkt will be freed up by the callback */
 		}
+
+		/*
+		 * If ack is not required, update the Deauth tx vdev_id as the
+		 * disconnect sent vdev
+		 */
+		lim_update_disconnect_vdev_id(mac, pe_session->vdev_id);
 	}
 
 } /* End lim_send_deauth_mgmt_frame. */
