@@ -8636,12 +8636,15 @@ enum rateid lim_get_min_session_txrate(struct pe_session *session)
 /**
  * lim_override_vdev_id_broadcast() - Function to update vdev_id
  * @frame: Pointer to management frame buffer
+ * @frame_type: Frame type
  * @vdev_id: vdev id
  *
  * Return: Overridden vdev id as needed
  */
 static inline uint16_t
-lim_override_vdev_id_broadcast(uint8_t *frame, uint16_t vdev_id)
+lim_override_vdev_id_broadcast(uint8_t *frame,
+			       uint8_t frame_type,
+			       uint16_t vdev_id)
 {
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)(frame + 4)) &&
 	    !vdev_id)
@@ -8651,9 +8654,15 @@ lim_override_vdev_id_broadcast(uint8_t *frame, uint16_t vdev_id)
 }
 #else
 static inline uint16_t
-lim_override_vdev_id_broadcast(uint8_t *frame, uint16_t vdev_id)
+lim_override_vdev_id_broadcast(uint8_t *frame,
+			       uint8_t frame_type,
+			       uint16_t vdev_id)
 {
-	return vdev_id;
+	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)(frame + 4)) &&
+	    !vdev_id && frame_type == SIR_MAC_MGMT_ACTION)
+		return SME_SESSION_ID_BROADCAST;
+	else
+		return vdev_id;
 }
 #endif
 
@@ -8672,7 +8681,7 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 	if (!sme_mgmt_frame)
 		return;
 
-	session_id = lim_override_vdev_id_broadcast(frame, session_id);
+	session_id = lim_override_vdev_id_broadcast(frame, frame_type, session_id);
 
 	sme_mgmt_frame->frame_len = frame_len;
 	sme_mgmt_frame->sessionId = session_id;
