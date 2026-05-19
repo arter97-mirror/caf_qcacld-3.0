@@ -121,6 +121,7 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_nan_api_i.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature

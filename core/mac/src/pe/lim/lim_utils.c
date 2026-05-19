@@ -73,7 +73,6 @@
 #include <wlan_dlm_api.h>
 #include <lim_assoc_utils.h>
 #include "wlan_mlme_ucfg_api.h"
-#include "nan_ucfg_api.h"
 #include "wlan_twt_ucfg_ext_cfg.h"
 #ifdef WLAN_FEATURE_11BE
 #include "wma_eht.h"
@@ -6137,7 +6136,7 @@ static QDF_STATUS lim_send_ht_caps_ie(struct mac_context *mac_ctx,
 					 NSS_CHAINS_BAND_2GHZ);
 
 	nan_beamforming_supported =
-		ucfg_nan_is_beamforming_supported(mac_ctx->psoc);
+		wlan_nan_is_beamforming_supported(mac_ctx->psoc);
 	if (device_mode == QDF_NDI_MODE && !nan_beamforming_supported) {
 		p_ht_cap->txBF = 0;
 		p_ht_cap->implicitTxBF = 0;
@@ -6205,7 +6204,7 @@ static QDF_STATUS lim_send_vht_caps_ie(struct mac_context *mac_ctx,
 					  NSS_CHAINS_BAND_5GHZ);
 
 	nan_beamforming_supported =
-		ucfg_nan_is_beamforming_supported(mac_ctx->psoc);
+		wlan_nan_is_beamforming_supported(mac_ctx->psoc);
 	if (device_mode == QDF_NDI_MODE && !nan_beamforming_supported) {
 		p_vht_cap->muBeamformeeCap = 0;
 		p_vht_cap->muBeamformerCap = 0;
@@ -8655,7 +8654,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	he_cap = (struct he_capability_info *) (&he_caps[2 + HE_CAP_OUI_SIZE]);
 
 	nan_beamforming_supported =
-		ucfg_nan_is_beamforming_supported(mac_ctx->psoc);
+		wlan_nan_is_beamforming_supported(mac_ctx->psoc);
 	if (device_mode == QDF_NDI_MODE && !nan_beamforming_supported) {
 		he_cap->su_beamformee = 0;
 		he_cap->su_beamformer = 0;

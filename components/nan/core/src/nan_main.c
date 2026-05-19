@@ -2355,9 +2355,16 @@ bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc)
 		ucfg_is_nan_conc_control_supported(psoc));
 }
 
-bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
+bool nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
-	return ucfg_nan_is_beamforming_supported(psoc);
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return false;
+	}
+
+	return nan_obj->nan_caps.ndi_txbf_supported;
 }
 
 /**

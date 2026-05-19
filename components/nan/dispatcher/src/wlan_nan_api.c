@@ -57,6 +57,11 @@ bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc)
 	return nan_is_disc_active(psoc);
 }
 
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return nan_is_beamforming_supported(psoc);
+}
+
 bool wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc)
 {
 	return cfg_nan_is_eht_cap_enable(psoc);

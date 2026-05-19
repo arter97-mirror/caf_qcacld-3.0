@@ -235,14 +235,6 @@ bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_nan_is_beamforming_supported- Get support for beamforing
- * @psoc: pointer to psoc object
- *
- * Return: True if beamforming is supported, false if not.
- */
-bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
-
-/**
  * wlan_is_nan_allowed_on_freq() - Check if NAN is allowed on given freq
  * @pdev: pdev context
  * @freq: Frequency to be checked
@@ -397,12 +389,6 @@ static inline
 QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_E_FAILURE;
-}
-
-static inline
-bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
 }
 
 static inline

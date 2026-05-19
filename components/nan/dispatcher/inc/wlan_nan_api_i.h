@@ -57,6 +57,15 @@ uint8_t wlan_nan_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
 bool wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_nan_is_beamforming_supported() - Check if beamforming is supported on
+ * NDI
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if beamforming is supported, false if not.
+ */
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_nan_vdev_delete_all_pasn_peers: send delete all pasn peers cmd to FW
  * @vdev: pointer to vdev object
  *
@@ -167,6 +176,12 @@ uint8_t wlan_nan_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
 
 static inline bool
 wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

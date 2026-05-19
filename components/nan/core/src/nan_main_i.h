@@ -338,6 +338,14 @@ bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq,
 bool nan_is_disc_active(struct wlan_objmgr_psoc *psoc);
 
 /*
+ * nan_is_beamforming_supported: Check if beamforming is supported on NDI
+ * @psoc: PSOC object
+ *
+ * Return: True if ndi_txbf_supported capability is set, False otherwise
+ */
+bool nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
+
+/*
  * nan_get_connection_info: Gets connection info of the NAN Discovery interface
  * @psoc: PSOC object
  * @chan: NAN Social channel to be returned

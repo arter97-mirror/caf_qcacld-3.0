@@ -1239,15 +1239,7 @@ ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc)
 
 bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return false;
-	}
-
-	return psoc_nan_obj->nan_caps.ndi_txbf_supported;
+	return wlan_nan_is_beamforming_supported(psoc);
 }
 
 bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
