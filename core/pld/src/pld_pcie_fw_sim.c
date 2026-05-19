@@ -35,6 +35,48 @@
 
 #endif
 
+/**
+ * pld_pcie_fw_sim_update_event() - update wlan driver status callback function
+ * @pdev: PCIE device
+ * @uevent_data: driver uevent data
+ *
+ * This function will be called when platform driver wants to update wlan
+ * driver's status.
+ *
+ * Return: 0 for success, non zero for error code
+ */
+static int pld_pcie_fw_sim_update_event(struct pci_dev *pdev,
+					struct cnss_uevent_data *uevent_data)
+{
+	struct pld_context *pld_context;
+	struct pld_uevent_data data = {0};
+	struct cnss_hang_event *hang_event;
+
+	pld_context = pld_get_global_context();
+
+	if (!pld_context || !uevent_data)
+		return -EINVAL;
+
+	switch (uevent_data->status) {
+	case CNSS_HANG_EVENT:
+		if (!uevent_data->data)
+			return -EINVAL;
+		hang_event = (struct cnss_hang_event *)uevent_data->data;
+		data.uevent = PLD_FW_HANG_EVENT;
+		data.hang_data.hang_event_data = hang_event->hang_event_data;
+		data.hang_data.hang_event_data_len =
+					hang_event->hang_event_data_len;
+		break;
+	default:
+		return 0;
+	}
+
+	if (pld_context->ops->uevent)
+		pld_context->ops->uevent(&pdev->dev, &data);
+
+	return 0;
+}
+
 #ifdef CONFIG_PLD_IPCIE_FW_SIM
 /**
  * pld_pcie_fw_sim_probe() - Probe function for PCIE platform driver
@@ -599,6 +641,7 @@ struct cnss_wlan_driver pld_pcie_fw_sim_ops = {
 	.modem_status   = pld_pcie_fw_sim_notify_handler,
 	.update_status  = pld_pcie_fw_sim_uevent,
 	.set_therm_cdev_state = pld_pcie_fw_sim_set_thermal_state,
+	.update_event = pld_pcie_fw_sim_update_event,
 };
 
 /**
