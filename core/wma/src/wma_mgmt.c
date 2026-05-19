@@ -4278,6 +4278,21 @@ wma_check_and_process_rmf_frame(tp_wma_handle wma_handle,
 	     iface->type != WMI_VDEV_TYPE_NAN) && !iface->rmfEnabled)
 		return 0;
 
+	/*
+	 * For NAN vdev operating in standard mode, broadcast/multicast
+	 * management frames are not BIP-protected. Skip RMF processing
+	 * for unencrypted BC/MC frames to allow them to be passed up to
+	 * the upper layers without failing BIP cipher validation.
+	 */
+	if (iface->type == WMI_VDEV_TYPE_NAN &&
+	    tgt_nan_is_fw_support_standard_mode(wma_handle->psoc) &&
+	    (qdf_is_macaddr_group((struct qdf_mac_addr *)hdr->i_addr1) ||
+	     qdf_is_macaddr_broadcast((struct qdf_mac_addr *)hdr->i_addr1)) &&
+	    !(hdr->i_fc[1] & IEEE80211_FC1_WEP)) {
+		wma_debug("NAN std mode: skip RMF for unencrypted BC/MC mgmt frame");
+		return 0;
+	}
+
 	if (qdf_is_macaddr_group((struct qdf_mac_addr *)(hdr->i_addr1)) ||
 	    qdf_is_macaddr_broadcast((struct qdf_mac_addr *)(hdr->i_addr1)) ||
 	    wma_get_peer_pmf_status(wma_handle, hdr->i_addr2) ||
