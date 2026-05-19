@@ -34,6 +34,7 @@
 #include <cdp_txrx_peer_ops.h>
 #include <wlan_utility.h>
 #include <wlan_tdls_stats_api.h>
+#include <wlan_tdls_api.h>
 
 static inline struct wlan_lmac_if_tdls_rx_ops *
 target_if_tdls_get_rx_ops(struct wlan_objmgr_psoc *psoc)
@@ -254,6 +255,7 @@ target_if_tdls_stats_event_handler(ol_scn_t scn, uint8_t *data,
 	struct tdls_stats_batch batch;
 	uint32_t total;
 	QDF_STATUS status;
+	uint32_t i;
 
 	if (!scn || !data) {
 		target_if_err("TDLS stats: scn: 0x%pK, data: 0x%pK",
@@ -305,6 +307,9 @@ target_if_tdls_stats_event_handler(ol_scn_t scn, uint8_t *data,
 		target_if_tdls_fill_stats_entries(&stats_event, entries);
 		batch.num_entries = total;
 		batch.entries     = entries;
+		for (i = 0; i < total; i++)
+			wlan_tdls_stats_entry_find_vdev_info(&entries[i], psoc);
+
 		wlan_tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 						 TDLS_STATS_EV_FW_STATS,
 						 sizeof(batch), &batch);

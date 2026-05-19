@@ -263,6 +263,11 @@ enum tdls_stats_sm_evt {
  * @session_id:          Per-peer session identifier.  Incremented each time
  *                       the TDLS link with this peer is torn down and
  *                       re-established.
+ * @dut_mac:             DUT MAC address snapshotted at cache time.  For MLO
+ *                       sessions this is the MLD address; for non-MLO
+ *                       sessions it is the vdev MAC address.
+ * @link_id:             MLO link ID snapshotted at cache time.  Set to
+ *                       %WLAN_INVALID_LINK_ID for non-MLO sessions.
  *
  * This structure holds all data for a single TDLS stats event.  It is
  * the unit of storage in the TDLS stats cache database
@@ -308,6 +313,14 @@ struct tdls_stats_entry {
 	uint32_t rx_ppdu_failures;
 
 	uint32_t session_id;
+
+	/*
+	 * Vdev-derived fields snapshotted at cache time so that emit-time
+	 * derivation is not affected by a subsequent reconnection with
+	 * different MLO characteristics.
+	 */
+	uint8_t  dut_mac[QDF_MAC_ADDR_SIZE];
+	uint8_t  link_id;
 };
 
 /**

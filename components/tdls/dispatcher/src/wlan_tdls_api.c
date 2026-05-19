@@ -31,6 +31,7 @@
 #include <wlan_objmgr_cmn.h>
 #include "wlan_tdls_cfg_api.h"
 #include "wlan_tdls_stats_api.h"
+#include "../../core/src/wlan_tdls_stats.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
 #include <wlan_mlo_mgr_link_switch.h>
@@ -155,7 +156,7 @@ release_ref:
 void  wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 					      struct wlan_objmgr_vdev *vdev)
 {
-	uint8_t sta_count;
+	uint32_t sta_count;
 	enum QDF_OPMODE opmode;
 	bool tgt_tdls_concurrency_supported;
 
@@ -163,9 +164,9 @@ void  wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 		wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					      WLAN_TDLS_CONCURRENCIES_SUPPORT);
 	/* Don't initiate teardown in case of STA + P2P Client concurreny */
-	sta_count = policy_mgr_mode_specific_connection_count(psoc,
-							      PM_STA_MODE,
-							      NULL);
+	sta_count =
+		policy_mgr_mode_specific_connection_count_with_mlo(psoc,
+								   PM_STA_MODE);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	if (tgt_tdls_concurrency_supported && opmode == QDF_P2P_CLIENT_MODE &&
 	    sta_count) {
@@ -618,6 +619,18 @@ struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 	return tdls_find_peer(vdev_obj, macaddr);
 }
 
+void wlan_tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
+					  struct wlan_objmgr_psoc *psoc)
+{
+	tdls_stats_entry_fill_vdev_info(entry, psoc);
+}
+
+void wlan_tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
+					  struct wlan_objmgr_psoc *psoc)
+{
+	tdls_stats_entry_find_vdev_info(entry, psoc);
+}
+
 void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id,
 				       const uint8_t *peer_mac,
@@ -662,19 +675,22 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 	/*
 	 * For MLO, tdls_frm_session_id may point to the default DP link vdev
 	 * while the TDLS peer is registered on a different link's vdev.
-	 * Fall back to a psoc-wide search so that RSSI
-	 * and channel are populated correctly.
+	 * Fall back to a psoc-wide search to populate RSSI; channel is only
+	 * taken from the peer's vdev if it was not already set from the
+	 * frame-submission vdev above.
 	 */
 	if (!peer)
 		peer = tdls_find_all_peer(soc_obj, peer_mac);
 
 	if (peer) {
 		entry.rssi = peer->rssi;
-		if (peer->vdev_priv)
+		if (!entry.channel && peer->vdev_priv)
 			entry.channel =
 				wlan_get_operation_chan_freq(
 						peer->vdev_priv->vdev);
 	}
+
+	wlan_tdls_stats_entry_fill_vdev_info(&entry, psoc);
 
 	wlan_tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 					 TDLS_STATS_EV_NEW_EVENT,

@@ -396,4 +396,35 @@ void tdls_stats_record_peers_teardown(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS tdls_get_tdls_stats(struct tdls_stats_context *stats_ctx,
 			       bool enable);
 
+/**
+ * tdls_stats_entry_fill_vdev_info() - Snapshot dut_mac and link_id into a
+ *                                     stats entry.
+ * @entry: Stats entry to populate.
+ * @psoc:  PSOC used to look up the vdev by entry->session_id.
+ *
+ * Called at cache time so the entry carries the correct DUT MAC and link ID
+ * regardless of any subsequent reconnection.
+ *
+ * Core-internal only — callers outside the core layer must use the
+ * dispatcher wrapper wlan_tdls_stats_entry_fill_vdev_info().
+ */
+void tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
+				     struct wlan_objmgr_psoc *psoc);
+
+/**
+ * tdls_stats_entry_find_vdev_info() - Resolve per-peer vdev then fill
+ *                                     dut_mac and link_id into entry.
+ * @entry: Stats entry whose peer_mac is used to locate the correct vdev.
+ * @psoc:  PSOC for the psoc-wide peer lookup.
+ *
+ * Use instead of tdls_stats_entry_fill_vdev_info() when entry->session_id
+ * may not reflect the peer's actual registered vdev (e.g. FW batch events
+ * that carry a single ev->vdev_id for all peers).
+ *
+ * Core-internal only — callers outside the core layer must use the
+ * dispatcher wrapper wlan_tdls_stats_entry_find_vdev_info().
+ */
+void tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
+				     struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_TDLS_STATS_H_ */

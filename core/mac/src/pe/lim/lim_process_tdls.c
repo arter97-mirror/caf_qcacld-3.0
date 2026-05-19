@@ -626,6 +626,9 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 	bool is_tdls_teardown_frm = false;
 	uint8_t *peer_mac = NULL;
 	uint8_t *src_mac = NULL;
+	uint8_t type, subtype;
+	uint8_t stats_reason = TDLS_STATS_REASON_GENERAL;
+	bool tx_ok = (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
 
 
 	if (NO_SESSION != mac_ctx->lim.tdls_frm_session_id) {
@@ -727,10 +730,6 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 				 is_tdls_setup_response_frm,
 				 is_tdls_setup_confirm_frm,
 				 is_tdls_teardown_frm);
-			uint8_t type, subtype;
-			uint8_t stats_reason = TDLS_STATS_REASON_GENERAL;
-			bool tx_ok = (tx_complete ==
-				      WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
 
 			if (is_tdls_discvory_frm) {
 				type    = TDLS_STATS_DISCOVERY;
@@ -795,11 +794,11 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 				mac_ctx->lim.tdls_frm_session_id,
 				tx_complete);
 		mac_ctx->lim.tdls_frm_session_id = NO_SESSION;
+	} else {
+		pe_debug("tdls_frm_session_id: %x tx_complete: %x is_discovery:%d",
+			 mac_ctx->lim.tdls_frm_session_id, tx_complete,
+			 is_tdls_discvory_frm);
 	}
-
-	pe_debug("tdls_frm_session_id: %x tx_complete: %x is_discovery:%d",
-		 mac_ctx->lim.tdls_frm_session_id, tx_complete,
-		 is_tdls_discvory_frm);
 
 	if (buf)
 		qdf_nbuf_free(buf);

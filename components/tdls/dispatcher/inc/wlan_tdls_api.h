@@ -278,6 +278,32 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 				       uint8_t reason_code);
 
 /**
+ * wlan_tdls_stats_entry_fill_vdev_info() - Snapshot dut_mac and link_id
+ *                                          into a stats entry.
+ * @entry: Stats entry to populate.
+ * @psoc:  PSOC used to look up the vdev by entry->session_id.
+ *
+ * Dispatcher wrapper around tdls_stats_entry_fill_vdev_info().  Must be
+ * called while the vdev is still valid (at entry construction time).
+ */
+void wlan_tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
+					  struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_tdls_stats_entry_find_vdev_info() - Resolve per-peer vdev then
+ *                                             fill dut_mac and link_id.
+ * @entry: Stats entry whose peer_mac is used to find the correct vdev.
+ * @psoc:  PSOC for the psoc-wide peer lookup.
+ *
+ * Use instead of wlan_tdls_stats_entry_fill_vdev_info() when
+ * entry->session_id may be wrong (e.g. FW batch events that carry a single
+ * ev->vdev_id for all peers).  Corrects session_id from the peer's actual
+ * registered vdev before stamping dut_mac and link_id.
+ */
+void wlan_tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
+					  struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_tdls_teardown_links_for_non_dbs() - notify TDLS module to teardown
  * TDLS links for non-DBS target
  * @psoc: psoc object
@@ -443,6 +469,16 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 				       uint8_t subtype,
 				       bool success,
 				       uint8_t reason_code)
+{}
+
+static inline
+void wlan_tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
+					  struct wlan_objmgr_psoc *psoc)
+{}
+
+static inline
+void wlan_tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
+					  struct wlan_objmgr_psoc *psoc)
 {}
 
 static inline

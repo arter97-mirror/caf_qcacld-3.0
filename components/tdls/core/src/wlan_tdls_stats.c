@@ -41,6 +41,7 @@
 #include "wlan_tdls_stats.h"
 #include <wlan_tdls_cfg_api.h>
 #include <wlan_tdls_stats_public_structs.h>
+#include "wlan_objmgr_vdev_obj.h"
 #include <wlan_sm_engine.h>
 #include "wlan_tdls_tgt_api.h"
 #include "wlan_policy_mgr_public_struct.h"
@@ -128,6 +129,78 @@ void tdls_stats_db_deinit(struct tdls_stats_db *db)
 	qdf_mutex_destroy(&db->lock);
 }
 
+void tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
+				     struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!entry || !psoc)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, entry->session_id,
+						    WLAN_TDLS_NB_ID);
+	if (!vdev) {
+		tdls_debug("TDLS stats: vdev %u not found, dut_mac will be zero",
+			   entry->session_id);
+		qdf_mem_zero(entry->dut_mac, QDF_MAC_ADDR_SIZE);
+		entry->link_id = WLAN_INVALID_LINK_ID;
+		return;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		qdf_mem_copy(entry->dut_mac,
+			     wlan_vdev_mlme_get_mldaddr(vdev),
+			     QDF_MAC_ADDR_SIZE);
+		entry->link_id = wlan_vdev_get_link_id(vdev);
+	} else {
+		qdf_mem_copy(entry->dut_mac,
+			     wlan_vdev_mlme_get_macaddr(vdev),
+			     QDF_MAC_ADDR_SIZE);
+		entry->link_id = WLAN_INVALID_LINK_ID;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+}
+
+void tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
+				     struct wlan_objmgr_psoc *psoc)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+	struct tdls_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	if (!entry || !psoc)
+		return;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj)
+		return;
+
+	/*
+	 * wlan_objmgr_iterate_obj_list() (used by tdls_find_all_peer)
+	 * serializes the vdev list walk, but the peer pointer it returns is
+	 * not reference-counted. Take an objmgr ref on the peer's vdev before
+	 * reading its ID so a concurrent teardown cannot free the vdev in
+	 * between; wlan_objmgr_vdev_try_get_ref() fails cleanly (instead of
+	 * operating on a half-torn-down object) if the vdev has already left
+	 * the CREATED state.
+	 */
+	peer = tdls_find_all_peer(soc_obj, entry->peer_mac);
+	if (peer && peer->vdev_priv) {
+		vdev = peer->vdev_priv->vdev;
+		status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			entry->session_id = wlan_vdev_get_id(vdev);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+		} else {
+			entry->session_id = WLAN_UMAC_VDEV_ID_MAX;
+		}
+	}
+
+	tdls_stats_entry_fill_vdev_info(entry, psoc);
+}
+
 /**
  * tdls_stats_push() - Insert a stats entry into the cache database.
  * @db: TDLS stats cache database.
@@ -145,6 +218,7 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	struct tdls_stats_node *node;
 	qdf_list_node_t *old_ln = NULL;
 	QDF_STATUS status;
+	uint32_t num_entries = 0;
 
 	if (!db || !entry)
 		return QDF_STATUS_E_INVAL;
@@ -187,15 +261,17 @@ static QDF_STATUS tdls_stats_push(struct tdls_stats_db *db,
 	node->entry = *entry;
 	qdf_list_insert_back(&db->list, &node->node);
 	db->num_entries++;
+	num_entries = db->num_entries;
 
 	qdf_mutex_release(&db->lock);
 
-	tdls_debug("TDLS stats: push peer=" QDF_MAC_ADDR_FMT " ts_ms=%llu type=%u subtype=%u success=%u reason=%u session=%u ch=%u rssi=%d is_sender=%u entries=%u",
-		   QDF_MAC_ADDR_REF(entry->peer_mac),
+	tdls_debug("TDLS stats: push dut=" QDF_MAC_ADDR_FMT " peer=" QDF_MAC_ADDR_FMT " link_id=%u ts_ms=%llu type=%u subtype=%u success=%u reason=%u session=%u ch=%u rssi=%d is_sender=%u entries=%u",
+		   QDF_MAC_ADDR_REF(entry->dut_mac),
+		   QDF_MAC_ADDR_REF(entry->peer_mac), entry->link_id,
 		   entry->ts_ms, entry->type, entry->subtype,
 		   entry->success, entry->reason_code,
 		   entry->session_id, entry->channel, entry->rssi,
-		   entry->is_sender, db->num_entries);
+		   entry->is_sender, num_entries);
 	if (entry->type == TDLS_STATS_DATA) {
 		char mcs_buf[192];
 		uint8_t i;
@@ -584,6 +660,12 @@ static void tdls_stats_state_enabling_exit(void *ctx)
 	tdls_debug("TDLS stats: exiting ENABLING state");
 }
 
+static QDF_STATUS tdls_stats_enable_flush_cb(struct scheduler_msg *msg)
+{
+	/* stats_ctx is psoc-owned; nothing to free */
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * tdls_stats_state_enabling_event() - Event handler for ENABLING parent state.
  * @ctx: TDLS stats context (struct tdls_stats_context *)
@@ -610,6 +692,7 @@ static bool tdls_stats_state_enabling_event(void *ctx, uint16_t event,
 	switch (event) {
 	case TDLS_STATS_EV_ENABLE:
 		msg.callback = tdls_process_cmd;
+		msg.flush_callback = tdls_stats_enable_flush_cb;
 		msg.type = TDLS_STATS_ENABLE;
 		msg.bodyptr = stats_ctx;
 		status = scheduler_post_message(QDF_MODULE_ID_TDLS,
@@ -1103,6 +1186,7 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.rssi        = rssi;
 	entry.channel     = wlan_get_operation_chan_freq(vdev);
+	tdls_stats_entry_fill_vdev_info(&entry, soc_obj->soc);
 
 	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 				    TDLS_STATS_EV_NEW_EVENT,
@@ -1150,6 +1234,7 @@ void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
 	entry.reason_code = reason_code;
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.channel     = wlan_get_operation_chan_freq(vdev);
+	tdls_stats_entry_fill_vdev_info(&entry, soc_obj->soc);
 
 	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 				    TDLS_STATS_EV_NEW_EVENT,
@@ -1180,6 +1265,7 @@ void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
 	entry.session_id  = wlan_vdev_get_id(vdev);
 	entry.rssi        = rssi;
 	entry.channel     = wlan_get_operation_chan_freq(vdev);
+	tdls_stats_entry_fill_vdev_info(&entry, soc_obj->soc);
 
 	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 				    TDLS_STATS_EV_NEW_EVENT,
@@ -1218,6 +1304,7 @@ void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
 		if (peer)
 			entry.rssi = peer->rssi;
 	}
+	tdls_stats_entry_fill_vdev_info(&entry, soc_obj->soc);
 
 	tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
 				    TDLS_STATS_EV_NEW_EVENT,
