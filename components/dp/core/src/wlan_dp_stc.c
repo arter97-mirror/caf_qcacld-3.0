@@ -320,7 +320,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 				       struct wlan_dp_stc_sampling_candidate *candidate,
 				       struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_stc_sampling_table *s_table =
 					dp_stc->sampling_flow_table;
 	bool rx_flow_valid = false, tx_flow_valid = false;
@@ -497,7 +497,7 @@ wlan_dp_stc_find_ul_flow(struct wlan_dp_stc *dp_stc, uint16_t rx_flow_id,
 			 uint64_t rx_flow_tuple_hash, uint16_t *tx_flow_id,
 			 uint64_t *tx_flow_metadata)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	uint16_t flow_id;
 
 	if (!dp_ctx->gl_flow_recs)
@@ -526,7 +526,7 @@ static inline QDF_STATUS
 wlan_dp_send_txrx_sample(struct wlan_dp_stc *dp_stc,
 			 struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
 	uint32_t flags = WLAN_DP_TXRX_SAMPLES_READY;
 
@@ -544,7 +544,7 @@ static inline QDF_STATUS
 wlan_dp_send_flow_report(struct wlan_dp_stc *dp_stc,
 			 struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
 	uint32_t flags = 0;
 
@@ -570,7 +570,7 @@ static inline QDF_STATUS
 wlan_dp_send_burst_sample(struct wlan_dp_stc *dp_stc,
 			  struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
 	uint32_t flags = WLAN_DP_BURST_SAMPLES_READY;
 
@@ -589,7 +589,7 @@ wlan_dp_stc_send_flow_status(struct wlan_dp_stc *dp_stc,
 			     struct wlan_dp_stc_classified_flow_entry *c_entry,
 			     enum qca_flow_status_update_type status)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
 	struct wlan_dp_stc_flow_status flow_status;
 
@@ -608,7 +608,7 @@ static inline QDF_STATUS
 wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 					struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_stc_sampling_table *s_table =
 					dp_stc->sampling_flow_table;
 	struct dp_fisa_rx_sw_ft *rx_flow;
@@ -667,7 +667,7 @@ static inline uint64_t
 wlan_dp_stc_get_tx_flow_pkts(struct wlan_dp_stc *dp_stc,
 			     struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_spm_flow_info *tx_flow;
 
 	/* Check if TX flow is valid */
@@ -689,7 +689,7 @@ static inline uint64_t
 wlan_dp_stc_get_rx_flow_pkts(struct wlan_dp_stc *dp_stc,
 			     struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct dp_fisa_rx_sw_ft *rx_flow;
 
 	/* Check if RX flow is valid */
@@ -787,7 +787,7 @@ static inline uint64_t
 wlan_dp_stc_get_peer_tx_pkts(struct wlan_dp_stc *dp_stc,
 			     struct wlan_dp_stc_peer_traffic_context *peer_tc)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	cdp_config_param_type val = {0};
 	QDF_STATUS status;
 	uint64_t delta;
@@ -809,7 +809,7 @@ static inline uint64_t
 wlan_dp_stc_get_peer_rx_pkts(struct wlan_dp_stc *dp_stc,
 			     struct wlan_dp_stc_peer_traffic_context *peer_tc)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	cdp_config_param_type val = {0};
 	QDF_STATUS status;
 	uint64_t delta;
@@ -981,7 +981,7 @@ wlan_dp_stc_purge_classified_flow_tx(struct wlan_dp_stc *dp_stc,
 
 	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
 				&c_entry->flags)) {
-		tx_flow = wlan_dp_get_tx_flow_hdl(dp_stc->dp_ctx,
+		tx_flow = wlan_dp_get_tx_flow_hdl(wlan_dp_stc_get_dp_ctx(dp_stc),
 						  c_entry->tx_flow_id);
 		tx_flow->classified = DP_STC_CLASSIFIED_INIT;
 		tx_flow->c_flow_id = 0;
@@ -997,7 +997,7 @@ wlan_dp_stc_purge_classified_flow_rx(struct wlan_dp_stc *dp_stc,
 
 	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID,
 				&c_entry->flags)) {
-		rx_flow = wlan_dp_get_rx_flow_hdl(dp_stc->dp_ctx,
+		rx_flow = wlan_dp_get_rx_flow_hdl(wlan_dp_stc_get_dp_ctx(dp_stc),
 						  c_entry->rx_flow_id);
 		rx_flow->classified = DP_STC_CLASSIFIED_INIT;
 		rx_flow->c_flow_id = 0;
@@ -1075,7 +1075,7 @@ static inline void
 wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
@@ -1145,7 +1145,7 @@ static inline void
 wlan_dp_stc_check_flow_resumption(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
@@ -1221,7 +1221,7 @@ static inline QDF_STATUS
 wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 					uint16_t peer_id)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_psoc_sb_ops *sb_ops = &dp_ctx->sb_ops;
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct dp_active_traffic_map_params req_buf;
@@ -1334,7 +1334,7 @@ wlan_dp_stc_update_flow_pkt_rate(struct wlan_dp_psoc_context *dp_ctx,
 				 uint16_t rx_flow_id,
 				 uint64_t curr_pkt_ts)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	uint64_t time_delta;
@@ -1579,7 +1579,7 @@ wlan_dp_stc_check_reclass_eligibility(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	struct wlan_dp_stc_classify_insights *classify_results;
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	bool quota_available, rate_sufficient;
 	uint32_t avg_pkt_rate, sampling_stages;
@@ -1651,7 +1651,7 @@ static inline bool
 wlan_dp_stc_check_and_trigger_reclassification(struct wlan_dp_stc *dp_stc,
 					       struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	uint8_t flow_tuple_str[BUF_LEN_MAX];
 
@@ -1740,7 +1740,7 @@ static void
 wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 				     struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct wlan_dp_stc_classified_flow_table *c_table =
 						dp_stc->classified_flow_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
@@ -1876,7 +1876,7 @@ wlan_dp_stc_update_burst_status(struct wlan_dp_stc_sampling_table_entry
 static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 {
 	struct wlan_dp_stc *dp_stc = (struct wlan_dp_stc *)arg;
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 	uint32_t candidate_idx = 0;
 	uint8_t bidi, tx, rx;
@@ -2144,7 +2144,7 @@ static inline QDF_STATUS
 wlan_dp_stc_trigger_sampling(struct wlan_dp_stc *dp_stc, uint16_t flow_id,
 			     uint8_t track, enum qdf_proto_dir dir)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 
 	switch (dir) {
 	case QDF_TX:
@@ -2470,7 +2470,7 @@ wlan_dp_stc_check_provisional_transition(struct wlan_dp_stc *dp_stc,
 					 struct wlan_dp_stc_sampling_table_entry *s_entry,
 					 uint64_t cur_ts)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = wlan_dp_stc_get_dp_ctx(dp_stc);
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t flow_age;
 	uint32_t pkt_rate;
@@ -2876,7 +2876,7 @@ wlan_dp_stc_handle_flow_stats_policy(enum qca_async_stats_type type,
 				     enum qca_async_stats_action action)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 
 	if (!dp_stc)
 		return QDF_STATUS_E_NOSUPPORT;
@@ -3039,7 +3039,7 @@ void
 wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_sampling_table *s_table;
 	struct flow_info *flow_tuple = &flow_classify_result->flow_tuple;
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
@@ -3172,7 +3172,7 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 					 uint8_t *peer_mac_addr)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	uint8_t is_mld = 0;
 
@@ -3251,7 +3251,7 @@ wlan_dp_stc_print_c_entry(struct wlan_dp_stc *dp_stc,
 static uint32_t
 wlan_dp_stc_print_classified_table_compact(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	uint16_t c_id, i, len = 0;
@@ -3298,7 +3298,7 @@ wlan_dp_stc_print_classified_table_compact(struct wlan_dp_psoc_context *dp_ctx)
 
 void wlan_dp_stc_print_classified_table(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	uint16_t c_id;
@@ -3356,7 +3356,7 @@ wlan_dp_stc_print_s_entry(struct wlan_dp_stc *dp_stc,
 
 void wlan_dp_stc_print_sampling_table(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_sampling_table *s_table;
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
 	int i;
@@ -3397,7 +3397,7 @@ wlan_dp_stc_print_peer_active_traffic_map(struct wlan_dp_stc *dp_stc,
 
 void wlan_dp_stc_print_active_traffic_map(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	uint16_t peer_id;
 
@@ -3415,7 +3415,7 @@ void wlan_dp_stc_print_active_traffic_map(struct wlan_dp_psoc_context *dp_ctx)
 
 uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 
 	if (!dp_stc)
 		return 0;
@@ -3426,7 +3426,7 @@ uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
 void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
 				uint32_t mask)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 
 	if (!dp_stc)
 		return;
@@ -3436,7 +3436,7 @@ void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
 
 static void wlan_dp_stc_print_cfg(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 
 	if (!dp_stc)
 		return;
@@ -3616,7 +3616,7 @@ sampling_table_alloc_fail:
 
 QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 
 	if (!dp_stc) {

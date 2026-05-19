@@ -635,6 +635,30 @@ struct wlan_dp_stc {
 /* Function Declaration - START */
 
 #ifdef WLAN_DP_FEATURE_STC
+/**
+ * wlan_dp_get_stc() - Get STC from DP context
+ * @dp_ctx: DP component global context
+ *
+ * Return: Pointer to wlan_dp_stc
+ */
+static inline struct wlan_dp_stc *
+wlan_dp_get_stc(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return dp_ctx->dp_stc;
+}
+
+/**
+ * wlan_dp_stc_get_dp_ctx() - Get DP context from STC context
+ * @dp_stc: STC context
+ *
+ * Return: Pointer to wlan_dp_psoc_context
+ */
+static inline struct wlan_dp_psoc_context *
+wlan_dp_stc_get_dp_ctx(struct wlan_dp_stc *dp_stc)
+{
+	return dp_stc->dp_ctx;
+}
+
 #define BUF_LEN_MAX 256
 static inline bool is_flow_tuple_ipv4(struct flow_info *flow_tuple)
 {
@@ -779,7 +803,7 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t c_flow_id,
 			       uint8_t flow_evict_success_code)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	struct flow_info *flow_tuple;
@@ -819,7 +843,7 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t c_flow_id,
 			       uint8_t flow_evict_success_code)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	struct flow_info *flow_tuple;
@@ -864,7 +888,7 @@ static inline void
 wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 			 uint16_t peer_id)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	bool send_fw_indication = false;
 
@@ -964,7 +988,7 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 			  enum wlan_dp_flow_dir dir,
 			  struct flow_info *flow_tuple, uint32_t flow_id)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	uint8_t buf[BUF_LEN_MAX];
 	uint8_t flow_info_buf[BUF_LEN_MAX];
 
@@ -1057,7 +1081,7 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 			 wlan_dp_stc_rx_nbuf_is_tcp_ack(nbuf)))
 		return QDF_STATUS_SUCCESS;
 
-	dp_stc = dp_ctx->dp_stc;
+	dp_stc = wlan_dp_get_stc(dp_ctx);
 	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf);
 	peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
 	flow_id = QDF_NBUF_CB_EXT_RX_FLOW_ID(nbuf);
@@ -1091,7 +1115,7 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 					   uint16_t flow_id, uint8_t vdev_id,
 					   uint16_t peer_id, uint32_t metadata)
 {
-	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc *dp_stc = wlan_dp_get_stc(dp_ctx);
 	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	uint16_t pkt_len;
 
@@ -1237,6 +1261,18 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx);
  */
 QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx);
 #else
+static inline struct wlan_dp_stc *
+wlan_dp_get_stc(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return NULL;
+}
+
+static inline struct wlan_dp_psoc_context *
+wlan_dp_stc_get_dp_ctx(struct wlan_dp_stc *dp_stc)
+{
+	return NULL;
+}
+
 static inline void
 wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 				struct cdp_rx_flow_tuple_info *flow_tuple_info)
