@@ -3157,7 +3157,8 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
 {
 	uint32_t curr_length = rso_mode_cfg->assoc_ie_length;
 
-	if ((MAC_MAX_ADD_IE_LENGTH - curr_length) < ie_len) {
+	if ((curr_length >= MAX_ASSOC_IE_LENGTH) ||
+	    ((MAX_ASSOC_IE_LENGTH - curr_length) < (ie_len + 2))) {
 		mlme_err("Appending IE id: %d failed", ie_id);
 		return;
 	}
