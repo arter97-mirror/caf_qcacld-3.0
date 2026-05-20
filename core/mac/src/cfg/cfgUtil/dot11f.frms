@@ -2766,7 +2766,7 @@ IE reduced_neighbor_report (EID_RNR_IE)
 
 IE ExtCap (EID_EXT_CAP)
 {
-    bytes[1..15];
+    bytes[1..255];
 }
 
 IE HTCaps (EID_HT_CAPABILITIES)

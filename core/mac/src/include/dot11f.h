@@ -5750,7 +5750,7 @@ uint32_t dot11f_get_packed_ie_ESEVersion(
 typedef struct sDot11fIEExtCap {
 	uint8_t             present;
 	uint8_t             num_bytes;
-	uint8_t             bytes[15];
+	uint8_t             bytes[255];
 } tDot11fIEExtCap;
 
 #define DOT11F_EID_EXTCAP (127)
@@ -5758,7 +5758,7 @@ typedef struct sDot11fIEExtCap {
 /* N.B. These #defines do *not* include the EID & length */
 #define DOT11F_IE_EXTCAP_MIN_LEN (1)
 
-#define DOT11F_IE_EXTCAP_MAX_LEN (15)
+#define DOT11F_IE_EXTCAP_MAX_LEN (255)
 
 #ifdef __cplusplus
 extern "C" {
