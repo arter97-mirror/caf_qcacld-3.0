@@ -578,7 +578,8 @@ bool wlan_hdd_is_ap_supports_immediate_power_save(uint8_t *ies, int length);
 int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac);
 
 #if defined(USE_CFG80211_DEL_STA_V2)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  struct station_del_parameters *param);

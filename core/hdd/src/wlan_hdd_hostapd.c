@@ -2574,7 +2574,8 @@ hdd_sap_is_recv_assoc_link(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac)
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 static QDF_STATUS
 wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
 			  const u8 *mac, struct station_info *sinfo)

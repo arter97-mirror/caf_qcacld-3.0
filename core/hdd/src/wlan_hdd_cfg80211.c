@@ -31170,7 +31170,8 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	return ret;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 /**
  * wlan_hdd_change_station() - cfg80211 change station handler function
  * @wiphy: Pointer to the wiphy structure
@@ -34341,7 +34342,8 @@ static int _wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 }
 
 #ifdef USE_CFG80211_DEL_STA_V2
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  struct station_del_parameters *param)
@@ -34396,7 +34398,8 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 #endif
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 static int _wlan_hdd_del_station(struct hdd_adapter *adapter,
 				 struct station_del_parameters *param)
 {
@@ -34500,7 +34503,8 @@ static int __wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 	return status;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 /**
  * wlan_hdd_cfg80211_add_station() - add station
  * @wiphy: Pointer to wiphy

@@ -12156,7 +12156,8 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
 {
 	cfg80211_del_sta(&adapter->wdev, mac, GFP_KERNEL);
