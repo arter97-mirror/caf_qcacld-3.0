@@ -1407,12 +1407,12 @@ CFG_INI_UINT("sap_traffic_monitoring_time_s", 0, 100, 1, \
 /*
  * <ini>
  * gEdcaTxopLimit - EDCA TXOP limit in milliseconds
- * @Min: 4
+ * @Min: 0
  * @Max: 16
- * @Default: 4
+ * @Default: 0
  *
  * This ini is used to set the TXOP limit in firmware. The value is
- * specified in milliseconds.
+ * specified in milliseconds. This will be set to zero if feature is disabled.
  *
  * Related: None
  *
@@ -1423,7 +1423,7 @@ CFG_INI_UINT("sap_traffic_monitoring_time_s", 0, 100, 1, \
  * </ini>
  */
 #define CFG_EDCA_TXOP_LIMIT \
-CFG_INI_UINT("gEdcaTxopLimit", 4, 16, 4, \
+CFG_INI_UINT("gEdcaTxopLimit", 0, 16, 0, \
 	     CFG_VALUE_OR_DEFAULT, "TXOP limit in milliseconds")
 
 #define CFG_GENERIC_ALL \
