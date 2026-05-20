@@ -2612,6 +2612,7 @@ static int wma_flush_complete_evt_handler(void *handle,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t *buf_ptr;
 	uint32_t reason_code;
+	enum log_event_type evt_type;
 
 	param_buf = (WMI_DEBUG_MESG_FLUSH_COMPLETE_EVENTID_param_tlvs *) event;
 	if (!param_buf) {
@@ -2704,9 +2705,13 @@ static int wma_flush_complete_evt_handler(void *handle,
 		return QDF_STATUS_SUCCESS;
 	} else if (reason_code && cds_is_log_report_in_progress() == false) {
 		/* Asynchronous flush event for fatal events */
-		status = cds_set_log_completion(WLAN_LOG_TYPE_FATAL,
-				WLAN_LOG_INDICATOR_FIRMWARE,
-				reason_code, false);
+		evt_type = (reason_code == WMI_DIAG_TRIGGER_DISCONNECT) ?
+			   WLAN_LOG_TYPE_NON_FATAL :
+			   WLAN_LOG_TYPE_FATAL;
+
+		status = cds_set_log_completion(evt_type,
+						WLAN_LOG_INDICATOR_FIRMWARE,
+						reason_code, false);
 		if (QDF_STATUS_SUCCESS != status) {
 			wma_err("Failed to set log trigger params");
 			return QDF_STATUS_E_FAILURE;
