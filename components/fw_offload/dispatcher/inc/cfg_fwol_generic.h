@@ -974,6 +974,28 @@
 		1, \
 		"enable pci gen")
 
+/*
+ * <ini>
+ * g_iot_temporal_mode_enabled - Enable IoT temporal mode
+ * @Default: 0
+ *
+ * This INI controls whether the IoT temporal mode feature
+ * is enabled in firmware via WMI resource config.
+ * BIT 0 of apl_temporal_mode_config_word is set when enabled.
+ *
+ * Related: None
+ *
+ * Supported Feature: IoT
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_IOT_TEMPORAL_MODE_ENABLED CFG_INI_BOOL( \
+		"g_iot_temporal_mode_enabled", \
+		0, \
+		"Enable IoT temporal mode")
+
 #ifdef FEATURE_ETM_TRACE_SUPPORT
 #define PCIE_CONFIG 1
 #else
@@ -1068,6 +1090,7 @@
 	CFG(CFG_ENABLE_PCI_GEN) \
 	CFG(CFG_PCIE_CONFIG) \
 	CFG(CFG_DYNAMIC_MODE_SWITCH)\
+	CFG(CFG_IOT_TEMPORAL_MODE_ENABLED) \
 	ENABLE_OFDM_SCRAMBLER_SEED
 
 #endif
