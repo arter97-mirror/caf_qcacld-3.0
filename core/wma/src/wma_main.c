@@ -734,6 +734,9 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->twt_ap_sta_count = CFG_TGT_DEFAULT_TWT_AP_STA_COUNT;
 	tgt_cfg->enable_pci_gen = cfg_get(wma_handle->psoc, CFG_ENABLE_PCI_GEN);
 
+	tgt_cfg->iot_temporal_mode_enabled =
+		cfg_get(wma_handle->psoc, CFG_IOT_TEMPORAL_MODE_ENABLED);
+
 	tgt_cfg->mgmt_comp_evt_bundle_support = true;
 	tgt_cfg->tx_msdu_new_partition_id_support = true;
 	tgt_cfg->is_sap_connected_d3wow_enabled =
