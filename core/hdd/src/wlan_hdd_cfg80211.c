@@ -7278,7 +7278,8 @@ hdd_parse_per_band_rssi_thresholds(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 		hdd_debug("Setting rssi threshold: band=%d, threshold=%d dBm",
 			  band, threshold);
 
-		if (threshold > 0 || threshold < -128) {
+		if (!cfg_in_range(CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
+				  threshold)) {
 			hdd_err("Invalid threshold %d for band %d", threshold,
 				band);
 			return QDF_STATUS_E_INVAL;
