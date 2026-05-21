@@ -8824,11 +8824,6 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!IS_DOT11_MODE_HE(session_entry->dot11mode)) {
-		pe_debug("HE is not set in session");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
 					  session_entry->ch_width,
 					  MLME_DOT11_MODE_11AX);
