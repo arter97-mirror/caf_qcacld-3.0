@@ -67,7 +67,6 @@ struct passthru_peer_tbl_entry {
  * @frame_filter: frame filter value
  * @magic: handle for external entity
  * @tx_rate_cfg: transmit rate configuration
- * @peer_tbl_lock: spinlock for access to peer table
  * @peer_tbl: passthru peer table
  * @num_peers: number of peers in the table
  * @is_peer_create_enabled: is peer created enabled
@@ -82,7 +81,6 @@ struct hdd_wondertap_context {
 	uint8_t frame_filter;
 	uint64_t magic;
 	struct hdd_wondertap_tx_rate_cfg tx_rate_cfg;
-	qdf_spinlock_t peer_tbl_lock;
 	struct passthru_peer_tbl_entry peer_tbl[WLAN_PASSTHRU_MAX_PEER];
 	uint8_t num_peers;
 	bool is_peer_create_enabled;
@@ -127,23 +125,6 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup);
  * Return: None
  */
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up);
-
-/**
- * hdd_passthru_is_peer_create_allowed() - Check whether passthru peer create is
- *  allowed or not.
- *
- * Return: true if allowed else false
- */
-bool hdd_passthru_is_peer_create_allowed(void);
-
-/**
- * hdd_passthru_check_n_create_peer() - Check for new peer and do the necessary
- *  control path peer setup.
- * @peer_mac: peer MAC address
- *
- * Return: None
- */
-void hdd_passthru_check_n_create_peer(struct qdf_mac_addr *peer_mac);
 #else
 static inline int wlan_hdd_wondertap_register_ops(struct device *dev)
 {
@@ -157,16 +138,6 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 static inline
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
-{
-}
-
-static inline bool hdd_passthru_is_peer_create_allowed(void)
-{
-	return false;
-}
-
-static inline
-void hdd_passthru_check_n_create_peer(struct qdf_mac_addr *peer_mac)
 {
 }
 #endif /*DRIVER_PASSTHRU_MODE */
