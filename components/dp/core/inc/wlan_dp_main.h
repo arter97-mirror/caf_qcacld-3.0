@@ -999,15 +999,6 @@ QDF_STATUS dp_get_arp_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 
 void dp_trace_init(struct wlan_objmgr_psoc *psoc);
 
-/**
- * dp_set_dump_dp_trace() - set DP trace dump level
- * @cmd_type : command type
- * @count: count
- *
- * Return: None
- */
-void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count);
-
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #define DP_BUS_BW_CFG(bus_bw_cfg)	bus_bw_cfg
 #define DP_BUS_BW_GET_RX_LVL(dp_ctx)	(dp_ctx)->cur_rx_level

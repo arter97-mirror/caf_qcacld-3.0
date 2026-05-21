@@ -568,26 +568,8 @@ void dp_trace_init(struct wlan_objmgr_psoc *psoc)
 	qdf_dp_trace_init(live_mode, thresh, thresh_time_limit,
 			  verbosity, proto_bitmap);
 }
-
-void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
-{
-	dp_debug("DUMP_DP_TRACE_LEVEL: %d %d",
-		 cmd_type, count);
-	if (cmd_type == DUMP_DP_TRACE)
-		qdf_dp_trace_dump_all(count, QDF_TRACE_DEFAULT_PDEV_ID);
-	else if (cmd_type == ENABLE_DP_TRACE_LIVE_MODE)
-		qdf_dp_trace_enable_live_mode();
-	else if (cmd_type == CLEAR_DP_TRACE_BUFFER)
-		qdf_dp_trace_clear_buffer();
-	else if (cmd_type == DISABLE_DP_TRACE_LIVE_MODE)
-		qdf_dp_trace_disable_live_mode();
-}
 #else
 void dp_trace_init(struct wlan_objmgr_psoc *psoc)
-{
-}
-
-void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
 {
 }
 #endif

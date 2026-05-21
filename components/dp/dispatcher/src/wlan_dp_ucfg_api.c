@@ -2411,11 +2411,6 @@ void ucfg_dp_clear_nud_stats_cb(struct wlan_objmgr_psoc *psoc)
 	sb_ops->dp_arp_stats_unregister_event_handler(psoc);
 }
 
-void ucfg_dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
-{
-	dp_set_dump_dp_trace(cmd_type, count);
-}
-
 int ucfg_dp_get_current_throughput_level(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
