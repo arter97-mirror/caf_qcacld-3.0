@@ -31,6 +31,7 @@
 #include "wlan_serialization_api.h"
 #include "wlan_objmgr_cmn.h"
 #include "wlan_tdls_ucfg_api.h"
+#include "wlan_tdls_stats_api.h"
 #include "wlan_objmgr_global_obj.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
@@ -2082,6 +2083,16 @@ QDF_STATUS nan_discovery_pre_enable(struct wlan_objmgr_pdev *pdev,
 	}
 
 	nan_handle_emlsr_concurrency(psoc, true);
+
+	/*
+	 * Record concurrency teardown stats for all connected TDLS peers
+	 * before initiating the teardown due to NAN enable.
+	 */
+	wlan_tdls_stats_record_peers_teardown(
+		psoc, WLAN_UMAC_VDEV_ID_MAX,
+		policy_mgr_is_mcc_on_any_sta_vdev(psoc) ?
+			TDLS_STATS_REASON_CONC_DIFF_BAND :
+			TDLS_STATS_REASON_CONC_SAME_BAND);
 
 	/* Try to teardown TDLS links, but do not wait */
 	status = ucfg_tdls_teardown_links(psoc);

@@ -1934,6 +1934,101 @@ QDF_STATUS wlan_dp_rx_fisa_flush_by_vdev_id(void *dp_soc, uint8_t vdev_id)
 }
 #endif
 
+/*
+ * TDLS data-path frame layout (EtherType 0x890D):
+ *   bytes  0-5  : Destination MAC
+ *   bytes  6-11 : Source MAC
+ *   bytes 12-13 : EtherType (0x890D)
+ *   byte  14    : Payload Type (0x02 = TDLS)
+ *   byte  15    : Category (12 = TDLS Action)
+ *   byte  16    : Action Code (enum tdls_actioncode)
+ *   bytes 17-18 : Reason Code (2 bytes, big-endian) — Teardown only
+ */
+#define TDLS_DP_FRAME_MIN_LEN              17
+#define TDLS_DP_FRAME_ACTION_OFFSET        16
+#define TDLS_DP_FRAME_REASON_CODE_OFFSET   17
+#define TDLS_DP_FRAME_MIN_LEN_WITH_REASON  19
+
+static inline void
+wlan_dp_rx_tdls_packet(uint8_t vdev_id, struct sk_buff *skb,
+		       enum qdf_proto_dir dir, uint8_t pdev_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	uint16_t dot11_reason = 0;
+	struct tdls_dp_pkt_info *info;
+	uint8_t *peer_mac;
+	uint8_t action_code;
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+
+	/* Identify whether the frame is a TDLS frame (EtherType 0x890D). */
+	if (!qdf_nbuf_is_ipv4_tdls_pkt(skb))
+		return;
+
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	/*
+	 * Step 2 (DP context): extract the required TDLS-specific information.
+	 *
+	 * skb->data points to the start of the complete Ethernet frame:
+	 *   bytes  0-5  : Destination MAC  (QDF_NBUF_DEST_MAC_OFFSET = 0)
+	 *   bytes  6-11 : Source MAC       (QDF_NBUF_SRC_MAC_OFFSET  = 6)
+	 *   bytes 12-13 : EtherType (0x890D for TDLS)
+	 *   byte  14    : Payload Type (0x02)
+	 *   byte  15    : Category (12 = TDLS Action)
+	 *   byte  16    : Action Code
+	 *
+	 * The peer MAC is:
+	 *   TX: we are sending to the peer  → peer = Destination MAC
+	 *   RX: the peer is sending to us   → peer = Source MAC
+	 */
+	peer_mac = (dir == QDF_TX) ?
+		   skb->data + QDF_NBUF_DEST_MAC_OFFSET :
+		   skb->data + QDF_NBUF_SRC_MAC_OFFSET;
+
+	/* Parse the TDLS action code and map to stats type/subtype.
+	 * Only schedule processing if the frame is long enough to contain
+	 * a valid action code; drop frames that are too short.
+	 */
+	if (skb->len < TDLS_DP_FRAME_MIN_LEN)
+		return;
+
+	action_code = skb->data[TDLS_DP_FRAME_ACTION_OFFSET];
+	/*
+	 * For Teardown frames, the 802.11 reason code is embedded
+	 * in the frame at bytes 17-18 (big-endian).  Map it to the
+	 * TDLS stats reason code.  For all other frame types the
+	 * reason code is not present and defaults to GENERAL.
+	 */
+	if (action_code == TDLS_TEARDOWN &&
+	    skb->len >= TDLS_DP_FRAME_MIN_LEN_WITH_REASON) {
+		dot11_reason =
+			(skb->data[TDLS_DP_FRAME_REASON_CODE_OFFSET] << 8) |
+			 skb->data[TDLS_DP_FRAME_REASON_CODE_OFFSET + 1];
+	}
+
+	info = qdf_mem_malloc(sizeof(*info));
+	if (!info)
+		return;
+
+	info->psoc         = dp_ctx->psoc;
+	info->vdev_id      = vdev_id;
+	qdf_mem_copy(info->peer_mac.bytes, peer_mac, QDF_MAC_ADDR_SIZE);
+	info->dir          = dir;
+	info->action_code  = action_code;
+	info->dot11_reason = dot11_reason;
+
+	msg.type     = TDLS_CMD_STATS_DP_PKT;
+	msg.bodyptr  = info;
+	msg.callback = wlan_tdls_process_cmd;
+	status = scheduler_post_message(QDF_MODULE_ID_DP,
+					QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_mem_free(info);
+}
+
 QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 			    qdf_nbuf_t rxBuf)
 {
@@ -2050,6 +2145,8 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 				     dp_intf->device_mode,
 				     dp_intf->dhcp_ltxid);
 
+		wlan_dp_rx_tdls_packet(dp_link->link_id, nbuf, QDF_RX,
+				       QDF_TRACE_DEFAULT_PDEV_ID);
 		DPTRACE(qdf_dp_trace(nbuf,
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,

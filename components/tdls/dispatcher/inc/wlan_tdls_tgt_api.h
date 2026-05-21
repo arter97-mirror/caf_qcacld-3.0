@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -150,5 +150,21 @@ void tgt_tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
  */
 void tgt_tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 					  uint32_t session_id);
+
+/**
+ * tgt_tdls_request_stats_info() - Send WMI_REQUEST_STATS_INFO_CMDID to FW
+ * @psoc: PSOC object
+ * @vdev_id: ID of the STA vdev for which stats collection is requested
+ * @enable: 1 = enable FW TDLS stats collection; host never sends 0
+ *          (FW handles disable automatically on disconnect/MCC)
+ *
+ * Invokes the request_stats_info tx_op registered by the target_if layer.
+ * Called from tdls_stats_handle_sta_connection() when a single-STA SCC
+ * condition is detected after a STA connection event.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tgt_tdls_request_stats_info(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t enable);
 
 #endif

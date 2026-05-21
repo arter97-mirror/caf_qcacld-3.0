@@ -162,6 +162,7 @@
 #include "wlan_cfg80211_p2p.h"
 #include "wlan_cfg80211_interop_issues_ap.h"
 #include "wlan_tdls_cfg_api.h"
+#include <wlan_tdls_stats_api.h>
 #include <wlan_hdd_rssi_monitor.h>
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_mlme_twt_ucfg_api.h"
@@ -1980,7 +1981,8 @@ static int hdd_update_tdls_config(struct hdd_context *hdd_ctx)
 	tdls_cfg.tdls_osif_update_cb.tdls_osif_conn_update =
 					hdd_check_and_set_tdls_conn_params;
 	tdls_cfg.tdls_osif_update_cb.tdls_osif_disconn_update =
-					hdd_check_and_set_tdls_disconn_params;
+				hdd_check_and_set_tdls_disconn_params;
+	hdd_tdls_stats_register_emit_cb(&tdls_cfg);
 
 	status = ucfg_tdls_update_config(psoc, &tdls_cfg);
 	if (status != QDF_STATUS_SUCCESS) {
@@ -2430,6 +2432,12 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	cfg_tdls_set_stats_enable(hdd_ctx->psoc,
 				  tdls_stats_info &&
 				  cfg->en_tdls_stats_info);
+	/*
+	 * Notify the TDLS stats SM that FW service capability and INI
+	 * have been finalised.  The SM transitions from DISABLED to INIT
+	 * if the combined (INI && FW-cap) value is true.
+	 */
+	wlan_tdls_stats_notify_fw_cap(hdd_ctx->psoc);
 #endif
 	hdd_update_roam_offload(hdd_ctx, cfg);
 

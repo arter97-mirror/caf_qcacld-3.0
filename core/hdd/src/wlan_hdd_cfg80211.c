@@ -2264,6 +2264,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE,
 	},
 #endif
+	FEATURE_TDLS_VENDOR_EVENTS
 };
 
 /**

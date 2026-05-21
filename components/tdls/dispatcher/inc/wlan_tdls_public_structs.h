@@ -33,6 +33,7 @@
 #ifdef FEATURE_RUNTIME_PM
 #include <wlan_pmo_common_public_struct.h>
 #endif
+#include <wlan_tdls_stats_public_structs.h>
 
 #define WLAN_TDLS_STA_MAX_NUM                        8
 #define WLAN_TDLS_STA_P_UAPSD_OFFCHAN_MAX_NUM        1
@@ -259,6 +260,8 @@ enum tdls_feature_mode {
  * @TDLS_DELETE_ALL_PEERS_INDICATION: tdls delete all peers indication
  * @TDLS_CMD_START_BSS: SAP start indication to tdls module
  * @TDLS_CMD_SET_LINK_UNFORCE: tdls to unforce link for MLO case
+ * @TDLS_STATS_ENABLE: tdls stats enable
+ * @TDLS_CMD_STATS_DP_PKT: process a TDLS data-path packet for stats SM
  */
 enum tdls_command_type {
 	TDLS_CMD_TX_ACTION = 1,
@@ -286,7 +289,9 @@ enum tdls_command_type {
 	TDLS_CMD_SET_SECOFFCHANOFFSET,
 	TDLS_DELETE_ALL_PEERS_INDICATION,
 	TDLS_CMD_START_BSS,
-	TDLS_CMD_SET_LINK_UNFORCE
+	TDLS_CMD_SET_LINK_UNFORCE,
+	TDLS_STATS_ENABLE,
+	TDLS_CMD_STATS_DP_PKT,
 };
 
 /**
@@ -747,6 +752,12 @@ struct tdls_osif_cb {
  * @tdls_osif_init_cb: callback to initialize the tdls priv
  * @tdls_osif_deinit_cb: callback to deinitialize the tdls priv
  * @tdls_osif_update_cb: callback to update osif params
+ * @tdls_stats_emit_cb: OS-IF callback to emit a TDLS stats entry as a
+ *                      vendor event.  Registered by HDD in
+ *                      hdd_update_tdls_config() and stored in
+ *                      tdls_soc_priv_obj by ucfg_tdls_update_config().
+ *                      The psoc pointer is passed as the first argument
+ *                      when the callback is invoked.
  */
 struct tdls_start_params {
 	struct tdls_user_config config;
@@ -769,6 +780,7 @@ struct tdls_start_params {
 	tdls_vdev_init_cb tdls_osif_init_cb;
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;
 	struct tdls_osif_cb tdls_osif_update_cb;
+	tdls_stats_emit_cb tdls_stats_emit_cb;
 };
 
 /**
@@ -1530,6 +1542,47 @@ enum tdls_teardown_reason {
  */
 struct tdls_link_teardown {
 	struct wlan_objmgr_psoc *psoc;
+};
+
+/**
+ * struct tdls_dp_pkt_info - pre-parsed TDLS data-path packet info
+ *
+ * Populated by wlan_dp_rx_tdls_packet() in the DP context and posted
+ * as the body of a TDLS_CMD_STATS_DP_PKT scheduler message so that
+ * the actual stats-SM update runs on the TDLS scheduler thread.
+ *
+ * The raw @action_code and @dot11_reason are filled by the DP layer
+ * and converted to @type, @subtype, and @reason_code by
+ * tdls_process_stats_dp_pkt() on the TDLS scheduler thread.
+ *
+ * @psoc:          PSOC object (borrowed reference; valid for the lifetime
+ *                 of the scheduler message)
+ * @vdev_id:       Vdev ID on which the TDLS frame was observed
+ * @peer_mac:      MAC address of the remote TDLS peer
+ * @dir:           QDF_TX or QDF_RX
+ * @action_code:   Raw TDLS action code from the frame (byte 16 of the
+ *                 Ethernet payload); mapped to @type/@subtype by the
+ *                 TDLS core handler
+ * @dot11_reason:  Raw 802.11 reason code (big-endian, bytes 17-18);
+ *                 present only for Teardown frames, 0 otherwise;
+ *                 mapped to @reason_code by the TDLS core handler
+ * @type:          TDLS stats event type — populated by the TDLS core
+ *                 handler from @action_code
+ * @subtype:       TDLS stats event subtype — populated by the TDLS core
+ *                 handler from @action_code
+ * @reason_code:   Teardown reason code — populated by the TDLS core
+ *                 handler from @dot11_reason
+ */
+struct tdls_dp_pkt_info {
+	struct wlan_objmgr_psoc    *psoc;
+	uint8_t                     vdev_id;
+	struct qdf_mac_addr         peer_mac;
+	enum qdf_proto_dir          dir;
+	uint8_t                     action_code;
+	uint16_t                    dot11_reason;
+	enum tdls_stats_type        type;
+	enum tdls_stats_subtype     subtype;
+	enum tdls_stats_reason_code reason_code;
 };
 
 #ifdef FEATURE_SET

@@ -27,6 +27,7 @@
 #include "wlan_tdls_peer.h"
 #include "wlan_tdls_ct.h"
 #include "wlan_tdls_mgmt.h"
+#include "wlan_tdls_stats.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_tdls_cmds_process.h"
 #include "wlan_reg_services_api.h"
@@ -249,8 +250,8 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		if (tdls_soc && tdls_soc->tdls_rx_cb)
 			tdls_soc->tdls_rx_cb(tdls_soc->tdls_rx_cb_data,
 					     rx_mgmt);
-		tdls_recv_discovery_resp(tdls_vdev, mac);
 		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
+		tdls_recv_discovery_resp(tdls_vdev, mac);
 
 cleanup:
 		/* cleanup rx_mgmt for all the ML vdevs */
@@ -751,10 +752,23 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 					  TDLS_LINK_SUCCESS);
 
 	curr_peer->tdls_support = TDLS_CAP_SUPPORTED;
+	tdls_cfg = &tdls_vdev->threshold_config;
+
+	/*
+	 * Record discovery response stats.  Success is determined by whether
+	 * the peer is in DISCOVERING state and the RSSI meets the trigger
+	 * threshold — the same condition that drives the setup request below.
+	 */
+	tdls_stats_record_discovery_resp(tdls_soc, tdls_vdev->vdev, mac,
+					 curr_peer->rssi,
+					 (curr_peer->link_status ==
+					  TDLS_LINK_DISCOVERING) &&
+					 ((int32_t)curr_peer->rssi >
+					  (int32_t)tdls_cfg->rssi_trigger_threshold));
+
 	if (TDLS_LINK_DISCOVERING != curr_peer->link_status)
 		return status;
 
-	tdls_cfg = &tdls_vdev->threshold_config;
 	/*
 	 * Throughput threshold is already met. Make sure RSSI threshold is also
 	 * met before setting up TDLS link.
@@ -922,9 +936,29 @@ tdls_ct_process_idle_handler(struct wlan_objmgr_vdev *vdev,
 			 " back to normal, will stay",
 			  QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 	} else {
+		enum tdls_stats_reason_code reason_code;
+
+		/*
+		 * Determine teardown reason for TDLS stats:
+		 *   - No traffic at all (both tx and rx are zero):
+		 *     TDLS_STATS_REASON_NO_TRAFFIC
+		 *   - Some traffic but below the idle threshold:
+		 *     TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC
+		 */
+		if (!curr_peer->tx_pkt && !curr_peer->rx_pkt)
+			reason_code = TDLS_STATS_REASON_NO_TRAFFIC;
+		else
+			reason_code = TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC;
+
+		/* Record teardown in TDLS stats state machine */
+		tdls_stats_record_peer_teardown(tdls_soc_obj, vdev,
+						curr_peer->peer_mac.bytes,
+						reason_code);
+
 		/* this tdls link needs to get torn down */
-		tdls_notice("trigger tdls link to "QDF_MAC_ADDR_FMT" down",
-			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+		tdls_notice("trigger tdls link to "QDF_MAC_ADDR_FMT" down, reason %d",
+			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
+			    reason_code);
 		tdls_indicate_teardown(tdls_vdev_obj,
 					curr_peer,
 					TDLS_TEARDOWN_PEER_UNSPEC_REASON);

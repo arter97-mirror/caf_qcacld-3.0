@@ -47,6 +47,7 @@
 #include <wlan_reg_ucfg_api.h>
 #include "wlan_tdls_api.h"
 #include "wlan_policy_mgr_ucfg.h"
+#include <wlan_tdls_stats_api.h>
 
 /**
  * enum qca_wlan_vendor_tdls_trigger_mode_hdd_map: Maps the user space TDLS
@@ -126,6 +127,17 @@ const struct nla_policy
 		[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK] = {
 						.type = NLA_U8},
 };
+
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+const struct nla_policy
+	wlan_hdd_tdls_stats_policy
+	[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX + 1] = {
+		[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG] = {
+						.type = NLA_U32},
+		[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES] = {
+						.type = NLA_NESTED},
+};
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 const struct nla_policy
 	wlan_hdd_tdls_mode_configuration_policy
@@ -355,6 +367,62 @@ __wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
 	return ret;
 }
 
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+static int
+__wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   const void *data,
+				   int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX + 1];
+	int ret = 0;
+	uint32_t id;
+	enum qca_wlan_tdls_stats_config tdls_stats_enable;
+	struct nlattr *tdls_stats_attr;
+	QDF_STATUS status;
+
+	hdd_enter_dev(dev);
+	if (!adapter)
+		return -EINVAL;
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_debug("Failed to get TDLS info due to opmode:%d",
+			  adapter->device_mode);
+		return -EOPNOTSUPP;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX,
+				    data, data_len,
+				    wlan_hdd_tdls_stats_policy)) {
+		hdd_err("Invalid attribute");
+		return -EINVAL;
+	}
+
+	id = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG;
+	tdls_stats_attr = tb[id];
+
+	if (!tdls_stats_attr) {
+		hdd_err("TDLS stats enable/disable NOT specified");
+		return -EINVAL;
+	}
+
+	tdls_stats_enable = nla_get_u32(tdls_stats_attr);
+	hdd_debug("Userspace TDLS stats: %d", tdls_stats_enable);
+
+	status = wlan_tdls_get_tdls_stats(hdd_ctx->psoc,
+					  tdls_stats_enable);
+
+	return qdf_status_to_os_return(status);
+}
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
+
 /**
  * __wlan_hdd_cfg80211_configure_tdls_mode() - configure the tdls mode
  * @wiphy: wiphy
@@ -496,6 +564,27 @@ int wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
 	return errno;
 }
 
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+int wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data,
+				     int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_tdls_stats(wiphy, wdev,
+						   data, data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
+
 static int wlan_hdd_tdls_enable(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -612,6 +701,14 @@ static int wlan_hdd_tdls_disable(struct hdd_context *hdd_ctx,
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_TDLS_NB_ID);
 		if (!vdev)
 			return -EINVAL;
+
+		/*
+		 * Record teardown stats for all connected TDLS peers before
+		 * tearing down the links due to user-initiated TDLS disable.
+		 */
+		wlan_tdls_stats_record_peers_teardown(hdd_ctx->psoc,
+						      wlan_vdev_get_id(vdev),
+						      TDLS_STATS_REASON_GENERAL);
 
 		ucfg_tdls_teardown_links(hdd_ctx->psoc);
 		ucfg_tdls_set_user_tdls_enable(vdev, false);
@@ -1339,6 +1436,518 @@ void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)
 	tdls_cfg->tdls_update_peer_state = WMA_UPDATE_TDLS_PEER_STATE;
 	tdls_cfg->tdls_update_offchan_mode = WMA_UPDATE_TDLS_OFF_CHAN;
 }
+
+#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
+/**
+ * tdls_stats_reason_to_qca() - Map internal TDLS stats reason code to
+ *                              QCA vendor reason code.
+ * @reason_code: Internal reason code (enum tdls_stats_reason_code).
+ * @qca_reason:  Output QCA vendor reason code
+ *               (enum qca_wlan_tdls_stats_reason_code).
+ *
+ * Return: true if the reason code has a valid QCA mapping and @qca_reason
+ *         has been set; false if the reason code is TDLS_STATS_REASON_GENERAL
+ *         or TDLS_STATS_REASON_UNKNOWN which have no corresponding value in
+ *         enum qca_wlan_tdls_stats_reason_code and the REASON_CODE attribute
+ *         should be omitted.
+ */
+static bool tdls_stats_reason_to_qca(uint8_t reason_code, uint8_t *qca_reason)
+{
+	switch (reason_code) {
+	case TDLS_STATS_REASON_PEER_UNREACHABLE:
+		*qca_reason = QCA_WLAN_TDLS_STATS_REASON_CODE_PEER_UNREACHABLE;
+		return true;
+	case TDLS_STATS_REASON_TEARDOWN_UNSPECIFIED:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_TEARDOWN_UNSPECIFIED;
+		return true;
+	case TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_INSUFFICIENT_TRAFFIC;
+		return true;
+	case TDLS_STATS_REASON_NO_TRAFFIC:
+		*qca_reason = QCA_WLAN_TDLS_STATS_REASON_CODE_NO_TRAFFIC;
+		return true;
+	case TDLS_STATS_REASON_ROAMED:
+		*qca_reason = QCA_WLAN_TDLS_STATS_REASON_CODE_ROAMED;
+		return true;
+	case TDLS_STATS_REASON_CONC_SAME_BAND:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_CONCURRENT_OP_SAME_BAND;
+		return true;
+	case TDLS_STATS_REASON_CONC_DIFF_BAND:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_CONCURRENT_OP_DIFF_BAND;
+		return true;
+	case TDLS_STATS_REASON_BT_COEX:
+		*qca_reason = QCA_WLAN_TDLS_STATS_REASON_CODE_BT_COEX;
+		return true;
+	case TDLS_STATS_REASON_BSS_CHANNEL_SWITCH:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_BSS_CHANNEL_SWITCH;
+		return true;
+	case TDLS_STATS_REASON_DEAUTH_LEAVING:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_DEAUTHENTICATED_LEAVING;
+		return true;
+	case TDLS_STATS_REASON_USER_INITIATED_CH_SWITCH:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_USER_INITIATED_CH_SWITCH;
+		return true;
+	case TDLS_STATS_REASON_PEER_INITIATED_CH_SWITCH:
+		*qca_reason =
+			QCA_WLAN_TDLS_STATS_REASON_CODE_PEER_INITIATED_CH_SWITCH;
+		return true;
+	default:
+		/* TDLS_STATS_REASON_GENERAL and TDLS_STATS_REASON_UNKNOWN
+		 * have no QCA equivalent
+		 */
+		return false;
+	}
+}
+
+/**
+ * tdls_stats_role_to_qca() - Map internal TDLS stats is_sender flag to
+ *                            QCA vendor role.
+ * @is_sender: Internal sender flag (1 = local STA is the initiator).
+ * @qca_role:  Output QCA vendor role (enum qca_wlan_tdls_stats_role).
+ *
+ * Return: true if the role has a valid QCA mapping and @qca_role has been
+ *         set; false otherwise.
+ */
+static bool tdls_stats_role_to_qca(uint8_t is_sender, uint8_t *qca_role)
+{
+	if (is_sender) {
+		*qca_role = QCA_WLAN_TDLS_STATS_ROLE_SENDER;
+		return true;
+	}
+
+	*qca_role = QCA_WLAN_TDLS_STATS_ROLE_RECEIVER;
+	return true;
+}
+
+/**
+ * tdls_stats_type_to_qca() - Map internal TDLS stats type to
+ *                            QCA vendor type.
+ * @type:     Internal type (enum tdls_stats_type).
+ * @qca_type: Output QCA vendor type (enum qca_wlan_tdls_stats_type).
+ *
+ * Return: true if the type has a valid QCA mapping and @qca_type has been
+ *         set; false if the type is unknown and the TYPE attribute should
+ *         be omitted.
+ */
+static bool tdls_stats_type_to_qca(uint8_t type, uint8_t *qca_type)
+{
+	switch (type) {
+	case TDLS_STATS_IF_SETUP:
+		*qca_type = QCA_WLAN_TDLS_STATS_TYPE_IFACE_SETUP;
+		return true;
+	case TDLS_STATS_DISCOVERY:
+		*qca_type = QCA_WLAN_TDLS_STATS_TYPE_DISCOVERY;
+		return true;
+	case TDLS_STATS_SETUP:
+		*qca_type = QCA_WLAN_TDLS_STATS_TYPE_SETUP;
+		return true;
+	case TDLS_STATS_TEARDOWN:
+		*qca_type = QCA_WLAN_TDLS_STATS_TYPE_TEARDOWN;
+		return true;
+	case TDLS_STATS_STATE_CHANGED:
+		*qca_type = QCA_WLAN_TDLS_STATS_TYPE_CHANNEL_CHANGE;
+		return true;
+	case TDLS_STATS_DATA:
+		*qca_type = QCA_WLAN_TDLS_STATS_TYPE_DATA;
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
+ * tdls_stats_subtype_to_qca() - Map internal TDLS stats subtype to
+ *                               QCA vendor subtype.
+ * @subtype:     Internal subtype (enum tdls_stats_subtype).
+ * @qca_subtype: Output QCA vendor subtype (enum qca_wlan_tdls_stats_subtype).
+ *
+ * Return: true if the subtype has a valid QCA mapping and @qca_subtype has
+ *         been set; false if the subtype is TDLS_STATS_SUBTYPE_GENERAL which
+ *         has no corresponding value in enum qca_wlan_tdls_stats_subtype and
+ *         the SUBTYPE attribute should be omitted.
+ */
+static bool tdls_stats_subtype_to_qca(uint8_t subtype, uint8_t *qca_subtype)
+{
+	switch (subtype) {
+	case TDLS_STATS_SUBTYPE_REQ:
+		*qca_subtype = QCA_WLAN_TDLS_STATS_SUBTYPE_REQUEST;
+		return true;
+	case TDLS_STATS_SUBTYPE_RESP:
+		*qca_subtype = QCA_WLAN_TDLS_STATS_SUBTYPE_RESPONSE;
+		return true;
+	case TDLS_STATS_SUBTYPE_CONFIRM:
+		*qca_subtype = QCA_WLAN_TDLS_STATS_SUBTYPE_CONFIRM;
+		return true;
+	case TDLS_STATS_SUBTYPE_COMPLETE:
+		*qca_subtype = QCA_WLAN_TDLS_STATS_SUBTYPE_COMPLETE;
+		return true;
+	default:
+		/* TDLS_STATS_SUBTYPE_GENERAL has no QCA equivalent */
+		return false;
+	}
+}
+
+/**
+ * hdd_tdls_stats_entry_skb_len() - Calculate the skb size needed to emit
+ *                                  one TDLS stats entry as a vendor event.
+ *
+ * Return: Conservative upper-bound byte count for the vendor event skb.
+ */
+static uint32_t hdd_tdls_stats_entry_skb_len(void)
+{
+	return NLMSG_HDRLEN +
+		nla_total_size(0) +                 /* ENTRIES nested */
+		nla_total_size(0) +                 /* entry nested */
+		nla_total_size(QDF_MAC_ADDR_SIZE) + /* DUT_MAC_ADDR */
+		nla_total_size(QDF_MAC_ADDR_SIZE) + /* PEER_MAC_ADDR */
+		nla_total_size(sizeof(uint8_t)) +   /* TYPE */
+		nla_total_size(sizeof(uint8_t)) +   /* SUBTYPE */
+		nla_total_size(0) +                 /* SUCCESS flag */
+		nla_total_size(sizeof(uint8_t)) +   /* ROLE */
+		nla_total_size(sizeof(uint32_t)) +  /* DATA_RATE */
+		nla_total_size(sizeof(uint32_t)) +  /* TX_PACKETS */
+		nla_total_size(sizeof(uint32_t)) +  /* TX_FAILURES */
+		nla_total_size(sizeof(uint32_t)) +  /* RX_PACKETS */
+		nla_total_size(sizeof(uint32_t)) +  /* RX_FAILURES */
+		nla_total_size(sizeof(uint32_t)) +  /* OP_FREQ */
+		nla_total_size(sizeof(uint8_t)) +   /* RSSI */
+		nla_total_size(sizeof(uint8_t)) +   /* LINK_ID */
+		nla_total_size(sizeof(uint64_t)) +  /* TIMESTAMP */
+		nla_total_size(sizeof(uint8_t)) +   /* REASON_CODE */
+		nla_total_size(0) +                 /* MCS_PKT_COUNT nested */
+		TDLS_STATS_MAX_MCS_COUNTERS *
+		(nla_total_size(0) +                /* per-MCS nested */
+		 nla_total_size(sizeof(uint8_t)) +  /* MCS_INDEX */
+		 nla_total_size(sizeof(uint64_t)) + /* TX_PACKET_COUNT */
+		 nla_total_size(sizeof(uint64_t))); /* RX_PACKET_COUNT */
+}
+
+/**
+ * hdd_tdls_stats_emit_cb() - OS-IF callback that emits a TDLS stats entry
+ *                            as a QCA vendor event.
+ * @psoc: Psoc context
+ * @entry:   Stats entry to emit.
+ *
+ * This is the concrete implementation of the tdls_stats_emit_cb callback
+ * type.  It is registered with the TDLS component via tdls_start_params
+ * in hdd_update_tdls_config() so that the TDLS stats state machine can
+ * forward entries to user space without any direct dependency on HDD
+ * headers.
+ *
+ * Attribute layout emitted via QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS:
+ * QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES (nested)
+ * [0] (nested entry)
+ * DUT_MAC_ADDR, PEER_MAC_ADDR, TYPE, SUBTYPE, SUCCESS (flag),
+ * ROLE, DATA_RATE, TX_PACKETS, TX_FAILURES, RX_PACKETS,
+ * RX_FAILURES, OP_FREQ, RSSI, LINK_ID (MLO only), TIMESTAMP,
+ * REASON_CODE (teardown/failure/channel-switch only),
+ * MCS_PKT_COUNT (nested, Type-5 only)
+ * [i] MCS_INDEX, TX_PACKET_COUNT, RX_PACKET_COUNT
+ */
+void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
+			    const struct tdls_stats_entry *entry)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct sk_buff *skb;
+	struct nlattr *entries_attr, *entry_attr, *mcs_attr, *mcs_entry;
+	uint32_t i;
+	uint32_t skb_len;
+	uint8_t link_id = WLAN_INVALID_LINK_ID;
+	uint8_t qca_type;
+	uint8_t qca_subtype;
+	uint8_t qca_role;
+	uint8_t qca_reason;
+	bool is_mlo = false;
+	struct qdf_mac_addr dut_mac_addr;
+	int attr;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx || !entry)
+		return;
+
+	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!adapter)
+		adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_CLIENT_MODE);
+	if (!adapter) {
+		hdd_err("TDLS stats: no STA/P2P-client adapter found");
+		return;
+	}
+
+	/*
+	 * Determine the DUT MAC address to report:
+	 *   - MLO session  : use the MLD address of the vdev
+	 *   - non-MLO session: use the self (link) MAC address of the vdev
+	 * Also capture link_id for MLO sessions so we can emit it later
+	 * without a second vdev look-up.
+	 */
+	link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							 entry->session_id,
+							 WLAN_OSIF_ID);
+	if (link_vdev) {
+		is_mlo = wlan_vdev_mlme_is_mlo_vdev(link_vdev);
+		if (is_mlo) {
+			qdf_mem_copy(dut_mac_addr.bytes,
+				     wlan_vdev_mlme_get_mldaddr(link_vdev),
+				     QDF_MAC_ADDR_SIZE);
+			link_id = wlan_vdev_get_link_id(link_vdev);
+		} else {
+			qdf_mem_copy(dut_mac_addr.bytes,
+				     wlan_vdev_mlme_get_macaddr(link_vdev),
+				     QDF_MAC_ADDR_SIZE);
+		}
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_OSIF_ID);
+	} else {
+		/* Fallback: vdev not found, use deflink address */
+		qdf_mem_copy(dut_mac_addr.bytes,
+			     adapter->deflink->link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	}
+
+	skb_len = hdd_tdls_stats_entry_skb_len();
+
+	hdd_debug("TDLS stats: emit dut=" QDF_MAC_ADDR_FMT " peer=" QDF_MAC_ADDR_FMT " type=%u subtype=%u success=%u reason=%u is_sender=%u data_rate=%u(x100Kbps) ch=%u rssi=%d link_id=%u session_id=%u ts_ms=%llu tx_pkts=%u tx_fail=%u rx_pkts=%u rx_fail=%u",
+		  QDF_MAC_ADDR_REF(dut_mac_addr.bytes),
+		  QDF_MAC_ADDR_REF(entry->peer_mac),
+		  entry->type, entry->subtype,
+		  entry->success, entry->reason_code, entry->is_sender,
+		  (uint32_t)entry->data_rate * 5,
+		  (uint32_t)entry->channel, (int8_t)entry->rssi, link_id,
+		  entry->session_id, entry->ts_ms,
+		  entry->tx_ppdus_cumulative, entry->tx_ppdu_failures,
+		  entry->rx_ppdus_cumulative, entry->rx_ppdu_failures);
+
+	skb = wlan_cfg80211_vendor_event_alloc(
+				hdd_ctx->wiphy,
+				&adapter->wdev,
+				skb_len,
+				QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS_INDEX,
+				qdf_mem_malloc_flags());
+	if (!skb) {
+		hdd_err("TDLS stats: failed to alloc vendor event skb");
+		return;
+	}
+
+	/* Wrap everything in ENTRIES nested attribute */
+	entries_attr = nla_nest_start(skb,
+				      QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES);
+	if (!entries_attr)
+		goto fail;
+
+	/* Single entry nested attribute (index 0) */
+	entry_attr = nla_nest_start(skb, 0);
+	if (!entry_attr)
+		goto fail;
+
+	/*
+	 * DUT MAC address:
+	 *   MLO     -> MLD address
+	 *   non-MLO -> self (link) MAC address
+	 */
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_DUT_MAC_ADDR;
+	if (nla_put(skb, attr, QDF_MAC_ADDR_SIZE, dut_mac_addr.bytes))
+		goto fail;
+
+	/* Peer MAC address */
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_PEER_MAC_ADDR;
+	if (nla_put(skb, attr, QDF_MAC_ADDR_SIZE, entry->peer_mac))
+		goto fail;
+
+	/*
+	 * Event type — Mandatory; convert internal type to QCA vendor type.
+	 * TDLS_STATS_STATE_CHANGED maps to
+	 * QCA_WLAN_TDLS_STATS_TYPE_CHANNEL_CHANGE.
+	 */
+	if (!tdls_stats_type_to_qca(entry->type, &qca_type))
+		goto fail;
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TYPE;
+	if (nla_put_u8(skb, attr, qca_type))
+		goto fail;
+
+	/*
+	 * Event subtype — Optional; only emit when the internal subtype maps
+	 * to a valid QCA subtype.  TDLS_STATS_SUBTYPE_GENERAL has no
+	 * corresponding value in enum qca_wlan_tdls_stats_subtype and is
+	 * therefore skipped.
+	 */
+	if (tdls_stats_subtype_to_qca(entry->subtype, &qca_subtype)) {
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_SUBTYPE;
+		if (nla_put_u8(skb, attr, qca_subtype))
+			goto fail;
+	}
+
+	/*
+	 * Success flag: present when success == 0 (success),
+	 * absent when success == 1 (failure).
+	 */
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_SUCCESS;
+	if (entry->success == 0) {
+		if (nla_put_flag(skb, attr))
+			goto fail;
+	}
+
+	/*
+	 * Sender/receiver role — Optional; not applicable for Type-5 (DATA)
+	 * entries where is_sender is set to 0 and has no meaning.
+	 */
+	if (entry->type != TDLS_STATS_DATA) {
+		if (tdls_stats_role_to_qca(entry->is_sender, &qca_role)) {
+			attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_ROLE;
+			if (nla_put_u8(skb, attr, qca_role))
+				goto fail;
+		}
+	}
+
+	/*
+	 * Type-5 (DATA) periodic stats — Optional; only applicable for DATA
+	 * entries.  All fields are set to 0 for non-DATA entries.
+	 *
+	 * Data rate: entry stores 0.5 Mbps units; vendor attr expects
+	 * 100 Kbps units.  Multiply by 5 (0.5 Mbps = 500 Kbps = 5 × 100 Kbps).
+	 */
+	if (entry->type == TDLS_STATS_DATA) {
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_DATA_RATE;
+		if (nla_put_u32(skb, attr, (uint32_t)entry->data_rate * 5))
+			goto fail;
+
+		/* TX PPDUs (cumulative) */
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_PACKETS;
+		if (nla_put_u32(skb, attr, entry->tx_ppdus_cumulative))
+			goto fail;
+
+		/* TX PPDU failures */
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_FAILURES;
+		if (nla_put_u32(skb, attr, entry->tx_ppdu_failures))
+			goto fail;
+
+		/* RX PPDUs (cumulative) */
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_PACKETS;
+		if (nla_put_u32(skb, attr, entry->rx_ppdus_cumulative))
+			goto fail;
+
+		/* RX PPDU failures */
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_FAILURES;
+		if (nla_put_u32(skb, attr, entry->rx_ppdu_failures))
+			goto fail;
+	}
+
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OP_FREQ;
+	if (nla_put_u32(skb, attr, entry->channel))
+		goto fail;
+
+	/*
+	 * RSSI — Optional; -128 is reserved to indicate RSSI not available.
+	 * Skip the attribute when RSSI is not available.
+	 * Cast to int8_t to clamp to s8 range, then reinterpret as uint8_t
+	 * for nla_put_u8 (the kernel NLA layer treats the byte as-is).
+	 */
+	if (entry->rssi != -128) {
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RSSI;
+		if (nla_put_u8(skb, attr, (uint8_t)(int8_t)entry->rssi))
+			goto fail;
+	}
+
+	/*
+	 * Reason code — applicable for teardown, failure, and channel switch
+	 * events.  Optional for all other event types.  Skip if the internal
+	 * reason code has no QCA equivalent (GENERAL or UNKNOWN).
+	 */
+	if (entry->type == TDLS_STATS_TEARDOWN ||
+	    entry->type == TDLS_STATS_STATE_CHANGED ||
+	    entry->success != 0) {
+		if (tdls_stats_reason_to_qca(entry->reason_code, &qca_reason)) {
+			attr =
+			QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_REASON_CODE;
+			if (nla_put_u8(skb, attr, qca_reason))
+				goto fail;
+		}
+	}
+
+	/* MLO link ID — cached from the early vdev lookup above */
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LINK_ID;
+	if (nla_put_u8(skb, attr, link_id))
+		goto fail;
+
+	/*
+	 * Timestamp: entry stores milliseconds since boot; vendor attr
+	 * expects microseconds.  Multiply by 1000.
+	 */
+	attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TIMESTAMP;
+	if (nla_put_u64_64bit(skb, attr,
+			      entry->ts_ms * 1000ULL,
+			      QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_INVALID))
+		goto fail;
+
+	/*
+	 * MCS histogram — only meaningful for Type-5 (DATA) entries.
+	 * Emit only MCS indices that have non-zero TX or RX counts to
+	 * keep the event compact.
+	 */
+	if (entry->type == TDLS_STATS_DATA) {
+		attr = QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_MCS_PKT_COUNT;
+		mcs_attr = nla_nest_start(skb, attr);
+		if (!mcs_attr)
+			goto fail;
+
+		for (i = 0; i < TDLS_STATS_MAX_MCS_COUNTERS; i++) {
+			if (!entry->tx_mcs_data_ppdu[i] &&
+			    !entry->rx_mcs_data_ppdu[i])
+				continue;
+
+			hdd_debug("TDLS stats: MCS[%u]: tx=%u rx=%u",
+				  i, entry->tx_mcs_data_ppdu[i],
+				  entry->rx_mcs_data_ppdu[i]);
+
+			mcs_entry = nla_nest_start(skb, i);
+			if (!mcs_entry)
+				goto fail;
+
+			if (nla_put_u8(
+				skb,
+				QCA_WLAN_VENDOR_ATTR_MCS_PKT_MCS_INDEX,
+				(uint8_t)i))
+				goto fail;
+
+			if (nla_put_u64_64bit(
+				skb,
+				QCA_WLAN_VENDOR_ATTR_MCS_PKT_TX_PACKET_COUNT,
+				entry->tx_mcs_data_ppdu[i],
+				QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD))
+				goto fail;
+
+			if (nla_put_u64_64bit(
+				skb,
+				QCA_WLAN_VENDOR_ATTR_MCS_PKT_RX_PACKET_COUNT,
+				entry->rx_mcs_data_ppdu[i],
+				QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD))
+				goto fail;
+
+			nla_nest_end(skb, mcs_entry);
+		}
+
+		nla_nest_end(skb, mcs_attr);
+	}
+
+	nla_nest_end(skb, entry_attr);
+	nla_nest_end(skb, entries_attr);
+
+	wlan_cfg80211_vendor_event(skb, qdf_mem_malloc_flags());
+	return;
+
+fail:
+	hdd_err("TDLS stats: failed to fill vendor event attributes");
+	wlan_cfg80211_vendor_free_skb(skb);
+}
+#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 {

@@ -33,6 +33,7 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_tdls_public_structs.h>
+#include <wlan_tdls_stats_public_structs.h>
 #include <scheduler_api.h>
 #include "wlan_serialization_api.h"
 #include <wlan_utility.h>
@@ -221,6 +222,11 @@ struct tdls_callbacks {
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  * @is_user_tdls_enable: bool to check whether TDLS enable through userspace
  * @tdls_cb: TDLS callbacks to other modules
+ * @stats_ctx: TDLS stats state machine context
+ * @stats_emit_cb: Callback registered by OS-IF (HDD) to emit a TDLS stats
+ *                 entry as a vendor event.  Called by the TDLS stats SM
+ *                 instead of directly invoking HDD functions.  The psoc
+ *                 pointer (soc_obj->soc) is passed as the first argument.
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -283,6 +289,8 @@ struct tdls_soc_priv_obj {
 	bool fw_tdls_wideband_capability;
 	bool is_user_tdls_enable;
 	struct tdls_callbacks tdls_cb;
+	struct tdls_stats_context *stats_ctx;
+	tdls_stats_emit_cb stats_emit_cb;
 };
 
 /**
@@ -555,6 +563,21 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg);
+
+/**
+ * tdls_process_stats_dp_pkt() - Process a pre-parsed TDLS data-path packet
+ *                               on the TDLS scheduler thread.
+ * @info: Pointer to a heap-allocated tdls_dp_pkt_info struct.  Ownership
+ *        is transferred to this function; it will be freed before returning.
+ *
+ * Called from tdls_process_cmd() when msg->type == TDLS_CMD_STATS_DP_PKT.
+ * Looks up the vdev from the stored psoc, retrieves the TDLS soc private
+ * object, and calls tdls_stats_record_dp_pkt() to deliver the event to
+ * the TDLS stats state machine.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS tdls_process_stats_dp_pkt(struct tdls_dp_pkt_info *info);
 
 /**
  * tdls_process_evt() - tdls main event process function

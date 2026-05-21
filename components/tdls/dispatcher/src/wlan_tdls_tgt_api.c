@@ -348,3 +348,26 @@ void tgt_tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 {
 	tdls_check_and_indicate_delete_all_peers(psoc, session_id);
 }
+
+/**
+ * tgt_tdls_request_stats_info() - Send WMI_REQUEST_STATS_INFO_CMDID to FW
+ * @psoc: PSOC object
+ * @vdev_id: vdev_id
+ * @enable: 1 = enable FW TDLS stats collection
+ *
+ * Invokes the request_stats_info tx_op if registered by the target_if layer.
+ * If the op is not registered (e.g. older FW), returns success silently.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tgt_tdls_request_stats_info(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t enable)
+{
+	struct wlan_lmac_if_tdls_tx_ops *tdls_ops = NULL;
+
+	tdls_ops = wlan_psoc_get_tdls_txops(psoc);
+	if (tdls_ops && tdls_ops->request_stats_info)
+		return tdls_ops->request_stats_info(psoc, vdev_id, enable);
+
+	return QDF_STATUS_SUCCESS;
+}

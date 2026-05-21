@@ -1940,7 +1940,9 @@ TDLS_OBJS := $(TDLS_DIR)/core/src/wlan_tdls_main.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_cfg.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_api.o \
        $(TDLS_OS_IF_SRC)/wlan_cfg80211_tdls.o \
-       $(TDLS_TARGET_IF_SRC)/target_if_tdls.o
+       $(TDLS_TARGET_IF_SRC)/target_if_tdls.o \
+       $(TDLS_DIR)/dispatcher/src/wlan_tdls_stats_api.o \
+       $(TDLS_DIR)/core/src/wlan_tdls_stats.o
 endif
 
 $(call add-wlan-objs,tdls,$(TDLS_OBJS))

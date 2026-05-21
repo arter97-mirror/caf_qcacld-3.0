@@ -42,6 +42,54 @@
 #include <wlan_tdls_stats_public_structs.h>
 #include <wlan_sm_engine.h>
 
+/* Forward declaration to avoid circular includes with wlan_tdls_main.h */
+struct tdls_soc_priv_obj;
+
+/* =========================================================================
+ * SM lock helpers (inline, mirroring the cm_lock_* pattern)
+ * =========================================================================
+ */
+
+/**
+ * tdls_stats_lock_create() - Initialise the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_create(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_create(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/**
+ * tdls_stats_lock_destroy() - Destroy the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_destroy(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_destroy(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/**
+ * tdls_stats_lock_acquire() - Acquire the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_acquire(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_acquire(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
+/**
+ * tdls_stats_lock_release() - Release the TDLS stats SM mutex.
+ * @stats_ctx: TDLS stats context.
+ */
+static inline void
+tdls_stats_lock_release(struct tdls_stats_context *stats_ctx)
+{
+	qdf_mutex_release(&stats_ctx->sm.tdls_stats_sm_lock);
+}
+
 /* =========================================================================
  * SM lifecycle APIs (defined in wlan_tdls_stats.c)
  * =========================================================================
@@ -62,7 +110,7 @@
  *   2. Queries wmi_service_tdls_stats_info to determine the initial state:
  *        - FW capability present  -> TDLS_STATS_S_INIT  (cache DB initialised)
  *        - FW capability absent   -> TDLS_STATS_S_DISABLED (cache DB skipped)
- *   3. Creates the wlan_sm_engine instance and the SM spinlock.
+ *   3. Creates the wlan_sm_engine instance and the SM mutex lock.
  *   4. Initialises the cache DB when starting in TDLS_STATS_S_INIT.
  *
  * The double-pointer output parameter is the standard C pattern for
@@ -82,7 +130,7 @@ QDF_STATUS tdls_stats_sm_create(struct wlan_objmgr_psoc *psoc,
  *
  * Cleanup order:
  *   1. Deinit cache DB (only if db_initialized is true).
- *   2. Destroy the SM spinlock.
+ *   2. Destroy the SM mutex lock.
  *   3. Delete the wlan_sm_engine instance.
  *   4. Free the context itself.
  *
@@ -156,7 +204,7 @@ QDF_STATUS tdls_stats_sm_deliver_event(struct tdls_stats_context *stats_ctx,
  * @db: Pointer to the cache database structure to initialise.
  * @max_entries: Maximum number of entries the cache can hold.
  *
- * Zeroes the structure, sets the capacity, creates the spinlock, and
+ * Zeroes the structure, sets the capacity, creates the mutex, and
  * creates the QDF list.  Called during PSOC creation when FW capability
  * is present.
  *
@@ -180,7 +228,7 @@ void tdls_stats_db_flush(struct tdls_stats_db *db);
  * @db: Pointer to the cache database structure.
  *
  * Flushes all remaining entries, destroys the QDF list, and destroys
- * the spinlock.  Called during PSOC destruction.
+ * the mutex.  Called during PSOC destruction.
  */
 void tdls_stats_db_deinit(struct tdls_stats_db *db);
 
@@ -198,12 +246,17 @@ uint32_t tdls_stats_flush_entire_cache(struct tdls_stats_context *stats_ctx);
 
 /**
  * tdls_emit_vendor_event() - Emit a single stats entry as a vendor event.
+ * @psoc:  PSOC object used to look up the registered OS-IF callback.
  * @entry: Stats entry to emit.
  *
- * Formats @entry and delivers it to user space via the nl80211 vendor
- * event path.
+ * Retrieves the %tdls_stats_emit_cb callback registered by the OS-IF layer
+ * (HDD) via wlan_tdls_register_stats_emit_cb() and invokes it.  This keeps
+ * the TDLS component free of any direct dependency on HDD headers.
+ *
+ * If no callback has been registered the entry is silently dropped.
  */
-void tdls_emit_vendor_event(const struct tdls_stats_entry *entry);
+void tdls_emit_vendor_event(struct wlan_objmgr_psoc *psoc,
+			    const struct tdls_stats_entry *entry);
 
 /**
  * tdls_stats_handle_sta_connection() - Handle a STA-connected event.
@@ -213,5 +266,134 @@ void tdls_emit_vendor_event(const struct tdls_stats_entry *entry);
  * if the single-STA SCC condition is met.
  */
 void tdls_stats_handle_sta_connection(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * tdls_stats_enable_cmd() - Core handler for the TDLS_STATS_ENABLE scheduler
+ *                           message.
+ * @stats_ctx: TDLS stats context obtained from the scheduler message bodyptr.
+ *
+ * Must NOT be called while tdls_stats_sm_lock is held.
+ */
+void tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx);
+
+/**
+ * tdls_stats_record_peer_add() - Record a TDLS stats entry when a new peer
+ *                                is added to the peer list.
+ * @soc_obj: TDLS soc private object (provides stats_ctx).
+ * @vdev:    VDEV on which the peer is being added (used for channel lookup).
+ * @macaddr: MAC address of the newly added peer.
+ * @rssi:    Last known RSSI for the peer (0 if not yet measured).
+ *
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_SETUP,
+ * subtype=TDLS_STATS_SUBTYPE_REQ, is_sender=0 (responder), and delivers
+ * it to the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
+				struct wlan_objmgr_vdev *vdev,
+				const uint8_t *macaddr,
+				int8_t rssi);
+
+/**
+ * tdls_stats_record_dp_pkt() - Record a TDLS data-path packet stats entry.
+ * @soc_obj:     TDLS soc private object (provides stats_ctx).
+ * @vdev:        VDEV on which the packet was sent/received.
+ * @macaddr:     Peer MAC address of the packet.
+ * @dir:         QDF_TX or QDF_RX.
+ * @type:        TDLS stats event type derived from the TDLS action code.
+ * @subtype:     TDLS stats event subtype derived from the TDLS action code.
+ * @reason_code: Reason code to record with the entry; use
+ *               TDLS_STATS_REASON_GENERAL for normal data-path frames.
+ *
+ * Called from tdls_process_stats_dp_pkt() on the TDLS scheduler thread
+ * after wlan_dp_rx_tdls_packet() detects a TDLS frame (EtherType 0x890D)
+ * in the RX data path and posts a TDLS_CMD_STATS_DP_PKT message.
+ * The type, subtype, and reason_code are already mapped from the raw
+ * action_code and dot11_reason before this function is called.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
+			      struct wlan_objmgr_vdev *vdev,
+			      const uint8_t *macaddr,
+			      enum qdf_proto_dir dir,
+			      enum tdls_stats_type type,
+			      enum tdls_stats_subtype subtype,
+			      enum tdls_stats_reason_code reason_code);
+
+/**
+ * tdls_stats_record_discovery_resp() - Record a TDLS discovery response stats
+ *                                      entry.
+ * @soc_obj: TDLS soc private object (provides stats_ctx).
+ * @vdev:    VDEV on which the discovery response was received.
+ * @macaddr: MAC address of the peer that sent the discovery response.
+ * @rssi:    RSSI of the received discovery response frame.
+ * @success: true if the discovery was successful (RSSI threshold met and
+ *           setup request will be sent); false if the RSSI threshold was
+ *           not met and the link returns to IDLE.
+ *
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_DISCOVERY,
+ * subtype=TDLS_STATS_SUBTYPE_RESP, is_sender=0 (we received it), and
+ * delivers it to the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_discovery_resp(struct tdls_soc_priv_obj *soc_obj,
+				      struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *macaddr,
+				      int8_t rssi,
+				      bool success);
+
+/**
+ * tdls_stats_record_peer_teardown() - Record a TDLS teardown stats entry.
+ * @soc_obj:     TDLS soc private object (provides stats_ctx).
+ * @vdev:        VDEV on which the teardown is occurring.
+ * @macaddr:     MAC address of the peer being torn down.
+ * @reason_code: Teardown reason; use TDLS_STATS_REASON_NO_TRAFFIC when
+ *               both tx and rx packet counts are zero, or
+ *               TDLS_STATS_REASON_INSUFFICIENT_TRAFFIC when traffic exists
+ *               but is below the idle threshold.
+ *
+ * Populates a struct tdls_stats_entry with type=TDLS_STATS_TEARDOWN,
+ * subtype=TDLS_STATS_SUBTYPE_GENERAL, is_sender=1, and delivers it to
+ * the TDLS stats SM via TDLS_STATS_EV_NEW_EVENT.
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
+				     struct wlan_objmgr_vdev *vdev,
+				     const uint8_t *macaddr,
+				     enum tdls_stats_reason_code reason_code);
+
+/**
+ * tdls_stats_record_peers_teardown() - Unified teardown stats recorder for
+ *                                       connected TDLS peers.
+ * @psoc:        PSOC object.
+ * @vdev_id:     Vdev ID of the STA session, or WLAN_UMAC_VDEV_ID_MAX to
+ *               record teardown for all connected peers regardless of vdev.
+ *               When WLAN_UMAC_VDEV_ID_MAX is passed, the TDLS link vdev is
+ *               used for the channel and session_id fields of the stats entry.
+ * @reason_code: Teardown reason to record for each peer.
+ *
+ * Covers two use cases:
+ *   1. Per-vdev (vdev_id != WLAN_UMAC_VDEV_ID_MAX): records teardown only for
+ *      peers whose session_id matches @vdev_id.
+ *   2. All-peers (vdev_id == WLAN_UMAC_VDEV_ID_MAX): records teardown for
+ *      every connected TDLS peer using the TDLS link vdev.
+ *
+ * No-op if soc_obj->stats_ctx is NULL.
+ */
+void tdls_stats_record_peers_teardown(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      enum tdls_stats_reason_code reason_code);
+
+/**
+ * tdls_get_tdls_stats() - Core API to handle a TDLS stats enable/disable
+ *                         request from the dispatcher layer.
+ * @stats_ctx: TDLS stats context obtained from tdls_soc_priv_obj::stats_ctx.
+ * @enable: true  -> deliver TDLS_STATS_EV_ENABLE to the SM
+ *          false -> deliver TDLS_STATS_EV_DISABLE to the SM
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS tdls_get_tdls_stats(struct tdls_stats_context *stats_ctx,
+			       bool enable);
 
 #endif /* _WLAN_TDLS_STATS_H_ */
