@@ -1768,6 +1768,7 @@ static QDF_STATUS lim_ap_determine_nss_for_sta_ds(struct mac_context *mac_ctx,
 	sta_ds->cap_rx_nss = QDF_MIN(nss_ies.cap_tx_nss, min_rx_nss);
 	sta_ds->op_tx_nss = QDF_MIN(nss_ies.op_rx_nss, sta_ds->cap_tx_nss);
 	sta_ds->op_rx_nss = QDF_MIN(nss_ies.op_tx_nss, sta_ds->cap_rx_nss);
+	sta_ds->nss_hw_restricted = limit_to_min_nss;
 
 	/*
 	 * sta_ds holds the NSS fields of self hence logging the peer's

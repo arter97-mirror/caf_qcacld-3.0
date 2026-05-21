@@ -2359,6 +2359,31 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 				populate_dot11f_wmm_caps(&frm.WMMCaps);
 		}
 
+		/*
+		 * Select the NSS to advertise in capability IEs.
+		 * Default to the full session NSS. Override with the sta_ds
+		 * intersected NSS only when hw NSS is restricted, the AP can
+		 * signal an NSS change later, and at least one of the
+		 * intersected TX or RX NSS is above the absolute hw minimum
+		 * across modes.
+		 */
+		uint8_t assoc_rsp_tx_nss = pe_session->cap_tx_nss;
+		uint8_t assoc_rsp_rx_nss = pe_session->cap_rx_nss;
+
+		if (sta->nss_hw_restricted &&
+		    wlan_mlme_get_sap_supports_nss_change(pe_session->vdev)) {
+			uint8_t min_tx_nss = 0, min_rx_nss = 0;
+
+			policy_mgr_fetch_min_nss_across_hw_modes(mac_ctx->psoc,
+								 &min_tx_nss,
+								 &min_rx_nss);
+			if (sta->cap_tx_nss > min_tx_nss ||
+			    sta->cap_rx_nss > min_rx_nss) {
+				assoc_rsp_tx_nss = sta->cap_tx_nss;
+				assoc_rsp_rx_nss = sta->cap_rx_nss;
+			}
+		}
+
 		if (sta->mlmStaContext.htCapability &&
 		    pe_session->htCapability) {
 			populate_dot11f_ht_caps(mac_ctx, pe_session,
@@ -2377,8 +2402,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 			wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc,
 							&frm.HTCaps, NULL,
-							sta->cap_tx_nss,
-							sta->cap_rx_nss);
+							assoc_rsp_tx_nss,
+							assoc_rsp_rx_nss);
 			populate_dot11f_ht_info(mac_ctx, &frm.HTInfo,
 						pe_session);
 		}
@@ -2388,8 +2413,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			populate_dot11f_vht_caps(mac_ctx, pe_session,
 						 &frm.VHTCaps);
 			lim_update_dot11f_vht_caps_for_nss(&frm.VHTCaps,
-							   sta->cap_tx_nss,
-							   sta->cap_rx_nss);
+							   assoc_rsp_tx_nss,
+							   assoc_rsp_rx_nss);
 			populate_dot11f_vht_operation(mac_ctx, pe_session,
 					&frm.VHTOperation);
 			is_vht = true;
@@ -2447,8 +2472,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 			wlan_mlme_set_he_mcsset_for_nss(mac_ctx->mlme_cfg,
 							&frm.he_cap,
-							sta->cap_tx_nss,
-							sta->cap_rx_nss);
+							assoc_rsp_tx_nss,
+							assoc_rsp_rx_nss);
 			populate_dot11f_sr_info(mac_ctx, pe_session,
 						&frm.spatial_reuse);
 			populate_dot11f_he_operation(mac_ctx, pe_session,
@@ -2462,8 +2487,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			populate_dot11f_eht_caps(mac_ctx, pe_session,
 						 &frm.eht_cap);
 			wlan_mlme_set_eht_mcsset_for_nss(&frm.eht_cap,
-							 sta->cap_tx_nss,
-							 sta->cap_rx_nss);
+							 assoc_rsp_tx_nss,
+							 assoc_rsp_rx_nss);
 			populate_dot11f_eht_operation(mac_ctx, pe_session,
 						      &frm.eht_op);
 		}

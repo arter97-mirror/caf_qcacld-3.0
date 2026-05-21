@@ -157,6 +157,14 @@ typedef struct sDphHashNode {
 	uint8_t op_tx_nss;
 	/* Intersected operating Rx NSS for this session */
 	uint8_t op_rx_nss;
+	/*
+	 * Set when the peer lacks OMI/OMN support (HE omi_a_ctrl, VHT OMN,
+	 * EHT eht_om_ctl) and the AP must restrict the assoc response NSS to
+	 * the hw minimum across concurrent modes. Clear (default) for peers
+	 * that support OMI/OMN; those peers receive the full session NSS and
+	 * adjust their operating NSS dynamically via OMI frames.
+	 */
+	bool nss_hw_restricted;
 	int8_t del_sta_ctx_rssi;
 	bool sta_deletion_in_progress;
 	/* Flag indicating connected STA doesn't support ECSA */
