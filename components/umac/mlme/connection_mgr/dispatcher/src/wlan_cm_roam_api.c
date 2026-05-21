@@ -46,6 +46,7 @@
 #include "wlan_mlo_link_force.h"
 #endif
 #include "wlan_mlo_link_recfg.h"
+#include "wlan_smd_roam.h"
 #include <../../core/src/wlan_cm_roam_offload.h>
 #include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_STA_SEAMLESS_ROAMING
@@ -6792,3 +6793,8 @@ wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 }
 #endif
+
+uint32_t cm_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev)
+{
+	return smd_get_roam_sync_timeout(vdev);
+}

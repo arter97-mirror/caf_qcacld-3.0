@@ -2541,4 +2541,17 @@ static inline void
 wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {}
 #endif
+
+/**
+ * cm_get_roam_sync_timeout() - Get serialization timeout for FW roam command
+ * @vdev: VDEV object
+ *
+ * Returns FW_SMD_ROAM_SYNC_TIMEOUT when WLAN_FEATURE_11BN_SMD is enabled
+ * and SMD roaming is in progress on the vdev, FW_ROAM_SYNC_TIMEOUT otherwise.
+ *
+ * Return: timeout in milliseconds
+ */
+uint32_t
+cm_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev);
+
 #endif  /* WLAN_CM_ROAM_API_H__ */

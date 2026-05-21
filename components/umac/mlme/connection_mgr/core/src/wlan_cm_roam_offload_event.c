@@ -132,7 +132,7 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 	cmd.cmd_cb = cm_fw_roam_ser_cb;
 	cmd.source = WLAN_UMAC_COMP_MLME;
 	cmd.is_high_priority = true;
-	cmd.cmd_timeout_duration = FW_ROAM_SYNC_TIMEOUT;
+	cmd.cmd_timeout_duration = cm_get_roam_sync_timeout(cm_ctx->vdev);
 	cmd.vdev = cm_ctx->vdev;
 	cmd.is_blocking = cm_ser_get_blocking_cmd();
 

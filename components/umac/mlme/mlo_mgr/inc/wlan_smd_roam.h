@@ -135,6 +135,18 @@ smd_uhr_link_recfg_send_request_frame(
 		struct mlo_link_recfg_state_req *req);
 
 /**
+ * smd_get_roam_sync_timeout() - Get serialization timeout for FW roam command
+ * @vdev: VDEV object
+ *
+ * Returns FW_SMD_ROAM_SYNC_TIMEOUT when SMD roaming is in progress on
+ * the vdev, FW_ROAM_SYNC_TIMEOUT otherwise.
+ *
+ * Return: timeout in milliseconds
+ */
+uint32_t
+smd_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev);
+
+/**
  * smd_find_first_accepted_link() - Find first accepted link from ST Prep response
  * @recfg_ctx: Link reconfiguration context
  * @tran: Link reconfiguration state transition
@@ -458,6 +470,12 @@ static inline bool
 smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx)
 {
 	return false;
+}
+
+static inline uint32_t
+smd_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev)
+{
+	return FW_ROAM_SYNC_TIMEOUT;
 }
 
 static inline bool

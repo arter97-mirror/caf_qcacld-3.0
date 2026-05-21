@@ -2185,4 +2185,20 @@ QDF_STATUS smd_handle_roam_sync(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+uint32_t
+smd_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!vdev)
+		return FW_ROAM_SYNC_TIMEOUT;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (mlo_dev_ctx && mlo_dev_ctx->link_recfg_ctx &&
+	    smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx))
+		return FW_SMD_ROAM_SYNC_TIMEOUT;
+
+	return FW_ROAM_SYNC_TIMEOUT;
+}
 #endif /* WLAN_FEATURE_11BN_SMD */

@@ -119,6 +119,9 @@
 #define WLAN_MAX_BTM_CANDIDATES      8
 
 #define FW_ROAM_SYNC_TIMEOUT 7000
+#ifdef WLAN_FEATURE_11BN_SMD
+#define FW_SMD_ROAM_SYNC_TIMEOUT 35000
+#endif /* WLAN_FEATURE_11BN_SMD */
 
 /* Default value of WTC reason code */
 #define DISABLE_VENDOR_BTM_CONFIG 2
