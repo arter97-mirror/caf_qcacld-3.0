@@ -1209,8 +1209,6 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	wlan_twt_concurrency_update(adapter->hdd_ctx);
-
 	if (hdd_adapter_is_link_adapter(adapter)) {
 		hdd_debug("replace link adapter dev with ml adapter dev");
 		assoc_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
@@ -1235,6 +1233,8 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 		hdd_debug("Vdev %d is not connected", vdev_id);
 		goto exit;
 	}
+
+	wlan_twt_concurrency_update(adapter->hdd_ctx);
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		link_id = wlan_vdev_get_link_id(vdev);
