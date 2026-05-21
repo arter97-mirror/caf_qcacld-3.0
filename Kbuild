@@ -1422,6 +1422,9 @@ UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_link_switch.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_link_recfg.o \
 
+ifeq ($(CONFIG_WLAN_FEATURE_11BN_SMD), y)
+UMAC_MLO_MGR_OBJS += $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_smd_roam.o
+endif
 $(call add-wlan-objs,umac_mlomgr,$(UMAC_MLO_MGR_OBJS))
 endif
 ########## POWER MANAGEMENT OFFLOADS (PMO) ##########
