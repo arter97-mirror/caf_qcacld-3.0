@@ -39749,7 +39749,7 @@ static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 	}
 
 	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	if (hdd_validate_adapter(adapter)) {
+	if (!adapter) {
 		hdd_err("Invalid adapter");
 		return;
 	}
