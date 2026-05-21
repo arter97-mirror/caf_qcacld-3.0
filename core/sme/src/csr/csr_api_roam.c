@@ -4034,15 +4034,41 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		if (csr_akm_type == eCSR_AUTH_TYPE_OWE) {
 			roam_info->owe_pending_assoc_ind = qdf_mem_malloc(
 							    sizeof(*pAssocInd));
-			if (roam_info->owe_pending_assoc_ind)
+			if (roam_info->owe_pending_assoc_ind) {
 				qdf_mem_copy(roam_info->owe_pending_assoc_ind,
 					     pAssocInd, sizeof(*pAssocInd));
+				if (pAssocInd->assocReqLength) {
+					roam_info->owe_pending_assoc_ind->assocReqPtr =
+						qdf_mem_malloc(pAssocInd->assocReqLength);
+					if (roam_info->owe_pending_assoc_ind->assocReqPtr) {
+						qdf_mem_copy(roam_info->owe_pending_assoc_ind->assocReqPtr,
+							     pAssocInd->assocReqPtr,
+							     pAssocInd->assocReqLength);
+					} else {
+						sme_err("OWE assocReqPtr alloc failed");
+						roam_info->owe_pending_assoc_ind->assocReqPtr = NULL;
+					}
+				}
+			}
 		} else if (csr_akm_type == eCSR_AUTH_TYPE_FT_RSN_PSK) {
 			roam_info->ft_pending_assoc_ind = qdf_mem_malloc(
 			    sizeof(*pAssocInd));
-			if (roam_info->ft_pending_assoc_ind)
+			if (roam_info->ft_pending_assoc_ind) {
 				qdf_mem_copy(roam_info->ft_pending_assoc_ind,
 					     pAssocInd, sizeof(*pAssocInd));
+				if (roam_info->ft_pending_assoc_ind->assocReqLength) {
+					roam_info->ft_pending_assoc_ind->assocReqPtr =
+						qdf_mem_malloc(pAssocInd->assocReqLength);
+					if (roam_info->ft_pending_assoc_ind->assocReqPtr) {
+						qdf_mem_copy(roam_info->ft_pending_assoc_ind->assocReqPtr,
+							     pAssocInd->assocReqPtr,
+							     pAssocInd->assocReqLength);
+					} else {
+						sme_err("FT assocReqPtr alloc failed");
+						roam_info->ft_pending_assoc_ind->assocReqPtr = NULL;
+					}
+				}
+			}
 		}
 		status = csr_roam_call_callback(mac_ctx, sessionId,
 					roam_info, eCSR_ROAM_INFRA_IND,
@@ -4050,9 +4076,13 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			/* Refused due to Mac filtering */
 			if (roam_info->owe_pending_assoc_ind) {
+				if (roam_info->owe_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(roam_info->owe_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(roam_info->owe_pending_assoc_ind);
 				roam_info->owe_pending_assoc_ind = NULL;
 			} else if (roam_info->ft_pending_assoc_ind) {
+				if (roam_info->ft_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(roam_info->ft_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(roam_info->ft_pending_assoc_ind);
 				roam_info->ft_pending_assoc_ind = NULL;
 			}

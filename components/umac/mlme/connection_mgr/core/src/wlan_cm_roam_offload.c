@@ -1215,23 +1215,20 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlme_err("Cannot set high RSSI offset as vdev object is NULL for vdev %d",
 			 vdev_id);
 	} else {
-		qdf_freq_t op_freq;
+		uint8_t roam_high_rssi_delta;
 
-		op_freq = wlan_get_operation_chan_freq(vdev);
-		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(op_freq)) {
-			uint8_t roam_high_rssi_delta;
+		roam_high_rssi_delta =
+			wlan_cm_get_roam_scan_high_rssi_offset(psoc);
+		if (roam_high_rssi_delta) {
+			qdf_freq_t op_freq;
 
-			roam_high_rssi_delta =
-				wlan_cm_get_roam_scan_high_rssi_offset(psoc);
-			if (roam_high_rssi_delta)
-				params->hi_rssi_scan_rssi_delta =
-							roam_high_rssi_delta;
+			params->hi_rssi_scan_rssi_delta = roam_high_rssi_delta;
+			op_freq = wlan_get_operation_chan_freq(vdev);
 			/*
 			 * Firmware will use this flag to enable 5 to 6 GHz
 			 * high RSSI roam
 			 */
-			if (roam_high_rssi_delta &&
-			    WLAN_REG_IS_5GHZ_CH_FREQ(op_freq))
+			if (WLAN_REG_IS_5GHZ_CH_FREQ(op_freq))
 				params->flags |=
 					ROAM_SCAN_RSSI_THRESHOLD_FLAG_ROAM_HI_RSSI_EN_ON_5G;
 		}
@@ -3791,20 +3788,12 @@ QDF_STATUS cm_set_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_roam_offload_scan_rssi_params *roam_rssi_params;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
-	qdf_freq_t op_freq;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
 	if (!vdev) {
 		mlme_err("vdev object is NULL for vdev %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	op_freq = wlan_get_operation_chan_freq(vdev);
-	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(op_freq)) {
-		mlme_err("vdev:%d High RSSI offset can't be set in 6 GHz band",
-			 vdev_id);
-		goto rel_vdev_ref;
 	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
@@ -7244,10 +7233,11 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 {
 	uint8_t i;
 	enum wlan_diag_wifi_band band = WLAN_INVALID_BAND;
+	unsigned long band_bitmap = bitmap;
 
 	for (i = WLAN_24GHZ_BAND; i <= WLAN_6GHZ_BAND; i++) {
 		/* 2.4 GHz band will be populated at 0th bit in the bitmap*/
-		if (qdf_test_bit((i - 1), (unsigned long *)&bitmap)) {
+		if (qdf_test_bit((i - 1), &band_bitmap)) {
 			band = i;
 			break;
 		}

@@ -942,6 +942,7 @@ struct dp_haps {
 	bool is_one_shot;
 	uint8_t state;
 	uint8_t vdev_id;
+	uint16_t fail_safe_timeout;
 	struct dp_soc *soc;
 	struct dp_haps_stats stats;
 	qdf_hrtimer_data_t haps_timer;

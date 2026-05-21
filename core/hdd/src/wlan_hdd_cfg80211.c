@@ -10144,7 +10144,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL];
 	struct nlattr *ps_latency_tolerance_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE];
-	int ret;
+	int ret = 0;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -10202,8 +10202,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
 		ps_params.ps_opm_level = curr_ps_params.ps_opm_level;
 
-		if (!ps_params.ps_ito)
-			return -EINVAL;
+		if (!ps_params.ps_ito) {
+			ret = -EINVAL;
+			goto err;
+		}
 
 		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
 			  ps_params.ps_ito, ps_params.spec_wake,
@@ -10215,7 +10217,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 						  ps_params.spec_wake);
 
 		if (ret)
-			return ret;
+			goto err;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
 	}
 
 	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
@@ -10223,8 +10228,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ps_params.spec_wake = nla_get_u16(ps_latency_tolerance_attr);
 		ps_params.ps_ito = curr_ps_params.ps_ito;
 
-		if (!ps_params.ps_opm_level)
-			return -EINVAL;
+		if (!ps_params.ps_opm_level) {
+			ret = -EINVAL;
+			goto err;
+		}
 
 		hdd_debug("ps_opm_level %d latency_tolerance %d opm_mode %d",
 			  ps_params.ps_opm_level, ps_params.spec_wake,
@@ -10236,17 +10243,23 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 						  ps_params.spec_wake);
 
 		if (ret)
-			return ret;
+			goto err;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
 	}
 
 	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
-	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED))
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED)) {
 		ucfg_pmo_set_ps_params(vdev, &ps_params);
-	else
+	} else {
 		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, true, 0);
+	}
 
+err:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-	return 0;
+	return ret;
 }
 
 static int hdd_config_stats_avg_factor(struct wlan_hdd_link_info *link_info,
@@ -28343,16 +28356,20 @@ __wlan_hdd_cfg80211_update_connect_params(struct wiphy *wiphy,
 	mac_handle = hdd_ctx->mac_handle;
 
 	if (changed & UPDATE_ASSOC_IE) {
-		assoc_ie.len = req->ie_len;
-		assoc_ie.ptr = (uint8_t *)req->ie;
-		/*
-		 * Update this assoc IE received from user space to
-		 * umac. RSO command will pick up the assoc
-		 * IEs to be sent to firmware from the umac.
-		 */
-		ucfg_cm_update_session_assoc_ie(hdd_ctx->psoc,
+		if (!hdd_cm_is_vdev_roaming(adapter->deflink)) {
+			assoc_ie.len = req->ie_len;
+			assoc_ie.ptr = (uint8_t *)req->ie;
+			/*
+			 * Update this assoc IE received from user space to
+			 * umac. RSO command will pick up the assoc
+			 * IEs to be sent to firmware from the umac.
+			 */
+			ucfg_cm_update_session_assoc_ie(
+						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
 						&assoc_ie);
+		} else
+			hdd_debug("skip assoc ie during roam");
 	}
 
 	if ((changed & UPDATE_FILS_ERP_INFO) ||
