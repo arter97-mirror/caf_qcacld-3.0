@@ -539,7 +539,7 @@ hdd_update_standard_for_connect(struct hdd_context *hdd_ctx,
 				struct cfg80211_connect_params *req,
 				struct wlan_objmgr_vdev *vdev)
 {
-	WMI_HOST_WIFI_STANDARD std = WMI_HOST_WIFI_STANDARD_7;
+	WMI_HOST_WIFI_STANDARD std = WMI_HOST_WIFI_STANDARD_8;
 	uint8_t vdev_id;
 	int ret;
 
