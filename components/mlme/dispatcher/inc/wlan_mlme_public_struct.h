@@ -2150,6 +2150,11 @@ struct fw_scan_channels {
  * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
  * @roam_aggre_threshold: Roam threshold in aggressive mode
  * @mrsno_support: FW support for Multi RSNO feature
+ * @disable_btm_cfg: psoc-level cache of the BTM disable flag set by
+ *                  userspace via vendor command. Persists across vdev
+ *                  delete/create cycles (e.g. MAC address randomization)
+ *                  so that rso_cfg->is_disable_btm can be restored on
+ *                  every vdev init and connect request.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2283,6 +2288,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_aggre_scan_step_rssi;
 	uint8_t roam_aggre_threshold;
 	bool mrsno_support;
+	bool disable_btm_cfg;
 };
 
 /**
