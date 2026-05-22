@@ -32472,12 +32472,14 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	/* restart the adapter if it was up before the change iface request */
 	if (iff_up) {
+		clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 		errno = hdd_start_adapter(adapter, true);
 		if (errno) {
 			hdd_err("Failed to start adapter");
 			errno = -EINVAL;
 			goto err;
 		}
+		set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 	}
 
 	ndev->ieee80211_ptr->iftype = type;
