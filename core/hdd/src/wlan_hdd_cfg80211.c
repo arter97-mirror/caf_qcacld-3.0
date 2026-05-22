@@ -17140,7 +17140,7 @@ static int hdd_config_vendor_nss_chains_per_band(
 	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE)
 		return 0;
 
-	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID &&
+	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID ||
 	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID) {
 		hdd_err("Invalid NSS/Chain configuration");
 		return -EINVAL;
@@ -17258,7 +17258,7 @@ static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_NONE)
 		return 0;
 
-	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID &&
+	if (nss_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID ||
 	    chains_req_type == WLAN_VENDOR_NSS_CHAIN_REQ_INVALID) {
 		hdd_err("Invalid NSS/Chain configuration");
 		return -EINVAL;
