@@ -26,5 +26,5 @@ wlan_action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
 			       bool *found_in_list,
 			       uint32_t *list_type)
 {
-	return action_oui_get_nss_policy(psoc, attr, found_in_list, list_type);
+	action_oui_get_nss_policy(psoc, attr, found_in_list, list_type);
 }
