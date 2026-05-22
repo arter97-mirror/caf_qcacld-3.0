@@ -3719,6 +3719,7 @@ endif
 
 #Enable NL80211 test mode
 ccflags-$(CONFIG_NL80211_TESTMODE) += -DWLAN_NL80211_TESTMODE
+ccflags-$(CONFIG_NL80211_TESTMODE) += -DCONFIG_NL80211_TESTMODE
 
 # Flag to enable bus auto suspend
 ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
@@ -5215,6 +5216,8 @@ endif
 ifneq ($(WLAN_CTRL_NAME),)
 ccflags-y += -DWLAN_CTRL_NAME=\"$(WLAN_CTRL_NAME)\"
 endif
+
+ccflags-$(CONFIG_CFG80211_PROP_MULTI_LINK_SUPPORT) += -DCFG80211_PROP_MULTI_LINK_SUPPORT
 
 # inject some build related information
 ifeq ($(CONFIG_BUILD_TAG), y)
