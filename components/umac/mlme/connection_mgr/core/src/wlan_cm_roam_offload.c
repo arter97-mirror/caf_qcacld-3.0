@@ -6171,6 +6171,8 @@ static void cm_roam_clear_is_disable_btm_flag(struct wlan_objmgr_pdev *pdev,
 {
 	struct rso_config *rso_cfg;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -6188,6 +6190,17 @@ static void cm_roam_clear_is_disable_btm_flag(struct wlan_objmgr_pdev *pdev,
 	if (rso_cfg->is_disable_btm) {
 		mlme_debug("vdev: %d clear is_disable_btm flag", vdev_id);
 		rso_cfg->is_disable_btm = false;
+	}
+
+	/*
+	 * Also clear the psoc-level cache so that the flag is not
+	 * re-applied on the next vdev init after a genuine disconnect.
+	 */
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (psoc) {
+		mlme_obj = mlme_get_psoc_ext_obj(psoc);
+		if (mlme_obj)
+			mlme_obj->cfg.lfr.disable_btm_cfg = false;
 	}
 
 release_ref:

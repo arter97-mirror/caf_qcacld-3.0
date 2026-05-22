@@ -2368,6 +2368,11 @@ struct fw_scan_channels {
  * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
  * @neighbor_lookup_rssi_threshold_5ghz: lookup rssi threshold for 5GHz band
  * @neighbor_lookup_rssi_threshold_6ghz: lookup rssi threshold for 6GHz band
+ * @disable_btm_cfg: psoc-level cache of the BTM disable flag set by
+ *                  userspace via vendor command. Persists across vdev
+ *                  delete/create cycles (e.g. MAC address randomization)
+ *                  so that rso_cfg->is_disable_btm can be restored on
+ *                  every vdev init and connect request.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2510,6 +2515,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_periodic_scan_interval;
 	uint32_t neighbor_lookup_rssi_threshold_5ghz;
 	uint32_t neighbor_lookup_rssi_threshold_6ghz;
+	bool disable_btm_cfg;
 };
 
 /**

@@ -1433,6 +1433,7 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct rso_config *rso_cfg;
 
 	if (!vdev || !req)
 		return QDF_STATUS_E_FAILURE;
@@ -1447,6 +1448,23 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * Re-apply the psoc-level BTM disable cache into rso_cfg on every
+	 * connect request. This handles the case where the vdev was
+	 * destroyed and recreated (e.g. MAC address randomization) after
+	 * the vendor command set the flag, causing wlan_cm_rso_config_init
+	 * to have already restored it; but also covers any edge case where
+	 * the flag may not yet be reflected in rso_cfg.
+	 */
+	if (mlme_obj->cfg.lfr.disable_btm_cfg) {
+		rso_cfg = wlan_cm_get_rso_config(vdev);
+		if (rso_cfg) {
+			mlme_debug(CM_PREFIX_FMT "restore disable_btm_cfg into rso_cfg",
+				   CM_PREFIX_REF(req->vdev_id, req->cm_id));
+			rso_cfg->is_disable_btm = true;
+		}
+	}
 
 	join_req = qdf_mem_malloc(sizeof(*join_req));
 	if (!join_req)
