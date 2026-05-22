@@ -150,12 +150,12 @@ dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, enum cdp_haps_state new_state,
 	qdf_time_t timeout;
 
 	if (!haps_ctx) {
-		dp_err("HAPS: Null haps_ctx rcvd");
+		dp_err_rl("HAPS: Null haps_ctx rcvd");
 		return;
 	}
 
 	if (!dp_is_haps_enabled(osif_vdev)) {
-		dp_err("HAPS: Not enabled");
+		dp_err_rl("HAPS: Not enabled");
 		return;
 	}
 
@@ -171,7 +171,7 @@ dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, enum cdp_haps_state new_state,
 	}
 
 	if ((time_rcvd != 0) && (time_rcvd < curr_time_us)) {
-		dp_err("HAPS: Host time:(%llu us) is less than device time:"
+		dp_err_rl("HAPS: Host time:(%llu us) is less than device time:"
 		       "(%lld us) for vdev:%u", curr_time_us, time_rcvd,
 			haps_ctx->vdev_id);
 		return;
@@ -182,8 +182,8 @@ dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, enum cdp_haps_state new_state,
 		timeout = qdf_time_ns_to_ktime(delta_us * 1000);
 
 		if (timeout >= qdf_time_ms_to_ktime(haps_ctx->fail_safe_timeout)) {
-			dp_err("HAPS: invalid timeout (%lu ns) received for vdev:%u",
-				timeout, haps_ctx->vdev_id);
+			dp_err_rl("HAPS: invalid timeout (%lu ns) received for vdev:%u",
+				  timeout, haps_ctx->vdev_id);
 			return;
 		}
 	} else {
