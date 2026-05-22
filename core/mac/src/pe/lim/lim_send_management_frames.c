@@ -3554,6 +3554,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	    pe_session->vhtCapabilityPresentInBeacon) {
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		vht_enabled = true;
+
+		if (pe_session->cap_rx_nss >= 4) {
+			frm->VHTCaps.suBeamformeeCap = 0;
+			frm->VHTCaps.muBeamformeeCap = 0;
+		}
+
 		if (pe_session->gLimOperatingMode.present &&
 		    pe_session->ap_ch_width == CH_WIDTH_20MHZ &&
 		    frm->VHTCaps.present &&
