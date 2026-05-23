@@ -38386,13 +38386,16 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 						REG_CURRENT_PWR_MODE);
 
 	if (chan_info->ch_cfreq1 != ch_params.mhz_freq_seg0 ||
-	    chan_info->ch_cfreq2 != ch_params.mhz_freq_seg1)
-		hdd_debug("Old ccfs1 %d ccfs2 %d - New ccfs1 %d ccfs2 %d",
-			  chan_info->ch_cfreq1, chan_info->ch_cfreq2,
-			  ch_params.mhz_freq_seg0, ch_params.mhz_freq_seg1);
+	    chan_info->ch_cfreq2 != ch_params.mhz_freq_seg1 ||
+	    chan_info->ch_width != ch_params.ch_width)
+		hdd_debug("ccfs1 %d->%d ccfs2 %d->%d bw %d->%d",
+			  chan_info->ch_cfreq1, ch_params.mhz_freq_seg0,
+			  chan_info->ch_cfreq2, ch_params.mhz_freq_seg1,
+			  chan_info->ch_width, ch_params.ch_width);
 
 	chan_info->ch_cfreq1 = ch_params.mhz_freq_seg0;
 	chan_info->ch_cfreq2 = ch_params.mhz_freq_seg1;
+	chan_info->ch_width = ch_params.ch_width;
 
 	hdd_debug("vdev: %d, freq: %d, freq1: %d, freq2: %d, ch_width: %d, max_ch_width:%d",
 		  vdev_id, chan_info->ch_freq, chan_info->ch_cfreq1,

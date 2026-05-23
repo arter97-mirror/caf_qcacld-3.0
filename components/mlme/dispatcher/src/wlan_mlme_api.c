@@ -8569,7 +8569,11 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 						sec_2g_freq, &ch_params,
 						REG_CURRENT_PWR_MODE);
 
-	des_chan->ch_width = ch_width;
+	if (ch_width != ch_params.ch_width)
+		mlme_warn("vdev %d: ch_width %d->%d freq %d sec %d",
+			  vdev_id, ch_width, ch_params.ch_width,
+			  curr_op_freq, sec_2g_freq);
+	des_chan->ch_width = ch_params.ch_width;
 	des_chan->ch_freq_seg1 = ch_params.center_freq_seg0;
 	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
 	des_chan->ch_cfreq1 = ch_params.mhz_freq_seg0;
@@ -8888,7 +8892,8 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	wmi_chan_width = target_if_phy_ch_width_to_wmi_chan_width(ch_width);
+	wmi_chan_width = target_if_phy_ch_width_to_wmi_chan_width(
+						des_chan->ch_width);
 
 	/* update ch width to fw */
 	status = wlan_mlme_update_vdev_chwidth_with_notify(psoc, vdev, vdev_id,
