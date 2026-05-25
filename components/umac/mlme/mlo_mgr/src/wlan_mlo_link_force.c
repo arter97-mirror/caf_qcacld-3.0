@@ -5632,7 +5632,7 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	if (ml_num_link < 2)
 		goto end;
 
-	if (evt == ml_nlink_ap_csa_start_evt)
+	if (evt == ml_nlink_ap_csa_start_evt && data)
 		tgt_ch_freq = data->evt.csa_start.tgt_ch_freq;
 
 	for (i = 0; i < ml_num_link; i++) {
@@ -5669,7 +5669,7 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		goto end;
 
 	/* eMLSR downgrade to single link for below event */
-	if (evt == ml_nlink_ap_csa_start_evt) {
+	if (evt == ml_nlink_ap_csa_start_evt && data) {
 		if (!data->evt.csa_start.wait_set_link) {
 			status = QDF_STATUS_E_PENDING;
 			goto end;
