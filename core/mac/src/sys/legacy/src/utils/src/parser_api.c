@@ -917,6 +917,9 @@ populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
 	/* advertise global operating class */
 	ctry_ie->country[REG_ALPHA2_LEN] = 0x04;
 
+	/* Pass 1: 2.4/5 GHz subband triplets — grouped by adjacency and
+	 * tx_power
+	 */
 	start = NULL;
 	prev = NULL;
 	for (chan_enum = 0; chan_enum < chan_num; chan_enum++) {
@@ -925,21 +928,11 @@ populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
 		if (cur_chan->chan_flags & REGULATORY_CHAN_DISABLED)
 			continue;
 
-		if (wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq) &&
-		    !six_gig_started) {
-			if (num_triplets > 80) {
-				pe_err("Triplets number exceed max size");
-				status = QDF_STATUS_E_FAILURE;
-				goto out;
-			}
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_131;
-			num_triplets++;
-			six_gig_started = true;
-		}
+		if (wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq))
+			continue;
 
-		/* Continue only if band is not same, tx power is different
-		 * or channel is not the last channel.
+		/* Continue if channels are adjacent, in the same
+		 * band, and have the same tx_power.
 		 */
 		if ((start && prev &&
 		     adjacent_same_band(prev, cur_chan, chan_spacing_for_2ghz,
@@ -951,7 +944,7 @@ populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
 			continue;
 		} else {
 			/* Different band or not adjacent or tx power changed */
-			pe_debug("new triplet (band change or non-adjacent or tx power mismatch or last chan)");
+			pe_debug("new triplet (band change or non-adjacent or tx power mismatch)");
 		}
 
 		if (start && prev) {
@@ -967,51 +960,9 @@ populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
 			buffer_triplets[num_triplets][2] = start->tx_power;
 			start = NULL;
 			cur_triplet_num_chans = 0;
-
 			num_triplets++;
 		}
 
-		if (six_gig_started) {
-			/* Ensure space for 3 triplets (indices num_triplets,
-			 * num_triplets+1, num_triplets+2). triplet for 320 MHz
-			 * is optional, so different check for one triplet space
-			 * is for that.
-			 */
-			if (num_triplets > 78) {
-				pe_err("Triplets number exceed max size for 3 entries");
-				status = QDF_STATUS_E_FAILURE;
-				goto out;
-			}
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_132;
-			num_triplets++;
-
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_133;
-			num_triplets++;
-
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_134;
-			num_triplets++;
-			/* Add OP_CLASS_137 when 6 GHz is present and operating BW is 320 MHz */
-			if (pe_session && (pe_session->ch_width == CH_WIDTH_320MHZ)) {
-				/* Ensure space for 1 triplet
-				 * (indices num_triplets)
-				 */
-				if (num_triplets > 80) {
-					pe_err("Triplets number exceed max size");
-					status = QDF_STATUS_E_FAILURE;
-					goto out;
-				}
-				buffer_triplets[num_triplets][0] =
-							OP_CLASS_ID_202;
-				buffer_triplets[num_triplets][1] =
-							OP_CLASS_137;
-				num_triplets++;
-			}
-		}
-
-		/* Start new group */
 		start = cur_chan;
 		prev = cur_chan;
 	}
@@ -1026,6 +977,116 @@ populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
 		buffer_triplets[num_triplets][1] = cur_triplet_num_chans + 1;
 		buffer_triplets[num_triplets][2] = start->tx_power;
 		num_triplets++;
+	}
+
+	/*
+	 * Pass 2: 6 GHz Operating/Subband Sequences per IEEE 802.11ax 9.4.2.8.
+	 *
+	 * {201, 131, 0} is followed by subband triplets for 20 MHz channels
+	 * grouped by adjacency only. Power field is reserved (0) per spec
+	 * NOTE 4 — actual power is conveyed via the TPE IE. Operating
+	 * triplets for >=40 MHz classes have zero subband triplets following
+	 * them.
+	 */
+	start = NULL;
+	prev = NULL;
+	cur_triplet_num_chans = 0;
+	six_gig_started = false;
+
+	for (chan_enum = 0; chan_enum < chan_num; chan_enum++) {
+		cur_chan = &sec_cur_chan_list[chan_enum];
+
+		if (!wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq))
+			continue;
+
+		if (cur_chan->chan_flags & REGULATORY_CHAN_DISABLED)
+			continue;
+
+		if (!six_gig_started) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
+			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+			buffer_triplets[num_triplets][1] = OP_CLASS_131;
+			buffer_triplets[num_triplets][2] = 0;
+			num_triplets++;
+			six_gig_started = true;
+		}
+
+		if (start && prev &&
+		    adjacent_same_band(prev, cur_chan, chan_spacing_for_2ghz,
+				       chan_spacing_for_5ghz_6ghz)) {
+			prev = cur_chan;
+			cur_triplet_num_chans++;
+			continue;
+		}
+
+		if (start && prev) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
+			buffer_triplets[num_triplets][0] = start->chan_num;
+			buffer_triplets[num_triplets][1] =
+					cur_triplet_num_chans + 1;
+			buffer_triplets[num_triplets][2] = 0;
+			start = NULL;
+			cur_triplet_num_chans = 0;
+			num_triplets++;
+		}
+
+		start = cur_chan;
+		prev = cur_chan;
+	}
+
+	if (start) {
+		if (num_triplets > 80) {
+			pe_err("Triplets number exceed max size");
+			status = QDF_STATUS_E_FAILURE;
+			goto out;
+		}
+		buffer_triplets[num_triplets][0] = start->chan_num;
+		buffer_triplets[num_triplets][1] = cur_triplet_num_chans + 1;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+	}
+
+	if (six_gig_started) {
+		/* >=40 MHz classes require zero subband triplets per spec */
+		if (num_triplets > 78) {
+			pe_err("Triplets number exceed max size");
+			status = QDF_STATUS_E_FAILURE;
+			goto out;
+		}
+		buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+		buffer_triplets[num_triplets][1] = OP_CLASS_132;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+
+		buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+		buffer_triplets[num_triplets][1] = OP_CLASS_133;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+
+		buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+		buffer_triplets[num_triplets][1] = OP_CLASS_134;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+
+		if (pe_session && (pe_session->ch_width == CH_WIDTH_320MHZ)) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
+			buffer_triplets[num_triplets][0] = OP_CLASS_ID_202;
+			buffer_triplets[num_triplets][1] = OP_CLASS_137;
+			buffer_triplets[num_triplets][2] = 0;
+			num_triplets++;
+		}
 	}
 
 	if (!num_triplets) {
