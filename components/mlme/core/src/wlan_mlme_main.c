@@ -24,6 +24,7 @@
 #include "include/wlan_vdev_mlme.h"
 #include "cfg_ucfg_api.h"
 #include "wmi_unified.h"
+#include "wma_api.h"
 #include "wlan_scan_public_structs.h"
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_vdev_mlme_api.h"
@@ -1306,41 +1307,17 @@ QDF_STATUS mlme_get_peer_mic_len(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
 void
 wlan_acquire_peer_key_wakelock(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr)
 {
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
-		return;
-
-	qdf_atomic_inc(&mlme_priv->set_key_wakelock_counter);
-	mlme_debug(QDF_MAC_ADDR_FMT " VDEV-%d Acquire set key wake lock cnt %d",
-		   QDF_MAC_ADDR_REF(mac_addr), wlan_vdev_get_id(vdev),
-		   qdf_atomic_read(&mlme_priv->set_key_wakelock_counter));
-
-	qdf_wake_lock_timeout_acquire(&mlme_priv->peer_set_key_wakelock,
-				      MLME_PEER_SET_KEY_WAKELOCK_TIMEOUT);
-	qdf_runtime_pm_prevent_suspend(&mlme_priv->peer_set_key_rt_wakelock);
+	mlme_debug(QDF_MAC_ADDR_FMT " VDEV-%d Acquire key op wake lock",
+		   QDF_MAC_ADDR_REF(mac_addr), wlan_vdev_get_id(vdev));
+	wma_acquire_key_op_wakelock();
 }
 
 void
 wlan_release_peer_key_wakelock(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr)
 {
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv ||
-	    qdf_atomic_read(&mlme_priv->set_key_wakelock_counter) <= 0)
-		return;
-
-	qdf_atomic_dec(&mlme_priv->set_key_wakelock_counter);
-	if (qdf_atomic_read(&mlme_priv->set_key_wakelock_counter) == 0)
-		qdf_wake_lock_release(&mlme_priv->peer_set_key_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_WMI_CMD_RSP);
-
-	qdf_runtime_pm_allow_suspend(&mlme_priv->peer_set_key_rt_wakelock);
-	mlme_debug(QDF_MAC_ADDR_FMT " VDEV-%d Release set key wake lock cnt %d",
-		   QDF_MAC_ADDR_REF(mac_addr), wlan_vdev_get_id(vdev),
-		   qdf_atomic_read(&mlme_priv->set_key_wakelock_counter));
+	mlme_debug(QDF_MAC_ADDR_FMT " VDEV-%d Release key op wake lock",
+		   QDF_MAC_ADDR_REF(mac_addr), wlan_vdev_get_id(vdev));
+	wma_release_key_op_wakelock();
 }
 
 QDF_STATUS

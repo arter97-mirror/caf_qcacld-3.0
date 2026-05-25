@@ -939,17 +939,11 @@ struct enhance_roam_info {
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
  * @is_single_link_mlo_roam: Single link mlo roam flag
- * @bss_color_change_wakelock: wakelock to complete bss color change
- *				operation on bss color collision detection
- * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
  * @best_6g_power_type: best 6g power type
  * @mac_id: vdev mac_id
  * @ap_nss: AP advertised NSS
  * @keep_alive_period: KEEPALIVE period in seconds
- * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
- * @peer_set_key_rt_wakelock: runtime pm wakelock for set key
- * @set_key_wakelock_counter: Counter for runtime pm wakelock
  * @is_acs_sap: Sets to true if this is an ACS SAP
  * @uhr_config: UHR capability configuration
  */
@@ -1030,16 +1024,11 @@ struct mlme_legacy_priv {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool is_single_link_mlo_roam;
 #endif
-	qdf_wake_lock_t bss_color_change_wakelock;
-	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
 	enum reg_6g_ap_type best_6g_power_type;
 	uint32_t mac_id;
 	uint8_t ap_nss;
 	uint16_t keep_alive_period;
-	qdf_wake_lock_t peer_set_key_wakelock;
-	qdf_runtime_lock_t peer_set_key_rt_wakelock;
-	qdf_atomic_t set_key_wakelock_counter;
 	bool is_acs_sap;
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_mlme_uhr_caps uhr_config;

@@ -4155,6 +4155,10 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	qdf_wake_lock_create(&wma_handle->wmi_cmd_rsp_wake_lock,
 					"wlan_fw_rsp_wakelock");
 	qdf_runtime_lock_init(&wma_handle->wmi_cmd_rsp_runtime_lock);
+	qdf_wake_lock_create(&wma_handle->wlan_key_op_wake_lock,
+			     "wlan_key_op_wake_lock");
+	qdf_runtime_lock_init(&wma_handle->wlan_key_op_runtime_lock);
+	qdf_atomic_init(&wma_handle->wlan_key_op_counter);
 	qdf_runtime_lock_init(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_init(&wma_handle->ndp_prevent_runtime_pm_lock);
 
@@ -4268,9 +4272,11 @@ err_dbglog_init:
 		wma_err("Failed to destroy radio stats mutex");
 
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
+	qdf_wake_lock_destroy(&wma_handle->wlan_key_op_wake_lock);
 	qdf_runtime_lock_deinit(&wma_handle->ndp_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
+	qdf_runtime_lock_deinit(&wma_handle->wlan_key_op_runtime_lock);
 	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);
 err_event_init:
 	wmi_unified_unregister_event_handler(wma_handle->wmi_handle,
@@ -5294,9 +5300,11 @@ QDF_STATUS wma_close(void)
 	qdf_event_destroy(&wma_handle->tx_queue_empty_event);
 	wma_cleanup_hold_req(wma_handle);
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
+	qdf_wake_lock_destroy(&wma_handle->wlan_key_op_wake_lock);
 	qdf_runtime_lock_deinit(&wma_handle->ndp_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
+	qdf_runtime_lock_deinit(&wma_handle->wlan_key_op_runtime_lock);
 	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);
 
 	qdf_spinlock_destroy(&wma_handle->qos_null_tx_lock);
@@ -10746,4 +10754,31 @@ QDF_STATUS wma_deregister_qos_null_hdd_cb(void)
 	wma_handle->qos_null_tx_compl_cb_context = NULL;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void wma_acquire_key_op_wakelock(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma)
+		return;
+
+	qdf_atomic_inc(&wma->wlan_key_op_counter);
+	qdf_wake_lock_timeout_acquire(&wma->wlan_key_op_wake_lock,
+				      WMA_VDEV_SET_KEY_WAKELOCK_TIMEOUT);
+	qdf_runtime_pm_prevent_suspend(&wma->wlan_key_op_runtime_lock);
+}
+
+void wma_release_key_op_wakelock(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma || qdf_atomic_read(&wma->wlan_key_op_counter) <= 0)
+		return;
+
+	qdf_atomic_dec(&wma->wlan_key_op_counter);
+	if (!qdf_atomic_read(&wma->wlan_key_op_counter))
+		qdf_wake_lock_release(&wma->wlan_key_op_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_WMI_CMD_RSP);
+	qdf_runtime_pm_allow_suspend(&wma->wlan_key_op_runtime_lock);
 }

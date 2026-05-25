@@ -1830,12 +1830,7 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 
 	qdf_mem_common_free(vdev_mlme->ext_vdev_ptr->mlme_roam);
 	qdf_runtime_lock_deinit(
-		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
-	qdf_runtime_lock_deinit(
 		&vdev_mlme->ext_vdev_ptr->disconnect_runtime_lock);
-	qdf_runtime_lock_deinit(
-			&vdev_mlme->ext_vdev_ptr->peer_set_key_rt_wakelock);
-	qdf_atomic_set(&vdev_mlme->ext_vdev_ptr->set_key_wakelock_counter, 0);
 	mlme_free_peer_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_sae_auth_retry(vdev_mlme->vdev);
 	mlme_deinit_wait_for_key_timer(&vdev_mlme->ext_vdev_ptr->wait_key_timer);
@@ -1876,46 +1871,6 @@ static void mlme_wma_vdev_detach_handler(uint8_t vdev_id)
 		return;
 
 	mlme_err("Failed to post wma vdev detach");
-}
-
-void mlme_vdev_create_wakelocks(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
-		return;
-
-	qdf_wake_lock_create(&mlme_priv->bss_color_change_wakelock,
-			     "bss_color_change_wakelock");
-	qdf_wake_lock_create(&mlme_priv->peer_set_key_wakelock,
-			     "peer_set_key");
-}
-
-void mlme_vdev_release_wakelocks(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
-		return;
-
-	/*
-	 * Explicitly release before destroy. Both locks use timeout-acquire so
-	 * they may still be active if a color-change event or key-set response
-	 * arrived just before teardown. qdf_wake_lock_release -> __pm_relax is
-	 * a no-op when the lock is not active, so this is unconditionally safe.
-	 *
-	 * For peer_set_key_wakelock, zero the ref-counter first so that any
-	 * concurrent wlan_release_peer_key_wakelock on the scheduler thread
-	 * returns early and does not touch the lock after it is destroyed.
-	 */
-	qdf_wake_lock_release(&mlme_priv->bss_color_change_wakelock, 0);
-	qdf_wake_lock_destroy(&mlme_priv->bss_color_change_wakelock);
-
-	qdf_atomic_set(&mlme_priv->set_key_wakelock_counter, 0);
-	qdf_wake_lock_release(&mlme_priv->peer_set_key_wakelock, 0);
-	qdf_wake_lock_destroy(&mlme_priv->peer_set_key_wakelock);
 }
 
 /**
@@ -1991,8 +1946,6 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 				     &vdev_mlme->ext_vdev_ptr->wait_key_timer);
 
 	qdf_runtime_lock_init(
-		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
-	qdf_runtime_lock_init(
 		&vdev_mlme->ext_vdev_ptr->disconnect_runtime_lock);
 
 	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
@@ -2007,10 +1960,6 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 		mlme_ext_handler_destroy(vdev_mlme);
 		return status;
 	}
-
-	qdf_atomic_init(&vdev_mlme->ext_vdev_ptr->set_key_wakelock_counter);
-	qdf_runtime_lock_init(
-			&vdev_mlme->ext_vdev_ptr->peer_set_key_rt_wakelock);
 
 	status = vdev_mgr_create_send(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status)) {

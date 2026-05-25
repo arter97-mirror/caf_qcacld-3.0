@@ -1489,27 +1489,26 @@ QDF_STATUS wma_get_hemu_mode(uint32_t *hemumode, struct mac_context *mac)
 
 void wma_prevent_suspend_on_obss_color_collision(struct wlan_objmgr_vdev *vdev)
 {
-	struct mlme_legacy_priv *mlme_priv;
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
+	if (!wma)
 		return;
 
-	qdf_wake_lock_timeout_acquire(&mlme_priv->bss_color_change_wakelock,
+	qdf_atomic_inc(&wma->wlan_key_op_counter);
+	qdf_wake_lock_timeout_acquire(&wma->wlan_key_op_wake_lock,
 				      MAX_WAKELOCK_FOR_BSS_COLOR_CHANGE);
-	qdf_runtime_pm_prevent_suspend(
-			&mlme_priv->bss_color_change_runtime_lock);
+	qdf_runtime_pm_prevent_suspend(&wma->wlan_key_op_runtime_lock);
 }
 
 void wma_allow_suspend_after_obss_color_change(struct wlan_objmgr_vdev *vdev)
 {
-	struct mlme_legacy_priv *mlme_priv;
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
+	if (!wma || qdf_atomic_read(&wma->wlan_key_op_counter) <= 0)
 		return;
 
-	qdf_runtime_pm_allow_suspend(
-			&mlme_priv->bss_color_change_runtime_lock);
-	qdf_wake_lock_release(&mlme_priv->bss_color_change_wakelock, 0);
+	qdf_atomic_dec(&wma->wlan_key_op_counter);
+	if (!qdf_atomic_read(&wma->wlan_key_op_counter))
+		qdf_wake_lock_release(&wma->wlan_key_op_wake_lock, 0);
+	qdf_runtime_pm_allow_suspend(&wma->wlan_key_op_runtime_lock);
 }

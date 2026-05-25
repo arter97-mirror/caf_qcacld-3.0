@@ -1072,4 +1072,23 @@ QDF_STATUS
 wma_vdev_unified_disconnect_rsp_handler(
 				struct vdev_mlme_obj *vdev_mlme,
 				struct vdev_unified_disconnect_response *rsp);
+
+/**
+ * wma_acquire_key_op_wakelock() - Prevent suspend for a key/color-change op
+ *
+ * Increments the shared WMA-level reference counter and acquires
+ * wlan_key_op_wake_lock with a timeout. Safe to call from any context;
+ * never called during vdev teardown so synchronize_srcu is never reached
+ * while RTNL or the scheduler lock is held.
+ */
+void wma_acquire_key_op_wakelock(void);
+
+/**
+ * wma_release_key_op_wakelock() - Allow suspend after a key/color-change op
+ *
+ * Decrements the shared reference counter and releases wlan_key_op_wake_lock
+ * when the count reaches zero.
+ */
+void wma_release_key_op_wakelock(void);
+
 #endif /* WMA_API_H */

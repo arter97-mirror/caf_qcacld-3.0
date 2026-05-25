@@ -8358,7 +8358,6 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	ucfg_scan_vdev_set_disable(vdev, REASON_VDEV_DOWN);
 	wlan_hdd_scan_abort(link_info);
 	hdd_vdev_deinit_components(vdev);
-	mlme_vdev_release_wakelocks(vdev);
 	hdd_mlo_t2lm_unregister_callback(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
@@ -8965,7 +8964,6 @@ int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 	}
 
 	hdd_store_vdev_info(link_info, vdev);
-	mlme_vdev_create_wakelocks(vdev);
 	osif_cm_osif_priv_init(vdev);
 
 	if (hdd_adapter_is_ml_adapter(adapter))

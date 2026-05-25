@@ -6350,25 +6350,4 @@ void wlan_mlme_determine_allowed_nss(struct wlan_objmgr_psoc *psoc,
 				     struct action_oui_search_attr *attr,
 				     uint8_t *tx_nss, uint8_t *rx_nss);
 
-/**
- * mlme_vdev_create_wakelocks() - Create MLME wake locks for a vdev
- * @vdev: pointer to vdev object
- *
- * Must be called from hdd_vdev_create after sme_vdev_create succeeds, on the
- * caller (binder) thread. Keeps wake lock lifecycle tied to HDD vdev open/close
- * rather than the MLME vdev object, so qdf_wake_lock_destroy (which calls
- * synchronize_srcu) never runs on the scheduler thread.
- */
-void mlme_vdev_create_wakelocks(struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_vdev_release_wakelocks() - Destroy MLME wake locks for a vdev
- * @vdev: pointer to vdev object
- *
- * Must be called from hdd_vdev_destroy before wlan_objmgr_vdev_release_ref,
- * while the caller (binder) thread still holds the HDD vdev reference. Calling
- * synchronize_srcu here is safe; calling it on the scheduler thread is not.
- */
-void mlme_vdev_release_wakelocks(struct wlan_objmgr_vdev *vdev);
-
 #endif /* _WLAN_MLME_API_H_ */

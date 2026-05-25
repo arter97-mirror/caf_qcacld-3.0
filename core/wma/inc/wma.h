@@ -1105,6 +1105,10 @@ typedef struct {
 					enum QDF_OPMODE device_mode);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
+	/* shared lock for peer key-setup and BSS color-change operations */
+	qdf_wake_lock_t wlan_key_op_wake_lock;
+	qdf_runtime_lock_t wlan_key_op_runtime_lock;
+	qdf_atomic_t wlan_key_op_counter;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
 	qdf_runtime_lock_t ndp_prevent_runtime_pm_lock;
 	enum active_apf_mode active_uc_apf_mode;
