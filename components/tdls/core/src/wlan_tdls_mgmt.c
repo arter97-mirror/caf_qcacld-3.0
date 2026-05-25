@@ -698,6 +698,76 @@ static QDF_STATUS tdls_activate_send_mgmt_request_flush_cb(
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * tdls_start_all_discovery_timers() - Start discovery timers for all MLO links
+ * @action_req: TDLS action frame request
+ *
+ * For MLO connections, start discovery response wait timers for all links
+ * simultaneously when sending discovery request. This ensures that responses
+ * from all links are collected before forwarding the best one to supplicant.
+ *
+ * Return: None
+ */
+static void tdls_start_all_discovery_timers(
+				struct tdls_action_frame_request *action_req)
+{
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+	struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+	uint16_t vdev_count = 0;
+	uint8_t i;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(action_req->vdev))
+		return;
+
+	tdls_soc_obj = wlan_vdev_get_tdls_soc_obj(action_req->vdev);
+	if (!tdls_soc_obj)
+		return;
+
+	/* Get all vdevs in the MLO connection */
+	mlo_get_ml_vdev_list(action_req->vdev, &vdev_count, vdev_list);
+	if (!vdev_count) {
+		tdls_debug("No ML vdevs found");
+		return;
+	}
+
+	tdls_debug("Starting discovery timers for %d ML links", vdev_count);
+
+	/* Start timer for each vdev/link */
+	for (i = 0; i < vdev_count; i++) {
+		if (!vdev_list[i])
+			continue;
+
+		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev_list[i]);
+		if (!tdls_vdev) {
+			mlo_release_vdev_ref(vdev_list[i]);
+			continue;
+		}
+
+		if (QDF_TIMER_STATE_RUNNING !=
+		    qdf_mc_timer_get_current_state(
+					&tdls_vdev->peer_discovery_timer)) {
+			tdls_timer_restart(
+					vdev_list[i],
+					&tdls_vdev->peer_discovery_timer,
+					TDLS_DISCOVERY_TIMEOUT_BEFORE_UPDATE);
+			qdf_atomic_inc(&tdls_soc_obj->timer_cnt);
+			tdls_debug("Started discovery timer on vdev %d, timer_cnt now %d",
+				   wlan_vdev_get_id(vdev_list[i]),
+				   qdf_atomic_read(&tdls_soc_obj->timer_cnt));
+		}
+
+		mlo_release_vdev_ref(vdev_list[i]);
+	}
+}
+#else
+static inline void tdls_start_all_discovery_timers(
+				struct tdls_action_frame_request *action_req)
+{
+}
+#endif
+
 static QDF_STATUS
 tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 {
@@ -706,7 +776,6 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 	struct tdls_send_mgmt_request *tdls_mgmt_req;
 	struct wlan_objmgr_peer *peer;
 	struct scheduler_msg msg = {0};
-	struct tdls_vdev_priv_obj *tdls_vdev;
 
 	if (!action_req || !action_req->vdev)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -775,22 +844,9 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 
 	if (wlan_vdev_mlme_is_mlo_vdev(action_req->vdev) &&
 	    !tdls_mlo_get_tdls_link_vdev(action_req->vdev) &&
-	    tdls_mgmt_req->req_type == TDLS_DISCOVERY_REQUEST) {
-		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(action_req->vdev);
-		if (QDF_TIMER_STATE_RUNNING !=
-		    qdf_mc_timer_get_current_state(
-					  &tdls_vdev->peer_discovery_timer)) {
-			tdls_timer_restart(tdls_vdev->vdev,
-				     &tdls_vdev->peer_discovery_timer,
-				     tdls_vdev->threshold_config.tx_period_t -
-				     TDLS_DISCOVERY_TIMEOUT_ERE_UPDATE);
-			qdf_atomic_inc(&tdls_soc_obj->timer_cnt);
-		} else {
-			qdf_mem_free(tdls_mgmt_req);
-			status = QDF_STATUS_E_NULL_VALUE;
-			goto release_cmd;
-		}
-	}
+	    tdls_mgmt_req->req_type == TDLS_DISCOVERY_REQUEST)
+		/* Start discovery timers for all ML links simultaneously */
+		tdls_start_all_discovery_timers(action_req);
 
 	/* Send the request to PE. */
 	qdf_mem_zero(&msg, sizeof(msg));
