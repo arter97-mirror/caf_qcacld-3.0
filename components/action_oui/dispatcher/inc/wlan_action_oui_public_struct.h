@@ -348,6 +348,8 @@ struct action_oui_request {
  * @vht_cap: Whether AP is VHT capable
  * @enable_2g: Whether 2.4GHz band is enabled in AP
  * @enable_5g: Whether 5GHz band is enabled in AP
+ * @ignore_wildcards: when true, skip extensions whose info_mask has the OUI
+ * bit clear (wildcard OUI)
  */
 struct action_oui_search_attr {
 	uint8_t *ie_data;
@@ -358,6 +360,7 @@ struct action_oui_search_attr {
 	bool vht_cap;
 	bool enable_2g;
 	bool enable_5g;
+	bool ignore_wildcards;
 };
 
 /**

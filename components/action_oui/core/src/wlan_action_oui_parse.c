@@ -1327,6 +1327,13 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 		if (!check_for_vendor_ap_capabilities(extension, attr))
 			goto next;
 
+		/*
+		 * If the caller set ignore_wildcards, skip this extension
+		 * entirely when it is a wildcard
+		 */
+		if (wildcard_oui && attr->ignore_wildcards)
+			goto next;
+
 		action_oui_debug("action id %d vendor AP/STA found for OUI", action_id);
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   extension->oui, extension->oui_length);
