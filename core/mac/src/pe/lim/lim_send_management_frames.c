@@ -3359,6 +3359,28 @@ uint32_t lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 /**
+ * lim_update_assoc_req_mcs_nss() - Symmetrize Tx/Rx NSS in assoc req IEs
+ * @pe_session: PE session carrying cap_tx_nss and cap_rx_nss
+ * @frm: Association request frame whose VHT/HE/EHT caps are updated
+ *
+ * After the VHT/HE/EHT capability IEs have been populated, this function
+ * ensures both Tx and Rx MCS-NSS fields advertise max(cap_tx_nss,
+ * cap_rx_nss) so the AP does not under-estimate the STA's capability.
+ *
+ * Return: void
+ */
+static void lim_update_assoc_req_mcs_nss(struct pe_session *pe_session,
+					 tDot11fAssocRequest *frm)
+{
+	uint8_t tx_nss = pe_session->cap_tx_nss;
+	uint8_t rx_nss = pe_session->cap_rx_nss;
+
+	lim_sym_dot11f_vht_mcs_nss(&frm->VHTCaps, tx_nss, rx_nss);
+	lim_sym_assoc_req_he_mcs_nss(&frm->he_cap, tx_nss, rx_nss);
+	lim_sym_assoc_req_eht_mcs_nss(&frm->eht_cap, tx_nss, rx_nss);
+}
+
+/**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
  * @mlm_assoc_req: Association request information
@@ -3701,6 +3723,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
+
+	lim_update_assoc_req_mcs_nss(pe_session, frm);
 
 	/*
 	 * Restore original (intersected) bandwidth values.

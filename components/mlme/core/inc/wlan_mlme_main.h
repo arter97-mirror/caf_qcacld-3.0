@@ -2438,9 +2438,32 @@ static inline void mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
 void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
 				tDot11fIEhe_cap *dst_he_cap,
 				uint8_t tx_nss, uint8_t rx_nss);
+
+/**
+ * mlme_sym_he_mcsset_for_nss() - Symmetrize HE MCS-NSS to max of Tx/Rx
+ * @he_cap: Pointer to HE capability structure to update in-place
+ * @tx_nss: Transmit NSS value
+ * @rx_nss: Receive NSS value
+ *
+ * Directly copies the MCS maps of the higher-NSS direction onto the
+ * lower-NSS direction across all bandwidths (lt_80, 160, 80_80), so
+ * the advertised Tx and Rx capabilities are symmetric at max(tx_nss,
+ * rx_nss). Unlike mlme_set_he_mcsset_for_nss(), this does not use
+ * base_he_cap from mlme_cfg, so it works even when the base caps have
+ * already been limited to the lower NSS.
+ *
+ * Return: None
+ */
+void mlme_sym_he_mcsset_for_nss(tDot11fIEhe_cap *he_cap,
+				uint8_t tx_nss, uint8_t rx_nss);
 #else
 static inline void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
 					      tDot11fIEhe_cap *dst_he_cap,
+					      uint8_t tx_nss, uint8_t rx_nss)
+{
+}
+
+static inline void mlme_sym_he_mcsset_for_nss(tDot11fIEhe_cap *he_cap,
 					      uint8_t tx_nss, uint8_t rx_nss)
 {
 }

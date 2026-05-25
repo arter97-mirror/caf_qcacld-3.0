@@ -6070,6 +6070,10 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 		goto end;
 	}
 
+	/* Symmetrize to max so the higher capability is not lost */
+	tx_nss = QDF_MAX(tx_nss, rx_nss);
+	rx_nss = tx_nss;
+
 	vht_mcs = (tSirVhtMcsInfo *)&vht_caps[2 +
 					sizeof(tSirMacVHTCapabilityInfo)];
 	/* Populate VHT MCS Information */
@@ -8440,6 +8444,7 @@ void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
 
 	wlan_mlme_set_he_mcsset_for_nss(mac->mlme_cfg, &dot11_cap,
 					tx_nss, rx_nss);
+	wlan_mlme_sym_he_mcsset_for_nss(&dot11_cap, tx_nss, rx_nss);
 
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
@@ -10067,7 +10072,9 @@ void lim_set_eht_caps(struct mac_context *mac,
 	}
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
-	wlan_mlme_set_eht_mcsset_for_nss(&dot11_cap, tx_nss, rx_nss);
+	wlan_mlme_set_eht_mcsset_for_nss(&dot11_cap,
+					 QDF_MAX(tx_nss, rx_nss),
+					 QDF_MAX(tx_nss, rx_nss));
 	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
 					vdev_id);

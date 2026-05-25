@@ -6956,6 +6956,27 @@ void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
 		*(uint16_t *)dst_he_cap->tx_he_mcs_map_80_80 = dst_tx_mcs;
 	}
 }
+
+void mlme_sym_he_mcsset_for_nss(tDot11fIEhe_cap *he_cap,
+				uint8_t tx_nss, uint8_t rx_nss)
+{
+	if (!he_cap->present || tx_nss == rx_nss)
+		return;
+
+	if (tx_nss < rx_nss) {
+		he_cap->tx_he_mcs_map_lt_80 = he_cap->rx_he_mcs_map_lt_80;
+		*(uint16_t *)he_cap->tx_he_mcs_map_160 =
+				*(uint16_t *)he_cap->rx_he_mcs_map_160;
+		*(uint16_t *)he_cap->tx_he_mcs_map_80_80 =
+				*(uint16_t *)he_cap->rx_he_mcs_map_80_80;
+	} else {
+		he_cap->rx_he_mcs_map_lt_80 = he_cap->tx_he_mcs_map_lt_80;
+		*(uint16_t *)he_cap->rx_he_mcs_map_160 =
+				*(uint16_t *)he_cap->tx_he_mcs_map_160;
+		*(uint16_t *)he_cap->rx_he_mcs_map_80_80 =
+				*(uint16_t *)he_cap->tx_he_mcs_map_80_80;
+	}
+}
 #endif
 
 QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,

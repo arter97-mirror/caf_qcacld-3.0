@@ -1359,6 +1359,22 @@ void lim_update_dot11f_vht_caps_for_nss(tDot11fIEVHTCaps *vht_cap,
 					uint8_t tx_nss, uint8_t rx_nss);
 
 /**
+ * lim_sym_dot11f_vht_mcs_nss() - Symmetrize VHT MCS-NSS to max of Tx/Rx
+ * @vht_cap: Pointer to VHT capabilities IE to update in-place
+ * @tx_nss: Number of Spatial Streams for TX
+ * @rx_nss: Number of Spatial Streams for RX
+ *
+ * Copies the MCS map and data rate of the higher-NSS direction onto the
+ * lower-NSS direction so both Tx and Rx advertise the same (max) NSS.
+ * Unlike lim_update_dot11f_vht_caps_for_nss(), this does not use |= so
+ * it can restore streams that were previously disabled.
+ *
+ * Return: None
+ */
+void lim_sym_dot11f_vht_mcs_nss(tDot11fIEVHTCaps *vht_cap,
+				uint8_t tx_nss, uint8_t rx_nss);
+
+/**
  * lim_extract_vht_caps_txrx_nss() - API to extract Tx/Rx NSS from VHT caps
  * @vht_caps: Pointer to VHT caps struct
  * @tx_nss: Pointer to hold extracted Tx NSS

@@ -5681,6 +5681,25 @@ void wlan_mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
 }
 
 /**
+ * wlan_mlme_sym_he_mcsset_for_nss() - Wrapper to symmetrize HE MCS-NSS
+ * @he_cap: Pointer to HE capability IE struct to update in-place
+ * @tx_nss: Tx value of NSS
+ * @rx_nss: Rx value of NSS
+ *
+ * Copies the MCS maps of the higher-NSS direction onto the lower-NSS
+ * direction so the advertised Tx and Rx are symmetric at max(tx_nss,
+ * rx_nss). Does not reference base_he_cap from mlme_cfg.
+ *
+ * Return: void
+ */
+static inline
+void wlan_mlme_sym_he_mcsset_for_nss(tDot11fIEhe_cap *he_cap,
+				     uint8_t tx_nss, uint8_t rx_nss)
+{
+	mlme_sym_he_mcsset_for_nss(he_cap, tx_nss, rx_nss);
+}
+
+/**
  * wlan_mlme_set_eht_mcsset_for_nss() - Wrapper API to fill the EHT caps'
  * MCS-SET
  * @eht_cap: Pointer to EHT capability IE struct

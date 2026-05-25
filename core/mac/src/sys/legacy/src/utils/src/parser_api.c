@@ -1772,6 +1772,21 @@ void lim_update_dot11f_vht_caps_for_nss(tDot11fIEVHTCaps *vht_cap,
 				VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true);
 }
 
+void lim_sym_dot11f_vht_mcs_nss(tDot11fIEVHTCaps *vht_cap,
+				uint8_t tx_nss, uint8_t rx_nss)
+{
+	if (!vht_cap->present || tx_nss == rx_nss)
+		return;
+
+	if (tx_nss < rx_nss) {
+		vht_cap->txMCSMap = vht_cap->rxMCSMap;
+		vht_cap->txSupDataRate = vht_cap->rxHighSupDataRate;
+	} else {
+		vht_cap->rxMCSMap = vht_cap->txMCSMap;
+		vht_cap->rxHighSupDataRate = vht_cap->txSupDataRate;
+	}
+}
+
 void lim_extract_vht_caps_txrx_nss(tDot11fIEVHTCaps *vht_caps, uint8_t *tx_nss,
 				   uint8_t *rx_nss)
 {
@@ -15283,8 +15298,10 @@ no_ext_mld_cap:
 		}
 
 		lim_update_dot11f_vht_caps_for_nss(&vht_caps,
-						   ml_link_info->cnx_tx_nss,
-						   ml_link_info->cnx_rx_nss);
+						   QDF_MAX(ml_link_info->cnx_tx_nss,
+							   ml_link_info->cnx_rx_nss),
+						   QDF_MAX(ml_link_info->cnx_tx_nss,
+							   ml_link_info->cnx_rx_nss));
 		if ((vht_caps.present && frm->VHTCaps.present &&
 		     qdf_mem_cmp(&vht_caps, &frm->VHTCaps, sizeof(vht_caps))) ||
 		     (vht_caps.present && !frm->VHTCaps.present)) {
@@ -15318,6 +15335,9 @@ no_ext_mld_cap:
 			he_caps.ppet.ppe_threshold.num_ppe_th = 0;
 		}
 		wlan_mlme_set_he_mcsset_for_nss(mac_ctx->mlme_cfg, &he_caps,
+						ml_link_info->cnx_tx_nss,
+						ml_link_info->cnx_rx_nss);
+		wlan_mlme_sym_he_mcsset_for_nss(&he_caps,
 						ml_link_info->cnx_tx_nss,
 						ml_link_info->cnx_rx_nss);
 		if ((he_caps.present && frm->he_cap.present &&
@@ -15365,8 +15385,10 @@ no_ext_mld_cap:
 			eht_caps.num_sounding_dim_320mhz = 0;
 
 		wlan_mlme_set_eht_mcsset_for_nss(&eht_caps,
-						 ml_link_info->cnx_tx_nss,
-						 ml_link_info->cnx_rx_nss);
+						 QDF_MAX(ml_link_info->cnx_tx_nss,
+							 ml_link_info->cnx_rx_nss),
+						 QDF_MAX(ml_link_info->cnx_tx_nss,
+							 ml_link_info->cnx_rx_nss));
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||
 		     (eht_caps.present && !frm->eht_cap.present) ||

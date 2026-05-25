@@ -1528,6 +1528,24 @@ static inline void lim_update_session_he_config_nss(struct mac_context *mac,
 }
 
 /**
+ * lim_sym_assoc_req_he_mcs_nss() - Symmetrize HE MCS-NSS in assoc req frame
+ * @he_cap: Pointer to HE capability IE in the frame to update in-place
+ * @tx_nss: Transmit NSS
+ * @rx_nss: Receive NSS
+ *
+ * Copies the MCS maps of the higher-NSS direction onto the lower-NSS
+ * direction so the assoc request IE advertises max(tx_nss, rx_nss) for
+ * both Tx and Rx across all bandwidths.
+ *
+ * Return: None
+ */
+static inline void lim_sym_assoc_req_he_mcs_nss(tDot11fIEhe_cap *he_cap,
+						uint8_t tx_nss, uint8_t rx_nss)
+{
+	wlan_mlme_sym_he_mcsset_for_nss(he_cap, tx_nss, rx_nss);
+}
+
+/**
  * lim_log_he_op() - Print HE Operation
  * @mac: pointer to MAC context
  * @he_op: pointer to HE Operation
@@ -1946,6 +1964,11 @@ static inline void lim_update_session_he_config_nss(struct mac_context *mac,
 						    struct pe_session *session,
 						    uint8_t tx_nss,
 						    uint8_t rx_nss)
+{
+}
+
+static inline void lim_sym_assoc_req_he_mcs_nss(tDot11fIEhe_cap *he_cap,
+						uint8_t tx_nss, uint8_t rx_nss)
 {
 }
 
@@ -2470,6 +2493,25 @@ static inline void lim_update_session_eht_config_nss(struct pe_session *session,
 }
 
 /**
+ * lim_sym_assoc_req_eht_mcs_nss() - Symmetrize EHT MCS-NSS in assoc req frame
+ * @eht_cap: Pointer to EHT capability IE in the frame to update in-place
+ * @tx_nss: Transmit NSS
+ * @rx_nss: Receive NSS
+ *
+ * Sets both Tx and Rx NSS fields to max(tx_nss, rx_nss) using the existing
+ * mlme helper which performs direct assignment.
+ *
+ * Return: None
+ */
+static inline void lim_sym_assoc_req_eht_mcs_nss(tDot11fIEeht_cap *eht_cap,
+						 uint8_t tx_nss, uint8_t rx_nss)
+{
+	uint8_t nss = QDF_MAX(tx_nss, rx_nss);
+
+	wlan_mlme_set_eht_mcsset_for_nss(eht_cap, nss, nss);
+}
+
+/**
  * lim_log_eht_op() - Print EHT Operation
  * @mac: pointer to MAC context
  * @eht_op: pointer to EHT Operation
@@ -2687,6 +2729,11 @@ lim_update_bss_eht_capable(struct mac_context *mac,
 static inline void lim_update_session_eht_config_nss(struct pe_session *session,
 						     uint8_t tx_nss,
 						     uint8_t rx_nss)
+{
+}
+
+static inline void lim_sym_assoc_req_eht_mcs_nss(tDot11fIEeht_cap *eht_cap,
+						 uint8_t tx_nss, uint8_t rx_nss)
 {
 }
 
