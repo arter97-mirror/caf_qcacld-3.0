@@ -415,8 +415,9 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 
 	roam_synch_frame_ind = &rso_cfg->roam_sync_frame_ind;
 
-	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
-		mlme_err("Ignoring this event as it is unexpected");
+	if (!cm_is_vdev_active(vdev)) {
+		mlme_err("vdev:%d Ignoring sync frame event, vdev not active, roam state:%d",
+			 vdev_id, mlme_get_roam_state(psoc, vdev_id));
 		wlan_cm_free_roam_synch_frame_ind(rso_cfg);
 		status = QDF_STATUS_E_FAILURE;
 		goto complete;
