@@ -2266,20 +2266,6 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			lim_process_ext_channel_switch_action_frame(mac_ctx,
 							rx_pkt_info, session);
 			break;
-		case PUB_ACTION_FILS_DISCOVERY:
-			if (LIM_IS_STA_ROLE(session) ||
-				LIM_IS_AP_ROLE(session)){
-				/* FILS Discovery frames are not expected
-				* to be received in AP/STA mode as 
-				* they are broadcast by APs for
-				* discovery. Drop these frames to avoid
-				* unnecessary processing.
-				*/
-				pe_err_rl("Do not forward the FILS in AP/STA mode");
-				break;
-			}
-			/* send the frame to supplicant */
-			fallthrough;
 		case TDLS_DISCOVERY_RESPONSE:
 			/* do not forward the tdls discovery response frame,
 			 * it is handled by
@@ -2550,7 +2536,6 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 	tpSirMacActionFrameHdr action_hdr = (tpSirMacActionFrameHdr) pBody;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
 	uint8_t vdev_id;
-	struct wlan_objmgr_vdev *vdev;
 
 	pe_debug("Received an action frame category: %d action_id: %d",
 		 action_hdr->category, (action_hdr->category ==
@@ -2599,31 +2584,6 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 
 		if (vdev_id == INVALID_VDEV_ID)
 			vdev_id = 0;
-
-		if (action_hdr->actionID == PUB_ACTION_FILS_DISCOVERY) {
-			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-					mac->psoc, vdev_id,
-					WLAN_LEGACY_MAC_ID);
-			if (vdev &&
-				(vdev->vdev_mlme.vdev_opmode == QDF_STA_MODE||
-				vdev->vdev_mlme.vdev_opmode == QDF_SAP_MODE)) {
-				/* FILS Discovery frames are not expected
-				* to be received in AP/STA mode as
-				* they are broadcast by APs for
-				* discovery. Drop these frames to avoid
-				* unnecessary processing.
-				*/
-				wlan_objmgr_vdev_release_ref(
-						vdev,
-						WLAN_LEGACY_MAC_ID);
-				pe_err_rl("Do not forward the FILS in AP/STA mode with no session");
-				return;
-			}
-			if (vdev)
-				wlan_objmgr_vdev_release_ref(
-						vdev,
-						WLAN_LEGACY_MAC_ID);
-		}
 
 		/*
 		 * Forward all public action frame with no session to
