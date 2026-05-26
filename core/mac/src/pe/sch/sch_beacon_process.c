@@ -706,7 +706,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						mac_ctx,
 						session,
 						bcn->chan_freq,
-						&pwr_type_6g);
+						&pwr_type_6g,
+						false);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 

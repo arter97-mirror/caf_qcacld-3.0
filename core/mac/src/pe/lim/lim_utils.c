@@ -12403,9 +12403,19 @@ QDF_STATUS lim_get_6g_power_type_with_bw(
 	struct mac_context *mac,
 	struct pe_session *session,
 	qdf_freq_t chan_freq,
-	enum reg_6g_ap_type *power_type_6g)
+	enum reg_6g_ap_type *power_type_6g,
+	bool bw_update_allowed)
 {
+	static const enum phy_ch_width downgrade_bws[] = {
+		CH_WIDTH_160MHZ,
+		CH_WIDTH_80MHZ,
+		CH_WIDTH_40MHZ,
+		CH_WIDTH_20MHZ,
+	};
 	qdf_freq_t center_320 = 0;
+	QDF_STATUS status;
+	uint16_t orig_bw_mhz;
+	int i;
 
 	if (session->ch_center_freq_seg1 &&
 	    session->ch_width == CH_WIDTH_320MHZ)
@@ -12413,13 +12423,51 @@ QDF_STATUS lim_get_6g_power_type_with_bw(
 			mac->pdev, session->ch_center_freq_seg1,
 			BIT(REG_BAND_6G));
 
-	return wlan_reg_get_best_6g_power_type_for_bw(
+	status = wlan_reg_get_best_6g_power_type_for_bw(
 		mac->psoc, mac->pdev,
 		power_type_6g,
 		session->ap_defined_power_type_6g,
 		chan_freq,
 		center_320,
 		session->ch_width);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return status;
+
+	if (!bw_update_allowed)
+		return status; /* caller does not permit BW change */
+
+	/* Not all bonded channels support the required power type at the
+	 * negotiated bandwidth. Try progressively narrower bandwidths so
+	 * the connection can succeed instead of being rejected.
+	 */
+	orig_bw_mhz = wlan_reg_get_bw_value(session->ch_width);
+	if (!orig_bw_mhz) {
+		pe_err("invalid channel width %d", session->ch_width);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < QDF_ARRAY_SIZE(downgrade_bws); i++) {
+		if (wlan_reg_get_bw_value(downgrade_bws[i]) >= orig_bw_mhz)
+			continue;
+
+		status = wlan_reg_get_best_6g_power_type_for_bw(
+			mac->psoc, mac->pdev,
+			power_type_6g,
+			session->ap_defined_power_type_6g,
+			chan_freq,
+			0,
+			downgrade_bws[i]);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			pe_debug("BW downgraded %d -> %d MHz",
+				 orig_bw_mhz,
+				 wlan_reg_get_bw_value(downgrade_bws[i]));
+			session->ch_width = downgrade_bws[i];
+			session->ch_center_freq_seg1 = 0;
+			return status;
+		}
+	}
+
+	return QDF_STATUS_E_INVAL;
 }
 
 void
@@ -12450,7 +12498,8 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 					mac_ctx,
 					session,
 					session->curr_op_freq,
-					&power_type_6g);
+					&power_type_6g,
+					false);
 	if ((QDF_IS_STATUS_ERROR(status))) {
 		if (lim_is_sb_disconnect_allowed(session)) {
 			pe_err("No power type found for connection frequency, trigger DISCONNECT");
@@ -12508,7 +12557,8 @@ lim_recompute_sta_cli_tpc(struct mac_context *mac,
 					mac,
 					session,
 					session->curr_op_freq,
-					&power_type_6g);
+					&power_type_6g,
+					false);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
