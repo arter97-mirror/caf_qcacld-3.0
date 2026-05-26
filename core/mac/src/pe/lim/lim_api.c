@@ -4894,6 +4894,19 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 	fill_crypto_filter_params(filter, session->vdev);
 
+	/*
+	 * The Security Profile element is an MLD-level advertisement:
+	 * if the assoc link carries it, all partner links inherit it.
+	 * Set security_profile in the filter so scm_check_security_profile()
+	 * is invoked for partner link scan entries, ensuring their
+	 * neg_sec_info matches the assoc link's overridden values.
+	 */
+	if (util_scan_entry_security_profile(cur_entry))
+		filter->security_profile = true;
+
+	filter->eppke_allowed =
+		wlan_vdev_is_eppke_allowed(session->vdev);
+
 	wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_addr);
 	filter->match_mld_addr = true;
 	qdf_copy_macaddr(&filter->mld_addr, &mld_addr);
