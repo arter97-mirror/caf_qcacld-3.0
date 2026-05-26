@@ -937,10 +937,8 @@ static void tgt_mc_cp_stats_extract_vdev_summary_stats(
 			break;
 	}
 
-	if (i == ev->num_summary_stats) {
-		cp_stats_debug("vdev_id %d not found", vdev_id);
+	if (i == ev->num_summary_stats)
 		return;
-	}
 
 	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
 		cp_stats_err("invalid vdev id %d", vdev_id);
