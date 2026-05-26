@@ -3734,7 +3734,7 @@ IE reg_connect (EID_EXTN_ID_ELEMENT) OUI (0x89)
 
 IE uhr_cap (EID_EXTN_ID_ELEMENT) OUI (0x98)
 {
-    data[5..8];
+    data[6..8];
 }
 
 IE uhr_op (EID_EXTN_ID_ELEMENT) OUI (0x97)
