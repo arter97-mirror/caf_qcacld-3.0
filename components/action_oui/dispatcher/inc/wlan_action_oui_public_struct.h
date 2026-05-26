@@ -176,6 +176,7 @@ enum action_oui_arbitrator_type {
  * @ACTION_OUI_HOST_FW_EXT_START: Dynamic length OUI start here- placeholder
  * @ACTION_OUI_ALLOW_NSS_GREATER_THAN_2: Allow NSS > 2 for specified APs
  * @ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2: Disallow NSS > 2 for specified APs
+ * @ACTION_OUI_ALLOW_UL_TX_BEAMFORMER: Allow UL TX Beamformer for specified APs
  * @ACTION_OUI_HOST_ONLY: host only action id start - placeholder.
  * New Firmware related "ACTION" needs to be added before this placeholder.
  * @ACTION_OUI_HOST_RECONN: reconnect to the same BSSID when wait for
@@ -228,7 +229,7 @@ enum action_oui_id {
 	ACTION_OUI_ALLOW_NSS_GREATER_THAN_2 =
 				ACTION_OUI_HOST_FW_EXT_START,
 	ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2 = 129,
-
+	ACTION_OUI_ALLOW_UL_TX_BEAMFORMER = 130,
 	/* host&fw interface add above here */
 	ACTION_OUI_HOST_ONLY,
 	ACTION_OUI_HOST_RECONN = ACTION_OUI_HOST_ONLY,

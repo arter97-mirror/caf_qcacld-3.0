@@ -46,7 +46,8 @@ action_oui_allocate(struct action_oui_psoc_priv *psoc_priv)
 	uint32_t j;
 
 	for (i = 0; i < ACTION_OUI_MAXIMUM_ID; i++) {
-		if (!wlan_action_oui_id_valid(i)) {
+		if (!wlan_action_oui_id_valid(i) ||
+		    !wlan_action_oui_max_ext_num(i)) {
 			psoc_priv->oui_priv[i] = NULL;
 			continue;
 		}
@@ -739,6 +740,27 @@ wlan_is_nss_allowlist_denylist_config_supported(struct wlan_objmgr_psoc *psoc)
 			wmi_service_support_whitelist_blacklist_ap_config);
 }
 
+bool
+wlan_is_ul_tx_beamformer_config_supported(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_hdl;
+
+	if (!psoc) {
+		action_oui_err("Invalid psoc");
+		return false;
+	}
+
+	wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
+	if (!wmi_hdl) {
+		action_oui_err("wmi handle is NULL");
+		return false;
+	}
+
+	return wmi_service_enabled(
+			wmi_hdl,
+			wmi_service_support_ul_tx_beamformer_ap_config);
+}
+
 /**
  * wlan_action_oui_convert_bit_to_byte_mask() - Convert bit mask to byte mask
  * @bit_mask_value: input, bit mask value, use 1 bit to mask 1 bit
@@ -1157,8 +1179,17 @@ action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
 uint32_t
 wlan_action_oui_max_ext_num(enum action_oui_id action_id)
 {
-	if (wlan_action_oui_is_dynamic(action_id))
-		return ACTION_OUI_MAX_HOST_FW_EXT;
+	if (wlan_action_oui_is_dynamic(action_id)) {
+		switch (action_id) {
+		case ACTION_OUI_ALLOW_NSS_GREATER_THAN_2:
+		case ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2:
+			return TOTAL_NO_OUI_EXT;
+		case ACTION_OUI_ALLOW_UL_TX_BEAMFORMER:
+			return TOTAL_NO_BFORMER_OUI_EXT;
+		default:
+			return ACTION_OUI_MAX_HOST_FW_EXT;
+		}
+	}
 	return  action_id < ACTION_OUI_HOST_ONLY ?
 		ACTION_OUI_MAX_EXT_TO_FW : ACTION_OUI_MAX_EXT_HOST_ONLY;
 }

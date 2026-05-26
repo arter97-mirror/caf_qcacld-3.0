@@ -57,6 +57,38 @@ wlan_action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
 			       bool *found_in_list,
 			       uint32_t *list_type);
 
+/**
+ * wlan_action_oui_is_ul_tx_beamformer_config_supported() - Check whether UL TX
+ * beamformer configuration is supported
+ * @psoc: objmgr psoc object
+ *
+ * This dispatcher API returns true only when the underlying action OUI UL TX
+ * beamformer configuration support is enabled.
+ *
+ * Return: true if supported, else false
+ */
+bool
+wlan_action_oui_is_ul_tx_beamformer_config_supported(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_search_action_oui() - Search for AP in action OUI list
+ * @psoc: objmgr psoc object
+ * @attr: action OUI search attributes (contains AP info like OUI, MAC, etc.)
+ * @action_id: action OUI ID to search in
+ *
+ * This dispatcher API searches for an AP in the specified action OUI list
+ * based on the provided search attributes. It is similar to
+ * ucfg_action_oui_search but intended for use by WLAN internal components
+ * like CM (Connection Manager), scan module, etc.
+ *
+ * Return: true if AP found in the list, false otherwise
+ */
+bool
+wlan_search_action_oui(struct wlan_objmgr_psoc *psoc,
+		       struct action_oui_search_attr *attr,
+		       enum action_oui_id action_id);
+
 #else
 
 /**
@@ -96,6 +128,21 @@ wlan_action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
 			       bool *found_in_list,
 			       uint32_t *list_type)
 {
+}
+
+static inline bool
+wlan_action_oui_is_ul_tx_beamformer_config_supported(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_search_action_oui(struct wlan_objmgr_psoc *psoc,
+		       struct action_oui_search_attr *attr,
+		       enum action_oui_id action_id)
+{
+	return false;
 }
 
 #endif /* WLAN_FEATURE_ACTION_OUI */

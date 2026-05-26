@@ -905,9 +905,36 @@ static bool action_oui_id_valid(struct wlan_objmgr_psoc *psoc,
 			return false;
 
 		return true;
+	case ACTION_OUI_ALLOW_UL_TX_BEAMFORMER:
+
+		if (!wlan_is_ul_tx_beamformer_config_supported(psoc)) {
+			action_oui_debug("UL TX beamformer feature is not supported");
+			return false;
+		}
+
+		return true;
 	default:
 		return true;
 	}
+}
+
+static uint32_t
+get_dynamic_oui_extension_total_count(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t count = 0;
+
+	if (!psoc) {
+		action_oui_err("psoc is NULL");
+		return 0;
+	}
+
+	if (wlan_is_nss_allowlist_denylist_config_supported(psoc))
+		count += TOTAL_NO_OUI_EXT;
+
+	if (wlan_is_ul_tx_beamformer_config_supported(psoc))
+		count += TOTAL_NO_BFORMER_OUI_EXT;
+
+	return count;
 }
 
 QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
@@ -966,7 +993,8 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	req->is_action_oui_dynamic = wlan_action_oui_is_dynamic(action_id);
 	req->no_oui_extensions = no_oui_extensions;
 	if (req->is_action_oui_dynamic)
-		req->total_no_oui_extensions = TOTAL_NO_OUI_EXT;
+		req->total_no_oui_extensions =
+			get_dynamic_oui_extension_total_count(psoc_priv->psoc);
 	else
 		req->total_no_oui_extensions = psoc_priv->max_extensions;
 

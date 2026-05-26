@@ -28,3 +28,18 @@ wlan_action_oui_get_nss_policy(struct wlan_objmgr_psoc *psoc,
 {
 	action_oui_get_nss_policy(psoc, attr, found_in_list, list_type);
 }
+
+bool
+wlan_action_oui_is_ul_tx_beamformer_config_supported(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_is_ul_tx_beamformer_config_supported(psoc);
+}
+
+bool
+wlan_search_action_oui(struct wlan_objmgr_psoc *psoc,
+		       struct action_oui_search_attr *attr,
+		       enum action_oui_id action_id)
+{
+	return wlan_action_oui_search(psoc, attr, action_id);
+}

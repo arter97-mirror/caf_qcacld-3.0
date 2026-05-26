@@ -30,6 +30,7 @@
 #include "wlan_action_oui_public_struct.h"
 #include "wlan_action_oui_objmgr.h"
 #include "wlan_action_oui_main.h"
+#include "wmi_unified_priv.h"
 
 #ifdef WLAN_FEATURE_ACTION_OUI
 
@@ -149,6 +150,20 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
  */
 bool
 ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_action_oui_is_ul_tx_beamformer_config_supported() - Check
+ * whether UL TX beamformer configuration is supported
+ * @psoc: objmgr psoc object
+ *
+ * This UCFG API returns true only when both FW services required for UL TX
+ * beamformer configuration are enabled.
+ *
+ * Return: true if supported, else false
+ */
+bool
+ucfg_action_oui_is_ul_tx_beamformer_config_supported(
 				struct wlan_objmgr_psoc *psoc);
 
 /**
@@ -312,11 +327,19 @@ ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 
 	if ((action_id == ACTION_OUI_ALLOW_NSS_GREATER_THAN_2 ||
 	     action_id == ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2) &&
-	    oui_ext_num > ACTION_OUI_MAX_HOST_FW_EXT) {
+	     oui_ext_num > TOTAL_NO_OUI_EXT) {
 		action_oui_warn("Trim OUI count for action id %u from %u to %u",
 				action_id, oui_ext_num,
-				ACTION_OUI_MAX_HOST_FW_EXT);
-		oui_ext_num = ACTION_OUI_MAX_HOST_FW_EXT;
+				TOTAL_NO_OUI_EXT);
+		oui_ext_num = TOTAL_NO_OUI_EXT;
+	}
+
+	if (action_id == ACTION_OUI_ALLOW_UL_TX_BEAMFORMER &&
+	    oui_ext_num > TOTAL_NO_BFORMER_OUI_EXT) {
+		action_oui_warn("Trim OUI count for action id %u from %u to %u",
+				action_id, oui_ext_num,
+				TOTAL_NO_BFORMER_OUI_EXT);
+		oui_ext_num = TOTAL_NO_BFORMER_OUI_EXT;
 	}
 
 	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext,
@@ -449,6 +472,13 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 
 static inline
 bool ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+bool ucfg_action_oui_is_ul_tx_beamformer_config_supported(
 				struct wlan_objmgr_psoc *psoc)
 {
 	return false;

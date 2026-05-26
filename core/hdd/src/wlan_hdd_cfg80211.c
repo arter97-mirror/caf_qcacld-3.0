@@ -40556,7 +40556,9 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	    action_oui_id !=
 	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ALLOW_NSS_GT_2 &&
 	    action_oui_id !=
-	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2) {
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2 &&
+	    action_oui_id !=
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE) {
 		hdd_err("Invalid id %d", action_oui_id);
 		ret = -EOPNOTSUPP;
 		goto exit;
@@ -40572,7 +40574,9 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	else if (action_oui_id ==
 		 QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2)
 		oui_id = ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2;
-
+	else if (action_oui_id ==
+		 QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE)
+		oui_id = ACTION_OUI_ALLOW_UL_TX_BEAMFORMER;
 	if (action_oui_op > QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
 		hdd_err("Invalid oui op %d", action_oui_op);
 		ret = -EINVAL;
@@ -40585,6 +40589,14 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2) &&
 	    !ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
 							hdd_ctx->psoc)) {
+		ret = -ENOTSUPP;
+		goto exit;
+	}
+
+	if (action_oui_id ==
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE &&
+	    !ucfg_action_oui_is_ul_tx_beamformer_config_supported(
+						hdd_ctx->psoc)) {
 		ret = -ENOTSUPP;
 		goto exit;
 	}
