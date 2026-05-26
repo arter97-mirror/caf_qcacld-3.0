@@ -498,6 +498,172 @@ smd_cleanup_curr_ap_link(struct mlo_link_recfg_context *recfg_ctx,
 	return false;
 }
 
+/*
+ * smd_is_vdev_idle_for_link_addition() - Check if vdev is idle for link add
+ * @vdev: Pointer to vdev object
+ *
+ * This function checks if the given vdev is in IDLE state and can be used
+ * for adding a new link during SMD roaming without requiring disconnect.
+ *
+ * Return: true if vdev is idle and suitable for link addition, false otherwise
+ */
+static bool smd_is_vdev_idle_for_link_addition(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_peer *peer;
+	enum wlan_vdev_state vdev_state;
+
+	if (!vdev) {
+		mlo_err("Invalid vdev");
+		return false;
+	}
+
+	/* Check vdev state - should be INIT (IDLE/DISCONNECTED) */
+	vdev_state = wlan_vdev_mlme_get_state(vdev);
+	if (vdev_state != WLAN_VDEV_S_INIT) {
+		mlo_debug("Vdev not in INIT state: %d", vdev_state);
+		return false;
+	}
+
+	/* Check if there's an active peer association */
+	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
+	if (peer) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
+		mlo_debug("Vdev has active peer, not idle");
+		return false;
+	}
+
+	/* Check if link switch is already in progress */
+	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlo_debug("Link switch already in progress");
+		return false;
+	}
+
+	mlo_debug("Vdev %d is idle and suitable for link addition",
+		  wlan_vdev_get_id(vdev));
+	return true;
+}
+
+/*
+ * smd_link_recfg_has_idle_vdev_for_add_link() - Check if idle vdev available for link add
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration request
+ * @link_sw_req: Link switch request to be filled
+ *
+ * This function checks if there's an idle vdev that can be used for adding
+ * a new link during SMD roaming. If found, it prepares the link switch request
+ * with MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK reason.
+ *
+ * Return: true if idle vdev found and link switch request prepared, false otherwise
+ */
+bool
+smd_link_recfg_has_idle_vdev_for_add_link(
+				struct mlo_link_recfg_context *recfg_ctx,
+				struct mlo_link_recfg_state_req *req,
+				struct wlan_mlo_link_switch_req *link_sw_req)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlo_link_recfg_bss_info *link_add;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t i;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	bool found_idle_vdev = false;
+
+	if (!req || !link_sw_req) {
+		mlo_err("Invalid parameters");
+		return false;
+	}
+
+	if (!req->add_link_info.num_links) {
+		mlo_err("unexpected add link num 0");
+		return false;
+	}
+
+	mlo_dev_ctx = mlo_link_recfg_get_mlo_ctx(recfg_ctx);
+	if (!mlo_dev_ctx) {
+		mlo_err("mlo_ctx null");
+		return false;
+	}
+
+	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
+	if (!psoc) {
+		mlo_err("psoc null");
+		return false;
+	}
+
+	/* Search for an idle vdev that can be used for link addition */
+	for (i = 0; i < req->add_link_info.num_links; i++) {
+		link_add = &req->add_link_info.link[i];
+
+		if (link_add->status_code != STATUS_SUCCESS) {
+			mlo_debug("link id %d add reject status code %d",
+					link_add->link_id,
+					link_add->status_code);
+			continue;
+		}
+
+		/* Check if this link has an idle vdev assigned */
+		if (link_add->vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				psoc, link_add->vdev_id,
+				WLAN_LINK_RECFG_ID);
+		if (!vdev) {
+			mlo_err("Invalid VDEV id %d", link_add->vdev_id);
+			continue;
+		}
+
+		/* Check if this vdev is idle (disconnected) and suitable
+		 * for link addition.
+		 */
+		if (!cm_is_vdev_disconnected(vdev) ||
+		    !smd_is_vdev_idle_for_link_addition(vdev)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+			continue;
+		}
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+
+		/* Found an idle vdev */
+		ml_link_recfg_sm_lock_acquire(mlo_dev_ctx);
+		recfg_ctx->curr_recfg_req.join_pending_vdev_id = link_add->vdev_id;
+		ml_link_recfg_sm_lock_release(mlo_dev_ctx);
+		mlo_info("Set join_pending_vdev_id %d for idle vdev link addition",
+				link_add->vdev_id);
+
+		found_idle_vdev = true;
+		break;
+	}
+
+	if (!found_idle_vdev) {
+		mlo_debug("No idle vdev found for link addition");
+		return false;
+	}
+
+	mlo_debug("Idle vdev %d found for add link %d freq %d",
+			link_add->vdev_id,
+			link_add->link_id,
+			link_add->freq);
+
+	/* Fill link switch request for idle vdev */
+	link_sw_req->vdev_id = link_add->vdev_id;
+	link_sw_req->curr_ieee_link_id = WLAN_INVALID_LINK_ID; /* Idle vdev has no current link */
+	link_sw_req->new_ieee_link_id = link_add->link_id;
+	link_sw_req->new_primary_freq = link_add->freq;
+	link_sw_req->new_phymode = 0;
+	link_sw_req->reason = MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK;
+	link_sw_req->smd_lnk_sw_trigger = true;
+	link_sw_req->tgt_ap_link_addr = link_add->ap_link_addr;
+
+	mlo_info("Idle vdev link switch: vdev %d, new link_id %d, freq %d, reason %d",
+			link_sw_req->vdev_id,
+			link_sw_req->new_ieee_link_id,
+			link_sw_req->new_primary_freq,
+			link_sw_req->reason);
+
+	return true;
+}
+
 static struct mlo_link_info *
 smd_find_current_ap_link_info(struct wlan_objmgr_vdev *vdev, uint8_t del_vdev_id)
 {

@@ -310,6 +310,23 @@ smd_link_recfg_has_active_vdev_for_add_link(
 				struct mlo_link_recfg_context *recfg_ctx,
 				struct mlo_link_recfg_state_req *req,
 				struct wlan_mlo_link_switch_req *link_sw_req);
+/**
+ * smd_link_recfg_has_idle_vdev_for_add_link() - Check if idle vdev available for link add
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration request
+ * @link_sw_req: Link switch request to be filled
+ *
+ * This function checks if there's an idle vdev that can be used for adding
+ * a new link during SMD roaming. If found, it prepares the link switch request
+ * with MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK reason.
+ *
+ * Return: true if idle vdev found and link switch request prepared, false otherwise
+ */
+bool
+smd_link_recfg_has_idle_vdev_for_add_link(
+	struct mlo_link_recfg_context *recfg_ctx,
+	struct mlo_link_recfg_state_req *req,
+	struct wlan_mlo_link_switch_req *link_sw_req);
 
 /**
  * smd_cleanup_curr_ap_link() - Prepare link switch to tear down cleanup vdev link
@@ -724,6 +741,14 @@ wlan_smd_roam_sync_status(QDF_STATUS status)
 
 static inline bool
 smd_link_recfg_has_active_vdev_for_add_link(
+				struct mlo_link_recfg_context *recfg_ctx,
+				struct mlo_link_recfg_state_req *req,
+				struct wlan_mlo_link_switch_req *link_sw_req)
+{
+	return false;
+}
+static inline bool
+smd_link_recfg_has_idle_vdev_for_add_link(
 				struct mlo_link_recfg_context *recfg_ctx,
 				struct mlo_link_recfg_state_req *req,
 				struct wlan_mlo_link_switch_req *link_sw_req)

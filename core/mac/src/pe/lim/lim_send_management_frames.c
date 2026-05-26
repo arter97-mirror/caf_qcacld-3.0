@@ -10008,6 +10008,20 @@ populate_nonce_ie(uint8_t *buf, uint16_t *out_len)
 	pe_debug("Nonce IE populated, len=%d", *out_len);
 	return QDF_STATUS_SUCCESS;
 }
+
+#else
+static QDF_STATUS
+populate_dh_param_ie(struct wlan_objmgr_psoc *psoc,
+		     uint8_t *buf, uint16_t *out_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+populate_nonce_ie(uint8_t *buf, uint16_t *out_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /*
