@@ -62,6 +62,7 @@
 #include "wlan_twt_ucfg_api.h"
 #include "wlan_p2p_api.h"
 #include "wlan_hdd_wifi_pos_pasn.h"
+#include "wlan_hdd_wmm.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -1832,11 +1833,14 @@ check_adapter:
 
 		/* Channel indicated may be wrong. TODO */
 		/* Indicate an action frame. */
-		if (hdd_is_qos_action_frame(pb_frames, frm_len))
-			sme_update_dsc_pto_up_mapping(
+		if (hdd_is_qos_action_frame(pb_frames, frm_len)) {
+			if (QDF_IS_STATUS_SUCCESS(
+				sme_update_dsc_pto_up_mapping(
 						hdd_ctx->mac_handle,
 						adapter->dscp_to_up_map,
-						adapter->deflink->vdev_id);
+						adapter->deflink->vdev_id)))
+				hdd_send_dscp_up_map_to_fw(adapter);
+		}
 
 		assoc_adapter = adapter;
 		ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);

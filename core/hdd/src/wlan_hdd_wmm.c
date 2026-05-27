@@ -2662,8 +2662,14 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 					       adapter->dscp_to_up_map,
 					       adapter->deflink->vdev_id);
 
-	if (!QDF_IS_STATUS_SUCCESS(status))
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_wmm_dscp_initial_state(adapter);
+	} else {
+		status = hdd_send_dscp_up_map_to_fw(adapter);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			hdd_err("Failed to sync DSCP-to-UP map to FW: %d",
+				status);
+	}
 
 	hdd_exit();
 
