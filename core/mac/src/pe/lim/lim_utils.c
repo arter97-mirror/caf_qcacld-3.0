@@ -9420,7 +9420,11 @@ void lim_update_passthru_config(struct mac_context *mac,
 			     sizeof(add_sta_params->he_config));
 	add_sta_params->ht_caps = (*(uint16_t *)&session_entry->ht_config);
 	add_sta_params->vht_caps = session_entry->vht_config.caps;
-	pe_debug("passthru eht_capable: %d", add_sta_params->eht_capable);
+	add_sta_params->create_only =
+		session_entry->passthru_pending_create_only;
+	pe_debug("passthru eht_capable: %d he_capable: %d create_only: %d",
+		 add_sta_params->eht_capable, add_sta_params->he_capable,
+		 add_sta_params->create_only);
 }
 #endif
 

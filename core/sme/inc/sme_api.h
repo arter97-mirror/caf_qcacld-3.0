@@ -5271,20 +5271,39 @@ sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
 
 #ifdef DRIVER_PASSTHRU_MODE
 /**
- * sme_passthru_peer_setup() - api to request passthru peer setup.
- * @mac_handle: mac hancle
- * @vdev_id: vdev id
- * @peer_mac_addr: mac address of the peer.
+ * sme_passthru_peer_setup() - request passthru peer setup or update
+ * @mac_handle: mac handle
+ * @peer_setup: setup request; create_only=1 for NEW, 0 for UPDATE
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 sme_passthru_peer_setup(mac_handle_t mac_handle,
 			struct sir_passthru_peer_setup_msg *peer_setup);
+
+/**
+ * sme_passthru_peer_del() - request passthru peer deletion
+ * @mac_handle: mac handle
+ * @peer_del: deletion request carrying peer MAC address
+ *
+ * Posts WNI_SME_PASSTHRU_PEER_DEL to LIM to trigger WMI_PEER_DELETE_CMDID.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_passthru_peer_del(mac_handle_t mac_handle,
+		      struct sir_passthru_peer_del_msg *peer_del);
 #else
 static inline QDF_STATUS
 sme_passthru_peer_setup(mac_handle_t mac_handle,
 			struct sir_passthru_peer_setup_msg *peer_setup)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+sme_passthru_peer_del(mac_handle_t mac_handle,
+		      struct sir_passthru_peer_del_msg *peer_del)
 {
 	return QDF_STATUS_SUCCESS;
 }
