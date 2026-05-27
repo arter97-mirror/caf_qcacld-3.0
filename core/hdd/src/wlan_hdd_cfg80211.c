@@ -32573,6 +32573,18 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return false;
 
+	/*
+	 * Skip deferral for an already-connected vdev, except for the
+	 * MLO link vdev roam-auth-connected case which still needs the
+	 * deferred key install handled below.
+	 */
+	if ((adapter->device_mode == QDF_STA_MODE) &&
+	    wlan_cm_is_vdev_connected(vdev) &&
+	    (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	     !mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
+						 wlan_vdev_get_id(vdev))))
+		return false;
+
 	link_id = wlan_vdev_get_link_id(vdev);
 
 	if ((adapter->device_mode == QDF_STA_MODE) &&
