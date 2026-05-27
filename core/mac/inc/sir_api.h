@@ -5142,20 +5142,91 @@ struct start_bss_config {
 };
 
 /**
- * struct sir_passthru_peer_setup_msg - msg used for passthru peer setup
- * @message_type: message type
- * @vdev_id: vdev id
+ * struct wlan_passthru_htcap - HT Capabilities element body (IEEE 802.11n)
+ * @cap_info:      HT capability info (2 bytes)
+ * @ampdu_params:  A-MPDU parameters (1 byte)
+ * @mcs_set:       Supported MCS set (16 bytes)
+ * @ext_cap:       Extended HT capability info (2 bytes)
+ * @txbf_cap:      Transmit beamforming capabilities (4 bytes)
+ * @antenna:       Antenna selection capabilities (1 byte)
+ *
+ * Byte-identical to struct ieee80211_ht_cap (26 bytes packed).
+ * HDD fills this via qdf_mem_copy from sta_info.ht_capa in peer_assoc().
+ */
+struct wlan_passthru_htcap {
+	uint16_t cap_info;
+	uint8_t  ampdu_params;
+	uint8_t  mcs_set[16];
+	uint16_t ext_cap;
+	uint32_t txbf_cap;
+	uint8_t  antenna;
+} qdf_packed;
+
+/**
+ * struct wlan_passthru_vhtcap - VHT Capabilities element body (IEEE 802.11ac)
+ * @cap_info:      VHT capability info (4 bytes)
+ * @rx_mcs_map:    RX MCS map (2 bytes)
+ * @rx_highest:    Max RX data rate (2 bytes)
+ * @tx_mcs_map:    TX MCS map (2 bytes)
+ * @tx_highest:    Max TX data rate (2 bytes)
+ *
+ * Byte-identical to struct ieee80211_vht_cap (12 bytes packed).
+ * HDD fills this via qdf_mem_copy from sta_info.vht_capa in peer_assoc().
+ */
+struct wlan_passthru_vhtcap {
+	uint32_t cap_info;
+	uint16_t rx_mcs_map;
+	uint16_t rx_highest;
+	uint16_t tx_mcs_map;
+	uint16_t tx_highest;
+} qdf_packed;
+
+/**
+ * struct sir_passthru_peer_setup_msg - msg for passthru peer setup/update
+ * @message_type: WNI_SME_PASSTHRU_PEER_SETUP
+ * @vdev_id: vdev id of the passthru interface
  * @peer_mac_addr: peer MAC address
+ * @peer_aid: AID provided by WONDER in set_station_info NEW; used as the
+ *            DPH and WMI peer_associd for this peer (NEW only)
+ * @ch_width: channel width (derived from peer caps in HDD for UPDATE;
+ *            from tx_rate_cfg for NEW)
+ * @dot11mode: 802.11 mode (derived from peer capability_mask in HDD for
+ *             UPDATE; from tx_rate_cfg for NEW)
+ * @gi_val: guard interval value from tx_rate_cfg
+ * @nss: number of spatial streams from tx_rate_cfg
+ * @max_mcs: max MCS index
+ * @create_only: 1 = NEW (WMI_PEER_CREATE only); 0 = UPDATE (WMI_PEER_ASSOC)
+ * @htcap_present: 1 if peer_ht_cap is valid (UPDATE only)
+ * @peer_ht_cap: peer HT caps; byte-copy of sta_info.ht_capa in HDD
+ * @vhtcap_present: 1 if peer_vht_cap is valid (UPDATE only)
+ * @peer_vht_cap: peer VHT caps; byte-copy of sta_info.vht_capa in HDD
  */
 struct sir_passthru_peer_setup_msg {
-	uint16_t message_type;
-	uint16_t vdev_id;
-	struct qdf_mac_addr peer_mac_addr;
-	enum phy_ch_width ch_width;
-	uint32_t dot11mode;
-	uint8_t gi_val;
-	uint8_t nss;
-	uint8_t max_mcs;
+	uint16_t                    message_type;
+	uint16_t                    vdev_id;
+	uint16_t                    peer_aid;
+	struct qdf_mac_addr         peer_mac_addr;
+	enum phy_ch_width           ch_width;
+	uint32_t                    dot11mode;
+	uint8_t                     gi_val;
+	uint8_t                     nss;
+	uint8_t                     max_mcs;
+	uint8_t                     create_only;
+	uint8_t                     htcap_present;
+	struct wlan_passthru_htcap  peer_ht_cap;
+	uint8_t                     vhtcap_present;
+	struct wlan_passthru_vhtcap peer_vht_cap;
 };
 
+/**
+ * struct sir_passthru_peer_del_msg - msg for passthru peer deletion
+ * @message_type: WNI_SME_PASSTHRU_PEER_DEL
+ * @vdev_id: vdev id of the passthru interface
+ * @peer_mac_addr: MAC address of the peer to delete
+ */
+struct sir_passthru_peer_del_msg {
+	uint16_t            message_type;
+	uint16_t            vdev_id;
+	struct qdf_mac_addr peer_mac_addr;
+};
 #endif /* __SIR_API_H */
