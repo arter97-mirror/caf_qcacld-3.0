@@ -96,7 +96,8 @@ static int __wlan_hdd_cfg80211_nan_ext_request(struct wiphy *wiphy,
 	}
 
 	if (hdd_is_connection_in_progress(&conc_vdev_id, &out_reason)) {
-		if (out_reason != EAPOL_IN_PROGRESS) {
+		if (out_reason == REASSOC_IN_PROGRESS ||
+		    out_reason == NAN_ENABLE_DISABLE_IN_PROGRESS) {
 			hdd_err("NAN command refused, reason %d", out_reason);
 			return -EAGAIN;
 		}
