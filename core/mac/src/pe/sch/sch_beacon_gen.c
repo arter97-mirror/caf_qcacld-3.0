@@ -44,6 +44,7 @@
 #include "wlan_utility.h"
 #include "lim_mlo.h"
 #include "utils_parser.h"
+#include "wlan_reg_services_api.h"
 
 /* Offset of Channel Switch count field in CSA/ECSA IE */
 #define SCH_CSA_SWITCH_COUNT_OFFSET 2
@@ -816,7 +817,12 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 
 	populate_dot11_supp_operating_classes(mac_ctx,
 		&bcn_2->SuppOperatingClasses, session);
-	populate_dot11f_country(mac_ctx, &bcn_2->Country, session);
+
+	if (!session->dfsIncludeChanSwIe ||
+	    !wlan_reg_is_disable_in_secondary_list_for_freq(
+					mac_ctx->pdev,
+					session->curr_op_freq))
+		populate_dot11f_country(mac_ctx, &bcn_2->Country, session);
 	if (bcn_1->Capabilities.qos)
 		populate_dot11f_edca_param_set(mac_ctx, &bcn_2->EDCAParamSet,
 					       session);
