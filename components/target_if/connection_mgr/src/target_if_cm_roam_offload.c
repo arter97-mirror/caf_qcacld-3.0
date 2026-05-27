@@ -104,11 +104,13 @@ target_if_cm_roam_send_roam_invoke_cmd(struct wlan_objmgr_vdev *vdev,
 /**
  * target_if_cm_roam_send_roam_sync_complete  - Send roam sync complete to wmi.
  * @vdev: VDEV object pointer
+ * @params: roam synch complete params
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
-target_if_cm_roam_send_roam_sync_complete(struct wlan_objmgr_vdev *vdev)
+target_if_cm_roam_send_roam_sync_complete(struct wlan_objmgr_vdev *vdev,
+					  struct wlan_roam_synch_complete_params *params)
 {
 	wmi_unified_t wmi_handle;
 	QDF_STATUS status;
@@ -124,8 +126,7 @@ target_if_cm_roam_send_roam_sync_complete(struct wlan_objmgr_vdev *vdev)
 	if (!wmi_handle)
 		return QDF_STATUS_E_FAILURE;
 
-	status = wmi_unified_roam_synch_complete_cmd(wmi_handle,
-						     wlan_vdev_get_id(vdev));
+	status = wmi_unified_roam_synch_complete_cmd(wmi_handle, params);
 
 	return status;
 }

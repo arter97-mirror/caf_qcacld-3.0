@@ -2331,7 +2331,9 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	struct roam_offload_synch_ind *sync_ind;
 	uint32_t sync_ind_len;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_roam_synch_complete_params sync_params = {};
+	uint8_t i;
 
 	if (!recfg_ctx) {
 		mlo_err("SMD: recfg_ctx is NULL");
@@ -2358,9 +2360,32 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	recfg_ctx->smd_roam_in_progress = false;
 	recfg_ctx->st_exec_in_progress = false;
 
-	wlan_cm_tgt_send_roam_sync_complete_cmd(psoc,
-						recfg_ctx->curr_recfg_req.vdev_id);
+	sync_params.vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
+	if (mlo_dev_ctx->smd_ctx) {
+		struct smd_context *smd_ctx = mlo_dev_ctx->smd_ctx;
+		struct wlan_mlo_sta *target_bss_ctx =
+			smd_ctx->prepared_targets[smd_ctx->active_target_idx].target_bss_ctx;
+		struct mlo_link_info *link_info;
 
+		if (target_bss_ctx) {
+			for (i = 0; i < WLAN_MAX_ML_BSS_LINKS &&
+			     sync_params.num_vdev_repurpose_resp <
+						WLAN_MAX_ML_BSS_LINKS; i++) {
+				link_info = &target_bss_ctx->links_info[i];
+				if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+					continue;
+				sync_params.vdev_repurpose_resp[
+					sync_params.num_vdev_repurpose_resp].vdev_id =
+						link_info->vdev_id;
+				sync_params.vdev_repurpose_resp[
+					sync_params.num_vdev_repurpose_resp].status =
+					(link_info->link_status_code ==
+					 STATUS_SUCCESS) ? 0 : 1;
+				sync_params.num_vdev_repurpose_resp++;
+			}
+		}
+	}
+	wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, &sync_params);
 	/* mlrc_sm_lock may be held by caller; assoc CM lock is NOT held.
 	 * cm_sm_deliver_event acquires assoc CM lock internally — safe.
 	 * Caller (smd_link_recfg_complete) frees cached_sync_ind after return.
@@ -2370,6 +2395,9 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 				     sync_ind_len, sync_ind);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_err("SMD: ROAM_DONE delivery failed: %d", status);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("CM ROAM Done evt failure");
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 

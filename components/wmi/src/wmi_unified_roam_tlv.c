@@ -1528,6 +1528,8 @@ static QDF_STATUS send_set_ric_req_cmd_tlv(wmi_unified_t wmi_handle,
  * fw.
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
+ * @num_vdev_repurpose_resp: number of vdev repurpose response entries
+ * @vdev_repurpose_resp: array of vdev repurpose response TLV params
  *
  * This function sends roam synch complete event to fw.
  *
@@ -1535,13 +1537,22 @@ static QDF_STATUS send_set_ric_req_cmd_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_process_roam_synch_complete_cmd_tlv(wmi_unified_t wmi_handle,
-					 uint8_t vdev_id)
+				uint8_t vdev_id,
+				uint8_t num_vdev_repurpose_resp,
+				wmi_vdev_repurpose_response_tlv_param
+						*vdev_repurpose_resp)
 {
 	wmi_roam_synch_complete_fixed_param *cmd;
+	wmi_vdev_repurpose_response_tlv_param *repurpose_tlv;
 	wmi_buf_t wmi_buf;
 	uint8_t *buf_ptr;
 	uint16_t len;
-	len = sizeof(wmi_roam_synch_complete_fixed_param);
+	uint8_t i;
+
+	len = sizeof(wmi_roam_synch_complete_fixed_param) +
+	      WMI_TLV_HDR_SIZE +
+	      num_vdev_repurpose_resp *
+			sizeof(wmi_vdev_repurpose_response_tlv_param);
 
 	wmi_buf = wmi_buf_alloc(wmi_handle, len);
 	if (!wmi_buf)
@@ -1554,6 +1565,24 @@ send_process_roam_synch_complete_cmd_tlv(wmi_unified_t wmi_handle,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_roam_synch_complete_fixed_param));
 	cmd->vdev_id = vdev_id;
+	buf_ptr += sizeof(*cmd);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       num_vdev_repurpose_resp *
+		       sizeof(wmi_vdev_repurpose_response_tlv_param));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	repurpose_tlv = (wmi_vdev_repurpose_response_tlv_param *)buf_ptr;
+	for (i = 0; i < num_vdev_repurpose_resp; i++) {
+		WMITLV_SET_HDR(
+		    &repurpose_tlv[i].tlv_header,
+		    WMITLV_TAG_STRUC_wmi_vdev_repurpose_response_tlv_param,
+		    WMITLV_GET_STRUCT_TLVLEN(
+				wmi_vdev_repurpose_response_tlv_param));
+		repurpose_tlv[i].repurpose_vdev_id =
+				vdev_repurpose_resp[i].repurpose_vdev_id;
+		repurpose_tlv[i].status = vdev_repurpose_resp[i].status;
+	}
+
 	wmi_mtrace(WMI_ROAM_SYNCH_COMPLETE, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
 				 WMI_ROAM_SYNCH_COMPLETE)) {
@@ -5726,6 +5755,7 @@ send_smd_roam_start_status_cmd_tlv(wmi_unified_t wmi_handle,
 				   struct wlan_roam_smd_start_status_params *params)
 {
 	wmi_roam_smd_start_status_cmd_fixed_param *cmd;
+	wmi_vdev_repurpose_response_tlv_param *repurpose_resp;
 	wmi_prep_resp_status_list *status_list;
 	wmi_buf_t buf;
 	uint32_t len;
@@ -5733,6 +5763,9 @@ send_smd_roam_start_status_cmd_tlv(wmi_unified_t wmi_handle,
 	uint8_t *buf_ptr;
 
 	len = sizeof(*cmd) +
+	      WMI_TLV_HDR_SIZE +
+	      params->num_vdev_repurpose_resp *
+			sizeof(wmi_vdev_repurpose_response_tlv_param) +
 	      WMI_TLV_HDR_SIZE +
 	      qdf_roundup(params->smd_transition_ie_len, sizeof(uint32_t)) +
 	      WMI_TLV_HDR_SIZE +
@@ -5758,6 +5791,26 @@ send_smd_roam_start_status_cmd_tlv(wmi_unified_t wmi_handle,
 		  cmd->vdev_id, cmd->status);
 
 	buf_ptr += sizeof(*cmd);
+
+	/* vdev repurpose response struct array */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       params->num_vdev_repurpose_resp *
+		       sizeof(wmi_vdev_repurpose_response_tlv_param));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	repurpose_resp = (wmi_vdev_repurpose_response_tlv_param *)buf_ptr;
+	for (i = 0; i < params->num_vdev_repurpose_resp; i++) {
+		WMITLV_SET_HDR(
+		    &repurpose_resp[i].tlv_header,
+		    WMITLV_TAG_STRUC_wmi_vdev_repurpose_response_tlv_param,
+		    WMITLV_GET_STRUCT_TLVLEN(
+				wmi_vdev_repurpose_response_tlv_param));
+		repurpose_resp[i].repurpose_vdev_id =
+				params->vdev_repurpose_resp[i].vdev_id;
+		repurpose_resp[i].status =
+				params->vdev_repurpose_resp[i].status;
+	}
+	buf_ptr += params->num_vdev_repurpose_resp *
+		   sizeof(wmi_vdev_repurpose_response_tlv_param);
 
 	/* smd_transition_ie byte array */
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,

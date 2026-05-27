@@ -2751,7 +2751,8 @@ wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 
 	vdev_id = roam_event->vdev_id;
 
-	if (notif == CM_ROAM_NOTIF_ROAM_START) {
+	if (notif == CM_ROAM_NOTIF_ROAM_START ||
+	    notif == CM_ROAM_NOTIF_ROAM_SMD_START) {
 		op_code = SIR_ROAMING_START;
 	} else if (notif == CM_ROAM_NOTIF_ROAM_ABORT) {
 		op_code = SIR_ROAMING_ABORT;
@@ -2765,12 +2766,14 @@ wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 		return;
 
 	roam_synch_data->roamed_vdev_id = vdev_id;
-	if (notif != CM_ROAM_NOTIF_ROAM_START)
+	if (notif != CM_ROAM_NOTIF_ROAM_START &&
+	    notif != CM_ROAM_NOTIF_ROAM_SMD_START)
 		wma_handle->pe_roam_synch_cb(wma_handle->mac_context,
 					     roam_synch_data->roamed_vdev_id,
 					     roam_synch_data, 0, op_code);
 
-	if (notif == CM_ROAM_NOTIF_ROAM_START)
+	if (notif == CM_ROAM_NOTIF_ROAM_START ||
+	    notif == CM_ROAM_NOTIF_ROAM_SMD_START)
 		cm_fw_roam_start_req(wma_handle->psoc, roam_event);
 	else
 		cm_fw_roam_abort_req(wma_handle->psoc, vdev_id, roam_event);

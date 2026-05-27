@@ -223,14 +223,14 @@ QDF_STATUS wmi_unified_set_ric_req_cmd(wmi_unified_t wmi_handle, void *msg,
 /**
  * wmi_unified_roam_synch_complete_cmd() - roam synch complete command to fw.
  * @wmi_handle: wmi handle
- * @vdev_id: vdev id
+ * @params: roam synch complete params including vdev_id and repurpose responses
  *
  * This function sends roam synch complete event to fw.
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
-					       uint8_t vdev_id);
+			struct wlan_roam_synch_complete_params *params);
 
 /**
  * wmi_get_host_roam_frame_tx_status() - API to convert FW TX status code to

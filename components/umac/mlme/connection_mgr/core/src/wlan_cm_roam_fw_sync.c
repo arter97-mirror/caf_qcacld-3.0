@@ -1244,6 +1244,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	bool eht_capab = false;
 	struct pe_session *session;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct wlan_roam_synch_complete_params sync_params = {};
 
 	if (!mac_ctx)
 		return QDF_STATUS_E_FAILURE;
@@ -1336,7 +1337,10 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   QDF_MAC_ADDR_REF(connect_rsp->bssid.bytes));
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 		}
-		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
+		sync_params.vdev_id = vdev_id;
+		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc,
+							&sync_params);
+
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
 					       false);

@@ -2914,6 +2914,16 @@ struct roam_pmkid_req_event {
 };
 
 /**
+ * struct wlan_vdev_repurpose_resp - VDEV repurpose response
+ * @vdev_id: VDEV ID that was repurposed
+ * @status: Status of the repurpose operation (0 is success)
+ */
+struct wlan_vdev_repurpose_resp {
+	uint32_t vdev_id;
+	uint32_t status;
+};
+
+/**
  * struct roam_smd_prep_resp_status - Per-link PREP response status
  * @ieee_link_id: IEEE link ID
  * @status: Status for this link
@@ -2928,6 +2938,8 @@ struct roam_smd_prep_resp_status {
  * @vdev_id: VDEV ID
  * @status: Overall status (0=SUCCESS, 1=UNSPECIFIC_FAIL, 2=VDEV_REPURPOSE_FAIL,
  *          3=PREP_REQ_TX_NO_ACK, 4=PREP_RESP_RX_TIMEOUT)
+ * @num_vdev_repurpose_resp: Number of vdev repurpose response entries
+ * @vdev_repurpose_resp: Array of per-vdev repurpose response params
  * @smd_transition_ie_len: Length of SMD transition IE
  * @smd_transition_ie: SMD transition IE buffer from AP
  * @num_prep_status: Number of per-link PREP status entries
@@ -2938,12 +2950,28 @@ struct roam_smd_prep_resp_status {
 struct wlan_roam_smd_start_status_params {
 	uint32_t vdev_id;
 	uint32_t status;
+	uint8_t num_vdev_repurpose_resp;
+	struct wlan_vdev_repurpose_resp
+			vdev_repurpose_resp[WLAN_MAX_ML_BSS_LINKS];
 	uint32_t smd_transition_ie_len;
 	uint8_t *smd_transition_ie;
 	uint32_t num_prep_status;
 	struct roam_smd_prep_resp_status prep_status_list[WLAN_MAX_ML_BSS_LINKS];
 	uint32_t kck_len;
 	uint8_t *kck;
+};
+
+/**
+ * struct wlan_roam_synch_complete_params - Roam sync complete command params
+ * @vdev_id: VDEV ID
+ * @num_vdev_repurpose_resp: Number of vdev repurpose response entries
+ * @vdev_repurpose_resp: Array of per-vdev repurpose response params
+ */
+struct wlan_roam_synch_complete_params {
+	uint8_t vdev_id;
+	uint8_t num_vdev_repurpose_resp;
+	struct wlan_vdev_repurpose_resp
+			vdev_repurpose_resp[WLAN_MAX_ML_BSS_LINKS];
 };
 
 /**
@@ -3007,7 +3035,9 @@ struct wlan_cm_roam_tx_ops {
 				struct roam_disable_cfg *req);
 	QDF_STATUS (*send_roam_invoke_cmd)(struct wlan_objmgr_vdev *vdev,
 					   struct roam_invoke_req *req);
-	QDF_STATUS (*send_roam_sync_complete_cmd)(struct wlan_objmgr_vdev *vdev);
+	QDF_STATUS (*send_roam_sync_complete_cmd)(
+				struct wlan_objmgr_vdev *vdev,
+				struct wlan_roam_synch_complete_params *params);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	QDF_STATUS (*send_roam_rt_stats_config)(struct wlan_objmgr_vdev *vdev,
 						uint8_t vdev_id, uint8_t value);

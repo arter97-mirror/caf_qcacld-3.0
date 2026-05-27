@@ -124,13 +124,25 @@ QDF_STATUS wmi_unified_set_ric_req_cmd(wmi_unified_t wmi_handle, void *msg,
 }
 
 QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
-					       uint8_t vdev_id)
+				struct wlan_roam_synch_complete_params *params)
 {
-	if (wmi_handle->ops->send_process_roam_synch_complete_cmd)
-		return wmi_handle->ops->send_process_roam_synch_complete_cmd(
-				wmi_handle, vdev_id);
+	wmi_vdev_repurpose_response_tlv_param
+			repurpose_resp[WLAN_MAX_ML_BSS_LINKS] = {};
+	uint8_t i;
 
-	return QDF_STATUS_E_FAILURE;
+	if (!wmi_handle->ops->send_process_roam_synch_complete_cmd)
+		return QDF_STATUS_E_FAILURE;
+
+	for (i = 0; i < params->num_vdev_repurpose_resp; i++) {
+		repurpose_resp[i].repurpose_vdev_id =
+				params->vdev_repurpose_resp[i].vdev_id;
+		repurpose_resp[i].status =
+				params->vdev_repurpose_resp[i].status;
+	}
+
+	return wmi_handle->ops->send_process_roam_synch_complete_cmd(
+			wmi_handle, params->vdev_id,
+			params->num_vdev_repurpose_resp, repurpose_resp);
 }
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
