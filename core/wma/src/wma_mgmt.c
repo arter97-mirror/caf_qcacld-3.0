@@ -1124,6 +1124,44 @@ static inline bool wma_is_phymode_eht(enum wlan_phymode phymode)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * wma_fw_to_host_phymode_11bn() - convert fw to host phymode for 11bn phymodes
+ * @phymode: phymode to convert
+ *
+ * Return: one of the 11bn values defined in enum wlan_phymode;
+ *         or WLAN_PHYMODE_AUTO if the input is not an 11bn phymode
+ */
+static enum wlan_phymode
+wma_fw_to_host_phymode_11bn(WMI_HOST_WLAN_PHY_MODE phymode)
+{
+	switch (phymode) {
+	default:
+		return WLAN_PHYMODE_AUTO;
+	case WMI_HOST_MODE_11BN_UHR20:
+		return WLAN_PHYMODE_11BNA_UHR20;
+	case WMI_HOST_MODE_11BN_UHR40:
+		return WLAN_PHYMODE_11BNA_UHR40;
+	case WMI_HOST_MODE_11BN_UHR80:
+		return WLAN_PHYMODE_11BNA_UHR80;
+	case WMI_HOST_MODE_11BN_UHR160:
+		return WLAN_PHYMODE_11BNA_UHR160;
+	case WMI_HOST_MODE_11BN_UHR320:
+		return WLAN_PHYMODE_11BNA_UHR320;
+	case WMI_HOST_MODE_11BN_UHR20_2G:
+		return WLAN_PHYMODE_11BNG_UHR20;
+	case WMI_HOST_MODE_11BN_UHR40_2G:
+		return WLAN_PHYMODE_11BNG_UHR40;
+	}
+}
+#else
+static enum wlan_phymode
+wma_fw_to_host_phymode_11bn(WMI_HOST_WLAN_PHY_MODE phymode)
+{
+	return WLAN_PHYMODE_AUTO;
+}
+#endif
+
 #ifdef CONFIG_160MHZ_SUPPORT
 /**
  * wma_fw_to_host_phymode_160() - convert fw to host phymode for 160 mhz
@@ -1164,7 +1202,10 @@ enum wlan_phymode wma_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode)
 		host_phymode = wma_fw_to_host_phymode_11ax(phymode);
 		if (host_phymode != WLAN_PHYMODE_AUTO)
 			return host_phymode;
-		return wma_fw_to_host_phymode_11be(phymode);
+		host_phymode = wma_fw_to_host_phymode_11be(phymode);
+		if (host_phymode != WLAN_PHYMODE_AUTO)
+			return host_phymode;
+		return wma_fw_to_host_phymode_11bn(phymode);
 	case WMI_HOST_MODE_11A:
 		return WLAN_PHYMODE_11A;
 	case WMI_HOST_MODE_11G:

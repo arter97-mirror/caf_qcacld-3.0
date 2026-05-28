@@ -2456,6 +2456,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		roam_sync_ind->phy_mode =
 			wlan_cm_fw_to_host_phymode(WMI_GET_CHANNEL_MODE(chan));
 		roam_sync_ind->chan = *chan;
+		wmi_debug("BSS phymode: %d", roam_sync_ind->phy_mode);
 	} else {
 		roam_sync_ind->phy_mode = WLAN_PHYMODE_AUTO;
 	}

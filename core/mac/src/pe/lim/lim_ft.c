@@ -343,7 +343,15 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
  */
 static uint8_t lim_convert_phymode_to_dot11mode(enum wlan_phymode phymode)
 {
+#ifdef WLAN_FEATURE_11BN
+	if (IS_WLAN_PHYMODE_UHR(phymode))
+		return MLME_DOT11_MODE_11BN;
+#endif
 
+#ifdef WLAN_FEATURE_11BE
+	if (IS_WLAN_PHYMODE_EHT(phymode))
+		return MLME_DOT11_MODE_11BE;
+#endif
 	if (IS_WLAN_PHYMODE_HE(phymode))
 		return MLME_DOT11_MODE_11AX;
 
@@ -352,11 +360,6 @@ static uint8_t lim_convert_phymode_to_dot11mode(enum wlan_phymode phymode)
 
 	if (IS_WLAN_PHYMODE_HT(phymode))
 		return MLME_DOT11_MODE_11N;
-
-#ifdef WLAN_FEATURE_11BE
-	if (IS_WLAN_PHYMODE_EHT(phymode))
-		return MLME_DOT11_MODE_11BE;
-#endif
 
 	if (phymode == WLAN_PHYMODE_11G)
 		return MLME_DOT11_MODE_11G;
@@ -398,6 +401,16 @@ static uint8_t lim_calculate_dot11_mode(struct mac_context *mac_ctx,
 		new_dot11_mode = MLME_DOT11_MODE_11A;
 
 	switch (self_dot11_mode) {
+	case MLME_DOT11_MODE_11BN:
+	case MLME_DOT11_MODE_11BN_ONLY:
+		if (bcn->uhr_op.present)
+			return MLME_DOT11_MODE_11BN;
+		fallthrough;
+	case MLME_DOT11_MODE_11BE:
+	case MLME_DOT11_MODE_11BE_ONLY:
+		if (bcn->eht_cap.present)
+			return MLME_DOT11_MODE_11BE;
+		fallthrough;
 	case MLME_DOT11_MODE_11AX:
 	case MLME_DOT11_MODE_11AX_ONLY:
 	case MLME_DOT11_MODE_ALL:
