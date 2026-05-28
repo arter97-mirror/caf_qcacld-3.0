@@ -16957,10 +16957,11 @@ lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
 
 	/* Fixed minimum: Op Params (2) + Basic MCS/NSS (4) */
 	if (uhr_op_payload_len <
-	    (sizeof(op_params) + WLAN_UHR_BASIC_MCS_NSS_SET_LEN)) {
+	    (min_header_len + sizeof(op_params) +
+	     WLAN_UHR_BASIC_MCS_NSS_SET_LEN)) {
 		pe_err_rl("UHR payload len %zu insufficient for fixed fields %zu",
 			  uhr_op_payload_len,
-			  (qdf_size_t)(sizeof(op_params) +
+			  (qdf_size_t)(min_header_len + sizeof(op_params) +
 				       WLAN_UHR_BASIC_MCS_NSS_SET_LEN));
 		return QDF_STATUS_E_PROTO;
 	}
