@@ -38602,17 +38602,88 @@ wlan_hdd_cfg80211_start_pd(struct wiphy *wiphy, struct wireless_dev *wdev)
 /**
  * wlan_hdd_cfg80211_stop_pd() - Stop PD interface
  * @wiphy: Pointer to wiphy
- * @wdev: Pointer to wireless device (STA interface)
+ * @wdev: Pointer to wireless device (PD interface, netdev-less)
  *
  * This function is called when userspace requests to stop the PD interface.
- * It finds the PD adapter, releases its MAC address, and closes it.
+ * It posts a peer-delete request for all userspace-created USD ranging peers
+ * and blocks until the deletion is complete or times out.
+ *
+ * The PD wdev has no associated netdev (wdev->netdev == NULL), so hdd_ctx
+ * is obtained via wiphy_priv(). The STA adapter is looked up separately
+ * to retrieve the vdev_id that owns the ranging peers.
  *
  * Return: None
  */
 static void
 wlan_hdd_cfg80211_stop_pd(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
-	hdd_debug("Stop PD iface");
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *sta_adapter;
+	struct wlan_pasn_request *peer_delete_req;
+	struct scheduler_msg msg = {0};
+	struct osif_request *request;
+	QDF_STATUS status;
+	static const struct osif_request_params req_params = {
+		.priv_size  = 0,
+		.timeout_ms = PASN_PEER_CREATE_TIMEOUT_MS,
+	};
+
+	hdd_enter();
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return;
+	}
+
+	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!sta_adapter || !sta_adapter->deflink) {
+		hdd_err("STA adapter or deflink not found");
+		return;
+	}
+
+	peer_delete_req = qdf_mem_malloc(sizeof(*peer_delete_req));
+	if (!peer_delete_req)
+		return;
+
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		qdf_mem_free(peer_delete_req);
+		return;
+	}
+
+	peer_delete_req->vdev_id = sta_adapter->deflink->vdev_id;
+	peer_delete_req->psoc    = hdd_ctx->psoc;
+
+	wifi_pos_set_usd_delete_ctx(hdd_ctx->psoc,
+				    osif_request_cookie(request));
+
+	msg.bodyptr        = peer_delete_req;
+	msg.type           = WIFI_POS_NB_PASN_PEER_DELETE_USD_REQ;
+	msg.callback       = wlan_wifi_pos_process_msg;
+	msg.flush_callback = wlan_wifi_pos_pasn_flush_callback;
+
+	status = scheduler_post_message(QDF_MODULE_ID_WIFIPOS,
+					QDF_MODULE_ID_WIFIPOS,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to post USD peer delete msg, status:%d",
+			status);
+		wlan_wifi_pos_pasn_flush_callback(&msg);
+		goto end;
+	}
+
+	status = osif_request_wait_for_response(request);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("USD peer delete request timed out: %d", status);
+
+end:
+	wifi_pos_set_usd_delete_ctx(hdd_ctx->psoc, NULL);
+	osif_request_put(request);
+	hdd_exit();
 }
 #endif
 
