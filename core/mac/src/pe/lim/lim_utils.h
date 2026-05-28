@@ -4417,6 +4417,14 @@ void lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
 void lim_copy_join_req_uhr_cap(struct pe_session *session);
 
 /**
+ * lim_get_uhr_dps_support() - Check if both STA and AP support DPS
+ * @pe_session: pointer to PE session
+ *
+ * Return: true if STA dps_present and AP dps_assist_support are both set
+ */
+bool lim_get_uhr_dps_support(struct pe_session *pe_session);
+
+/**
  * lim_add_self_uhr_cap() - Copy UHR capability into add sta from PE session
  * @add_sta_params: pointer to add sta params
  * @session: pointer to PE Session
@@ -4522,6 +4530,11 @@ lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
 
 static inline void lim_copy_join_req_uhr_cap(struct pe_session *session)
 {
+}
+
+static inline bool lim_get_uhr_dps_support(struct pe_session *pe_session)
+{
+	return false;
 }
 
 static inline void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,

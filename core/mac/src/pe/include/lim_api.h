@@ -674,6 +674,23 @@ void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
 void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq);
 
 /**
+ * lim_disable_ht_dynamic_smps() - Disable HT dynamic SMPS
+ * @session: pointer to PE session
+ */
+void lim_disable_ht_dynamic_smps(struct pe_session *session);
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * lim_disable_he_dynamic_smps() - Disable HE dynamic SMPS
+ * @session: pointer to PE session
+ */
+void lim_disable_he_dynamic_smps(struct pe_session *session);
+#else
+static inline
+void lim_disable_he_dynamic_smps(struct pe_session *session)
+{}
+#endif
+/**
  * lim_disable_ht_he_dynamic_smps() - disable dynamic SMPS for STA/P2P client
  *@session: pe session
  *@chan_freq: channel frequency

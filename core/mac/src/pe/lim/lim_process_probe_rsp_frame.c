@@ -385,6 +385,11 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 		pe_err("Parse error ProbeResponse, length=%d", frame_len);
 		goto mem_free;
 	}
+#ifdef WLAN_FEATURE_11BN
+	if (IS_DOT11_MODE_UHR(session_entry->dot11mode) &&
+	    probe_rsp->uhr_cap_ie.present)
+		session_entry->ap_uhr_cap = probe_rsp->uhr_cap_ie;
+#endif
 
 	if (!probe_rsp->chan_freq) {
 		probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);

@@ -3154,7 +3154,6 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
-static
 void lim_disable_ht_dynamic_smps(struct pe_session *session)
 {
 	pe_debug("Disable HT D-SMPS");
@@ -3167,7 +3166,6 @@ void lim_enable_ht_dynamic_smps(struct pe_session *session)
 	session->ht_config.mimo_power_save = DYNAMIC_SMPS_MODE;
 }
 #ifdef WLAN_FEATURE_11AX
-static
 void lim_disable_he_dynamic_smps(struct pe_session *session)
 {
 	pe_debug("Disable HE D-SMPS");
@@ -3185,10 +3183,6 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
 	return session->he_config.he_dynamic_smps;
 }
 #else
-static inline
-void lim_disable_he_dynamic_smps(struct pe_session *session)
-{}
-
 static inline
 void lim_enable_he_dynamic_smps(struct pe_session *session)
 {}

@@ -9682,6 +9682,20 @@ static void lim_intersect_uhr_caps(struct wlan_uhr_cap_info *rcvd_uhr,
 				rcvd_uhr->elr_rx_support;
 	peer_uhr->elr_tx_support = session_uhr->elr_rx_support &
 				rcvd_uhr->elr_tx_support;
+	/*
+	 * DPS cross-intersection:
+	 * peer dps_present = STA dps_assist_support & AP dps_present
+	 * peer dps_assist_support = STA dps_present & AP dps_assist_support
+	 */
+	peer_uhr->dps_present = session_uhr->dps_assist_support &
+				rcvd_uhr->dps_present;
+	peer_uhr->dps_assist_support = session_uhr->dps_present &
+				       rcvd_uhr->dps_assist_support;
+
+	pe_debug("vdev %d: UHR DPS intersection: peer_dps_present=%d peer_dps_assist=%d",
+		 session->vdev_id,
+		 peer_uhr->dps_present,
+		 peer_uhr->dps_assist_support);
 }
 
 void lim_intersect_ap_uhr_caps(struct pe_session *session,
@@ -9850,6 +9864,23 @@ void lim_copy_join_req_uhr_cap(struct pe_session *session)
 	lim_revise_req_uhr_cap_per_band(mlme_priv, session);
 	qdf_mem_copy(&session->uhr_config, &mlme_priv->uhr_config,
 		     sizeof(session->uhr_config));
+}
+
+bool lim_get_uhr_dps_support(struct pe_session *pe_session)
+{
+	if (!pe_session)
+		return false;
+
+	if (!IS_DOT11_MODE_UHR(pe_session->dot11mode))
+		return false;
+
+	pe_debug("vdev %d: DPS support check: sta_dps_present=%d ap_dps_assist_support=%d",
+		 pe_session->vdev_id,
+		 pe_session->uhr_config.dps_present,
+		 pe_session->ap_uhr_cap.dps_assist_support);
+
+	return pe_session->uhr_config.dps_present &&
+	       pe_session->ap_uhr_cap.dps_assist_support;
 }
 
 void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,

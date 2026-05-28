@@ -4148,6 +4148,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (wlan_vdev_is_smd_enabled(pe_session->vdev))
 		smd_ie_len = lim_fill_assoc_req_smd_ie(mac_ctx, pe_session,
 						       frm);
+#ifdef WLAN_FEATURE_11BN
+	if (lim_get_uhr_dps_support(pe_session)) {
+		lim_disable_ht_dynamic_smps(pe_session);
+		lim_disable_he_dynamic_smps(pe_session);
+	}
+#endif
 	/**
 	 * In case of ML connection, if ML IE length is 0 then return failure.
 	 */
