@@ -3509,6 +3509,17 @@ wlan_mlme_is_pmk_set_deferred(struct wlan_objmgr_psoc *psoc,
 
 	return set_pmk_pending;
 }
+
+void wlan_mlme_init_roam_high_rssi_delta(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.lfr.roam_high_rssi_delta = ROAM_HIGH_RSSI_OFFSET_INVALID;
+}
 #else
 static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 				       struct wlan_mlme_lfr_cfg *lfr)
@@ -3821,6 +3832,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_HI_RSSI_MAXCOUNT);
 	lfr->roam_scan_hi_rssi_delta =
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_HI_RSSI_DELTA);
+	wlan_mlme_init_roam_high_rssi_delta(psoc);
 	lfr->roam_scan_hi_rssi_delay =
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_HI_RSSI_DELAY);
 	lfr->roam_scan_hi_rssi_ub =

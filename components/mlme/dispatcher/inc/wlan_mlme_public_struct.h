@@ -2210,6 +2210,9 @@ struct fw_scan_channels {
 	uint32_t freq[NUM_CHANNELS];
 };
 
+/* Sentinel: roam_high_rssi_delta not yet configured via vendor command */
+#define ROAM_HIGH_RSSI_OFFSET_INVALID   0xFF
+
 /**
  * struct wlan_mlme_lfr_cfg - MLME LMAC fast roaming config
  * @mawc_roam_enabled: Enable/Disable MAWC during roaming

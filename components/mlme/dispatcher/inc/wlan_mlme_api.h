@@ -4095,7 +4095,21 @@ wlan_mlme_get_idle_roam_band(struct wlan_objmgr_psoc *psoc, uint32_t *val);
 QDF_STATUS
 wlan_mlme_get_self_bss_roam(struct wlan_objmgr_psoc *psoc,
 			    uint8_t *enable_self_bss_roam);
+
+/**
+ * wlan_mlme_init_roam_high_rssi_delta() - Initialize roam_high_rssi_delta
+ * to sentinel value indicating it has not been configured via vendor command
+ * @psoc: pointer to psoc object
+ *
+ * Return: None
+ */
+void wlan_mlme_init_roam_high_rssi_delta(struct wlan_objmgr_psoc *psoc);
 #else
+static inline void
+wlan_mlme_init_roam_high_rssi_delta(struct wlan_objmgr_psoc *psoc)
+{
+}
+
 static inline QDF_STATUS
 wlan_mlme_get_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 				      uint8_t *roam_reason_vsie_enable)

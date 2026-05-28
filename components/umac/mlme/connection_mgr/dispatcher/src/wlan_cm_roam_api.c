@@ -5957,7 +5957,7 @@ wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return 0;
+		return ROAM_HIGH_RSSI_OFFSET_INVALID;
 
 	return mlme_obj->cfg.lfr.roam_high_rssi_delta;
 }
