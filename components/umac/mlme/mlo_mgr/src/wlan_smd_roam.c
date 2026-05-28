@@ -1173,6 +1173,57 @@ smd_populate_add_link_info(struct mlo_link_recfg_context *recfg_ctx,
 }
 
 /**
+ * smd_count_active_links() - Count currently active (connected/roaming) links.
+ * @vdev: vdev pointer (any vdev in the MLD)
+ *
+ * Counts the number of links in mlo_dev_ctx that have a connected or roaming
+ * vdev. Used to determine the source topology for smd_detect_roam_topology().
+ *
+ * Return: number of active links
+ */
+static uint8_t
+smd_count_active_links(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_info *link_info;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t count = 0;
+	uint8_t i;
+
+	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx)
+		return 0;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return 0;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+
+		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID ||
+		    qdf_is_macaddr_zero(&link_info->ap_link_addr) ||
+		    link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, link_info->vdev_id,
+					WLAN_MLO_MGR_ID);
+		if (!link_vdev)
+			continue;
+
+		if (cm_is_vdev_connected(link_vdev) ||
+		    cm_is_vdev_roaming(link_vdev))
+			count++;
+
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
+	}
+
+	return count;
+}
+
+/**
  * smd_roam_prep_sl_to_sl_ml_handler() - Handle single-link to single/multi-link roaming
  * @vdev: VDEV object
  * @recfg_ctx: Link reconfiguration context
@@ -1916,6 +1967,13 @@ QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 	qdf_copy_macaddr(&recfg_req.add_link_info.smd_addr,
 			 &recfg_ctx->vdev_repurpose_req[0].smd_addr);
 
+	/* Capture source link count before any links are modified.
+	 * Used by smd_detect_roam_topology() after M2 is received.
+	 **/
+	recfg_ctx->num_src_active_links = smd_count_active_links(vdev);
+	mlo_debug("SMD: num_src_active_links=%u",
+		  recfg_ctx->num_src_active_links);
+
 	/* Try single-link to single/multi-link handler first */
 	status = smd_roam_prep_sl_to_sl_ml_handler(vdev, recfg_ctx, &recfg_req);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -2456,6 +2514,80 @@ end:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static const char *
+smd_roam_topology_str(enum smd_roam_topology_type topo)
+{
+	switch (topo) {
+	case SMD_ROAM_TOPO_SL_TO_SL: return "SL_TO_SL";
+	case SMD_ROAM_TOPO_SL_TO_ML: return "SL_TO_ML";
+	case SMD_ROAM_TOPO_ML_TO_ML: return "ML_TO_ML";
+	case SMD_ROAM_TOPO_ML_TO_SL: return "ML_TO_SL";
+	default:                      return "UNKNOWN";
+	}
+}
+
+/**
+ * smd_detect_roam_topology() - Detect SMD roaming topology after M2.
+ * @recfg_ctx: link reconfig context
+ * @num_src_active_links: active links before roam (set at ROAM_START)
+ * @num_dst_accepted_links: links accepted by target AP in M2
+ *
+ * Called from smd_st_prep_response_received() after M2 is parsed.
+ * Stores the result in recfg_ctx for use by S_ADD_LINK.
+ */
+static void
+smd_detect_roam_topology(struct mlo_link_recfg_context *recfg_ctx,
+			 uint8_t num_src_active_links,
+			 uint8_t num_dst_accepted_links)
+{
+	bool src_is_ml = (num_src_active_links > 1);
+	bool dst_is_ml = (num_dst_accepted_links > 1);
+	enum smd_roam_topology_type topo;
+
+	if (!src_is_ml && !dst_is_ml)
+		topo = SMD_ROAM_TOPO_SL_TO_SL;
+	else if (!src_is_ml && dst_is_ml)
+		topo = SMD_ROAM_TOPO_SL_TO_ML;
+	else if (src_is_ml && dst_is_ml)
+		topo = SMD_ROAM_TOPO_ML_TO_ML;
+	else
+		topo = SMD_ROAM_TOPO_ML_TO_SL;
+
+	recfg_ctx->roam_topology          = topo;
+	recfg_ctx->num_src_active_links   = num_src_active_links;
+	recfg_ctx->num_dst_accepted_links = num_dst_accepted_links;
+
+	mlo_debug("SMD: roam topology src=%u dst=%u → %s",
+		  num_src_active_links, num_dst_accepted_links,
+		  smd_roam_topology_str(topo));
+}
+
+/**
+ * smd_count_accepted_links() - Count links accepted by target AP in M2.
+ * @add_link_info: add_link_info populated from M2 per-link status codes
+ *
+ * Return: number of links with STATUS_SUCCESS
+ */
+static uint8_t
+smd_count_accepted_links(struct wlan_mlo_link_recfg_info *add_link_info)
+{
+	uint8_t count = 0;
+	uint8_t i;
+
+	if (!add_link_info)
+		return 0;
+
+	for (i = 0; i < add_link_info->num_links &&
+	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (add_link_info->link[i].status_code == STATUS_SUCCESS)
+			count++;
+	}
+
+	return count;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 QDF_STATUS
 smd_st_prep_response_received(struct mlo_link_recfg_context *recfg_ctx,
 			      struct mlo_link_recfg_state_tran *tran)
@@ -2483,6 +2615,11 @@ smd_st_prep_response_received(struct mlo_link_recfg_context *recfg_ctx,
 	bss_info = smd_find_first_accepted_link(recfg_ctx, tran);
 	if (bss_info)
 		smd_update_del_link_info(recfg_ctx, bss_info, tran);
+
+	/* Detect and store roaming topology based on accepted links in M2. */
+	smd_detect_roam_topology(recfg_ctx,
+				 recfg_ctx->num_src_active_links,
+				 smd_count_accepted_links(&tran->req.add_link_info));
 	/* Same PTK case, TODO add check for same ptk vs diff ptk */
 	smd_roam_store_key(recfg_ctx, &tran->req);
 
