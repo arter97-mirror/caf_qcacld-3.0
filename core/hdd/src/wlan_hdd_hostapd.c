@@ -876,6 +876,10 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 
 	hdd_set_mld_address(adapter, &mac_addr);
 
+	if (!qdf_atomic_test_bit(SOFTAP_ADD_INTF_LINK,
+				 adapter->deflink->link_flags))
+		qdf_copy_macaddr(&adapter->deflink->link_addr, &mac_addr);
+
 	/* Currently for SL-ML-SAP use same MAC for both MLD and link */
 	hdd_update_dynamic_mac(hdd_ctx, &adapter->mac_addr, &mac_addr);
 	ucfg_dp_update_intf_mac(hdd_ctx->psoc, &adapter->mac_addr, &mac_addr,
