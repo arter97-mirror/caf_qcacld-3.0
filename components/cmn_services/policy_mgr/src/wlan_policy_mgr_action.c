@@ -256,37 +256,58 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_get_sap_bw() - get current SAP bandwidth
  * @psoc: Pointer to psoc
+ * @get_max_bw: if true, return the maximum BW among all 6 GHz SAPs
+ * (downgrade check); if false, return the minimum BW (upgrade check).
  * @bw: Buffer to update the bandwidth
+ * @sel_vdev_id: Optional buffer to store the vdev_id of the selected SAP
+ * (max-BW SAP for downgrade, min-BW SAP for upgrade). May be NULL.
  *
- * Get the current SAP bandwidth. This API supports only single SAP
- * concurrencies and doesn't cover multi SAP(e.g. SAP+SAP).
+ * Get the operating bandwidth across all active 6 GHz SAP connections.
+ * Supports multi-SAP concurrencies including ML AP scenarios where each
+ * link vdev is a separate PM_SAP_MODE entry.
  *
  * return : QDF_STATUS
  */
 static QDF_STATUS
-policy_mgr_get_sap_bw(struct wlan_objmgr_psoc *psoc, enum phy_ch_width *bw)
+policy_mgr_get_sap_bw(struct wlan_objmgr_psoc *psoc, bool get_max_bw,
+		      enum phy_ch_width *bw, uint8_t *sel_vdev_id)
 {
 	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	uint32_t count, i;
 	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width sap_bw;
+	bool found = false;
 
-	if (policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
-						   &vdev_id_list[0],
-						   PM_SAP_MODE) != 1 ||
-	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(freq_list[0]))
-		return QDF_STATUS_E_NOSUPPORT;
+	count = policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
+						       &vdev_id_list[0],
+						       PM_SAP_MODE);
+	for (i = 0; i < count; i++) {
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(freq_list[i]))
+			continue;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id_list[0],
-						    WLAN_POLICY_MGR_ID);
-	if (!vdev) {
-		policy_mgr_err("vdev %d is NULL", vdev_id_list[0]);
-		return QDF_STATUS_E_INVAL;
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    vdev_id_list[i],
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev %d is NULL", vdev_id_list[i]);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		sap_bw = wlan_mlme_get_ap_oper_ch_width(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+		if (!found ||
+		    (get_max_bw && sap_bw > *bw) ||
+		    (!get_max_bw && sap_bw < *bw)) {
+			*bw = sap_bw;
+			if (sel_vdev_id)
+				*sel_vdev_id = vdev_id_list[i];
+			found = true;
+		}
 	}
 
-	*bw = wlan_mlme_get_ap_oper_ch_width(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-
-	return QDF_STATUS_SUCCESS;
+	return found ? QDF_STATUS_SUCCESS : QDF_STATUS_E_NOSUPPORT;
 }
 
 /**
@@ -311,6 +332,8 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 	enum phy_ch_width cur_bw, original_bw;
 	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	uint8_t sel_vdev_id = WLAN_INVALID_VDEV_ID;
+	uint32_t sap_cnt, sap_idx, i;
 	bool eht_capab = false;
 
 	/*
@@ -321,14 +344,28 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(wlan_psoc_mlme_get_11be_capab(psoc,
 							      &eht_capab)) ||
 	    !eht_capab ||
-	    QDF_IS_STATUS_ERROR(policy_mgr_get_sap_bw(psoc, &cur_bw)) ||
+	    QDF_IS_STATUS_ERROR(policy_mgr_get_sap_bw(psoc, !!ch_freq, &cur_bw,
+						      &sel_vdev_id)) ||
 	    cur_bw < CH_WIDTH_160MHZ)
 		return;
 
-	policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
-					       &vdev_id_list[0], PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
+							 &vdev_id_list[0],
+							 PM_SAP_MODE);
 
-	original_bw = policy_mgr_get_bw_by_session_id(psoc, vdev_id_list[0]);
+	/* Find the index matching the selected SAP (max-BW for downgrade,
+	 * min-BW for upgrade). Default to first entry if not found.
+	 */
+	sap_idx = 0;
+	for (i = 0; i < sap_cnt; i++) {
+		if (vdev_id_list[i] == sel_vdev_id) {
+			sap_idx = i;
+			break;
+		}
+	}
+
+	original_bw = policy_mgr_get_bw_by_session_id(psoc,
+						      vdev_id_list[sap_idx]);
 
 	if (cur_bw == CH_WIDTH_320MHZ && ch_freq &&
 	    policy_mgr_is_conn_lead_to_bw_downgrade(psoc, vdev_id, ch_freq,
@@ -337,8 +374,8 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 	else if (cur_bw == CH_WIDTH_160MHZ &&
 		 !ch_freq &&
 		 !policy_mgr_is_conn_lead_to_bw_downgrade(psoc,
-							  vdev_id_list[0],
-							  freq_list[0],
+							  vdev_id_list[sap_idx],
+							  freq_list[sap_idx],
 							  cur_bw) &&
 		 (reason &&
 		  (*reason == POLICY_MGR_UPDATE_REASON_TIMER_START ||
@@ -346,7 +383,8 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 		 original_bw == CH_WIDTH_320MHZ)
 		*next_action = PM_UPGRADE_BW;
 
-	policy_mgr_debug("cur_bw %d original bw %d next action %d reason %d",
+	policy_mgr_debug("vdev %d cur_bw %d original bw %d next action %d reason %d",
+			 vdev_id_list[sap_idx],
 			 cur_bw, original_bw, *next_action,
 			 reason ? (*reason) : 255);
 }
@@ -1298,8 +1336,9 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_stop_opportunistic_timer(psoc);
 		wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 		if (eht_capab &&
-		    QDF_IS_STATUS_SUCCESS(policy_mgr_get_sap_bw(psoc,
-								&cur_bw)) &&
+		    QDF_IS_STATUS_SUCCESS(policy_mgr_get_sap_bw(psoc, true,
+								&cur_bw,
+								NULL)) &&
 						cur_bw == CH_WIDTH_320MHZ &&
 		    !mlo_mgr_is_link_switch_in_progress(vdev))
 			check_sap_bw_downgrade = true;

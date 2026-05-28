@@ -5677,8 +5677,9 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint8_t sap_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum phy_ch_width target_bw;
-	uint32_t sap_cnt;
+	uint32_t sap_cnt, i;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5688,7 +5689,7 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_debug("action: %d reason: %d", next_action, reason);
 
-	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, sap_freq_list,
 							 sap_vdev_id,
 							 PM_SAP_MODE);
 	if (!sap_cnt) {
@@ -5701,14 +5702,22 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 	else
 		target_bw = CH_WIDTH_320MHZ;
 
-	status = pm_ctx->sme_cbacks.sme_sap_update_ch_width(psoc,
-							    sap_vdev_id[0],
-							    target_bw, reason,
-							    conc_vdev_id,
-							    request_id);
-	if (QDF_IS_STATUS_ERROR(status))
-		policy_mgr_err("vdev %d failed to set BW to %d",
-			       sap_vdev_id[0], target_bw);
+	for (i = 0; i < sap_cnt; i++) {
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_freq_list[i]))
+			continue;
+
+		if (policy_mgr_get_bw_by_session_id(psoc, sap_vdev_id[i]) !=
+		    CH_WIDTH_320MHZ)
+			continue;
+
+		status = pm_ctx->sme_cbacks.sme_sap_update_ch_width(
+						psoc, sap_vdev_id[i],
+						target_bw, reason,
+						conc_vdev_id, request_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			policy_mgr_err("vdev %d failed to set BW to %d",
+				       sap_vdev_id[i], target_bw);
+	}
 
 	return status;
 }
