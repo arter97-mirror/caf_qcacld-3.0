@@ -306,9 +306,11 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	ucfg_p2p_status_disconnect(vdev);
 	hdd_cfr_disconnect(vdev);
 
-	ucfg_cm_ft_reset(vdev);
-	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
-	hdd_clear_roam_profile_ie(adapter);
+	if (!is_link_switch) {
+		ucfg_cm_ft_reset(vdev);
+		ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
+		hdd_clear_roam_profile_ie(adapter);
+	}
 	wlan_hdd_reset_bcn_rssi_history_stats(link_info);
 
 	if (adapter->device_mode == QDF_STA_MODE)

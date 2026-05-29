@@ -1588,6 +1588,7 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 	int32_t ucast_cipher, akm;
 	uint32_t key_interval;
 	struct element_info *bcn_probe_rsp = &rsp->connect_ies.bcn_probe_rsp;
+	bool is_link_switch = rsp->cm_id & CM_ID_LSWITCH_BIT;
 
 	if (bcn_probe_rsp->ptr &&
 	    bcn_probe_rsp->len > sizeof(struct wlan_frame_hdr)) {
@@ -1597,9 +1598,11 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 				     bcn_probe_rsp->ptr +
 				     sizeof(struct wlan_frame_hdr));
 	}
+
 	akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
-	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
-	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY)) {
+	if (!is_link_switch &&
+	    (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
+	     QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))) {
 		mlme_debug("Update the MDID in PMK cache for FT-SAE case");
 		cm_update_pmk_cache_ft(psoc, vdev_id, NULL);
 	}
