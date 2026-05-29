@@ -93,6 +93,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_dnw_api.h"
 
+#ifdef WLAN_FEATURE_11AX
 enum phy_ch_width
 lim_get_he_max_ch_width(tDot11fIEhe_cap *he_cap, struct pe_session *session)
 {
@@ -218,6 +219,7 @@ lim_get_he_max_ch_width(tDot11fIEhe_cap *he_cap, struct pe_session *session)
 out:
 	return ap_max_ch_width;
 }
+#endif /* WLAN_FEATURE_11AX */
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
