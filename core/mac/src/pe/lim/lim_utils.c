@@ -12138,8 +12138,50 @@ QDF_STATUS lim_ap_mlme_vdev_rnr_notify(struct pe_session *session)
 	return status;
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * lim_mlo_sap_skip_peer_delete_on_csa() - Check if peer delete can be skipped
+ *                                         during CSA restart for MLO SAP
+ * @vdev_mlme: VDEV MLME comp object
+ * @session: PE session of the vdev being restarted
+ *
+ * For MLO SAP with MCST IE support, when the 5 GHz link switches to a new DFS
+ * channel (whether from UP state or DFS_CAC_WAIT state), the FW handles the
+ * channel change transparently and the 6 GHz link stays up with peers intact.
+ * No peer teardown is needed; skip it and advance the state machine directly.
+ *
+ * session->cac_duration_ms is used rather than mlme_get_cac_required() because
+ * the latter is consumed and cleared by ap_mlme_vdev_is_newchan_no_cac() (the
+ * EV_CSA_COMPLETE guard) before disconnect_peers is ever called.
+ * cac_duration_ms is set earlier in lim_process_sme_dfs_csa_ie_request() from
+ * the CSA IE request and remains valid throughout the CSA restart sequence.
+ *
+ * Return: true if peer delete should be skipped, false otherwise
+ */
+static bool
+lim_mlo_sap_skip_peer_delete_on_csa(struct vdev_mlme_obj *vdev_mlme,
+				    struct pe_session *session)
+{
+	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
+		return false;
+
+	if (!wlan_mlme_get_mlo_sap_mcst_ie_support(wlan_vdev_get_psoc(vdev_mlme->vdev)))
+		return false;
+
+	return !!session->cac_duration_ms;
+}
+#else
+static inline bool
+lim_mlo_sap_skip_peer_delete_on_csa(struct vdev_mlme_obj *vdev_mlme,
+				    struct pe_session *session)
+{
+	return false;
+}
+#endif
+
 QDF_STATUS lim_ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
-					     uint16_t data_len, void *data)
+					     uint16_t data_len, void *data,
+					     bool is_csa_restart)
 {
 	struct pe_session *session;
 	struct mac_context *mac_ctx;
@@ -12158,6 +12200,14 @@ QDF_STATUS lim_ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
 		}
 	} else {
 		session = (struct pe_session *)data;
+	}
+
+	if (is_csa_restart &&
+	    lim_mlo_sap_skip_peer_delete_on_csa(vdev_mlme, session)) {
+		pe_info("vdev %d: MLO SAP mcst ie CAC, skip del on CSA restart",
+			session->vdev_id);
+		lim_disconnect_complete(session, false);
+		return QDF_STATUS_SUCCESS;
 	}
 
 	lim_delete_all_peers(session);

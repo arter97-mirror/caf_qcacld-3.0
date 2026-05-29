@@ -3363,18 +3363,31 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 				    uint16_t data_len, void *data);
 
 /**
- * lim_ap_mlme_vdev_disconnect_peers - Disconnect peers
+ * lim_ap_mlme_vdev_disconnect_peers - Disconnect peers connected to AP vdev
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
+ * @is_csa_restart: true when called from the CSA restart path
+ *                  (WLAN_VDEV_SM_EV_SUSPEND_CSA_RESTART); false otherwise.
+ *                  When true and the MLO SAP MCST IE CAC feature is active,
+ *                  peer deletion is skipped if session->cac_duration_ms is
+ *                  non-zero (i.e. the new channel requires CAC).
+ *                  session->cac_duration_ms is used instead of
+ *                  mlme_get_cac_required() because the latter is consumed and
+ *                  cleared by ap_mlme_vdev_is_newchan_no_cac() before
+ *                  disconnect_peers is called.
  *
- * API trigger stations disconnection connected with AP
+ * Triggers disconnection of all stations associated with the AP.  For MLO SAP
+ * (WLAN_FEATURE_MULTI_LINK_SAP) during a CSA restart onto a channel that
+ * requires CAC, peer teardown is suppressed and the vdev state machine is
+ * advanced directly via lim_disconnect_complete().
  *
- * Return: SUCCESS on successful invocation of station disconnection
- *         FAILURE, if it fails due to any
+ * Return: QDF_STATUS_SUCCESS on successful invocation of station disconnection
+ *         QDF_STATUS_E_INVAL if the MAC context or session cannot be found
  */
 QDF_STATUS lim_ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
-					     uint16_t data_len, void *data);
+					     uint16_t data_len, void *data,
+					     bool is_csa_restart);
 
 /**
  * lim_ap_mlme_vdev_stop_send - Invokes VDEV stop operation

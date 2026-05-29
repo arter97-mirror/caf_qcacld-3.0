@@ -895,9 +895,11 @@ static QDF_STATUS ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
 						uint16_t data_len, void *data,
 						bool is_disconnect_legacy_only)
 {
-	mlme_legacy_debug("vdev id = %d ",
-			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
-	return lim_ap_mlme_vdev_disconnect_peers(vdev_mlme, data_len, data);
+	mlme_legacy_debug("vdev id = %d is_disconnect_legacy_only %d",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id,
+			  is_disconnect_legacy_only);
+	return lim_ap_mlme_vdev_disconnect_peers(vdev_mlme, data_len, data,
+						 is_disconnect_legacy_only);
 }
 
 /**
