@@ -729,8 +729,17 @@ static int cds_ol_rx_thread(void *arg)
 
 	struct sched_param scheduler_params = {0};
 
+#if 0
 	scheduler_params.sched_priority = 99;
 	sched_setscheduler(current, SCHED_FIFO, &scheduler_params);
+#endif
+	struct sched_attr attr = {
+		.size			= sizeof(struct sched_attr),
+		.sched_policy	= SCHED_FIFO,
+		.sched_priority = 1,
+	};
+	sched_setattr_nocheck(current, &attr);
+
 
 	qdf_set_wake_up_idle(true);
 
