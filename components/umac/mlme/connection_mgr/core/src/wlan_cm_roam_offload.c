@@ -7588,10 +7588,11 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 {
 	uint8_t i;
 	enum wlan_diag_wifi_band band = WLAN_INVALID_BAND;
+	unsigned long band_bitmap = bitmap;
 
 	for (i = WLAN_24GHZ_BAND; i <= WLAN_6GHZ_BAND; i++) {
 		/* 2.4 GHz band will be populated at 0th bit in the bitmap*/
-		if (qdf_test_bit((i - 1), (unsigned long *)&bitmap)) {
+		if (qdf_test_bit((i - 1), &band_bitmap)) {
 			band = i;
 			break;
 		}
