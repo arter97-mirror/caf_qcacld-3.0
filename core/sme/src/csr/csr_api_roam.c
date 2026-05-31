@@ -3272,6 +3272,75 @@ csr_roam_send_disconnect_done_indication(struct mac_context *mac_ctx,
 	qdf_mem_free(roam_info);
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/**
+ * csr_external_auth_callback() - Initiate external authentication via CSR
+ * @mac_ctx: MAC context
+ * @msg_ptr: pointer to external authentication message
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS csr_external_auth_callback(struct mac_context *mac_ctx,
+					     tSirSmeRsp *msg_ptr)
+{
+	struct wlan_external_auth_params *params;
+	uint32_t session_id;
+	struct external_auth_info *auth_info;
+	struct csr_roam_info *roam_info;
+
+	auth_info = (struct external_auth_info *)msg_ptr;
+	if (!auth_info) {
+		sme_err("EPPKE external auth info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sme_debug("vdev_id %d " QDF_MAC_ADDR_FMT,
+		  auth_info->vdev_id,
+		  QDF_MAC_ADDR_REF(auth_info->peer_mac_addr.bytes));
+
+	session_id = auth_info->vdev_id;
+	if (session_id == WLAN_UMAC_VDEV_ID_MAX ||
+	    session_id >= WLAN_MAX_VDEVS)
+		return QDF_STATUS_E_INVAL;
+
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (!roam_info)
+		return QDF_STATUS_E_FAILURE;
+
+	params = &roam_info->ext_auth_info;
+
+	qdf_mem_copy(params->ssid.ssid, auth_info->ssid.ssId,
+		     auth_info->ssid.length);
+	params->ssid.length = auth_info->ssid.length;
+
+	params->bssid = auth_info->peer_mac_addr;
+	params->mld_addr = auth_info->peer_mld_addr;
+	params->auth_algo = auth_info->auth_algo;
+	params->akm = auth_info->akm;
+	params->pairwise_cipher = auth_info->pairwise_cipher;
+	params->group_cipher = auth_info->group_cipher;
+	params->group_mgmt_cipher = auth_info->group_mgmt_cipher;
+	params->rsn_capab = auth_info->rsn_capab;
+
+	params->rsnxe_len = auth_info->rsnxe_len;
+	qdf_mem_copy(params->rsnxe_data, auth_info->rsnxe_data,
+		     params->rsnxe_len);
+
+	csr_roam_call_callback(mac_ctx, session_id, roam_info,
+			       eCSR_ROAM_EXTERNAL_AUTH_REQUEST,
+			       eCSR_ROAM_RESULT_NONE);
+	qdf_mem_free(roam_info);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+csr_external_auth_callback(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * csr_roaming_state_msg_processor() - process roaming messages
  * @mac:       mac global context
@@ -3315,7 +3384,11 @@ void csr_roaming_state_msg_processor(struct mac_context *mac, void *msg_buf)
 		sme_debug("Invoke SAE callback");
 		csr_sae_callback(mac, pSmeRsp);
 		break;
-
+	case WNI_SME_TRIGGER_EXTERNAL_AUTH:
+		sme_debug("vdev:%d Trigger external authentication",
+			  pSmeRsp->vdev_id);
+		csr_external_auth_callback(mac, pSmeRsp);
+		break;
 	case eWNI_SME_SETCONTEXT_RSP:
 		csr_roam_check_for_link_status_change(mac, pSmeRsp);
 		break;

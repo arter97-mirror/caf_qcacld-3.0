@@ -16295,6 +16295,121 @@ error:
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+QDF_STATUS
+sme_process_external_authentication_status(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   struct wlan_external_auth_params *ext_auth_info)
+{
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct sir_sae_msg *eppke_msg;
+	struct scheduler_msg sch_msg = {0};
+	struct wmi_roam_auth_status_params *params;
+	struct csr_roam_session *csr_session;
+	enum QDF_OPMODE opmode;
+
+	qdf_status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
+	csr_session = CSR_GET_SESSION(mac, vdev_id);
+	if (!csr_session) {
+		sme_err("session %d not found", vdev_id);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto error;
+	}
+
+	/*
+	 * Update the status to SME in below cases:
+	 * 1. SAP mode: Always
+	 * 2. STA mode: When the device is not in joined state
+	 *    If the device is in joined state, send the status to WMA which
+	 *    is meant for roaming.
+	 */
+	opmode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
+	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE ||
+	    !CSR_IS_ROAM_JOINED(mac, vdev_id)) {
+		eppke_msg = qdf_mem_malloc(sizeof(*eppke_msg));
+		if (!eppke_msg) {
+			qdf_status = QDF_STATUS_E_NOMEM;
+			goto error;
+		}
+
+		eppke_msg->message_type = WNI_SME_EXTERNAL_AUTH_STATUS_MSG;
+		eppke_msg->length = sizeof(*eppke_msg);
+		eppke_msg->vdev_id = vdev_id;
+		eppke_msg->sae_status = ext_auth_info->status_code;
+		eppke_msg->result_code = (ext_auth_info->status_code == 0) ?
+				       eSIR_SME_SUCCESS : eSIR_SME_AUTH_REFUSED;
+
+		qdf_copy_macaddr((struct qdf_mac_addr *)eppke_msg->peer_mac_addr,
+				 &ext_auth_info->bssid);
+
+		qdf_mem_zero(eppke_msg->pmkid, PMKID_LEN);
+		qdf_mem_copy(eppke_msg->pmkid, ext_auth_info->pmkid, PMKID_LEN);
+
+		sme_debug("EPPKE: vdev_id %d external_auth_status %d Peer: "
+			  QDF_MAC_ADDR_FMT, eppke_msg->vdev_id,
+			  eppke_msg->sae_status,
+			  QDF_MAC_ADDR_REF(eppke_msg->peer_mac_addr));
+
+		sch_msg.type = WNI_SME_EXTERNAL_AUTH_STATUS_MSG;
+		sch_msg.bodyptr = eppke_msg;
+
+		qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+						    QDF_MODULE_ID_PE,
+						    QDF_MODULE_ID_PE,
+						    &sch_msg);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			qdf_mem_free(eppke_msg);
+			goto error;
+		}
+	} else {
+		/*
+		 * For EPPKE roaming, external auth offload is enabled. The
+		 * firmware will send preauth start event after candidate
+		 * selection. The supplicant will perform the EPPKE
+		 * authentication and will send the auth status, PMKID in the
+		 * external auth cmd.
+		 *
+		 * csr roam state is CSR_ROAM_STATE_JOINED. So this EPPKE
+		 * external auth event is for wpa3 roam pre-auth offload.
+		 *
+		 * Post the preauth status to WMA.
+		 */
+		params = qdf_mem_malloc(sizeof(*params));
+		if (!params) {
+			qdf_status = QDF_STATUS_E_NOMEM;
+			goto error;
+		}
+
+		params->vdev_id = vdev_id;
+		params->preauth_status = ext_auth_info->status_code;
+		qdf_copy_macaddr(&params->bssid, &ext_auth_info->bssid);
+
+		qdf_mem_zero(params->pmkid, PMKID_LEN);
+		qdf_mem_copy(params->pmkid, ext_auth_info->pmkid, PMKID_LEN);
+
+		sch_msg.type = WMA_ROAM_PRE_AUTH_STATUS;
+		sch_msg.bodyptr = params;
+
+		qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+						    QDF_MODULE_ID_WMA,
+						    QDF_MODULE_ID_WMA,
+						    &sch_msg);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			sme_err("WMA_ROAM_PRE_AUTH_STATUS cmd posting failed");
+			qdf_mem_free(params);
+		}
+	}
+error:
+	sme_release_global_lock(&mac->sme);
+
+	return qdf_status;
+}
+#endif
+
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 QDF_STATUS sme_handle_fils_hlp_msg(mac_handle_t mac_handle,
 				   uint8_t vdev_id,

@@ -820,6 +820,22 @@ QDF_STATUS lim_initiate_external_auth_req(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("Failed to fetch peer mld address");
 
+	if (session->lim_join_req) {
+		uint8_t *rsnxe_ie;
+
+		rsnxe_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(
+				WLAN_ELEMID_RSNXE,
+				session->lim_join_req->addIEAssoc.addIEdata,
+				session->lim_join_req->addIEAssoc.length);
+		if (rsnxe_ie) {
+			ext_auth->rsnxe_len = rsnxe_ie[1] +
+					      SIR_MAC_IE_TYPE_LEN_SIZE;
+			qdf_mem_copy(ext_auth->rsnxe_data, rsnxe_ie,
+				     ext_auth->rsnxe_len);
+			pe_debug("RSNXE len:%d", ext_auth->rsnxe_len);
+		}
+	}
+
 	pe_debug("vdev_id %d ssid " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " akm:0x%x algo:%d pairwise:0x%x grp:0x%x grp_mgmt:0x%x",
 		 ext_auth->vdev_id,
 		 QDF_SSID_REF(ext_auth->ssid.length, ext_auth->ssid.ssId),

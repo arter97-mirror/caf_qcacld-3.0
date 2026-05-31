@@ -3487,6 +3487,20 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/**
+ * sme_process_external_authentication_status() - Process external
+ * authentication status from upper layers
+ * @mac_handle: MAC handle
+ * @vdev_id: vdev_id
+ * @params: External authentication parameters
+ */
+QDF_STATUS
+sme_process_external_authentication_status(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   struct wlan_external_auth_params *params);
+#endif
+
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 /**
  * sme_handle_fils_hlp_msg() - Sends HLP message received from data path
