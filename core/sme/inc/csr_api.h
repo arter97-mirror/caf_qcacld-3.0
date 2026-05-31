@@ -544,7 +544,7 @@ struct csr_roam_info {
 	uint32_t rx_mc_bc_cnt;
 	uint32_t rx_retry_cnt;
 #ifdef WLAN_FEATURE_SAE
-	struct sir_sae_info *sae_info;
+	struct external_auth_info *sae_info;
 #endif
 	struct assoc_ind *owe_pending_assoc_ind;
 	struct assoc_ind *ft_pending_assoc_ind;

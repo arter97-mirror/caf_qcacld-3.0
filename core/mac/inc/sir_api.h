@@ -4923,21 +4923,37 @@ struct sir_roam_scan_stats {
 };
 
 /**
- * struct sae_info - SAE info used for commit/confirm messages
+ * struct external_auth_info - SAE info used for commit/confirm messages
  * @msg_type: Message type
  * @msg_len: length of message
  * @vdev_id: vdev id
  * @peer_mac_addr: peer MAC address
+ * @peer_mld_addr: MLD address of the peer
  * @ssid: SSID
+ * @auth_algo: authentication algorithm used
  * @akm: key mgmt suite used
+ * @pairwise_cipher: pairwise cipher used
+ * @group_cipher: group cipher used
+ * @group_mgmt_cipher: group management cipher used
+ * @rsn_capab: RSN capabilities
+ * @rsnxe_len: length of RSNXE data
+ * @rsnxe_data: RSNXE data payload
  */
-struct sir_sae_info {
+struct external_auth_info {
 	uint16_t msg_type;
 	uint16_t msg_len;
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_mac_addr;
+	struct qdf_mac_addr peer_mld_addr;
 	tSirMacSSid ssid;
+	uint8_t  auth_algo;
 	uint32_t akm;
+	uint32_t pairwise_cipher;
+	uint32_t group_cipher;
+	uint32_t group_mgmt_cipher;
+	uint16_t rsn_capab;
+	uint8_t rsnxe_len;
+	uint8_t rsnxe_data[WLAN_MAX_IE_LEN + 2];
 };
 
 /**

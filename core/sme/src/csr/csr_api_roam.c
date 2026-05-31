@@ -112,9 +112,9 @@ static QDF_STATUS csr_sae_callback(struct mac_context *mac_ctx,
 {
 	struct csr_roam_info *roam_info;
 	uint32_t session_id;
-	struct sir_sae_info *sae_info;
+	struct external_auth_info *sae_info;
 
-	sae_info = (struct sir_sae_info *) msg_ptr;
+	sae_info = (struct external_auth_info *)msg_ptr;
 	if (!sae_info) {
 		sme_err("SAE info is NULL");
 		return QDF_STATUS_E_FAILURE;
@@ -8032,7 +8032,7 @@ csr_process_roam_auth_sae_callback(struct mac_context *mac_ctx,
 				   uint32_t akm)
 {
 	struct csr_roam_info *roam_info;
-	struct sir_sae_info sae_info;
+	struct external_auth_info sae_info;
 	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
 	if (!session) {

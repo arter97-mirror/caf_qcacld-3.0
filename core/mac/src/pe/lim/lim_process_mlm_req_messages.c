@@ -688,7 +688,7 @@ QDF_STATUS lim_trigger_auth_req_sae(struct mac_context *mac_ctx,
 				    struct qdf_mac_addr *peer_bssid)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	struct sir_sae_info *sae_info;
+	struct external_auth_info *sae_info;
 	struct scheduler_msg msg = {0};
 	uint32_t keymgmt;
 
@@ -983,25 +983,24 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 	}
 
 	if ((mac_ctx->lim.gpLimMlmAuthReq->authType == eSIR_AUTH_TYPE_SAE) &&
-	     !session->sae_pmk_cached) {
+	    !session->sae_pmk_cached) {
 		if (lim_process_mlm_auth_req_sae(mac_ctx, session) !=
-					QDF_STATUS_SUCCESS) {
+		    QDF_STATUS_SUCCESS) {
 			mlm_auth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			qdf_mem_free(auth_frame_body);
 			goto end;
-		} else {
-			pe_debug("lim_process_mlm_auth_req_sae is successful");
-			auth_frame_body->authAlgoNumber = eSIR_AUTH_TYPE_SAE;
-			auth_frame_body->authTransactionSeqNumber =
-							SIR_MAC_AUTH_FRAME_1;
-			auth_frame_body->authStatusCode = 0;
-			host_log_wlan_auth_info(auth_frame_body->authAlgoNumber,
-				auth_frame_body->authTransactionSeqNumber,
-				auth_frame_body->authStatusCode);
-
-			qdf_mem_free(auth_frame_body);
-			return;
 		}
+		pe_debug("lim_process_mlm_auth_req_sae is successful");
+		auth_frame_body->authAlgoNumber = eSIR_AUTH_TYPE_SAE;
+		auth_frame_body->authTransactionSeqNumber =
+						SIR_MAC_AUTH_FRAME_1;
+		auth_frame_body->authStatusCode = 0;
+		host_log_wlan_auth_info(auth_frame_body->authAlgoNumber,
+					auth_frame_body->authTransactionSeqNumber,
+					auth_frame_body->authStatusCode);
+
+		qdf_mem_free(auth_frame_body);
+		return;
 	} else if (mac_ctx->lim.gpLimMlmAuthReq->authType ==
 		   eSIR_AUTH_TYPE_EPPKE ||
 		   mac_ctx->lim.gpLimMlmAuthReq->authType ==
@@ -1010,14 +1009,14 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 
 		status = lim_process_mlm_external_auth_req(mac_ctx, session);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("vdev:%d EDPKE External Authentication request failed",
+			pe_err("vdev:%d EPPKE External Authentication request failed",
 			       session->vdev_id);
 			mlm_auth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			qdf_mem_free(auth_frame_body);
 			goto end;
 		}
 
-		pe_debug("vdev:%d EDPKE External Authentication request is successful",
+		pe_debug("vdev:%d EPPKE External Authentication request is successful",
 			 session->vdev_id);
 		auth_frame_body->authAlgoNumber =
 				mac_ctx->lim.gpLimMlmAuthReq->authType;
@@ -1035,11 +1034,11 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 	session->limMlmState = eLIM_MLM_WT_AUTH_FRAME2_STATE;
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
-		       session->limMlmState));
+			 session->limMlmState));
 
 	/* Mark auth algo as open when auth type is SAE and PMK is cached */
 	if ((mac_ctx->lim.gpLimMlmAuthReq->authType == eSIR_AUTH_TYPE_SAE) &&
-	   session->sae_pmk_cached) {
+	    session->sae_pmk_cached) {
 		auth_frame_body->authAlgoNumber = eSIR_OPEN_SYSTEM;
 	} else {
 		auth_frame_body->authAlgoNumber =

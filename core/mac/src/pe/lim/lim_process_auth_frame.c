@@ -497,7 +497,7 @@ void lim_sae_auth_cleanup_retry(struct mac_context *mac_ctx,
 #define SAE_AUTH_SEQ_OFFSET 1
 
 /**
- * lim_is_sae_auth_algo_match()- Match SAE auth seq in queued SAE auth and
+ * lim_is_external_auth_algo_match()- Match SAE auth seq in queued SAE auth and
  * SAE auth rx frame
  * @queued_frame: Pointer to queued SAE auth retry frame
  * @q_len: length of queued sae auth retry frame
@@ -505,8 +505,9 @@ void lim_sae_auth_cleanup_retry(struct mac_context *mac_ctx,
  *
  * Return: True if SAE auth seq is matched else false
  */
-static bool lim_is_sae_auth_algo_match(uint8_t *queued_frame, uint16_t q_len,
-				       uint8_t *rx_pkt_info)
+static bool
+lim_is_external_auth_algo_match(uint8_t *queued_frame, uint16_t q_len,
+				uint8_t *rx_pkt_info)
 {
 	tpSirMacMgmtHdr qmac_hdr = (tpSirMacMgmtHdr)queued_frame;
 	uint16_t *rxbody_ptr, *qbody_ptr, rxframe_len, min_len;
@@ -897,9 +898,9 @@ lim_process_sae_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	sae_retry = mlme_get_sae_auth_retry(pe_session->vdev);
 	if (LIM_IS_STA_ROLE(pe_session) && sae_retry &&
 	    sae_retry->sae_auth.ptr) {
-		if (lim_is_sae_auth_algo_match(sae_retry->sae_auth.ptr,
-					       sae_retry->sae_auth.len,
-					       rx_pkt_info))
+		if (lim_is_external_auth_algo_match(sae_retry->sae_auth.ptr,
+						    sae_retry->sae_auth.len,
+						    rx_pkt_info))
 			lim_sae_auth_cleanup_retry(mac_ctx,
 						   pe_session->vdev_id);
 	}
@@ -2280,8 +2281,8 @@ free:
 }
 
 /**
- * lim_process_sae_preauth_frame() - Send the WPA3 preauth SAE frame received
- * to the user space.
+ * lim_process_external_preauth_frame() - Send the WPA3 preauth SAE frame
+ * received to the user space.
  * @mac: Global mac context
  * @rx_pkt: Received auth packet
  *
@@ -2290,8 +2291,8 @@ free:
  *
  * Return: True if auth algo is SAE else false
  */
-static
-bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
+static bool
+lim_process_external_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 {
 	tpSirMacMgmtHdr dot11_hdr;
 	tSirMacMgmtHdr original_hdr;
@@ -2473,7 +2474,7 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 	tSirMacAuthFrameBody *rx_auth_frame;
 	QDF_STATUS ret_status = QDF_STATUS_E_FAILURE;
 	int i;
-	bool sae_auth_frame;
+	bool external_auth_frame;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(pBd);
 	pBody = WMA_GET_RX_MPDU_DATA(pBd);
@@ -2505,8 +2506,8 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 			pe_session = &mac->lim.gpSession[i];
 	}
 
-	sae_auth_frame = lim_process_sae_preauth_frame(mac, pBd);
-	if (sae_auth_frame) {
+	external_auth_frame = lim_process_external_preauth_frame(mac, pBd);
+	if (external_auth_frame) {
 		lim_process_ft_sae_auth_frame(mac, pe_session, pBody, frameLen);
 		return QDF_STATUS_SUCCESS;
 	}

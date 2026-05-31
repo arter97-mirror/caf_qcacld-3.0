@@ -393,7 +393,7 @@ static void wlan_hdd_sae_callback(struct wlan_hdd_link_info *link_info,
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	int flags;
-	struct sir_sae_info *sae_info = roam_info->sae_info;
+	struct external_auth_info *sae_info = roam_info->sae_info;
 	struct cfg80211_external_auth_params params = {0};
 	QDF_STATUS status;
 
