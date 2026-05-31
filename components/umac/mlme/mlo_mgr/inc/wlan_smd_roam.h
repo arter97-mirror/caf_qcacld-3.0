@@ -15,6 +15,8 @@
 #include <wlan_cm_roam_public_struct.h>
 #include <../../core/src/wlan_cm_roam_i.h>
 #include <wlan_mlo_link_recfg.h>
+#include <wlan_serialization_api.h>
+#include <wlan_cm_api.h>
 
 #ifdef WLAN_FEATURE_11BN_SMD
 
@@ -379,6 +381,46 @@ QDF_STATUS
 wlan_smd_roam_sync_status(QDF_STATUS status);
 
 /**
+ * smd_roam_update_standby_links() - Update standby link table post roam.
+ * @vdev: New assoc vdev
+ *
+ * Removes old AP standby link entries and registers new AP MLD standby links.
+ * Updates wlan_connected_links bitmask. Called ALWAYS (even on abort) so stale
+ * entries do not block subsequent link switches or T2LM operations.
+ */
+void smd_roam_update_standby_links(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * smd_roam_update_deflink() - Update adapter->deflink to new assoc vdev.
+ * @vdev: New assoc vdev receiving EV_SMD_EXEC_COMPLETE
+ *
+ * Fixes the known cross-vdev roaming deflink bug. Called ALWAYS (even on
+ * abort) because the new AP connection is active even if cleanup failed.
+ */
+void smd_roam_update_deflink(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * smd_abort_roam_sync() - Abort SMD roaming when DISCONNECT arrives.
+ * @vdev: vdev in CONNECTED/SMD_ROAM_SYNC
+ *
+ * Called on T6 (EV_DISCONNECT_REQ in SMD_ROAM_SYNC). Cancels any pending
+ * SMD operations and attempts reconnect to old AP if possible.
+ */
+void smd_abort_roam_sync(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * smd_abort_link_recfg() - Clean up SMD state when Link Recfg SM aborts.
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * Called from the Link Recfg SM S_ABORT handler when a disconnect arrives
+ * while the SM is in SS_WAIT_SMD_EXEC (ST Prep complete, waiting for FW ST
+ * Exec). Clears smd_roam_in_progress and st_exec_in_progress, and frees
+ * cached_sync_ind so the host does not send a stale WMI_ROAM_SYNCH_COMPLETE
+ * if the FW roam sync event still arrives after abort.
+ */
+void smd_abort_link_recfg(struct mlo_link_recfg_context *recfg_ctx);
+
+/**
  * smd_trigger_link_recfg_sm() - Trigger Link Recfg SM after CM lock release
  * @vdev: Assoc vdev pointer
  *
@@ -481,10 +523,27 @@ smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS
 smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_serialization_command *cmd);
+
+/**
+ * smd_roam_skip_rso() - Check if RSO command should be skipped due to SMD
+ * @vdev: vdev pointer
+ *
+ * Returns true if SMD roam sync is in progress and RSO commands must be
+ * suppressed to prevent FW from retrying roam during old-link cleanup.
+ *
+ * Return: true if RSO should be skipped, false otherwise
+ */
+bool smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev);
 #else
 static inline void
 smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
 {
+}
+
+static inline bool
+smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
 }
 static inline QDF_STATUS
 smd_roam_link_recfg_set_tx_link_addr(
@@ -494,6 +553,26 @@ smd_roam_link_recfg_set_tx_link_addr(
 			uint32_t candidate_link_set)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+smd_roam_update_standby_links(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+smd_roam_update_deflink(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+smd_abort_roam_sync(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+smd_abort_link_recfg(struct mlo_link_recfg_context *recfg_ctx)
+{
 }
 
 static inline QDF_STATUS

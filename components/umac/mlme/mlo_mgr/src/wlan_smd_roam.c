@@ -1652,6 +1652,8 @@ smd_update_del_link_info(
 	struct wlan_objmgr_psoc *psoc = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_link_info *link_info = NULL;
+	struct wlan_mlo_link_recfg_bss_info matched_link;
+	uint8_t i;
 
 	if (!bss_info || !tran || !recfg_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -1677,26 +1679,38 @@ smd_update_del_link_info(
 		goto end;
 	}
 
-	if (bss_info->vdev_id != tran->req.del_link_info.link[0].vdev_id) {
-		link_info = smd_find_current_ap_link_info(vdev, bss_info->vdev_id);
+	for (i = 0; i < tran->req.del_link_info.num_links &&
+	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (tran->req.del_link_info.link[i].vdev_id != bss_info->vdev_id)
+			continue;
 
-		if (!link_info) {
-			mlo_err("Link info not found");
-			status = QDF_STATUS_E_INVAL;
-			goto end;
-		}
-
+		matched_link = tran->req.del_link_info.link[i];
 		qdf_mem_zero(&tran->req.del_link_info,
 			     sizeof(struct wlan_mlo_link_recfg_info));
-		// update del link info
-		tran->req.del_link_info.link[0].vdev_id = link_info->vdev_id;
-		qdf_copy_macaddr(&tran->req.del_link_info.link[0].self_link_addr,
-				 &link_info->link_addr);
-		qdf_copy_macaddr(&tran->req.del_link_info.link[0].ap_link_addr,
-				 &link_info->ap_link_addr);
+		tran->req.del_link_info.link[0] = matched_link;
 		tran->req.del_link_info.num_links = 1;
-		mlo_debug("Update del Link info vdev id %d", link_info->vdev_id);
+		mlo_debug("Update del link info vdev id %d at index %d",
+			  matched_link.vdev_id, i);
+		goto end;
 	}
+
+	/* No match found in del_link_info — fall back to current AP link lookup */
+	link_info = smd_find_current_ap_link_info(vdev, bss_info->vdev_id);
+	if (!link_info) {
+		mlo_err("Link info not found for vdev_id %d", bss_info->vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	qdf_mem_zero(&tran->req.del_link_info,
+		     sizeof(struct wlan_mlo_link_recfg_info));
+	tran->req.del_link_info.link[0].vdev_id = link_info->vdev_id;
+	qdf_copy_macaddr(&tran->req.del_link_info.link[0].self_link_addr,
+			 &link_info->link_addr);
+	qdf_copy_macaddr(&tran->req.del_link_info.link[0].ap_link_addr,
+			 &link_info->ap_link_addr);
+	tran->req.del_link_info.num_links = 1;
+	mlo_debug("Update del link info vdev id %d (fallback)", link_info->vdev_id);
 
 end:
 	if (vdev)
@@ -1984,7 +1998,6 @@ smd_send_roam_start_status_cmd(struct mlo_link_recfg_context *recfg_ctx,
 	return status;
 }
 
-QDF_STATUS
 /**
  * smd_cleanup_target_bss_ctx() - Free all prepared target BSS contexts in
  *                                 smd_ctx and reset the prepared target state.
@@ -2026,6 +2039,8 @@ smd_cleanup_target_bss_ctx(struct mlo_link_recfg_context *recfg_ctx)
 	smd_ctx->st_prep_in_progress = false;
 	smd_ctx->st_exec_in_progress = false;
 }
+
+QDF_STATUS
 smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 			   struct mlo_link_recfg_state_req *req)
 {
@@ -2513,16 +2528,82 @@ bool smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
 	return true;
 }
 
+/**
+ * smd_find_new_assoc_vdev() - Find the vdev to receive EV_SMD_EXEC_COMPLETE.
+ * @mlo_dev_ctx: MLO device context
+ * @recfg_ctx: link reconfig context
+ * @psoc: psoc pointer
+ *
+ * CASE 1 (ML→ML / SL→ML / ML→SL):
+ *   curr_recfg_req.vdev_id reconnected as assoc vdev and entered
+ *   CONNECTED/SMD_ROAM_SYNC via T4. Return it directly.
+ *
+ * CASE 2 (SL→SL):
+ *   curr_recfg_req.vdev_id is in INIT (disconnected, cleaned up).
+ *   The new assoc vdev is the OTHER vdev — it entered CONNECTED/SMD_ROAM_SYNC
+ *   at T4 during Phase 3 (idle-vdev direct connect with set_mlo_vdev only).
+ *   Search all MLD vdevs for one in CONNECTED/SMD_ROAM_SYNC.
+ *
+ * Return: vdev pointer (caller must release ref), NULL if not found.
+ */
+static struct wlan_objmgr_vdev *
+smd_find_new_assoc_vdev(struct wlan_mlo_dev_context *mlo_dev_ctx,
+			struct mlo_link_recfg_context *recfg_ctx,
+			struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *exec_vdev, *vdev;
+	uint8_t exec_vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
+	struct mlo_link_info *link_info;
+	uint8_t i;
+
+	exec_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, exec_vdev_id,
+							 WLAN_MLO_MGR_ID);
+
+	/* CASE 1: exec vdev is already in CONNECTED/SMD_ROAM_SYNC (ML→ML) */
+	if (exec_vdev && cm_is_vdev_smd_roam_sync_in_progress(exec_vdev))
+		return exec_vdev;
+
+	if (exec_vdev)
+		wlan_objmgr_vdev_release_ref(exec_vdev, WLAN_MLO_MGR_ID);
+
+	/* CASE 2: SL→SL — search for the other vdev in SMD_ROAM_SYNC */
+	if (!mlo_dev_ctx->sta_ctx)
+		return NULL;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+
+		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID ||
+		    link_info->vdev_id == exec_vdev_id)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    link_info->vdev_id,
+							    WLAN_MLO_MGR_ID);
+		if (!vdev)
+			continue;
+
+		if (cm_is_vdev_smd_roam_sync_in_progress(vdev))
+			return vdev;
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+	}
+
+	mlo_debug("SMD: could not find assoc vdev in SMD_ROAM_SYNC");
+	return NULL;
+}
+
 QDF_STATUS
 smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 			struct mlo_link_recfg_context *recfg_ctx)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *target_vdev;
 	struct roam_offload_synch_ind *sync_ind;
 	uint32_t sync_ind_len;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_roam_synch_complete_params sync_params = {};
+	struct smd_context *smd_ctx;
 	uint8_t i;
 
 	if (!recfg_ctx) {
@@ -2534,14 +2615,6 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	if (!mlo_dev_ctx) {
 		mlo_err("SMD: mlo_dev_ctx is NULL");
 		return QDF_STATUS_E_INVAL;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-				psoc, recfg_ctx->curr_recfg_req.vdev_id,
-				WLAN_MLO_MGR_ID);
-	if (!vdev) {
-		mlo_err("link vdev is null");
-		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	sync_ind = recfg_ctx->cached_sync_ind;
@@ -2575,22 +2648,39 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 			}
 		}
 	}
-	wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, &sync_params);
-	/* mlrc_sm_lock may be held by caller; assoc CM lock is NOT held.
-	 * cm_sm_deliver_event acquires assoc CM lock internally — safe.
-	 * Caller (smd_link_recfg_complete) frees cached_sync_ind after return.
+
+	/* Clear prepared_targets now that exec is complete */
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (smd_ctx) {
+		smd_ctx->prepared_targets[smd_ctx->active_target_idx].prepared = false;
+		smd_ctx->prepared_targets[smd_ctx->active_target_idx].target_bss_ctx = NULL;
+	}
+
+	/*
+	 * Deliver EV_SMD_EXEC_COMPLETE with sync_params as event data.
+	 * sync_params carries the fully populated vdev_repurpose_resp[] built
+	 * above. The CM handler casts data to
+	 * struct wlan_roam_synch_complete_params * and calls
+	 * wlan_cm_tgt_send_roam_sync_complete_cmd() — delivery is synchronous
+	 * so the stack pointer remains valid for the entire handler execution.
 	 */
-	status = cm_sm_deliver_event(vdev,
-				     WLAN_CM_SM_EV_ROAM_DONE,
-				     sync_ind_len, sync_ind);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlo_err("SMD: ROAM_DONE delivery failed: %d", status);
+	target_vdev = smd_find_new_assoc_vdev(mlo_dev_ctx, recfg_ctx, psoc);
+	if (!target_vdev) {
+		mlo_err("SMD: no assoc vdev in SMD_ROAM_SYNC for exec complete");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlo_debug("SMD: delivering EV_SMD_EXEC_COMPLETE to vdev %d",
+		  wlan_vdev_get_id(target_vdev));
+
+	status = cm_sm_deliver_event(target_vdev,
+				     WLAN_CM_SM_EV_SMD_EXEC_COMPLETE,
+				     sizeof(sync_params), &sync_params);
 
 	if (QDF_IS_STATUS_ERROR(status))
-		mlo_err("CM ROAM Done evt failure");
+		mlo_err("CM SMD Exec complete evt delivery failed");
 
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-
+	wlan_objmgr_vdev_release_ref(target_vdev, WLAN_MLO_MGR_ID);
 	return status;
 }
 
@@ -2604,6 +2694,94 @@ QDF_STATUS wlan_smd_roam_sync_status(QDF_STATUS status)
 	if (status == QDF_STATUS_E_PENDING)
 		return QDF_STATUS_SUCCESS;
 	return status;
+}
+
+/**
+ * smd_roam_update_standby_links() - Update standby link table after SMD roam.
+ * @vdev: New assoc vdev
+ *
+ * TODO: Implement:
+ *   - mlo_sta_remove_standby_links(mlo_dev_ctx, old_ap_mld_addr)
+ *   - Register new AP's non-connected links as standby
+ *   - Update wlan_connected_links bitmask
+ */
+void smd_roam_update_standby_links(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev)
+		return;
+
+	mlo_debug("SMD: update standby links for vdev %d (TODO: full impl)",
+		  wlan_vdev_get_id(vdev));
+
+	/* TODO: full standby link table update */
+}
+
+/**
+ * smd_roam_update_deflink() - Fix adapter->deflink after cross-vdev roam.
+ * @vdev: New assoc vdev receiving EV_SMD_EXEC_COMPLETE
+ *
+ * TODO: Call the OSIF layer to update adapter->deflink to point to @vdev.
+ * Known bug: after cross-vdev SMD roam, deflink still points to old vdev,
+ * causing all cfg80211/ioctls to operate on wrong vdev.
+ */
+void smd_roam_update_deflink(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev)
+		return;
+
+	mlo_debug("SMD: update deflink to vdev %d (TODO: osif call)",
+		  wlan_vdev_get_id(vdev));
+
+	/* TODO: osif_update_deflink(vdev) or equivalent */
+}
+
+/**
+ * smd_abort_roam_sync() - Abort SMD roaming on DISCONNECT_REQ.
+ * @vdev: vdev in CONNECTED/SMD_ROAM_SYNC
+ *
+ * Called on T6 before transitioning to DISCONNECTING. Cancels pending
+ * SMD operations. The disconnect flow handles actual peer teardown.
+ */
+void smd_abort_roam_sync(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_recfg_context *recfg_ctx;
+
+	if (!vdev)
+		return;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
+		return;
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	recfg_ctx->smd_roam_in_progress = false;
+	recfg_ctx->st_exec_in_progress = false;
+	smd_free_cached_sync_ind(recfg_ctx);
+
+	mlo_debug("SMD: roam aborted for vdev %d", wlan_vdev_get_id(vdev));
+}
+
+void smd_abort_link_recfg(struct mlo_link_recfg_context *recfg_ctx)
+{
+	if (!recfg_ctx)
+		return;
+
+	/*
+	 * Free cached_sync_ind before transitioning to ABORT so that a stale
+	 * WMI_ROAM_SYNCH_COMPLETE is not sent if the FW roam sync event still
+	 * arrives after this point.
+	 *
+	 * Do NOT clear smd_roam_in_progress here. The flag must remain set so
+	 * that S_ABORT/EV_COMPLETED routes to smd_link_recfg_complete(false),
+	 * which clears smd_roam_in_progress and st_exec_in_progress atomically
+	 * as part of the normal abort completion path.
+	 * smd_free_cached_sync_ind() is idempotent (NULL-checks the pointer),
+	 * so the second call inside smd_link_recfg_complete(false) is safe.
+	 */
+	smd_free_cached_sync_ind(recfg_ctx);
+
+	mlo_debug("SMD: link recfg aborted, cached_sync_ind freed");
 }
 
 uint32_t
@@ -2904,5 +3082,10 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 		mlo_err("VDEV %d disconnect request not handled", req->vdev_id);
 
 	return status;
+}
+
+bool smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev)
+{
+	return cm_is_vdev_smd_roam_sync_in_progress(vdev);
 }
 #endif /* WLAN_FEATURE_11BN_SMD */

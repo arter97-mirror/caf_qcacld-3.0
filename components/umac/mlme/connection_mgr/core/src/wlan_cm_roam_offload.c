@@ -55,6 +55,7 @@
 #include "wlan_cm_public_struct.h"
 #include "wlan_policy_mgr_i.h"
 #include <wlan_mlo_link_recfg.h>
+#include <wlan_smd_roam.h>
 
 #define MIN_FIRST_BMISS_CNT 2
 #define MIN_FINAL_BMISS_CNT 5
@@ -4033,6 +4034,13 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	if (smd_roam_skip_rso(vdev)) {
+		mlme_debug("vdev %d: skip RSO stop — SMD_ROAM_SYNC in progress",
+			   vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (mlo_is_link_recfg_in_progress(vdev)) {
 		mlme_debug("skip RSO cmd for vdev %d due to link recfg is in progress",
 			   vdev_id);
@@ -5583,6 +5591,13 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 						    WLAN_MLME_NB_ID);
 	if (!vdev)
 		return status;
+
+	if (smd_roam_skip_rso(vdev)) {
+		mlme_debug("vdev %d: skip RSO state change — SMD_ROAM_SYNC in progress",
+			   vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
 		mlme_debug("link switch in progress. skip roam state change");
