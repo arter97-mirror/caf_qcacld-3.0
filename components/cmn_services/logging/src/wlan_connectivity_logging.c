@@ -782,6 +782,11 @@ wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
 	buf->mlo_cmn_info[bss_link].vdev_id = link_info->vdev_id;
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		if (t2lm[dir].direction == WLAN_T2LM_INVALID_DIRECTION) {
+			logging_debug("T2LM dir[%u] invalid, skipping", dir);
+			continue;
+		}
+
 		if (t2lm[dir].default_link_mapping) {
 			buf->mlo_cmn_info[bss_link].tid_ul = DEFAULT_TID_MAP;
 			buf->mlo_cmn_info[bss_link].tid_dl = DEFAULT_TID_MAP;
