@@ -716,6 +716,19 @@ bool policy_mgr_is_chnl_in_diff_band(struct wlan_objmgr_psoc *psoc,
 				     uint32_t ch_freq);
 
 /**
+ * policy_mgr_is_mlo_ap() - to check that given vdev id
+ * belongs to an mlo ap vdev or not
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev_id
+ *
+ * This API will check that if the given vdev_id belongs to mlo ap vdev or not.
+ *
+ * Return: true if vdev id belongs to an mlo sap
+ */
+bool policy_mgr_is_mlo_ap(struct wlan_objmgr_psoc *psoc,
+			  uint8_t vdev_id);
+
+/**
  * policy_mgr_is_pcl_weightage_required() - to check that PCL weightage req or
  * not
  * @psoc: pointer to psoc
@@ -1596,6 +1609,8 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  * channel from conc table
  * @psoc: PSOC object information
  * @ch_freq: pointer to channel frequency which needs to be filled
+ * @exclude_mlo_sap_link: exclude freq of existing SAP link
+ * @sap_vdev_id: SAP vdev_id
  *
  * In-case if any connection is already present whose channel is none dfs then
  * return that channel
@@ -1603,7 +1618,9 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  * Return: true up-on finding non-dfs channel else false
  */
 bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
-					   uint32_t *ch_freq);
+					   uint32_t *ch_freq,
+					   bool exclude_mlo_sap_link,
+					   uint8_t sap_vdev_id);
 
 /**
  * policy_mgr_get_dfs_beaconing_session_id() - to find the
@@ -3497,6 +3514,24 @@ bool
 policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2,
 				  qdf_freq_t freq_3);
+
+/**
+ * policy_mgr_get_conc_freq_if_ml_sta_in_smm() - Function to get concurrent
+ * frequency for SAP if ML STA is in SMM
+ * @psoc: Pointer to psoc
+ * @sap_ch_freq: User given SAP channel frequency
+ * @ml_sta1_freq: ML STA link 1 frequency
+ * @ml_sta2_freq: ML STA link2 freq
+ *
+ * Return: Interference freq for given SAP channel
+ */
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+qdf_freq_t
+policy_mgr_get_conc_freq_if_ml_sta_in_smm(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t sap_ch_freq,
+					  qdf_freq_t ml_sta1_freq,
+					  qdf_freq_t ml_sta2_freq);
+#endif
 
 /**
  * policy_mgr_allow_4th_new_freq() - Function to check whether 4th freq can
@@ -6151,4 +6186,60 @@ policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+
+/**
+ * policy_mgr_get_conc_ml_sap_link_freq()- Get concurrent ML SAP link frequency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @ml_sap_vdev: ml sap vdev or not
+ *
+ * This API returns concurrent ml sap freq if there are any.
+ * This function can only call when locked by qdf_conc_list_lock.
+ *
+ * Return: Concurrent ml sap freq if present. Otherwise 0.
+ */
+uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      bool *ml_sap_vdev);
+
+/**
+ * policy_mgr_get_conc_ml_sap_link_vdev_id()- Get concurrent ML SAP link vdev-id
+ *
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ *
+ * This API returns concurrent ml sap link vdev-id if there is any.
+ *
+ * Return: concurrent ML sap vdev-id if present, otherwise INVALID_VDEV_ID
+ */
+uint8_t
+policy_mgr_get_conc_ml_sap_link_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * policy_mgr_if_both_vdev_has_same_mldaddr()- Check if both vdev has same mld
+ *						address
+ * @psoc: Pointeer to psoc
+ * @vdev_id_1: vdev_id_1
+ * @vdev_id_2: vdev_id_2
+ *
+ * Return: True if both vdev's has same mldaddr, Otherwise false.
+ */
+bool
+policy_mgr_if_both_vdev_has_same_mldaddr(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id_1, uint8_t vdev_id_2);
+
+/**
+ * policy_mgr_get_conc_ml_sap_user_config_freq()- Get user configured frequency
+ *						of concurrenct ML SAP link
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev_id
+ *
+ * This API returns user configures freq of conc ML SAP link
+ *
+ * Return: User config freq of Concurrent ML SAP link if any. Otherwise 0.
+ */
+qdf_freq_t
+policy_mgr_get_conc_ml_sap_user_config_freq(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
 #endif /* __WLAN_POLICY_MGR_API_H */

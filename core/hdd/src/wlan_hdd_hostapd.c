@@ -2147,7 +2147,7 @@ hdd_hostapd_sap_fill_peer_ml_info(struct wlan_hdd_link_info *link_info,
 
 static void
 hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
-				   struct hdd_adapter *adapter)
+				   struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sap_cnt;
@@ -2155,8 +2155,8 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	struct sap_context *sap_ctx;
 	bool ch_valid;
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("sap ctx is null");
 		return;
@@ -2176,7 +2176,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 		qdf_status = hdd_unsafe_channel_restart_sap(hdd_ctx);
 	else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
 		qdf_status = hdd_dcs_hostapd_set_chan(
-			hdd_ctx, adapter->deflink->vdev_id,
+			hdd_ctx, link_info->vdev_id,
 			ap_ctx->operating_chan_freq);
 	if (qdf_status == QDF_STATUS_E_PENDING) {
 		hdd_debug("csa is pending with reason %d",
@@ -2196,7 +2196,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	}
 
 	qdf_status = policy_mgr_check_sap_go_force_scc(
-			hdd_ctx->psoc, adapter->deflink->vdev,
+			hdd_ctx->psoc, link_info->vdev,
 			ap_ctx->sap_context->csa_reason);
 	if (qdf_status == QDF_STATUS_E_PENDING) {
 		hdd_debug("csa is pending by sap go force scc");
@@ -3493,7 +3493,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		/* Check any other sap need restart */
 		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						  link_info->vdev_id))
-			hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
+			hdd_hostapd_check_channel_post_csa(hdd_ctx, link_info);
 
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -3834,6 +3834,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
+	qdf_freq_t ll_sap_freq;
 
 	if (!link_info)
 		return -EINVAL;
@@ -3887,6 +3888,19 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				wlan_vdev_get_id(sap_ctx->vdev),
 				LL_SAP_CSA_CONCURENCY);
 		return ret;
+	}
+
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
+
+	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
+					      ll_sap_freq)) {
+		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
 	}
 
 	if (wlan_reg_is_6ghz_chan_freq(target_chan_freq) &&
@@ -7661,7 +7675,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 
 	if (QDF_STATUS_SUCCESS !=
-	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq)) {
+	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq) &&
+	    !test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		hdd_err("Invalid Ch_freq: %d", config->chan_freq);
 		ret = -EINVAL;
 		goto error;
@@ -8792,8 +8807,17 @@ wlan_hdd_is_ap_ap_force_scc_override(struct wlan_hdd_link_info *link_info,
 		return false;
 	}
 
-	status = wlan_hdd_get_sap_ch_params(hdd_ctx, con_vdev_id, con_freq,
-					    &ch_params);
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		ch_params.ch_width = hdd_map_nl_chan_width(chandef->width);
+		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+							con_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		status = QDF_STATUS_SUCCESS;
+	} else {
+		status = wlan_hdd_get_sap_ch_params(hdd_ctx, con_vdev_id,
+						    con_freq, &ch_params);
+	}
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
@@ -9101,6 +9125,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
+	qdf_freq_t user_config_freq;
 
 	hdd_enter();
 
@@ -9166,6 +9191,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
+	user_config_freq = freq;
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
@@ -9477,6 +9503,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 		if (!vdev)
 			return -EINVAL;
+
+		if (user_config_freq != freq)
+			wlan_set_sap_user_config_freq(vdev, user_config_freq);
 
 		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 			link_id = wlan_vdev_get_link_id(vdev);
