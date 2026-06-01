@@ -13152,7 +13152,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS]) {
 		chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
 		if (!chn_bd) {
-			hdd_err("[non-MLO] CHANNEL_WIDTH ATTR is NULL");
+			hdd_debug_rl("[non-MLO] CHANNEL_WIDTH ATTR is NULL");
 			ret = 0;
 			goto end;
 		}
