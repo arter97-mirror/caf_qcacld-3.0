@@ -2053,8 +2053,8 @@ bool policy_mgr_is_sap_safe_with_bw(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-/* policy_mgr_check_go_restart_for_non_dbs() - is go restart required in
- * in non-DBS case after sta disconnection.
+/* policy_mgr_check_go_restart_on_dfs_or_indoor() - check if GO restart is
+ * required after STA disconnection when GO is on DFS or indoor channel.
  * @pm_ctx: pointer to policy_mgr_psoc_priv_obj.
  * @sta_count: STA count
  * @op_ch_freq_list: operating channel frequency list
@@ -2065,13 +2065,13 @@ bool policy_mgr_is_sap_safe_with_bw(struct wlan_objmgr_psoc *psoc,
  * Return: bool
  */
 static bool
-policy_mgr_check_go_restart_for_non_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
-					uint32_t *intf_ch_freq,
-					uint32_t sta_count,
-					uint32_t *op_ch_freq_list,
-					uint8_t *vdev_id,
-					uint32_t cc_count,
-					uint32_t go_index_start)
+policy_mgr_check_go_restart_on_dfs_or_indoor(struct policy_mgr_psoc_priv_obj *pm_ctx,
+					     uint32_t *intf_ch_freq,
+					     uint32_t sta_count,
+					     uint32_t *op_ch_freq_list,
+					     uint8_t *vdev_id,
+					     uint32_t cc_count,
+					     uint32_t go_index_start)
 {
 	uint32_t i;
 	uint8_t cur_sap_vdev_id = INVALID_VDEV_ID;
@@ -2187,26 +2187,25 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 							  PM_NDI_MODE,
 							  NULL);
 
-	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
-		con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
-		if (con_mode == PM_P2P_GO_MODE &&
-		    sap_vdev_id != INVALID_VDEV_ID) {
-			if (sta_count && policy_mgr_go_scc_enforced(psoc))
-				return false;
-
-			if (policy_mgr_check_go_restart_for_non_dbs(pm_ctx,
-							     intf_ch_freq,
-							     sta_count,
-							     op_ch_freq_list,
-							     vdev_id,
-							     cc_count,
-							     go_index_start))
-				return true;
-		}
-
-		if (policy_mgr_get_connection_count(psoc) > 1)
+	con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
+	if (con_mode == PM_P2P_GO_MODE &&
+	    sap_vdev_id != INVALID_VDEV_ID) {
+		if (sta_count && policy_mgr_go_scc_enforced(psoc))
 			return false;
+
+		if (policy_mgr_check_go_restart_on_dfs_or_indoor(pm_ctx,
+								 intf_ch_freq,
+								 sta_count,
+								 op_ch_freq_list,
+								 vdev_id,
+								 cc_count,
+								 go_index_start))
+			return true;
 	}
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+	    policy_mgr_get_connection_count(psoc) > 1)
+		return false;
 
 	for (i = 0 ; i < cc_count; i++) {
 		if (sap_vdev_id != INVALID_VDEV_ID &&
