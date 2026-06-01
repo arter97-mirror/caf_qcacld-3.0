@@ -13703,9 +13703,41 @@ static void wlan_hdd_cache_chann_mutex_destroy(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * hdd_cfg80211_shutdown_all_interfaces() - shutdown all cfg80211 interfaces
+ * before wiphy unregister
+ * @is_standard_mode: true if NAN standard mode supported by FW
+ * @wiphy: pointer to wiphy
+ *
+ * Shutdown all interfaces (including NAN) before unregistering the wiphy.
+ * This ensures cfg80211_stop_nan() is called for NAN interfaces, which
+ * properly decrements rdev->opencount and prevents "opencount != 0"
+ * warnings during unload. Only needed for NAN standard mode, where the
+ * NAN interface is a wdev with NL80211_IFTYPE_NAN tracked by
+ * rdev->opencount; legacy NAN uses a netdev-based NDI adapter cleaned up
+ * via hdd_close_all_adapters() instead.
+ *
+ * Return: None
+ */
+static void hdd_cfg80211_shutdown_all_interfaces(bool is_standard_mode,
+						 struct wiphy *wiphy)
+{
+	if (is_standard_mode)
+		cfg80211_shutdown_all_interfaces(wiphy);
+}
+#else
+static inline void
+hdd_cfg80211_shutdown_all_interfaces(bool is_standard_mode,
+				     struct wiphy *wiphy)
+{
+}
+#endif
+
 void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 {
 	struct wiphy *wiphy = hdd_ctx->wiphy;
+	bool is_standard_mode;
 
 	hdd_enter();
 
@@ -13756,6 +13788,8 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 
 	qdf_dp_trace_deinit();
 
+	is_standard_mode = ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc);
+
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
 	hdd_driver_memdump_deinit();
@@ -13783,6 +13817,7 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 	 * check the wiphy status before un-registering again
 	 */
 	if (wiphy && wiphy->registered) {
+		hdd_cfg80211_shutdown_all_interfaces(is_standard_mode, wiphy);
 		wiphy_unregister(wiphy);
 		wlan_hdd_cfg80211_deinit(wiphy);
 		hdd_lpass_notify_stop(hdd_ctx);
