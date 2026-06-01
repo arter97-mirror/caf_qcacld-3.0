@@ -65,6 +65,7 @@
 #include "wlan_mlo_mgr_ap.h"
 #include "wlan_scan_api.h"
 #include "wlan_action_oui_main.h"
+#include "wlan_action_oui_api.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_mgmt_txrx_utils_api.h"
 #include "wlan_mgmt_txrx_tgt_api.h"
@@ -3358,6 +3359,46 @@ uint32_t lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
 	return 0;
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
+
+#ifdef WLAN_FEATURE_11BE
+static inline void
+lim_set_assoc_req_eht_su_beamformer(struct pe_session *pe_session,
+				    bool oui_in_whitelist)
+{
+	if (!oui_in_whitelist) {
+		if (!pe_session->eht_config.su_beamformer)
+			pe_session->eht_config.su_beamformer = 0;
+	} else {
+		pe_session->eht_config.su_beamformer = 1;
+	}
+}
+#else
+static inline void
+lim_set_assoc_req_eht_su_beamformer(struct pe_session *pe_session,
+				    bool oui_in_whitelist)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11AX
+static inline void
+lim_set_assoc_req_he_su_beamformer(struct pe_session *pe_session,
+				   bool oui_in_whitelist)
+{
+	if (!oui_in_whitelist) {
+		if (!pe_session->he_config.su_beamformer)
+			pe_session->he_config.su_beamformer = 0;
+	} else {
+		pe_session->he_config.su_beamformer = 1;
+	}
+}
+#else
+static inline void
+lim_set_assoc_req_he_su_beamformer(struct pe_session *pe_session,
+				   bool oui_in_whitelist)
+{
+}
+#endif
 /**
  * lim_update_assoc_req_mcs_nss() - Symmetrize Tx/Rx NSS in assoc req IEs
  * @pe_session: PE session carrying cap_tx_nss and cap_rx_nss
@@ -3435,6 +3476,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bool eht_capable = false;
 	uint8_t uhr_cap_ie_len = 0;
 	uint16_t smd_ie_len = 0;
+	struct scan_cache_entry *scan_entry = NULL;
+	struct action_oui_search_attr attr = {0};
+	bool oui_in_whitelist = false;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3656,6 +3700,36 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		 pe_session->sta_max_ch_width, pe_session->ch_width,
 		 pe_session->htSupportedChannelWidthSet, saved_ch_width,
 		 saved_ht_supported_ch_width);
+
+	if (wlan_action_oui_is_ul_tx_beamformer_config_supported(mac_ctx->psoc)) {
+		scan_entry = wlan_scan_get_entry_by_bssid(mac_ctx->pdev,
+							  (struct qdf_mac_addr *)pe_session->bssId);
+		if (scan_entry) {
+			attr.ie_data = util_scan_entry_ie_data(scan_entry);
+			attr.ie_length = util_scan_entry_ie_len(scan_entry);
+			attr.mac_addr = pe_session->bssId;
+
+			oui_in_whitelist = wlan_search_action_oui(mac_ctx->psoc, &attr,
+								  ACTION_OUI_ALLOW_UL_TX_BEAMFORMER);
+
+			pe_debug("AP " QDF_MAC_ADDR_FMT " OUI %s in beamformer whitelist",
+				 QDF_MAC_ADDR_REF(pe_session->bssId),
+				 oui_in_whitelist ? "found" : "not found");
+
+			util_scan_free_cache_entry(scan_entry);
+		}
+
+		/* Disable beamformer if OUI not in whitelist */
+		if (!oui_in_whitelist) {
+			if (!pe_session->vht_config.su_beam_former)
+				pe_session->vht_config.su_beam_former = 0;
+		} else {
+			pe_session->vht_config.su_beam_former = 1;
+		}
+
+		lim_set_assoc_req_he_su_beamformer(pe_session, oui_in_whitelist);
+		lim_set_assoc_req_eht_su_beamformer(pe_session, oui_in_whitelist);
+	}
 
 	if (pe_session->vhtCapability &&
 	    pe_session->vhtCapabilityPresentInBeacon) {
