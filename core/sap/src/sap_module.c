@@ -292,6 +292,8 @@ static void wlansap_owe_cleanup(struct sap_context *sap_ctx)
 			assoc_ind->owe_ie_len = 0;
 			assoc_ind->owe_status = STATUS_UNSPECIFIED_FAILURE;
 			status = sme_update_owe_info(mac, assoc_ind);
+			if (assoc_ind->assocReqPtr)
+				qdf_mem_free(assoc_ind->assocReqPtr);
 			qdf_mem_free(assoc_ind);
 		} else {
 			sap_err("Failed to remove assoc ind");
@@ -340,6 +342,8 @@ static void wlansap_ft_cleanup(struct sap_context *sap_ctx)
 			assoc_ind->ft_ie = NULL;
 			assoc_ind->ft_ie_len = 0;
 			assoc_ind->ft_status = STATUS_UNSPECIFIED_FAILURE;
+			if (assoc_ind->assocReqPtr)
+				qdf_mem_free(assoc_ind->assocReqPtr);
 			qdf_mem_free(assoc_ind);
 		} else {
 			sap_err("Failed to remove assoc ind");
@@ -3691,6 +3695,8 @@ QDF_STATUS wlansap_update_owe_info(struct sap_context *sap_ctx,
 		assoc_ind->owe_ie_len = ie_len;
 		assoc_ind->owe_status = owe_status;
 		status = sme_update_owe_info(mac, assoc_ind);
+		if (assoc_ind->assocReqPtr)
+			qdf_mem_free(assoc_ind->assocReqPtr);
 		qdf_mem_free(assoc_ind);
 	} else {
 		/*
@@ -3766,6 +3772,8 @@ QDF_STATUS wlansap_update_ft_info(struct sap_context *sap_ctx,
 		assoc_ind->ft_ie_len = ie_len;
 		assoc_ind->ft_status = ft_status;
 		status = sme_update_ft_info(mac, assoc_ind);
+		if (assoc_ind->assocReqPtr)
+			qdf_mem_free(assoc_ind->assocReqPtr);
 		qdf_mem_free(assoc_ind);
 	}
 	return status;
