@@ -3329,6 +3329,22 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 
+	/*
+	 * NAN Discovery vdev has no concept of a home channel from the
+	 * driver's perspective, so any off-channel action frame TX triggers
+	 * a P2P_LISTEN scan that the firmware scheduler cancels immediately
+	 * without dwelling.  FOREIGN_CHANNEL is never raised, so
+	 * p2p_ready_to_tx_frame() is never called and the tx_ctx stalls in
+	 * tx_q_roc until the scan-complete event drops it with failure.
+	 * Skip the RoC path entirely for NAN action frames.
+	 */
+	if (mode == QDF_NAN_DISC_MODE && tx_ctx->off_chan &&
+	    tx_ctx->frame_info.sub_type == P2P_MGMT_ACTION) {
+		p2p_debug("NAN vdev %d: skip RoC for action frame, freq %d",
+			  tx_ctx->vdev_id, tx_ctx->chan_freq);
+		tx_ctx->off_chan = false;
+	}
+
 	if (!tx_ctx->off_chan || !tx_ctx->chan_freq) {
 		if (!tx_ctx->chan_freq)
 			p2p_check_and_update_channel(tx_ctx);
