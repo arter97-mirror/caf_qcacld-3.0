@@ -1945,17 +1945,27 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 		return -EINVAL;
 	}
+
+	if (wlan_objmgr_vdev_try_get_ref(vdev, WLAN_OSIF_STATS_ID) !=
+	    QDF_STATUS_SUCCESS) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		return -EINVAL;
+	}
+
 	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
-	if (!peer_stats)
+	if (!peer_stats) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 		return -ENOMEM;
+	}
 
 	status = cdp_host_get_peer_stats(soc, wlan_vdev_get_id(vdev),
 					 stainfo->sta_mac.bytes, peer_stats);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("cdp_host_get_peer_stats failed");
 		qdf_mem_free(peer_stats);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 		return -EINVAL;
 	}
 
@@ -1976,6 +1986,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	if (ret || !stats) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 		hdd_err("Failed to get peer stats info");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 		return -EINVAL;
 	}
 
@@ -2037,6 +2048,8 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	}
 
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 
 	return ret;
 }
