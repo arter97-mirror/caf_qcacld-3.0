@@ -3647,10 +3647,8 @@ static bool policy_mgr_is_sbs_enable(struct wlan_objmgr_psoc *psoc)
 
 bool policy_mgr_is_hw_sbs_capable(struct wlan_objmgr_psoc *psoc)
 {
-	if (!policy_mgr_is_sbs_enable(psoc)) {
-		policy_mgr_rl_debug("SBS INI is disabled");
+	if (!policy_mgr_is_sbs_enable(psoc))
 		return false;
-	}
 
 	if (!policy_mgr_find_if_fw_supports_dbs(psoc)) {
 		policy_mgr_rl_debug("fw doesn't support dual band");
