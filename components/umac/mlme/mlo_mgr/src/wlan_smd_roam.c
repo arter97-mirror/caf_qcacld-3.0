@@ -123,7 +123,7 @@ smd_link_recfg_find_link_info_with_active_vdev(
 			continue;
 		}
 
-		if (!cm_is_vdev_connected(vdev) || cm_is_vdev_roaming(vdev)) {
+		if (!cm_is_vdev_connected(vdev) && !cm_is_vdev_roaming(vdev)) {
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
 			continue;
 		}
@@ -1190,6 +1190,11 @@ QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 		  recfg_ctx->num_vdev_repurpose_req);
 
 	qdf_mem_zero(&recfg_req, sizeof(struct wlan_mlo_link_recfg_req));
+	qdf_copy_macaddr(&recfg_req.add_link_info.mld_addr,
+			 &recfg_ctx->vdev_repurpose_req[0].mld_addr);
+
+	qdf_copy_macaddr(&recfg_req.add_link_info.smd_addr,
+			 &recfg_ctx->vdev_repurpose_req[0].smd_addr);
 
 	/* Try single-link to single/multi-link handler first */
 	status = smd_roam_prep_sl_to_sl_ml_handler(vdev, recfg_ctx, &recfg_req);
@@ -1516,7 +1521,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 						      &del_link_set_no_common);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mlo_err("fail to ssign self link for added links status %d",
+		mlo_err("fail to assign self link for added links status %d",
 			status);
 		return status;
 	}
@@ -1880,20 +1885,48 @@ struct mlo_link_info *
 smd_get_prepared_ap_link_info(struct wlan_objmgr_vdev *vdev,
 			      struct qdf_mac_addr *ap_link_addr)
 {
+	struct smd_context *smd_ctx;
+	struct wlan_mlo_sta *target_bss_ctx;
 	struct mlo_link_info *link_info;
+	uint8_t target_iter;
 	uint8_t link_info_iter;
 
 	if (!vdev || !vdev->mlo_dev_ctx || !ap_link_addr ||
 	    qdf_is_macaddr_zero(ap_link_addr))
 		return NULL;
 
-	link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
-	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
-	     link_info_iter++) {
-		if (qdf_is_macaddr_equal(&link_info->ap_link_addr,
-					 ap_link_addr))
-			return link_info;
-		link_info++;
+	smd_ctx = vdev->mlo_dev_ctx->smd_ctx;
+	if (!smd_ctx) {
+		mlo_err("SMD: smd_ctx is NULL");
+		return NULL;
+	}
+
+	mlo_debug("SMD: searching " QDF_MAC_ADDR_FMT " in %u prepared targets",
+		  QDF_MAC_ADDR_REF(ap_link_addr->bytes),
+		  smd_ctx->num_prepared);
+
+	for (target_iter = 0;
+	     target_iter < smd_ctx->num_prepared &&
+	     target_iter < SMD_MAX_PREPARED_TARGETS;
+	     target_iter++) {
+		if (!smd_ctx->prepared_targets[target_iter].prepared)
+			continue;
+
+		target_bss_ctx =
+			smd_ctx->prepared_targets[target_iter].target_bss_ctx;
+		if (!target_bss_ctx)
+			continue;
+
+		for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
+		     link_info_iter++) {
+			link_info = &target_bss_ctx->links_info[link_info_iter];
+			mlo_debug("SMD: target[%u] link[%u] ap_addr " QDF_MAC_ADDR_FMT,
+				  target_iter, link_info_iter,
+				  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+			if (qdf_is_macaddr_equal(&link_info->ap_link_addr,
+						 ap_link_addr))
+				return link_info;
+		}
 	}
 
 	return NULL;
@@ -2244,10 +2277,22 @@ smd_add_prepared_target_links_in_smd_ctx(
 		/* Update link info in target BSS context using separate index */
 		link_info = &target_bss_ctx->links_info[link_idx];
 
-		qdf_mem_copy(&link_info->ap_link_addr, &add_link->ap_link_addr,
-			     QDF_MAC_ADDR_SIZE);
-		qdf_mem_copy(&link_info->link_addr, &add_link->self_link_addr,
-			     QDF_MAC_ADDR_SIZE);
+		link_info->link_chan_info =
+			qdf_mem_malloc(sizeof(*link_info->link_chan_info));
+		if (!link_info->link_chan_info) {
+			mlo_err("link_chan_info alloc failed for link %d",
+				link_idx);
+			util_scan_free_cache_entry(scan_entry);
+			status = QDF_STATUS_E_NOMEM;
+			goto end;
+		}
+		qdf_mem_copy(link_info->link_chan_info, &channel,
+			     sizeof(struct wlan_channel));
+
+		qdf_copy_macaddr(&link_info->ap_link_addr,
+				 &add_link->ap_link_addr);
+		qdf_copy_macaddr(&link_info->link_addr,
+				 &add_link->self_link_addr);
 
 		link_info->vdev_id = add_link->vdev_id;
 		link_info->link_id = add_link->link_id;
@@ -2285,6 +2330,12 @@ end:
 		/* Free allocated target_bss_ctx on error */
 		if (target_bss_ctx &&
 		    smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx == target_bss_ctx) {
+			uint8_t k;
+
+			for (k = 0; k < WLAN_MAX_ML_BSS_LINKS; k++) {
+				qdf_mem_free(target_bss_ctx->links_info[k].link_chan_info);
+				target_bss_ctx->links_info[k].link_chan_info = NULL;
+			}
 			qdf_mem_free(target_bss_ctx);
 			smd_ctx->prepared_targets[smd_ctx->num_prepared].target_bss_ctx = NULL;
 		}
@@ -2603,7 +2654,7 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	uint32_t sync_ind_len;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_roam_synch_complete_params sync_params = {};
-	struct smd_context *smd_ctx;
+	struct smd_context *smd_ctx = NULL;
 	uint8_t i;
 
 	if (!recfg_ctx) {
@@ -2625,10 +2676,12 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 
 	sync_params.vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
 	if (mlo_dev_ctx->smd_ctx) {
-		struct smd_context *smd_ctx = mlo_dev_ctx->smd_ctx;
-		struct wlan_mlo_sta *target_bss_ctx =
-			smd_ctx->prepared_targets[smd_ctx->active_target_idx].target_bss_ctx;
+		struct wlan_mlo_sta *target_bss_ctx;
 		struct mlo_link_info *link_info;
+
+		smd_ctx = mlo_dev_ctx->smd_ctx;
+		target_bss_ctx =
+			smd_ctx->prepared_targets[smd_ctx->active_target_idx].target_bss_ctx;
 
 		if (target_bss_ctx) {
 			for (i = 0; i < WLAN_MAX_ML_BSS_LINKS &&
@@ -2921,11 +2974,11 @@ smd_roam_link_switch_start_connect(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	req =  &mlo_dev_ctx->link_ctx->last_req;
-	if (!req) {
-		mlo_err("Link switch req is NULL");
+	if (!mlo_dev_ctx->link_ctx) {
+		mlo_err("SMD: link ctx is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
+	req = &mlo_dev_ctx->link_ctx->last_req;
 
 	if (!smd_is_roaming_in_progress(vdev)) {
 		mlo_err("SMD: roaming not in progress for vdev %d",
