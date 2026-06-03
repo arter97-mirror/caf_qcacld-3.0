@@ -30,7 +30,6 @@
 #include "wlan_action_oui_public_struct.h"
 #include "wlan_action_oui_objmgr.h"
 #include "wlan_action_oui_main.h"
-#include "wmi_unified_priv.h"
 
 #ifdef WLAN_FEATURE_ACTION_OUI
 

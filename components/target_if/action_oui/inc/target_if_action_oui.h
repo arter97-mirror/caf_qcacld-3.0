@@ -50,4 +50,22 @@ target_if_action_oui_register_tx_ops(struct action_oui_tx_ops *tx_ops);
 bool
 target_if_get_action_oui_v2_cap(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * target_if_get_nss_allowlist_denylist_cap() - Get NSS allowlist/denylist cap
+ * @psoc: psoc
+ *
+ * Return: bool, true: NSS allowlist/denylist config supported by target
+ */
+bool
+target_if_get_nss_allowlist_denylist_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * target_if_get_ul_tx_beamformer_cap() - Get UL TX beamformer cap
+ * @psoc: psoc
+ *
+ * Return: bool, true: UL TX beamformer config supported by target
+ */
+bool
+target_if_get_ul_tx_beamformer_cap(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _TARGET_IF_ACTION_OUI_H_ */

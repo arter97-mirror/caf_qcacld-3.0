@@ -64,3 +64,33 @@ target_if_get_action_oui_v2_cap(struct wlan_objmgr_psoc *psoc)
 				   wmi_service_vendor_oui_action_v2);
 }
 
+bool
+target_if_get_nss_allowlist_denylist_cap(struct wlan_objmgr_psoc *psoc)
+{
+	void *wmi_hdl;
+
+	wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
+	if (!wmi_hdl)
+		return false;
+
+	return wmi_service_enabled(wmi_hdl,
+				   wmi_service_supported_ext_oui_action_ids) &&
+	       wmi_service_enabled(
+			wmi_hdl,
+			wmi_service_support_whitelist_blacklist_ap_config);
+}
+
+bool
+target_if_get_ul_tx_beamformer_cap(struct wlan_objmgr_psoc *psoc)
+{
+	void *wmi_hdl;
+
+	wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
+	if (!wmi_hdl)
+		return false;
+
+	return wmi_service_enabled(
+			wmi_hdl,
+			wmi_service_support_ul_tx_beamformer_ap_config);
+}
+

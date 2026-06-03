@@ -32,6 +32,7 @@
 #include "wlan_action_oui_public_struct.h"
 #include "wlan_action_oui_priv.h"
 #include "wlan_action_oui_objmgr.h"
+#include "wmi_unified_priv.h"
 
 #define action_oui_log(level, args...) \
 	QDF_TRACE(QDF_MODULE_ID_ACTION_OUI, level, ## args)
@@ -187,10 +188,10 @@ wlan_is_nss_allowlist_denylist_config_supported(struct wlan_objmgr_psoc *psoc);
  * support
  * @psoc: psoc object
  *
- * This function checks whether both the required FW services for UL TX
- * beamformer configuration are enabled.
+ * This function checks whether the required FW service for UL TX
+ * beamformer configuration is enabled.
  *
- * Return: true if both services are enabled, else false
+ * Return: true if required service is enabled, else false
  */
 bool
 wlan_is_ul_tx_beamformer_config_supported(struct wlan_objmgr_psoc *psoc);
