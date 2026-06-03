@@ -1180,6 +1180,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	if (cfg_in_range(CFG_HE_DCM_RX, he_cap->dcm_enc_rx))
 		mlme_he_cap->dcm_enc_rx = he_cap->dcm_enc_rx;
 	mlme_he_cap->ul_he_mu = he_cap->ul_he_mu;
+	mlme_obj->cfg.he_caps.su_beamformer_cap = he_cap->su_beamformer;
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformer) {
 		mlme_he_cap->su_beamformer = he_cap->su_beamformer;
 		if (cfg_in_range(CFG_HE_NUM_SOUND_LT80,
@@ -1338,6 +1339,7 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(&mlme_obj->cfg.eht_caps.dot11_eht_cap, eht_cap,
 		     sizeof(tDot11fIEeht_cap));
 	mlme_eht_cap = &mlme_obj->cfg.eht_caps.dot11_eht_cap;
+	mlme_obj->cfg.eht_caps.su_beamformer_cap = eht_cap->su_beamformer;
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformer) {
 		mlme_eht_cap->su_beamformer = eht_cap->su_beamformer;
 		if (cfg_in_range(CFG_EHT_NUM_SOUNDING_DIM_LE_80MHZ,
@@ -5435,6 +5437,8 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 	/* Set VHT SU Beamformer cap */
 	if (vht_cap_info->su_bformer && !vht_cap->vht_su_bformer)
 		vht_cap_info->su_bformer = 0;
+
+	vht_cap_info->su_bformer_cap = vht_cap->vht_su_bformer;
 
 	/* check and update SU BEAMFORMEE capabality */
 	if (vht_cap_info->su_bformee && !vht_cap->vht_su_bformee)

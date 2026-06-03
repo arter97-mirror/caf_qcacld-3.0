@@ -901,6 +901,7 @@ struct wlan_mlme_powersave {
  * @rx_stbc: Rx STBC cap
  * @su_bformer: SU Beamformer cap
  * @su_bformee: SU Beamformee cap
+ * @su_bformer_cap: WMI SU Beamformer cap
  * @tx_bfee_ant_supp: Tx beamformee anti supp
  * @num_soundingdim: Number of sounding dimensions
  * @mu_bformer: MU Beamformer cap
@@ -952,6 +953,7 @@ struct mlme_vht_capabilities_info {
 	bool rx_stbc;
 	bool su_bformer;
 	bool su_bformee;
+	bool su_bformer_cap;
 	uint8_t tx_bfee_ant_supp;
 	uint8_t num_soundingdim;
 	bool mu_bformer;
@@ -1114,6 +1116,7 @@ struct wlan_mlme_qos {
  * @he_mcs_12_13_supp_2g:
  * @he_mcs_12_13_supp_5g:
  * @disable_sap_mcs_12_13: Bitmap to disable he mcs 12 13 for SAP
+ * @su_beamformer_cap: WMI HE SU Beamformer cap
  */
 struct wlan_mlme_he_caps {
 	tDot11fIEhe_cap dot11_he_cap;
@@ -1128,6 +1131,7 @@ struct wlan_mlme_he_caps {
 	uint16_t he_mcs_12_13_supp_2g;
 	uint16_t he_mcs_12_13_supp_5g;
 	uint32_t disable_sap_mcs_12_13;
+	bool su_beamformer_cap;
 };
 #endif
 
@@ -1136,11 +1140,13 @@ struct wlan_mlme_he_caps {
  * struct wlan_mlme_eht_caps - EHT Capabilities related config items
  * @dot11_eht_cap: current EHT capabilities
  * @eht_cap_orig: original EHT capabilities
+ * @su_beamformer_cap: WMI EHT SU Beamformer cap
  */
 struct wlan_mlme_eht_caps {
 	tDot11fIEeht_cap dot11_eht_cap;
 	tDot11fIEeht_cap eht_cap_orig;
 	/* Add members to store INI configuration corresponding to 11be */
+	bool su_beamformer_cap;
 };
 #endif
 
