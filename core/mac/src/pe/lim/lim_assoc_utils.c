@@ -3894,19 +3894,13 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 	ch_width = wlan_peer_get_op_ch_width(peer);
 
 	/* Step 1: VHT Operation ch_width is authoritative */
+	/* Step 2: CCFS1 validation for > 80 MHz */
 	if (pe_session->ch_width &&
 	    vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
 		ch_width = lim_get_vht_ch_width(vht_caps, vht_oper,
 						&assoc_rsp->HTInfo,
 						&assoc_rsp->HTCaps,
 						&assoc_rsp->OperatingMode);
-	/* Step 2: CCFS1 validation for > 80 MHz */
-	if ((ch_width == CH_WIDTH_160MHZ || ch_width == CH_WIDTH_80P80MHZ) &&
-	    !vht_oper->chan_center_freq_seg1) {
-		pe_debug("vdev %d: VHT BW downgrade %d -> %d: seg1 missing for 160/80+80",
-			 pe_session->vdev_id, ch_width, CH_WIDTH_80MHZ);
-		ch_width = CH_WIDTH_80MHZ;
-	}
 
 	/* Step 3: Cap by AP max capability */
 	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
