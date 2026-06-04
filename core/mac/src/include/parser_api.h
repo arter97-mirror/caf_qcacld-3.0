@@ -48,6 +48,7 @@
 #define IS_24G_CH(__chNum) ((__chNum > 0) && (__chNum < 15))
 #define IS_5G_CH(__chNum) ((__chNum >= 36) && (__chNum <= 165))
 #define IS_2X2_CHAIN(__chain) ((__chain & 0x3) == 0x3)
+#define VHT_MCS_0_7 0x0
 #define VHT_MCS_0_8 0x1
 #define VHT_MCS_0_9 0x2
 #define VHT_MCS_DISABLE 0x3

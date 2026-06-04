@@ -5345,7 +5345,13 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 	tDot11fIEHTCaps ht_caps = {0};
 	tDot11fIEVHTCaps vht_caps = {0};
 	uint16_t capability;
+	uint8_t vht_mcs;
+	uint8_t he_mcs;
+	uint8_t max_nss;
+	uint8_t i;
 
+	pe_debug("Dot11Mode %d MCS %d NSS %d", msg->dot11mode,
+		 msg->max_mcs, msg->nss);
 	if (IS_DOT11_MODE_HT(msg->dot11mode)) {
 		pe_debug("Populate HT caps");
 		populate_dot11f_ht_caps(mac, pe_session, &ht_caps);
@@ -5414,15 +5420,83 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 			 sta->htSupportedChannelWidthSet,
 			 sta->ch_width);
 
+		max_nss = QDF_MIN(pe_session->cap_tx_nss, msg->nss);
 		sta->vhtLdpcCapable = vht_caps.ldpcCodingCap;
 		sta->vhtBeamFormerCapable = 0;
 		lim_populate_vht_mcs_set(mac, &sta->supportedRates, &vht_caps,
-					 pe_session, sta->nss,
-					 NULL);
+					 pe_session, max_nss, max_nss, NULL);
+		/* Convert max_mcs integer to 2-bit VHT map encoding:
+		 * MCS 0-7 -> 0x0, MCS 0-8 -> VHT_MCS_0_8,
+		 * MCS 0-9 -> VHT_MCS_0_9
+		 */
+		if (msg->max_mcs >= 9)
+			vht_mcs = VHT_MCS_0_9;
+		else if (msg->max_mcs >= 8)
+			vht_mcs = VHT_MCS_0_8;
+		else
+			vht_mcs = VHT_MCS_0_7;
+		for (i = 1; i <= max_nss; i++) {
+			if (!VHT_MCS_IS_NSS_ENABLED(
+						sta->supportedRates.vhtRxMCSMap,
+						i))
+				continue;
+			if (VHT_GET_MCS_FOR_NSS(sta->supportedRates.vhtRxMCSMap,
+						i) > vht_mcs)
+				VHT_SET_MCS_FOR_NSS(
+						sta->supportedRates.vhtRxMCSMap,
+						vht_mcs, i);
+			if (VHT_GET_MCS_FOR_NSS(sta->supportedRates.vhtTxMCSMap,
+						i) > vht_mcs)
+				VHT_SET_MCS_FOR_NSS(
+						sta->supportedRates.vhtTxMCSMap,
+						vht_mcs, i);
+		}
 	} else {
 		sta->mlmStaContext.vhtCapability = 0;
 		sta->vhtSupportedChannelWidthSet =
 			WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+	}
+	if (IS_DOT11_MODE_HE(msg->dot11mode)) {
+		pe_debug("Populate HE caps");
+		/* Pass NULL session so caps are drawn from the global mlme
+		 * he_caps — pe_session->he_config is uninitialized (0xffff)
+		 * for passthru sessions.
+		 */
+		populate_dot11f_he_caps(mac, NULL, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &sta->he_config);
+		sta->mlmStaContext.he_capable = 1;
+		max_nss = QDF_MIN(pe_session->cap_tx_nss, msg->nss);
+		lim_populate_he_mcs_set(mac, &sta->supportedRates,
+					&sta->he_config, pe_session,
+					max_nss, max_nss);
+		/* Convert max_mcs integer to 2-bit HE map encoding:
+		 * MCS 0-7 -> HE_MCS_0_7, MCS 0-9 -> HE_MCS_0_9,
+		 * MCS 0-11 -> HE_MCS_0_11
+		 */
+		if (msg->max_mcs >= 11)
+			he_mcs = HE_MCS_0_11;
+		else if (msg->max_mcs >= 9)
+			he_mcs = HE_MCS_0_9;
+		else
+			he_mcs = HE_MCS_0_7;
+		for (i = 1; i <= max_nss; i++) {
+			if (!HE_MCS_IS_NSS_ENABLED(
+					sta->supportedRates.rx_he_mcs_map_lt_80, i))
+				continue;
+			if (HE_GET_MCS_FOR_NSS(
+					sta->supportedRates.rx_he_mcs_map_lt_80,
+					i) > he_mcs)
+				HE_SET_MCS_FOR_NSS(
+					sta->supportedRates.rx_he_mcs_map_lt_80,
+					he_mcs, i);
+			if (HE_GET_MCS_FOR_NSS(
+					sta->supportedRates.tx_he_mcs_map_lt_80,
+					i) > he_mcs)
+				HE_SET_MCS_FOR_NSS(
+					sta->supportedRates.tx_he_mcs_map_lt_80,
+					he_mcs, i);
+		}
 	}
 	/* Lets enable QOS parameter */
 	sta->qosMode = 1;

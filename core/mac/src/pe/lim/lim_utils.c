@@ -9414,7 +9414,10 @@ void lim_update_passthru_config(struct mac_context *mac,
 		return;
 	}
 	add_sta_params->eht_capable = 0;
-	add_sta_params->he_capable = 0;
+	add_sta_params->he_capable = sta_ds->mlmStaContext.he_capable;
+	if (add_sta_params->he_capable)
+		qdf_mem_copy(&add_sta_params->he_config, &sta_ds->he_config,
+			     sizeof(add_sta_params->he_config));
 	add_sta_params->ht_caps = (*(uint16_t *)&session_entry->ht_config);
 	add_sta_params->vht_caps = session_entry->vht_config.caps;
 	pe_debug("passthru eht_capable: %d", add_sta_params->eht_capable);
