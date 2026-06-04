@@ -5823,6 +5823,7 @@ void lim_passthru_peer_del(struct mac_context *mac,
 	status = lim_del_sta(mac, sta, false, session);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		lim_delete_dph_hash_entry(mac, sta->staAddr, aid, session);
+		lim_release_peer_idx(mac, aid, session);
 	} else {
 		pe_err("vdev:%d lim_del_sta failed: %d",
 		       msg->vdev_id, status);
@@ -5895,19 +5896,20 @@ void lim_passthrough_peer_setup(struct mac_context *mac,
 		return;
 	}
 
-	aid = msg->peer_aid;
-	if (!aid || aid > mac->lim.maxBssId) {
-		pe_err("vdev:%d invalid AID %d from WONDER for peer "
-		       QDF_MAC_ADDR_FMT, session->vdev_id, aid,
+	aid = lim_assign_peer_idx(mac, session);
+	if (!aid) {
+		pe_err("No more free AID for peer: " QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
 		return;
 	}
-	pe_debug("vdev:%d AID %d from WONDER for peer: " QDF_MAC_ADDR_FMT,
+	pe_debug("vdev:%d Aid: %d, for peer: " QDF_MAC_ADDR_FMT,
 		 session->vdev_id, aid,
 		 QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
 	sta = dph_add_hash_entry(mac, msg->peer_mac_addr.bytes,
 				 aid, &session->dph.dphHashTable);
+
 	if (!sta) {
+		lim_release_peer_idx(mac, aid, session);
 		pe_err("vdev:%d add hash entry failed for AID %d",
 		       session->vdev_id, aid);
 		return;
@@ -5920,6 +5922,7 @@ void lim_passthrough_peer_setup(struct mac_context *mac,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("vdev:%d add sta failed", session->vdev_id);
 		lim_delete_dph_hash_entry(mac, sta->staAddr, aid, session);
+		lim_release_peer_idx(mac, aid, session);
 	}
 }
 #endif
