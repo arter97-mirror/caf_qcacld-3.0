@@ -2362,6 +2362,12 @@ bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 	bool noa_in_prog = false;
 	uint8_t index;
+	uint32_t num_desc;
+
+	if (!pdev) {
+		p2p_err("pdev is NULL");
+		return noa_in_prog;
+	}
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_P2P_ID);
@@ -2378,7 +2384,14 @@ bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
 		goto end;
 	}
 
-	for (index = 0; index < p2p_vdev_obj->noa_info->num_desc; index++) {
+	num_desc = p2p_vdev_obj->noa_info->num_desc;
+	if (num_desc > P2P_MAX_NOA_DESC) {
+		p2p_err("num_desc %u exceeds max %u, clamping",
+			num_desc, P2P_MAX_NOA_DESC);
+		num_desc = P2P_MAX_NOA_DESC;
+	}
+
+	for (index = 0; index < num_desc; index++) {
 		if (p2p_vdev_obj->noa_info->noa_desc[index].type_count ==
 							SINGLE_SHOT_NOA &&
 		    p2p_vdev_obj->noa_info->noa_desc[index].duration >
