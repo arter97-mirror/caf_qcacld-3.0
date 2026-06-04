@@ -45,6 +45,7 @@
 #include <wlan_action_oui_api.h>
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_mlo_mgr_roam.h"
 
 #ifdef WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY
 static struct sDphHashNode *g_dph_node_array;
@@ -1184,8 +1185,7 @@ lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
 		if (QDF_IS_STATUS_ERROR(status))
 			pe_debug("Failed to set curr bss nss %d", status);
 	} else if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
-		   (roam_sync->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED &&
-		    cur_vdev_id == roam_sync->roamed_vdev_id)) {
+		   mlo_get_single_link_ml_roaming(mac_ctx->psoc, cur_vdev_id)) {
 		status = lim_mlo_roam_store_nss_from_reassoc_req(mac_ctx,
 								 roam_sync,
 								 subtype,
