@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -89,6 +89,11 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 	bool is_dbs;
 	enum QDF_OPMODE opmode;
 	struct qdf_mac_addr mac_addr = {0};
+
+	if (!p2p_soc_obj || !p2p_soc_obj->soc) {
+		p2p_err("p2p soc obj or psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
 			p2p_soc_obj->soc, roc_ctx->vdev_id,
@@ -460,7 +465,23 @@ static void p2p_roc_timeout(void *pdata)
 static QDF_STATUS p2p_execute_roc_req(struct p2p_roc_context *roc_ctx)
 {
 	QDF_STATUS status;
-	struct p2p_soc_priv_obj *p2p_soc_obj = roc_ctx->p2p_soc_obj;
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	if (!roc_ctx) {
+		p2p_err("roc ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	p2p_soc_obj = roc_ctx->p2p_soc_obj;
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!p2p_soc_obj->soc) {
+		p2p_err("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	p2p_debug("p2p soc obj:%pK, roc ctx:%pK, vdev_id:%d, scan_id:%d,"
 		  " tx ctx:%pK, freq:%d, phy_mode:%d, duration:%d,"
