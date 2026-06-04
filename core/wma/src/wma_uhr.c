@@ -581,6 +581,8 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 		np->npca_disabled_subchan_bm = nc->npca_disabled_subchan_bm;
 	}
 
+	peer->two_x_ldpc_flag = uhr_cap->two_x_ldpc_rx_support;
+
 	wma_print_uhr_cap(uhr_cap);
 	wma_debug("Peer UHR Capabilities:");
 }

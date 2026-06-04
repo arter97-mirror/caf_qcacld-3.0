@@ -5264,6 +5264,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
 						  bcn_ies, pAssocRsp);
 
+		if (lim_is_session_uhr_capable(pe_session))
+			lim_intersect_ap_uhr_caps(pe_session, pAddBssParams,
+						  pAssocRsp);
+
 		/* Use STA SMPS capability as AP's SMPS value is not valid,
 		 * and use p2p GO's assoc response value to avoid IOT issue.
 		 */

@@ -9852,11 +9852,14 @@ static void lim_intersect_uhr_caps(struct wlan_uhr_cap_info *rcvd_uhr,
 				rcvd_uhr->dps_assist_support;
 	peer_uhr->dps_assist_support = session_uhr->dps_assist_support &
 				       rcvd_uhr->dps_present;
-
 	pe_debug("vdev %d: UHR DPS intersection: peer_dps_present=%d peer_dps_assist=%d",
-		 session->vdev_id,
-		 peer_uhr->dps_present,
+		 session->vdev_id, peer_uhr->dps_present,
 		 peer_uhr->dps_assist_support);
+
+	peer_uhr->two_x_ldpc_tx_support = session_uhr->two_x_ldpc_rx_support &
+					rcvd_uhr->two_x_ldpc_tx_support;
+	peer_uhr->two_x_ldpc_rx_support = session_uhr->two_x_ldpc_tx_support &
+					rcvd_uhr->two_x_ldpc_rx_support;
 }
 
 void lim_intersect_ap_uhr_caps(struct pe_session *session,
