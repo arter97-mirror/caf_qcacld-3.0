@@ -207,6 +207,7 @@ __wlan_hdd_wondertap_set_fixed_tx_rate(struct hdd_adapter *adapter,
 	}
 
 	g_wt_ctx->tx_rate_cfg.nss = params->nss;
+	g_wt_ctx->tx_rate_cfg.mcs = params->mcs;
 	g_wt_ctx->tx_rate_cfg.gi_val = gi;
 	g_wt_ctx->tx_rate_cfg.ch_width =
 		__wlan_hdd_convert_wt_bandwidth_to_phy_ch_width(params->bw);
@@ -686,6 +687,7 @@ static void wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
 	req.dot11mode = g_wt_ctx->tx_rate_cfg.dot11_mode;
 	req.gi_val = g_wt_ctx->tx_rate_cfg.gi_val;
 	req.nss = g_wt_ctx->tx_rate_cfg.nss;
+	req.max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
 	sme_passthru_peer_setup(mac_handle, &req);
 }
 
@@ -755,6 +757,10 @@ int wlan_hdd_wondertap_init(void **handle,
 		 params->tx_rate.preamble, params->tx_rate.bw,
 		 params->tx_rate.gi, params->tx_rate.nss,
 		 params->tx_rate.mcs);
+	hdd_info("Rate mask preamble:%d bw:%d nss:%d max_mcs:%d rate_adaptation:%d",
+		 params->tx_rate_mask.max_preamble, params->tx_rate_mask.max_bw,
+		 params->tx_rate_mask.max_nss, params->tx_rate_mask.max_mcs,
+		 params->rate_adaptation_enable);
 
 	if (params->channel.bandwidth > WONDERTAP_RATE_BW_320 ||
 	    params->tx_rate.bw > WONDERTAP_RATE_BW_320 ||

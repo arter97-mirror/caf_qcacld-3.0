@@ -4443,6 +4443,7 @@ struct wow_enable_params {
 	enum wow_resume_trigger resume_trigger;
 };
 
+#define VHT_MCS_0_7 0x0
 #define VHT_MCS_0_8 0x1U
 #define VHT_MCS_0_9 0x2U
 #define VHT_MCS_DISABLE 0x3U
