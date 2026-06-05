@@ -987,7 +987,7 @@ void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	enum qdf_proto_subtype subtype;
 	struct qdf_mac_addr *dest_mac_addr;
-	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (is_dp_intf_valid(dp_intf))
 		return;
@@ -1027,10 +1027,10 @@ void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 	}
 
 	/* Since it is TDLS call took TDLS vdev ref*/
-	status = wlan_objmgr_vdev_try_get_ref(dp_link->vdev, WLAN_TDLS_SB_ID);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		wlan_tdls_update_tx_pkt_cnt(dp_link->vdev, dest_mac_addr);
-		wlan_objmgr_vdev_release_ref(dp_link->vdev, WLAN_TDLS_SB_ID);
+	vdev = dp_objmgr_get_vdev_by_user(dp_link, WLAN_TDLS_SB_ID);
+	if (vdev) {
+		wlan_tdls_update_tx_pkt_cnt(vdev, dest_mac_addr);
+		dp_objmgr_put_vdev_by_user(vdev, WLAN_TDLS_SB_ID);
 	}
 }
 
@@ -2047,7 +2047,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 	bool is_eapol, send_over_nl;
 	bool is_dhcp, is_ip_mcast;
 	struct dp_tx_rx_stats *stats;
-	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 	uint8_t pkt_type;
 
 	/* Sanity check on inputs */
@@ -2162,13 +2162,11 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						   QDF_NBUF_SRC_MAC_OFFSET);
 
-		status = wlan_objmgr_vdev_try_get_ref(dp_link->vdev,
-						      WLAN_TDLS_SB_ID);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			wlan_tdls_update_rx_pkt_cnt(dp_link->vdev, mac_addr,
+		vdev = dp_objmgr_get_vdev_by_user(dp_link, WLAN_TDLS_SB_ID);
+		if (vdev) {
+			wlan_tdls_update_rx_pkt_cnt(vdev, mac_addr,
 						    dest_mac_addr);
-			wlan_objmgr_vdev_release_ref(dp_link->vdev,
-						     WLAN_TDLS_SB_ID);
+			dp_objmgr_put_vdev_by_user(vdev, WLAN_TDLS_SB_ID);
 		}
 
 		if (dp_rx_pkt_tracepoints_enabled())
