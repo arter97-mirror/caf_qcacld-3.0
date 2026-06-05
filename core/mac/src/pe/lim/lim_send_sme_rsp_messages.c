@@ -453,9 +453,15 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		lim_send_smps_intolerent(mac_ctx, pe_session, bcn_len, bcn_ptr);
 		rsp->uapsd_mask = pe_session->gUapsdPerAcBitmask;
 
-		mlo_mgr_update_link_status_code(pe_session->vdev,
-						wlan_vdev_get_link_id(pe_session->vdev),
-						STATUS_SUCCESS);
+		/* Link ID is valid only for MLO connections; skip for
+		 * single link connections where no link ID is assigned.
+		 */
+		if (wlan_vdev_get_link_id(pe_session->vdev) !=
+		    WLAN_LINK_ID_INVALID)
+			mlo_mgr_update_link_status_code(
+					pe_session->vdev,
+					wlan_vdev_get_link_id(pe_session->vdev),
+					STATUS_SUCCESS);
 	}
 
 	return QDF_STATUS_SUCCESS;
