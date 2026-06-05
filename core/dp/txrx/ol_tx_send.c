@@ -203,17 +203,18 @@ ol_tx_send(struct ol_txrx_pdev_t *pdev,
 	int msdu_credit_consumed;
 	uint16_t id;
 	int failed;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
 
 	msdu_credit_consumed = ol_tx_send_base(pdev, tx_desc, msdu);
 	id = ol_tx_desc_id(pdev, tx_desc);
 	QDF_NBUF_UPDATE_TX_PKT_COUNT(msdu, QDF_NBUF_TX_PKT_TXRX);
+	if (qdf_likely(tx_desc->vdev))
+		opmode = tx_desc->vdev->qdf_opmode;
 	DPTRACE(qdf_dp_trace_ptr(msdu, QDF_DP_TRACE_TXRX_PACKET_PTR_RECORD,
-				QDF_TRACE_DEFAULT_PDEV_ID,
-				qdf_nbuf_data_addr(msdu),
-				sizeof(uint8_t *), tx_desc->id,
-				vdev_id, 0,
-				tx_desc->vdev->qdf_opmode
-				));
+				 QDF_TRACE_DEFAULT_PDEV_ID,
+				 qdf_nbuf_data_addr(msdu),
+				 sizeof(uint8_t *), tx_desc->id,
+				 vdev_id, 0, opmode));
 	failed = htt_tx_send_std(pdev->htt_pdev, msdu, id);
 	if (qdf_unlikely(failed)) {
 		ol_tx_target_credit_incr_int(pdev, msdu_credit_consumed);
