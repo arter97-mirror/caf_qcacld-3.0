@@ -608,6 +608,7 @@ static uint16_t p2p_get_next_seq_num(uint16_t *seq_num,
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 	struct wlan_objmgr_vdev *vdev;
 	bool is_new_random_ta;
+	enum QDF_OPMODE opmode;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(tx_ctx->p2p_soc_obj->soc,
 						    tx_ctx->vdev_id,
@@ -620,6 +621,18 @@ static uint16_t p2p_get_next_seq_num(uint16_t *seq_num,
 	p2p_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(
 						vdev, WLAN_UMAC_COMP_P2P);
 	if (!p2p_vdev_obj) {
+		opmode = wlan_vdev_mlme_get_opmode(vdev);
+		if (opmode == QDF_NAN_DISC_MODE) {
+			/*
+			 * NAN discovery vdevs don't have a p2p_vdev_priv_obj.
+			 * Skip random-seq logic and increment sequentially.
+			 */
+			new_seq_num = wlan_peer_mlme_get_next_seq_num(seq_num);
+			*seq_num = new_seq_num;
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+			return new_seq_num;
+		}
+
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		p2p_debug("p2p vdev object is NULL");
 		return false;
