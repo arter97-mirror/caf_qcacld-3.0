@@ -1337,7 +1337,19 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 		req.crypto.mgmt_ciphers = rso_cfg->orig_sec_info.mgmtcipherset;
 		req.crypto.akm_suites = rso_cfg->orig_sec_info.key_mgmt;
 		req.assoc_ie.len = rso_cfg->assoc_ie.len;
-
+		/*
+		 * Derive user_mfp from rso_rsn_caps (for cross-AKM roam)
+		 * but also preserve MFPC/MFPR from the original connection
+		 * profile. If rso_rsn_caps lost these bits (e.g. due to
+		 * user_mfp not being re-propagated), orig_sec_info.rsn_caps
+		 * ensures they are restored, preventing rso_rsn_caps from
+		 * being permanently zeroed out on the next cm_connect_start_ind.
+		 */
+		req.crypto.user_mfp =
+			(rso_cfg->rso_rsn_caps |
+			 (rso_cfg->orig_sec_info.rsn_caps &
+			  (RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE))) &
+			(RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE);
 		req.assoc_ie.ptr = qdf_mem_malloc(req.assoc_ie.len);
 		if (!req.assoc_ie.ptr)
 			return QDF_STATUS_E_NOMEM;
@@ -1350,14 +1362,15 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 	mlme_cm_osif_roam_get_scan_params(assoc_vdev, &req.scan_ie,
 					  &req.dot11mode_filter);
 
-	mlme_info("vdev:%d Connecting to " QDF_SSID_FMT " link_addr: " QDF_MAC_ADDR_FMT " freq %d rsn_caps:0x%x auth_type:0x%x pairwise:0x%x grp:0x%x mcast:0x%x akms:0x%x assoc_ie_len:%d f_rsne:%d is_wps:%d dot11_filter:%d",
+	mlme_info("vdev:%d Connecting to " QDF_SSID_FMT " link_addr: " QDF_MAC_ADDR_FMT " freq %d rsn_caps:0x%x auth_type:0x%x pairwise:0x%x grp:0x%x mcast:0x%x akms:0x%x assoc_ie_len:%d f_rsne:%d is_wps:%d dot11_filter:%d mfp:%d",
 		  req.vdev_id, QDF_SSID_REF(req.ssid.length, req.ssid.ssid),
 		  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
 		  req.chan_freq, req.crypto.rsn_caps, req.crypto.auth_type,
 		  req.crypto.ciphers_pairwise, req.crypto.group_cipher,
 		  req.crypto.mgmt_ciphers, req.crypto.akm_suites,
 		  req.assoc_ie.len, req.force_rsne_override,
-		  req.is_wps_connection, req.dot11mode_filter);
+		  req.is_wps_connection, req.dot11mode_filter,
+		  req.crypto.user_mfp);
 
 	copied_conn_req_lock_acquire(sta_ctx);
 	if (!sta_ctx->copied_conn_req)

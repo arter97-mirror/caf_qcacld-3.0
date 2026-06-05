@@ -355,6 +355,11 @@ QDF_STATUS wlan_hdd_send_green_ap_ll_ps_event(
 	struct vdev_osif_priv *osif_priv;
 	struct sk_buff *skb;
 
+	if (!vdev) {
+		hdd_err("VDEV is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv) {
 		hdd_err("OSIF priv is NULL");
