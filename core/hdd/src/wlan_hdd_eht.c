@@ -32,6 +32,7 @@
 #include "wma_api.h"
 #include "wlan_osif_features.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include "wlan_cmn_ieee80211.h"
 
 #if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
 #define CHAN_WIDTH_SET_40MHZ_IN_2G \
@@ -168,6 +169,56 @@ hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 	iftype_sta->types_mask = BIT(NL80211_IFTYPE_STATION);
 	iftype_ap->types_mask = BIT(NL80211_IFTYPE_AP);
 }
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+static struct wiphy_iftype_ext_capab wlan_hdd_ap_iftype_ext_capab = {
+	.iftype = NL80211_IFTYPE_AP,
+};
+
+void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
+{
+	struct wiphy_iftype_ext_capab *ap_capab = NULL;
+	uint8_t max_simul_links;
+	int i;
+
+	if (!(hdd_ctx->wiphy->flags & WIPHY_FLAG_SUPPORTS_MLO))
+		return;
+
+	max_simul_links = wlan_mlme_get_mlo_sap_support_link(hdd_ctx->psoc);
+	if (!max_simul_links)
+		return;
+
+	/*
+	 * wifi_pos (RTT/11AZ) may have already registered an AP iftype entry.
+	 * Patch EML/MLD fields into it rather than overwriting the pointer,
+	 * so both ext_capa (RTT) and eml/mld caps coexist in one entry.
+	 */
+	for (i = 0; i < hdd_ctx->wiphy->num_iftype_ext_capab; i++) {
+		if (hdd_ctx->wiphy->iftype_ext_capab[i].iftype ==
+		    NL80211_IFTYPE_AP) {
+			ap_capab = (struct wiphy_iftype_ext_capab *)
+					&hdd_ctx->wiphy->iftype_ext_capab[i];
+			break;
+		}
+	}
+
+	if (ap_capab) {
+		ap_capab->eml_capabilities = 0;
+		QDF_SET_BITS(ap_capab->mld_capa_and_ops,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_IDX,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_BITS,
+			     max_simul_links - 1);
+	} else {
+		wlan_hdd_ap_iftype_ext_capab.eml_capabilities = 0;
+		QDF_SET_BITS(wlan_hdd_ap_iftype_ext_capab.mld_capa_and_ops,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_IDX,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_BITS,
+			     max_simul_links - 1);
+		hdd_ctx->wiphy->iftype_ext_capab = &wlan_hdd_ap_iftype_ext_capab;
+		hdd_ctx->wiphy->num_iftype_ext_capab = 1;
+	}
+}
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
 
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 {
