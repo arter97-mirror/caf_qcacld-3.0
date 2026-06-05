@@ -376,7 +376,7 @@ static void wma_derive_ext_he_cap(tDot11fIEhe_cap *he_cap,
 	he_cap->min_frag_size = QDF_MIN(he_cap->min_frag_size,
 			new_cap->min_frag_size);
 	he_cap->trigger_frm_mac_pad =
-		QDF_MIN(he_cap->trigger_frm_mac_pad,
+		QDF_MAX(he_cap->trigger_frm_mac_pad,
 				new_cap->trigger_frm_mac_pad);
 	he_cap->multi_tid_aggr_rx_supp = QDF_MIN(he_cap->multi_tid_aggr_rx_supp,
 			new_cap->multi_tid_aggr_rx_supp);
