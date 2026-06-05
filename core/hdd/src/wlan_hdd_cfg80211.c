@@ -32999,7 +32999,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
 #if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
-QDF_STATUS
+static QDF_STATUS
 wlan_hdd_cfg80211_create_pmsr_peer(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev,
 				   struct qdf_mac_addr *peer_mac_addr)
@@ -34415,7 +34415,7 @@ static int __wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy,
  *
  * Return: 0 on success, negative errno on failure
  */
-int wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy, struct net_device *dev,
+static int wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy, struct net_device *dev,
 				 const u8 *peer, u64 *cookie)
 {
 	int errno;
