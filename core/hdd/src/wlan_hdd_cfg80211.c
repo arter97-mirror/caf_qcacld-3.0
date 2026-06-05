@@ -249,6 +249,7 @@
 #include "osif_twt_ext_req.h"
 #include "osif_twt_internal.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_hdd_eht.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -30666,6 +30667,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 
 	wlan_wifi_pos_cfg80211_set_wiphy_ext_feature(wiphy, hdd_ctx->psoc);
 	wlan_hdd_set_mlo_wiphy_ext_feature(wiphy, hdd_ctx);
+	hdd_update_wiphy_mlo_sap_cap(hdd_ctx);
 	wlan_hdd_set_ext_kek_kck_support(wiphy);
 	wlan_hdd_set_32bytes_kck_support(wiphy);
 	wlan_hdd_set_nan_secure_mode(wiphy);
