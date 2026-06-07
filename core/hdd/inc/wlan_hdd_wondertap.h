@@ -95,6 +95,20 @@ struct hdd_wondertap_peer_setup {
 };
 
 /**
+ * wlan_hdd_wondertap_peer_del() - Delete a wondertap peer
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @peer_addr: peer MAC address
+ *
+ * Sends a passthru peer delete message to PE via SME.
+ *
+ * Return: None
+ */
+void wlan_hdd_wondertap_peer_del(struct hdd_context *hdd_ctx,
+				 uint8_t vdev_id,
+				 const uint8_t *peer_addr);
+
+/**
  * wlan_hdd_wondertap_register_ops() - Register wondertap operations
  * @dev: device handle
  *
