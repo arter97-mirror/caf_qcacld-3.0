@@ -276,6 +276,9 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 	uint8_t num_ml_sta = 0, num_disabled_ml = 0;
 	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct passthru_peer_tbl_entry *peer_tbl;
+	uint8_t vdev_id = adapter->deflink->vdev_id;
+	uint8_t i;
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -284,6 +287,19 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 	ASSERT_RTNL();
 
 	dev_close(adapter->dev);
+
+	peer_tbl = g_wt_ctx->peer_tbl;
+	for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		if (peer_tbl[i].peer_status == PASSTHRU_PEER_SETUP_NOT_DONE)
+			continue;
+		hdd_debug("Deleting wondertap peer " QDF_MAC_ADDR_FMT
+			  " status %d on deinit",
+			  QDF_MAC_ADDR_REF(peer_tbl[i].mac_addr.bytes),
+			  peer_tbl[i].peer_status);
+		wlan_hdd_wondertap_peer_del(hdd_ctx, vdev_id,
+					    peer_tbl[i].mac_addr.bytes);
+		qdf_mem_zero(&peer_tbl[i], sizeof(peer_tbl[i]));
+	}
 
 	status = qdf_event_reset(&g_wt_ctx->wondertap_vdev_event);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -747,9 +763,9 @@ wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 	sme_passthru_peer_setup(mac_handle, &req);
 }
 
-static void wlan_hdd_wondertap_peer_del(struct hdd_context *hdd_ctx,
-					uint8_t vdev_id,
-					const uint8_t *peer_addr)
+void wlan_hdd_wondertap_peer_del(struct hdd_context *hdd_ctx,
+				 uint8_t vdev_id,
+				 const uint8_t *peer_addr)
 {
 	struct sir_passthru_peer_del_msg req = {0};
 	mac_handle_t mac_handle;
