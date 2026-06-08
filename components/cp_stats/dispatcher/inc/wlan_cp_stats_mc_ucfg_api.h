@@ -166,6 +166,23 @@ ucfg_mc_cp_stats_send_get_avg_tx_power(
 		void *cookie);
 
 /**
+ * ucfg_mc_cp_stats_send_get_tx_power_calling() - Query effective per-chain
+ *                                                TX power limits from FW
+ * @psoc: pointer to psoc object
+ * @dsi_id: DSI index for which power limits are requested
+ * @cb: callback invoked on wlan_tas_plimit_event with per-chain data
+ * @cookie: opaque cookie passed back to @cb
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS
+ucfg_mc_cp_stats_send_get_tx_power_calling(
+		struct wlan_objmgr_psoc *psoc,
+		uint32_t dsi_id,
+		void (*cb)(struct wlan_tas_plimit_event *ev, void *cookie),
+		void *cookie);
+
+/**
  * wlan_cfg80211_mc_twt_clear_infra_cp_stats() - send request to reset
  * control path statistics
  * @vdev: pointer to vdev object

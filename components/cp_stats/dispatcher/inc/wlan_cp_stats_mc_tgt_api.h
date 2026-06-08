@@ -176,6 +176,18 @@ QDF_STATUS tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
 					      uint32_t dsi_id);
 
 /**
+ * tgt_cp_stats_send_get_tx_power_calling() - Request per-chain TX power
+ *                                            limits from FW
+ * @psoc: pointer to psoc object
+ * @dsi_id: DSI ID for the query
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS tgt_cp_stats_send_get_tx_power_calling(
+					struct wlan_objmgr_psoc *psoc,
+					uint32_t dsi_id);
+
+/**
  * tgt_set_pdev_stats_update_period(): API to set pdev stats update
  * period to FW
  * @psoc: pointer to psoc object

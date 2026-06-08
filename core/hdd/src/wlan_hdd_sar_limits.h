@@ -295,6 +295,46 @@ struct hdd_tas_metrics_priv {
 };
 
 /**
+ * struct hdd_tas_plimit_chain - TAS per-antenna chain power info
+ * (0.25 dBm units)
+ * @chain_no: chain number
+ * @chain_operating_band: chain operating band
+ * @power: power value
+ */
+struct hdd_tas_plimit_chain {
+	uint32_t chain_no;
+	uint32_t chain_operating_band;
+	int32_t  power; /* 0.25 dBm units */
+};
+
+/**
+ * struct hdd_tas_plimit_priv: TAS per-chain power limit container used by
+ * callbacks
+ * @fw_status: firmware status
+ * @num_chains: number chains
+ * @chains: hdd_tas_plimit_chain array
+ */
+struct hdd_tas_plimit_priv {
+	uint32_t fw_status;
+	uint32_t num_chains;
+	struct hdd_tas_plimit_chain chains[HDD_TAS_PLIMIT_MAX_CHAINS];
+};
+
+/**
+ * struct hdd_tas_chain_info - generic per-chain descriptor for NL band-entry
+ * helper
+ * @chain_no: chain number
+ * @chain_operating_band: chain operating band
+ * @tx_value: value to report inside tx_power_level_info (power_region or raw
+ *            power bits)
+ */
+struct hdd_tas_chain_info {
+	uint32_t chain_no;
+	uint32_t chain_operating_band;
+	uint32_t tx_value;
+};
+
+/**
  * wlan_hdd_cfg80211_tas() - Handle QCA_NL80211_VENDOR_SUBCMD_TAS
  * @wiphy: Pointer to wireless phy
  * @wdev: Pointer to wireless device

@@ -68,6 +68,7 @@
  * @TYPE_QSH_SCAN_STATS: QSH scan stats was requested
  * @TYPE_COEX_STATS: coex stats requested
  * @TYPE_TAS_METRICS: TAS avg TX power metrics requested
+ * @TYPE_TAS_CURRENT_PLIMIT: TAS effective per-chain power limits requested
  * @TYPE_MAX: maximum value
  */
 enum stats_req_type {
@@ -82,6 +83,7 @@ enum stats_req_type {
 	TYPE_QSH_SCAN_STATS,
 	TYPE_COEX_STATS,
 	TYPE_TAS_METRICS,
+	TYPE_TAS_CURRENT_PLIMIT,
 	TYPE_MAX,
 };
 
@@ -273,6 +275,32 @@ struct wlan_tas_metrics_event {
 };
 
 /**
+ * struct wlan_tas_chain_plimit - per-chain TX power limit (GET_PLIMIT)
+ * @chain_no: antenna chain number
+ * @chain_operating_band: 0=2GHz, 1=5GHz, 2=6GHz
+ * @power_limit_dbm: power limit in units of 0.25 dBm (signed)
+ */
+struct wlan_tas_chain_plimit {
+	uint32_t chain_no;
+	uint32_t chain_operating_band;
+	int32_t  power_limit_dbm;
+};
+
+/**
+ * struct wlan_tas_plimit_event - abstracted GET_PLIMIT response
+ * @fw_status: 0=success, 1=failure
+ * @dsi_id: Device State Index for which limits are filled
+ * @num_chains: number of valid entries in @chains
+ * @chains: per-chain power limit data
+ */
+struct wlan_tas_plimit_event {
+	uint32_t fw_status;
+	uint32_t dsi_id;
+	uint32_t num_chains;
+	struct wlan_tas_chain_plimit chains[WLAN_TAS_MAX_CHAINS];
+};
+
+/**
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
@@ -308,6 +336,9 @@ struct request_info {
 					  void *cookie);
 		void (*get_tas_metrics_cb)(struct wlan_tas_metrics_event *ev,
 					   void *cookie);
+		void (*get_tas_current_plimit_cb)(
+				struct wlan_tas_plimit_event *ev,
+				void *cookie);
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
 					      void *cookie);
