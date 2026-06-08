@@ -262,8 +262,38 @@ wlan_hdd_sar_limits_policy[QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX + 1];
 	.doit = wlan_hdd_cfg80211_get_sar_capability,                   \
 	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)                   \
 },
+
+/**
+ * wlan_hdd_cfg80211_tas() - Handle QCA_NL80211_VENDOR_SUBCMD_TAS
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Length of @data
+ *
+ * Wrapper function of __wlan_hdd_cfg80211_tas()
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
+			  struct wireless_dev *wdev,
+			  const void *data, int data_len);
+
+extern const struct nla_policy
+wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1];
+
+#define FEATURE_TAS_VENDOR_COMMANDS                                     \
+{                                                                       \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TAS,                   \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,                         \
+	.doit = wlan_hdd_cfg80211_tas,                                  \
+	vendor_command_policy(wlan_hdd_tas_policy,                      \
+			      QCA_WLAN_VENDOR_ATTR_TAS_MAX)             \
+},
 #else /* FEATURE_SAR_LIMITS */
 #define FEATURE_SAR_LIMITS_VENDOR_COMMANDS
+#define FEATURE_TAS_VENDOR_COMMANDS
 static inline
 void hdd_store_sar_config(struct hdd_context *hdd_ctx,
 			  struct sar_limit_cmd_params *sar_limit_cmd)

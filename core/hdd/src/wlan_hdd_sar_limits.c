@@ -33,6 +33,7 @@
 #include <linux/if_ether.h>
 #include <wlan_osif_request_manager.h>
 #include <wlan_hdd_sar_limits.h>
+#include <wlan_cp_stats_mc_ucfg_api.h>
 
 #define WLAN_WAIT_TIME_SAR 5000
 /**
@@ -1430,3 +1431,104 @@ void wlan_hdd_sar_timers_deinit(struct hdd_context *hdd_ctx)
 }
 #endif
 
+const struct nla_policy
+wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]          = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE]         = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES]       = {.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO]    = {.type = NLA_U32},
+};
+
+static int __wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1];
+	uint32_t operation, tas_mode;
+	enum host_tas_direction direction;
+	QDF_STATUS status;
+	int errno;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err("Command not allowed in FTM/MONITOR mode");
+		return -EPERM;
+	}
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_TAS_MAX,
+				    data, data_len,
+				    wlan_hdd_tas_policy)) {
+		hdd_err("Invalid TAS attributes");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]) {
+		hdd_err("TAS operation not present");
+		return -EINVAL;
+	}
+
+	if (!ucfg_cp_stats_is_ctas_plim_indication_supported(hdd_ctx->psoc)) {
+		hdd_err("FW does not support CTAS PLIM indication");
+		return -EOPNOTSUPP;
+	}
+
+	operation = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]);
+	switch (operation) {
+	case QCA_WLAN_TAS_OPERATION_SET_MODE:
+		if (!tb[QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE]) {
+			hdd_err("TAS mode value not present");
+			return -EINVAL;
+		}
+		tas_mode = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE]);
+		switch (tas_mode) {
+		case QCA_WLAN_TAS_MODE_NONE:
+			direction = HOST_TAS_DIRECTION_NONE;
+			break;
+		case QCA_WLAN_TAS_MODE_INCREASE:
+			direction = HOST_TAS_DIRECTION_INCREASE;
+			break;
+		case QCA_WLAN_TAS_MODE_DECREASE:
+			direction = HOST_TAS_DIRECTION_DECREASE;
+			break;
+		default:
+			hdd_err("Invalid TAS mode value: %u", tas_mode);
+			return -EINVAL;
+		}
+		hdd_debug("TAS SET_MODE: sending direction=%d to FW",
+			  direction);
+		status = ucfg_cp_stats_send_tas_mode(hdd_ctx->psoc, direction);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to send TAS mode, status: %d", status);
+			return qdf_status_to_os_return(status);
+		}
+		return 0;
+
+	default:
+		hdd_err("Unsupported TAS operation: %u", operation);
+		return -EOPNOTSUPP;
+	}
+}
+
+int wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
+			  struct wireless_dev *wdev,
+			  const void *data, int data_len)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_tas(wiphy, wdev, data, data_len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
+}

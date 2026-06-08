@@ -155,6 +155,17 @@ bool tgt_cp_stats_is_ctas_plim_indication_supported(
 					struct wlan_objmgr_psoc *psoc);
 
 /**
+ * tgt_cp_stats_send_tas_mode() - Send TAS mode to firmware
+ * @psoc: pointer to psoc object
+ * @direction: TAS direction as enum host_tas_direction; WMI layer converts
+ *             to wmi_plim_direction_type before sending to firmware
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS tgt_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
+				      enum host_tas_direction direction);
+
+/**
  * tgt_set_pdev_stats_update_period(): API to set pdev stats update
  * period to FW
  * @psoc: pointer to psoc object

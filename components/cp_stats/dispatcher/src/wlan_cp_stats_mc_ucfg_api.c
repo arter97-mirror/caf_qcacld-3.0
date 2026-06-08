@@ -1623,3 +1623,9 @@ ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return tgt_cp_stats_is_ctas_plim_indication_supported(psoc);
 }
+
+QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
+				       enum host_tas_direction direction)
+{
+	return tgt_cp_stats_send_tas_mode(psoc, direction);
+}
