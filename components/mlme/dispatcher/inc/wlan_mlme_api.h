@@ -5555,6 +5555,18 @@ wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *periodic_display_time);
 
 /**
+ * wlan_mlme_stats_get_chain_signal_in_signal_row() - get INI toggle for
+ * reporting per-chain RSSI on the signal row in iw station dump
+ * @psoc: pointer to psoc object
+ * @val: buffer to hold value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_stats_get_chain_signal_in_signal_row(struct wlan_objmgr_psoc *psoc,
+					       bool *val);
+
+/**
  * wlan_mlme_is_bcn_prot_disabled_for_sap() - Is beacon protection config
  * disabled for SAP interface
  *

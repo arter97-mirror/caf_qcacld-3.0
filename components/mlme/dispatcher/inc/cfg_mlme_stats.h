@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -152,11 +153,37 @@ enum mlme_stats_link_speed_rpt_type {
 		CFG_VALUE_OR_DEFAULT, \
 		"max possible rssi link speed")
 
+/*
+ * <ini>
+ * gchain_signal_in_signal_row - Report per-chain RSSI on signal row
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When enabled, iw station dump reports per-chain RSSI values on the
+ * "signal:" row instead of "signal avg:":
+ *   signal:     -35 dBm [-35, -35] dBm
+ *   signal avg: -41 dBm
+ *
+ * When disabled (default), per-chain values appear on "signal avg:" row:
+ *   signal:     -35 dBm
+ *   signal avg: -41 [-41, -41] dBm
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STATS_CHAIN_SIGNAL_IN_SIGNAL_ROW CFG_INI_BOOL( \
+		"gchain_signal_in_signal_row", \
+		false, \
+		"Report per-chain RSSI on signal row in iw station dump")
+
 #define CFG_STATS_ALL \
 	CFG(CFG_PERIODIC_STATS_DISPLAY_TIME) \
 	CFG(CFG_LINK_SPEED_RSSI_HIGH) \
 	CFG(CFG_LINK_SPEED_RSSI_MID) \
 	CFG(CFG_LINK_SPEED_RSSI_LOW) \
-	CFG(CFG_REPORT_MAX_LINK_SPEED)
+	CFG(CFG_REPORT_MAX_LINK_SPEED) \
+	CFG(CFG_STATS_CHAIN_SIGNAL_IN_SIGNAL_ROW)
 
 #endif /* __CFG_MLME_STATS_H */

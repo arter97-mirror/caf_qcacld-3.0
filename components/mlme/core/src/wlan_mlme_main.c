@@ -3322,6 +3322,8 @@ static void mlme_init_stats_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LINK_SPEED_RSSI_LOW);
 	stats->stats_report_max_link_speed_rssi =
 		cfg_get(psoc, CFG_REPORT_MAX_LINK_SPEED);
+	stats->stats_chain_signal_in_signal_row =
+		cfg_get(psoc, CFG_STATS_CHAIN_SIGNAL_IN_SIGNAL_ROW);
 }
 
 #ifdef WLAN_ADAPTIVE_11R
