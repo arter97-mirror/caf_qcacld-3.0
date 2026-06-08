@@ -1980,6 +1980,7 @@ struct wlan_mlme_sta_cfg {
  * @stats_link_speed_rssi_med: medium rssi link speed
  * @stats_link_speed_rssi_low: rssi link speed, low
  * @stats_report_max_link_speed_rssi: report speed limit
+ * @stats_chain_signal_in_signal_row: report per-chain RSSI on signal row
  */
 struct wlan_mlme_stats_cfg {
 	uint32_t stats_periodic_display_time;
@@ -1987,6 +1988,7 @@ struct wlan_mlme_stats_cfg {
 	int stats_link_speed_rssi_med;
 	int stats_link_speed_rssi_low;
 	uint32_t stats_report_max_link_speed_rssi;
+	bool stats_chain_signal_in_signal_row;
 };
 
 /**

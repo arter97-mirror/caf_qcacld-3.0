@@ -8846,6 +8846,23 @@ wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_stats_get_chain_signal_in_signal_row(struct wlan_objmgr_psoc *psoc,
+					       bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_STATS_CHAIN_SIGNAL_IN_SIGNAL_ROW);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.stats.stats_chain_signal_in_signal_row;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool
 wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc)
 {
