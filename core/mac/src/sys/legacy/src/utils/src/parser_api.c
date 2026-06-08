@@ -17525,7 +17525,7 @@ sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
 	qdf_size_t uhr_ie_len;
 	QDF_STATUS status;
 
-	if (nframe <= WLAN_ASSOC_RSP_IES_OFFSET)
+	if (nframe <= WLAN_ASSOC_REQ_IES_OFFSET)
 		return;
 
 	status = find_uhr_cap_ie(pframe + WLAN_ASSOC_REQ_IES_OFFSET,
