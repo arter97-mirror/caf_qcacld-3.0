@@ -6869,6 +6869,13 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 			if (ch_freq == pcl.pcl_list[i])
 				return true;
 
+		if (mode == PM_SAP_MODE &&
+		    policy_mgr_allow_4th_new_freq(psoc, ch_freq, mode, 0)) {
+			policy_mgr_debug("4th port SAP ch %d allowed via hw mode check",
+					 ch_freq);
+			return true;
+		}
+
 		policy_mgr_err("4th port failed on ch freq %d with mode %d",
 			       ch_freq, mode);
 
