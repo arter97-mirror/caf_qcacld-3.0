@@ -690,9 +690,26 @@ bool is_mgmt_protected(uint32_t vdev_id,
 	tpDphHashNode sta_ds;
 	struct pe_session *session;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE opmode;
 
 	if (!mac_ctx)
 		return false;
+
+	/*
+	 * NAN Discovery vdevs have no PE session. For NAN peers, RMF
+	 * protection is determined solely by whether a key is installed.
+	 */
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		opmode = wlan_vdev_mlme_get_opmode(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		if (opmode == QDF_NAN_DISC_MODE)
+			return wlan_peer_is_key_installed(
+						mac_ctx->psoc,
+						(uint8_t *)peer_mac_addr);
+	}
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
