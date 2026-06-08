@@ -635,7 +635,9 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	enum channel_state ch_state;
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t cur_band;
-	qdf_freq_t ch_freq, allowed_freq;
+	qdf_freq_t ch_freq, allowed_freq, op_freq = 0;
+	enum reg_wifi_band offchan_band, op_band;
+	struct wlan_channel *bss_chan;
 	uint32_t tx_power = 0;
 
 	vdev_obj = peer->vdev_priv;
@@ -674,8 +676,19 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 		return;
 	}
 
-	if (BIT(REG_BAND_2G) == cur_band) {
-		tdls_err("sending the offchannel value as 0 as only 2g is supported");
+	offchan_band = wlan_reg_freq_to_band(peer->pref_off_chan_freq);
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev_obj->vdev);
+	if (bss_chan)
+		op_freq = bss_chan->ch_freq;
+	op_band = wlan_reg_freq_to_band(op_freq);
+
+	if (BIT(REG_BAND_2G) == cur_band || op_band != REG_BAND_2G ||
+	    (peer->pref_off_chan_freq && offchan_band == REG_BAND_2G)) {
+		tdls_err("vdev %d off-channel disabled: op_freq %d offchan_freq %d (cur_band cap 0x%x)",
+			 peer_param->vdev_id, op_freq,
+			 peer->pref_off_chan_freq, cur_band);
+		peer_param->peer_cap.peer_off_chan_support = 0;
 		peer_param->peer_cap.pref_off_channum = 0;
 		peer_param->peer_cap.opclass_for_prefoffchan = 0;
 		peer_param->peer_cap.pref_offchan_freq = 0;
