@@ -4710,6 +4710,80 @@ policy_mgr_filter_non_acs_channels(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * policy_mgr_get_mlo_sap_scc_freq_on_empty_pcl() - Get MLO SAP force SCC
+ * frequency when PCL is empty
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @ml_sap_vdev: whether the vdev is an ML SAP vdev
+ * @intf_ch_freq: prefer force scc frequency
+ *
+ * For MLO SAP with non-2G channel, when PCL is empty
+ * (e.g., ML STA 2G+6G + SAP 2G -> new SAP 5G),
+ * hardware can only support 2 channels simultaneously:
+ *   MAC0: 2GHz (STA 2G + SAP 2G)
+ *   MAC1: 6GHz (STA 6G + SAP 5G -> must SCC to 6G)
+ * Force SCC of SAP's non-2G link to ML STA's non-2G channel.
+ *
+ * Return: QDF_STATUS_SUCCESS if force SCC channel is found.
+ */
+static QDF_STATUS
+policy_mgr_get_mlo_sap_scc_freq_on_empty_pcl(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id,
+					     qdf_freq_t sap_ch_freq,
+					     bool ml_sap_vdev,
+					     qdf_freq_t *intf_ch_freq)
+{
+	uint32_t conn_index;
+	struct wlan_objmgr_vdev *vdev;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (!ml_sap_vdev || WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
+		return QDF_STATUS_E_INVAL;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0;
+	     conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (!pm_conc_connection_list[conn_index].in_use ||
+		    pm_conc_connection_list[conn_index].mode != PM_STA_MODE ||
+		    WLAN_REG_IS_24GHZ_CH_FREQ(
+		    pm_conc_connection_list[conn_index].freq))
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				psoc,
+				pm_conc_connection_list[conn_index].vdev_id,
+				WLAN_POLICY_MGR_ID);
+
+		if (!vdev)
+			continue;
+
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			*intf_ch_freq =
+			pm_conc_connection_list[conn_index].freq;
+			wlan_objmgr_vdev_release_ref(vdev,
+						     WLAN_POLICY_MGR_ID);
+			policy_mgr_debug("MLO SAP vdev %d: force SCC to ML STA freq %d",
+					 vdev_id, *intf_ch_freq);
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return QDF_STATUS_SUCCESS;
+		}
+		wlan_objmgr_vdev_release_ref(vdev,
+					     WLAN_POLICY_MGR_ID);
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
  * @psoc: Pointer to Psoc
@@ -4788,7 +4862,10 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status) || !pcl.pcl_len) {
 		policy_mgr_err("get pcl failed for mode: %d, pcl len %d", mode,
 			       pcl.pcl_len);
-		return QDF_STATUS_E_INVAL;
+		return policy_mgr_get_mlo_sap_scc_freq_on_empty_pcl(
+					psoc, vdev_id,
+					sap_ch_freq, ml_sap_vdev,
+					intf_ch_freq);
 	}
 
 	/*
@@ -5337,10 +5414,17 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 					 num_connections);
 			break;
 		}
-		/* Use PCL and concurrency combo to get the best channel */
-		policy_mgr_get_pref_force_scc_freq(psoc, vdev_id, intf_ch_freq,
-						   sap_ch_freq, acs_band,
-						   allow_6ghz);
+		/* Use PCL and concurrency combo to get the best channel. */
+		if (QDF_IS_STATUS_ERROR(
+			policy_mgr_get_pref_force_scc_freq(psoc,
+							   vdev_id,
+							   intf_ch_freq,
+							   sap_ch_freq,
+							   acs_band,
+							   allow_6ghz))) {
+			policy_mgr_debug("get_pref_force_scc_freq failed vdev %d",
+					 vdev_id);
+		}
 		break;
 	}
 
