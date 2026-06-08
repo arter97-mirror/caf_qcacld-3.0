@@ -73,6 +73,7 @@
 #define HDD_INFO_RX_BITRATE             STATION_INFO_RX_BITRATE
 #define HDD_INFO_TX_BYTES               STATION_INFO_TX_BYTES
 #define HDD_INFO_CHAIN_SIGNAL_AVG       STATION_INFO_CHAIN_SIGNAL_AVG
+#define HDD_INFO_CHAIN_SIGNAL           0
 #define HDD_INFO_EXPECTED_THROUGHPUT    0
 #define HDD_INFO_RX_BYTES               STATION_INFO_RX_BYTES
 #define HDD_INFO_RX_PACKETS             STATION_INFO_RX_PACKETS
@@ -93,6 +94,7 @@
 #define HDD_INFO_RX_BITRATE             BIT(NL80211_STA_INFO_RX_BITRATE)
 #define HDD_INFO_TX_BYTES               BIT(NL80211_STA_INFO_TX_BYTES)
 #define HDD_INFO_CHAIN_SIGNAL_AVG       BIT(NL80211_STA_INFO_CHAIN_SIGNAL_AVG)
+#define HDD_INFO_CHAIN_SIGNAL           BIT(NL80211_STA_INFO_CHAIN_SIGNAL)
 #define HDD_INFO_EXPECTED_THROUGHPUT  BIT(NL80211_STA_INFO_EXPECTED_THROUGHPUT)
 #define HDD_INFO_RX_BYTES               BIT(NL80211_STA_INFO_RX_BYTES)
 #define HDD_INFO_RX_PACKETS             BIT(NL80211_STA_INFO_RX_PACKETS)
@@ -8308,7 +8310,8 @@ static void hdd_report_actual_rate(enum tx_rate_info rate_flags,
 }
 
 /**
- * hdd_wlan_fill_per_chain_rssi_stats() - Fill per chain rssi stats
+ * hdd_wlan_fill_chain_signal_avg_stats() - Fill per-chain RSSI into
+ * chain_signal_avg[] (legacy behaviour — brackets on "signal avg:" row)
  *
  * @sinfo: The station_info structure to be filled.
  * @link_info: pointer to link_info struct in adapter
@@ -8317,8 +8320,9 @@ static void hdd_report_actual_rate(enum tx_rate_info rate_flags,
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 static void
-hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
-				   struct wlan_hdd_link_info *link_info)
+hdd_wlan_fill_chain_signal_avg_stats(
+		struct station_info *sinfo,
+		struct wlan_hdd_link_info *link_info)
 {
 	bool rssi_stats_valid = false;
 	uint8_t i;
@@ -8327,7 +8331,7 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 	for (i = 0; i < WLAN_MAX_VDEV_CHAINS; i++) {
 		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
 			sinfo->chain_signal_avg[i] =
-			link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
+				link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
 			sinfo->chains |= 1 << i;
 			if (sinfo->chain_signal_avg[i] > sinfo->signal_avg)
 				sinfo->signal_avg = sinfo->chain_signal_avg[i];
@@ -8345,6 +8349,75 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 		sinfo->filled |= HDD_INFO_CHAIN_SIGNAL_AVG;
 		sinfo->filled |= HDD_INFO_SIGNAL_AVG;
 	}
+}
+
+/**
+ * hdd_wlan_fill_chain_signal_stats() - Fill per-chain RSSI into
+ * chain_signal[] (AL WiFi format — brackets on "signal:" row)
+ *
+ * @sinfo: The station_info structure to be filled.
+ * @link_info: pointer to link_info struct in adapter
+ *
+ * Return: None
+ */
+static void
+hdd_wlan_fill_chain_signal_stats(struct station_info *sinfo,
+				 struct wlan_hdd_link_info *link_info)
+{
+	bool rssi_stats_valid = false;
+	uint8_t i;
+
+	sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
+	for (i = 0; i < WLAN_MAX_VDEV_CHAINS; i++) {
+		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
+			sinfo->chain_signal[i] =
+				link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
+			sinfo->chains |= 1 << i;
+			if (sinfo->chain_signal[i] > sinfo->signal_avg)
+				sinfo->signal_avg = sinfo->chain_signal[i];
+
+			hdd_debug("RSSI for chain %d, vdev_id %d is %d",
+				  i, link_info->vdev_id,
+				  sinfo->chain_signal[i]);
+		}
+
+		if (!rssi_stats_valid && sinfo->chain_signal[i])
+			rssi_stats_valid = true;
+	}
+
+	if (rssi_stats_valid) {
+		sinfo->filled |= HDD_INFO_CHAIN_SIGNAL;
+		sinfo->filled |= HDD_INFO_SIGNAL_AVG;
+	}
+}
+
+/**
+ * hdd_wlan_fill_per_chain_rssi_stats() - Fill per chain rssi stats
+ *
+ * @sinfo: The station_info structure to be filled.
+ * @link_info: pointer to link_info struct in adapter
+ *
+ * Dispatches to hdd_wlan_fill_chain_signal_stats() when the INI
+ * gchain_signal_in_signal_row is enabled, otherwise falls back to
+ * hdd_wlan_fill_chain_signal_avg_stats().
+ *
+ * Return: None
+ */
+static void
+hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
+				   struct wlan_hdd_link_info *link_info)
+{
+	bool chain_signal_in_signal_row = false;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	wlan_mlme_stats_get_chain_signal_in_signal_row(
+			hdd_ctx->psoc,
+			&chain_signal_in_signal_row);
+
+	if (chain_signal_in_signal_row)
+		hdd_wlan_fill_chain_signal_stats(sinfo, link_info);
+	else
+		hdd_wlan_fill_chain_signal_avg_stats(sinfo, link_info);
 }
 #else
 static inline void
