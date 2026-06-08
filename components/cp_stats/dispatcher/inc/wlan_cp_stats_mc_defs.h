@@ -67,6 +67,7 @@
  * @TYPE_POWER_DATAPATH_STATS: power datapath stats was requested
  * @TYPE_QSH_SCAN_STATS: QSH scan stats was requested
  * @TYPE_COEX_STATS: coex stats requested
+ * @TYPE_TAS_METRICS: TAS avg TX power metrics requested
  * @TYPE_MAX: maximum value
  */
 enum stats_req_type {
@@ -80,6 +81,7 @@ enum stats_req_type {
 	TYPE_POWER_DATAPATH_STATS,
 	TYPE_QSH_SCAN_STATS,
 	TYPE_COEX_STATS,
+	TYPE_TAS_METRICS,
 	TYPE_MAX,
 };
 
@@ -245,6 +247,32 @@ struct medium_assess_data {
 };
 
 /**
+ * struct wlan_tas_chain_metrics - per-chain TX power region (GET_METRICS)
+ * @chain_no: antenna chain number
+ * @chain_operating_band: 0=2GHz, 1=5GHz, 2=6GHz
+ * @chain_power_region: 0=invalid,1=low,2=medium,3=high,4=extra_high
+ */
+struct wlan_tas_chain_metrics {
+	uint32_t chain_no;
+	uint32_t chain_operating_band;
+	uint32_t chain_power_region;
+};
+
+/**
+ * struct wlan_tas_metrics_event - abstracted GET_METRICS response
+ * @fw_status: 0=success, 1=failure
+ * @time_window_in_sec: regulatory measurement time window
+ * @num_chains: number of valid entries in @chains
+ * @chains: per-chain power region data
+ */
+struct wlan_tas_metrics_event {
+	uint32_t fw_status;
+	uint32_t time_window_in_sec;
+	uint32_t num_chains;
+	struct wlan_tas_chain_metrics chains[WLAN_TAS_MAX_CHAINS];
+};
+
+/**
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
@@ -278,6 +306,8 @@ struct request_info {
 					  bool last);
 		void (*get_coex_stats_cb)(struct wlan_coex_policy_stats *stats,
 					  void *cookie);
+		void (*get_tas_metrics_cb)(struct wlan_tas_metrics_event *ev,
+					   void *cookie);
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
 					      void *cookie);

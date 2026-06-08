@@ -2125,6 +2125,19 @@ tgt_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
 	return tx_ops->send_tas_mode(psoc, direction);
 }
 
+QDF_STATUS
+tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
+				   uint32_t dsi_id)
+{
+	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
+
+	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
+	if (!tx_ops || !tx_ops->send_get_avg_tx_power)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	return tx_ops->send_get_avg_tx_power(psoc, dsi_id);
+}
+
 QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    enum stats_req_type type,
 				    struct request_info *req)

@@ -772,6 +772,43 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+QDF_STATUS
+ucfg_mc_cp_stats_send_get_avg_tx_power(
+		struct wlan_objmgr_psoc *psoc,
+		uint32_t dsi_id,
+		void (*cb)(struct wlan_tas_metrics_event *ev, void *cookie),
+		void *cookie)
+{
+	QDF_STATUS status;
+	bool pending = false;
+	struct request_info info = {0};
+
+	if (!psoc) {
+		cp_stats_err("psoc is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	info.u.get_tas_metrics_cb = cb;
+	info.cookie = cookie;
+
+	status = ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_TAS_METRICS,
+						  &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("Failed to set pending TAS metrics req: %d",
+			     status);
+		return status;
+	}
+
+	status = tgt_cp_stats_send_get_avg_tx_power(psoc, dsi_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("send_get_avg_tx_power failed: %d", status);
+		ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_TAS_METRICS,
+						   &info, &pending);
+	}
+
+	return status;
+}
+
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
 					    enum stats_req_type type,

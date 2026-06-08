@@ -263,6 +263,37 @@ wlan_hdd_sar_limits_policy[QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX + 1];
 	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)                   \
 },
 
+#define HDD_TAS_METRICS_MAX_CHAINS WLAN_TAS_MAX_CHAINS
+#define HDD_TAS_PLIMIT_MAX_CHAINS HDD_TAS_METRICS_MAX_CHAINS
+
+/**
+ * struct hdd_tas_metrics_chain - TAS per-antenna chain metrics
+ * (average TX power region)
+ * @chain_no: chain number
+ * @chain_operating_band: chain operating band
+ * @chain_power_region: chain power region
+ */
+struct hdd_tas_metrics_chain {
+	uint32_t chain_no;
+	uint32_t chain_operating_band;
+	uint32_t chain_power_region;
+};
+
+/**
+ * struct hdd_tas_metrics_priv - TAS metrics container used by callbacks and
+ * replies
+ * @fw_status: firmware status
+ * @time_window_in_sec: time window in second
+ * @num_chains: number of chains
+ * @chains: hdd_tas_metrics_chain array
+ */
+struct hdd_tas_metrics_priv {
+	uint32_t fw_status;
+	uint32_t time_window_in_sec;
+	uint32_t num_chains;
+	struct hdd_tas_metrics_chain chains[HDD_TAS_METRICS_MAX_CHAINS];
+};
+
 /**
  * wlan_hdd_cfg80211_tas() - Handle QCA_NL80211_VENDOR_SUBCMD_TAS
  * @wiphy: Pointer to wireless phy

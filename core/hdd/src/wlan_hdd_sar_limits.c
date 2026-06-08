@@ -1440,6 +1440,178 @@ wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO]    = {.type = NLA_U32},
 };
 
+static void hdd_get_tas_metrics_cb(struct wlan_tas_metrics_event *ev,
+				   void *cookie)
+{
+	struct osif_request *request;
+	struct hdd_tas_metrics_priv *priv;
+	uint32_t i;
+
+	request = osif_request_get(cookie);
+	if (!request) {
+		hdd_err("Obsolete TAS metrics request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+	priv->fw_status = ev->fw_status;
+	priv->time_window_in_sec = ev->time_window_in_sec;
+	priv->num_chains = QDF_MIN(ev->num_chains, HDD_TAS_METRICS_MAX_CHAINS);
+	hdd_debug("TAS metrics cb: fw_status=%u time_window=%u num_chains=%u",
+		  priv->fw_status, priv->time_window_in_sec, priv->num_chains);
+	for (i = 0; i < priv->num_chains; i++) {
+		priv->chains[i].chain_no = ev->chains[i].chain_no;
+		priv->chains[i].chain_operating_band =
+			ev->chains[i].chain_operating_band;
+		priv->chains[i].chain_power_region =
+			ev->chains[i].chain_power_region;
+		hdd_debug("TAS metrics cb chain[%u]: chain_no=%u band=%u power_region=%u",
+			  i, priv->chains[i].chain_no,
+			  priv->chains[i].chain_operating_band,
+			  priv->chains[i].chain_power_region);
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+#define HDD_TAS_NUM_BANDS 3
+static int hdd_handle_tas_get_metrics(struct hdd_context *hdd_ctx,
+				      struct sk_buff *reply_skb)
+{
+	struct hdd_tas_metrics_priv *priv;
+	struct osif_request *request;
+	struct request_info info = {0};
+	bool pending = false;
+	void *cookie;
+	QDF_STATUS status;
+	int errno;
+	uint32_t band, chain_idx, ant_idx;
+	bool has_chains;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = 5000,
+	};
+	struct nlattr *band_list, *band_entry, *antenna_list, *antenna_entry;
+	struct nlattr *tx_info;
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Failed to alloc osif request");
+		return -ENOMEM;
+	}
+
+	cookie = osif_request_cookie(request);
+	status = ucfg_mc_cp_stats_send_get_avg_tx_power(hdd_ctx->psoc, 0,
+							hdd_get_tas_metrics_cb,
+							cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send get avg tx power cmd");
+		errno = qdf_status_to_os_return(status);
+		goto put_request;
+	}
+
+	errno = osif_request_wait_for_response(request);
+	if (errno) {
+		hdd_err("TAS metrics wait timed out");
+		ucfg_mc_cp_stats_reset_pending_req(hdd_ctx->psoc,
+						   TYPE_TAS_METRICS,
+						   &info, &pending);
+		goto put_request;
+	}
+
+	priv = osif_request_priv(request);
+	if (priv->fw_status) {
+		hdd_err("FW returned failure for TAS metrics: %u",
+			priv->fw_status);
+		errno = -EINVAL;
+		goto put_request;
+	}
+
+	if (nla_put_u32(reply_skb,
+			QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW,
+			priv->time_window_in_sec))
+		goto free_skb;
+
+	band_list = nla_nest_start(reply_skb,
+				   QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES);
+	if (!band_list)
+		goto free_skb;
+
+	/* Group chains by band: 0=2GHz, 1=5GHz, 2=6GHz */
+	for (band = 0; band < HDD_TAS_NUM_BANDS; band++) {
+		has_chains = false;
+
+		for (chain_idx = 0; chain_idx < priv->num_chains; chain_idx++) {
+			if (priv->chains[chain_idx].chain_operating_band ==
+			    band) {
+				has_chains = true;
+				break;
+			}
+		}
+		if (!has_chains)
+			continue;
+
+		band_entry = nla_nest_start(reply_skb, band);
+		if (!band_entry)
+			goto free_skb;
+
+		if (nla_put_u8(reply_skb,
+			       QCA_WLAN_VENDOR_ATTR_TAS_BAND_INDEX,
+			       (uint8_t)band))
+			goto free_skb;
+
+		antenna_list = nla_nest_start(
+				reply_skb,
+				QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST);
+		if (!antenna_list)
+			goto free_skb;
+		ant_idx = 0;
+		for (chain_idx = 0; chain_idx < priv->num_chains; chain_idx++) {
+			if (priv->chains[chain_idx].chain_operating_band !=
+			    band)
+				continue;
+
+			antenna_entry = nla_nest_start(reply_skb, ant_idx++);
+			if (!antenna_entry)
+				goto free_skb;
+
+			if (nla_put_u32(reply_skb,
+					QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_INDEX,
+					priv->chains[chain_idx].chain_no))
+				goto free_skb;
+
+			hdd_debug("TAS GET_METRICS: band=%u chain=%u power_region=%u",
+				  band, priv->chains[chain_idx].chain_no,
+				  priv->chains[chain_idx].chain_power_region);
+			tx_info = nla_nest_start(reply_skb,
+						 QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO);
+			if (!tx_info)
+				goto free_skb;
+
+			if (nla_put_u32(reply_skb,
+					QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LEVEL,
+					priv->chains[chain_idx].chain_power_region))
+				goto free_skb;
+
+			nla_nest_end(reply_skb, tx_info);
+			nla_nest_end(reply_skb, antenna_entry);
+		}
+
+		nla_nest_end(reply_skb, antenna_list);
+		nla_nest_end(reply_skb, band_entry);
+	}
+	nla_nest_end(reply_skb, band_list);
+	osif_request_put(request);
+	return 0;
+
+free_skb:
+	errno = -EMSGSIZE;
+put_request:
+	osif_request_put(request);
+	return errno;
+}
+
 static int __wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
 				   struct wireless_dev *wdev,
 				   const void *data, int data_len)
@@ -1448,6 +1620,7 @@ static int __wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1];
 	uint32_t operation, tas_mode;
 	enum host_tas_direction direction;
+	struct sk_buff *reply_skb;
 	QDF_STATUS status;
 	int errno;
 
@@ -1508,7 +1681,20 @@ static int __wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
 			return qdf_status_to_os_return(status);
 		}
 		return 0;
+	case QCA_WLAN_TAS_OPERATION_GET_METRICS: {
+		reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(
+				wiphy, NLMSG_DEFAULT_SIZE);
+		if (!reply_skb)
+			return -ENOMEM;
 
+		errno = hdd_handle_tas_get_metrics(hdd_ctx, reply_skb);
+		if (errno) {
+			kfree_skb(reply_skb);
+			return errno;
+		}
+		hdd_debug("TAS GET_METRICS: reply sent successfully");
+		return cfg80211_vendor_cmd_reply(reply_skb);
+	}
 	default:
 		hdd_err("Unsupported TAS operation: %u", operation);
 		return -EOPNOTSUPP;

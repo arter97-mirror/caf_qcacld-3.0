@@ -150,6 +150,22 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 					       struct request_info *info);
 
 /**
+ * ucfg_mc_cp_stats_send_get_avg_tx_power() - Query avg TX power from FW
+ * @psoc: pointer to psoc object
+ * @dsi_id: active Device State Index
+ * @cb: callback invoked on WMI_AVG_TX_POWER_EVENTID with per-chain data
+ * @cookie: opaque cookie passed back to @cb
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS
+ucfg_mc_cp_stats_send_get_avg_tx_power(
+		struct wlan_objmgr_psoc *psoc,
+		uint32_t dsi_id,
+		void (*cb)(struct wlan_tas_metrics_event *ev, void *cookie),
+		void *cookie);
+
+/**
  * wlan_cfg80211_mc_twt_clear_infra_cp_stats() - send request to reset
  * control path statistics
  * @vdev: pointer to vdev object
