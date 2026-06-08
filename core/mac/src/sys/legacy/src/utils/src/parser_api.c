@@ -17327,19 +17327,21 @@ lim_unpack_ieee80211_uhr_cap_payload(uint8_t *uhr_cap_payload,
 
 	qdf_mem_zero(uhr, sizeof(*uhr));
 
-	/* Fixed minimum: MAC cap (6) + PHY cap (1) */
-	if (uhr_cap_payload_len < (WLAN_UHR_CAP_MAC_FIXED_FIELD_LEN +
+	/* Fixed minimum: header (3) + MAC cap (5) + PHY cap (1) */
+	if (uhr_cap_payload_len < (parsed_len +
+				   WLAN_UHR_CAP_MAC_FIXED_FIELD_LEN +
 				   WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN)) {
 		pe_err_rl("UHR payload len %zu insufficient for fixed fields %zu",
 			  uhr_cap_payload_len,
-			  (qdf_size_t)(WLAN_UHR_CAP_MAC_FIXED_FIELD_LEN +
+			  (qdf_size_t)(parsed_len +
+				       WLAN_UHR_CAP_MAC_FIXED_FIELD_LEN +
 				       WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN));
 		return QDF_STATUS_E_PROTO;
 	}
 
 	/*
-	 * ---- UHR MAC Capabilities Information (6 octets) ----
-	 * Copy only 6 bytes into a zeroed u64, then endian-adjust.
+	 * ---- UHR MAC Capabilities Information (5 octets) ----
+	 * Copy only 5 bytes into a zeroed u64, then endian-adjust.
 	 */
 	cap_params = 0;
 	if (uhr_cap_payload_len <
