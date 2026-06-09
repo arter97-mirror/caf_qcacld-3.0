@@ -100,10 +100,11 @@ struct wlan_dp_resource_ml_vote_info {
 /**
  * struct wlan_dp_resource_vote_node - DP Resource vote node context
  * @priv_ctx: DP peer priv context ref
- * @peer: OBJMGR peer reference
  * @self_mac: Self MAC address
  * @remote_mac: Remote MAC address
  * @ml_vote_info: ML vote common info
+ * @mlo_peer_ctx: MLO peer context; non-NULL for MLO link peers, used for
+ *   BA window dedup (pointer comparison only, never dereferenced)
  * @phymode: phymode it can operate
  * @phymode0: phymode on MAC-0
  * @phymode1: phymode on MAC-1
@@ -118,10 +119,10 @@ struct wlan_dp_resource_ml_vote_info {
  */
 struct wlan_dp_resource_vote_node {
 	struct wlan_dp_peer_priv_context *priv_ctx;
-	struct wlan_objmgr_peer *peer;
 	struct qdf_mac_addr self_mac;
 	struct qdf_mac_addr remote_mac;
 	struct wlan_dp_resource_ml_vote_info *ml_vote_info;
+	struct wlan_mlo_peer_context *mlo_peer_ctx;
 	enum wlan_phymode phymode;
 	enum wlan_phymode phymode0;
 	enum wlan_phymode phymode1;
@@ -168,6 +169,23 @@ struct wlan_dp_resource_mgr_ctx {
 };
 
 #ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+
+#if defined(CONFIG_BORON) && defined(DP_FEATURE_DIRECT_REFILL)
+/* BA window minimum buffer floor.
+ * Worst-case RX buffer floor for the BA reorder window.
+ * BA window is in MPDUs; assumes every MPDU carries a fully-packed
+ * A-MSDU (WLAN_DP_MAX_MSDU_PER_AMSDU sub-MSDUs), each needing one
+ * RX buffer. This is an upper bound to ensure the ring is never the
+ * bottleneck even under worst-case aggregation.
+ */
+#define WLAN_DP_11AX_MAX_BA_WINDOW		256
+#define WLAN_DP_11BE_MAX_BA_WINDOW		1024
+#define WLAN_DP_MAX_MSDU_PER_AMSDU		7
+#define WLAN_DP_11AX_BA_WINDOW_MIN_BUFS \
+	(WLAN_DP_11AX_MAX_BA_WINDOW * WLAN_DP_MAX_MSDU_PER_AMSDU)
+#define WLAN_DP_11BE_BA_WINDOW_MIN_BUFS \
+	(WLAN_DP_11BE_MAX_BA_WINDOW * WLAN_DP_MAX_MSDU_PER_AMSDU)
+#endif /* CONFIG_BORON && DP_FEATURE_DIRECT_REFILL */
 
 /*RX buffers replenished based on batch manner - optimized for 5 levels*/
 #define RX_RESOURCE_ALLOC_BATCH_COUNT			128

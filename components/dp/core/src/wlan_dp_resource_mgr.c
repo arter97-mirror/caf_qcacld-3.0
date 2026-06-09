@@ -612,6 +612,120 @@ wlan_dp_resource_mgr_sort_phymodes(struct wlan_dp_resource_vote_node **phymodes,
 	}
 }
 
+#if defined(CONFIG_BORON) && defined(DP_FEATURE_DIRECT_REFILL)
+static uint32_t
+wlan_dp_resource_mgr_phymode_ba_min_bufs(enum wlan_phymode phymode)
+{
+	switch (phymode) {
+	case WLAN_PHYMODE_11AXA_HE20:
+	case WLAN_PHYMODE_11AXG_HE20:
+	case WLAN_PHYMODE_11AXA_HE40:
+	case WLAN_PHYMODE_11AXG_HE40PLUS:
+	case WLAN_PHYMODE_11AXG_HE40MINUS:
+	case WLAN_PHYMODE_11AXG_HE40:
+	case WLAN_PHYMODE_11AXA_HE80:
+	case WLAN_PHYMODE_11AXG_HE80:
+	case WLAN_PHYMODE_11AXA_HE160:
+	case WLAN_PHYMODE_11AXA_HE80_80:
+		return WLAN_DP_11AX_BA_WINDOW_MIN_BUFS;
+#ifdef WLAN_FEATURE_11BE
+	case WLAN_PHYMODE_11BEA_EHT20:
+	case WLAN_PHYMODE_11BEG_EHT20:
+	case WLAN_PHYMODE_11BEA_EHT40:
+	case WLAN_PHYMODE_11BEG_EHT40PLUS:
+	case WLAN_PHYMODE_11BEG_EHT40MINUS:
+	case WLAN_PHYMODE_11BEG_EHT40:
+	case WLAN_PHYMODE_11BEA_EHT80:
+	case WLAN_PHYMODE_11BEG_EHT80:
+	case WLAN_PHYMODE_11BEA_EHT160:
+	case WLAN_PHYMODE_11BEA_EHT320:
+		return WLAN_DP_11BE_BA_WINDOW_MIN_BUFS;
+#endif
+	default:
+		return 0;
+	}
+}
+
+static enum wlan_dp_resource_level
+wlan_dp_resource_mgr_adjust_level_for_ba_window(
+			struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+			enum wlan_dp_resource_level level)
+{
+	struct wlan_dp_resource_vote_node *vote_node;
+	struct wlan_mlo_peer_context *counted[MAX_MAC_RESOURCES];
+	enum wlan_dp_resource_level ba_level;
+	uint32_t ba_min_total = 0;
+	int i, j, n_counted = 0;
+	uint32_t node_ba_min;
+
+	for (i = 0; i < rsrc_ctx->mac_count; i++) {
+		vote_node = rsrc_ctx->max_phymode_nodes[i];
+		if (!vote_node)
+			continue;
+
+		node_ba_min =
+			wlan_dp_resource_mgr_phymode_ba_min_bufs(
+						vote_node->phymode);
+		if (!node_ba_min)
+			continue;
+
+		/*
+		 * MLO STA: all links share one BA window. Skip this node
+		 * if another link of the same MLO connection (same
+		 * mlo_peer_ctx) was already counted in this round.
+		 * A node with no mlo_peer_ctx (non-MLO, or SAP) is always
+		 * counted independently.
+		 */
+		if (vote_node->mlo_peer_ctx) {
+			struct wlan_mlo_peer_context *ml_ctx =
+					vote_node->mlo_peer_ctx;
+			bool already_counted = false;
+
+			for (j = 0; j < n_counted; j++) {
+				if (counted[j] == ml_ctx) {
+					already_counted = true;
+					break;
+				}
+			}
+			if (already_counted)
+				continue;
+			if (n_counted < MAX_MAC_RESOURCES)
+				counted[n_counted++] = ml_ctx;
+		}
+		ba_min_total += node_ba_min;
+	}
+
+	if (!ba_min_total)
+		return level;
+
+	/* cur_rsrc_map[] entries must have ascending num_rx_buffers for
+	 * this walk to find the lowest level satisfying the floor.
+	 */
+	for (ba_level = RESOURCE_LVL_1; ba_level < RESOURCE_LVL_MAX;
+	     ba_level++)
+		if (rsrc_ctx->cur_rsrc_map[ba_level].num_rx_buffers >=
+		    ba_min_total)
+			break;
+	if (ba_level >= RESOURCE_LVL_MAX)
+		ba_level = RESOURCE_LVL_MAX - 1;
+	if (ba_level > level) {
+		dp_info("BA floor lvl:%u tput lvl:%u ba_min:%u",
+			ba_level, level, ba_min_total);
+		level = ba_level;
+	}
+
+	return level;
+}
+#else
+static inline enum wlan_dp_resource_level
+wlan_dp_resource_mgr_adjust_level_for_ba_window(
+			struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+			enum wlan_dp_resource_level level)
+{
+	return level;
+}
+#endif /* CONFIG_BORON && DP_FEATURE_DIRECT_REFILL */
+
 static void
 wlan_dp_resource_mgr_select_resource_level(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
@@ -643,6 +757,8 @@ wlan_dp_resource_mgr_select_resource_level(
 		i = (RESOURCE_LVL_MAX - 1);
 
 	new_level = i;
+	new_level = wlan_dp_resource_mgr_adjust_level_for_ba_window(rsrc_ctx,
+								    new_level);
 	prev_level = rsrc_ctx->cur_resource_level;
 	/* Check for aggressive upscale (jumping 2+ levels) */
 	if (new_level > prev_level &&
@@ -802,6 +918,8 @@ wlan_dp_resource_mgr_add_vote_node(struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 		QDF_BUG(0);
 	}
 	vote_node->mac_id = mac_id;
+	/* Store mlo_peer_ctx for BA window dedup, pointer comparison only */
+	vote_node->mlo_peer_ctx = peer->mlo_peer_ctx;
 	mac_list = &rsrc_ctx->mac_list[mac_id];
 	wlan_dp_resource_mgr_list_insert_vote_node(mac_list, vote_node, opmode);
 	dp_info("New vote node added to list mac_id:%u len:%u phymode:%u",
@@ -1159,8 +1277,19 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 	}
 
-	if (list_update)
+	if (list_update) {
 		wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
+		/*
+		 * Two back-to-back migrations (one per vdev) can each see
+		 * the other vdev's node still in the old slot, causing a
+		 * transient level:0. The second migration call corrects
+		 * this immediately via aggressive upscale. Log the final
+		 * level to make such transients visible in field logs.
+		 */
+		dp_rsrc_mgr_debug("MAC migration done prev:%u new:%u lvl:%u",
+				  old_mac_id, new_mac_id,
+				  rsrc_ctx->cur_resource_level);
+	}
 
 	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
