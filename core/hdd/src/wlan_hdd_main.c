@@ -7925,6 +7925,50 @@ hdd_set_multi_client_ll_support(struct hdd_adapter *adapter)
 }
 #endif
 
+#ifdef QCA_OL_TX_MULTIQ_SUPPORT
+/**
+ * hdd_get_sta_num_tx_queues() - Get number of TX queues for STA mode
+ *
+ * In QCA_OL_TX_MULTIQ_SUPPORT mode, use one TX queue per CPU so that
+ * each CPU can acquire its own netdev queue lock and run hard_start_xmit
+ * concurrently. This enables per-CPU TCL ring selection in dp_tx_get_queue()
+ * (ring_id = qdf_get_cpu()) without cross-CPU lock contention.
+ *
+ * num_tcl_data_rings must be >= num_online_cpus() for full benefit.
+ *
+ * Return: number of TX queues for STA netdev
+ */
+static inline unsigned int hdd_get_sta_num_tx_queues(void)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	unsigned int max_pools;
+	unsigned int num_tx_queues;
+
+	if (!soc)
+		return NDP_NUM_TX_QUEUES;
+
+	max_pools = cdp_get_max_txdesc_pools(soc);
+	num_tx_queues = num_online_cpus();
+	if (num_tx_queues > max_pools)
+		num_tx_queues = max_pools;
+
+	return num_tx_queues;
+}
+#else
+/**
+ * hdd_get_sta_num_tx_queues() - Get number of TX queues for STA mode
+ *
+ * Without QCA_OL_TX_MULTIQ_SUPPORT, use the standard NDP TX queue count
+ * which is based on WMM access categories.
+ *
+ * Return: number of TX queues for STA netdev
+ */
+static inline unsigned int hdd_get_sta_num_tx_queues(void)
+{
+	return NDP_NUM_TX_QUEUES;
+}
+#endif /* QCA_OL_TX_MULTIQ_SUPPORT */
+
 /**
  * hdd_alloc_station_adapter() - allocate the station hdd adapter
  * @hdd_ctx: global hdd context
@@ -7951,7 +7995,8 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 
 	switch (session_type) {
 	case QDF_STA_MODE:
-		num_tx_queues = NDP_NUM_TX_QUEUES;
+		num_tx_queues = hdd_get_sta_num_tx_queues();
+		hdd_debug("STA num_tx_queues %u", num_tx_queues);
 		break;
 	case QDF_PASSTHRU_MODE:
 		num_tx_queues = 1;

@@ -47,6 +47,7 @@
 #include <linux/ip.h>
 #include <linux/semaphore.h>
 #include <linux/ipv6.h>
+#include <qdf_util.h>
 #include "osif_sync.h"
 #include "os_if_fwol.h"
 #include <wlan_hdd_tx_rx.h>
@@ -2340,10 +2341,41 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev,
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+
+#ifdef QCA_OL_TX_MULTIQ_SUPPORT
+/**
+ * hdd_cpu_select_queue() - CPU-based TX queue selection for multi-queue
+ * @dev: net_device pointer
+ * @skb: socket buffer pointer
+ *
+ * Select the TX queue based on the current CPU ID so that each CPU
+ * uses its own netdev queue and TCL ring, enabling parallel TX from
+ * multiple CPUs.
+ *
+ * Return: TX queue index (qdf_get_cpu() % real_num_tx_queues)
+ */
+static uint16_t hdd_cpu_select_queue(struct net_device *dev,
+				     struct sk_buff *skb)
+{
+	return (uint16_t)(qdf_get_cpu() % dev->real_num_tx_queues);
+}
+#else
+static uint16_t hdd_cpu_select_queue(struct net_device *dev,
+				     struct sk_buff *skb)
+{
+	return hdd_wmm_select_queue(dev, skb);
+}
+#endif /* QCA_OL_TX_MULTIQ_SUPPORT */
+
 uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
 			  struct net_device *sb_dev)
 {
-	return hdd_wmm_select_queue(dev, skb);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	if (adapter->device_mode == QDF_STA_MODE)
+		return hdd_cpu_select_queue(dev, skb);
+	else
+		return hdd_wmm_select_queue(dev, skb);
 }
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
