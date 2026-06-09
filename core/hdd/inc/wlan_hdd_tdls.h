@@ -457,5 +457,12 @@ bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
 {
 	return true;
 }
-#endif /* End of FEATURE_WLAN_TDLS */
+
+/* FEATURE_TDLS_VENDOR_EVENTS is defined inside FEATURE_WLAN_TDLS gated on
+ * FEATURE_TDLS_STATS_VENDOR_EVENTS. Define it empty here so vendor command
+ * table compile units (e.g. wlan_hdd_linux_ioctl.c) compile cleanly when
+ * TDLS is fully disabled.
+ */
+#define FEATURE_TDLS_VENDOR_EVENTS
+#endif /* FEATURE_WLAN_TDLS */
 #endif /* __HDD_TDLS_H */

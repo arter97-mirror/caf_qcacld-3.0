@@ -35,6 +35,8 @@
 #include <wlan_tdls_stats_public_structs.h>
 #include <wlan_objmgr_psoc_obj.h>
 
+#ifdef FEATURE_WLAN_TDLS
+
 /**
  * wlan_tdls_stats_sm_deliver_event() - Deliver an event to the TDLS stats SM.
  * @stats_ctx: TDLS stats context
@@ -113,5 +115,16 @@ void wlan_tdls_stats_record_peers_teardown(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id,
 				enum tdls_stats_reason_code reason_code);
+
+#else
+
+static inline void
+wlan_tdls_stats_record_peers_teardown(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      enum tdls_stats_reason_code reason_code)
+{
+}
+
+#endif /* FEATURE_WLAN_TDLS */
 
 #endif /* _WLAN_TDLS_STATS_API_H_ */
