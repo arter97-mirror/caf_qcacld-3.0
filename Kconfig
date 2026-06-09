@@ -1314,6 +1314,21 @@ config TX_MULTIQ_PER_AC
 	bool "Enable TX_MULTIQ_PER_AC"
 	default n
 
+config QCA_OL_TX_MULTIQ_SUPPORT
+	bool "Enable CPU-based TX multi-queue support"
+	default n
+	help
+	  Enable per-CPU TX ring selection. Each CPU uses its own
+	  TCL data ring and descriptor pool, eliminating lock contention
+	  in the TX path.
+
+config QCA_OL_TX_LOCK_LESS_ACCESS
+	bool "Enable lockless TX ring access"
+	default n
+	help
+	  Enable lockless access to TCL data rings during TX.
+	  Requires QCA_OL_TX_MULTIQ_SUPPORT to be effective.
+
 config TX_PER_PDEV_DESC_POOL
 	bool "Enable TX_PER_PDEV_DESC_POOL"
 	default n
