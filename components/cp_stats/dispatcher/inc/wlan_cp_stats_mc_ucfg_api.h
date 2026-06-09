@@ -448,6 +448,17 @@ void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev);
 struct channel_status *
 ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 				    uint32_t chan_freq);
+
+/**
+ * ucfg_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
+ * supports C-TAS power indication and power limit enquiring
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if FW supports the capability, false otherwise
+ */
+bool ucfg_cp_stats_is_ctas_plim_indication_supported(
+					struct wlan_objmgr_psoc *psoc);
+
 #else /* QCA_SUPPORT_CP_STATS */
 
 void static inline ucfg_mc_cp_stats_register_pmo_handler(void) { };
@@ -559,6 +570,12 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 				    uint32_t chan_freq)
 {
 	return NULL;
+}
+
+static inline bool
+ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif /* QCA_SUPPORT_CP_STATS */
 

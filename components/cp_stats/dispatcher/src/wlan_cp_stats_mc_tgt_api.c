@@ -2100,6 +2100,18 @@ QDF_STATUS tgt_mc_cp_stats_inc_wake_lock_stats(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool
+tgt_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
+
+	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
+	if (!tx_ops || !tx_ops->is_ctas_plim_indication_supported)
+		return false;
+
+	return tx_ops->is_ctas_plim_indication_supported(psoc);
+}
+
 QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    enum stats_req_type type,
 				    struct request_info *req)

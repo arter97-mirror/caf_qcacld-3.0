@@ -142,6 +142,19 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    struct request_info *req);
 
 /**
+ * tgt_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
+ * supports C-TAS power indication and power limit enquiring
+ * @psoc: pointer to psoc object
+ *
+ * Calls target_if_is_ctas_plim_indication_supported() via the target_if
+ * layer. Not for direct use by HDD — call ucfg wrapper instead.
+ *
+ * Return: true if FW supports the capability, false otherwise
+ */
+bool tgt_cp_stats_is_ctas_plim_indication_supported(
+					struct wlan_objmgr_psoc *psoc);
+
+/**
  * tgt_set_pdev_stats_update_period(): API to set pdev stats update
  * period to FW
  * @psoc: pointer to psoc object

@@ -1617,3 +1617,9 @@ unlock_and_exit:
 	return status;
 }
 #endif
+
+bool
+ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_cp_stats_is_ctas_plim_indication_supported(psoc);
+}
