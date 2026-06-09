@@ -2686,6 +2686,37 @@ static int wma_copy_chan_stats(uint32_t num_chan,
  */
 #define WMI_MAX_RADIO_SINGLE_STATS_LEN 72
 
+static void wma_log_chan_stats(char *info, uint32_t *stats_len,
+			       wmi_channel_stats *cs)
+{
+	int ret;
+
+	ret = qdf_scnprintf(info + *stats_len,
+			    WMI_MAX_RADIO_STATS_LOGS - *stats_len,
+			    " %d[%d][%d][%d]",
+			    cs->center_freq, cs->channel_width,
+			    cs->center_freq0, cs->center_freq1);
+	if (ret <= 0)
+		return;
+	*stats_len += ret;
+
+	ret = qdf_scnprintf(info + *stats_len,
+			    WMI_MAX_RADIO_STATS_LOGS - *stats_len,
+			    "[%d][%d][%d][%d]",
+			    cs->radio_awake_time, cs->cca_busy_time,
+			    cs->tx_time, cs->rx_time);
+	if (ret <= 0)
+		return;
+	*stats_len += ret;
+
+	if (*stats_len >= (WMI_MAX_RADIO_STATS_LOGS -
+			   WMI_MAX_RADIO_SINGLE_STATS_LEN)) {
+		wmi_nofl_debug("freq[width][freq0][freq1][awake][cca busy][tx][rx] :%s",
+			       info);
+		*stats_len = 0;
+	}
+}
+
 static int
 __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 					     uint8_t *cmd_param_info,
@@ -2708,7 +2739,6 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 	int32_t status;
 	uint8_t *info;
 	uint32_t stats_len = 0;
-	int ret;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (!mac) {
@@ -2863,8 +2893,11 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		channels_in_this_event = qdf_mem_malloc(
 					radio_stats->num_channels *
 					chan_stats_size);
-		if (!channels_in_this_event)
-			return -ENOMEM;
+		if (!channels_in_this_event) {
+			wma_warn("radio %d: chan stats alloc failed, skipping channel data",
+				 radio_stats->radio_id);
+			goto link_radio_stats_cb;
+		}
 
 		chn_results =
 			(struct wifi_channel_stats *)&channels_in_this_event[0];
@@ -2873,40 +2906,14 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 			  radio_stats->radio_id, radio_stats->num_channels);
 
 		info = qdf_mem_malloc(WMI_MAX_RADIO_STATS_LOGS);
-		if (!info) {
-			qdf_mem_free(channels_in_this_event);
-			return -ENOMEM;
-		}
+		if (!info)
+			wma_warn("radio %d: debug log buffer alloc failed, skipping channel log",
+				 radio_stats->radio_id);
 
 		for (count = 0; count < radio_stats->num_channels; count++) {
-			ret = qdf_scnprintf(info + stats_len,
-					WMI_MAX_RADIO_STATS_LOGS - stats_len,
-					" %d[%d][%d][%d]",
-					channel_stats->center_freq,
-					channel_stats->channel_width,
-					channel_stats->center_freq0,
-					channel_stats->center_freq1);
-			if (ret <= 0)
-				break;
-			stats_len += ret;
-
-			ret = qdf_scnprintf(info + stats_len,
-					WMI_MAX_RADIO_STATS_LOGS - stats_len,
-					"[%d][%d][%d][%d]",
-					channel_stats->radio_awake_time,
-					channel_stats->cca_busy_time,
-					channel_stats->tx_time,
-					channel_stats->rx_time);
-			if (ret <= 0)
-				break;
-			stats_len += ret;
-
-			if (stats_len >= (WMI_MAX_RADIO_STATS_LOGS -
-					WMI_MAX_RADIO_SINGLE_STATS_LEN)) {
-				wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][tx time][rx time] :%s",
-					       info);
-				stats_len = 0;
-			}
+			if (info)
+				wma_log_chan_stats(info, &stats_len,
+						   channel_stats);
 
 			channel_stats++;
 
@@ -2918,18 +2925,20 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 			next_chan_offset += sizeof(*channel_stats);
 		}
 
-		if (stats_len)
-			wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][tx time][rx time] :%s",
-				       info);
-
-		qdf_mem_free(info);
+		if (info) {
+			if (stats_len)
+				wmi_nofl_debug("freq[width][freq0][freq1][awake][cca busy][tx][rx] :%s",
+					       info);
+			qdf_mem_free(info);
+		}
 
 		status = wma_copy_chan_stats(num_chan_in_this_event,
 					     channels_in_this_event,
 					     rs_results);
 		if (status) {
-			wma_err("Failed to copy channel stats");
-			return status;
+			wma_warn("radio %d: chan stats copy failed, skipping channel data",
+				 radio_stats->radio_id);
+			goto link_radio_stats_cb;
 		}
 	}
 
