@@ -33592,6 +33592,11 @@ done:
 				hdd_err("PASN peer creation fails %d", status);
 				return -EINVAL;
 			}
+
+			wlan_cfg80211_set_peer_ucastcipher(vdev,
+							   mac_address.bytes,
+							   ucast_cipher,
+							   cipher_cap);
 		}
 		fallthrough;
 	case QDF_STA_MODE:
