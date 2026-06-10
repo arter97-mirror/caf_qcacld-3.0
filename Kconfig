@@ -1329,6 +1329,14 @@ config QCA_OL_TX_LOCK_LESS_ACCESS
 	  Enable lockless access to TCL data rings during TX.
 	  Requires QCA_OL_TX_MULTIQ_SUPPORT to be effective.
 
+config WLAN_SUPPORT_TX_DESC_PER_POOL
+	bool "Enable per-pool TX descriptor count configuration"
+	default n
+	help
+	  Allow each TX descriptor pool to have an independent size
+	  configured via separate INI keys (dp_tx_desc_pool_0/1/2/3).
+	  When disabled, all pools share a single dp_tx_desc value.
+
 config TX_PER_PDEV_DESC_POOL
 	bool "Enable TX_PER_PDEV_DESC_POOL"
 	default n
