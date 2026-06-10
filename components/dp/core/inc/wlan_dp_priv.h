@@ -130,6 +130,7 @@ struct dp_rtpm_tput_policy_context {
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
  * @stc_enable: indicates whether STC feature is enabled or not
  * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
+ * @haps_config: Store the HAPS power save config
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -216,6 +217,9 @@ struct wlan_dp_psoc_cfg {
 	bool stc_enable;
 #endif
 	uint32_t dp_irq_affinity_mask;
+#ifdef WLAN_HAPS_ENABLE
+	uint32_t haps_config;
+#endif
 };
 
 /**
@@ -690,6 +694,7 @@ struct dp_rx_fst {
  * @spm_intf_ctx: SPM interface context
  * @opm_stats_work: OPM stats work
  * @ipv4_addr: IPv4 address
+ * @haps_ctx: HAPS context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -781,6 +786,9 @@ struct wlan_dp_intf {
 	struct qdf_periodic_work opm_stats_work;
 #endif
 	uint8_t ipv4_addr[QDF_IPV4_ADDR_SIZE];
+#ifdef WLAN_HAPS_ENABLE
+	struct dp_haps haps_ctx;
+#endif
 };
 
 #define WLAN_DP_LINK_MAGIC 0x5F44505F4C494E4B	/* "_DP_LINK" in ASCII */

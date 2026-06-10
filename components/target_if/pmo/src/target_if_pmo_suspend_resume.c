@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -161,6 +161,9 @@ QDF_STATUS target_if_pmo_send_vdev_ps_param_req(
 		break;
 	case pmo_sta_ps_param_ito_repeat_count:
 		param_id = WMI_STA_PS_PARAM_MAX_RESET_ITO_COUNT_ON_TIM_NO_TXRX;
+		break;
+	case pmo_sta_ps_param_opm_level:
+		param_id = WMI_STA_PS_PARAM_ITO_LEVEL;
 		break;
 	case pmo_sta_ps_param_spec_wake_interval:
 		param_id = WMI_STA_PS_PARAM_SPEC_WAKE_INTERVAL;

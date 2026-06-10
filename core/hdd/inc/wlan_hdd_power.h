@@ -554,13 +554,14 @@ int hdd_set_power_config(struct hdd_context *hddctx,
  * @hddctx: HDD context
  * @adapter: HDD adapter
  * @ps_ito: power save inactivitiy duration in ms
+ * @ps_opm_level: power save opm level
  * @spec_wake: power save speculative wake duration in ms
  *
  * Return: 0 on success; Errno on failure
  */
 int hdd_set_power_config_params(struct hdd_context *hddctx,
-				struct hdd_adapter *adapter,
-				uint16_t ps_ito, uint16_t spec_wake);
+				struct hdd_adapter *adapter, uint16_t ps_ito,
+				uint8_t ps_opm_level, uint16_t spec_wake);
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
  * hdd_wlan_suspend_resume_event()- send suspend/resume state

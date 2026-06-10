@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,7 @@
 #include <qdf_types.h>
 #include <qdf_hashtable.h>
 #include <qdf_notifier.h>
+#include <qdf_hrtimer.h>
 #include "wlan_dp_rx_thread.h"
 
 #define DP_MAX_SUBTYPES_TRACKED	4
@@ -806,6 +807,8 @@ struct wlan_dp_stc_flow_samples {
  * @send_flow_stats_event: Callback to send flow stats vendor command
  * @send_flow_report_event: Callback to send flow report vendor command
  * @dp_get_ndev_by_vdev_id: Callback API to get net device reference by vdev id
+ * @wlan_dp_haps_update_qtime_sync_period: Callback API to update the qtime
+ * sync period for haps feature
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -914,6 +917,8 @@ struct wlan_dp_psoc_callbacks {
 #endif
 	QDF_STATUS (*dp_get_ndev_by_vdev_id)(uint32_t vdev_id,
 					     qdf_netdev_t *netdev);
+	void (*wlan_dp_haps_update_qtime_sync_period)(hdd_cb_handle context,
+						      uint32_t sync_interval);
 };
 
 /**
@@ -1091,4 +1096,42 @@ enum ctrl_rx_aggr_client_id {
 	CTRL_RX_AGGR_ID_MAX
 };
 
+#ifdef WLAN_HAPS_ENABLE
+enum haps_hist_buckets {
+	HAPS_BUCKET_20_MS,
+	HAPS_BUCKET_40_MS,
+	HAPS_BUCKET_60_MS,
+	HAPS_BUCKET_80_MS,
+	HAPS_BUCKET_100_MS,
+	HAPS_BUCKET_120_MS,
+	HAPS_BUCKET_140_MS,
+	HAPS_BUCKET_BEYOND,
+	HAPS_BUCKET_MAX
+};
+
+struct dp_haps_stats {
+	uint32_t event_received;
+	uint32_t pause_ind;
+	uint32_t oneshot_pause_ind;
+	uint32_t unpause_ind;
+	uint32_t haps_timer_expired;
+	uint32_t fail_safe_timer_expired;
+	uint32_t haps_pause_bucket[HAPS_BUCKET_MAX];
+	qdf_time_t start_time;
+	qdf_time_t last_time;
+	qdf_time_t total_time;
+	qdf_time_t total_pause_time;
+};
+
+struct dp_haps {
+	bool is_enable;
+	bool is_one_shot;
+	uint8_t state;
+	uint8_t vdev_id;
+	struct dp_soc *soc;
+	struct dp_haps_stats stats;
+	qdf_hrtimer_data_t haps_timer;
+	qdf_hrtimer_data_t haps_fail_safe_timer;
+};
+#endif
 #endif /* end  of _WLAN_DP_PUBLIC_STRUCT_H_ */

@@ -215,6 +215,10 @@ QDF_STATUS wma_set_ap_peer_uapsd(tp_wma_handle wma, uint32_t vdev_id,
  * @edca_param: EDCA parameters
  * @wmm_param: wmm parameters
  * @ac: access category
+ * @mu_edca_param: mu EDCA parameter flag
+ * @debug_str: debug string buffer
+ * @debug_str_size: size of debug string buffer
+ * @len: current length of debug string
  *
  * Return: none
  */
@@ -398,7 +402,7 @@ void wma_set_max_tx_power(WMA_HANDLE handle,
 
 /**
  * wmi_unified_set_sta_ps() - set sta powersave params in fw
- * @handle: wma handle
+ * @wmi_handle: wmi handle
  * @vdev_id: vdev id
  * @val: value
  *
@@ -459,7 +463,7 @@ static inline uint32_t wma_get_uapsd_mask(tpUapsd_Params uapsd_params)
  * @wma: wma handle
  * @vdev_id: vdev id
  * @enable: enable/disable
- * @ps_param: OPM params
+ * @ps_params: OPM params
  * @enable_ps: enable power save
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
@@ -544,6 +548,18 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 	}
 	wma_debug("Set Tx/Rx InActivity vdevId %d InAct %d",
 		  vdev_id, ps_params->ps_ito);
+
+	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+					   WMI_STA_PS_PARAM_ITO_LEVEL,
+					   ps_params->ps_opm_level);
+
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_err("Setting opm level Failed vdevId %d InAct %d",
+			vdev_id, ps_params->ps_opm_level);
+		return ret;
+	}
+	wma_debug("Set opm level vdevId %d InAct %d",
+		  vdev_id, ps_params->ps_opm_level);
 
 	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					   WMI_STA_PS_PARAM_SPEC_WAKE_INTERVAL,
@@ -652,11 +668,15 @@ static QDF_STATUS wma_wlan_pmo_get_ps_params(struct wlan_objmgr_vdev *vdev,
 	case PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED:
 		ps_params->opm_mode = WMI_STA_PS_USER_DEF;
 		break;
+	case PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED:
+		ps_params->opm_mode = WMI_STA_PS_LATENCY_DEF;
+		break;
 	default:
 		wma_err("Invalid opm_mode:%d", pmo_ps_param.opm_mode);
 		return QDF_STATUS_E_INVAL;
 	}
 	ps_params->ps_ito = pmo_ps_param.ps_ito;
+	ps_params->ps_opm_level = pmo_ps_param.ps_opm_level;
 	ps_params->spec_wake = pmo_ps_param.spec_wake;
 
 	return status;
@@ -766,7 +786,6 @@ void wma_enable_sta_ps_mode(tpEnablePsParams ps_req)
 
 /**
  * wma_disable_sta_ps_mode() - disable sta powersave params in fw
- * @wma: wma handle
  * @ps_req: power save request
  *
  * Return: none
@@ -826,6 +845,8 @@ wma_convert_opm_mode(enum wma_sta_ps_scheme_cfg opm_mode)
 		return WMI_STA_PS_OPM_AGGRESSIVE;
 	case WMA_STA_PS_USER_DEF:
 		return WMI_STA_PS_USER_DEF;
+	case WMA_STA_PS_LATENCY_DEF:
+		return WMI_STA_PS_LATENCY_DEF;
 	default:
 		wma_err("Invalid opm_mode: %d", opm_mode);
 		return WMI_STA_PS_OPM_CONSERVATIVE;
@@ -859,6 +880,21 @@ QDF_STATUS wma_set_power_config_ito(uint8_t vdev_id, uint16_t ps_ito)
 	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					   WMI_STA_PS_PARAM_INACTIVITY_TIME,
 					   ps_ito);
+}
+
+QDF_STATUS
+wma_set_power_config_opm_level(uint8_t vdev_id, uint8_t ps_opm_level)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+					   WMI_STA_PS_PARAM_ITO_LEVEL,
+					   ps_opm_level);
 }
 
 QDF_STATUS wma_set_power_config_spec_wake(uint8_t vdev_id, uint16_t spec_wake)
@@ -1148,7 +1184,7 @@ QDF_STATUS wma_disable_uapsd_per_ac(tp_wma_handle wma_handle,
 
 /**
  * wma_get_temperature() - get pdev temperature req
- * @wmi_handle: wma handle
+ * @wma_handle: wma handle
  *
  * Return: QDF_STATUS_SUCCESS for success or error code.
  */
@@ -1309,20 +1345,28 @@ static void wma_update_beacon_noa_ie(struct beacon_info *bcn,
 			/* TODO: Assuming p2p noa ie is last ie in the beacon */
 			qdf_mem_zero(bcn->noa_ie, (bcn->noa_sub_ie_len +
 						   sizeof(struct p2p_ie)));
-			bcn->len -= (bcn->noa_sub_ie_len +
-				     sizeof(struct p2p_ie));
+			if (bcn->len < (bcn->noa_sub_ie_len +
+					sizeof(struct p2p_ie)))
+				bcn->len = 0;
+			else
+				bcn->len -= (bcn->noa_sub_ie_len +
+					     sizeof(struct p2p_ie));
 			bcn->noa_ie = NULL;
 			bcn->noa_sub_ie_len = 0;
 		}
-		wma_debug("No need to update NoA");
 		return;
 	}
 
 	if (bcn->noa_sub_ie_len && bcn->noa_ie) {
+		if (bcn->len < (bcn->noa_sub_ie_len + sizeof(struct p2p_ie)))
+			bcn->len = 0;
+		else
+			bcn->len -= (bcn->noa_sub_ie_len +
+				     sizeof(struct p2p_ie));
+
 		/* NoA present in previous beacon, update it */
 		wma_debug("NoA present in previous beacon, update the NoA IE, bcn->len %u bcn->noa_sub_ie_len %u",
-			 bcn->len, bcn->noa_sub_ie_len);
-		bcn->len -= (bcn->noa_sub_ie_len + sizeof(struct p2p_ie));
+			   bcn->len, bcn->noa_sub_ie_len);
 		qdf_mem_zero(bcn->noa_ie,
 			     (bcn->noa_sub_ie_len + sizeof(struct p2p_ie)));
 	} else {                /* NoA is not present in previous beacon */
@@ -1511,7 +1555,7 @@ void wma_update_probe_resp_noa(tp_wma_handle wma_handle,
 
 /**
  * wma_process_set_mimops_req() - Set the received MiMo PS state to firmware
- * @handle: wma handle
+ * @wma_handle: wma handle
  * @mimops: MIMO powersave params
  *
  * Return: none
@@ -1538,7 +1582,7 @@ void wma_process_set_mimops_req(tp_wma_handle wma_handle,
 
 /**
  * wma_set_mimops() - set MIMO powersave
- * @handle: wma handle
+ * @wma: wma handle
  * @vdev_id: vdev id
  * @value: value
  *
@@ -1744,4 +1788,3 @@ QDF_STATUS wma_enable_disable_imps(uint32_t pdev_id, uint32_t param_val)
 	return status;
 }
 #endif /* FEATURE_TX_POWER */
-
