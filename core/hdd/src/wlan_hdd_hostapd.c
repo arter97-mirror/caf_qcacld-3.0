@@ -9735,10 +9735,16 @@ wlan_hdd_is_ap_ap_force_scc_override(struct wlan_hdd_link_info *link_info,
 
 	if ((ch_params.ch_width == CH_WIDTH_80MHZ) ||
 	    (ch_params.ch_width == CH_WIDTH_80P80MHZ) ||
-	    (ch_params.ch_width == CH_WIDTH_160MHZ) ||
-	    wlan_hdd_is_chwidth_320mhz(ch_params.ch_width)) {
+	    (ch_params.ch_width == CH_WIDTH_160MHZ)) {
 		if (ch_params.mhz_freq_seg0)
 			new_chandef->center_freq1 = ch_params.mhz_freq_seg0;
+	} else if (wlan_hdd_is_chwidth_320mhz(ch_params.ch_width)) {
+		/* For 320MHz, nl80211 center_freq1 is the center of the full
+		 * 320MHz span (mhz_freq_seg1/ch_cfreq2), not the primary 160MHz
+		 * subchannel center (mhz_freq_seg0/ch_cfreq1).
+		 */
+		if (ch_params.mhz_freq_seg1)
+			new_chandef->center_freq1 = ch_params.mhz_freq_seg1;
 	}
 
 	hdd_debug("override AP freq %d to first AP(vdev_id %d) center_freq:%d width:%d freq1:%d freq2:%d ",
