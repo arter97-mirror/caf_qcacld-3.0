@@ -715,6 +715,32 @@ cm_connect_success_diag(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	WLAN_HOST_DIAG_EVENT_REPORT(&connect_status, EVENT_WLAN_STATUS_V2);
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static void cm_print_smd_info(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->smd_ctx)
+		return;
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (qdf_is_macaddr_zero(&smd_ctx->smd_identifier))
+		return;
+
+	mlme_nofl_debug("smd_mac_addr:" QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes));
+}
+#else
+static void cm_print_smd_info(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
 {
@@ -863,6 +889,7 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 			conn_stats.qos_capability,
 			(conn_stats.result_code ? "yes" : "no"));
 	cm_print_mlo_info(vdev);
+	cm_print_smd_info(vdev);
 	mlme_nofl_debug("+---------CONNECTION INFO END------------+");
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&conn_stats, EVENT_WLAN_CONN_STATS_V2);
