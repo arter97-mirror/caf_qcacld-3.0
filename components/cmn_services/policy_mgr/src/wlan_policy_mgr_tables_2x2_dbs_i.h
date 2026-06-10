@@ -4773,6 +4773,12 @@ const enum policy_mgr_pcl_type
 fourth_connection_pcl_dbs_sbs_table
 	[PM_MAX_THREE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
 	[PM_MAX_CONC_PRIORITY_MODE] = {
+	[PM_STA_SAP_SCC_24_SAP_5_DBS] = {
+	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G },
+	[PM_SAP_MODE] = { PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH } },
+	[PM_STA_SAP_SCC_5_SAP_24_DBS] = {
+	[PM_STA_MODE] = { PM_24G, PM_24G, PM_24G },
+	[PM_SAP_MODE] = { PM_24G_SCC_CH, PM_24G_SCC_CH, PM_24G_SCC_CH } },
 	[PM_SAP_SAP_SAP_SCC_24_SMM] = {
 	[PM_SAP_MODE] =	{ PM_5G, PM_5G, PM_5G } },
 	[PM_SAP_SAP_SAP_SCC_5_SMM] = {

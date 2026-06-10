@@ -1169,7 +1169,7 @@ target_if_cp_stats_extract_peer_stats_event(struct wmi_unified *wmi_hdl,
 	QDF_STATUS status;
 	wmi_host_stats_event stats_param = {0};
 	struct peer_stats_info_ext_event *peer_stats_info;
-	wmi_host_peer_stats_info stats_info;
+	wmi_host_peer_stats_info stats_info = {0};
 	uint32_t peer_stats_info_size;
 	int i, j;
 	uint32_t tx_rate_count_idx = 0, rx_rate_count_idx = 0;
