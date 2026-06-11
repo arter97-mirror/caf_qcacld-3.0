@@ -34437,6 +34437,12 @@ static int __wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy,
 		return -ENOTCONN;
 	}
 
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
+		hdd_err("Roaming in progress, reject probe peer request on vdev %d",
+			adapter->deflink->vdev_id);
+		return -EBUSY;
+	}
+
 	if (qdf_atomic_inc_return(&adapter->is_probe_peer_pending) != 1) {
 		qdf_atomic_dec(&adapter->is_probe_peer_pending);
 		hdd_err("Probe already in progress on %s", adapter->dev->name);
