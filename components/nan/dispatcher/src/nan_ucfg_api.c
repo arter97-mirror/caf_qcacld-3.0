@@ -1020,6 +1020,11 @@ ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id)
 		.timeout_ms = 2000,
 	};
 
+	if (ucfg_nan_is_fw_support_standard_mode(psoc)) {
+		nan_debug("FW supports NAN standard mode, skip NDI disable");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	ndi_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ndi_vdev_id,
 							WLAN_NAN_ID);
 	if (!ndi_vdev) {
