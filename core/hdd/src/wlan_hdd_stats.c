@@ -61,6 +61,7 @@
 #endif
 #include "wlan_nan_api.h"
 #include "wlan_pmo_tgt_api.h"
+#include "wlan_pmo_ucfg_api.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -8801,7 +8802,8 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	wlan_hdd_get_station_stats(link_info);
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
-	if (!pmo_tgt_is_target_suspended(hdd_ctx->psoc))
+	if (!pmo_tgt_is_target_suspended(hdd_ctx->psoc) &&
+	    !ucfg_pmo_get_wow_bus_suspend(hdd_ctx->psoc))
 		wlan_hdd_get_sta_tx_rate_stats(link_info);
 
 	wlan_hdd_update_rssi(link_info, sinfo);
