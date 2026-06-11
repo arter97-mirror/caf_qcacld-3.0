@@ -2803,14 +2803,14 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		      mac_ctx->mgmtSeqNum, status_code, aid, addn_ie_len,
 		      frm.HTCaps.present, frm.VHTCaps.present,
 		      frm.vendor_vht_ie.present, frm.he_cap.present,
-		      frm.eht_cap.present);
+		      eht_cap_ie_len > 0);
 
 	lim_cp_stats_cstats_log_assoc_resp_evt(pe_session, CSTATS_DIR_TX,
 					       status_code, aid, mac_hdr->bssId,
 					       mac_hdr->da, frm.HTCaps.present,
 					       frm.VHTCaps.present,
 					       frm.he_cap.present,
-					       frm.eht_cap.present, false);
+					       eht_cap_ie_len > 0, false);
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
