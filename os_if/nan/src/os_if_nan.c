@@ -3197,8 +3197,18 @@ int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
 	nan_req->psoc = psoc;
 	nan_req->pdev = pdev;
 	nan_req->vdev_id = vdev_id;
-	nan_req->social_chan_2g_freq = 0;
-	nan_req->social_chan_5g_freq = 0;
+
+	if (conf->band_cfgs[NL80211_BAND_2GHZ].chan)
+		nan_req->social_chan_2g_freq =
+			conf->band_cfgs[NL80211_BAND_2GHZ].chan->center_freq;
+	else
+		nan_req->social_chan_2g_freq = 0;
+
+	if (conf->band_cfgs[NL80211_BAND_5GHZ].chan)
+		nan_req->social_chan_5g_freq =
+			conf->band_cfgs[NL80211_BAND_5GHZ].chan->center_freq;
+	else
+		nan_req->social_chan_5g_freq = 0;
 
 	/* Copy from kernel cfg80211_nan_conf to internal nan_conf */
 	os_if_nan_copy_cfg80211_to_internal(&nan_req->nan_conf, conf);
