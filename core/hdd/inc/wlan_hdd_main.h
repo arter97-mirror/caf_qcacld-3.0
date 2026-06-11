@@ -1586,6 +1586,24 @@ struct hdd_priv_data {
 	int total_len;
 };
 
+/*
+ * struct hdd_wds_ext - hdd wds extended data
+ * @netdev: pointer to own net device
+ * @parent_netdev: pointer to parent net device
+ * @peer_id: peer id of wds sta
+ * @peer_mac_addr: mac address of wds sta
+ * @wiphy: pointer to wiphy structure
+ * @wdev: wireless device structure
+ */
+struct hdd_wds_ext {
+	struct net_device *netdev;
+	struct net_device *parent_netdev;
+	uint16_t peer_id;
+	uint8_t peer_mac_addr[QDF_MAC_ADDR_SIZE];
+	struct wiphy *wiphy;
+	struct wireless_dev wdev;
+};
+
 #define  MAX_MOD_LOGLEVEL 10
 struct fw_log_info {
 	uint8_t enable;
@@ -3274,6 +3292,38 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
  */
 void hdd_set_station_ops(struct net_device *dev);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
+/**
+ * hdd_alloc_netdev_mqs - Wrapper function of alloc_netdev_mqs
+ * @sizeof_priv: size of private data
+ * @name: device name
+ * @name_assign_type: origin of device name
+ * @setup: callback to initialize device
+ * @txqs: tx queue size
+ * @rxqs: rx queue size
+ *
+ * Return: Net device pointer
+ */
+static inline struct net_device *
+hdd_alloc_netdev_mqs(int sizeof_priv, const char *name,
+		     unsigned char name_assign_type,
+		     void (*setup)(struct net_device *),
+		     unsigned int txqs, unsigned int rxqs)
+{
+	return alloc_netdev_mqs(sizeof_priv, name, name_assign_type,
+				setup, txqs, rxqs);
+}
+#else
+static inline struct net_device *
+hdd_alloc_netdev_mqs(int sizeof_priv, const char *name,
+		     unsigned char name_assign_type,
+		     void (*setup)(struct net_device *),
+		     unsigned int txqs, unsigned int rxqs)
+{
+	return alloc_netdev_mqs(sizeof_priv, name, setup, txqs, rxqs);
+}
+#endif
+
 /**
  * wlan_hdd_get_intf_addr() - Get address for the interface
  * @hdd_ctx: Pointer to hdd context
@@ -3507,6 +3557,38 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable);
 static inline void
 wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 {
+}
+#endif
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * wlan_hdd_wdev_is_ap_vlan() - Check if wireless device is AP VLAN type
+ * @wdev: Pointer to wireless device structure
+ *
+ * This function checks if the given wireless device is of type AP VLAN.
+ * AP VLAN interfaces are used for WDS (Wireless Distribution System)
+ * extended functionality to support 4-address frame format.
+ *
+ * Return: true if the device is AP VLAN type, false otherwise
+ */
+static inline bool wlan_hdd_wdev_is_ap_vlan(struct wireless_dev *wdev)
+{
+	return wdev->iftype == NL80211_IFTYPE_AP_VLAN;
+}
+#else
+/**
+ * wlan_hdd_wdev_is_ap_vlan() - Check if wireless device is AP VLAN type
+ * @wdev: Pointer to wireless device structure
+ *
+ * This function checks if the given wireless device is of type AP VLAN.
+ * When QCA_SUPPORT_WDS_EXTENDED is not enabled, this function always
+ * returns false as AP VLAN functionality is not supported.
+ *
+ * Return: false (AP VLAN not supported when WDS extended is disabled)
+ */
+static inline bool wlan_hdd_wdev_is_ap_vlan(struct wireless_dev *wdev)
+{
+	return false;
 }
 #endif
 

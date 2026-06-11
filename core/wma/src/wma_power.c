@@ -53,6 +53,7 @@
 
 #include "wma_internal.h"
 #include "wlan_pmo_ucfg_api.h"
+#include "sch_api.h"
 
 /**
  * wma_unified_modem_power_state() - set modem power state to fw
@@ -259,12 +260,15 @@ void wma_set_tx_power(WMA_HANDLE handle,
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	int8_t max_reg_power;
 	struct wma_txrx_node *iface;
+	bool update_beacon = false;
+	struct pe_session *session;
 
 	if (tx_pwr_params->dev_mode == QDF_SAP_MODE ||
 	    tx_pwr_params->dev_mode == QDF_P2P_GO_MODE) {
 		ret = wma_find_vdev_id_by_addr(wma_handle,
 					       tx_pwr_params->bssId.bytes,
 					       &vdev_id);
+		update_beacon = true;
 	} else {
 		ret = wma_find_vdev_id_by_bssid(wma_handle,
 						tx_pwr_params->bssId.bytes,
@@ -311,6 +315,18 @@ void wma_set_tx_power(WMA_HANDLE handle,
 					 tx_pwr_params->power);
 		if (ret == QDF_STATUS_SUCCESS)
 			mlme_set_tx_power(iface->vdev, tx_pwr_params->power);
+
+		session = pe_find_session_by_vdev_id(wma_handle->mac_context,
+						     vdev_id);
+		if (!session || !update_beacon)
+			goto end;
+
+		/* update beacon tpc report IE */
+		sch_set_fixed_beacon_fields(wma_handle->mac_context,
+					    session);
+		lim_send_beacon_ind(wma_handle->mac_context,
+				    session,
+				    REASON_CONFIG_UPDATE);
 	} else {
 		/* no tx_power change */
 		ret = QDF_STATUS_SUCCESS;

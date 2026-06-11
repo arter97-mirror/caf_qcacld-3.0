@@ -964,7 +964,9 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		status = policy_mgr_wait_chan_switch_complete_evt(hdd_ctx->psoc);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("qdf wait for csa event failed");
-			return QDF_STATUS_E_FAILURE;
+			if (hdd_is_chan_switch_in_progress())
+				return QDF_STATUS_E_FAILURE;
+			hdd_debug("channel switch not in progress, continue");
 		}
 	}
 

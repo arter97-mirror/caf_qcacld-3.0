@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1217,7 +1217,7 @@ static uint8_t *
 wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id,
 			       uint8_t ie_extn_id)
 {
-	uint8_t len = 0, sub_ele_len = 0;
+	int16_t len = 0, sub_ele_len = 0;
 	struct ie_header *ele;
 	struct extn_ie_header *extn_ie;
 
@@ -1230,7 +1230,7 @@ wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id,
 	len = ele->ie_len;
 	ele = (struct ie_header *)(ch_wr_ie + sizeof(struct ie_header));
 
-	while (len > 0) {
+	while (len >= sizeof(struct ie_header)) {
 		sub_ele_len = sizeof(struct ie_header) + ele->ie_len;
 		if (sub_ele_len > len) {
 			wma_debug("invalid sub element len :%d id:%d ie len:%d",
@@ -1275,6 +1275,12 @@ QDF_STATUS wma_parse_bw_indication_ie(uint8_t *ie,
 	uint8_t ccfs0, ccfs1;
 	enum phy_ch_width ch_width;
 	QDF_STATUS status;
+
+	if (!ie || tlv_len < SIR_MAC_MIN_IE_LEN) {
+		wma_debug("Invalid WMI_CSWRAP_IE len %d",
+			  tlv_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	ie_head = (struct ie_header *)ie;
 	if (ie_head->ie_len + sizeof(struct ie_header) > tlv_len) {
@@ -1365,7 +1371,7 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 				    struct wlan_objmgr_pdev *pdev)
 {
 	struct mlo_link_info *link_info;
-	struct wlan_mlo_dev_context *mldev;
+	struct wlan_mlo_dev_context *mldev = NULL;
 	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 	struct csa_offload_params csa_param = {0};
 	struct mlo_link_bss_params params = {0};
@@ -1466,7 +1472,7 @@ static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
 	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t link_id;
 	struct mlo_link_info *link_info;
-	struct wlan_mlo_dev_context *mldev;
+	struct wlan_mlo_dev_context *mldev = NULL;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->mld_mac_address,
 				   &mld_addr[0]);
@@ -1538,7 +1544,6 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
-	uint8_t tlv_len;
 	struct wlan_channel *chan;
 
 	param_buf = (WMI_CSA_HANDLING_EVENTID_param_tlvs *) event;
@@ -1550,8 +1555,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	}
 	csa_event = param_buf->fixed_param;
 
-	if (csa_event->link_id_present &&
-	    csa_event->mld_mac_address_present) {
+	if (csa_event->link_id_present && csa_event->mld_mac_address_present) {
 		status = fill_peer_mac_addr(csa_event, &bssid[0]);
 		if (status)
 			return -EINVAL;
@@ -1559,10 +1563,10 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		/* check standby link and return */
 		if (handle_csa_standby_link(csa_event, wma->psoc, wma->pdev))
 			return 0;
-		} else {
-			WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2,
-						   &bssid[0]);
-		}
+	} else {
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2,
+					   &bssid[0]);
+	}
 
 	peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
 					   bssid, WLAN_LEGACY_WMA_ID);
@@ -1605,9 +1609,8 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 
 	if (csa_event->ies_present_flag & WMI_CSWRAP_IE_EXT_VER_2_PRESENT) {
 		wma_debug("WMI_CSWRAP_IE_EXT_VER_2 received");
-		tlv_len = csa_event->num_bytes_valid_in_cswrap_ie_ext_ver2;
 		status = wma_parse_bw_indication_ie(param_buf->cs_wrap_ie,
-						    tlv_len,
+						    param_buf->num_cs_wrap_ie,
 						    csa_offload_event);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			csa_offload_event->ies_present_flag |=
@@ -3662,6 +3665,9 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *event_param;
 	WOW_EVENT_INFO_fixed_param *wake_info;
 
+	if (!wma || !wma->psoc)
+		return -EINVAL;
+
 	event_param = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *)event;
 	if (!event_param) {
 		wma_err("Wake event data is null");
@@ -4053,8 +4059,8 @@ QDF_STATUS wma_process_del_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 static void wma_stats_ext_req_vdev_id_bitmap(struct wlan_objmgr_psoc *psoc,
 					     uint32_t vdev_id, uint32_t *bitmap)
 {
-	struct wlan_objmgr_vdev *vdev, *link_vdev;
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *vdev = NULL, *link_vdev = NULL;
+	struct wlan_mlo_dev_context *mlo_dev_ctx = NULL;
 	uint32_t i, connected_links_bitmap = 0;
 	uint8_t connected_vdev_id;
 

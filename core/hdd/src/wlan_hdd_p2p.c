@@ -716,6 +716,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	int ret;
 	struct hdd_adapter_create_param create_params = {0};
 	uint8_t *device_address = NULL;
+	struct wireless_dev *wdev;
 
 	hdd_enter();
 
@@ -732,6 +733,11 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ERR_PTR(ret);
+
+	wdev = hdd_create_wds_ext_dev(wiphy, name,
+				      name_assign_type, type);
+	if (!IS_ERR(wdev))
+		return wdev;
 
 	status = hdd_nl_to_qdf_iface_type(type, &mode);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -1065,11 +1071,120 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	return 0;
 }
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * _wlan_hdd_del_wds_ext_intf() - Delete WDS extension interface (internal)
+ * @wiphy: Pointer to wiphy structure
+ * @wdev: Pointer to wireless device structure
+ *
+ * This is the internal implementation function for deleting a WDS (Wireless
+ * Distribution System) extension interface. It performs the actual cleanup
+ * operations including releasing the parent network device reference,
+ * stopping the network queue, and unregistering the network device from
+ * cfg80211.
+ *
+ * Context: This function should be called with appropriate synchronization
+ * locks held by the caller (wlan_hdd_del_wds_ext_intf).
+ *
+ * Return: None
+ */
+static void
+_wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_wds_ext *osifp = netdev_priv(dev);
+	struct qdf_net_if *nif = (struct qdf_net_if *)osifp->parent_netdev;
+
+	hdd_enter();
+
+	if (osifp->parent_netdev) {
+		qdf_net_if_release_dev(nif);
+		osifp->parent_netdev = NULL;
+	}
+
+	netif_stop_queue(dev);
+
+	wlan_cfg80211_unregister_netdevice(dev);
+
+	hdd_exit();
+}
+
+/**
+ * wlan_hdd_del_wds_ext_intf() - Delete WDS extension interface
+ * @wiphy: Pointer to wiphy structure
+ * @wdev: Pointer to wireless device structure
+ *
+ * This function handles the deletion of a WDS (Wireless Distribution System)
+ * extension interface. It provides proper synchronization by managing vdev
+ * sync operations, validates the interface type (must be AP_VLAN), and calls
+ * the internal deletion function to perform the actual cleanup.
+ *
+ * The function ensures thread safety by:
+ * - Starting a vdev sync transaction
+ * - Unregistering the vdev sync
+ * - Waiting for pending operations to complete
+ * - Calling the internal deletion function
+ * - Properly cleaning up sync resources
+ *
+ * Context: Process context. This function may sleep due to sync operations.
+ *
+ * Return: 0 on success, negative error code on failure
+ *         -EINVAL if interface type is not AP_VLAN
+ *         Other negative values for sync operation failures
+ */
+static int
+wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	if (wdev->iftype != NL80211_IFTYPE_AP_VLAN)
+		return -EINVAL;
+
+	/*
+	 * Need to remove existing AP/VLAN interfaces even when driver is
+	 * recovering, will recreate when BH-STA connect back after recovering.
+	 * Below normal path will refuse to handle when driver is recovering.
+	 */
+	if (qdf_is_recovering()) {
+		hdd_debug("Recovering, perform best-effort WDS EXT cleanup");
+		_wlan_hdd_del_wds_ext_intf(wiphy, wdev);
+		vdev_sync = osif_vdev_sync_unregister(wdev->netdev);
+		if (vdev_sync)
+			osif_vdev_sync_destroy(vdev_sync);
+		return 0;
+	}
+
+	errno = osif_vdev_sync_trans_start_wait(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	osif_vdev_sync_unregister(wdev->netdev);
+	osif_vdev_sync_wait_for_ops(vdev_sync);
+
+	_wlan_hdd_del_wds_ext_intf(wiphy, wdev);
+
+	osif_vdev_sync_trans_stop(vdev_sync);
+	osif_vdev_sync_destroy(vdev_sync);
+
+	return errno;
+}
+#else
+static inline int
+wlan_hdd_del_wds_ext_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	return -EINVAL;
+}
+#endif
+
 int wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+
+	if (!wlan_hdd_del_wds_ext_intf(wiphy, wdev))
+		return 0;
 
 	adapter->delete_in_progress = true;
 	errno = osif_vdev_sync_trans_start_wait(wdev->netdev, &vdev_sync);

@@ -2545,7 +2545,7 @@ populate_dot11f_tpc_report(struct mac_context *mac,
 			   tDot11fIETPCReport *pDot11f, struct pe_session *pe_session)
 {
 	uint16_t staid;
-	uint8_t tx_power;
+	uint8_t tx_power, reg_power;
 	QDF_STATUS nSirStatus;
 
 	nSirStatus = lim_get_mgmt_staid(mac, &staid, pe_session);
@@ -2554,8 +2554,18 @@ populate_dot11f_tpc_report(struct mac_context *mac,
 			nSirStatus);
 		return QDF_STATUS_E_FAILURE;
 	}
-	tx_power = wlan_reg_get_channel_reg_power_for_freq(
+	reg_power = wlan_reg_get_channel_reg_power_for_freq(
 				mac->pdev, pe_session->curr_op_freq);
+	if (reg_power == 0 || reg_power == REG_INVALID_TXPOWER)
+		return QDF_STATUS_E_FAILURE;
+
+	tx_power = wlan_vdev_mlme_get_txpower(pe_session->vdev);
+	pe_debug("reg max power %d tx max power %d", reg_power, tx_power);
+	if (tx_power)
+		tx_power = QDF_MIN(reg_power, tx_power);
+	else
+		tx_power = reg_power;
+
 	pDot11f->tx_power = tx_power;
 	pDot11f->link_margin = 0;
 	pDot11f->present = 1;
