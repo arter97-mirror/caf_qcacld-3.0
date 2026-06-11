@@ -14847,6 +14847,44 @@ populate_dot11f_use_reporting_bss_ext_cap(tDot11fIEExtCap *reporting_ext_cap,
 #define ML_CTRL_BV_PBM_RESERVED_BITS_VAL 0xF80
 #define STA_CTRL_BV_RESERVED_BITS_VAL 0xF
 
+static inline void
+lim_copy_vht_su_bfr_cap_from_session(struct pe_session *pe_session,
+				     tDot11fIEVHTCaps *vht_caps)
+{
+	vht_caps->suBeamFormerCap =
+		pe_session->vht_config.su_beam_former;
+}
+
+#ifdef WLAN_FEATURE_11AX
+static inline void
+lim_copy_he_su_bfr_cap_from_session(struct pe_session *pe_session,
+				    tDot11fIEhe_cap *he_caps)
+{
+	he_caps->su_beamformer = pe_session->he_config.su_beamformer;
+}
+#else
+static inline void
+lim_copy_he_su_bfr_cap_from_session(struct pe_session *pe_session,
+				    tDot11fIEhe_cap *he_caps)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+static inline void
+lim_copy_eht_su_bfr_cap_from_session(struct pe_session *pe_session,
+				     tDot11fIEeht_cap *eht_caps)
+{
+	eht_caps->su_beamformer = pe_session->eht_config.su_beamformer;
+}
+#else
+static inline void
+lim_copy_eht_su_bfr_cap_from_session(struct pe_session *pe_session,
+				     tDot11fIEeht_cap *eht_caps)
+{
+}
+#endif
+
 QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 					    struct pe_session *pe_session,
 					    tDot11fAssocRequest *frm)
@@ -15408,6 +15446,8 @@ no_ext_mld_cap:
 				vht_caps.shortGI80MHz = 0;
 				vht_caps.shortGI160and80plus80MHz = 0;
 			}
+			lim_copy_vht_su_bfr_cap_from_session(pe_session,
+							     &vht_caps);
 		}
 
 		lim_update_dot11f_vht_caps_for_nss(&vht_caps,
@@ -15430,6 +15470,7 @@ no_ext_mld_cap:
 
 		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps,
 						pe_session->vdev_id);
+		lim_copy_he_su_bfr_cap_from_session(pe_session, &he_caps);
 		if (he_caps.ppet_present) {
 			value = WNI_CFG_HE_PPET_LEN;
 			if (!is_2g)
@@ -15489,6 +15530,7 @@ no_ext_mld_cap:
 		}
 		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
 						 NULL);
+		lim_copy_eht_su_bfr_cap_from_session(pe_session, &eht_caps);
 		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)) {
 			eht_caps.support_320mhz_6ghz = 0;
 			eht_caps.bfee_ss_320mhz = 0;
