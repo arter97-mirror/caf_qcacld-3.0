@@ -2451,6 +2451,14 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		 * key_ext carries key materials whose size
 		 * is greater than conventional 16bytes.
 		 */
+		if (key_ext->kck_len > MAX_KCK_LEN ||
+		    key_ext->kek_len > MAX_KEK_LENGTH) {
+			wmi_err("Invalid kck_len %d or kek_len %d",
+				key_ext->kck_len, key_ext->kek_len);
+			wlan_cm_free_roam_synch_frame_ind(rso_cfg);
+			return status;
+		}
+
 		kck_len = key_ext->kck_len ?
 				key_ext->kck_len : KCK_192BIT_KEY_LEN;
 		kek_len = key_ext->kek_len ?
