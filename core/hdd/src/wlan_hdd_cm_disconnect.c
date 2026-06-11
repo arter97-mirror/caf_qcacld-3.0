@@ -129,7 +129,8 @@ static void hdd_cm_print_bss_info(struct hdd_station_ctx *hdd_sta_ctx)
  * @link_info: Link info pointer in HDD adapter
  * @sta_ctx: pointer to struct hdd_station_ctx
  * @mac_addr: pointer to AP mld addr if MLO deflink. Otherwise pointer to
- *	      AP BSSID.
+ *	      AP BSSID. Also fires for link switch to update IPA WAN rules
+ *	      for the old assoc link even after deflink has been updated.
  *
  * This function handles STA MLO connection and only deflink information
  * is registered to IPA component for STA_DISCONNECT event.
@@ -141,10 +142,12 @@ static bool hdd_handle_ipa_sta_mlo_disconn(struct wlan_hdd_link_info *link_info,
 					   struct hdd_station_ctx *sta_ctx,
 					   uint8_t **mac_addr)
 {
+	struct wlan_objmgr_vdev *vdev = link_info->vdev;
 	struct qdf_mac_addr mac = {0};
 
-	if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)) {
-		if (WLAN_HDD_IS_DEFLINK(link_info)) {
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		if (WLAN_HDD_IS_DEFLINK(link_info) ||
+		    wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
 			qdf_mem_copy(&mac, &sta_ctx->conn_info.mld_addr,
 				     QDF_MAC_ADDR_SIZE);
 			*mac_addr = sta_ctx->conn_info.mld_addr.bytes;
