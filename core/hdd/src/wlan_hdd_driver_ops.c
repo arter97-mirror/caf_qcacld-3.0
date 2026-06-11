@@ -1013,6 +1013,9 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 	osif_psoc_sync_trans_stop(psoc_sync);
 	hdd_start_complete(0);
 
+	if (!errno)
+		wlan_hdd_wondertap_register_ops(dev);
+
 	return errno;
 }
 
