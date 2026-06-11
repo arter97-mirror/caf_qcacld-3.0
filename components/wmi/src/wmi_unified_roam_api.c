@@ -523,7 +523,7 @@ wmi_unified_extract_roam_ml_info(wmi_unified_t wmi_handle, void *event,
 				 struct roam_mlo_link_info *dst,
 				 uint64_t timestamp, uint8_t idx)
 {
-	if (wmi_handle->ops->extract_roam_stats_event)
+	if (wmi_handle->ops->extract_roam_ml_info)
 		return wmi_handle->ops->extract_roam_ml_info(wmi_handle, event,
 							     dst, timestamp,
 							     idx);
