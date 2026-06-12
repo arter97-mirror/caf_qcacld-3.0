@@ -189,6 +189,42 @@ wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 					uint8_t mac_id);
 
 /**
+ * wlan_twt_cfg_get_vdev_congestion_timeout() - Get per-vdev congestion timeout
+ * @psoc: Pointer to global psoc
+ * @vdev_id: VDEV ID
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t *val);
+
+/**
+ * wlan_twt_cfg_set_vdev_congestion_timeout() - Set per-vdev congestion timeout
+ * @psoc: Pointer to global psoc
+ * @vdev_id: VDEV ID
+ * @val: value to set (0 = TWT active; INI value = TWT inactive)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t val);
+
+/**
+ * wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini() - Reset per-vdev
+ * congestion timeout to INI configured value
+ * @psoc: Pointer to global psoc
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id);
+
+/**
  * wlan_twt_cfg_get_requestor_flag() - get requestor flag
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable
@@ -207,6 +243,31 @@ wlan_twt_cfg_get_requestor_flag(struct wlan_objmgr_psoc *psoc, bool *val);
  */
 QDF_STATUS
 wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val);
+
+/**
+ * wlan_twt_cfg_get_vdev_requestor_flag() - Get per-vdev TWT requestor flag
+ * @psoc: Pointer to global psoc
+ * @vdev_id: VDEV ID
+ * @val: pointer to output variable; set to true if TWT requestor is enabled
+ *       for this vdev (vdev-level TWT path)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool *val);
+
+/**
+ * wlan_twt_cfg_set_vdev_requestor_flag() - Set per-vdev TWT requestor flag
+ * @psoc: Pointer to global psoc
+ * @vdev_id: VDEV ID
+ * @val: true to enable, false to disable TWT requestor for this vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_set_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool val);
 
 /**
  * wlan_twt_cfg_get_responder_flag() - This API intersects TWT responder flag
@@ -407,6 +468,27 @@ wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 }
 
 static inline QDF_STATUS
+wlan_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 wlan_twt_cfg_get_requestor_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return QDF_STATUS_SUCCESS;
@@ -414,6 +496,21 @@ wlan_twt_cfg_get_requestor_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline QDF_STATUS
 wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_get_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool *val)
+{
+	*val = false;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_set_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool val)
 {
 	return QDF_STATUS_SUCCESS;
 }

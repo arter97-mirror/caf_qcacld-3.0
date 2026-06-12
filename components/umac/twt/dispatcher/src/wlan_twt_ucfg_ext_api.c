@@ -338,3 +338,24 @@ ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 	return wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
 								     mac_id);
 }
+
+QDF_STATUS
+ucfg_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t *val)
+{
+	return wlan_twt_cfg_get_vdev_congestion_timeout(psoc, vdev_id, val);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t val)
+{
+	return wlan_twt_cfg_set_vdev_congestion_timeout(psoc, vdev_id, val);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id)
+{
+	return wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(psoc, vdev_id);
+}

@@ -412,6 +412,42 @@ ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 					uint8_t mac_id);
 
 /**
+ * ucfg_twt_cfg_get_vdev_congestion_timeout() - Get per-vdev congestion timeout
+ * @psoc: Pointer to global PSOC object
+ * @vdev_id: VDEV ID
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t *val);
+
+/**
+ * ucfg_twt_cfg_set_vdev_congestion_timeout() - Set per-vdev congestion timeout
+ * @psoc: Pointer to global PSOC object
+ * @vdev_id: VDEV ID
+ * @val: value to set (0 = TWT active; INI value = TWT inactive)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t val);
+
+/**
+ * ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini() - Reset per-vdev
+ * congestion timeout to INI configured value
+ * @psoc: Pointer to global PSOC object
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id);
+
+/**
  * ucfg_twt_cfg_reset_responder() - Reset cfg responder
  * @psoc: psoc
  *
@@ -654,6 +690,27 @@ ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+ucfg_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 #endif

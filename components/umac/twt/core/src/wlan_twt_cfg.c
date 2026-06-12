@@ -60,6 +60,14 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 		twt_psoc->twt_congestion_timeout[i] =
 					twt_cfg->twt_congestion_timeout;
 
+	/* Initialize per-vdev congestion timeout with INI value.
+	 * twt_req_flag_vdev[] is already zero-initialized (all false)
+	 * by qdf_mem_malloc, so no explicit init needed for it.
+	 */
+	for (i = 0; i < WLAN_UMAC_PSOC_MAX_VDEVS; i++)
+		twt_psoc->twt_congestion_timeout_vdev[i] =
+					twt_cfg->twt_congestion_timeout;
+
 	twt_cfg->bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
 	twt_cfg->bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
 	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
@@ -359,6 +367,77 @@ wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 }
 
 QDF_STATUS
+wlan_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		twt_err("Invalid vdev_id: %d", vdev_id);
+		*val = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->twt_congestion_timeout_vdev[vdev_id];
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint32_t val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj)
+		return QDF_STATUS_E_INVAL;
+
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		twt_err("Invalid vdev_id: %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_psoc_obj->twt_congestion_timeout_vdev[vdev_id] = val;
+	twt_debug("Set vdev congestion_timeout for vdev%d: %u", vdev_id, val);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id)
+{
+	uint32_t ini_congestion_timeout;
+	QDF_STATUS status;
+
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		twt_err("Invalid vdev_id: %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ini_congestion_timeout = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+	status = wlan_twt_cfg_set_vdev_congestion_timeout(
+						psoc, vdev_id,
+						ini_congestion_timeout);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		twt_debug("Reset vdev congestion_timeout for vdev%d to INI value: %u",
+			  vdev_id, ini_congestion_timeout);
+	else
+		twt_err("Failed to reset vdev congestion_timeout for vdev%d",
+			vdev_id);
+
+	return status;
+}
+
+QDF_STATUS
 wlan_twt_cfg_get_requestor_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc_obj;
@@ -384,6 +463,49 @@ wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val)
 		return QDF_STATUS_E_INVAL;
 
 	twt_psoc_obj->cfg_params.req_flag = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = false;
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		twt_err("Invalid vdev_id: %d", vdev_id);
+		*val = false;
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->twt_req_flag_vdev[vdev_id];
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_set_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj)
+		return QDF_STATUS_E_INVAL;
+
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		twt_err("Invalid vdev_id: %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_psoc_obj->twt_req_flag_vdev[vdev_id] = val;
 
 	return QDF_STATUS_SUCCESS;
 }
