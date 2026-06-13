@@ -1104,6 +1104,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS qdf_status;
 	struct wlan_channel *bss_chan;
 	uint8_t band;
+	bool vdev_support = false;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1189,8 +1190,22 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE)
 		return osif_send_twt_setup_req(vdev, psoc, &params);
 
-	ucfg_twt_cfg_get_congestion_timeout_per_mac(psoc, mac_id,
-						    &congestion_timeout);
+	/*
+	 * If FW supports per-vdev TWT en/dis for requestor role, use the
+	 * per-vdev congestion timeout so that each vdev (STA, P2P-CLI etc.)
+	 * is tracked independently. Otherwise fall back to the mac-level
+	 * congestion timeout (legacy pdev-level path).
+	 */
+
+	ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, &vdev_support);
+	if (vdev_support)
+		ucfg_twt_cfg_get_vdev_congestion_timeout(psoc, vdev_id,
+							 &congestion_timeout);
+	else
+		ucfg_twt_cfg_get_congestion_timeout_per_mac(
+							psoc, mac_id,
+							&congestion_timeout);
+
 	if (congestion_timeout) {
 		reason = HOST_TWT_DISABLE_REASON_CHANGE_CONGESTION_TIMEOUT;
 		ret = osif_twt_send_requestor_disable_cmd(psoc, mac_id,
@@ -1200,7 +1215,12 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 			return -EOPNOTSUPP;
 		}
 	}
-	ucfg_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, 0);
+
+	if (vdev_support)
+		ucfg_twt_cfg_set_vdev_congestion_timeout(psoc, vdev_id, 0);
+	else
+		ucfg_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, 0);
+
 
 	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id, vdev_id);
 	if (ret) {
@@ -1216,9 +1236,15 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	return 0;
 
 end:
-	if (congestion_timeout)
-		ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
-								     mac_id);
+	if (congestion_timeout) {
+		if (vdev_support)
+			ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(
+					psoc, vdev_id);
+		else
+			ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
+					psoc, mac_id);
+	}
+
 	return ret;
 }
 

@@ -412,6 +412,18 @@ ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 					uint8_t mac_id);
 
 /**
+ * ucfg_twt_tgt_caps_get_req_en_dis_vdev_support() - Get FW capability for
+ * per-vdev TWT enable/disable command support for TWT requestor role
+ * @psoc: Pointer to global PSOC object
+ * @val: pointer to output variable; set to true if supported
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
+					      bool *val);
+
+/**
  * ucfg_twt_cfg_get_vdev_congestion_timeout() - Get per-vdev congestion timeout
  * @psoc: Pointer to global PSOC object
  * @vdev_id: VDEV ID

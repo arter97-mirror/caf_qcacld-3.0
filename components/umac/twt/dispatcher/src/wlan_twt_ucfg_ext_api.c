@@ -21,6 +21,7 @@
 #include "twt/core/src/wlan_twt_main.h"
 #include "cfg_twt.h"
 #include <wlan_twt_cfg_ext_api.h>
+#include "twt/core/src/wlan_twt_common.h"
 
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
 {
@@ -337,6 +338,13 @@ ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
 {
 	return wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
 								     mac_id);
+}
+
+QDF_STATUS
+ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
+					      bool *val)
+{
+	return wlan_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, val);
 }
 
 QDF_STATUS
