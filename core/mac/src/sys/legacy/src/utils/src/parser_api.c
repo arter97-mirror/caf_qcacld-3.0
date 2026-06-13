@@ -8890,11 +8890,23 @@ populate_dot11f_timing_advert_frame(struct mac_context *mac_ctx,
 
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_FEATURE_11AX)
 static bool
-twt_get_requestor_flag(struct mac_context *mac)
+twt_get_requestor_flag(struct mac_context *mac, uint8_t vdev_id)
 {
 	bool req_flag = false;
+	bool vdev_support = false;
 
-	wlan_twt_cfg_get_req_flag(mac->psoc, &req_flag);
+	/*
+	 * If FW supports per-vdev TWT en/dis for requestor role, check the
+	 * per-vdev requestor flag (vdev-level TWT path). Otherwise fall back
+	 * to the psoc-level requestor flag (pdev-level TWT path).
+	 */
+	wlan_twt_cfg_get_req_en_dis_vdev_support(mac->psoc, &vdev_support);
+	if (vdev_support)
+		wlan_twt_cfg_get_vdev_requestor_flag(mac->psoc, vdev_id,
+						     &req_flag);
+	else
+		wlan_twt_cfg_get_req_flag(mac->psoc, &req_flag);
+
 	return req_flag;
 }
 
@@ -8954,7 +8966,7 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 			break;
 		wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
 		he_cap->twt_request =
-			twt_requestor && twt_get_requestor_flag(mac);
+			twt_requestor && twt_get_requestor_flag(mac, vdev_id);
 		he_cap->broadcast_twt = bcast_requestor;
 		break;
 	case QDF_P2P_GO_MODE:
@@ -13860,7 +13872,8 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 	case QDF_STA_MODE:
 		wlan_twt_get_requestor_cfg(mac_ctx->psoc, &twt_requestor);
 		p_ext_cap->twt_requestor_support =
-			twt_requestor && twt_get_requestor_flag(mac_ctx);
+			twt_requestor && twt_get_requestor_flag(mac_ctx,
+								vdev_id);
 		break;
 	case QDF_P2P_GO_MODE:
 		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||

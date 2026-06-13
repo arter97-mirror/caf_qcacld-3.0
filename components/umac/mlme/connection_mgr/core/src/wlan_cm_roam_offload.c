@@ -6709,7 +6709,7 @@ void cm_update_session_assoc_ie(struct wlan_objmgr_psoc *psoc,
 		rso_cfg->assoc_ie.len = 0;
 	}
 
-	cm_update_ext_cap_ie_at_source(psoc, assoc_ie);
+	cm_update_ext_cap_ie_at_source(psoc, vdev_id, assoc_ie);
 
 	rso_cfg->assoc_ie.ptr = new_assoc_ie_ptr;
 	rso_cfg->assoc_ie.len = assoc_ie->len;
