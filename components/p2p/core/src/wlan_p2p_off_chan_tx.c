@@ -36,6 +36,7 @@
 #include "wlan_osif_request_manager.h"
 #include <wlan_mlme_main.h>
 #include "wlan_mlme_api.h"
+#include "wifi_pos_api.h"
 #include <wlan_cm_api.h>
 #include <wlan_mlo_mgr_sta.h>
 
@@ -715,6 +716,19 @@ static QDF_STATUS p2p_populate_mac_header(
 							       tx_ctx,
 							       wh->i_addr2);
 				mlme_set_p2p_device_seq_num(vdev, seq_num_cur);
+			}
+
+			if (WLAN_FC0_GET_TYPE(wh->i_fc[0]) ==
+					WLAN_FC0_TYPE_MGMT &&
+			    WLAN_FC0_GET_STYPE(wh->i_fc[0]) ==
+					WLAN_FC0_STYPE_AUTH &&
+			    wifi_pos_is_pd_wdev_mac(vdev, wh->i_addr2)) {
+				seq_num_cur =
+					wifi_pos_get_pd_wdev_seq_num(vdev);
+				seq_num = p2p_get_next_seq_num(&seq_num_cur,
+							       tx_ctx,
+							       wh->i_addr2);
+				wifi_pos_set_pd_wdev_seq_num(vdev, seq_num_cur);
 			}
 
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);

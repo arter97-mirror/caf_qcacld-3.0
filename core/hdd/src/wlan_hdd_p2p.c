@@ -64,6 +64,7 @@
 #include "wlan_hdd_wifi_pos_pasn.h"
 #include "wlan_hdd_wmm.h"
 #include "wifi_pos_ucfg_api.h"
+#include "wifi_pos_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -599,14 +600,28 @@ int wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	if (wlan_hdd_is_pd_iface(wdev)) {
 		struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 		struct hdd_adapter *sta_adapter;
+		struct wlan_objmgr_vdev *sta_vdev;
+		/* PD wdev is netdev-less; MAC is stored in wdev->address */
+		const uint8_t *pd_mac = wdev->address;
 
 		errno = wlan_hdd_validate_context(hdd_ctx);
 		if (errno)
 			return errno;
 
 		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
-		if (sta_adapter && sta_adapter->wdev.netdev)
-			wdev = &sta_adapter->wdev;
+		if (!sta_adapter || !sta_adapter->wdev.netdev) {
+			hdd_err("No usable STA adapter for PD mgmt tx");
+			return -EINVAL;
+		}
+
+		sta_vdev = hdd_objmgr_get_vdev_by_user(sta_adapter->deflink,
+						       WLAN_WIFI_POS_OSIF_ID);
+		if (sta_vdev) {
+			wifi_pos_set_pd_wdev_mac(sta_vdev, pd_mac);
+			hdd_objmgr_put_vdev_by_user(sta_vdev,
+						    WLAN_WIFI_POS_OSIF_ID);
+		}
+		wdev = &sta_adapter->wdev;
 	}
 
 	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
@@ -1352,6 +1367,24 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 
 	if (wlan_hdd_is_session_type_monitor(adapter->device_mode))
 		ucfg_dp_set_mon_conf_flags(hdd_ctx->psoc, 0);
+
+	if (wlan_hdd_is_pd_iface(wdev)) {
+		struct hdd_adapter *sta_adapter =
+				hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+
+		if (sta_adapter) {
+			struct wlan_objmgr_vdev *sta_vdev;
+
+			sta_vdev = hdd_objmgr_get_vdev_by_user(
+						sta_adapter->deflink,
+						WLAN_WIFI_POS_OSIF_ID);
+			if (sta_vdev) {
+				wifi_pos_set_pd_wdev_mac(sta_vdev, NULL);
+				hdd_objmgr_put_vdev_by_user(sta_vdev,
+							    WLAN_WIFI_POS_OSIF_ID);
+			}
+		}
+	}
 
 	if (adapter->device_mode == QDF_SAP_MODE &&
 	    ucfg_pre_cac_is_active(hdd_ctx->psoc)) {
