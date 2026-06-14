@@ -1612,7 +1612,8 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 		return is_csa_standby;
 	}
 
-	if (link_info->vdev_id != WLAN_INVALID_VDEV_ID) {
+	if (link_info->vdev_id != WLAN_INVALID_VDEV_ID &&
+	    link_info->is_link_active) {
 		wma_debug("vdev id %d link id %d Active link CSA event: BSSID "
 			  QDF_MAC_ADDR_FMT, link_info->vdev_id, link_id,
 			  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
