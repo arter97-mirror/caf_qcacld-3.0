@@ -158,6 +158,97 @@ lim_populate_mac_header(struct mac_context *mac_ctx, uint8_t *buf,
 		 mac_ctx->mgmtSeqNum, mac_hdr->seqControl.fragNum);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline void
+lim_set_assoc_req_eht_su_beamformer(struct pe_session *pe_session,
+				    bool oui_in_whitelist,
+				    struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+	if (oui_in_whitelist)
+		pe_session->eht_config.su_beamformer =
+			mlme_obj->cfg.eht_caps.su_beamformer_cap;
+}
+#else
+static inline void
+lim_set_assoc_req_eht_su_beamformer(struct pe_session *pe_session,
+				    bool oui_in_whitelist,
+				    struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11AX
+static inline void
+lim_set_assoc_req_he_su_beamformer(struct pe_session *pe_session,
+				   bool oui_in_whitelist,
+				   struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+	if (oui_in_whitelist)
+		pe_session->he_config.su_beamformer =
+			mlme_obj->cfg.he_caps.su_beamformer_cap;
+}
+#else
+static inline void
+lim_set_assoc_req_he_su_beamformer(struct pe_session *pe_session,
+				   bool oui_in_whitelist,
+				   struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+}
+#endif
+
+/**
+ * lim_update_session_su_beamformer() - Apply OUI whitelist to VHT/HE/EHT SU
+ *     beamformer caps in pe_session based on the target AP's OUI.
+ * @mac_ctx: MAC context
+ * @pe_session: PE session whose vht/he/eht_config.su_beamformer fields are
+ *     updated in-place.
+ *
+ * Reads IEs from lim_join_req->bssDescription, runs the
+ * ACTION_OUI_ALLOW_UL_TX_BEAMFORMER check, and enables/disables
+ * su_beamformer across VHT, HE, and EHT. No-op when the OUI feature is
+ * disabled or lim_join_req is absent.
+ */
+static void
+lim_update_session_su_beamformer(struct mac_context *mac_ctx,
+				 struct pe_session *pe_session)
+{
+	struct bss_description *bss_desc;
+	struct action_oui_search_attr attr = {0};
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	bool oui_in_whitelist = false;
+
+	if (!wlan_action_oui_is_ul_tx_beamformer_config_supported(mac_ctx->psoc))
+		return;
+
+	if (!pe_session->lim_join_req)
+		return;
+
+	mlme_obj = mlme_get_psoc_ext_obj(mac_ctx->psoc);
+	if (!mlme_obj)
+		return;
+
+	bss_desc = &pe_session->lim_join_req->bssDescription;
+	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	attr.ie_length = wlan_get_ielen_from_bss_description(bss_desc);
+	attr.mac_addr = &bss_desc->bssId[0];
+
+	oui_in_whitelist = wlan_search_action_oui(mac_ctx->psoc, &attr,
+						  ACTION_OUI_ALLOW_UL_TX_BEAMFORMER);
+
+	pe_debug("AP " QDF_MAC_ADDR_FMT " OUI %s in beamformer whitelist",
+		 QDF_MAC_ADDR_REF(pe_session->bssId),
+		 oui_in_whitelist ? "found" : "not found");
+
+	if (oui_in_whitelist)
+		pe_session->vht_config.su_beam_former =
+			mlme_obj->cfg.vht_caps.vht_cap_info.su_bformer_cap;
+
+	lim_set_assoc_req_he_su_beamformer(pe_session, oui_in_whitelist,
+					   mlme_obj);
+	lim_set_assoc_req_eht_su_beamformer(pe_session, oui_in_whitelist,
+					    mlme_obj);
+}
+
 QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 					 struct pe_session *pesession,
 					 uint16_t *additional_ielen,
@@ -306,6 +397,8 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 				CH_WIDTH_40MHZ;
 		}
 	}
+
+	lim_update_session_su_beamformer(mac_ctx, pesession);
 
 	if (pesession->vhtCapability &&
 	    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))) {
@@ -3387,43 +3480,6 @@ uint32_t lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 
-#ifdef WLAN_FEATURE_11BE
-static inline void
-lim_set_assoc_req_eht_su_beamformer(struct pe_session *pe_session,
-				    bool oui_in_whitelist,
-				    struct wlan_mlme_psoc_ext_obj *mlme_obj)
-{
-	if (oui_in_whitelist)
-		pe_session->eht_config.su_beamformer =
-			mlme_obj->cfg.eht_caps.su_beamformer_cap;
-}
-#else
-static inline void
-lim_set_assoc_req_eht_su_beamformer(struct pe_session *pe_session,
-				    bool oui_in_whitelist,
-				    struct wlan_mlme_psoc_ext_obj *mlme_obj)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_11AX
-static inline void
-lim_set_assoc_req_he_su_beamformer(struct pe_session *pe_session,
-				   bool oui_in_whitelist,
-				   struct wlan_mlme_psoc_ext_obj *mlme_obj)
-{
-	if (oui_in_whitelist)
-		pe_session->he_config.su_beamformer =
-			mlme_obj->cfg.he_caps.su_beamformer_cap;
-}
-#else
-static inline void
-lim_set_assoc_req_he_su_beamformer(struct pe_session *pe_session,
-				   bool oui_in_whitelist,
-				   struct wlan_mlme_psoc_ext_obj *mlme_obj)
-{
-}
-#endif
 /**
  * lim_update_assoc_req_mcs_nss() - Symmetrize Tx/Rx NSS in assoc req IEs
  * @pe_session: PE session carrying cap_tx_nss and cap_rx_nss
@@ -3501,20 +3557,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bool eht_capable = false;
 	uint8_t uhr_cap_ie_len = 0;
 	uint16_t smd_ie_len = 0;
-	struct bss_description *bss_desc = NULL;
-	struct action_oui_search_attr attr = {0};
-	bool oui_in_whitelist = false;
-	struct mlme_vht_capabilities_info *vht_cap_info;
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(mac_ctx->psoc);
-	if (!mlme_obj) {
-		pe_err("mlme_obj is NULL");
-		qdf_mem_free(mlm_assoc_req);
-		return;
-	}
-
-	vht_cap_info = &mlme_obj->cfg.vht_caps.vht_cap_info;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3737,30 +3779,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		 pe_session->htSupportedChannelWidthSet, saved_ch_width,
 		 saved_ht_supported_ch_width);
 
-	if (wlan_action_oui_is_ul_tx_beamformer_config_supported(mac_ctx->psoc)) {
-		bss_desc = &pe_session->lim_join_req->bssDescription;
-		attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-		attr.ie_length = wlan_get_ielen_from_bss_description(bss_desc);
-		attr.mac_addr = &bss_desc->bssId[0];
-
-		oui_in_whitelist = wlan_search_action_oui(mac_ctx->psoc, &attr,
-							  ACTION_OUI_ALLOW_UL_TX_BEAMFORMER);
-
-		pe_debug("AP " QDF_MAC_ADDR_FMT " OUI %s in beamformer whitelist",
-			 QDF_MAC_ADDR_REF(pe_session->bssId),
-			 oui_in_whitelist ? "found" : "not found");
-
-		if (oui_in_whitelist)
-			pe_session->vht_config.su_beam_former =
-						vht_cap_info->su_bformer_cap;
-
-		lim_set_assoc_req_he_su_beamformer(pe_session,
-						   oui_in_whitelist,
-						   mlme_obj);
-		lim_set_assoc_req_eht_su_beamformer(pe_session,
-						    oui_in_whitelist,
-						    mlme_obj);
-	}
+	lim_update_session_su_beamformer(mac_ctx, pe_session);
 
 	if (pe_session->vhtCapability &&
 	    pe_session->vhtCapabilityPresentInBeacon) {
