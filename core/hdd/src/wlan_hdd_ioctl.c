@@ -7145,8 +7145,10 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 	num_channels = temp_int;
 
 	chan_freq_list = qdf_mem_malloc(num_channels * sizeof(qdf_freq_t));
-	if (!chan_freq_list)
-		return -ENOMEM;
+	if (!chan_freq_list) {
+		ret = -ENOMEM;
+		goto mem_alloc_failed;
+	}
 
 	for (j = 0; j < num_channels; j++) {
 		/*
