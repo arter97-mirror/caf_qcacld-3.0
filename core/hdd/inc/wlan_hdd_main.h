@@ -660,6 +660,7 @@ struct hdd_peer_stats {
  * @signal: Signal strength of last received PPDU
  * @signal_avg: Average signal strength
  * @chains: valid chains bitmap
+ * @chain_signal: Per-chain signal strength of last PPDU
  * @chain_signal_avg: Per-chain signal strength average
  * @rxrate: Last unicast data frame rx rate
  * @txrate: Current unicasr tx rate
@@ -678,6 +679,7 @@ struct wlan_hdd_station_stats_info {
 	int8_t signal;
 	int8_t signal_avg;
 	uint8_t chains;
+	int8_t chain_signal[IEEE80211_MAX_CHAINS];
 	int8_t chain_signal_avg[IEEE80211_MAX_CHAINS];
 	struct rate_info txrate;
 	struct rate_info rxrate;
