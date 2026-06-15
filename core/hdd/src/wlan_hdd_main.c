@@ -19850,15 +19850,32 @@ destroy_sync:
 /**
  * hdd_open_p2p_interface - Open P2P interface
  * @hdd_ctx: HDD context
+ * @restore_intf: true if p2p0 is being recreated after being removed for a
+ *                monitor interface and the cached random MAC address should
+ *                be restored, false to derive a fresh device address
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx)
+static QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx,
+					 bool restore_intf)
 {
 	QDF_STATUS status;
 	bool p2p_dev_addr_admin;
 	bool is_p2p_locally_administered = false;
 	struct hdd_adapter_create_param params = {0};
+
+	if (!qdf_is_macaddr_zero(&hdd_ctx->p2p_random_mac_addr_cache) &&
+	    restore_intf) {
+		hdd_debug("Restoring cached P2P random MAC "
+			  QDF_MAC_ADDR_FMT
+			  " after monitor interface deletion",
+			  QDF_MAC_ADDR_REF(
+				  hdd_ctx->p2p_random_mac_addr_cache.bytes));
+		qdf_copy_macaddr(&hdd_ctx->p2p_device_address,
+				 &hdd_ctx->p2p_random_mac_addr_cache);
+		qdf_zero_macaddr(&hdd_ctx->p2p_random_mac_addr_cache);
+		goto open_adapter;
+	}
 
 	cfg_p2p_get_device_addr_admin(hdd_ctx->psoc, &p2p_dev_addr_admin);
 
@@ -19902,6 +19919,7 @@ static QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx)
 			     p2p_dev_addr, QDF_MAC_ADDR_SIZE);
 	}
 
+open_adapter:
 	status = hdd_open_adapter_no_trans(hdd_ctx, QDF_P2P_DEVICE_MODE,
 					   "p2p%d",
 					   hdd_ctx->p2p_device_address.bytes,
@@ -19917,7 +19935,8 @@ static QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 #else
-static inline QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx)
+static inline QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx,
+						bool restore_intf)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -20084,7 +20103,7 @@ hdd_open_adapters_for_mission_mode(struct hdd_context *hdd_ctx)
 	/* opening concurrent STA is best effort, continue on error */
 	hdd_open_concurrent_interface(hdd_ctx);
 
-	status = hdd_open_p2p_interface(hdd_ctx);
+	status = hdd_open_p2p_interface(hdd_ctx, false);
 	if (status)
 		goto err_close_adapters;
 
@@ -24516,7 +24535,7 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 	hdd_stop_adapter(hdd_ctx, adapter);
 	hdd_close_adapter(hdd_ctx, adapter, true);
 
-	hdd_open_p2p_interface(hdd_ctx);
+	hdd_open_p2p_interface(hdd_ctx, true);
 }
 
 void
@@ -24530,6 +24549,12 @@ wlan_hdd_del_p2p_interface(struct hdd_context *hdd_ctx)
 		if (adapter->device_mode == QDF_P2P_CLIENT_MODE ||
 		    adapter->device_mode == QDF_P2P_DEVICE_MODE ||
 		    adapter->device_mode == QDF_P2P_GO_MODE) {
+			hdd_debug("Caching P2P MAC= " QDF_MAC_ADDR_FMT
+				  "", QDF_MAC_ADDR_REF(
+				  adapter->mac_addr.bytes));
+			qdf_copy_macaddr(&hdd_ctx->p2p_random_mac_addr_cache,
+					 &adapter->mac_addr);
+
 			vdev_sync = osif_vdev_sync_unregister(adapter->dev);
 			if (vdev_sync)
 				osif_vdev_sync_wait_for_ops(vdev_sync);
@@ -24629,7 +24654,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 		hdd_err("hdd_open_adapter failed");
 		if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 						PACKET_CAPTURE_MODE_DISABLE)
-			hdd_open_p2p_interface(hdd_ctx);
+			hdd_open_p2p_interface(hdd_ctx, true);
 		return -EINVAL;
 	}
 

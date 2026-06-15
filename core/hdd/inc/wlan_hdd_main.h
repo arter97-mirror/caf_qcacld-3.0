@@ -2258,6 +2258,9 @@ struct hdd_tx_powerboost {
  * @no_of_open_sessions: number of open sessions per operating mode
  * @no_of_active_sessions: number of active sessions per operating mode
  * @p2p_device_address: P2P Device MAC Address for the adapter
+ * @p2p_random_mac_addr_cache: cached P2P random MAC address, used to restore
+ *                             p2p0's MAC when it is recreated after a
+ *                             monitor interface is deleted
  * @sap_wake_lock: Soft AP wakelock
  * @is_wiphy_suspended: Flag keeps track of wiphy suspend/resume
  * @ready_to_suspend: completed when ready to suspend
@@ -2490,6 +2493,8 @@ struct hdd_context {
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
 	uint8_t no_of_active_sessions[QDF_MAX_NO_OF_MODE];
 	struct qdf_mac_addr p2p_device_address;
+	struct qdf_mac_addr p2p_random_mac_addr_cache;
+
 	qdf_wake_lock_t sap_wake_lock;
 	bool is_wiphy_suspended;
 	struct completion ready_to_suspend;
