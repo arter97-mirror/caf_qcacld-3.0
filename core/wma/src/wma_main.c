@@ -350,12 +350,14 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 9 - MHS power save feature support updated
  * Version 10- Collaborative Cluster Merging and 11KV enhancement
  * Version 11- 11KV enhancement
+ * Version 12 - 11KV roaming enhancement
+ * Version 13 - Advanced NAN cluster and Pairing support updated
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 11;
+	fs->feature_set_version = 13;
 }
 
 /**
