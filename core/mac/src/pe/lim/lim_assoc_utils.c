@@ -4296,13 +4296,15 @@ static void lim_update_add_bss_vht_params(struct mac_context *mac,
  * This function validates the HE-MCS and NSS Set fields as defined in
  * IEEE 802.11ax-2021 Section 9.4.2.247.4 (Supported HE-MCS and NSS Set).
  *
- * Return: true if MCS maps are valid (at least one NSS supported),
- *         false if all spatial streams are disabled (0xFFFF)
+ * Return: true if MCS maps are valid (at least one NSS supported in both
+ *         directions), false if either direction has all spatial streams
+ *         disabled (0xFFFF). Consistent with VHT: if either rx or tx has
+ *         no valid NSS, HE is not usable at that bandwidth.
  */
 bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map,
 				uint16_t tx_he_mcs_map)
 {
-	if (rx_he_mcs_map == HE_MCS_ALL_DISABLED &&
+	if (rx_he_mcs_map == HE_MCS_ALL_DISABLED ||
 	    tx_he_mcs_map == HE_MCS_ALL_DISABLED) {
 		pe_debug("Invalid HE MCS map : rx=0x%x tx=0x%x",
 			 rx_he_mcs_map, tx_he_mcs_map);
@@ -4479,11 +4481,15 @@ static bool lim_validate_eht_mcs_fields(uint8_t rx_mcs_0_9,
 				       uint8_t tx_mcs_12_13)
 {
 	/*
-	 * MCS 0-9 is mandatory per IEEE 802.11be §9.4.2.313.
-	 * Both RX and TX NSS must be non-zero for a valid EHT STA.
-	 * MCS 10-11 and 12-13 are optional extensions.
+	 * EHT is usable if ANY MCS group (0-9, 10-11, or 12-13)
+	 * has non-zero NSS. An AP advertising only MCS10+
+	 * (bw_le_80_*_mcs_0_to_9=0) is valid per IEEE 802.11be
+	 * 9.4.2.313 - MCS 0-9 NSS=0 means "group not supported,"
+	 * not "EHT not usable."
 	 */
-	return (rx_mcs_0_9 && tx_mcs_0_9);
+	return (rx_mcs_0_9 || tx_mcs_0_9 ||
+		rx_mcs_10_11 || tx_mcs_10_11 ||
+		rx_mcs_12_13 || tx_mcs_12_13);
 }
 
 /**
@@ -4637,10 +4643,26 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 					pe_session,
 					&assoc_resp->eht_cap);
 	if (ap_max_ch_width == CH_WIDTH_INVALID) {
-		pe_debug("vdev %d: EHT MCS validation failed for AP " QDF_MAC_ADDR_FMT", not updating ap_max_ch_width",
+		/*
+		 * EHT MCS validation failed — EHT is not usable.
+		 * Fall back to the operational BW already established by
+		 * the HT/HE capability paths so that the stale VHT-derived
+		 * ap_max_ch_width (e.g. 80 MHz) does not allow a wider
+		 * connection than the HT/HE caps permit.
+		 *
+		 * IOT scenario: AP configured as EHT40 in 2.4 GHz but
+		 * assoc response has HT/HE caps indicating 20 MHz only and
+		 * EHT MCS fields zeroed out.  Without this fallback the VHT
+		 * path leaves ap_max_ch_width = 80 MHz, which lets the
+		 * connection proceed at 40 MHz instead of the correct 20 MHz.
+		 */
+		ap_max_ch_width = wlan_peer_get_op_ch_width(peer);
+		pe_debug("vdev %d: EHT MCS validation failed for AP "
+			 QDF_MAC_ADDR_FMT
+			 ", capping ap_max_ch_width to HT/HE op BW %d",
 			 pe_session->vdev_id,
-			 QDF_MAC_ADDR_REF(pe_session->bssId));
-		return;
+			 QDF_MAC_ADDR_REF(pe_session->bssId),
+			 ap_max_ch_width);
 	}
 
 	/* Persist into peer MLME (single source of truth). */
