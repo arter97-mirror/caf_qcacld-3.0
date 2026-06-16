@@ -5420,11 +5420,11 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 			 sta->htSupportedChannelWidthSet,
 			 sta->ch_width);
 
-		max_nss = QDF_MIN(pe_session->cap_tx_nss, msg->nss);
+		max_nss = QDF_MIN(pe_session->nss, msg->nss);
 		sta->vhtLdpcCapable = vht_caps.ldpcCodingCap;
 		sta->vhtBeamFormerCapable = 0;
 		lim_populate_vht_mcs_set(mac, &sta->supportedRates, &vht_caps,
-					 pe_session, max_nss, max_nss, NULL);
+					 pe_session, max_nss, NULL);
 		/* Convert max_mcs integer to 2-bit VHT map encoding:
 		 * MCS 0-7 -> 0x0, MCS 0-8 -> VHT_MCS_0_8,
 		 * MCS 0-9 -> VHT_MCS_0_9
@@ -5466,10 +5466,11 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 					pe_session->curr_op_freq,
 					pe_session->ch_width, &sta->he_config);
 		sta->mlmStaContext.he_capable = 1;
-		max_nss = QDF_MIN(pe_session->cap_tx_nss, msg->nss);
+		max_nss = QDF_MIN(pe_session->nss, msg->nss);
+
 		lim_populate_he_mcs_set(mac, &sta->supportedRates,
 					&sta->he_config, pe_session,
-					max_nss, max_nss);
+					max_nss);
 		/* Convert max_mcs integer to 2-bit HE map encoding:
 		 * MCS 0-7 -> HE_MCS_0_7, MCS 0-9 -> HE_MCS_0_9,
 		 * MCS 0-11 -> HE_MCS_0_11
