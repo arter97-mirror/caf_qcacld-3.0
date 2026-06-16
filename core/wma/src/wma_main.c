@@ -867,6 +867,9 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 		case wmi_vdev_param_ldpc:
 			ret = intr[vdev_id].config.ldpc;
 			break;
+		case wmi_vdev_param_2x_ldpc:
+			ret = intr[vdev_id].config.two_x_ldpc;
+			break;
 		case wmi_vdev_param_tx_stbc:
 			ret = intr[vdev_id].config.tx_stbc;
 			break;
@@ -1910,6 +1913,9 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			break;
 		case wmi_vdev_param_ldpc:
 			intr[vid].config.ldpc = privcmd->param_value;
+			break;
+		case wmi_vdev_param_2x_ldpc:
+			intr[vid].config.two_x_ldpc = privcmd->param_value;
 			break;
 		case wmi_vdev_param_tx_stbc:
 			intr[vid].config.tx_stbc = privcmd->param_value;

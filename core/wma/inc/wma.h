@@ -592,6 +592,7 @@ typedef struct {
  * struct vdev_cli_config_t - store vdev parameters
  * @nss: nss width
  * @ldpc: is ldpc is enable/disable
+ * @two_x_ldpc: is 2xLDPC enabled (UHR only)
  * @tx_stbc: TX STBC is enable/disable
  * @rx_stbc: RX STBC is enable/disable
  * @shortgi: short gi is enable/disable
@@ -624,6 +625,7 @@ typedef struct {
 typedef struct {
 	uint32_t nss;
 	uint32_t ldpc;
+	uint32_t two_x_ldpc;
 	uint32_t tx_stbc;
 	uint32_t rx_stbc;
 	uint32_t shortgi;

@@ -2382,6 +2382,8 @@ int hdd_set_ldpc(struct wlan_hdd_link_info *link_info, int value)
 	int ret;
 	QDF_STATUS status;
 	struct mlme_ht_capabilities_info ht_cap_info;
+	int ldpc_enable;
+	bool is_2x_ldpc;
 
 	hdd_debug("%d", value);
 
@@ -2390,33 +2392,46 @@ int hdd_set_ldpc(struct wlan_hdd_link_info *link_info, int value)
 		return -EINVAL;
 	}
 
+	/* value 2 = 2xLDPC (UHR only): treat as LDPC enabled for caps */
+	is_2x_ldpc = (value == 2);
+	ldpc_enable = is_2x_ldpc ? 1 : value;
+
 	status = ucfg_mlme_get_ht_cap_info(hdd_ctx->psoc, &ht_cap_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to get HT capability info");
 		return -EIO;
 	}
 
-	ht_cap_info.adv_coding_cap = value;
+	ht_cap_info.adv_coding_cap = ldpc_enable;
 	status = ucfg_mlme_set_ht_cap_info(hdd_ctx->psoc, ht_cap_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to set HT capability info");
 		return -EIO;
 	}
-	status = ucfg_mlme_cfg_set_vht_ldpc_coding_cap(hdd_ctx->psoc, value);
+	status = ucfg_mlme_cfg_set_vht_ldpc_coding_cap(hdd_ctx->psoc,
+						       ldpc_enable);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to set VHT LDPC capability info");
 		return -EIO;
 	}
 	ret = sme_update_ht_config(mac_handle, link_info->vdev_id,
-				   WNI_CFG_HT_CAP_INFO_ADVANCE_CODING, value);
+				   WNI_CFG_HT_CAP_INFO_ADVANCE_CODING,
+				   ldpc_enable);
 	if (ret)
 		hdd_err("Failed to set LDPC value");
 	ret = sme_update_he_ldpc_supp(mac_handle,
-				      link_info->vdev_id, value);
+				      link_info->vdev_id, ldpc_enable);
 	if (ret)
 		hdd_err("Failed to set HE LDPC value");
 	ret = sme_set_auto_rate_ldpc(mac_handle, link_info->vdev_id,
-				     (value ? 0 : 1));
+				     (ldpc_enable ? 0 : 1));
+
+	if (!ret && is_2x_ldpc) {
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_vdev_param_2x_ldpc, 1, VDEV_CMD);
+		if (ret)
+			hdd_err("Failed to set 2xLDPC vdev param");
+	}
 
 	return ret;
 }
