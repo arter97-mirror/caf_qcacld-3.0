@@ -1774,6 +1774,15 @@ MGMT_RX_SRNG_INC := -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/core/inc \
 		    -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/dispatcher/inc \
 		    -I$(WLAN_ROOT)/components/target_if/mgmt_rx_srng/inc
 
+ifeq ($(CONFIG_FEATURE_MGMT_RX_OVER_SRNG), y)
+MGMT_RX_SRNG_OBJS := $(MGMT_RX_SRNG_DIR)/core/src/wlan_mgmt_rx_srng.o \
+		     $(MGMT_RX_SRNG_DIR)/dispatcher/src/wlan_mgmt_rx_srng_tgt_api.o \
+		     $(MGMT_RX_SRNG_DIR)/dispatcher/src/wlan_mgmt_rx_srng_ucfg_api.o \
+		     components/target_if/mgmt_rx_srng/src/target_if_mgmt_rx_srng.o
+endif
+
+$(call add-wlan-objs,mgmt_rx_srng,$(MGMT_RX_SRNG_OBJS))
+
 ########## FTM TIME SYNC ##########
 
 FTM_TIME_SYNC_DIR := components/ftm_time_sync
@@ -3800,6 +3809,7 @@ ccflags-$(CONFIG_FEATURE_COEX) += -DFEATURE_COEX
 ccflags-$(CONFIG_HOST_WAKEUP_OVER_QMI) += -DHOST_WAKEUP_OVER_QMI
 ccflags-$(CONFIG_DISABLE_STATUS_RING_TIMER_WAR) += -DWLAN_DISABLE_STATUS_RING_TIMER_WAR
 ccflags-$(CONFIG_CE_DISABLE_SRNG_TIMER_IRQ) += -DWLAN_WAR_CE_DISABLE_SRNG_TIMER_IRQ
+ccflags-$(CONFIG_FEATURE_MGMT_RX_OVER_SRNG) += -DFEATURE_MGMT_RX_OVER_SRNG
 
 ccflags-$(CONFIG_PLD_IPCI_ICNSS_FLAG) += -DCONFIG_PLD_IPCI_ICNSS
 ccflags-$(CONFIG_PLD_SDIO_CNSS_FLAG) += -DCONFIG_PLD_SDIO_CNSS
