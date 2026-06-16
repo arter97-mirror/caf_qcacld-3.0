@@ -2192,30 +2192,6 @@ static void lim_add_tdls_sta_6ghz_he_cap(struct mac_context *mac_ctx,
 #endif /* WLAN_FEATURE_11AX */
 #endif /* FEATURE_WLAN_TDLS */
 
-#ifdef WLAN_FEATURE_11AX
-/*
- * HE Operation IE presence check
- *
- * Per IEEE 802.11ax, HE operation information is present if the HE Operation
- * element is present. Sub-fields like vht_oper_present are optional and must
- * only be checked when that specific sub-field is required.
- */
-static bool lim_is_he_connection_op_info_present(struct pe_session *pe_session,
-						 tpSirAssocRsp assoc_rsp)
-{
-	return IS_DOT11_MODE_HE(pe_session->dot11mode) &&
-	       assoc_rsp->he_op.present;
-}
-
-#else
-static bool lim_is_he_connection_op_info_present(struct pe_session *pe_session,
-						 tpSirAssocRsp assoc_rsp)
-{
-	return false;
-}
-
-#endif
-
 #ifdef WLAN_FEATURE_11BE
 static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 						  tpSirAssocRsp assoc_rsp)
@@ -3890,6 +3866,22 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 	if (!vht_oper || !vht_caps)
 		return;
 
+	/*
+	 * IEEE 802.11-2020, Section 9.4.2.161 (VHT Operation element):
+	 * When Channel Width = 1 (80/160/80+80 MHz), CCFS0 must be a valid
+	 * channel center frequency index. CCFS0 = 0 is not a valid channel
+	 * center frequency and indicates a malformed VHT Operation IE.
+	 * Skip the VHT bandwidth update entirely. The HT update path
+	 * (lim_update_add_bss_ht_params) has already set the correct
+	 * HT Info IE-derived bandwidth and center frequency values.
+	 */
+	if (vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ &&
+	    !vht_oper->chan_center_freq_seg0) {
+		pe_debug("vdev %d: VHT Op IE malformed: chanWidth=1 but CCFS0=0, skipping VHT BW update",
+			 pe_session->vdev_id);
+		return;
+	}
+
 	ch_width = wlan_peer_get_op_ch_width(peer);
 
 	/* Step 1: VHT Operation ch_width is authoritative */
@@ -4114,24 +4106,17 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 
 	pAddBssParams->htCapable = pAssocRsp->HTCaps.present;
 
-	/**
-	 * in limExtractApCapability function intersection of FW
-	 * advertised channel width and AP advertised channel
-	 * width has been taken into account for calculating
-	 * pe_session->ch_width
+	/*
+	 * Always process HT Caps and HT Info IE to derive the baseline
+	 * bandwidth and center frequency segment values. This ensures
+	 * that peer->op_ch_width, center_freq_seg0, and center_freq_seg1
+	 * are always set from the HT Info IE before the VHT/HE/EHT paths
+	 * run. The VHT/HE/EHT paths will then override these values with
+	 * their own IE-derived values when valid. If the VHT Op IE is
+	 * malformed (chanWidth=1 but CCFS0=0), the VHT path returns early
+	 * and the HT Info IE-derived values are preserved as the final
+	 * connection bandwidth.
 	 */
-	if (lim_is_eht_connection_op_info_present(pe_session,
-						  pAssocRsp) ||
-	    lim_is_he_connection_op_info_present(pe_session,
-						 pAssocRsp) ||
-	    (chan_width_support && pAssocRsp->VHTCaps.present)) {
-		pAddBssParams->ch_width = pe_session->ch_width;
-		wlan_peer_set_op_ch_width(peer, pe_session->ch_width);
-		wlan_peer_set_ap_max_ch_width(peer, pe_session->ch_width);
-
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-		return;
-	}
 
 	if (!((chan_width_support &&
 	     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
