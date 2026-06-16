@@ -4635,9 +4635,13 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 					   struct wlan_objmgr_peer *peer)
 {
 	enum phy_ch_width ap_max_ch_width = CH_WIDTH_20MHZ;
+	enum phy_ch_width vht_ap_max_ch_width;
 
 	if (!assoc_resp->eht_cap.present)
 		return;
+
+	/* Preserve VHT-derived ap_max_ch_width as the constraint */
+	vht_ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
 
 	ap_max_ch_width = lim_calculate_ap_max_eht_ch_width(
 					pe_session,
@@ -4663,6 +4667,20 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 			 pe_session->vdev_id,
 			 QDF_MAC_ADDR_REF(pe_session->bssId),
 			 ap_max_ch_width);
+	}
+
+	/*
+	 * Cap EHT-derived ap_max_ch_width by VHT Caps constraint.
+	 * This handles IOT scenarios where the AP's VHT Capability IE
+	 * (e.g. supportedChannelWidthSet=0) restricts bandwidth to 80 MHz,
+	 * but the EHT Capability IE indicates a higher bandwidth.
+	 * VHT Caps is the authoritative constraint and must not be overridden
+	 * by EHT Caps.
+	 */
+	if (ap_max_ch_width > vht_ap_max_ch_width) {
+		pe_debug("vdev %d: EHT ap_max_ch_width capped %d -> %d: constrained by VHT Caps",
+			 pe_session->vdev_id, ap_max_ch_width, vht_ap_max_ch_width);
+		ap_max_ch_width = vht_ap_max_ch_width;
 	}
 
 	/* Persist into peer MLME (single source of truth). */
@@ -4993,6 +5011,7 @@ static void lim_process_sta_bw_update(struct mac_context *mac,
 {
 	struct wlan_objmgr_peer *peer;
 	enum phy_ch_width op_ch_width;
+	enum phy_ch_width vht_ap_max_ch_width = CH_WIDTH_20MHZ;
 
 	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
 					   pAddBssParams->bssId,
@@ -5031,6 +5050,16 @@ static void lim_process_sta_bw_update(struct mac_context *mac,
 		lim_update_add_bss_vht_params(mac, pe_session, pAssocRsp,
 					      pAddBssParams);
 
+	/*
+	 * Capture VHT-derived ap_max_ch_width before EHT path runs.
+	 * The EHT path may overwrite ap_max_ch_width with EHT-derived values,
+	 * but we need to preserve the VHT Caps constraint as the final limit.
+	 * This handles IOT scenarios where VHT Caps restricts bandwidth
+	 * (e.g. supportedChannelWidthSet=0 limits to 80 MHz) but EHT Caps
+	 * or EHT Op IE indicate a higher bandwidth.
+	 */
+	vht_ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+
 	if (lim_is_session_he_capable(pe_session) &&
 	    pAssocRsp->he_cap.present)
 		lim_update_add_bss_he_params(mac, pAssocRsp, pAddBssParams,
@@ -5056,6 +5085,43 @@ static void lim_process_sta_bw_update(struct mac_context *mac,
 			wlan_peer_get_center_freq_seg0(peer);
 	pAddBssParams->staContext.center_freq_seg1 =
 			wlan_peer_get_center_freq_seg1(peer);
+
+	/*
+	 * Enforce that the operational channel width never exceeds the AP's
+	 * maximum advertised capability from VHT Caps. This handles IOT
+	 * scenarios where the AP's VHT Capability IE (e.g.
+	 * supportedChannelWidthSet=0) restricts bandwidth to 80 MHz, but the
+	 * EHT path may have set op_ch_width to a higher value based on the
+	 * EHT Operation IE or EHT Capability IE.
+	 *
+	 * Use vht_ap_max_ch_width (captured before EHT path) as the constraint,
+	 * not the EHT-updated ap_max_ch_width, to ensure VHT Caps restrictions
+	 * are always honored.
+	 *
+	 * Example: IOT AP disables 160 MHz in VHT Caps IE (vht_ap_max_ch_width=80 MHz)
+	 * but EHT Op IE indicates 160 MHz. Without this check the connection
+	 * would proceed at 160 MHz, violating the VHT Caps restriction.
+	 */
+	if (pAddBssParams->ch_width > vht_ap_max_ch_width &&
+	    vht_ap_max_ch_width > CH_WIDTH_20MHZ) {
+		pe_debug("vdev %d: BW capped %d -> %d: op_ch_width exceeds VHT ap_max_ch_width",
+			 pe_session->vdev_id,
+			 pAddBssParams->ch_width,
+			 vht_ap_max_ch_width);
+		pAddBssParams->ch_width = vht_ap_max_ch_width;
+		pAddBssParams->staContext.ch_width = vht_ap_max_ch_width;
+		pAddBssParams->staContext.ap_max_ch_width = vht_ap_max_ch_width;
+		wlan_peer_set_op_ch_width(peer, vht_ap_max_ch_width);
+		/*
+		 * When downgrading from 160/320 MHz to 80 MHz, clear seg1 so
+		 * firmware does not interpret the stale CCFS1 as a 160 MHz
+		 * indicator.
+		 */
+		if (vht_ap_max_ch_width <= CH_WIDTH_80MHZ) {
+			pAddBssParams->staContext.center_freq_seg1 = 0;
+			wlan_peer_set_center_freq_seg1(peer, 0);
+		}
+	}
 
 	pe_debug("STA BW update: ch_width=%d sta_ch_width=%d ap_max_ch_width=%d seg0=%d seg1=%d",
 		 pAddBssParams->ch_width,
