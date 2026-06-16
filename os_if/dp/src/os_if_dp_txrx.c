@@ -125,6 +125,60 @@ static void osif_dp_mark_non_critical_pkt(struct sk_buff *skb)
 			QDF_NBUF_CB_PACKET_TYPE_WAPI;
 }
 
+#ifdef QCA_OL_TX_MULTIQ_SUPPORT
+/**
+ * osif_dp_is_critical_icmpv6() - Check if an ICMPv6 packet is critical
+ * @skb: skb ptr (caller must ensure this is an ICMPv6 packet)
+ *
+ * Only Neighbor Solicitation (NS) and Neighbor Advertisement (NA) are
+ * treated as critical; other ICMPv6 types (RA, RS, echo, MLD, …) are not.
+ *
+ * Return: true if the ICMPv6 subtype is NS or NA, false otherwise
+ */
+static bool osif_dp_is_critical_icmpv6(struct sk_buff *skb)
+{
+	enum qdf_proto_subtype subtype = qdf_nbuf_get_icmpv6_subtype(skb);
+
+	return subtype == QDF_PROTO_ICMPV6_NS ||
+	       subtype == QDF_PROTO_ICMPV6_NA;
+}
+
+/**
+ * osif_dp_classify_critical_pkt() - Classify TX packet as critical or not
+ * @skb: skb ptr
+ *
+ * In MULTIQ mode the netdev queue index carries CPU affinity (not priority),
+ * so queue_mapping cannot be used to identify critical frames. Inspect the
+ * packet header directly: EAPOL/ARP/DHCP/DHCPv6/ICMPv6-NS/ICMPv6-NA are
+ * critical.
+ *
+ * In non-MULTIQ mode, TX_HI_PRIO_QUEUE_IDX (= 0) is reserved for critical
+ * control frames routed there by hdd_select_queue(). Use queue_mapping as
+ * the priority indicator.
+ *
+ * Return: None
+ */
+static void osif_dp_classify_critical_pkt(struct sk_buff *skb)
+{
+	if (qdf_nbuf_is_ipv4_eapol_pkt(skb) ||
+	    qdf_nbuf_is_ipv4_arp_pkt(skb)   ||
+	    qdf_nbuf_is_ipv4_dhcp_pkt(skb)  ||
+	    qdf_nbuf_is_ipv6_dhcp_pkt(skb)  ||
+	    (qdf_nbuf_is_icmpv6_pkt(skb) && osif_dp_is_critical_icmpv6(skb)))
+		osif_dp_mark_critical_pkt(skb);
+	else
+		osif_dp_mark_non_critical_pkt(skb);
+}
+#else
+static void osif_dp_classify_critical_pkt(struct sk_buff *skb)
+{
+	if (skb->queue_mapping == TX_HI_PRIO_QUEUE_IDX)
+		osif_dp_mark_critical_pkt(skb);
+	else
+		osif_dp_mark_non_critical_pkt(skb);
+}
+#endif /* QCA_OL_TX_MULTIQ_SUPPORT */
+
 void osif_dp_mark_pkt_type(struct sk_buff *skb)
 {
 	struct ethhdr *eh = (struct ethhdr *)skb->data;
@@ -141,14 +195,7 @@ void osif_dp_mark_pkt_type(struct sk_buff *skb)
 	else if (is_multicast_ether_addr((uint8_t *)eh))
 		QDF_NBUF_CB_GET_IS_MCAST(skb) = true;
 
-	/*
-	 * TX Packets in the HI_PRIO queue are assumed to be critical and
-	 * marked accordingly.
-	 */
-	if (skb->queue_mapping == TX_HI_PRIO_QUEUE_IDX)
-		osif_dp_mark_critical_pkt(skb);
-	else
-		osif_dp_mark_non_critical_pkt(skb);
+	osif_dp_classify_critical_pkt(skb);
 }
 
 /*
