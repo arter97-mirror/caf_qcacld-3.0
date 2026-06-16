@@ -11362,7 +11362,9 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 	 * Note to restart sap after SSR driver needs below information
 	 * and is not cleared/freed on purpose in case of SAP SSR
 	 */
-	if (!cds_is_driver_recovering() || cds_is_driver_unloading()) {
+
+	if (!cds_is_driver_recovering() || cds_is_driver_unloading() ||
+	    !HDD_IS_NETDEV_UP(adapter)) {
 		qdf_atomic_clear_bit(SOFTAP_INIT_DONE, link_info->link_flags);
 		qdf_mem_free(ap_ctx->beacon);
 		ap_ctx->beacon = NULL;

@@ -260,6 +260,13 @@ struct hdd_apf_context {
 		} \
 	} while (0)
 
+/* HDD_IS_NETDEV_UP: Macro to check if a specific netdev flag is set
+ * @adapter:HDD adapter pointer
+ * Returns true if netdev flag is set in adapter->dev->flags,false otherwise.
+ */
+#define HDD_IS_NETDEV_UP(adapter) \
+	(((adapter)->dev->flags & IFF_UP) ? true : false)
+
 /*
  * API in_compat_syscall() is introduced in 4.6 kernel to check whether we're
  * in a compat syscall or not. It is a new way to query the syscall type, which
