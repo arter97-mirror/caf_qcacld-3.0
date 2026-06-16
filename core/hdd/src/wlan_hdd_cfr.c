@@ -746,7 +746,7 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 }
 
 #define DEFAULT_CFR_NSS 0xff
-#define DEFAULT_CFR_BW  0xf
+#define DEFAULT_CFR_BW  0x1f
 static QDF_STATUS
 wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 				   struct nlattr *tb[])
@@ -1053,6 +1053,9 @@ static void wlan_cfg80211_reset_cfr(struct pdev_cfr *pcfr, uint8_t value)
 	pcfr->unassoc_phy_mode = value;
 	pcfr->bandwidth = value;
 	pcfr->is_cfr_data_present = value;
+	pcfr->is_cfr_rx = value;
+	pcfr->is_cfr_tx = value;
+	memset(pcfr->peer_addr, value, QDF_MAC_ADDR_SIZE);
 }
 
 static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
@@ -2245,6 +2248,19 @@ wlan_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1];
 	uint8_t version = 0;
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = wiphy_priv(wiphy);
+
+	if (!hdd_ctx->pdev) {
+		hdd_err("pdev is null");
+		return -EINVAL;
+	}
+
+	if (ucfg_cfr_is_ini_disabled(hdd_ctx->pdev)) {
+		hdd_err("CFR is disabled via INI for this pdev");
+		return -EINVAL;
+	}
 
 	if (wlan_cfg80211_nla_parse(
 			tb,

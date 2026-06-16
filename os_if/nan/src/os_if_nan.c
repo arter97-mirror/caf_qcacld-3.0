@@ -1961,7 +1961,7 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 
 	os_if_cstats_log_ndp_confirm_evt(vdev, ndp_confirm);
 
-	osif_debug("NDP confim sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
+	osif_debug("NDP confirm sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
 		   ndp_confirm->ndp_instance_id,
 		   QDF_MAC_ADDR_REF(ndp_confirm->peer_ndi_mac_addr.bytes),
 		   ndp_confirm->rsp_code, ndp_confirm->reason_code);
@@ -2975,7 +2975,8 @@ static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 	if (QDF_IS_STATUS_SUCCESS(status))
-		status = ucfg_disable_nan_discovery(psoc, data, data_len);
+		status = ucfg_disable_nan_discovery(psoc, data, data_len,
+						    vdev_id);
 
 end:
 	return qdf_status_to_os_return(status);
@@ -3378,4 +3379,3 @@ os_if_cstats_log_disable_nan_disc_evt(struct wlan_objmgr_pdev *pdev,
 			       &stat);
 }
 #endif /* WLAN_CHIPSET_STATS */
-

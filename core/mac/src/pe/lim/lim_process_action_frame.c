@@ -1550,7 +1550,7 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 				 frame_len - SA_QUERY_IE_OFFSET)) {
 		/*
 		 * In case of channel switch, last ocv frequency will be
-		 * different from current frquency.
+		 * different from current frequency.
 		 * If there is channel switch and OCI is invalid in sa_query,
 		 * deauth STA on new channel.
 		 * Reset post csa sa query flag in case that post csa sa query
@@ -1752,7 +1752,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	struct wlan_mlme_qos *qos_aggr;
 
 	if (mlo_is_any_link_disconnecting(session->vdev)) {
-		pe_err("Ignore ADDBA, vdev:%d is in not in conncted state",
+		pe_err("Ignore ADDBA, vdev:%d is in not in connected state",
 		       wlan_vdev_get_id(session->vdev));
 		return;
 	}

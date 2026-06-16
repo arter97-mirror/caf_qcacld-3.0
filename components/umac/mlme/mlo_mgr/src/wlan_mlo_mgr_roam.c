@@ -1458,6 +1458,19 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 		req.crypto.mgmt_ciphers = rso_cfg->orig_sec_info.mgmtcipherset;
 		req.crypto.akm_suites = rso_cfg->orig_sec_info.key_mgmt;
 		req.assoc_ie.len = rso_cfg->assoc_ie.len;
+		/*
+		 * Derive user_mfp from rso_rsn_caps (for cross-AKM roam)
+		 * but also preserve MFPC/MFPR from the original connection
+		 * profile. If rso_rsn_caps lost these bits (e.g. due to
+		 * user_mfp not being re-propagated), orig_sec_info.rsn_caps
+		 * ensures they are restored, preventing rso_rsn_caps from
+		 * being permanently zeroed out on the next cm_connect_start_ind.
+		 */
+		req.crypto.user_mfp =
+			(rso_cfg->rso_rsn_caps |
+			 (rso_cfg->orig_sec_info.rsn_caps &
+			  (RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE))) &
+			(RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE);
 
 		req.assoc_ie.ptr = qdf_mem_malloc(req.assoc_ie.len);
 		if (!req.assoc_ie.ptr)
@@ -1763,7 +1776,7 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 						     &ml_partner_info,
 						     WLAN_FC0_STYPE_INVALID);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("Per STA profile parsing failed");
+		mlme_debug("Per STA profile parsing failed");
 		return status;
 	}
 

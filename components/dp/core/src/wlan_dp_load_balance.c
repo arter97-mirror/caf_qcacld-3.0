@@ -28,7 +28,7 @@
 #define OLDER_SAMPLE_WTG 25
 #define LATEST_SAMPLE_WTG (100 - OLDER_SAMPLE_WTG)
 
-/* time in ns to averge the data sample */
+/* time in ns to average the data sample */
 #define SAMPLING_AVERAGE_TIME_THRS 1000000000
 
 /*time in ns to make the load balance */

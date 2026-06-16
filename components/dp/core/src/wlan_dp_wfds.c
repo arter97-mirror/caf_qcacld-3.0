@@ -561,7 +561,7 @@ void
 dp_wfds_handle_request_mem_ind(struct wlan_qmi_wfds_mem_ind_msg *mem_msg)
 {
 	struct dp_direct_link_wfds_context *dl_wfds = gp_dl_wfds_ctx;
-	uint8_t i;
+	int i;
 
 	if (!dl_wfds)
 		return;

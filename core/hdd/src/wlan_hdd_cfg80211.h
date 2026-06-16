@@ -618,7 +618,7 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 /**
  * wlan_hdd_cfg80211_acs_ch_select_evt: Callback function for ACS evt
  * @link_info: Link info pointer in HDD adapter
- * @store_acs_freq: Store current ACS frequecy flag
+ * @store_acs_freq: Store current ACS frequency flag
  *
  * This is a callback function on ACS procedure is completed.
  * This function send the ACS selected channel information to hostapd

@@ -500,7 +500,7 @@
  * This ini is used to specify AP OUIs. Some of AP doesn't response our
  * first association request, but it would response our second association
  * request. Add such OUI configuration INI to apply reconnect logic when
- * association timeout happends with such AP.
+ * association timeout happens with such AP.
  * For default:
  *     gActionOUIReconnAssocTimeout=00E04C 00 01
  *          Explain: 00E04C: OUI

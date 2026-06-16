@@ -943,7 +943,7 @@ struct hdd_fw_txrx_stats {
 /**
  * struct hdd_ap_ctx - SAP/P2PGO specific information
  * @hostapd_state: state control information
- * @dfs_cac_block_tx: Is data tramsmission blocked due to DFS CAC?
+ * @dfs_cac_block_tx: Is data transmission blocked due to DFS CAC?
  * @ap_active: Are any stations active?
  * @disable_intrabss_fwd: Prevent forwarding between stations
  * @broadcast_sta_id: Station ID assigned after BSS starts
@@ -2099,6 +2099,11 @@ struct hdd_tx_powerboost {
 };
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+#define WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT BIT(0)
+#define WLAN_HDD_PASSTHRU_AMPDU_RA_CAP_BIT BIT(1)
+#endif
+
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
  * @psoc: object manager psoc context
@@ -2310,6 +2315,9 @@ struct hdd_tx_powerboost {
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
  * @tx_pb: Tx powerboost context
+ * @tas_enabled: Indicate if TAS has enabled
+ * @tas_send_to_fw: Indicate if TAS has sent to FW
+ * @passthru_cap_bitmap: passthru capability bitmap
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2623,6 +2631,9 @@ struct hdd_context {
 #if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
 	bool tas_enabled;
 	bool tas_send_to_fw;
+#endif
+#ifdef DRIVER_PASSTHRU_MODE
+	uint64_t passthru_cap_bitmap;
 #endif
 };
 
@@ -3681,7 +3692,7 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_psoc_create_vdevs(struct hdd_context *hdd_ctx);
 
 /*
- * hdd_context_create() - Allocate and inialize HDD context.
+ * hdd_context_create() - Allocate and initialize HDD context.
  * @dev: Device Pointer to the underlying device
  *
  * Allocate and initialize HDD context. HDD context is allocated as part of
@@ -4052,7 +4063,7 @@ hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
  * wlan_hdd_set_roaming_state() - Enable or disable roaming
  * on all STAs except the input one
  * @cur_link_info: Current link info pointer in HDD adapter
- * @rso_op_requestor: roam disable requestor
+ * @rso_op_requestor: roam disable requester
  * @enab_roam: Set to true to enable roaming or else set false
  *
  * This function loops through all adapters and enables or
@@ -5602,7 +5613,7 @@ hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 #endif
 
 /**
- * hdd_cleanup_conn_info() - Cleanup connectin info
+ * hdd_cleanup_conn_info() - Cleanup connection info
  * @link_info: pointer to link_info struct in adapter
  *
  * This function frees the memory allocated for the connection

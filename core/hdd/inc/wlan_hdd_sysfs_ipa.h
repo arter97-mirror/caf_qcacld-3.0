@@ -30,7 +30,7 @@ enum ipa_debug_cmd {
  * hdd_sysfs_ipa_create(): Initialize ipa specific sysfs file
  * @adapter: os if adapter
  *
- * Function to initialize ipa specific mode syfs files.
+ * Function to initialize ipa specific mode sysfs files.
  *
  * Return: NONE
  */
@@ -40,7 +40,7 @@ void hdd_sysfs_ipa_create(struct hdd_adapter *adapter);
  * hdd_sysfs_ipa_destroy(): Remove ipucstat specific sysfs file
  * @adapter: os if adapter
  *
- * Function to remove ipa specific mode syfs files.
+ * Function to remove ipa specific mode sysfs files.
  *
  * Return: NONE
  */

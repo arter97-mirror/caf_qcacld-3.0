@@ -178,7 +178,7 @@
 #define WMA_PEER_CREATE_RESPONSE 0x08
 #define WMA_PEER_CREATE_RESPONSE_TIMEOUT SIR_PEER_CREATE_RESPONSE_TIMEOUT
 
-/* send connect respone after bss peer is deleted */
+/* send connect response after bss peer is deleted */
 #define WMA_DELETE_STA_CONNECT_RSP 0x09
 
 /* Peer create response for 11az PASN peer */
@@ -213,7 +213,7 @@
 
 /*
  * Setting the Tx Comp Timeout to 1 secs.
- * TODO: Need to Revist the Timing
+ * TODO: Need to Revisit the Timing
  */
 #define WMA_TX_FRAME_COMPLETE_TIMEOUT  1000
 #define WMA_TX_FRAME_BUFFER_NO_FREE    0
@@ -986,6 +986,8 @@ struct wma_pf_sym_hist {
  * @eht_cap: 802.11be capabilities
  * @set_hw_mode_resp_status: Set HW mode response status
  * @wma_pf_hist: PF symbol history
+ * @get_tsf_cb: get tsf timer callback
+ * @get_tsf_cb_ctx: context passed to get tsf callback
  *
  * This structure is the global wma context.  It contains global wma
  * module parameters and handles of other modules.
@@ -1124,6 +1126,10 @@ typedef struct {
 	qdf_wake_lock_t go_d3_wow_wake_lock;
 	enum set_hw_mode_status set_hw_mode_resp_status;
 	struct wma_pf_sym_hist wma_pf_hist;
+#ifdef DRIVER_PASSTHRU_MODE
+	wma_get_tsf_timer_cb get_tsf_cb;
+	void *get_tsf_cb_ctx;
+#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -2384,7 +2390,7 @@ int wma_chip_power_save_failure_detected_handler(void *handle,
 /**
  * wma_get_chain_rssi() - send wmi cmd to get chain rssi
  * @wma_handle: wma handler
- * @req_params: requset params
+ * @req_params: request params
  *
  * Return: Return QDF_STATUS
  */
@@ -2800,5 +2806,34 @@ wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
  */
 int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
 			 uint16_t pdev_id, uint8_t *macaddr);
+
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * wma_send_vdev_ch_hop_sched() - send vdev channel hopping schedule
+ *  parameters to fw
+ * @params: vdev channel hopping schedule parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params);
+
+/**
+ * wma_passthru_get_tsf_timer() - Get MAC TSF timestamp
+ * @req: get tsf timer request
+ * @cb: callback triggered on receiving response
+ * @ctx: context provided to callback
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wma_passthru_get_tsf_timer(struct ocb_get_tsf_timer_param *req,
+			   wma_get_tsf_timer_cb cb, void *ctx);
+#else
+static inline
+QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif
 

@@ -2075,7 +2075,7 @@ QDF_STATUS ucfg_mlme_get_go_force_11n_for_11ac(struct wlan_objmgr_psoc
 }
 
 /**
- * ucfg_mlme_is_sap_11ac_override() - Override 11ac bandwdith for SAP
+ * ucfg_mlme_is_sap_11ac_override() - Override 11ac bandwidth for SAP
  *
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
@@ -2090,7 +2090,7 @@ QDF_STATUS ucfg_mlme_is_sap_11ac_override(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_is_go_11ac_override() - Override 11ac bandwdith for P2P GO
+ * ucfg_mlme_is_go_11ac_override() - Override 11ac bandwidth for P2P GO
  *
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
@@ -2105,7 +2105,7 @@ QDF_STATUS ucfg_mlme_is_go_11ac_override(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_set_sap_11ac_override() - Set override 11ac bandwdith for SAP
+ * ucfg_mlme_set_sap_11ac_override() - Set override 11ac bandwidth for SAP
  *
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
@@ -2120,7 +2120,7 @@ QDF_STATUS ucfg_mlme_set_sap_11ac_override(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_set_go_11ac_override() - Set override 11ac bandwdith for P2P GO
+ * ucfg_mlme_set_go_11ac_override() - Set override 11ac bandwidth for P2P GO
  *
  * @psoc: pointer to psoc object
  * @value: pointer to the value which will be filled for the caller
@@ -4783,7 +4783,7 @@ ucfg_mlme_get_indoor_channel_support(struct wlan_objmgr_psoc *psoc,
  * @vdev_id: vdev for which the RSO disable request bitmap is requested
  * @reqs: RSO start/stop requestor
  *
- * Return: true or flase
+ * Return: true or false
  */
 bool
 ucfg_mlme_check_bit_in_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc,

@@ -2555,10 +2555,11 @@ struct set_pcl_req {
  * @vdev_id: vdev for which the roaming has to be enabled/disabled
  * @target_bssid: target mac address
  * @ch_freq: channel frequency
- * @frame_len: frame length, includs mac header, fixed params and ies
+ * @frame_len: frame length, includes mac header, fixed params and ies
  * @frame_buf: buffer containing probe response or beacon
  * @is_same_bssid: flag to indicate if roaming is requested for same bssid
  * @forced_roaming: Roam to any bssid in any ch (here bssid & ch is not given)
+ * @skip_full_scan: skip full scan fallback when cache scan finds no candidate
  */
 struct roam_invoke_req {
 	uint8_t vdev_id;
@@ -2568,6 +2569,7 @@ struct roam_invoke_req {
 	uint8_t *frame_buf;
 	uint8_t is_same_bssid;
 	bool forced_roaming;
+	bool skip_full_scan;
 };
 
 /**

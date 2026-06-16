@@ -1001,8 +1001,12 @@ enum wlan_epcs_frame {
  * @Max: 2
  * @Default: 2
  *
- * This ini is used to enable Ring Buffer
+ * This ini is used to enable/disable/set Ring Buffer verbose level.
  *
+ * 0 : Completely disable logging in ring buffers for cnss_diag.
+ * 1 : Enable Complete logging in ring buffers.
+ * 2 : Only enable logging in cnss_diag if
+ *     wifi_verbose_log_level > WLAN_LOG_LEVEL_NORMAL
  * Related: None
  *
  * Supported Feature: STA/SAP
@@ -1333,12 +1337,12 @@ enum wlan_epcs_frame {
 /*
  * <ini>
  * gEdcaTxopLimit - EDCA TXOP limit in milliseconds
- * @Min: 4
+ * @Min: 0
  * @Max: 16
- * @Default: 4
+ * @Default: 0
  *
  * This ini is used to set the TXOP limit in firmware. The value is
- * specified in milliseconds.
+ * specified in milliseconds. This will be set to zero if feature is disabled.
  *
  * Related: None
  *
@@ -1349,7 +1353,7 @@ enum wlan_epcs_frame {
  * </ini>
  */
 #define CFG_EDCA_TXOP_LIMIT \
-CFG_INI_UINT("gEdcaTxopLimit", 4, 16, 4, \
+CFG_INI_UINT("gEdcaTxopLimit", 0, 16, 0, \
 	     CFG_VALUE_OR_DEFAULT, "TXOP limit in milliseconds")
 
 #define CFG_GENERIC_ALL \

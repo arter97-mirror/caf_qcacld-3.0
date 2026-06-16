@@ -2215,7 +2215,7 @@ user_freq_check:
 	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, cur_sap_vdev_id,
 						      &info, &num_cxn_del);
 
-	/* Add the user config ch as first condidate */
+	/* Add the user config ch as first candidate */
 	pcl_channels[0] = user_config_freq;
 	pcl_weight[0] = 0;
 	status = policy_mgr_get_pcl(psoc, mode, &pcl_channels[1], &pcl_len,
@@ -4368,7 +4368,7 @@ policy_mgr_sta_sap_dfs_scc_conc_check(struct wlan_objmgr_psoc *psoc,
 	/* If the new channel is DFS or indoor, then select another channel
 	 * and switch the SAP / GO to avoid CAC. This will resume traffic on
 	 * SAP / GO interface immediately. Once STA moves to this new channel
-	 * and receives the very first beacon, then it will enforece SCC
+	 * and receives the very first beacon, then it will enforce SCC
 	 */
 	if (wlan_reg_is_dfs_for_freq(pdev, new_freq) ||
 	    wlan_reg_is_freq_indoor(pdev, new_freq) ||

@@ -1695,7 +1695,7 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
  * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
  * @tx_status: TX status
  * @band: diag band on which frame was transmitted/received
- * @is_rx: Flag to inidcate packet being received
+ * @is_rx: Flag to indicate packet being received
  * @subtype: Determine whether the evnt sent is for t2lm request
  * or t2lm response
  *

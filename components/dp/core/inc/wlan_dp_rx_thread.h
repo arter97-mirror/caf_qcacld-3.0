@@ -117,7 +117,7 @@ enum dp_rx_refill_thread_state {
  * @vdev_del_event_flag: vdev bit map for per vdev delete event flags
  * @nbuf_queue:nbuf queue used to store RX packets
  * @nbufq_len: length of the nbuf queue
- * @aff_mask: cuurent affinity mask of the DP Rx thread
+ * @aff_mask: current affinity mask of the DP Rx thread
  * @stats: per thread stats
  * @rtm_handle_cmn: abstract RX TM handle. This allows access to the dp_rx_tm
  *		    structures via APIs.

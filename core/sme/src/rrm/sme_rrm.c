@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -685,7 +685,7 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 
 	/*
 	 * Even if RRM scan response is received after roaming to different AP
-	 * the messege shall be posted to PE for rrm cleanup.
+	 * the message shall be posted to PE for rrm cleanup.
 	 */
 
 	freq_list = pSmeRrmContext->channelList.freq_list;

@@ -3219,6 +3219,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *fils_hlp_ie = NULL;
 	struct cm_roam_values_copy mdie_cfg = {0};
 	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
+	bool eht_capable = false;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3308,7 +3309,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	wme_enabled = (pe_session->limWmeEnabled) &&
 		      LIM_BSS_CAPS_GET(WME, pe_session->limCurrentBssQosCaps);
 
-	/* We prefer .11e asociations: */
+	/* We prefer .11e associations: */
 	if (qos_enabled)
 		wme_enabled = false;
 
@@ -3560,9 +3561,11 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	} else {
 		wlan_cm_set_assoc_btm_cap(pe_session->vdev, false);
 	}
-
-	if (QDF_STATUS_SUCCESS != lim_strip_supp_op_class_update_struct(mac_ctx,
-			add_ie, &add_ie_len, &frm->SuppOperatingClasses))
+	eht_capable = lim_is_session_eht_capable(pe_session);
+	if (QDF_STATUS_SUCCESS !=
+			lim_strip_supp_op_class_update_struct(
+				mac_ctx, add_ie, &add_ie_len,
+				&frm->SuppOperatingClasses, eht_capable))
 		pe_debug("Unable to Stripoff supp op classes IE from Assoc Req");
 
 	if (lim_is_fils_connection(pe_session)) {
@@ -4356,7 +4359,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		/*
 		 * Auth frame3 to be sent with encrypted framebody
 		 *
-		 * Allocate buffer for Authenticaton frame of size
+		 * Allocate buffer for Authentication frame of size
 		 * equal to management frame header length plus 2 bytes
 		 * each for auth algorithm number, transaction number,
 		 * status code, 128 bytes for challenge text and
@@ -4371,7 +4374,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 	switch (auth_frame->authTransactionSeqNumber) {
 	case SIR_MAC_AUTH_FRAME_1:
 		/*
-		 * Allocate buffer for Authenticaton frame of size
+		 * Allocate buffer for Authentication frame of size
 		 * equal to management frame header length plus 2 bytes
 		 * each for auth algorithm number, transaction number
 		 * and status code.
@@ -4413,7 +4416,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		if ((auth_frame->authAlgoNumber == eSIR_OPEN_SYSTEM) ||
 		    (auth_frame->authStatusCode != STATUS_SUCCESS)) {
 			/*
-			 * Allocate buffer for Authenticaton frame of size
+			 * Allocate buffer for Authentication frame of size
 			 * equal to management frame header length plus
 			 * 2 bytes each for auth algorithm number,
 			 * transaction number and status code.
@@ -4442,7 +4445,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 			 * Shared Key algorithm with challenge text
 			 * to be sent.
 			 *
-			 * Allocate buffer for Authenticaton frame of size
+			 * Allocate buffer for Authentication frame of size
 			 * equal to management frame header length plus
 			 * 2 bytes each for auth algorithm number,
 			 * transaction number, status code and 128 bytes
@@ -4461,7 +4464,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		/*
 		 * Auth frame3 to be sent without encrypted framebody
 		 *
-		 * Allocate buffer for Authenticaton frame of size equal
+		 * Allocate buffer for Authentication frame of size equal
 		 * to management frame header length plus 2 bytes each
 		 * for auth algorithm number, transaction number and
 		 * status code.
@@ -4473,7 +4476,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 
 	case SIR_MAC_AUTH_FRAME_4:
 		/*
-		 * Allocate buffer for Authenticaton frame of size equal
+		 * Allocate buffer for Authentication frame of size equal
 		 * to management frame header length plus 2 bytes each
 		 * for auth algorithm number, transaction number and
 		 * status code.
@@ -7496,7 +7499,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		 tid, frm.DialogToken.token, frm.Status.status,
 		 frm.addba_param_set.buff_size,
 		 frm.addba_param_set.amsdu_supp);
-	pe_debug("addba_extn %d he_capable %d no_frag %d he_frag %d, exted buff size %d",
+	pe_debug("addba_extn %d he_capable %d no_frag %d he_frag %d, extend buff size %d",
 		 addba_extn_present,
 		 lim_is_session_he_capable(session),
 		 frm.addba_extn_element.no_fragmentation,
@@ -8970,11 +8973,12 @@ lim_handle_sae_auth_retry(struct mac_context *mac_ctx, uint8_t vdev_id,
 
 	val = mac_ctx->mlme_cfg->timeouts.sae_auth_failure_timeout;
 
-	tx_timer_change(
+	if (tx_timer_change(
 		&mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer,
-		SYS_MS_TO_TICKS(val), 0);
-	/* Activate Auth Retry timer */
-	if (tx_timer_activate(
+		SYS_MS_TO_TICKS(val), 0) != TX_SUCCESS) {
+		pe_err("failed to configure auth retry timer");
+		return;
+	} else if (tx_timer_activate(
 	    &mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer) !=
 	    TX_SUCCESS) {
 		pe_err("failed to start periodic auth retry timer");

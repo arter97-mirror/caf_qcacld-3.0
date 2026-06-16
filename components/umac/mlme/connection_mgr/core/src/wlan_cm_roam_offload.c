@@ -656,6 +656,20 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 	 */
 	/* RSN caps with global user MFP which can be used for cross-AKM roam */
 	rsn_caps = rso_cfg->rso_rsn_caps;
+	/*
+	 * Preserve STA self MFP capability bits (MFPC/MFPR) from the
+	 * original connection profile. These bits may be lost during roam
+	 * profile rebuild when user_mfp is not re-propagated. RSN self
+	 * capabilities are properties of the STA and must not change
+	 * across roam. Without this, firmware rejects roam candidates
+	 * from APs with MFP Required set.
+	 */
+	rsn_caps |= (rso_cfg->orig_sec_info.rsn_caps &
+		     (WLAN_CRYPTO_RSN_CAP_MFP_ENABLED |
+		      WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED));
+	mlme_debug("orig_rsn_caps=0x%04x rso_rsn_caps=0x%04x final_rsn_caps=0x%04x",
+		   rso_cfg->orig_sec_info.rsn_caps,
+		   rso_cfg->rso_rsn_caps, rsn_caps);
 
 	/* Fill LFR3 specific self capabilities for roam scan mode TLV */
 	self_caps.ess = 1;
@@ -4889,7 +4903,6 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		rso_command = ROAM_SCAN_OFFLOAD_UPDATE_CFG;
 		break;
 	case WLAN_ROAM_SYNCH_IN_PROG:
 		if (reason == REASON_ROAM_ABORT) {
@@ -6432,7 +6445,10 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	 */
 	cm_store_sae_single_pmk_to_global_cache(psoc, pdev, vdev);
 
-	wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
+	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) &&
+	    !MLME_IS_ROAMING_IN_PROG(psoc, vdev_id))
+		wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
+
 	wlan_cm_roam_state_change(pdev, vdev_id,
 				  WLAN_ROAM_RSO_ENABLED,
 				  REASON_CTX_INIT);
@@ -7537,6 +7553,10 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 	}
 
 	roam_invoke_req->vdev_id = vdev_id;
+
+	if (req->roam_req.req.source == CM_ROAMING_STA_SAP_MCC)
+		roam_invoke_req->skip_full_scan = true;
+
 	if (roam_req->req.forced_roaming) {
 		roam_invoke_req->forced_roaming = true;
 		goto send_cmd;
@@ -7695,6 +7715,7 @@ void
 cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 			    struct wlan_objmgr_vdev *vdev)
 {
+	enum wlan_diag_tx_rx_status diag_tx_rx_status;
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_nbr_rpt);
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
@@ -7707,10 +7728,10 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 	wlan_diag_event.token = neigh_rpt->req_token;
 	wlan_diag_event.band = neigh_rpt->band;
 	wlan_diag_event.is_tx = true;
-	wlan_diag_event.tx_fail_reason =
-	wlan_convert_host_to_diag_tx_fail_reason(neigh_rpt->tx_status);
-	wlan_diag_event.tx_status =
-		wlan_diag_get_tx_status(neigh_rpt->tx_status);
+	diag_tx_rx_status =
+		wlan_convert_host_to_diag_tx_fail_reason(neigh_rpt->tx_status);
+	wlan_diag_event.tx_fail_reason = diag_tx_rx_status;
+	wlan_diag_event.tx_status = wlan_diag_get_tx_status(diag_tx_rx_status);
 
 	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
 				(uint8_t *)&wlan_diag_event.ssid_len);
@@ -8068,6 +8089,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	uint8_t i;
 	uint16_t diag_event;
 	bool is_mlo = false;
+	enum wlan_diag_tx_rx_status diag_tx_rx_status;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
 
@@ -8081,10 +8103,10 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = frame_data->rssi;
-	wlan_diag_event.tx_fail_reason =
+	diag_tx_rx_status =
 		wlan_convert_host_to_diag_tx_fail_reason(frame_data->tx_status);
-	wlan_diag_event.tx_status =
-				wlan_diag_get_tx_status(frame_data->tx_status);
+	wlan_diag_event.tx_fail_reason = diag_tx_rx_status;
+	wlan_diag_event.tx_status = wlan_diag_get_tx_status(diag_tx_rx_status);
 	wlan_diag_event.status = frame_data->status_code;
 	wlan_diag_event.assoc_id = frame_data->assoc_id;
 
@@ -8125,8 +8147,14 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		 * BIT 0: 2 GHz link
 		 * BIT 1: 5 GHz link
 		 * BIT 2: 6 GHz link
+		 * Populate MLO log params only for assoc/reassoc frames,
+		 * skip for auth frames.
 		 */
-		if (frame_data->band) {
+		if (frame_data->band &&
+		    (frame_data->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
+		     frame_data->subtype == MGMT_SUBTYPE_ASSOC_RESP ||
+		     frame_data->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
+		     frame_data->subtype == MGMT_SUBTYPE_REASSOC_RESP)) {
 			is_mlo = true;
 			status =
 			wlan_populate_roam_mld_log_param(vdev,

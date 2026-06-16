@@ -437,7 +437,7 @@ struct ieee80211_ie_srp_extie {
 
 /*
  * 802.11ax HE Capability
- * with cabability & PPE (PPDU packet Extension) threshold
+ * with capability & PPE (PPDU packet Extension) threshold
  */
 struct ieee80211_ie_hecap {
 	u_int8_t elem_id;

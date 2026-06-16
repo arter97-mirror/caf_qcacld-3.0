@@ -650,6 +650,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 			++dp_intf->dp_stats.dhcp_stats.dhcp_req_count;
 			is_dhcp = true;
 		}
+		dp_intf->dhcp_ltxid = qdf_nbuf_get_dhcp_transaction_id(nbuf);
 	} else if ((pkt_type == QDF_NBUF_CB_PACKET_TYPE_ICMP) ||
 		   (pkt_type == QDF_NBUF_CB_PACKET_TYPE_ICMPv6)) {
 		dp_mark_icmp_req_to_fw(dp_ctx, nbuf);
@@ -1968,7 +1969,8 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		dp_event_eapol_log(nbuf, QDF_RX);
 		qdf_dp_trace_log_pkt(dp_link->link_id, nbuf, QDF_RX,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
-				     dp_intf->device_mode);
+				     dp_intf->device_mode,
+				     dp_intf->dhcp_ltxid);
 
 		DPTRACE(qdf_dp_trace(nbuf,
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
@@ -2141,7 +2143,8 @@ QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_nbuf)
 
 		qdf_dp_trace_log_pkt(dp_link->link_id, nbuf, QDF_RX,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
-				     dp_intf->device_mode);
+				     dp_intf->device_mode,
+				     dp_intf->dhcp_ltxid);
 
 		DPTRACE(qdf_dp_trace(nbuf,
 				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,

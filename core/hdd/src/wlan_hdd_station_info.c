@@ -193,7 +193,7 @@ static int hdd_get_sta_congestion(struct wlan_hdd_link_info *link_info,
 
 /**
  * hdd_get_station_assoc_fail() - Handle get station assoc fail
- * @link_info: Link info pointer in HDD adaper
+ * @link_info: Link info pointer in HDD adapter
  *
  * Handles QCA_NL80211_VENDOR_SUBCMD_GET_STATION_ASSOC_FAIL.
  * Validate cmd attributes and send the station info to upper layers.

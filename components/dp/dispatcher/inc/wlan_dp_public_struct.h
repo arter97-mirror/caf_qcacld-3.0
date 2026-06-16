@@ -409,7 +409,7 @@ struct dp_tx_rx_stats {
 
 /**
  * struct dp_dhcp_ind - DHCP Start/Stop indication message
- * @dhcp_start: Is DHCP start idication
+ * @dhcp_start: Is DHCP start indication
  * @device_mode: Mode of the device(ex:STA, AP)
  * @intf_mac_addr: MAC address of the interface
  * @peer_mac_addr: MAC address of the connected peer
@@ -526,9 +526,9 @@ enum bus_bw_level {
  * enum tput_level - throughput levels
  *
  * @TPUT_LEVEL_NONE: No throughput
- * @TPUT_LEVEL_IDLE: idle throughtput level
+ * @TPUT_LEVEL_IDLE: idle throughput level
  * @TPUT_LEVEL_LOW: low throughput level
- * @TPUT_LEVEL_MEDIUM: medium throughtput level
+ * @TPUT_LEVEL_MEDIUM: medium throughput level
  * @TPUT_LEVEL_HIGH: high throughput level
  * @TPUT_LEVEL_MID_HIGH: mid high throughput level
  * @TPUT_LEVEL_VERY_HIGH: very high throughput level
@@ -922,7 +922,7 @@ struct wlan_dp_psoc_callbacks {
 	bool (*dp_is_gratuitous_arp_unsolicited_na)(qdf_nbuf_t nbuf);
 
 	bool (*dp_send_rx_pkt_over_nl)(qdf_netdev_t dev, uint8_t *addr,
-				       qdf_nbuf_t nbuf, bool unecrypted);
+				       qdf_nbuf_t nbuf, bool unencrypted);
 	bool
 	(*wlan_dp_sta_get_dot11mode)(hdd_cb_handle context, qdf_netdev_t netdev,
 				     enum qca_wlan_802_11_mode *dot11_mode);
@@ -1053,7 +1053,7 @@ struct wlan_dp_psoc_nb_ops {
 /**
  * struct wlan_dp_user_config - DP component user config
  * @ipa_enable: IPA enabled/disabled config
- * @arp_connectivity_map: ARP connectiviy map
+ * @arp_connectivity_map: ARP connectivity map
  */
 struct wlan_dp_user_config {
 	bool ipa_enable;

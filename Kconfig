@@ -316,6 +316,10 @@ config DP_TX_COMP_RING_DESC_SANITY_CHECK
 	bool "Enable DP_TX_COMP_RING_DESC_SANITY_CHECK"
 	default n
 
+config DP_RX_RING_DESC_SANITY_CHECK
+	bool "Enable DP_RX_RING_DESC_SANITY_CHECK"
+	default n
+
 config DP_TX_HW_DESC_HISTORY
 	bool "Enable DP_TX_HW_DESC_HISTORY"
 	default n
@@ -3072,6 +3076,10 @@ config CNSS_ADRASTEA
 
 config FEATURE_ENABLE_CE_DP_IRQ_AFFINE
 	bool "Enable FEATURE_ENABLE_CE_DP_IRQ_AFFINE"
+	default n
+
+config DT_CPU_MASK_DP_INTR
+	bool "Enable DT_CPU_MASK_DP_INTR"
 	default n
 
 if CNSS_ADRASTEA

@@ -198,6 +198,7 @@ struct nan_psoc_priv_obj {
  * @num_peer_migrated: Number of peers migrated
  * @peer_migrated_addr_list: list containing migrated peer mac address
  * @nan_disable_req_info: NAN disable request info
+ * @migration_complete_event: NAN migration complete event
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -216,6 +217,7 @@ struct nan_vdev_priv_obj {
 	uint8_t num_peer_migrated;
 	struct qdf_mac_addr peer_migrated_addr_list[MAX_NAN_MIGRATED_PEERS];
 	uint8_t nan_disable_req_info;
+	qdf_event_t migration_complete_event;
 };
 
 /**
@@ -563,5 +565,15 @@ QDF_STATUS nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS nan_get_disable_req_info(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *value);
 
+/**
+ * nan_wait_for_peer_migration_complete() - API to wait for peer migration to
+ * compltet
+ * @psoc: pointer to PSOC object
+ * @vdev_id: Vdev ID
+ *
+ * Return: QDF status
+ */
+QDF_STATUS nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

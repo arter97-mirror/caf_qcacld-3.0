@@ -3615,7 +3615,7 @@ policy_mgr_get_index_for_3_given_freq_dbs(
 	}
 
 	/*
-	 * If freq1 and freq2 are on same band and freq3 is on differet band and
+	 * If freq1 and freq2 are on same band and freq3 is on different band and
 	 * is not sharing mac with any SAP. STA on same band is handled above,
 	 * so both SAP on same band mean STA cannot be on same band. This can
 	 * happen if SBS is not enabled.
@@ -3790,7 +3790,7 @@ policy_mgr_get_index_for_ml_sta_sap_dbs(
 	}
 
 	/*
-	 * If ML STA is MCC and SAP is on differet band and is not sharing mac
+	 * If ML STA is MCC and SAP is on different band and is not sharing mac
 	 * with any link. SAP on same band is handled above, so ML STA on same
 	 * band mean SAP cannot be on same band. This can happen if SBS is not
 	 * enabled.

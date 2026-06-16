@@ -5375,6 +5375,19 @@ wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
 enum phy_ch_width wlan_mlme_get_max_bw(void);
 
 /**
+ * wlan_mlme_get_max_curr_bw() - get max current bw
+ *
+ * @pdev: pdev pointer
+ * @curr_op_freq: current operating freq
+ * @chan_bw: chan bw
+ *
+ * Return: enum phy_ch_width
+ */
+enum phy_ch_width wlan_mlme_get_max_curr_bw(struct wlan_objmgr_pdev *pdev,
+					    qdf_freq_t curr_op_freq,
+					    enum phy_ch_width chan_bw);
+
+/**
  * wlan_mlme_get_sta_ch_width() - Get current operating
  * channel width and phymode for STA / P2P-CLI mode
  *

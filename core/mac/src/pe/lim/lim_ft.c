@@ -1106,7 +1106,7 @@ QDF_STATUS lim_process_ft_aggr_qos_req(struct mac_context *mac,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	else {
 		/* Implies it is a LFR3.0 based 11r connection
-		 * so donot send add ts request to firmware since it
+		 * so do not send add ts request to firmware since it
 		 * already has the RIC IEs */
 
 		/* Send the Aggr QoS response to SME */

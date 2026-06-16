@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -447,7 +447,10 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(struct hdd_context *hdd_ctx,
 
 		qdf_copy_macaddr(&data->peer_mac_addr, &peer_link_mac);
 		data->vdev_id = wlan_vdev_get_id(link_vdev);
-
+		hdd_debug("vdev:%d Peer_mac: " QDF_MAC_ADDR_FMT " key_seed_len:%d",
+			  data->vdev_id,
+			  QDF_MAC_ADDR_REF(data->peer_mac_addr.bytes),
+			  data->key_seed_len);
 		status = wlan_crypto_set_ltf_keyseed(hdd_ctx->psoc, data);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Set LTF Keyseed failed vdev:%d for peer: "
@@ -486,12 +489,13 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_crypto_ltf_keyseed_data *data;
+	struct qdf_mac_addr bss_peer_addr = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	bool is_ltf_keyseed_required;
+	bool is_ltf_keyseed_required, is_keyseed_for_assoc_bss = false;
 	enum wlan_peer_type peer_type;
 	int ret;
 
-	hdd_enter();
+	hdd_enter_dev(dev);
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
@@ -508,18 +512,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	if (!data)
 		return -ENOMEM;
 
-	data->vdev_id = adapter->deflink->vdev_id;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
-						    data->vdev_id,
-						    WLAN_WIFI_POS_OSIF_ID);
-	if (!vdev) {
-		hdd_err_rl("Vdev is not found for id:%d", data->vdev_id);
-		ret = -EINVAL;
-		goto err;
-	}
-
 	if (!tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_PEER_MAC_ADDR]) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_OSIF_ID);
 		hdd_err_rl("BSSID is not present");
 		ret = -EINVAL;
 		goto err;
@@ -533,6 +526,34 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		qdf_mem_copy(data->src_mac_addr.bytes,
 			     nla_data(tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_SRC_ADDR]),
 			     QDF_MAC_ADDR_SIZE);
+
+	peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
+					   data->peer_mac_addr.bytes,
+					   WLAN_WIFI_POS_OSIF_ID);
+	if (!peer) {
+		hdd_debug("PASN peer is not found");
+		ret = 0;
+		goto err;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		hdd_err_rl("Vdev is NULL for PASN peer");
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_WIFI_POS_OSIF_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Failed to get vdev reference");
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
+		ret = -EFAULT;
+		goto err;
+	}
+
+	data->vdev_id = wlan_vdev_get_id(vdev);
+	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
 
 	data->key_seed_len =
 		nla_len(tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_LTF_KEYSEED]);
@@ -550,10 +571,15 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		     data->key_seed_len);
 
 	/*
-	 * For MLO vdev send set LTF keyseed command on each link for the link
-	 * peer address similar to install key command
+	 * For MLO vdev send set LTF keyseed command on each link for the
+	 * associated BSS link peer addresses similar to install key command
 	 */
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+	status = wlan_vdev_get_bss_peer_mac(vdev, &bss_peer_addr);
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    qdf_is_macaddr_equal(&bss_peer_addr, &data->peer_mac_addr))
+		is_keyseed_for_assoc_bss = true;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && is_keyseed_for_assoc_bss)
 		status = wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(
 						hdd_ctx, vdev, adapter,
 						data, MLO_ALL_VDEV_LINK_ID);
@@ -570,13 +596,13 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 
 	peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
 					   data->peer_mac_addr.bytes,
-					   WLAN_WIFI_POS_CORE_ID);
+					   WLAN_WIFI_POS_OSIF_ID);
 	if (!peer) {
-		hdd_err_rl("PASN peer is not found");
 		/*
 		 * Auth status need not be sent for the BSS PASN
 		 * peer. So, return if peer is not found
 		 */
+		hdd_err_rl("PASN peer is not found after LTF keyseed");
 		ret = 0;
 		goto err;
 	}
@@ -587,7 +613,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	 */
 	peer_type = wlan_peer_get_peer_type(peer);
 	if (peer_type != WLAN_PEER_RTT_PASN) {
-		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
 		ret = 0;
 		goto err;
 	}
@@ -601,7 +627,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	 */
 	is_ltf_keyseed_required =
 			ucfg_wifi_pos_is_ltf_keyseed_required_for_peer(peer);
-	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
+	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_OSIF_ID);
 
 	if (!is_ltf_keyseed_required) {
 		ret = 0;
@@ -619,7 +645,7 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		goto err;
 	}
 
-	pasn_auth_status->vdev_id = adapter->deflink->vdev_id;
+	pasn_auth_status->vdev_id = data->vdev_id;
 	pasn_auth_status->num_peers = 1;
 	qdf_mem_copy(pasn_auth_status->auth_status[0].peer_mac.bytes,
 		     data->peer_mac_addr.bytes, QDF_MAC_ADDR_SIZE);

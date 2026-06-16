@@ -871,7 +871,7 @@ void sap_dfs_set_current_channel(void *ctx)
  * which MDM device's AP with MCC was detected. This function checks if given
  * channel is present in that list.
  *
- * Return: true, if channel was present, false othersie.
+ * Return: true, if channel was present, false otherwise.
  */
 bool sap_check_in_avoid_ch_list(struct sap_context *sap_ctx, uint8_t channel)
 {
@@ -1090,7 +1090,7 @@ static bool is_mcc_preferred(struct sap_context *sap_context,
 	 * If SAP ACS channel list is 1-11 and STA is on non-preferred
 	 * channel i.e. 12, 13, 14 then MCC is unavoidable. This is because
 	 * if SAP is started on 12,13,14 some clients may not be able to
-	 * join dependending on their regulatory country.
+	 * join depending on their regulatory country.
 	 */
 	if ((con_ch_freq >= 2467) && (con_ch_freq <= 2484) &&
 	    (sap_context->acs_cfg->start_ch_freq >= 2412 &&

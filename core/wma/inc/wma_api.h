@@ -318,7 +318,7 @@ void wma_process_pdev_hw_mode_trans_ind(void *wma,
  * @wma_handle:                  pointer to wma handle.
  * @cts2self_for_p2p_go:         value needs to set to firmware.
  *
- * At the time of driver startup, inform about ini parma to FW that
+ * At the time of driver startup, inform about ini param to FW that
  * if legacy client connects to P2P GO, stop using NOA for P2P GO.
  *
  * Return: QDF_STATUS.
@@ -455,9 +455,9 @@ QDF_STATUS wma_set_tx_power_per_mcs(WMA_HANDLE handle,
 /**
  * wma_send_coex_config_cmd() - Send coex config params
  * @wma_handle: wma handle
- * @coex_cfg_params: struct to coex cofig params
+ * @coex_cfg_params: struct to coex config params
  *
- * This function sends WMI command to send coex cofig params
+ * This function sends WMI command to send coex config params
  *
  * Return: QDF_STATUS
  */
@@ -739,7 +739,7 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
  *
  * API handle vdev stop during start req
  *
- * Return: SUCCESS alsways
+ * Return: SUCCESS always
  */
 QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 					    enum vdev_cmd_type type,
