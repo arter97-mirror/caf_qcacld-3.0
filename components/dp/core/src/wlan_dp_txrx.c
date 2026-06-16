@@ -797,7 +797,6 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	}
 
 	dp_fix_broadcast_eapol(dp_link, nbuf);
-	QDF_NBUF_CB_TX_VDEV_CTX(nbuf) = dp_link->link_id;
 
 	if (dp_intf->txrx_ops.tx.tx(soc, dp_link->link_id, nbuf)) {
 		dp_debug_rl("Failed to send packet from adapter %u",
