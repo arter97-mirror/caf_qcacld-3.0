@@ -755,6 +755,8 @@ struct punc_chan_info {
  * @uhr_op_ie: UHR op
  * @uhr_op_ie_len: UHR OP IE len
  * @uhr_cap_ie_len: Length of UHR capability IE
+ * @passthru_pending_create_only: one-shot flag set before
+ *   lim_add_sta() for passthru NEW action, cleared after
  */
 struct pe_session {
 	uint8_t available;
@@ -1104,6 +1106,10 @@ struct pe_session {
 	struct wlan_uhr_op_ie uhr_op_ie;
 	uint16_t uhr_op_ie_len;
 	uint16_t uhr_cap_ie_len;
+#endif
+#ifdef DRIVER_PASSTHRU_MODE
+	/* one-shot flag set before lim_add_sta(NEW), cleared after */
+	uint8_t passthru_pending_create_only;
 #endif
 };
 

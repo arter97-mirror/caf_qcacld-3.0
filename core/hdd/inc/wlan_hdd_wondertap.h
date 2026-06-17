@@ -48,12 +48,14 @@ enum passthru_peer_status {
 
 /**
  * struct passthru_peer_tbl_entry - passthru peer table entry
- * @mac_addr: peer mac address
- * @peer_status: peer status
+ * @mac_addr: peer MAC address
+ * @peer_status: peer setup status
+ * @sta_info: station info stored on UPDATE, returned verbatim on QUERY
  */
 struct passthru_peer_tbl_entry {
-	struct qdf_mac_addr mac_addr;
-	enum passthru_peer_status peer_status;
+	struct qdf_mac_addr          mac_addr;
+	enum passthru_peer_status    peer_status;
+	qdf_wondertap_station_info_t sta_info;
 };
 
 /**
@@ -87,8 +89,9 @@ struct hdd_wondertap_context {
 };
 
 struct hdd_wondertap_peer_setup {
-	uint8_t vdev_id;
-	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t  vdev_id;
+	uint8_t  peer_addr[QDF_MAC_ADDR_SIZE];
+	uint16_t peer_aid;
 };
 
 /**

@@ -2368,6 +2368,11 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
+	case WNI_SME_PASSTHRU_PEER_DEL:
+		lim_passthru_peer_del(mac_ctx, msg->bodyptr);
+		qdf_mem_free((void *)msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
 	case eWNI_SME_QOS_NULL_REQ:
 		lim_process_qos_null_req(msg);
 		break;
