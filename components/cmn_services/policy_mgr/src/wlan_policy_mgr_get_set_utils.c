@@ -6917,7 +6917,7 @@ bool policy_mgr_is_6ghz_conc_mode_supported(
 	struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode)
 {
 	if (mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE ||
-	    policy_mgr_is_beaconing_mode(mode))
+	    mode == PM_PASSTHRU_MODE || policy_mgr_is_beaconing_mode(mode))
 		return true;
 	else
 		return false;
@@ -6931,7 +6931,7 @@ bool policy_mgr_is_6ghz_conc_mode_supported(
  * @mode: new connection mode
  * @ch_freq: channel freq
  *
- * 1. Only STA/SAP are allowed on 6Ghz.
+ * 1. Only STA/SAP/PASSTHRU are allowed on 6Ghz.
  * 2. If there is DFS beacon entity existing on 5G band, 5G+6G MCC is not
  * allowed.
  *
@@ -6954,7 +6954,7 @@ static bool policy_mgr_is_6g_channel_allowed(
 	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq))
 		return true;
 
-	/* Only STA/SAP is supported on 6Ghz currently */
+	/* Only STA/SAP/PASSTHRU is supported on 6Ghz currently */
 	if (!policy_mgr_is_6ghz_conc_mode_supported(psoc, mode)) {
 		policy_mgr_rl_debug("mode %d for 6ghz not supported", mode);
 		return false;
