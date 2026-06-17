@@ -16647,21 +16647,29 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 	if (vdev_id_list[0] == INVALID_VDEV_ID)
 		return;
 
+	if (*num_rnr >= MAX_NUM_RNR_ENTRY) {
+		pe_debug("vdev id %d RNR array full (%d entries), skip 6G RNR",
+			 wlan_vdev_get_id(session->vdev), *num_rnr);
+		return;
+	}
+
 	co_session = pe_find_session_by_vdev_id(mac_ctx,
 						vdev_id_list[0]);
 	if (!co_session) {
 		pe_err("Invalid co located session");
 		return;
 	}
-	populate_dot11f_rnr_tbtt_info(mac_ctx, session, co_session, dot11f,
+	populate_dot11f_rnr_tbtt_info(mac_ctx, session, co_session,
+				      dot11f + *num_rnr,
 				      CURRENT_RNR_TBTT_INFO_LEN);
-	pe_debug("vdev id %d populate RNR IE with 6G vdev id %d op class %d chan num %d tbtt_len %d",
-		 wlan_vdev_get_id(session->vdev),
+	pe_debug("vdev id %d populate RNR IE[%d] with 6G vdev id %d op class %d chan num %d tbtt_len %d",
+		 wlan_vdev_get_id(session->vdev), *num_rnr,
 		 wlan_vdev_get_id(co_session->vdev),
-		 dot11f->op_class, dot11f->channel_num,
-		 dot11f->tbtt_info_len);
+		 (dot11f + *num_rnr)->op_class,
+		 (dot11f + *num_rnr)->channel_num,
+		 (dot11f + *num_rnr)->tbtt_info_len);
 
-	*num_rnr = 1;
+	(*num_rnr)++;
 }
 
 QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,

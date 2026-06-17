@@ -836,7 +836,8 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_mlo_rnr(mac_ctx, pe_session,
 					&frm->reduced_neighbor_report[0],
 					&frm->num_reduced_neighbor_report);
-	} else if (!wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq)) {
+	}
+	if (!wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq)) {
 		populate_dot11f_6g_rnr(mac_ctx, pe_session,
 				       &frm->reduced_neighbor_report[0],
 				       &frm->num_reduced_neighbor_report);
