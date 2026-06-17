@@ -604,10 +604,6 @@ QDF_STATUS dp_wfds_new_server(void)
 	dp_info("Connected to WFDS QMI service, state: 0x%x",
 		qdf_atomic_read(&dl_wfds->wfds_state));
 
-	dp_rx_handle_buf_pool_audio_smmu_mapping(wlan_psoc_get_dp_handle(dp_ctx->psoc),
-						 wlan_objmgr_pdev_get_pdev_id(dp_ctx->pdev),
-						 true);
-
 	if (dp_ctx->dp_ops.dp_register_lpass_ssr_notifier) {
 		status =
 		    dp_ctx->dp_ops.dp_register_lpass_ssr_notifier(dp_ctx->psoc);
@@ -702,10 +698,6 @@ void dp_wfds_del_server(void)
 
 	if (dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier)
 		dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier(dp_ctx->psoc);
-
-	dp_rx_handle_buf_pool_audio_smmu_mapping(wlan_psoc_get_dp_handle(dp_ctx->psoc),
-						 wlan_objmgr_pdev_get_pdev_id(dp_ctx->pdev),
-						 false);
 
 	htc_vote_link_down(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 }
