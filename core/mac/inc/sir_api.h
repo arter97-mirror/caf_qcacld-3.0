@@ -5182,6 +5182,19 @@ struct wlan_passthru_vhtcap {
 } qdf_packed;
 
 /**
+ * struct wlan_passthru_hecap - HE Capabilities element body (IEEE 802.11ax)
+ * @mac_cap_info: MAC capability info (6 bytes)
+ * @phycap_info:  PHY capability info (11 bytes)
+ *
+ * Byte-identical to struct ieee80211_he_cap_elem (17 bytes packed).
+ * Contains MAC/PHY capability fields but no MCS/NSS maps.
+ */
+struct wlan_passthru_hecap {
+	uint8_t mac_cap_info[6];
+	uint8_t phycap_info[11];
+} qdf_packed;
+
+/**
  * struct sir_passthru_peer_setup_msg - msg for passthru peer setup/update
  * @message_type: WNI_SME_PASSTHRU_PEER_SETUP
  * @vdev_id: vdev id of the passthru interface
@@ -5200,6 +5213,10 @@ struct wlan_passthru_vhtcap {
  * @peer_ht_cap: peer HT caps; byte-copy of sta_info.ht_capa in HDD
  * @vhtcap_present: 1 if peer_vht_cap is valid (UPDATE only)
  * @peer_vht_cap: peer VHT caps; byte-copy of sta_info.vht_capa in HDD
+ * @hecap_present: 1 if peer_he_cap is valid (UPDATE only)
+ * @peer_he_cap: peer HE MAC/PHY caps; byte-copy of sta_info.he_capa in HDD.
+ *               MCS/NSS maps are absent (ieee80211_he_cap_elem carries none);
+ *               LIM uses self caps for MCS maps, peer caps for MAC/PHY
  */
 struct sir_passthru_peer_setup_msg {
 	uint16_t                    message_type;
@@ -5216,6 +5233,8 @@ struct sir_passthru_peer_setup_msg {
 	struct wlan_passthru_htcap  peer_ht_cap;
 	uint8_t                     vhtcap_present;
 	struct wlan_passthru_vhtcap peer_vht_cap;
+	uint8_t                     hecap_present;
+	struct wlan_passthru_hecap  peer_he_cap;
 };
 
 /**

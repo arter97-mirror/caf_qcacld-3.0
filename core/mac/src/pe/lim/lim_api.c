@@ -5592,20 +5592,57 @@ lim_passthru_apply_vht_mcs_cap(struct mac_context *mac,
 }
 
 static void
+lim_passthru_apply_he_mcs_cap(struct mac_context *mac,
+			      tDphHashNode *sta,
+			      struct pe_session *pe_session,
+			      struct sir_passthru_peer_setup_msg *msg)
+{
+	uint8_t max_nss = QDF_MIN(pe_session->cap_tx_nss, msg->nss);
+	uint8_t he_mcs, i;
+
+	sta->mlmStaContext.he_capable = 1;
+	lim_populate_he_mcs_set(mac, &sta->supportedRates,
+				&sta->he_config, pe_session,
+				max_nss, max_nss);
+	if (msg->max_mcs >= 11)
+		he_mcs = HE_MCS_0_11;
+	else if (msg->max_mcs >= 9)
+		he_mcs = HE_MCS_0_9;
+	else
+		he_mcs = HE_MCS_0_7;
+	for (i = 1; i <= max_nss; i++) {
+		if (!HE_MCS_IS_NSS_ENABLED(
+				sta->supportedRates.rx_he_mcs_map_lt_80, i))
+			continue;
+		if (HE_GET_MCS_FOR_NSS(
+				sta->supportedRates.rx_he_mcs_map_lt_80,
+				i) > he_mcs)
+			HE_SET_MCS_FOR_NSS(
+				sta->supportedRates.rx_he_mcs_map_lt_80,
+				he_mcs, i);
+		if (HE_GET_MCS_FOR_NSS(
+				sta->supportedRates.tx_he_mcs_map_lt_80,
+				i) > he_mcs)
+			HE_SET_MCS_FOR_NSS(
+				sta->supportedRates.tx_he_mcs_map_lt_80,
+				he_mcs, i);
+	}
+}
+
+static void
 lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 				   struct pe_session *pe_session,
 				   struct sir_passthru_peer_setup_msg *msg)
 {
 	tDot11fIEHTCaps  ht_caps  = {0};
 	tDot11fIEVHTCaps vht_caps = {0};
+	tDot11fIEhe_cap  he_peer  = {0};
+	uint32_t he_unpack_status;
 	uint16_t capability;
 	union {
 		uint16_t                         raw;
 		struct mlme_ht_capabilities_info fields;
 	} ht_info;
-	uint8_t he_mcs;
-	uint8_t max_nss;
-	uint8_t i;
 
 	pe_debug("Dot11Mode %d MCS %d NSS %d", msg->dot11mode,
 		 msg->max_mcs, msg->nss);
@@ -5631,7 +5668,7 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 		sta->htSupportedChannelWidthSet =
 			ht_info.fields.supported_channel_width_set ? 1 : 0;
 		sta->mlmStaContext.htCapability = 1;
-	} else if (IS_DOT11_MODE_HT(msg->dot11mode)) {
+	} else if (msg->create_only && IS_DOT11_MODE_HT(msg->dot11mode)) {
 		/* NEW: self session caps */
 		pe_debug("vdev:%d Populate HT caps from session",
 			 pe_session->vdev_id);
@@ -5698,7 +5735,7 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 		sta->mlmStaContext.vhtCapability = 1;
 		lim_passthru_apply_vht_mcs_cap(mac, sta, pe_session,
 					       &vht_caps, msg);
-	} else if (IS_DOT11_MODE_VHT(msg->dot11mode)) {
+	} else if (msg->create_only && IS_DOT11_MODE_VHT(msg->dot11mode)) {
 		/* NEW: self session caps, ch_width from tx_rate_cfg */
 		pe_debug("vdev:%d Populate VHT caps from session",
 			 pe_session->vdev_id);
@@ -5741,47 +5778,52 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 		sta->vhtSupportedChannelWidthSet =
 			WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
 	}
-	if (IS_DOT11_MODE_HE(msg->dot11mode)) {
-		pe_debug("Populate HE caps");
-		/* Pass NULL session so caps are drawn from the global mlme
-		 * he_caps - pe_session->he_config is uninitialized (0xffff)
-		 * for passthru sessions.
+	if (msg->hecap_present) {
+		/* UPDATE: peer HE MAC/PHY caps from wonder.
+		 * peer_he_cap is 17 bytes: 6 MAC + 11 PHY.
+		 * dot11f_unpack_ie_he_cap consumes all 17 bytes
+		 * successfully, then fails with DOT11F_INCOMPLETE_IE
+		 * when trying to read rx_he_mcs_map_lt_80 (needs 2
+		 * more bytes). All MAC/PHY fields are fully parsed
+		 * before that point so he_peer fields are valid.
+		 * he_peer.present is set to 0 on that error; we do
+		 * not use it.
 		 */
 		populate_dot11f_he_caps(mac, NULL, pe_session->opmode,
 					pe_session->curr_op_freq,
 					pe_session->ch_width, &sta->he_config);
-		sta->mlmStaContext.he_capable = 1;
-		max_nss = QDF_MIN(pe_session->cap_tx_nss, msg->nss);
-		lim_populate_he_mcs_set(mac, &sta->supportedRates,
-					&sta->he_config, pe_session,
-					max_nss, max_nss);
-		/* Convert max_mcs integer to 2-bit HE map encoding:
-		 * MCS 0-7 -> HE_MCS_0_7, MCS 0-9 -> HE_MCS_0_9,
-		 * MCS 0-11 -> HE_MCS_0_11
-		 */
-		if (msg->max_mcs >= 11)
-			he_mcs = HE_MCS_0_11;
-		else if (msg->max_mcs >= 9)
-			he_mcs = HE_MCS_0_9;
-		else
-			he_mcs = HE_MCS_0_7;
-		for (i = 1; i <= max_nss; i++) {
-			if (!HE_MCS_IS_NSS_ENABLED(
-					sta->supportedRates.rx_he_mcs_map_lt_80, i))
-				continue;
-			if (HE_GET_MCS_FOR_NSS(
-					sta->supportedRates.rx_he_mcs_map_lt_80,
-					i) > he_mcs)
-				HE_SET_MCS_FOR_NSS(
-					sta->supportedRates.rx_he_mcs_map_lt_80,
-					he_mcs, i);
-			if (HE_GET_MCS_FOR_NSS(
-					sta->supportedRates.tx_he_mcs_map_lt_80,
-					i) > he_mcs)
-				HE_SET_MCS_FOR_NSS(
-					sta->supportedRates.tx_he_mcs_map_lt_80,
-					he_mcs, i);
-		}
+		he_unpack_status =
+			dot11f_unpack_ie_he_cap(mac,
+						(uint8_t *)&msg->peer_he_cap,
+						sizeof(msg->peer_he_cap),
+						&he_peer, false);
+		pe_debug("vdev:%d he_unpack status 0x%x",
+			 pe_session->vdev_id, he_unpack_status);
+		sta->he_config.htc_he          = he_peer.htc_he;
+		sta->he_config.ldpc_coding     = he_peer.ldpc_coding;
+		sta->he_config.chan_width_0    = he_peer.chan_width_0;
+		sta->he_config.chan_width_1    = he_peer.chan_width_1;
+		sta->he_config.chan_width_2    = he_peer.chan_width_2;
+		sta->he_config.chan_width_3    = he_peer.chan_width_3;
+		sta->he_config.su_beamformee   = he_peer.su_beamformee;
+		sta->he_config.mu_beamformer   = he_peer.mu_beamformer;
+		sta->he_config.ul_mu           = he_peer.ul_mu;
+		sta->he_config.doppler         = he_peer.doppler;
+		pe_debug("vdev:%d HE peer caps: ldpc %d su_bfee %d ul_mu %d htc_he %d chan_width %d%d%d%d",
+			 pe_session->vdev_id,
+			 he_peer.ldpc_coding, he_peer.su_beamformee,
+			 he_peer.ul_mu, he_peer.htc_he,
+			 he_peer.chan_width_0, he_peer.chan_width_1,
+			 he_peer.chan_width_2, he_peer.chan_width_3);
+		lim_passthru_apply_he_mcs_cap(mac, sta, pe_session, msg);
+	} else if (msg->create_only && IS_DOT11_MODE_HE(msg->dot11mode)) {
+		/* NEW: peer HE caps not yet known, use self caps */
+		populate_dot11f_he_caps(mac, NULL, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &sta->he_config);
+		lim_passthru_apply_he_mcs_cap(mac, sta, pe_session, msg);
+	} else {
+		sta->mlmStaContext.he_capable = 0;
 	}
 	/* Lets enable QOS parameter */
 	sta->qosMode = 1;

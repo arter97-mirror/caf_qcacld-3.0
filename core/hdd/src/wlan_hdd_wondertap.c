@@ -756,6 +756,22 @@ wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 		/* max_mcs from highest MCS set in stream 1 of VHT rx_mcs_map */
 		req.max_mcs = VHT_GET_MCS_FOR_NSS(rx_mcs_map, 1);
 	}
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HE)) {
+		req.hecap_present = 1;
+		qdf_mem_copy(&req.peer_he_cap, &sta_info->he_capa,
+			     sizeof(req.peer_he_cap));
+		/*
+		 * ieee80211_he_cap_elem only carries MAC+PHY capability
+		 * bytes -- HE MCS/NSS maps are not present in
+		 * wondertap_station_info. If HT/VHT NSS extraction above
+		 * yielded 0 (HE-only peer), fall back to tx_rate_cfg.nss
+		 * which WONDER sets via set_fixed_tx_rate/set_tx_rate_mask.
+		 */
+		if (!nss)
+			nss = g_wt_ctx->tx_rate_cfg.nss;
+		if (!req.max_mcs)
+			req.max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
+	}
 	req.nss = nss ? nss : 1;
 	hdd_debug("vdev %d peer assoc nss %d max_mcs %d",
 		  vdev_id, req.nss, req.max_mcs);
@@ -1391,6 +1407,7 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 				    qdf_wondertap_capability_t *features)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_mlme_nss_chains nss_cfg = {0};
 	int ret;
 
 	if (!hdd_ctx)
@@ -1411,7 +1428,15 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	features->bits.sta_coexist = 1;
 	features->maximum_channel_switch_time_us = 50000;
 
-	hdd_debug("passthru cap bitmap 0x%llx", hdd_ctx->passthru_cap_bitmap);
+	wlan_mlme_fetch_psoc_nss_chain_params_for_mode(
+					hdd_ctx->psoc, &nss_cfg,
+					QDF_PASSTHRU_MODE,
+					hdd_ctx->num_rf_chains,
+					WLAN_MLME_CFG_SRC_GLOBAL);
+	features->bits.nss = QDF_MIN(nss_cfg.tx_nss[NSS_CHAINS_BAND_5GHZ],
+				     (uint32_t)WLAN_PASSTHRU_MAX_NSS);
+	hdd_debug("passthru cap bitmap 0x%llx nss %d",
+		  hdd_ctx->passthru_cap_bitmap, features->bits.nss);
 	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT)
 		features->bits.channel_hopping = 1;
 

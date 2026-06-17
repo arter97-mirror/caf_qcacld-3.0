@@ -29,6 +29,7 @@ struct hdd_wondertap_tx_rate_cfg {
 };
 
 #define WLAN_PASSTHRU_MAX_PEER 7
+#define WLAN_PASSTHRU_MAX_NSS  2
 
 /**
  * enum passthru_peer_status - passthru peer status
