@@ -134,6 +134,17 @@ wlan_twt_cfg_get_congestion_timeout(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *val);
 
 /**
+ * wlan_twt_cfg_get_voip_pkt_ul_delay() - get VOIP uplink packet offset (UPO)
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_voip_pkt_ul_delay(struct wlan_objmgr_psoc *psoc,
+				   uint32_t *val);
+
+/**
  * wlan_twt_cfg_set_congestion_timeout() - set congestion timeout
  * @psoc: Pointer to global psoc
  * @val: value to be set
@@ -432,6 +443,13 @@ wlan_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 static inline QDF_STATUS
 wlan_twt_cfg_get_congestion_timeout(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_get_voip_pkt_ul_delay(struct wlan_objmgr_psoc *psoc,
+				   uint32_t *val)
 {
 	return QDF_STATUS_SUCCESS;
 }

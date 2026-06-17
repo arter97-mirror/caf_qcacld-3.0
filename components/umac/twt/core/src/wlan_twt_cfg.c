@@ -55,6 +55,8 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->twt_responder_orig = cfg_get(psoc, CFG_TWT_RESPONDER);
 	twt_cfg->twt_congestion_timeout =
 				cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+	twt_cfg->voip_pkt_ul_delay_ms =
+				cfg_get(psoc, CFG_TWT_VOIP_PKT_UL_DELAY);
 	/* Initialize per-MAC congestion timeout with INI value */
 	for (i = 0; i < MAX_MAC; i++)
 		twt_psoc->twt_congestion_timeout[i] =
@@ -266,6 +268,23 @@ wlan_twt_cfg_get_congestion_timeout(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = twt_psoc_obj->cfg_params.twt_congestion_timeout;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_voip_pkt_ul_delay(struct wlan_objmgr_psoc *psoc,
+				   uint32_t *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = cfg_default(CFG_TWT_VOIP_PKT_UL_DELAY);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->cfg_params.voip_pkt_ul_delay_ms;
 
 	return QDF_STATUS_SUCCESS;
 }

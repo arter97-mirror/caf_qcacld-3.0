@@ -129,6 +129,36 @@
 		100, \
 		CFG_VALUE_OR_DEFAULT, \
 		"twt congestion timeout")
+
+/*
+ * <ini>
+ * voip_pkt_ul_delay_ms - Uplink packet offset (UPO) for VOIP traffic.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 2
+ *
+ * This ini configures the delay, in units of milliseconds, from when a VOIP
+ * RTP packet is queued until it is received by the WLAN target. The value is
+ * passed to the firmware as part of the TWT enable command and is used to
+ * align the TWT service period with VOIP uplink traffic (TxRef alignment).
+ *
+ * This parameter is applicable to STA interfaces only.
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_TWT_VOIP_PKT_UL_DELAY CFG_INI_UINT( \
+		"voip_pkt_ul_delay_ms", \
+		0, \
+		100, \
+		2, \
+		CFG_VALUE_OR_DEFAULT, \
+		"twt voip pkt ul delay ms")
 /*
  * <ini>
  * twt_bcast_req_resp_config - To enable broadcast twt requestor and responder.
@@ -347,6 +377,7 @@
 	CFG(CFG_TWT_REQUESTOR) \
 	CFG(CFG_TWT_RESPONDER) \
 	CFG(CFG_TWT_CONGESTION_TIMEOUT) \
+	CFG(CFG_TWT_VOIP_PKT_UL_DELAY) \
 	CFG(CFG_BCAST_TWT_REQ_RESP) \
 	CFG(CFG_ENABLE_TWT_24GHZ) \
 	CFG(CFG_DISABLE_TWT_ON_SCAN) \

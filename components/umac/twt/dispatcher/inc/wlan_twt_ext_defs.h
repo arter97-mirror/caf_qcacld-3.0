@@ -33,6 +33,8 @@
  * @twt_responder_orig: Original twt responder enable/disable
  * @twt_requestor: twt requestor enable/disable
  * @twt_congestion_timeout: congestion timeout value
+ * @voip_pkt_ul_delay_ms: UPO - delay (ms) from VOIP RTP packet queued until
+ * received by the WLAN target, sent in the TWT enable command (STA only)
  * @bcast_requestor_enabled: bcast requestor enable/disable
  * @bcast_responder_enabled: bcast responder enable/disable
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
@@ -51,6 +53,7 @@ struct twt_mc_cfg_params {
 	uint8_t twt_responder_orig;
 	bool twt_requestor;
 	uint32_t twt_congestion_timeout;
+	uint32_t voip_pkt_ul_delay_ms;
 	bool bcast_requestor_enabled;
 	bool bcast_responder_enabled;
 	bool enable_twt_24ghz;
