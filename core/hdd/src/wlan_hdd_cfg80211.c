@@ -5163,6 +5163,9 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 					fset_extn,
 					WIFI_FEATURE_MULTIPLE_MLD_ON_SAP);
 
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_SET_VOIP_MODE);
+
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						       NLMSG_HDRLEN);
 	if (!skb) {

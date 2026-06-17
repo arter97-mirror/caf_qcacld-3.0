@@ -328,6 +328,9 @@ typedef enum {
 /* Support for configuring roaming mode */
 #define WIFI_FEATURE_ROAMING_MODE_CONTROL 0x800000000
 
+/* Support for configuring VOIP */
+#define WIFI_FEATURE_SET_VOIP_MODE	 0x1000000000
+
 #define WIFI_FEATURE_CACHED_SCAN_RESULTS 0x2000000000
 /* Support MLO SoftAp */
 #define WIFI_FEATURE_MLO_SAP            0x4000000000
