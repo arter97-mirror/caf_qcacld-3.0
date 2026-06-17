@@ -934,20 +934,6 @@ netdev_tx_t hdd_hard_start_xmit_passthru(struct sk_buff *skb,
 
 	qdf_mem_zero(skb->cb, sizeof(skb->cb));
 
-	if (hdd_passthru_is_peer_create_allowed()) {
-		uint16_t rt_hdr_len;
-		uint8_t *dest_mac;
-
-		rt_hdr_len = qdf_nbuf_get_radiotap_len(skb);
-		qdf_nbuf_pull_head(skb, rt_hdr_len);
-
-		dest_mac = ieee80211_get_DA((struct ieee80211_hdr *)qdf_nbuf_data(skb));
-		if (!qdf_is_macaddr_group((struct qdf_mac_addr *)dest_mac))
-			hdd_passthru_check_n_create_peer((struct qdf_mac_addr *)dest_mac);
-
-		qdf_nbuf_push_head(skb, rt_hdr_len);
-	}
-
 	/*
 	 * vdev in link_info is directly dereferenced because this is per
 	 * packet path, hdd_get_vdev_by_user() usage will be very costly
