@@ -2910,6 +2910,25 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/**
+ * mlme_init_sta_high_band_roaming_cfg() - initialize STA high band roaming
+ * configuration
+ * @psoc: Pointer to PSOC
+ * @sta: pointer to STA CFG items
+ *
+ * Return: None
+ */
+static void mlme_init_sta_high_band_roaming_cfg(struct wlan_objmgr_psoc *psoc,
+						struct wlan_mlme_sta_cfg *sta)
+{
+	sta->enable_high_band_roaming =
+		cfg_get(psoc, CFG_ENABLE_HIGH_BAND_ROAMING);
+	sta->high_band_roaming_threshold_time_ms =
+		cfg_get(psoc, CFG_HIGH_BAND_ROAMING_THRESHOLD_TIME_MS);
+	sta->high_band_roaming_data_threshold =
+		cfg_get(psoc, CFG_HIGH_BAND_ROAMING_DATA_THRESHOLD);
+}
+
 static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_sta_cfg *sta)
 {
@@ -2953,6 +2972,7 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_MAX_LI_MODULATED_DTIM_MS);
 
 	mlme_init_sta_mlo_cfg(psoc, sta);
+	mlme_init_sta_high_band_roaming_cfg(psoc, sta);
 	wlan_mlme_set_epcs_capability(psoc,
 				      wlan_mlme_get_epcs_capability(psoc));
 	wlan_mlme_set_usr_disable_sta_eht(psoc, false);

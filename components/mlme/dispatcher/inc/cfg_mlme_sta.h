@@ -776,6 +776,84 @@
 #define CFG_MLO_EPCS_SUPPORT_ENABLE_CFG
 #endif
 
+/*
+ * <ini>
+ * gEnableHighBandRoaming - Enable/Disable high band roaming feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This INI is used to enable or disable the high band roaming feature.
+ *
+ * Related: gHighBandRoamingThresholdTime, gHighBandRoamingDataThreshold
+ *
+ * Supported Feature: STA Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_HIGH_BAND_ROAMING CFG_INI_BOOL( \
+	"gEnableHighBandRoaming", \
+	0, \
+	"Enable high band roaming")
+
+/*
+ * <ini>
+ * gHighBandRoamingThresholdTime - High band roaming threshold time in ms
+ * @Min: 0
+ * @Max: 0x7fffffff
+ * @Default: 10000
+ *
+ * This INI is used to set the high band roaming threshold time in ms.
+ * When the STA is roaming to a high band AP, this parameter controls
+ * the minimum time threshold before considering roaming to another band.
+ * This value so be in multiple of 1000, otherwise the decimals value will get
+ * truncated as we are converting it to seconds before sending it to f/w.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HIGH_BAND_ROAMING_THRESHOLD_TIME_MS CFG_INI_UINT( \
+	"gHighBandRoamingThresholdTime", \
+	0, \
+	0x7fffffff, \
+	10000, \
+	CFG_VALUE_OR_DEFAULT, \
+	"High band roaming threshold time in milliseconds")
+
+/*
+ * <ini>
+ * gHighBandRoamingDataThreshold - High band roaming data threshold in KBps
+ * @Min: 0
+ * @Max: 102400
+ * @Default: 1024
+ *
+ * This INI is used to set the high band roaming data threshold in KBps.
+ * When the STA is roaming to a high band AP, this parameter controls the data
+ * rate threshold for triggering roaming decisions based on traffic patterns.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HIGH_BAND_ROAMING_DATA_THRESHOLD CFG_INI_UINT( \
+	"gHighBandRoamingDataThreshold", \
+	0, \
+	102400, \
+	1024, \
+	CFG_VALUE_OR_DEFAULT, \
+	"High band roaming data threshold in KBps")
+
 #define CFG_STA_ALL \
 	CFG(CFG_INFRA_STA_KEEP_ALIVE_PERIOD) \
 	CFG(CFG_STA_BSS_MAX_IDLE_PERIOD) \
@@ -803,5 +881,8 @@
 	CFG_MLO_PREFER_PERCENTAGE_CFG \
 	CFG_MLO_SAME_LINK_MLD_ADDR_CFG \
 	CFG_MLO_MLO_5GL_5GH_MLSR_CFG \
-	CFG_MLO_EPCS_SUPPORT_ENABLE_CFG
+	CFG_MLO_EPCS_SUPPORT_ENABLE_CFG \
+	CFG(CFG_ENABLE_HIGH_BAND_ROAMING) \
+	CFG(CFG_HIGH_BAND_ROAMING_THRESHOLD_TIME_MS) \
+	CFG(CFG_HIGH_BAND_ROAMING_DATA_THRESHOLD)
 #endif /* CFG_MLME_STA_H__ */
