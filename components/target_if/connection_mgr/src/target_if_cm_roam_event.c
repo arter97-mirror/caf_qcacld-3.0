@@ -224,7 +224,8 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 		target_if_stop_rso_stop_timer(roam_event);
 
 	if (roam_event->reason == ROAM_REASON_INVALID) {
-		if (roam_event->notif == CM_ROAM_NOTIF_ROAM_START)
+		if (roam_event->notif == CM_ROAM_NOTIF_ROAM_START ||
+		    roam_event->notif == CM_ROAM_NOTIF_ROAM_SMD_START)
 			target_if_prevent_pm_during_roam(psoc);
 		else if (roam_event->notif == CM_ROAM_NOTIF_ROAM_ABORT)
 			target_if_allow_pm_after_roam(psoc);

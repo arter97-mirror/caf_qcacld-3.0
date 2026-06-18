@@ -87,17 +87,19 @@ smd_create_link_recfg_transition_list(
 				struct wlan_mlo_link_recfg_req *recfg_req);
 
 /**
- * smd_link_recfg_assign_self_link_addr() - Assign link addresses for target AP
+ * smd_link_recfg_assign_self_link_addr() - Assign self link addresses for ST Prep add links
  * @recfg_ctx: Link reconfiguration context
  * @recfg_req: Link reconfiguration request
- * @del_link_set: Bitmap of links to be deleted
- * @first_del_link_set_no_common: Pointer to first delete link set with no common link
+ * @del_link_set: Bitmap of links being deleted in this transition
+ * @first_del_link_set_no_common: Output bitmap; set to the first non-common
+ *                                deleted link so it is deleted before others
  *
- * Extracts link addresses from vdev_repurpose_req and assigns to target AP's
- * sta_ctx->links_info[] array in prepared_targets[0].
- *
- * Called by Link Recfg SM when handling
- * WLAN_LINK_RECFG_EV_SMD_ROAM_START event.
+ * Assigns self_link_addr and vdev_id to each entry in add_link_info by
+ * trying the following choices in order until all add links are covered:
+ *   1. Idle (disconnected) vdev with no AP association
+ *   2. FW-preferred vdev on a link being deleted (active vdev repurpose)
+ * For SMD roaming FW always repurposes vdev 0 / vdev 1, so add_link_info
+ * contains at most 2 links and choices 1 and 2 always cover them.
  *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise
  */
@@ -393,21 +395,28 @@ QDF_STATUS
 wlan_smd_roam_sync_status(QDF_STATUS status);
 
 /**
- * smd_roam_update_standby_links() - Update standby link table post roam.
+ * smd_roam_update_sta_ctx_links() - Update all sta_ctx links post roam.
  * @vdev: New assoc vdev
  *
- * Removes old AP standby link entries and registers new AP MLD standby links.
- * Updates wlan_connected_links bitmask. Called ALWAYS (even on abort) so stale
- * entries do not block subsequent link switches or T2LM operations.
+ * Resets sta_ctx->links_info[] and copies all entries directly from the
+ * active prepared target BSS context. Handles all link-count transitions
+ * (single→single, single→multi, multi→single, multi→multi) without any
+ * slot-matching logic: link_chan_info pointers are heap-allocated and owned
+ * by sta_ctx, so they are preserved across the reset and the channel content
+ * is copied in-place from the corresponding target slot.
+ *
+ * Called only on the SUCCESS path (from smd_exec_complete(), before
+ * smd_roam_cleanup_ies()) so that target_bss_ctx is still valid.
  */
-void smd_roam_update_standby_links(struct wlan_objmgr_vdev *vdev);
+void smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev);
 
 /**
- * smd_roam_update_deflink() - Update adapter->deflink to new assoc vdev.
+ * smd_roam_update_deflink() - Update adapter->deflink after SMD roam.
  * @vdev: New assoc vdev receiving EV_SMD_EXEC_COMPLETE
  *
- * Fixes the known cross-vdev roaming deflink bug. Called ALWAYS (even on
- * abort) because the new AP connection is active even if cleanup failed.
+ * Invokes mlo_roam_osif_update_deflink for cross-vdev SMD roams (e.g.
+ * SL→SL where the assoc vdev changes). No-op for non-cross-vdev roams
+ * (ML→ML) where deflink is already correct.
  */
 void smd_roam_update_deflink(struct wlan_objmgr_vdev *vdev);
 
@@ -421,6 +430,16 @@ void smd_roam_update_deflink(struct wlan_objmgr_vdev *vdev);
 void smd_abort_roam_sync(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * smd_remove_roam_cmd() - Remove the original roam command from serialization.
+ * @cm_ctx: Connection manager context
+ *
+ * Looks up the first pending roam command for the vdev associated with
+ * @cm_ctx and removes it from the serialization queue. Safe to call when
+ * no roam command is present.
+ */
+void smd_remove_roam_cmd(struct cnx_mgr *cm_ctx);
+
+/**
  * smd_abort_link_recfg() - Clean up SMD state when Link Recfg SM aborts.
  * @recfg_ctx: Link reconfiguration context
  *
@@ -431,6 +450,18 @@ void smd_abort_roam_sync(struct wlan_objmgr_vdev *vdev);
  * if the FW roam sync event still arrives after abort.
  */
 void smd_abort_link_recfg(struct mlo_link_recfg_context *recfg_ctx);
+
+/**
+ * smd_roam_link_switch_start_connect() - Trigger link switch connect during SMD roaming
+ * @vdev: vdev on which the HOST_ADD_LINK link switch was requested
+ *
+ * Called when a link switch with reason MLO_LINK_SWITCH_REASON_HOST_ADD_LINK
+ * arrives and smd_is_roaming_in_progress() is true.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+smd_roam_link_switch_start_connect(struct wlan_objmgr_vdev *vdev);
 
 /**
  * smd_trigger_link_recfg_sm() - Trigger Link Recfg SM after CM lock release
@@ -593,6 +624,21 @@ smd_link_recfg_parse_perptk_ies(
 	struct wlan_mlo_link_recfg_rsp *link_recfg_rsp,
 	uint8_t *opt, uint32_t remaining);
 
+/**
+ * smd_link_recfg_ctx_cleanup() - Free SMD-specific fields of the link recfg ctx
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * Resets vdev_repurpose_req[]/num_vdev_repurpose_req, smd_transition_ie,
+ * tgt_ap_link_bitmap, smd_roam_in_progress, current_link_index, and
+ * st_exec_in_progress, and frees cached_sync_ind. Also invokes
+ * mlo_link_recfg_ctx_free_ies() to free the generic IE buffers owned by
+ * @recfg_ctx.
+ *
+ * Return: void
+ */
+void
+smd_link_recfg_ctx_cleanup(struct mlo_link_recfg_context *recfg_ctx);
+
 #else
 static inline void
 smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
@@ -604,6 +650,7 @@ smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }
+
 static inline QDF_STATUS
 smd_roam_link_recfg_set_tx_link_addr(
 			struct mlo_link_recfg_context *recfg_ctx,
@@ -615,7 +662,7 @@ smd_roam_link_recfg_set_tx_link_addr(
 }
 
 static inline void
-smd_roam_update_standby_links(struct wlan_objmgr_vdev *vdev)
+smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev)
 {
 }
 
@@ -631,6 +678,16 @@ smd_abort_roam_sync(struct wlan_objmgr_vdev *vdev)
 
 static inline void
 smd_abort_link_recfg(struct mlo_link_recfg_context *recfg_ctx)
+{
+}
+
+static inline void
+smd_remove_roam_cmd(struct cnx_mgr *cm_ctx)
+{
+}
+
+static inline void
+smd_link_recfg_ctx_cleanup(struct mlo_link_recfg_context *recfg_ctx)
 {
 }
 
@@ -789,9 +846,14 @@ QDF_STATUS smd_start_link_recfg(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline QDF_STATUS
-smd_create_link_recfg_transition_list(
-				struct mlo_link_recfg_context *recfg_ctx,
-				struct wlan_mlo_link_recfg_req *recfg_req)
+smd_roam_link_switch_start_connect(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
+				      struct wlan_mlo_link_recfg_req *recfg_req)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
