@@ -764,6 +764,11 @@ config IPA_WDS_EASYMESH
 	depends on FEATURE_WDS
 	default n
 
+config WLAN_WOW_IPA_SUSPEND_RESUME
+	bool "Enable WoW suspend/resume IPA pipe control"
+	depends on IPA_OFFLOAD
+	default n
+
 config IPA_DISABLE_OVERRIDE
 	bool "Enable IPA_DISABLE_OVERRIDE"
 	default n
