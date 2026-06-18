@@ -557,7 +557,17 @@ void lim_extract_eht_op(struct mac_context *mac,
 		session->ch_width = session->ap_ch_width;
 	}
 
-	/* Step 4: Set CCFS0/1 as per final BW */
+	/* Step 5: Cap ch_width per band — EHT 320 MHz is 6 GHz only (802.11be) */
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq) &&
+	    session->ch_width == CH_WIDTH_320MHZ) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT ": capping ch_width"
+			 " 320->160 for non-6G freq %d",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->curr_op_freq);
+		session->ch_width = CH_WIDTH_160MHZ;
+	}
+
+	/* Step 6: Set CCFS0/1 as per final BW */
 	session->ch_center_freq_seg0 = session->eht_op.ccfs0;
 	if (session->ch_width > CH_WIDTH_80MHZ)
 		session->ch_center_freq_seg1 = session->eht_op.ccfs1;
