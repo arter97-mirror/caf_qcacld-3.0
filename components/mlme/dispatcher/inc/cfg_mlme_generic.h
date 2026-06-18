@@ -1356,6 +1356,76 @@ enum wlan_epcs_frame {
 CFG_INI_UINT("gEdcaTxopLimit", 0, 16, 0, \
 	     CFG_VALUE_OR_DEFAULT, "TXOP limit in milliseconds")
 
+/*
+ * <ini>
+ * sap_perf_tuning_enable - Send SAP performance tuning params to
+ * firmware on vdev up.
+ * @Min: false
+ * @Max: true
+ * @Default: false
+
+ * This ini is used to monitor SAP performance tuning feature.
+ * 0 - Disable SAP tuning performance feature.
+ * 1 - Enable SAP tuning performance feature.
+ *
+ * When Vdev is up, this ini will be sent to firmware based on service
+ * capability. This ini is used to check for whether SAP tuning
+ * feature is enabled or not.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_PERF_TUNING_ENABLE \
+CFG_INI_BOOL("sap_perf_tuning_enable", false, \
+	     "Send SAP noise monitoring parameters on vdev up")
+
+/*
+ * <ini>
+ * sap_perf_data_threshold - data_threshold in Kbps corresponds to the total
+ * TX/RX bytes.
+ * Options.
+ * @Min: 0
+ * @Max: 102400
+ * @Default: 1024
+ *
+ * This ini is used to set the total data_threshold in Kbps corresponds to
+ * the total TX/RX bytes.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_SAP_PERF_DATA_THRESHOLD \
+CFG_INI_UINT("sap_perf_data_threshold", 0, 102400, 1024, \
+	     CFG_VALUE_OR_DEFAULT, "Set TX/RX bytes threshold value")
+/*
+ * <ini>
+ * sap_traffic_monitoring_time_s - Duration of traffic monitoring in unit of
+ * seconds.
+ * Options.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 1
+ *
+ * This ini is used to set the duration of traffic monitoring in unit of sec.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_SAP_TRAFFIC_MONITORING_TIME_S \
+CFG_INI_UINT("sap_traffic_monitoring_time_s", 0, 100, 1, \
+	     CFG_VALUE_OR_DEFAULT, "Set duration for traffic monitoring")
+
 #define CFG_GENERIC_ALL \
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
 	CFG(CFG_PMF_SA_QUERY_MAX_RETRIES) \
@@ -1403,5 +1473,8 @@ CFG_INI_UINT("gEdcaTxopLimit", 0, 16, 0, \
 	CFG_LINK_RECFG_SUPPORTED \
 	CFG_RELAXED_LPI_CONN_POLICY \
 	CFG(CFG_REDUCE_PWR_SCAN_MODE) \
-	CFG(CFG_EDCA_TXOP_LIMIT)
+	CFG(CFG_EDCA_TXOP_LIMIT) \
+	CFG(CFG_SAP_PERF_TUNING_ENABLE) \
+	CFG(CFG_SAP_PERF_DATA_THRESHOLD) \
+	CFG(CFG_SAP_TRAFFIC_MONITORING_TIME_S)
 #endif /* __CFG_MLME_GENERIC_H */

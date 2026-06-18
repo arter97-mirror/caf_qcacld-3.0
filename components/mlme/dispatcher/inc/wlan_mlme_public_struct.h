@@ -1540,6 +1540,11 @@ struct wlan_mlme_aux_dev_caps {
  * @bt_profile_con: Bluetooth connection profile
  * @relaxed_lpi_conn_policy: Relaxed LPI connection policy flag
  * @edca_txop_limit: EDCA TXOP limit in milliseconds.
+ * @sap_perf_tuning_enable: Enable/Disable SAP performance tuning.
+ * @sap_perf_data_threshold: data_threshold in Kbps corresponds to the total
+ * TX/RX bytes.
+ * @sap_traffic_monitoring_time_s: Duration of traffic monitoring
+ * in unit of sec
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1615,6 +1620,11 @@ struct wlan_mlme_generic {
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
 	uint32_t edca_txop_limit;
+#if defined(SAP_PERF_TUNING)
+	bool sap_perf_tuning_enable;
+	uint32_t sap_perf_data_threshold;
+	uint32_t sap_traffic_monitoring_time_s;
+#endif
 };
 
 /**

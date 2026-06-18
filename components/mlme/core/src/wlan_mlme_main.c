@@ -1386,6 +1386,31 @@ static void mlme_init_sr_ini_cfg(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
+#if defined(SAP_PERF_TUNING)
+/**
+ * mlme_init_sap_perf_tuning_cfg() - initialize sap performance tuning
+ * configuration
+ * @psoc: Pointer to PSOC
+ * @gen: pointer to generic CFG items
+ *
+ * Return: None
+ */
+static void mlme_init_sap_perf_tuning_cfg(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_mlme_generic *gen)
+{
+	gen->sap_perf_tuning_enable =
+		cfg_get(psoc, CFG_SAP_PERF_TUNING_ENABLE);
+	gen->sap_perf_data_threshold =
+		cfg_get(psoc, CFG_SAP_PERF_DATA_THRESHOLD);
+	gen->sap_traffic_monitoring_time_s =
+		cfg_get(psoc, CFG_SAP_TRAFFIC_MONITORING_TIME_S);
+}
+#else
+static inline void mlme_init_sap_perf_tuning_cfg(struct wlan_objmgr_psoc *psoc,
+						 struct wlan_mlme_generic *gen)
+{}
+#endif
+
 static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 				  struct wlan_mlme_generic *gen)
 {
@@ -1461,6 +1486,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_standard_6ghz_conn_policy(psoc, gen);
 	mlme_init_relaxed_lpi_conn_policy(psoc, gen);
 	mlme_init_link_recfg_support(psoc, gen);
+	mlme_init_sap_perf_tuning_cfg(psoc, gen);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_objmgr_psoc *psoc,
