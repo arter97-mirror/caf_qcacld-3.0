@@ -759,6 +759,13 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 			(pmkid_modes & CFG_PMKID_MODES_OKC) ? 1 : 0;
 	rso_config->rso_11i_info.fw_pmksa_cache =
 			(pmkid_modes & CFG_PMKID_MODES_PMKSA_CACHING) ? 1 : 0;
+	rso_config->rso_11i_info.user_okc_cache_support =
+			wlan_vdev_get_okc_pmkid_in_assoc(vdev);
+	mlme_debug("vdev:%d fw_okc:%d fw_pmksa_cache:%d user_okc_cache_support:%d",
+		   vdev_id,
+		   rso_config->rso_11i_info.fw_okc,
+		   rso_config->rso_11i_info.fw_pmksa_cache,
+		   rso_config->rso_11i_info.user_okc_cache_support);
 
 	/* Check whether to send psk_pmk or sae_single pmk info */
 	if (!cm_fill_rso_sae_single_pmk_info(vdev, mlme_obj, rso_config)) {
