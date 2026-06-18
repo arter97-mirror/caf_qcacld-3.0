@@ -9823,7 +9823,6 @@ QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *p
 	return QDF_STATUS_SUCCESS;
 }
 
-#if defined(SAP_PERF_TUNING)
 bool
 wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc)
 {
@@ -9897,16 +9896,3 @@ wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc)
 	return wma_get_sap_perf_tuning_enabled(
 		get_wmi_unified_hdl_from_psoc(psoc));
 }
-#else
-inline bool
-wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-inline bool
-wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-#endif

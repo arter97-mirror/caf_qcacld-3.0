@@ -1620,11 +1620,9 @@ struct wlan_mlme_generic {
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
 	uint32_t edca_txop_limit;
-#if defined(SAP_PERF_TUNING)
 	bool sap_perf_tuning_enable;
 	uint32_t sap_perf_data_threshold;
 	uint32_t sap_traffic_monitoring_time_s;
-#endif
 };
 
 /**

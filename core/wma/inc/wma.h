@@ -2836,7 +2836,6 @@ QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
 }
 #endif
 
-#ifdef SAP_PERF_TUNING
 /**
  * wma_get_sap_perf_tuning_enabled() - Get sap perf tuning service capability.
  * @wmi_handle: wmi handler
@@ -2847,12 +2846,5 @@ QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
  */
 bool
 wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle);
-#else
-static inline bool
-wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
-{
-	return false;
-}
-#endif
 
 #endif

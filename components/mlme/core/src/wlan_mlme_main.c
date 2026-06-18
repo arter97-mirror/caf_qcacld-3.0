@@ -1386,7 +1386,6 @@ static void mlme_init_sr_ini_cfg(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
-#if defined(SAP_PERF_TUNING)
 /**
  * mlme_init_sap_perf_tuning_cfg() - initialize sap performance tuning
  * configuration
@@ -1405,11 +1404,6 @@ static void mlme_init_sap_perf_tuning_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->sap_traffic_monitoring_time_s =
 		cfg_get(psoc, CFG_SAP_TRAFFIC_MONITORING_TIME_S);
 }
-#else
-static inline void mlme_init_sap_perf_tuning_cfg(struct wlan_objmgr_psoc *psoc,
-						 struct wlan_mlme_generic *gen)
-{}
-#endif
 
 static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 				  struct wlan_mlme_generic *gen)

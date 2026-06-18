@@ -5893,7 +5893,7 @@ bool wlan_mlme_get_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
 						      bool value);
-#if defined(SAP_PERF_TUNING)
+
 /**
  * wlan_mlme_get_sap_perf_tuning_enabled() - query current
  * SAP perf tuning support.
@@ -5944,13 +5944,6 @@ wlan_mlme_get_sap_perf_data_threshold(struct wlan_objmgr_psoc *psoc);
  */
 uint32_t
 wlan_mlme_get_sap_traffic_monitoring_time_s(struct wlan_objmgr_psoc *psoc);
-#else
-inline bool
-wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
-
-inline bool
-wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
-#endif
 
 /**
  * wlan_mlme_get_high_band_roaming_threshold_time_ms() - Get high band roaming
