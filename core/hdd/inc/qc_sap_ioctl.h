@@ -116,6 +116,11 @@
 #define HT_RC_2_STREAMS_11BE(_rc)       (((_rc) >> 5) & 0x7)
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+#define RC_2_RATE_IDX_11BN(_rc)         ((_rc) & 0x1f)
+#define HT_RC_2_STREAMS_11BN(_rc)       (((_rc) >> 5) & 0x7)
+#endif
+
 /*
  * <ioctl>
  * setRadar - simulate a radar event

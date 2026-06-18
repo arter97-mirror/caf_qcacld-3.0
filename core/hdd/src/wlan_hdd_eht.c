@@ -434,7 +434,7 @@ int hdd_set_11be_rate_code(struct hdd_adapter *adapter, uint16_t rate_code)
 
 	rix = RC_2_RATE_IDX_11BE(rate_code);
 	preamble = rate_code >> 8;
-	nss = HT_RC_2_STREAMS_11BE(rate_code) + 1;
+	nss = HT_RC_2_STREAMS_11BE(rate_code);
 
 	hdd_debug("SET_11BE_RATE rate_code %d rix %d preamble %x nss %d",
 		  rate_code, rix, preamble, nss);

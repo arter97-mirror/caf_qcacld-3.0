@@ -149,6 +149,48 @@ band_6ghz:
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+int hdd_set_11bn_rate_code(struct hdd_adapter *adapter, uint16_t rate_code)
+{
+	uint8_t preamble = 0, nss = 0, rix = 0;
+	int ret;
+	struct sap_config *sap_config = NULL;
+
+	if (adapter->device_mode == QDF_SAP_MODE)
+		sap_config = &adapter->deflink->session.ap.sap_config;
+
+	if (!sap_config) {
+		if (!sme_is_feature_supported_by_fw(DOT11BN)) {
+			hdd_err_rl("Target does not support 11bn");
+			return -EIO;
+		}
+	} else if (sap_config->SapHw_mode != eCSR_DOT11_MODE_11bn &&
+		   sap_config->SapHw_mode != eCSR_DOT11_MODE_11bn_ONLY) {
+		hdd_err_rl("Invalid hw mode, SAP hw_mode= 0x%x, ch_freq = %d",
+			   sap_config->SapHw_mode, sap_config->chan_freq);
+		return -EIO;
+	}
+
+	if ((rate_code >> 8) != WMI_RATE_PREAMBLE_UHR) {
+		hdd_err_rl("Invalid input: %x", rate_code);
+		return -EIO;
+	}
+
+	rix = RC_2_RATE_IDX_11BN(rate_code);
+	preamble = rate_code >> 8;
+	nss = HT_RC_2_STREAMS_11BN(rate_code);
+
+	hdd_debug("SET_11BN_RATE rate_code %d rix %d preamble %x nss %d",
+		  rate_code, rix, preamble, nss);
+
+	ret = wma_cli_set_command(adapter->deflink->vdev_id,
+				  wmi_vdev_param_fixed_rate,
+				  rate_code, VDEV_CMD);
+
+	return ret;
+}
+#endif
+
 #if defined(WLAN_FEATURE_11BN_TEST_SAP)
 void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
 				 struct sap_config *config)

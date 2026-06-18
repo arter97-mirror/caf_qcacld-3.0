@@ -66,6 +66,17 @@ static inline void hdd_update_wiphy_uhr_cap(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * hdd_set_11bn_rate_code() - set 11bn rate code
+ * @adapter: net device adapter
+ * @rate_code: new 11bn rate code
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_11bn_rate_code(struct hdd_adapter *adapter, uint16_t rate_code);
+#endif
+
 #if defined(WLAN_FEATURE_11BN_TEST_SAP)
 /**
  * wlan_hdd_check_11bn_support() - Check if 11bn supported

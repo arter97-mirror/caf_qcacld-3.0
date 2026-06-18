@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,12 +24,13 @@
 
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_eht.h"
+#include "wlan_hdd_uhr.h"
 #include "wlan_hdd_sysfs.h"
 #include "wlan_hdd_sysfs_eht_rate.h"
 #include "osif_sync.h"
 
 static ssize_t
-__hdd_sysfs_set_11be_fixed_rate(struct net_device *net_dev, char const *buf,
+__hdd_sysfs_set_wifi_fixed_rate(struct net_device *net_dev, char const *buf,
 				size_t count)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(net_dev);
@@ -38,6 +39,7 @@ __hdd_sysfs_set_11be_fixed_rate(struct net_device *net_dev, char const *buf,
 	int ret;
 	uint16_t rate_code;
 	char *sptr, *token;
+	uint8_t preamble;
 
 	if (hdd_validate_adapter(adapter)) {
 		hdd_err_rl("invalid adapter");
@@ -70,12 +72,28 @@ __hdd_sysfs_set_11be_fixed_rate(struct net_device *net_dev, char const *buf,
 		return -EINVAL;
 	}
 
-	hdd_set_11be_rate_code(adapter, rate_code);
-
-	return count;
+	preamble = rate_code >> 8;
+#ifdef WLAN_FEATURE_11BN
+	if (preamble == WMI_RATE_PREAMBLE_UHR) {
+		ret = hdd_set_11bn_rate_code(adapter, rate_code);
+		if (ret)
+			return ret;
+		return count;
+	}
+#endif
+#ifdef WLAN_FEATURE_11BE
+	if (preamble == WMI_RATE_PREAMBLE_EHT) {
+		ret = hdd_set_11be_rate_code(adapter, rate_code);
+		if (ret)
+			return ret;
+		return count;
+	}
+#endif
+	hdd_err_rl("unsupported preamble: %d", preamble);
+	return -EINVAL;
 }
 
-static ssize_t hdd_sysfs_set_11be_fixed_rate(
+static ssize_t hdd_sysfs_set_wifi_fixed_rate(
 			     struct device *dev, struct device_attribute *attr,
 			     char const *buf, size_t count)
 {
@@ -87,14 +105,14 @@ static ssize_t hdd_sysfs_set_11be_fixed_rate(
 	if (err_size)
 		return err_size;
 
-	err_size = __hdd_sysfs_set_11be_fixed_rate(net_dev, buf, count);
+	err_size = __hdd_sysfs_set_wifi_fixed_rate(net_dev, buf, count);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return err_size;
 }
 
-static DEVICE_ATTR(11be_rate, 0220, NULL, hdd_sysfs_set_11be_fixed_rate);
+static DEVICE_ATTR(11be_rate, 0220, NULL, hdd_sysfs_set_wifi_fixed_rate);
 
 void hdd_sysfs_11be_rate_create(struct hdd_adapter *adapter)
 {
