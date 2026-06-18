@@ -6499,4 +6499,16 @@ static inline void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 {
 }
 #endif
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * struct smd_external_auth_params - SMD-specific external auth parameters
+ * @smd_enabled: Flag indicating SMD connection
+ * @smd_identifier: SMD identifier (6 bytes, MAC address format)
+ */
+struct smd_external_auth_params {
+	bool smd_enabled;
+	uint8_t smd_identifier[QDF_MAC_ADDR_SIZE];
+};
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

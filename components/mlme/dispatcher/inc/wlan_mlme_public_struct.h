@@ -3594,6 +3594,8 @@ enum sap_invalid_chan_reason_code {
  * @rsn_capab: RSN capabilities
  * @rsnxe_len: Length of RSN Extension Element (RSNXE)
  * @rsnxe_data: RSN Extension Element (RSNXE) data
+ * @smd_enabled: Indicates SMD capable external auth
+ * @smd_identifier: SMD mac addr of AP
  *
  * This structure encapsulates the parameters used for the
  * external authentication vendor command/event.
@@ -3618,5 +3620,9 @@ struct wlan_external_auth_params {
 	uint16_t rsn_capab;
 	uint8_t rsnxe_len;
 	uint8_t rsnxe_data[WLAN_MAX_IE_LEN + 2];
+#ifdef WLAN_FEATURE_11BN_SMD
+	bool smd_enabled;
+	struct qdf_mac_addr smd_identifier;
+#endif
 };
 #endif

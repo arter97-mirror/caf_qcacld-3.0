@@ -94,6 +94,8 @@
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_hdd_apf.h"
+#include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_nl_to_crypto_params.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -349,6 +351,136 @@ wlan_hdd_sae_update_mld_addr(struct cfg80211_external_auth_params *params,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wlan_hdd_populate_smd_auth_params() - Populate SMD external auth parameters
+ * @smd_params: SMD parameters structure to populate
+ * @link_info: HDD link info
+ *
+ * Return: QDF_STATUS_SUCCESS if SMD parameters populated successfully
+ */
+static QDF_STATUS wlan_hdd_populate_smd_auth_params(
+				struct smd_external_auth_params *smd_params,
+				struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+
+	if (!smd_params || !link_info)
+		return QDF_STATUS_E_INVAL;
+
+	vdev = link_info->vdev;
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	if (!wlan_vdev_is_smd_enabled(vdev)) {
+		hdd_debug("SMD not enabled for vdev %d",
+			  wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		hdd_err("MLO dev context not found for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_NOENT;
+	}
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (!smd_ctx) {
+		hdd_err("SMD context not found for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_NOENT;
+	}
+
+	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+	if (qdf_is_macaddr_zero(&smd_ctx->smd_identifier)) {
+		qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+		hdd_err("SMD identifier not valid for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_NOENT;
+	}
+
+	qdf_mem_copy(smd_params->smd_identifier,
+		     smd_ctx->smd_identifier.bytes,
+		     QDF_MAC_ADDR_SIZE);
+	smd_params->smd_enabled = true;
+
+	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+	hdd_debug("SMD auth params populated: SMD ID " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(smd_params->smd_identifier));
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
+static uint32_t wlan_hdd_get_keymgmt_for_sae_akm(uint32_t akm);
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wlan_hdd_sae_callback_smd() - Handle SMD path for SAE external auth
+ * @link_info: HDD link info
+ * @params: cfg80211 external auth params (bssid/ssid already filled)
+ * @sae_info: SAE info from roam_info
+ *
+ * Checks whether the vdev is SMD-capable and, if so, sends the external
+ * authentication event via the vendor path with the SMD identifier.
+ *
+ * Return: true if the SMD vendor event was sent (caller should return),
+ *         false if SMD is not active and the standard path should proceed.
+ */
+static bool
+wlan_hdd_sae_callback_smd(struct wlan_hdd_link_info *link_info,
+			   struct cfg80211_external_auth_params *params,
+			   struct external_auth_info *sae_info)
+{
+	struct smd_external_auth_params smd_params = {0};
+	struct wlan_external_auth_params ext_params = {0};
+	QDF_STATUS status;
+
+	status = wlan_hdd_populate_smd_auth_params(&smd_params, link_info);
+	if (QDF_IS_STATUS_ERROR(status) || !smd_params.smd_enabled)
+		return false;
+
+	ext_params.vdev_id = link_info->vdev_id;
+	qdf_mem_copy(ext_params.ssid.ssid, params->ssid.ssid,
+		     params->ssid.ssid_len);
+	ext_params.ssid.length = params->ssid.ssid_len;
+	qdf_mem_copy(ext_params.bssid.bytes, params->bssid, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(ext_params.mld_addr.bytes, params->mld_addr,
+		     QDF_MAC_ADDR_SIZE);
+	/*
+	 * sae_info->akm is a raw IEEE 802.11 AKM suite number from the WMI
+	 * preauth event (e.g. WLAN_AKM_SAE=8). wlan_send_external_auth_start_event
+	 * calls wlan_crypto_get_secure_akm_available() which expects a
+	 * WLAN_CRYPTO_KEY_MGMT_* bitmask. Convert via the OUI as an intermediary.
+	 */
+	QDF_SET_PARAM(ext_params.akm,
+		      osif_nl_to_crypto_akm_type(
+			      wlan_hdd_get_keymgmt_for_sae_akm(sae_info->akm)));
+	ext_params.auth_algo = eSIR_AUTH_TYPE_SAE;
+	ext_params.smd_enabled = true;
+	qdf_mem_copy(ext_params.smd_identifier.bytes, smd_params.smd_identifier,
+		     QDF_MAC_ADDR_SIZE);
+
+	status = wlan_hdd_external_auth_callback(link_info, &ext_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("SMD external auth vendor event failed");
+
+	hdd_debug("SAE: sent cmd(SMD)");
+	return true;
+}
+#else
+static inline bool
+wlan_hdd_sae_callback_smd(struct wlan_hdd_link_info *link_info,
+			   struct cfg80211_external_auth_params *params,
+			   struct external_auth_info *sae_info)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 /**
  * wlan_hdd_get_keymgmt_for_sae_akm() - Get the keymgmt OUI
  * corresponding to the SAE AKM type
@@ -420,6 +552,11 @@ static void wlan_hdd_sae_callback(struct wlan_hdd_link_info *link_info,
 	qdf_mem_copy(params.ssid.ssid, sae_info->ssid.ssId,
 		     sae_info->ssid.length);
 	params.ssid.ssid_len = sae_info->ssid.length;
+
+	if (wlan_hdd_sae_callback_smd(link_info, &params, sae_info))
+		return;
+
+	hdd_debug("Standard external auth for non-SMD connection");
 	cfg80211_external_auth_request(adapter->dev, &params, flags);
 	hdd_debug("SAE: sent cmd");
 }

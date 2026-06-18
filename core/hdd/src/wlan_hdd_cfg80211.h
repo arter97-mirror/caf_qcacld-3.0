@@ -712,8 +712,9 @@ int wlan_hdd_change_hw_mode_for_given_chnl(struct hdd_adapter *adapter,
 					   uint32_t chan_freq,
 					   enum policy_mgr_conn_update_reason reason);
 
-#if defined(WLAN_FEATURE_11BI_SECURITY) && \
-	defined(CFG80211_80211BI_AUTH_SUPPORT)
+#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
+	defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
+	defined(WLAN_FEATURE_11BN_SMD)
 /**
  * wlan_hdd_external_auth_callback() - Callback to initiate external
  * authentication
@@ -732,7 +733,7 @@ wlan_hdd_external_auth_callback(struct wlan_hdd_link_info *link_info,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif /* WLAN_FEATURE_11BI_SECURITY */
+#endif /* WLAN_FEATURE_11BI_SECURITY || WLAN_FEATURE_11BN_SMD */
 
 /**
  * enum hdd_rate_info_bw: an HDD internal rate bandwidth representation

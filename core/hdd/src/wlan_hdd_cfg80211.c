@@ -2286,14 +2286,40 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_IDLE_SHUTDOWN,
 	},
 	FEATURE_TX_POWER_BOOST_EVENTS
+#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
+		defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
+		defined(WLAN_FEATURE_11BN_SMD)
+#define WLAN_EXTERNAL_AUTH_INDEX QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX
+#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT                  \
+[QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX] = {            \
+	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
+	.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,     \
+},
+#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND                         \
+{                                                                       \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,         \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
+		WIPHY_VENDOR_CMD_NEED_NETDEV |                          \
+		WIPHY_VENDOR_CMD_NEED_RUNNING,                          \
+	.doit = wlan_hdd_cfg80211_external_auth_cmd,                    \
+	vendor_command_policy(wlan_external_auth_policy,                \
+			      QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX)   \
+},
+#else
+#define WLAN_EXTERNAL_AUTH_INDEX 0
+#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT
+#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND
+#endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	[QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE,
 	},
 #endif
-#if defined(WLAN_FEATURE_11BI_SECURITY) && \
-		defined(CFG80211_80211BI_AUTH_SUPPORT)
+#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
+		defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
+		defined(WLAN_FEATURE_11BN_SMD)
 	FEATURE_EXTERNAL_AUTHENTICATION_EVENT
 #endif
 	FEATURE_TDLS_VENDOR_EVENTS
@@ -26811,15 +26837,212 @@ static int wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
 	return errno;
 }
 
-#if defined(WLAN_FEATURE_11BI_SECURITY) && \
-	defined(CFG80211_80211BI_AUTH_SUPPORT)
-#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT                  \
-[QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX] = {            \
-	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
-	.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,     \
-},
+#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
+	defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
+	defined(WLAN_FEATURE_11BN_SMD)
+#ifdef WLAN_FEATURE_11BN_SMD
+static inline uint16_t
+wlan_external_auth_smd_buf_len(const struct wlan_external_auth_params *params)
+{
+	if (params->smd_enabled)
+		return nla_total_size(QDF_MAC_ADDR_SIZE);
+	return 0;
+}
 
-#define WLAN_EXTERNAL_AUTH_INDEX QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX
+static inline int
+wlan_external_auth_put_smd_attr(struct sk_buff *skb,
+				const struct wlan_external_auth_params *params,
+				uint8_t vdev_id)
+{
+	if (params->smd_enabled &&
+	    nla_put(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_SMD_ID,
+		    QDF_MAC_ADDR_SIZE, params->smd_identifier.bytes)) {
+		hdd_err("vdev:%d Failed to fill SMD ID", vdev_id);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static inline void
+wlan_external_auth_populate_smd_params(struct wlan_external_auth_params *params,
+				       struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+
+	if (!wlan_vdev_is_smd_enabled(link_info->vdev))
+		return;
+
+	mlo_dev_ctx = link_info->vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->smd_ctx)
+		return;
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+	if (!qdf_is_macaddr_zero(&smd_ctx->smd_identifier)) {
+		params->smd_enabled = true;
+		qdf_copy_macaddr(&params->smd_identifier, &smd_ctx->smd_identifier);
+		hdd_debug("SMD auth: SMD ID " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(params->smd_identifier.bytes));
+	}
+	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+}
+
+static inline int
+wlan_parse_external_auth_smd_attr(struct nlattr *attrs[],
+				  struct wlan_external_auth_params *ext_auth_info)
+{
+	uint16_t attribute = QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_SMD_ID;
+
+	if (!attrs[attribute])
+		return 0;
+
+	if (nla_len(attrs[attribute]) != QDF_MAC_ADDR_SIZE) {
+		hdd_err("Invalid SMD ID length %u (expected %u)",
+			nla_len(attrs[attribute]), QDF_MAC_ADDR_SIZE);
+		return -EINVAL;
+	}
+
+	qdf_mem_copy(ext_auth_info->smd_identifier.bytes,
+		     nla_data(attrs[attribute]), QDF_MAC_ADDR_SIZE);
+	ext_auth_info->smd_enabled = true;
+	hdd_debug("vdev:%d SMD ID received: " QDF_MAC_ADDR_FMT,
+		  ext_auth_info->vdev_id,
+		  QDF_MAC_ADDR_REF(ext_auth_info->smd_identifier.bytes));
+	return 0;
+}
+
+static inline int
+wlan_validate_smd_auth_response(struct hdd_adapter *adapter,
+				const struct wlan_external_auth_params *ext_auth_info)
+{
+	struct wlan_objmgr_vdev *vdev = adapter->deflink->vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+
+	if (!ext_auth_info->smd_enabled)
+		return 0;
+
+	if (!vdev) {
+		hdd_err("vdev is NULL for SMD auth response");
+		return -EINVAL;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->smd_ctx)
+		goto done;
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+	if (!qdf_is_macaddr_zero(&smd_ctx->smd_identifier) &&
+	    qdf_mem_cmp(smd_ctx->smd_identifier.bytes,
+			ext_auth_info->smd_identifier.bytes,
+			QDF_MAC_ADDR_SIZE) != 0) {
+		qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+		hdd_err("SMD ID mismatch in external auth response");
+		return -EINVAL;
+	}
+	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+
+done:
+	hdd_debug("vdev:%d SMD external auth response validated",
+		  adapter->deflink->vdev_id);
+	return 0;
+}
+#else
+static inline uint16_t
+wlan_external_auth_smd_buf_len(const struct wlan_external_auth_params *params)
+{
+	return 0;
+}
+
+static inline int
+wlan_external_auth_put_smd_attr(struct sk_buff *skb,
+				const struct wlan_external_auth_params *params,
+				uint8_t vdev_id)
+{
+	return 0;
+}
+
+static inline void
+wlan_external_auth_populate_smd_params(struct wlan_external_auth_params *params,
+				       struct wlan_hdd_link_info *link_info)
+{
+}
+
+static inline int
+wlan_parse_external_auth_smd_attr(struct nlattr *attrs[],
+				  struct wlan_external_auth_params *ext_auth_info)
+{
+	return 0;
+}
+
+static inline int
+wlan_validate_smd_auth_response(struct hdd_adapter *adapter,
+				const struct wlan_external_auth_params *ext_auth_info)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
+static uint32_t
+wlan_crypto_get_cipher_from_bitmap(uint32_t cipher_bitmap)
+{
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_GCM_256))
+		return WLAN_CRYPTO_CIPHER_AES_GCM_256;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_GCM))
+		return WLAN_CRYPTO_CIPHER_AES_GCM;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_CCM_256))
+		return WLAN_CRYPTO_CIPHER_AES_CCM_256;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_CCM))
+		return WLAN_CRYPTO_CIPHER_AES_CCM;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_GMAC_256))
+		return WLAN_CRYPTO_CIPHER_AES_GMAC_256;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_GMAC))
+		return WLAN_CRYPTO_CIPHER_AES_GMAC;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC_256))
+		return WLAN_CRYPTO_CIPHER_AES_CMAC_256;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC))
+		return WLAN_CRYPTO_CIPHER_AES_CMAC;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_TKIP))
+		return WLAN_CRYPTO_CIPHER_TKIP;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_WEP_104))
+		return WLAN_CRYPTO_CIPHER_WEP_104;
+	if (cipher_bitmap & (1 << WLAN_CRYPTO_CIPHER_WEP_40))
+		return WLAN_CRYPTO_CIPHER_WEP_40;
+	return WLAN_CRYPTO_CIPHER_NONE;
+}
+
+static uint32_t osif_crypto_cipher_to_nl_suites(uint32_t cipher_type)
+{
+	switch (cipher_type) {
+	case WLAN_CRYPTO_CIPHER_AES_CCM:
+		return WLAN_CIPHER_SUITE_CCMP;
+	case WLAN_CRYPTO_CIPHER_AES_CCM_256:
+		return WLAN_CIPHER_SUITE_CCMP_256;
+	case WLAN_CRYPTO_CIPHER_AES_GCM:
+		return WLAN_CIPHER_SUITE_GCMP;
+	case WLAN_CRYPTO_CIPHER_AES_GCM_256:
+		return WLAN_CIPHER_SUITE_GCMP_256;
+	case WLAN_CRYPTO_CIPHER_AES_CMAC:
+		return WLAN_CIPHER_SUITE_AES_CMAC;
+	case WLAN_CRYPTO_CIPHER_AES_CMAC_256:
+		return WLAN_CIPHER_SUITE_BIP_CMAC_256;
+	case WLAN_CRYPTO_CIPHER_AES_GMAC:
+		return WLAN_CIPHER_SUITE_BIP_GMAC_128;
+	case WLAN_CRYPTO_CIPHER_AES_GMAC_256:
+		return WLAN_CIPHER_SUITE_BIP_GMAC_256;
+	case WLAN_CRYPTO_CIPHER_TKIP:
+		return WLAN_CIPHER_SUITE_TKIP;
+	case WLAN_CRYPTO_CIPHER_WEP_40:
+		return WLAN_CIPHER_SUITE_WEP40;
+	case WLAN_CRYPTO_CIPHER_WEP_104:
+		return WLAN_CIPHER_SUITE_WEP104;
+	default:
+		return 0;
+	}
+}
+
 static int
 wlan_send_external_auth_start_event(struct wireless_dev *wdev,
 				    struct wlan_external_auth_params *params)
@@ -26845,7 +27068,10 @@ wlan_send_external_auth_start_event(struct wireless_dev *wdev,
 	 */
 	vendor_buffer_len += 5 * nla_total_size(sizeof(u32));
 
-	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MLD_ADDR */
+	/*
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID
+	 * QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR
+	 */
 	vendor_buffer_len += 2 * nla_total_size(ETH_ALEN);
 
 	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB */
@@ -26854,6 +27080,8 @@ wlan_send_external_auth_start_event(struct wireless_dev *wdev,
 	/* QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA */
 	if (params->rsnxe_len)
 		vendor_buffer_len += nla_total_size(params->rsnxe_len);
+
+	vendor_buffer_len += wlan_external_auth_smd_buf_len(params);
 
 	skb = wlan_cfg80211_vendor_event_alloc(wdev->wiphy, wdev,
 					       vendor_buffer_len,
@@ -26880,6 +27108,8 @@ wlan_send_external_auth_start_event(struct wireless_dev *wdev,
 		auth_algo = NL80211_AUTHTYPE_IEEE8021X;
 	else if (params->auth_algo == eSIR_AUTH_TYPE_EPPKE)
 		auth_algo = NL80211_AUTHTYPE_EPPKE;
+	else if (params->auth_algo == eSIR_AUTH_TYPE_SAE)
+		auth_algo = NL80211_AUTHTYPE_SAE;
 
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO,
 			auth_algo)) {
@@ -26955,6 +27185,9 @@ wlan_send_external_auth_start_event(struct wireless_dev *wdev,
 				   params->rsnxe_data, params->rsnxe_len);
 	}
 
+	if (wlan_external_auth_put_smd_attr(skb, params, vdev_id))
+		goto free_skb;
+
 	hdd_debug("vdev:%d Initiate external auth to userspace (akm: 0x%x) auth_algo:%d pairwise:0x%x group:0x%x gp_mgmt:0x%x rsn_cap:0x%x",
 		  vdev_id, osif_crypto_to_nl_suites(akm),
 		  params->auth_algo,
@@ -26998,6 +27231,8 @@ wlan_hdd_external_auth_callback(struct wlan_hdd_link_info *link_info,
 	wdev = osif_priv->wdev;
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
+	wlan_external_auth_populate_smd_params(params, link_info);
+
 	ret = wlan_send_external_auth_start_event(wdev, params);
 	if (ret) {
 		hdd_err("Failed to initiate external auth eventt");
@@ -27018,21 +27253,11 @@ wlan_external_auth_policy[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PMKID] = {
 			.type = NLA_BINARY, .len = PMKID_LEN },
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_STATUS_CODE] = { .type = NLA_U16 },
-	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MLD_ADDR] = {
+	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR] = {
 			.type = NLA_BINARY, .len = ETH_ALEN },
+	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_SMD_ID] = {
+			.type = NLA_BINARY, .len = QDF_MAC_ADDR_SIZE },
 };
-
-#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND                         \
-{                                                                       \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,         \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
-		WIPHY_VENDOR_CMD_NEED_NETDEV |                          \
-		WIPHY_VENDOR_CMD_NEED_RUNNING,                          \
-	.doit = wlan_hdd_cfg80211_external_auth_cmd,                    \
-	vendor_command_policy(wlan_external_auth_policy,                \
-			      QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX)   \
-},
 
 /**
  * wlan_parse_external_auth_vendor_cmd - Parse external authentication
@@ -27056,6 +27281,7 @@ wlan_parse_external_auth_vendor_cmd(struct nlattr *attrs[],
 				    uint8_t vdev_id)
 {
 	uint16_t attribute;
+	int ret;
 
 	if (!attrs || !ext_auth_info) {
 		hdd_err(" Invalid input (attrs or ext_auth_info is NULL)");
@@ -27108,7 +27334,7 @@ wlan_parse_external_auth_vendor_cmd(struct nlattr *attrs[],
 	if (attrs[attribute])
 		ext_auth_info->status_code = nla_get_u16(attrs[attribute]);
 
-	attribute = QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MLD_ADDR;
+	attribute = QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR;
 	if (attrs[attribute]) {
 		if (nla_len(attrs[attribute]) != ETH_ALEN) {
 			hdd_err("Invalid MLD address length %u (expected %u)\n",
@@ -27118,6 +27344,10 @@ wlan_parse_external_auth_vendor_cmd(struct nlattr *attrs[],
 		qdf_mem_copy(ext_auth_info->mld_addr.bytes,
 			     nla_data(attrs[attribute]), ETH_ALEN);
 	}
+
+	ret = wlan_parse_external_auth_smd_attr(attrs, ext_auth_info);
+	if (ret)
+		return ret;
 
 	hdd_debug("vdev:%d External authentication status:%d received MLD_ADDR: " QDF_MAC_ADDR_FMT " BSSID: " QDF_MAC_ADDR_FMT "SSID: " QDF_SSID_FMT,
 		  ext_auth_info->vdev_id, ext_auth_info->status_code,
@@ -27188,8 +27418,14 @@ __wlan_hdd_cfg80211_external_auth_cmd(struct wiphy *wiphy,
 		goto exit;
 	}
 
-	status = sme_process_external_authentication_status(mac_handle, vdev_id,
-							    ext_auth_info);
+	ret = wlan_validate_smd_auth_response(adapter, ext_auth_info);
+	if (ret)
+		goto exit;
+
+	status = sme_handle_sae_msg(mac_handle, vdev_id,
+				    ext_auth_info->status_code,
+				    ext_auth_info->bssid,
+				    ext_auth_info->pmkid);
 	if (QDF_IS_STATUS_ERROR(status))
 		ret = -EINVAL;
 
@@ -27216,9 +27452,7 @@ int wlan_hdd_cfg80211_external_auth_cmd(struct wiphy *wiphy,
 
 	return errno;
 }
-#else
-#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND
-#endif /* WLAN_FEATURE_11BI_SECURITY */
+#endif /* WLAN_FEATURE_11BI_SECURITY || WLAN_FEATURE_11BN_SMD */
 
 const struct nla_policy wlan_hdd_action_oui_cap_policy[
 		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_MAX + 1] = {
