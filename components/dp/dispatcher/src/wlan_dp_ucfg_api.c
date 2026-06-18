@@ -261,6 +261,7 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_link *dp_link, *dp_link_next;
 
 	dp_ctx =  dp_get_context();
 
@@ -280,6 +281,31 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);
 	dp_mic_deinit_work(dp_intf);
+
+	/*
+	 * Null out dp_intf in all dp_links before freeing dp_intf.
+	 * A delayed vdev objmgr destroy notification (e.g. after SSR vdev
+	 * delete timeout) may fire after dp_intf is freed, causing UAF.
+	 * Setting dp_intf = NULL lets dp_vdev_obj_destroy_notification bail
+	 * out safely instead of accessing freed memory.
+	 */
+	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
+	dp_get_front_link_no_lock(dp_intf, &dp_link);
+	while (dp_link) {
+		dp_get_next_link_no_lock(dp_intf, dp_link, &dp_link_next);
+		dp_link->dp_intf = NULL;
+		dp_link = dp_link_next;
+	}
+	qdf_spin_unlock_bh(&dp_intf->dp_link_list_lock);
+
+	/* Also null out any inactive dp_links belonging to this dp_intf. */
+	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
+	TAILQ_FOREACH(dp_link, &dp_ctx->inactive_dp_link_list,
+		      inactive_list_elem) {
+		if (dp_link->dp_intf == dp_intf)
+			dp_link->dp_intf = NULL;
+	}
+	qdf_spin_unlock_bh(&dp_ctx->dp_link_del_lock);
 
 	qdf_spinlock_destroy(&dp_intf->dp_link_list_lock);
 	qdf_list_destroy(&dp_intf->dp_link_list);

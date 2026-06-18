@@ -2298,6 +2298,25 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	dp_intf = dp_link->dp_intf;
+	if (!dp_intf) {
+		/*
+		 * dp_intf was already freed (e.g. SSR vdev delete timeout):
+		 * dp_link still needs its own cleanup to avoid leaks.
+		 */
+		dp_err("dp_intf is NULL for dp_link %pK vdev_id %d, dp_intf already destroyed",
+		       dp_link, wlan_vdev_get_id(vdev));
+		dp_ctx = dp_get_context();
+		wlan_dp_resource_mgr_notify_vdev_deletion(dp_ctx->rsrc_mgr_ctx,
+							  vdev);
+		qdf_spin_lock_bh(&dp_link->vdev_lock);
+		dp_link->vdev = NULL;
+		qdf_spin_unlock_bh(&dp_link->vdev_lock);
+		qdf_spinlock_destroy(&dp_link->vdev_lock);
+		wlan_objmgr_vdev_component_obj_detach(vdev, WLAN_COMP_DP,
+						      (void *)dp_link);
+		dp_link_handle_cdp_vdev_delete(dp_ctx, dp_link);
+		return QDF_STATUS_E_INVAL;
+	}
 	dp_ctx = dp_intf->dp_ctx;
 
 	wlan_dp_resource_mgr_notify_vdev_deletion(dp_ctx->rsrc_mgr_ctx, vdev);
@@ -2359,6 +2378,15 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	qdf_spin_unlock_bh(&dp_link->vdev_lock);
 
 	qdf_spinlock_destroy(&dp_link->vdev_lock);
+
+	/* Defensive: dp_link_handle_cdp_vdev_delete and the inactive-list
+	 * path (wlan_dp_link_cdp_vdev_delete_notification) do not read
+	 * dp_link->dp_intf, so this has no functional effect today.
+	 * The detach below clears vdev_comp_priv_obj[WLAN_COMP_DP], which
+	 * prevents any future dp_get_vdev_priv_obj call from returning this
+	 * dp_link — making the bail-out path unreachable after this point.
+	 */
+	dp_link->dp_intf = NULL;
 
 	status = wlan_objmgr_vdev_component_obj_detach(vdev,
 						       WLAN_COMP_DP,
