@@ -469,7 +469,7 @@ static inline unsigned long pld_snoc_get_device_config(void)
 	return icnss_get_device_config();
 }
 
-#if defined(WLAN_CHIPSET_STATS) && defined(CNSS_QMI_ASYNC_EVENT_SUPPORT)
+#ifdef WLAN_CHIPSET_STATS
 static inline int
 pld_snoc_register_qmi_ind(struct device *dev, void *cb_ctx,
 			  int (*cb)(void *ctx, uint16_t type,
