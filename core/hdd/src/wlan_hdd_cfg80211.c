@@ -855,6 +855,24 @@ static const struct ieee80211_iface_limit
 	},
 };
 
+/*
+ * Monitor / Passthru with max_interfaces=2 so it is not filtered out on
+ * non-DBS and 1x1-DBS targets by the max_interfaces > 2 check in
+ * wlan_hdd_update_iface_combination(). Covers standalone monitor and
+ * STA + monitor concurrency on those targets.
+ */
+static const struct ieee80211_iface_limit
+	wlan_hdd_mon_sta_iface_limit[] = {
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_MONITOR),
+	},
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION),
+	},
+};
+
 #if defined(WLAN_FEATURE_NAN) && \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 /* STA + SAP + NAN. NAN represents NAN disc+NDI support */
@@ -1043,6 +1061,13 @@ static struct ieee80211_iface_combination
 		.max_interfaces = 2,
 		.num_different_channels = 2,
 		.n_limits = ARRAY_SIZE(wlan_hdd_mon_iface_limit),
+	},
+	/* Monitor / Passthru (non-DBS and 1x1-DBS safe) */
+	{
+		.limits = wlan_hdd_mon_sta_iface_limit,
+		.max_interfaces = 2,
+		.num_different_channels = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_mon_sta_iface_limit),
 	},
 #if defined(WLAN_FEATURE_NAN) && \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
