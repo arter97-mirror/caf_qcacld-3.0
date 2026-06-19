@@ -2383,5 +2383,22 @@ populate_smd_bss_transition_params(
 	uint8_t *ie_buf,
 	uint16_t *ie_len);
 
+/**
+ * populate_rv_mlo_ie_smd() - populate Reconfig MLO IE for SMD roaming
+ * @vdev: Pointer to vdev
+ * @session: Pointer to pe session
+ * @req: Pointer to MLO Reconfig request
+ *
+ * Populate the Reconfig MLO IE for SMD roaming in UHR Link Reconfig
+ * ST Preparation Request frame (Type=0). This function builds the
+ * Reconfig Multi-Link element with SMD-specific parameters including
+ * BSS Transition Parameters.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS populate_rv_mlo_ie_smd(struct wlan_objmgr_vdev *vdev,
+				  struct pe_session *session,
+				  struct mlo_link_recfg_state_req *req);
+
 #endif /*WLAN_FEATURE_11BN_SMD*/
 #endif /* __PARSE_H__ */
