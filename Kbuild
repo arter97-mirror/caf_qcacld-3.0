@@ -3672,6 +3672,20 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_PD_SUPPORT
 endif
 
+# WLAN_FEATURE_11BI_SECURITY
+# Used to indicate the Linux Kernel contains support for 802.11bi
+# (Enhanced Privacy and Key Establishment) external authentication.
+# Gated on assoc_encrypted support in struct cfg80211_connect_resp_params,
+# since the driver must be able to indicate (re)association encryption
+# status to userspace for EPPKE association to succeed.
+#
+# This feature was added to wireless-next via:
+# https://git.kernel.org/pub/scm/linux/kernel/git/wireless/wireless-next.git/commit/?id=829b815e910b8cc7bf36c85005abc3e66b59303b
+found = $(shell if grep -qF "assoc_encrypted" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DWLAN_FEATURE_11BI_SECURITY
+endif
+
 ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP), y)
 CONFIG_WLAN_DP_MLO_DEV_CTX := y
 CONFIG_QCA_DP_TX_FW_METADATA_V2 := y

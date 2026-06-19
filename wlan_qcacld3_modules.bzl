@@ -2803,6 +2803,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS",
         },
+        {
+            "pattern": "assoc_encrypted",
+            "file": "include/net/cfg80211.h",
+            "flag": "WLAN_FEATURE_11BI_SECURITY",
+        },
     ]
 
     cmd = 'touch "$@"\n'
