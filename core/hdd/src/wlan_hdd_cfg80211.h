@@ -1415,4 +1415,42 @@ bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
 	return false;
 }
 #endif
-#endif
+#endif /* end of file */
+
+/**
+ * hdd_fill_vdev_init_nss_chains_limits() - Fetch per-mode NSS/chains limits
+ * @link_info: Link info pointer in HDD adapter
+ * @nss_chains_limits: output struct to fill
+ * @src: config source (global or startup)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_fill_vdev_init_nss_chains_limits(
+				struct wlan_hdd_link_info *link_info,
+				struct wlan_mlme_nss_chains *nss_chains_limits,
+				enum wlan_mlme_cfg_nss_src src);
+
+/**
+ * hdd_resolve_non_force_nss_chains_fields() - Resolve unset NSS/chain fields
+ * @link_info: Link info pointer in HDD adapter
+ * @req: user request struct (updated in place)
+ * @limits: per-mode limits struct
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
+					struct wlan_mlme_nss_chains *req,
+					struct wlan_mlme_nss_chains *limits);
+
+/**
+ * hdd_update_vdev_nss_chains_config() - Propagate NSS/chains config to vdev
+ * @link_info: Link info pointer in HDD adapter
+ * @set_ies: whether to update per-band IEs
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info,
+				  bool set_ies);

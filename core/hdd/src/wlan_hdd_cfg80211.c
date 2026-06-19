@@ -16998,7 +16998,7 @@ hdd_resolve_vdev_up_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS
+QDF_STATUS
 hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info,
 				  bool set_ies)
 {
@@ -17260,7 +17260,7 @@ hdd_config_vendor_nss_chains_per_band(struct wlan_hdd_link_info *link_info,
 	return hdd_apply_nss_chains_vdev_up_req(link_info, &req, false);
 }
 
-static QDF_STATUS
+QDF_STATUS
 hdd_fill_vdev_init_nss_chains_limits(struct wlan_hdd_link_info *link_info,
 				     struct wlan_mlme_nss_chains *nss_chains_limits,
 				     enum wlan_mlme_cfg_nss_src src)
@@ -17276,7 +17276,7 @@ hdd_fill_vdev_init_nss_chains_limits(struct wlan_hdd_link_info *link_info,
 					src);
 }
 
-static QDF_STATUS
+QDF_STATUS
 hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 					struct wlan_mlme_nss_chains *req,
 					struct wlan_mlme_nss_chains *limits)

@@ -39,6 +39,7 @@
 #include <cds_api.h>
 #include <wlan_hdd_regulatory.h>
 #include "wlan_hdd_he.h"
+#include "wlan_hdd_cfg80211.h"
 #include <wlan_policy_mgr_api.h>
 #include "wifi_pos_api.h"
 #include "wlan_hdd_green_ap.h"
@@ -1192,6 +1193,7 @@ static void hdd_set_sap_nss_params(struct wlan_hdd_link_info *link_info,
  *
  * Return: None
  */
+
 static QDF_STATUS
 hdd_get_sap_rx_nss(struct wlan_hdd_link_info *link_info, uint8_t *rx_nss)
 {
@@ -1325,6 +1327,54 @@ hdd_get_sap_restart_required_for_nss(struct wlan_hdd_link_info *link_info,
 	return false;
 }
 
+/**
+ * hdd_update_sta_nss_in_disconnect() - Update STA vdev NSS in disconnect state
+ * @link_info: Link info pointer in HDD adapter
+ * @mac_handle: MAC handle
+ * @tx_nss: requested Tx NSS
+ * @rx_nss: requested Rx NSS
+ *
+ * Mirrors hdd_config_vendor_nss_chains() disconnect path: writes the
+ * requested NSS directly to the vdev's ini_cfg and dynamic_cfg so that
+ * PE reads the correct value via mlme_get_vdev_nss_by_freq_from_dyn()
+ * at association. Also keeps the global mac_ctx ini_cfg in sync.
+ */
+static void
+hdd_update_sta_nss_in_disconnect(struct wlan_hdd_link_info *link_info,
+				 mac_handle_t mac_handle,
+				 uint8_t tx_nss, uint8_t rx_nss)
+{
+	struct wlan_mlme_nss_chains user_cfg = {0};
+	struct wlan_mlme_nss_chains limits = {0};
+	enum nss_chains_band_info band;
+	QDF_STATUS status;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
+		sme_update_nss_in_mlme_cfg(mac_handle, rx_nss, tx_nss,
+					   adapter->device_mode, band);
+		hdd_populate_vdev_nss(&user_cfg, tx_nss, rx_nss, band);
+	}
+
+	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits,
+						      WLAN_MLME_CFG_SRC_GLOBAL);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	status = hdd_resolve_non_force_nss_chains_fields(link_info,
+							 &user_cfg, &limits);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	status = sme_nss_chains_update_no_session(mac_handle, &user_cfg,
+						  link_info->vdev_id);
+	if (status == QDF_STATUS_E_ALREADY || QDF_IS_STATUS_ERROR(status))
+		return;
+
+	/* Propagate to MLO links and update per-band IEs */
+	hdd_update_vdev_nss_chains_config(link_info, true);
+}
+
 QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t tx_nss, uint8_t rx_nss)
 {
@@ -1403,7 +1453,25 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		hdd_update_nss_in_vdev(link_info, mac_handle, tx_nss, rx_nss);
+		/*
+		 * For STA/P2P-CLI use the per-vdev path (writes to dynamic_cfg,
+		 * which PE reads at association). For SAP/P2P-GO use the
+		 * original global-pool path.
+		 */
+		if (adapter->device_mode == QDF_STA_MODE ||
+		    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+			hdd_update_sta_nss_in_disconnect(link_info, mac_handle,
+							 tx_nss, rx_nss);
+		else
+			hdd_update_nss_in_vdev(link_info, mac_handle,
+					       tx_nss, rx_nss);
+
+		/*
+		 * Update HE/EHT MCS capability maps regardless of path.
+		 * sme_nss_chains_update_no_session handles vdev dynamic_cfg;
+		 * this call additionally updates the HE/EHT capability IEs
+		 * (sme_update_he_cap_nss / sme_update_eht_cap_nss).
+		 */
 		sme_set_nss_capability(mac_handle, link_info->vdev_id,
 				       rx_nss, adapter->device_mode);
 
