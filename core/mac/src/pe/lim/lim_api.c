@@ -4438,7 +4438,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	uint8_t cap_tx_nss, cap_rx_nss;
 	bool is_security_allowed;
-	struct wlan_channel channel;
+	struct wlan_channel channel = {0};
 	struct wlan_objmgr_pdev *pdev;
 	struct bss_description *bss_desc;
 	struct scan_cache_entry *cache_entry;
