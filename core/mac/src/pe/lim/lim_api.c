@@ -5696,15 +5696,8 @@ void lim_passthrough_peer_setup(struct mac_context *mac,
 	sta = dph_lookup_hash_entry(mac, msg->peer_mac_addr.bytes, &aid,
 				    &session->dph.dphHashTable);
 
-	if (!msg->create_only) {
+	if (!msg->create_only && sta) {
 		/* UPDATE: peer must already exist from prior NEW */
-		if (!sta) {
-			pe_err("vdev:%d UPDATE for unknown peer "
-			       QDF_MAC_ADDR_FMT,
-			       session->vdev_id,
-			       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
-			return;
-		}
 		lim_passthru_update_hash_node_info(mac, sta, session, msg);
 		status = lim_add_sta(mac, sta, true, session);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -5720,6 +5713,7 @@ void lim_passthrough_peer_setup(struct mac_context *mac,
 		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
 		return;
 	}
+
 	peer = wlan_objmgr_get_peer_by_mac(mac->psoc, msg->peer_mac_addr.bytes,
 					   WLAN_LEGACY_MAC_ID);
 	if (peer) {
