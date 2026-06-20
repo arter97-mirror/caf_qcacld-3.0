@@ -678,11 +678,99 @@ stop_adapter:
 	return ret;
 }
 
-static void wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
-					  struct hdd_wondertap_peer_setup *peer)
+static QDF_STATUS
+__wlan_hdd_populate_caps_peer_setup_req(
+			struct sir_passthru_peer_setup_msg *req,
+			const qdf_wondertap_station_info_t *sta_info,
+			bool *caps_applied)
+{
+	uint8_t nss = 0;
+	uint8_t i;
+
+	hdd_debug("sta info cap mask: 0x%x", sta_info->capability_mask);
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HT)) {
+		req->htcap_present = 1;
+		qdf_mem_copy(&req->peer_ht_cap, &sta_info->ht_capa,
+			     sizeof(req->peer_ht_cap));
+		/* NSS from HT MCS rx_mask: each non-zero byte
+		 * represents one spatial stream
+		 */
+		for (i = 0; i < IEEE80211_HT_MCS_MASK_LEN; i++) {
+			if (sta_info->ht_capa.mcs.rx_mask[i])
+				nss = i + 1;
+		}
+	}
+
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_VHT)) {
+		uint8_t max_mcs;
+		uint16_t rx_mcs_map =
+			le16_to_cpu(sta_info->vht_capa.supp_mcs.rx_mcs_map);
+
+		req->vhtcap_present = 1;
+		qdf_mem_copy(&req->peer_vht_cap, &sta_info->vht_capa,
+			     sizeof(req->peer_vht_cap));
+		/* NSS from VHT rx_mcs_map: 2-bit value 0x3
+		 * per stream indicates disabled
+		 */
+		nss = 0;
+		for (i = 1; i <= 8; i++) {
+			if (((rx_mcs_map >> ((i - 1) * 2)) & 0x3) != 0x3)
+				nss = i;
+		}
+		/* max_mcs from highest MCS set in stream 1 of VHT rx_mcs_map */
+		max_mcs = VHT_GET_MCS_FOR_NSS(rx_mcs_map, 1);
+		if (max_mcs == VHT_MCS_0_9)
+			req->max_mcs = 9;
+		else if (max_mcs == VHT_MCS_0_8)
+			req->max_mcs = 8;
+		else if (max_mcs == VHT_MCS_0_7)
+			req->max_mcs = 7;
+		hdd_debug("vht: rx_mcs_map 0x%x max_mcs %u",
+			  rx_mcs_map, req->max_mcs);
+	}
+
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HE)) {
+		req->hecap_present = 1;
+		qdf_mem_copy(&req->peer_he_cap, &sta_info->he_capa,
+			     sizeof(req->peer_he_cap));
+		/*
+		 * ieee80211_he_cap_elem only carries MAC+PHY capability
+		 * bytes -- HE MCS/NSS maps are not present in
+		 * wondertap_station_info. If HT/VHT NSS extraction above
+		 * yielded 0 (HE-only peer), fall back to tx_rate_cfg.nss
+		 * which WONDER sets via set_fixed_tx_rate/set_tx_rate_mask.
+		 */
+		if (!nss)
+			nss = g_wt_ctx->tx_rate_cfg.nss;
+		if (!req->max_mcs)
+			req->max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
+	}
+
+	req->nss = nss ? nss : 1;
+
+	if (sta_info->capability_mask &
+		(BIT(WONDERTAP_STATION_CAP_HT) |
+		 BIT(WONDERTAP_STATION_CAP_VHT) |
+		 BIT(WONDERTAP_STATION_CAP_HE))) {
+		if (caps_applied)
+			*caps_applied = true;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (caps_applied)
+		*caps_applied = false;
+	return QDF_STATUS_E_INVAL;
+}
+
+static void
+wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
+			      struct hdd_wondertap_peer_setup *peer,
+			      const qdf_wondertap_station_info_t *sta_info,
+			      bool *caps_applied)
 {
 	mac_handle_t mac_handle;
-	struct sir_passthru_peer_setup_msg req;
+	struct sir_passthru_peer_setup_msg req = {0};
+	QDF_STATUS status;
 
 	if (wlan_hdd_validate_vdev_id(peer->vdev_id))
 		return;
@@ -700,7 +788,12 @@ static void wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
 	req.gi_val = g_wt_ctx->tx_rate_cfg.gi_val;
 	req.nss = g_wt_ctx->tx_rate_cfg.nss;
 	req.max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
-	req.create_only = 1;
+
+	status = __wlan_hdd_populate_caps_peer_setup_req(&req, sta_info,
+							 caps_applied);
+	if (QDF_IS_STATUS_ERROR(status))
+		req.create_only = 1;
+
 	sme_passthru_peer_setup(mac_handle, &req);
 }
 
@@ -709,10 +802,9 @@ wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 			      const uint8_t *peer_addr,
 			      const qdf_wondertap_station_info_t *sta_info)
 {
-	struct sir_passthru_peer_setup_msg req;
+	struct sir_passthru_peer_setup_msg req = {0};
 	mac_handle_t mac_handle;
-	uint8_t nss = 0;
-	uint8_t i;
+	QDF_STATUS status;
 
 	if (wlan_hdd_validate_vdev_id(vdev_id))
 		return;
@@ -720,68 +812,18 @@ wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 	hdd_debug("vdev %d peer assoc " QDF_MAC_ADDR_FMT,
 		  vdev_id, QDF_MAC_ADDR_REF(peer_addr));
 	mac_handle = hdd_ctx->mac_handle;
-	qdf_mem_zero(&req, sizeof(req));
+
 	qdf_mem_copy(req.peer_mac_addr.bytes, peer_addr, QDF_MAC_ADDR_SIZE);
 	req.vdev_id     = vdev_id;
 	req.gi_val      = g_wt_ctx->tx_rate_cfg.gi_val;
 	req.create_only = 0;
 
-	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HT)) {
-		req.htcap_present = 1;
-		qdf_mem_copy(&req.peer_ht_cap, &sta_info->ht_capa,
-			     sizeof(req.peer_ht_cap));
-		/* NSS from HT MCS rx_mask: each non-zero byte
-		 * represents one spatial stream
-		 */
-		for (i = 0; i < IEEE80211_HT_MCS_MASK_LEN; i++) {
-			if (sta_info->ht_capa.mcs.rx_mask[i])
-				nss = i + 1;
-		}
+	status = __wlan_hdd_populate_caps_peer_setup_req(&req, sta_info, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("no valid caps provided");
+		return;
 	}
-	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_VHT)) {
-		uint8_t max_mcs;
-		uint16_t rx_mcs_map =
-			le16_to_cpu(sta_info->vht_capa.supp_mcs.rx_mcs_map);
 
-		req.vhtcap_present = 1;
-		qdf_mem_copy(&req.peer_vht_cap, &sta_info->vht_capa,
-			     sizeof(req.peer_vht_cap));
-		/* NSS from VHT rx_mcs_map: 2-bit value 0x3
-		 * per stream indicates disabled
-		 */
-		nss = 0;
-		for (i = 1; i <= 8; i++) {
-			if (((rx_mcs_map >> ((i - 1) * 2)) & 0x3) != 0x3)
-				nss = i;
-		}
-		/* max_mcs from highest MCS set in stream 1 of VHT rx_mcs_map */
-		max_mcs = VHT_GET_MCS_FOR_NSS(rx_mcs_map, 1);
-		if (max_mcs == VHT_MCS_0_9)
-			req.max_mcs = 9;
-		else if (max_mcs == VHT_MCS_0_8)
-			req.max_mcs = 8;
-		else if (max_mcs == VHT_MCS_0_7)
-			req.max_mcs = 7;
-		hdd_debug("vht: rx_mcs_map 0x%x max_mcs %u",
-			  rx_mcs_map, req.max_mcs);
-	}
-	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HE)) {
-		req.hecap_present = 1;
-		qdf_mem_copy(&req.peer_he_cap, &sta_info->he_capa,
-			     sizeof(req.peer_he_cap));
-		/*
-		 * ieee80211_he_cap_elem only carries MAC+PHY capability
-		 * bytes -- HE MCS/NSS maps are not present in
-		 * wondertap_station_info. If HT/VHT NSS extraction above
-		 * yielded 0 (HE-only peer), fall back to tx_rate_cfg.nss
-		 * which WONDER sets via set_fixed_tx_rate/set_tx_rate_mask.
-		 */
-		if (!nss)
-			nss = g_wt_ctx->tx_rate_cfg.nss;
-		if (!req.max_mcs)
-			req.max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
-	}
-	req.nss = nss ? nss : 1;
 	hdd_debug("vdev %d peer assoc nss %d max_mcs %d",
 		  vdev_id, req.nss, req.max_mcs);
 
@@ -1952,10 +1994,6 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 	switch (action) {
 	case WONDERTAP_STATION_STATE_NEW:
 		hdd_debug("set_station_info aid %d", info->aid);
-		if (!info->aid) {
-			hdd_warn("set_station_info: AID is 0, assigning 1");
-			info->aid = 1;
-		}
 		if (g_wt_ctx->num_peers >= WLAN_PASSTHRU_MAX_PEER) {
 			hdd_err("max peers %d reached", WLAN_PASSTHRU_MAX_PEER);
 			errno = -ENOSPC;
@@ -2017,17 +2055,18 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 			  QDF_MAC_ADDR_REF(info->mac));
 
 		qdf_mem_copy(params.peer_addr, info->mac, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&peer_tbl[i].sta_info, info,
+			     sizeof(peer_tbl[i].sta_info));
+
 		params.vdev_id  = vdev_id;
 		params.peer_aid = info->aid;
-		wlan_hdd_wondertap_peer_setup(hdd_ctx, &params);
+		peer_tbl[i].caps_applied_in_new = false;
+		wlan_hdd_wondertap_peer_setup(hdd_ctx, &params, info,
+					      &peer_tbl[i].caps_applied_in_new);
 		break;
 
 	case WONDERTAP_STATION_STATE_UPDATE:
 		hdd_debug("set_station_info aid %d", info->aid);
-		if (!info->aid) {
-			hdd_warn("set_station_info: AID is 0, assigning 1");
-			info->aid = 1;
-		}
 		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
 			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
 						 &peer_mac))
@@ -2041,6 +2080,13 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 		}
 		qdf_mem_copy(&peer_tbl[i].sta_info, info,
 			     sizeof(peer_tbl[i].sta_info));
+
+		if (peer_tbl[i].caps_applied_in_new) {
+			hdd_debug("UPDATE: caps already applied in NEW for "
+				  QDF_MAC_ADDR_FMT ", skipping",
+				  QDF_MAC_ADDR_REF(info->mac));
+			break;
+		}
 
 		hdd_debug("set_station_info UPDATE " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(info->mac));
@@ -2063,6 +2109,7 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 		qdf_mem_zero(&peer_tbl[i].sta_info,
 			     sizeof(peer_tbl[i].sta_info));
 		peer_tbl[i].peer_status = PASSTHRU_PEER_SETUP_NOT_DONE;
+		peer_tbl[i].caps_applied_in_new = false;
 		g_wt_ctx->num_peers--;
 
 		hdd_debug("set_station_info DEL " QDF_MAC_ADDR_FMT,
@@ -2128,7 +2175,7 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
  * version supported and the operations table.
  */
 static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
-	.ver = WONDER_VERSION_1_6_4,
+	.ver = WONDER_VERSION_1_6_5,
 	.wonder_ops = &wlan_drv_wondertap_ops,
 };
 

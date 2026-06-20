@@ -52,11 +52,16 @@ enum passthru_peer_status {
  * @mac_addr: peer MAC address
  * @peer_status: peer setup status
  * @sta_info: station info stored on UPDATE, returned verbatim on QUERY
+ * @caps_applied_in_new: caps were already sent to FW as part of NEW; every
+ *  UPDATE for this peer is skipped while this is set, since FW does not
+ *  support a second peer_assoc for the same peer. Cleared only on DEL.
+ *  WONDER is expected to send caps in either NEW or UPDATE, never both.
  */
 struct passthru_peer_tbl_entry {
 	struct qdf_mac_addr          mac_addr;
 	enum passthru_peer_status    peer_status;
 	qdf_wondertap_station_info_t sta_info;
+	bool                          caps_applied_in_new;
 };
 
 /**
