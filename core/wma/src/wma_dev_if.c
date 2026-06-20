@@ -3958,6 +3958,8 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 	WMI_PEER_ASSOC_CONF_EVENTID_param_tlvs *param_buf;
 	wmi_peer_assoc_conf_event_fixed_param *event;
 	struct wma_target_req *req_msg;
+	struct wlan_objmgr_vdev *vdev;
+	cdp_config_param_type val;
 	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
 	int status = 0;
 
@@ -3999,6 +4001,16 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 		}
 
 		/* peer assoc conf event means the cmd succeeds */
+		vdev = wma->interfaces[event->vdev_id].vdev;
+		if (vdev && wlan_vdev_mlme_get_opmode(vdev) == QDF_PASSTHRU_MODE) {
+			wma_debug("Set peer_assoc state for passthru peer");
+			val.cdp_peer_param_assoc_done = true;
+			cdp_txrx_set_peer_param(cds_get_context(QDF_MODULE_ID_SOC),
+						event->vdev_id, macaddr,
+						CDP_CONFIG_PEER_ASSOC_STATE,
+						val);
+		}
+
 		params->status = event->status;
 		wma_debug("Send ADD_STA_RSP: statype %d vdev_id %d aid %d bssid "QDF_MAC_ADDR_FMT" status %d",
 			 params->staType, params->smesessionId,
