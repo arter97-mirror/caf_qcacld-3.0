@@ -788,20 +788,33 @@ void dp_rx_pkt_da_check(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 
 #ifdef CONFIG_BORON
 static inline
-void dp_set_peer_txpt_idx(qdf_nbuf_t nbuf,
-			  struct cdp_peer_output_param *peer_info)
+void dp_set_peer_search_idx(qdf_nbuf_t nbuf,
+			    struct cdp_peer_output_param *peer_info)
 {
 	if (qdf_likely(peer_info->txpt_classify_idx_valid)) {
-		QDF_NBUF_CB_TXPT_CLASSIFY_INFO_VALID(nbuf) = 1;
-		QDF_NBUF_CB_TXPT_IDX_VALUE(nbuf) = peer_info->txpt_classify_idx;
+		QDF_NBUF_CB_PEER_SEARCH_IDX_VALID(nbuf) = 1;
+		QDF_NBUF_CB_PEER_SEARCH_IDX_VALUE(nbuf) =
+						peer_info->txpt_classify_idx;
+	}
+}
+#else
+#if defined(CONFIG_BERYLLIUM) && defined(DRIVER_PASSTHRU_MODE)
+static inline
+void dp_set_peer_search_idx(qdf_nbuf_t nbuf,
+			    struct cdp_peer_output_param *peer_info)
+{
+	if (qdf_likely(peer_info->ast_idx != CDP_INVALID_PEER_AST_IDX)) {
+		QDF_NBUF_CB_PEER_SEARCH_IDX_VALID(nbuf) = 1;
+		QDF_NBUF_CB_PEER_SEARCH_IDX_VALUE(nbuf) = peer_info->ast_idx;
 	}
 }
 #else
 static inline
-void dp_set_peer_txpt_idx(qdf_nbuf_t nbuf,
-			  struct cdp_peer_output_param *peer_info)
+void dp_set_peer_search_idx(qdf_nbuf_t nbuf,
+			    struct cdp_peer_output_param *peer_info)
 {
 }
+#endif /* CONFIG_BERYLLIUM and DRIVER_PASSTHRU_MODE */
 #endif /* CONFIG_BORON */
 
 #ifdef QCA_SUPPORT_WDS_EXTENDED

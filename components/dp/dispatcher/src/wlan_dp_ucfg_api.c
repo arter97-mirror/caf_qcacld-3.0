@@ -1549,7 +1549,7 @@ ucfg_dp_update_bss_peer_info_for_tdls_ctrl(struct wlan_objmgr_psoc *psoc,
 	qdf_copy_macaddr(&bss_mac_addr, &dp_link->conn_info.bssid);
 	cdp_peer_get_info_by_peer_addr(soc, bss_mac_addr.bytes,
 				       dp_link->link_id, &peer_info);
-	dp_set_peer_txpt_idx(nbuf, &peer_info);
+	dp_set_peer_search_idx(nbuf, &peer_info);
 
 	return QDF_STATUS_SUCCESS;
 }

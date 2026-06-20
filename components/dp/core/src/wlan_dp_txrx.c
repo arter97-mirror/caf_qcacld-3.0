@@ -168,7 +168,7 @@ static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
 				       peer_info);
 	dp_get_bss_peer_on_active_tdls(soc, peer_mac, dp_link, peer_info);
 
-	dp_set_peer_txpt_idx(nbuf, peer_info);
+	dp_set_peer_search_idx(nbuf, peer_info);
 
 	peer_state = peer_info->state;
 
@@ -905,7 +905,9 @@ QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 
 	cdp_peer_get_info_by_peer_addr(soc, dest_mac, dp_link->link_id,
 				       &peer_info);
-	dp_set_peer_txpt_idx(nbuf, &peer_info);
+
+	if (peer_info.is_peer_assoc_done)
+		dp_set_peer_search_idx(nbuf, &peer_info);
 
 	QDF_NBUF_CB_TX_VDEV_CTX(nbuf) = dp_link->link_id;
 

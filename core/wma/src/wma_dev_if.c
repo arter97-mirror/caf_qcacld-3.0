@@ -4439,10 +4439,11 @@ QDF_STATUS wma_handle_peer_assoc_conf(tp_wma_handle wma, uint8_t vdev_id,
 	if (!wma_is_vdev_valid(vdev_id))
 		return QDF_STATUS_E_INVAL;
 
+	vdev = wma->interfaces[vdev_id].vdev;
+
 	req_msg = wma_find_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START, NULL);
 
 	if (!req_msg) {
-		vdev = wma->interfaces[vdev_id].vdev;
 		if (vdev && mlo_mgr_is_link_switch_in_progress(vdev) &&
 		    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(
 								wma->psoc)) {
@@ -4458,11 +4459,21 @@ QDF_STATUS wma_handle_peer_assoc_conf(tp_wma_handle wma, uint8_t vdev_id,
 
 	if (req_msg->msg_type == WMA_ADD_STA_REQ) {
 		tpAddStaParams params = (tpAddStaParams)req_msg->user_data;
+		cdp_config_param_type val;
 
 		if (!params) {
 			wma_err("add STA params is NULL for vdev %d", vdev_id);
 			qdf_status = QDF_STATUS_E_FAILURE;
 			goto free_req_msg;
+		}
+
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_PASSTHRU_MODE) {
+			wma_debug("Set peer_assoc state for passthru peer");
+			val.cdp_peer_param_assoc_done = true;
+			cdp_txrx_set_peer_param(cds_get_context(QDF_MODULE_ID_SOC),
+						vdev_id, macaddr,
+						CDP_CONFIG_PEER_ASSOC_STATE,
+						val);
 		}
 
 		/* peer assoc conf event means the cmd succeeds */
