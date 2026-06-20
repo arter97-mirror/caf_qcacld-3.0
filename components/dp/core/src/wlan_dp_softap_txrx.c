@@ -510,7 +510,7 @@ void dp_softap_get_bss_peer_tx_flow_idx(void *soc, qdf_nbuf_t nbuf,
 					       QDF_NBUF_SRC_MAC_OFFSET);
 	cdp_peer_get_info_by_peer_addr(soc, src_mac_addr->bytes, *link_id,
 				       &peer_info);
-	dp_set_peer_txpt_idx(nbuf, &peer_info);
+	dp_set_peer_search_idx(nbuf, &peer_info);
 }
 
 #else
@@ -552,7 +552,7 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 
 	cdp_peer_get_info_by_peer_addr(soc, mac_addr.bytes, *link_id,
 				       &peer_info);
-	dp_set_peer_txpt_idx(nbuf, &peer_info);
+	dp_set_peer_search_idx(nbuf, &peer_info);
 
 	*link_id = peer_info.vdev_id;
 	peer_state = peer_info.state;
