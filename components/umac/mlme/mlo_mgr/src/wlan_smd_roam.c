@@ -423,6 +423,81 @@ end:
 	return false;
 }
 
+/**
+ * smd_cleanup_curr_ap_link() - Prepare link switch to bring down del link
+ *                               during SMD cleanup_vdev scenario
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration state request
+ * @link_sw_req: Link switch request to be populated
+ *
+ * Handles the multi-link to single-link SMD roaming case where add_link_info is
+ * empty but del_link_info identifies a link to disconnect. Matches each del_link
+ * entry against sta_ctx->links_info[] by link_id and ap_link_addr and prepares a
+ * disconnect-only link switch request with
+ * MLO_LINK_SWITCH_REASON_SMD_ROAM_REMOVE_LINK.
+ *
+ * Return: true if a matching active link is found and link_sw_req is populated,
+ *         false otherwise
+ */
+bool
+smd_cleanup_curr_ap_link(struct mlo_link_recfg_context *recfg_ctx,
+			 struct mlo_link_recfg_state_req *req,
+			 struct wlan_mlo_link_switch_req *link_sw_req)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_info *link_info;
+	struct wlan_mlo_link_recfg_bss_info *del_link;
+	uint8_t i, j;
+
+	if (!recfg_ctx || !req || !link_sw_req)
+		return false;
+
+	/* Only applies when there is nothing to add but something to remove */
+	if (req->add_link_info.num_links || !req->del_link_info.num_links)
+		return false;
+
+	mlo_dev_ctx = recfg_ctx->ml_dev;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
+		return false;
+
+	for (i = 0; i < req->del_link_info.num_links; i++) {
+		del_link = &req->del_link_info.link[i];
+
+		for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
+			link_info = &mlo_dev_ctx->sta_ctx->links_info[j];
+
+			if (link_info->link_id != del_link->link_id)
+				continue;
+
+			if (!qdf_is_macaddr_equal(&link_info->ap_link_addr,
+						  &del_link->ap_link_addr))
+				continue;
+
+			if (link_info->vdev_id == WLAN_INVALID_VDEV_ID)
+				continue;
+
+			qdf_mem_zero(link_sw_req, sizeof(*link_sw_req));
+			link_sw_req->vdev_id            = link_info->vdev_id;
+			link_sw_req->curr_ieee_link_id  = del_link->link_id;
+			link_sw_req->new_ieee_link_id   = WLAN_INVALID_LINK_ID;
+			link_sw_req->new_primary_freq   = 0;
+			link_sw_req->new_phymode        = 0;
+			link_sw_req->reason             =
+				MLO_LINK_SWITCH_REASON_SMD_ROAM_REMOVE_LINK;
+			link_sw_req->smd_lnk_sw_trigger = true;
+
+			mlo_debug("SMD cleanup: vdev_id=%d link_id=%d BSSID=" QDF_MAC_ADDR_FMT,
+				  link_sw_req->vdev_id,
+				  link_sw_req->curr_ieee_link_id,
+				  QDF_MAC_ADDR_REF(del_link->ap_link_addr.bytes));
+			return true;
+		}
+	}
+
+	mlo_debug("SMD cleanup: no matching active link found for del_link");
+	return false;
+}
+
 static struct mlo_link_info *
 smd_find_current_ap_link_info(struct wlan_objmgr_vdev *vdev, uint8_t del_vdev_id)
 {
@@ -1709,6 +1784,33 @@ QDF_STATUS
 smd_host_link_switch_validate_request(struct wlan_objmgr_vdev *vdev,
 				      struct wlan_mlo_link_switch_req *req)
 {
+	if (req->reason == MLO_LINK_SWITCH_REASON_SMD_ROAM_REMOVE_LINK) {
+		/* Disconnect-only: new_ieee_link_id is intentionally INVALID.
+		 * Only curr_ieee_link_id needs to be valid.
+		 */
+		if (req->curr_ieee_link_id >= WLAN_INVALID_LINK_ID) {
+			mlo_err("REMOVE_LINK: invalid curr link id %d",
+				req->curr_ieee_link_id);
+			return QDF_STATUS_E_INVAL;
+		}
+		mlo_debug("REMOVE_LINK: curr_link_id %d, skipping new_link validation",
+			  req->curr_ieee_link_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (req->reason == MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK &&
+	    req->curr_ieee_link_id == WLAN_INVALID_LINK_ID) {
+		/* Idle vdev: curr_link_id is invalid (no current link) */
+		if (req->new_ieee_link_id >= WLAN_MAX_ML_BSS_LINKS) {
+			mlo_err("SMD_ADD_LINK: invalid new link id %d",
+				req->new_ieee_link_id);
+			return QDF_STATUS_E_INVAL;
+		}
+		mlo_debug("SMD_ADD_LINK idle vdev: new_link_id %d",
+			  req->new_ieee_link_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
 	if (req->curr_ieee_link_id >= WLAN_INVALID_LINK_ID ||
 	    req->new_ieee_link_id >= WLAN_INVALID_LINK_ID) {
 		mlo_err("Invalid link params, curr link id %d, new link id %d",
@@ -2431,4 +2533,289 @@ smd_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev)
 
 	return FW_ROAM_SYNC_TIMEOUT;
 }
+
+bool wlan_is_smd_roam_sync(struct roam_offload_synch_ind *sync_ind)
+{
+	return sync_ind && sync_ind->num_vdev_repurpose_req > 0;
+}
+
+QDF_STATUS wlan_smd_roam_sync_status(QDF_STATUS status)
+{
+	if (status == QDF_STATUS_E_PENDING)
+		return QDF_STATUS_SUCCESS;
+	return status;
+}
+
+bool
+smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!vdev)
+		return false;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
+		return false;
+
+	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
+}
+
+/**
+ * smd_roam_link_switch_disconnect_done() - Handle link switch disconnect
+ *                                          completion during SMD roaming
+ * @vdev: vdev on which the link switch disconnect completed
+ * @mlo_dev_ctx: MLO device context
+ *
+ * Handles post-disconnect processing for SMD-initiated link switches.
+ * For REMOVE_LINK: advances FSM directly to COMPLETE_SUCCESS (no new link).
+ * For HOST_ADD_LINK: looks up the prepared target AP link info and proceeds
+ * to MAC address change / connect via mlo_mgr_link_switch_decide_mac_addr_change().
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+smd_roam_link_switch_disconnect_done(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	QDF_STATUS status;
+	struct mlo_link_info *new_link_info;
+	struct wlan_mlo_link_switch_req *req = &mlo_dev_ctx->link_ctx->last_req;
+
+	if (req->reason == MLO_LINK_SWITCH_REASON_SMD_ROAM_REMOVE_LINK) {
+		/* Disconnect-only: no new link to set up.
+		 * FSM transitions DISCONNECT_CURR_LINK -> COMPLETE_SUCCESS.
+		 */
+		mlo_debug("VDEV %d REMOVE_LINK disconnect done, completing",
+			  req->vdev_id);
+		status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
+		if (QDF_IS_STATUS_ERROR(status))
+			mlo_mgr_remove_link_switch_cmd(vdev);
+		return status;
+	}
+
+	new_link_info = smd_get_prepared_ap_link_info(vdev,
+						      &req->tgt_ap_link_addr);
+	if (!new_link_info) {
+		mlo_err("VDEV %d SMD new link not found in mlo dev ctx",
+			req->vdev_id);
+		mlo_mgr_remove_link_switch_cmd(vdev);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_mgr_remove_link_switch_cmd(vdev);
+		return status;
+	}
+
+	return mlo_mgr_link_switch_decide_mac_addr_change(vdev, req,
+							  new_link_info);
+}
+
+/**
+ * smd_roam_link_switch_start_connect() - Trigger link switch connect during SMD roaming
+ * @vdev: vdev on which the HOST_ADD_LINK link switch was requested
+ *
+ * Called when a link switch with reason MLO_LINK_SWITCH_REASON_HOST_ADD_LINK
+ * arrives and smd_is_roaming_in_progress() is true.  Delegates to
+ * mlo_mgr_link_switch_start_connect() which drives the CM connect for the
+ * new link using the cached connect request.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+smd_roam_link_switch_start_connect(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct wlan_cm_connect_req conn_req = {0};
+	struct mlo_link_info *mlo_link_info;
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_mlo_link_switch_req *req;
+	struct mlo_link_recfg_context *recfg_ctx;
+
+	if (!vdev) {
+		mlo_err("SMD: vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_err("VDEV %d link switch connect request",
+		wlan_vdev_get_id(vdev));
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		mlo_err("SMD: ML dev ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	if (!recfg_ctx) {
+		mlo_err("SMD: link recfg ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	req =  &mlo_dev_ctx->link_ctx->last_req;
+	if (!req) {
+		mlo_err("Link switch req is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!smd_is_roaming_in_progress(vdev)) {
+		mlo_err("SMD: roaming not in progress for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return QDF_STATUS_SUCCESS;
+	}
+
+	mlo_link_info = smd_get_prepared_ap_link_info(vdev, &req->tgt_ap_link_addr);
+	if (!mlo_link_info) {
+		mlo_err("SMD: AP link info not found for "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(req->tgt_ap_link_addr.bytes));
+		return QDF_STATUS_SUCCESS;
+	}
+
+		/* Select correct vdev based on link switch reason */
+	if (req->reason == MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK) {
+		/* For idle vdev SMD roam, use the vdev passed in (idle vdev) */
+		mlo_debug("SMD_ADD_LINK: Using idle vdev %d for connect",
+			  wlan_vdev_get_id(vdev));
+		wlan_vdev_mlme_set_mlo_vdev(vdev);
+		wlan_vdev_mlme_set_mlo_link_vdev(vdev);
+	}
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	copied_conn_req_lock_acquire(sta_ctx);
+	if (sta_ctx->copied_conn_req) {
+		qdf_mem_copy(&conn_req, sta_ctx->copied_conn_req,
+			     sizeof(struct wlan_cm_connect_req));
+	} else {
+		copied_conn_req_lock_release(sta_ctx);
+		goto out;
+	}
+	copied_conn_req_lock_release(sta_ctx);
+
+	conn_req.vdev_id = req->vdev_id;
+	conn_req.source = CM_MLO_LINK_SWITCH_CONNECT;
+	wlan_vdev_set_link_id(vdev, req->new_ieee_link_id);
+
+	conn_req.chan_freq = req->new_primary_freq;
+	conn_req.link_id = req->new_ieee_link_id;
+	qdf_copy_macaddr(&conn_req.bssid, &mlo_link_info->ap_link_addr);
+	qdf_copy_macaddr(&conn_req.bssid_hint, &mlo_link_info->ap_link_addr);
+	if (req->reason == MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK) {
+		/* Idle vdev has no SSID; read it from the assoc vdev instead */
+		struct wlan_objmgr_vdev *assoc_vdev =
+					wlan_mlo_get_assoc_link_vdev(vdev);
+		if (!assoc_vdev) {
+			mlo_err("SMD_ADD_LINK: No assoc vdev found");
+			goto out;
+		}
+		wlan_vdev_mlme_get_ssid(assoc_vdev, conn_req.ssid.ssid,
+					&conn_req.ssid.length);
+	} else {
+		wlan_vdev_mlme_get_ssid(vdev, conn_req.ssid.ssid,
+					&conn_req.ssid.length);
+	}
+
+	qdf_copy_macaddr(&conn_req.mld_addr, &recfg_ctx->curr_recfg_req.add_link_info.mld_addr);
+
+	conn_req.crypto.auth_type = 0;
+	if (mlo_dev_ctx->smd_ctx && mlo_dev_ctx->smd_ctx->num_prepared > 0 &&
+	    mlo_dev_ctx->smd_ctx->prepared_targets[0].prepared &&
+	    mlo_dev_ctx->smd_ctx->prepared_targets[0].target_bss_ctx) {
+		struct wlan_mlo_sta *tgt_bss_ctx =
+			mlo_dev_ctx->smd_ctx->prepared_targets[0].target_bss_ctx;
+		struct mlo_partner_info *pinfo = &conn_req.ml_parnter_info;
+		uint8_t pi, nl = 0;
+
+		pinfo->num_partner_links = 0;
+		for (pi = 0; pi < WLAN_MAX_ML_BSS_LINKS; pi++) {
+			struct mlo_link_info *linfo = &tgt_bss_ctx->links_info[pi];
+
+			if (qdf_is_macaddr_zero(&linfo->ap_link_addr))
+				continue;
+			if (linfo->link_id == req->new_ieee_link_id)
+				continue;
+			pinfo->partner_link_info[nl].link_id = linfo->link_id;
+			pinfo->partner_link_info[nl].vdev_id = linfo->vdev_id;
+			pinfo->partner_link_info[nl].ap_link_addr = linfo->ap_link_addr;
+			pinfo->partner_link_info[nl].link_addr = linfo->link_addr;
+			pinfo->partner_link_info[nl].chan_freq = linfo->chan_freq;
+			nl++;
+		}
+		pinfo->num_partner_links = nl;
+		mlo_debug("SMD_ADD_LINK: updated partner_info from target_bss_ctx: %d links",
+			  nl);
+	} else {
+		conn_req.ml_parnter_info = sta_ctx->ml_partner_info;
+	}
+
+	mlo_allocate_and_copy_ies(&conn_req, sta_ctx->copied_conn_req);
+
+	status = wlan_cm_start_connect(vdev, &conn_req);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		mlo_update_connected_links(vdev, 1);
+
+	wlan_cm_free_connect_req_param(&conn_req);
+
+out:
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("VDEV %d link switch connect request failed",
+			wlan_vdev_get_id(vdev));
+		mlo_mgr_remove_link_switch_cmd(vdev);
+	}
+
+	mlo_debug("SMD: triggering link switch connect for vdev %d",
+		  req->vdev_id);
+
+	return status;
+}
+
+QDF_STATUS
+smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_serialization_command *cmd)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	uint8_t vdev_id, old_link_id, new_link_id;
+	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
+	struct wlan_mlo_link_switch_req *req = &mlo_dev_ctx->link_ctx->last_req;
+	struct qdf_mac_addr bssid;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	old_link_id = req->curr_ieee_link_id;
+	new_link_id = req->new_ieee_link_id;
+
+	mlo_debug("VDEV %d start link switch", vdev_id);
+	mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
+
+	if (!smd_is_roaming_in_progress(vdev)) {
+		mlo_err("SMD roaming not in progress");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = wlan_vdev_get_bss_peer_mld_mac(vdev, &req->peer_mld_addr);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = mlo_mgr_link_switch_notify(vdev, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	wlan_vdev_mlme_set_mlo_link_switch_in_progress(vdev);
+	status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = wlan_cm_disconnect(vdev, CM_MLO_LINK_SWITCH_DISCONNECT,
+				    REASON_FW_TRIGGERED_LINK_SWITCH, &bssid);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("VDEV %d disconnect request not handled", req->vdev_id);
+
+	return status;
+}
+
 #endif /* WLAN_FEATURE_11BN_SMD */

@@ -297,6 +297,40 @@ smd_link_recfg_has_active_vdev_for_add_link(
 				struct wlan_mlo_link_switch_req *link_sw_req);
 
 /**
+ * smd_cleanup_curr_ap_link() - Prepare link switch to tear down cleanup vdev link
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration state request (del_link_info carries cleanup vdev link)
+ * @link_sw_req: Link switch request to be populated
+ *
+ * Handles the multi-link to single-link SMD roaming case where add_link_info is empty
+ * but del_link_info identifies the vdev to disconnect. Matches del_link entries against
+ * sta_ctx->links_info[] by link_id and ap_link_addr. Prepares a link switch request
+ * with MLO_LINK_SWITCH_REASON_SMD_ROAM_REMOVE_LINK to disconnect without reconnecting.
+ *
+ * Return: true if cleanup link found and link_sw_req populated, false otherwise
+ */
+bool
+smd_cleanup_curr_ap_link(struct mlo_link_recfg_context *recfg_ctx,
+			 struct mlo_link_recfg_state_req *req,
+			 struct wlan_mlo_link_switch_req *link_sw_req);
+
+/**
+ * smd_roam_link_switch_disconnect_done() - Handle link switch disconnect
+ *                                          completion during SMD roaming
+ * @vdev: vdev on which the link switch disconnect completed
+ * @mlo_dev_ctx: MLO device context
+ *
+ * Handles post-disconnect processing for SMD-initiated link switches.
+ * For REMOVE_LINK advances FSM to COMPLETE_SUCCESS; for HOST_ADD_LINK
+ * looks up the prepared target AP link and proceeds to MAC addr change.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+smd_roam_link_switch_disconnect_done(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlo_dev_context *mlo_dev_ctx);
+
+/**
  * smd_fw_roam_sync() - Handle firmware roam sync indication for SMD roaming
  * @vdev: Assoc VDEV object on which FW roam sync was received
  * @sync_ind: Roam offload sync indication from firmware carrying vdev
@@ -426,6 +460,17 @@ smd_roam_link_recfg_set_tx_link_addr(
  */
 bool
 smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * smd_roam_start_link_switch() - Start link switch for SMD roaming
+ * @vdev: vdev pointer
+ * @cmd: Serialization command pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_serialization_command *cmd);
 #else
 static inline QDF_STATUS
 smd_roam_link_recfg_set_tx_link_addr(
@@ -470,6 +515,21 @@ smd_link_recfg_has_active_vdev_for_add_link(
 				struct wlan_mlo_link_switch_req *link_sw_req)
 {
 	return false;
+}
+
+static inline bool
+smd_cleanup_curr_ap_link(struct mlo_link_recfg_context *recfg_ctx,
+			 struct mlo_link_recfg_state_req *req,
+			 struct wlan_mlo_link_switch_req *link_sw_req)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+smd_roam_link_switch_disconnect_done(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline QDF_STATUS
@@ -592,6 +652,13 @@ smd_link_recfg_assign_self_link_addr(
 static inline QDF_STATUS
 smd_validate_repurpose_smd_addr(struct mlo_link_recfg_context *recfg_ctx,
 				struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_serialization_command *cmd)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
