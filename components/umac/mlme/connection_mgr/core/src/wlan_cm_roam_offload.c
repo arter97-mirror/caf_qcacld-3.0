@@ -5071,8 +5071,17 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 		 * of roam invoke or if roaming was disabled due to
 		 * other reasons like SAP start/connect on other vdev,
 		 * the state should be transitioned to RSO STOPPED.
+		 *
+		 * Exception: when reason is ROAM_ABORT, control_bitmap may be
+		 * set by a concurrent SAP start that was deferred via
+		 * rso_pending_disable_req_bitmap while roaming was in progress.
+		 * Do not transition to RSO_STOPPED here — cm_roam_abort_event()
+		 * will flush the pending bitmap and send RSO_STOP cleanly after
+		 * FW completes the abort. Sending RSO_STOP now races with
+		 * in-flight FW scan IPC events and causes an ExIPC crash.
 		 */
-		if (sup_disabled_roaming || control_bitmap)
+		if (sup_disabled_roaming ||
+		    (control_bitmap && reason != REASON_ROAM_ABORT))
 			new_roam_state = WLAN_ROAM_RSO_STOPPED;
 		else
 			new_roam_state = WLAN_ROAM_RSO_ENABLED;
@@ -5121,7 +5130,7 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (control_bitmap) {
+	if (control_bitmap && reason != REASON_ROAM_ABORT) {
 		mlme_debug("ROAM: RSO Disabled internally: vdev[%d] bitmap[0x%x]",
 			   vdev_id, control_bitmap);
 		return QDF_STATUS_E_FAILURE;
