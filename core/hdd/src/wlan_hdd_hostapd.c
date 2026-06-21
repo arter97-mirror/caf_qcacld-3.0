@@ -2147,7 +2147,7 @@ hdd_hostapd_sap_fill_peer_ml_info(struct wlan_hdd_link_info *link_info,
 
 static void
 hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
-				   struct hdd_adapter *adapter)
+				   struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sap_cnt;
@@ -2155,8 +2155,8 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	struct sap_context *sap_ctx;
 	bool ch_valid;
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("sap ctx is null");
 		return;
@@ -2176,7 +2176,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 		qdf_status = hdd_unsafe_channel_restart_sap(hdd_ctx);
 	else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
 		qdf_status = hdd_dcs_hostapd_set_chan(
-			hdd_ctx, adapter->deflink->vdev_id,
+			hdd_ctx, link_info->vdev_id,
 			ap_ctx->operating_chan_freq);
 	if (qdf_status == QDF_STATUS_E_PENDING) {
 		hdd_debug("csa is pending with reason %d",
@@ -2196,7 +2196,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	}
 
 	qdf_status = policy_mgr_check_sap_go_force_scc(
-			hdd_ctx->psoc, adapter->deflink->vdev,
+			hdd_ctx->psoc, link_info->vdev,
 			ap_ctx->sap_context->csa_reason);
 	if (qdf_status == QDF_STATUS_E_PENDING) {
 		hdd_debug("csa is pending by sap go force scc");
@@ -3493,7 +3493,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		/* Check any other sap need restart */
 		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						  link_info->vdev_id))
-			hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
+			hdd_hostapd_check_channel_post_csa(hdd_ctx, link_info);
 
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -3834,6 +3834,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
+	qdf_freq_t ll_sap_freq;
 
 	if (!link_info)
 		return -EINVAL;
@@ -3887,6 +3888,19 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				wlan_vdev_get_id(sap_ctx->vdev),
 				LL_SAP_CSA_CONCURENCY);
 		return ret;
+	}
+
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
+
+	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
+					      ll_sap_freq)) {
+		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
 	}
 
 	if (wlan_reg_is_6ghz_chan_freq(target_chan_freq) &&
@@ -5000,11 +5014,9 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 
 	hdd_debug("iface_name = %s", iface_name);
 
-	dev = alloc_netdev_mqs(sizeof(struct hdd_adapter), iface_name,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || defined(WITH_BACKPORTS)
-			       name_assign_type,
-#endif
-			       ether_setup, NUM_TX_QUEUES, NUM_RX_QUEUES);
+	dev = hdd_alloc_netdev_mqs(sizeof(struct hdd_adapter), iface_name,
+				   name_assign_type,
+				   ether_setup, NUM_TX_QUEUES, NUM_RX_QUEUES);
 
 	if (!dev)
 		return NULL;
@@ -5052,6 +5064,421 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 
 	return adapter;
 }
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * _hdd_wds_ext_dev_open() - Open WDS extended device
+ * @dev: Network device to open
+ *
+ * This function opens a WDS extended device by setting up the peer
+ * receive callback in the data path.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int _hdd_wds_ext_dev_open(struct net_device *dev)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	void *dp_handle;
+	struct hdd_wds_ext *osifp = netdev_priv(dev);
+	struct hdd_adapter *adapter;
+	QDF_STATUS status;
+
+	hdd_enter_dev(dev);
+
+	if (!osifp->parent_netdev) {
+		hdd_err("parent netdev is null");
+		return -EINVAL;
+	}
+
+	adapter = netdev_priv(osifp->parent_netdev);
+
+	psoc = adapter->hdd_ctx->psoc;
+	if (!psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	dp_handle = wlan_psoc_get_dp_handle(psoc);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_WDS_ID);
+	if (!vdev) {
+		hdd_err("parent vdev is null");
+		return -EINVAL;
+	}
+
+	status = cdp_wds_ext_set_peer_rx(dp_handle, wlan_vdev_get_id(vdev),
+					 osifp->peer_mac_addr,
+					 hdd_softap_wds_ext_rx_handler,
+					 (ol_osif_peer_handle)osifp);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("set wds ext callback failed, status %d", status);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WDS_ID);
+		return -EINVAL;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_WDS_ID);
+	return 0;
+}
+
+/**
+ * hdd_wds_ext_dev_open() - Open WDS extended device with synchronization
+ * @net_dev: Network device to open
+ *
+ * This function is a wrapper around _hdd_wds_ext_dev_open() that provides
+ * proper synchronization using osif_vdev_sync framework.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int hdd_wds_ext_dev_open(struct net_device *net_dev)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	hdd_enter_dev(net_dev);
+
+	errno = osif_vdev_sync_trans_start(net_dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = _hdd_wds_ext_dev_open(net_dev);
+
+	osif_vdev_sync_trans_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * _hdd_wds_ext_dev_stop() - Stop WDS extended device
+ * @dev: Network device to stop
+ *
+ * This function stops a WDS extended device by clearing the peer
+ * receive callback in the data path.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int _hdd_wds_ext_dev_stop(struct net_device *dev)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	void *dp_handle;
+	struct hdd_wds_ext *osifp = netdev_priv(dev);
+	struct hdd_adapter *adapter;
+	QDF_STATUS status;
+
+	hdd_enter_dev(dev);
+
+	if (!osifp->parent_netdev) {
+		hdd_err("parent netdev is null");
+		return -EINVAL;
+	}
+
+	adapter = netdev_priv(osifp->parent_netdev);
+
+	psoc = adapter->hdd_ctx->psoc;
+	if (!psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	dp_handle = wlan_psoc_get_dp_handle(psoc);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_WDS_ID);
+	if (!vdev) {
+		hdd_err("parent vdev is null");
+		return -EINVAL;
+	}
+
+	status = cdp_wds_ext_set_peer_rx(dp_handle, wlan_vdev_get_id(vdev),
+					 osifp->peer_mac_addr, NULL, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("clear wds ext callback failed, status %d", status);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WDS_ID);
+		return -EINVAL;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_WDS_ID);
+	return 0;
+}
+
+/**
+ * hdd_wds_ext_dev_stop() - Stop WDS extended device with synchronization
+ * @net_dev: Network device to stop
+ *
+ * This function is a wrapper around _hdd_wds_ext_dev_stop() that provides
+ * proper synchronization using osif_vdev_sync framework.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int hdd_wds_ext_dev_stop(struct net_device *net_dev)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_trans_start(net_dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = _hdd_wds_ext_dev_stop(net_dev);
+
+	osif_vdev_sync_trans_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * _hdd_wds_ext_set_mac() - Set MAC address for WDS extended device
+ * @dev: Network device
+ * @p: Pointer to sockaddr structure containing new MAC address
+ *
+ * This function sets the MAC address for a WDS extended device by updating
+ * the device MAC address and peer MAC address information.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int _hdd_wds_ext_set_mac(struct net_device *dev, void *p)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	void *dp_handle;
+	struct hdd_adapter *adapter;
+	struct sockaddr *addr = p;
+	struct hdd_wds_ext *osifp = netdev_priv(dev);
+
+	hdd_enter_dev(dev);
+
+	if (!osifp->parent_netdev) {
+		hdd_err("parent netdev is null");
+		return -EINVAL;
+	}
+
+	adapter = netdev_priv(osifp->parent_netdev);
+
+	psoc = adapter->hdd_ctx->psoc;
+	if (!psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	dp_handle = wlan_psoc_get_dp_handle(psoc);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_WDS_ID);
+	if (!vdev) {
+		hdd_err("parent vdev is null");
+		return -EINVAL;
+	}
+
+	qdf_net_update_net_device_dev_addr(dev,
+					   wlan_vdev_mlme_get_macaddr(vdev),
+					   QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(osifp->peer_mac_addr, addr->sa_data, QDF_MAC_ADDR_SIZE);
+	osifp->peer_id = cdp_get_peer_id(dp_handle, wlan_vdev_get_id(vdev),
+					 osifp->peer_mac_addr);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_WDS_ID);
+	return 0;
+}
+
+/**
+ * hdd_wds_ext_set_mac() - Set MAC address for WDS extended device with
+ * synchronization
+ * @net_dev: Network device
+ * @p: Pointer to sockaddr structure containing new MAC address
+ *
+ * This function is a wrapper around _hdd_wds_ext_set_mac() that provides
+ * proper synchronization using osif_vdev_sync framework.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int hdd_wds_ext_set_mac(struct net_device *net_dev, void *p)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = _hdd_wds_ext_set_mac(net_dev, p);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+static const struct net_device_ops wds_ext_dev_ops = {
+	.ndo_open = hdd_wds_ext_dev_open,
+	.ndo_stop = hdd_wds_ext_dev_stop,
+	.ndo_set_mac_address = hdd_wds_ext_set_mac,
+	.ndo_start_xmit = hdd_softap_wds_ext_start_xmit,
+};
+
+/**
+ * hdd_wds_ext_get_parent_netdev() - Get parent network device for WDS
+ * extension
+ * @name: Interface name containing parent device name
+ *
+ * This function extracts the parent device name from a WDS extension interface
+ * name (format: parent.extension) and returns the parent network device.
+ *
+ * Return: Pointer to parent network device on success, NULL on failure
+ */
+static struct qdf_net_if *hdd_wds_ext_get_parent_netdev(const char *name)
+{
+	char parent_name[IFNAMSIZ];
+	uint32_t index;
+	bool name_valid = false;
+
+	for (index = 0; index < IFNAMSIZ; index++) {
+		if (name[index] == '\0')
+			break;
+		if (name[index] == '.') {
+			parent_name[index] = '\0';
+			name_valid = true;
+			break;
+		}
+		parent_name[index] = name[index];
+	}
+
+	if (!name_valid)
+		return NULL;
+
+	return qdf_net_if_get_dev_by_name(parent_name);
+}
+
+/**
+ * hdd_alloc_wds_ext_netdev() - Allocate WDS extended network device
+ * @name_assign_type: Name assignment type for the network device
+ * @name: Interface name for the WDS extension device
+ *
+ * This function allocates and initializes a WDS extended network device.
+ * It extracts the parent device name from the interface name and creates
+ * a new network device with the WDS extension private data structure.
+ *
+ * Return: Pointer to hdd_wds_ext structure on success, NULL on failure
+ */
+static struct hdd_wds_ext *
+hdd_alloc_wds_ext_netdev(unsigned char name_assign_type, const char *name)
+{
+	struct hdd_wds_ext *osifp;
+	struct qdf_net_if *nif;
+	struct qdf_net_if *parent_nif;
+	struct net_device *net_dev;
+
+	nif = qdf_net_if_get_dev_by_name((char *)name);
+	if (nif) {
+		qdf_net_if_release_dev(nif);
+		hdd_err("%s net dev exists", name);
+		return NULL;
+	}
+
+	parent_nif = hdd_wds_ext_get_parent_netdev(name);
+	if (!parent_nif) {
+		hdd_err("%s cannot get parent netdev", name);
+		return NULL;
+	}
+
+	net_dev = hdd_alloc_netdev_mqs(sizeof(struct hdd_wds_ext), name,
+				       name_assign_type,
+				       ether_setup, NUM_TX_QUEUES,
+				       NUM_RX_QUEUES);
+	if (!net_dev) {
+		hdd_err("fail to allocate netdev %s", name);
+		goto fail;
+	}
+
+	osifp = netdev_priv(net_dev);
+
+	qdf_mem_zero(osifp, sizeof(*osifp));
+	osifp->netdev = net_dev;
+	osifp->parent_netdev = (struct net_device *)parent_nif;
+
+	return osifp;
+
+fail:
+	if (parent_nif)
+		qdf_net_if_release_dev(parent_nif);
+	return NULL;
+}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+/**
+ * hdd_set_netdev_no_queue() - Set network device to bypass queueing
+ * @dev: Network device pointer
+ *
+ * This function sets the IFF_NO_QUEUE flag on the network device to bypass
+ * the kernel's queueing discipline for better performance in certain scenarios.
+ *
+ * Return: None
+ */
+static inline void hdd_set_netdev_no_queue(struct net_device *dev)
+{
+	dev->priv_flags |= IFF_NO_QUEUE;
+}
+#else
+/**
+ * hdd_set_netdev_no_queue() - Set network device to bypass queueing (stub)
+ * @dev: Network device pointer
+ *
+ * Stub function for kernels that don't support IFF_NO_QUEUE flag.
+ *
+ * Return: None
+ */
+static inline void hdd_set_netdev_no_queue(struct net_device *dev) {}
+#endif
+
+struct wireless_dev *hdd_create_wds_ext_dev(struct wiphy *wiphy,
+					    const char *name,
+					    unsigned char name_assign_type,
+					    enum nl80211_iftype type)
+{
+	struct hdd_wds_ext *osifp;
+	struct net_device *netdev, *parent_netdev;
+
+	if (type != NL80211_IFTYPE_AP_VLAN)
+		return ERR_PTR(-EINVAL);
+
+	hdd_enter();
+
+	osifp = hdd_alloc_wds_ext_netdev(name_assign_type, name);
+	if (!osifp)
+		return NULL;
+
+	netdev = osifp->netdev;
+	parent_netdev = osifp->parent_netdev;
+
+	netdev->features = parent_netdev->features;
+
+	/* NB: bypass queueing */
+	netdev->tx_queue_len = 0;
+	hdd_set_netdev_no_queue(netdev);
+
+	hdd_dev_setup_destructor(netdev);
+	netdev->netdev_ops = &wds_ext_dev_ops;
+
+	netdev->ieee80211_ptr = &osifp->wdev;
+	osifp->wdev.wiphy = wiphy;
+	osifp->wdev.netdev = netdev;
+	osifp->wdev.iftype = NL80211_IFTYPE_AP_VLAN;
+
+	if (wlan_cfg80211_register_netdevice(netdev)) {
+		hdd_err("%s: unable to register device", netdev->name);
+		goto fail;
+	}
+
+	hdd_exit();
+
+	return netdev->ieee80211_ptr;
+
+fail:
+	if (osifp->parent_netdev)
+		qdf_net_if_release_dev((struct qdf_net_if *)parent_netdev);
+	if (osifp->netdev)
+		free_netdev(osifp->netdev);
+
+	return NULL;
+}
+#endif
 
 /**
  * wlan_hdd_rate_is_11g() - check if rate is 11g rate or not
@@ -7248,7 +7675,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 
 	if (QDF_STATUS_SUCCESS !=
-	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq)) {
+	    wlan_hdd_validate_operation_channel(hdd_ctx, config->chan_freq) &&
+	    !test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		hdd_err("Invalid Ch_freq: %d", config->chan_freq);
 		ret = -EINVAL;
 		goto error;
@@ -8379,8 +8807,17 @@ wlan_hdd_is_ap_ap_force_scc_override(struct wlan_hdd_link_info *link_info,
 		return false;
 	}
 
-	status = wlan_hdd_get_sap_ch_params(hdd_ctx, con_vdev_id, con_freq,
-					    &ch_params);
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		ch_params.ch_width = hdd_map_nl_chan_width(chandef->width);
+		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+							con_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		status = QDF_STATUS_SUCCESS;
+	} else {
+		status = wlan_hdd_get_sap_ch_params(hdd_ctx, con_vdev_id,
+						    con_freq, &ch_params);
+	}
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
@@ -8688,6 +9125,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
+	qdf_freq_t user_config_freq;
 
 	hdd_enter();
 
@@ -8753,6 +9191,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
+	user_config_freq = freq;
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
@@ -9064,6 +9503,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 		if (!vdev)
 			return -EINVAL;
+
+		if (user_config_freq != freq)
+			wlan_set_sap_user_config_freq(vdev, user_config_freq);
 
 		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 			link_id = wlan_vdev_get_link_id(vdev);

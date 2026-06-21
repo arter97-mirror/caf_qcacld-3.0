@@ -211,6 +211,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 				&adapter->deflink->hdd_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
 	QDF_STATUS status;
+	struct cdp_tx_exception_metadata tx_exc_param = {0};
+	bool exception;
 
 	osif_dp_mark_pkt_type(skb);
 	hdd_tx_latency_record_ingress_ts(adapter, skb);
@@ -219,8 +221,14 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 	++stats->per_cpu[cpu].tx_classified_ac[ac];
 
+	exception = ucfg_dp_softap_init_tx_exc_metadata(adapter->deflink->vdev,
+							(qdf_nbuf_t)skb,
+							&tx_exc_param);
+
 	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb,
-					   adapter->deflink->vdev);
+					   adapter->deflink->vdev,
+					   &tx_exc_param,
+					   exception);
 	if (QDF_IS_STATUS_ERROR(status))
 		++stats->per_cpu[cpu].tx_dropped_ac[ac];
 
@@ -246,6 +254,73 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	else
 		return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+netdev_tx_t hdd_softap_wds_ext_start_xmit(struct sk_buff *skb,
+					  struct net_device *net_dev)
+{
+	struct cdp_tx_exception_metadata tem_param;
+	struct net_device *parent_dev;
+	struct hdd_tx_rx_stats *stats;
+	struct hdd_adapter *adapter;
+	struct hdd_wds_ext *wds_ext;
+	sme_ac_enum_type ac;
+	QDF_STATUS status;
+	qdf_nbuf_t nbuf;
+	bool exception;
+	int cpu;
+
+	wds_ext = netdev_priv(net_dev);
+
+	parent_dev = wds_ext->parent_netdev;
+	adapter = netdev_priv(parent_dev);
+
+	cpu = qdf_get_smp_processor_id();
+	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
+
+	stats = &adapter->deflink->hdd_stats.tx_rx_stats;
+	++stats->per_cpu[cpu].tx_classified_ac[ac];
+
+	osif_dp_mark_pkt_type(skb);
+	nbuf = (qdf_nbuf_t)skb;
+
+	exception = ucfg_dp_softap_init_tx_exc_metadata(adapter->deflink->vdev,
+							nbuf, &tem_param);
+
+	if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) || QDF_NBUF_CB_GET_IS_MCAST(nbuf)) {
+		tem_param.peer_id = wds_ext->peer_id;
+		tem_param.is_wds_extended_mc_bc = 1;
+		exception = true;
+	}
+
+	status = ucfg_dp_softap_start_xmit(nbuf, adapter->deflink->vdev,
+					   &tem_param, exception);
+	if (QDF_IS_STATUS_ERROR(status))
+		++stats->per_cpu[cpu].tx_dropped_ac[ac];
+
+	netif_trans_update(net_dev);
+
+	return NETDEV_TX_OK;
+}
+
+QDF_STATUS hdd_softap_wds_ext_rx_handler(void *osif_dev, qdf_nbuf_t rxbuf)
+{
+	struct net_device *parent_dev;
+	struct hdd_adapter *adapter;
+	struct hdd_wds_ext *wds_ext;
+	struct net_device *dev;
+
+	wds_ext = (struct hdd_wds_ext *)osif_dev;
+
+	parent_dev = wds_ext->parent_netdev;
+	adapter = netdev_priv(parent_dev);
+
+	dev = wds_ext->netdev; /* points to the wds_ext interface */
+
+	return ucfg_dp_softap_wds_ext_rx_handler(adapter->deflink->vdev, dev,
+						 rxbuf);
+}
+#endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 static void __hdd_softap_tx_timeout(struct net_device *dev)
 {

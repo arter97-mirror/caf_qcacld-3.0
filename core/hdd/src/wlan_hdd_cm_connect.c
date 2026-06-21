@@ -453,6 +453,44 @@ static void hdd_update_scan_ie_for_connect(struct hdd_adapter *adapter,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static int
+hdd_get_partner_link_freqs_from_scan_res(struct scan_cache_node *cur_node,
+					 qdf_freq_t **partner_freqs)
+{
+	int i = 0;
+	qdf_freq_t *freqs;
+	int num_links;
+
+	if (!cur_node || !cur_node->entry)
+		return 0;
+
+	num_links = cur_node->entry->ml_info.num_links;
+
+	if (!num_links)
+		return 0;
+
+	freqs = qdf_mem_malloc(sizeof(*freqs) * num_links);
+
+	if (!freqs)
+		return 0;
+
+	for (i = 0; i < num_links; i++)
+		freqs[i] = cur_node->entry->ml_info.link_info[i].freq;
+
+	*partner_freqs = freqs;
+	return num_links;
+}
+
+#else
+static int
+hdd_get_partner_link_freqs_from_scan_res(struct scan_cache_node *cur_node,
+					 qdf_freq_t **partner_freqs)
+{
+	return 0;
+}
+#endif
+
 #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)) || \
 	defined(CFG80211_11BE_BASIC)) && \
 	defined(WLAN_FEATURE_11BE)
@@ -591,15 +629,15 @@ hdd_get_dot11mode_filter(struct hdd_context *hdd_ctx)
 }
 
 /**
- * hdd_get_sap_adapter_of_dfs - Get sap adapter on dfs channel
+ * hdd_get_sap_link_info_of_dfs - Get sap link info on dfs channel
  * @hdd_ctx: HDD context
  *
- * This function is used to get the sap adapter on dfs channel.
+ * This function is used to get the sap link info on dfs channel.
  *
- * Return: pointer to adapter or null
+ * Return: pointer to link_info or null
  */
-static struct hdd_adapter *
-hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
+static struct wlan_hdd_link_info *
+hdd_get_sap_link_info_of_dfs(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
@@ -609,7 +647,8 @@ hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->device_mode != QDF_SAP_MODE)
+		if (adapter->device_mode != QDF_SAP_MODE &&
+		    adapter->device_mode != QDF_P2P_GO_MODE)
 			goto loop_next;
 
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
@@ -657,7 +696,7 @@ hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
 
-				return adapter;
+				return link_info;
 			}
 		}
 loop_next:
@@ -680,7 +719,6 @@ static
 bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 					 struct cfg80211_connect_params *req)
 {
-	struct hdd_adapter *ap_adapter;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
 	QDF_STATUS status;
@@ -692,11 +730,15 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	qdf_list_node_t *cur_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	bool is_6ghz_cap = false;
-	int ret;
+	int ret, i;
+	struct wlan_hdd_link_info *link_info;
+	enum policy_mgr_con_mode dfs_con_mode = PM_SAP_MODE;
+	int num_partner_freq = 0;
+	qdf_freq_t *freqs = NULL;
 
-	ap_adapter = hdd_get_sap_adapter_of_dfs(hdd_ctx);
+	link_info = hdd_get_sap_link_info_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
-	if (!ap_adapter)
+	if (!link_info)
 		return true;
 
 	/* if sap is currently doing CAC then don't allow sta to go further */
@@ -709,12 +751,17 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	 * log and return error, if we allow STA to go through, we don't
 	 * know what is going to happen better stop sta connection
 	 */
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	if (!hdd_ap_ctx) {
 		hdd_err("AP context not found");
 		return false;
 	}
 
+	if (policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
+				      hdd_ap_ctx->operating_chan_freq)) {
+		hdd_debug("DFS SAP is already in SCC with STA");
+		return true;
+	}
 	if (req->channel && req->channel->center_freq) {
 		ch_freq = req->channel->center_freq;
 		goto def_chan;
@@ -755,6 +802,24 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 
 	cur_node = qdf_container_of(cur_lst, struct scan_cache_node, node);
 	ch_freq = cur_node->entry->channel.chan_freq;
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq))
+		goto purge_list;
+
+	num_partner_freq = hdd_get_partner_link_freqs_from_scan_res(cur_node,
+								    &freqs);
+	for (i = 0; i < num_partner_freq; i++) {
+		if (WLAN_REG_IS_5GHZ_CH_FREQ(freqs[i])) {
+			ch_freq = freqs[i];
+			break;
+		}
+
+		if (ch_freq < freqs[i])
+			ch_freq = freqs[i];
+	}
+	if (freqs)
+		qdf_mem_free(freqs);
+
 purge_list:
 	if (list)
 		ucfg_scan_purge_results(list);
@@ -770,9 +835,11 @@ def_chan:
 
 	if (policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc) &&
 	    ch_freq &&
+	    !policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc) &&
 	    policy_mgr_are_sbs_chan(hdd_ctx->psoc,
 				    ch_freq,
-				    hdd_ap_ctx->operating_chan_freq)) {
+				    hdd_ap_ctx->operating_chan_freq) &&
+	    !num_partner_freq) {
 		hdd_debug("sta freq %d sap freq %d in sbs mode is allowed",
 			  ch_freq, hdd_ap_ctx->operating_chan_freq);
 		return true;
@@ -787,16 +854,18 @@ def_chan:
 	ch_bw = hdd_ap_ctx->sap_config.ch_width_orig;
 	if (ch_freq)
 		is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(hdd_ctx->psoc,
-						ap_adapter->deflink->vdev_id,
+						link_info->vdev_id,
 							     NULL);
+	if (link_info->adapter->device_mode == QDF_P2P_GO_MODE)
+		dfs_con_mode = PM_P2P_GO_MODE;
 
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
 	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq) ||
 	    wlan_reg_is_passive_for_freq(hdd_ctx->pdev, ch_freq) ||
 	    (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) && !is_6ghz_cap))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
-				hdd_ctx->psoc, PM_SAP_MODE,
-				true, ap_adapter->deflink->vdev_id);
+				hdd_ctx->psoc, dfs_con_mode,
+				true, link_info->vdev_id);
 
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 	    ch_bw > CH_WIDTH_20MHZ) {
@@ -823,12 +892,12 @@ def_chan:
 			  ch_bw);
 	}
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
-	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
+	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
-	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq, 0,
+	ret = hdd_softap_set_channel_change(link_info, ch_freq, 0,
 					    ch_bw, NO_SCHANS_PUNC, false, true);
 	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
@@ -1830,7 +1899,15 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			adapter->device_mode);
 	}
 
-	if (ucfg_ipa_is_enabled() && !is_auth_required) {
+	/*
+	 * For MLO STA, only fire WLAN_IPA_STA_CONNECT on the assoc link.
+	 * Non-assoc (partner) links share the same net_device and would
+	 * trigger a spurious WLAN_STA_DISCONNECT + WAN teardown in IPACM.
+	 * Exception: link switch repurpose (is_vdev_repurpose) must always
+	 * fire so IPACM can update WAN rules for the new assoc link vdev.
+	 */
+	if (ucfg_ipa_is_enabled() && !is_auth_required &&
+	    (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) || is_vdev_repurpose)) {
 		status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info, &alt_pipe);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_debug("Failed to get alternate pipe for vdev %d",

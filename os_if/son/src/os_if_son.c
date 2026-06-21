@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,6 +42,9 @@
 #include <include/wlan_mlme_cmn.h>
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_hdd_main.h>
+#include <ol_ath_ucfg.h>
+#include <cfg_ucfg_api.h>
+#include <cdp_txrx_ctrl.h>
 
 static struct son_callbacks g_son_os_if_cb;
 static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
@@ -2501,6 +2504,23 @@ nla_put_failed:
 }
 
 qdf_export_symbol(os_if_son_send_status_nlink_msg);
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+void wlan_hdd_enable_wds_ext(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev)
+{
+	void *dp_handle;
+	cdp_config_param_type val = {0};
+
+	dp_handle = wlan_psoc_get_dp_handle(psoc);
+	val.cdp_vdev_param_wds_ext = cfg_get(psoc, CFG_SAP_ENABLE_WDS_EXT);
+	cdp_txrx_set_vdev_param(dp_handle,
+				wlan_vdev_get_id(vdev),
+				CDP_CFG_WDS_EXT, val);
+}
+
+qdf_export_symbol(wlan_hdd_enable_wds_ext);
+#endif
 
 #ifdef WLAN_FEATURE_SON
 struct mlme_external_tx_ops mlme_tx_ops;

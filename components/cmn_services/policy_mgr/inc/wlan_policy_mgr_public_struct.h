@@ -1233,7 +1233,9 @@ enum policy_mgr_two_connection_mode {
  * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NDI and NAN Disc on 2.4Ghz and second NDI in
  * 5ghz DBS
  * @PM_SAP_SAP_SAP_SCC_24_SMM: AP+AP+AP on 2.4Ghz in SMM mode
+ * @PM_SAP_SAP_STA_SCC_24_SMM: AP+AP+STA on 2.4Ghz in SMM mode
  * @PM_SAP_SAP_SAP_SCC_5_SMM: AP+AP+AP on 5Ghz in SMM mode
+ * @PM_SAP_SAP_STA_SCC_5_SMM: AP+AP+STA on 5Ghz in SMM mode
  * @PM_SAP_SAP_SCC_5_STA_24_DBS: Both SAP on 5Ghz and another STA on 2.4Ghz DBS
  * @PM_SAP_SAP_STA_SCC_5_DBS: Both SAP on 5Ghz and another STA on 5Ghz DBS
  * @PM_STA_STA_5_NAN_DISC_24_DBS: Both STA on 5Ghz and NAN Disc on 2.4Ghz DBS
@@ -1273,7 +1275,9 @@ enum policy_mgr_two_connection_mode {
  * @PM_STA_STA_5_HIGH_MCC_SAP_5_LOW_SBS : First STA on high 5 GHZ & Second STA
  * on high 5 GHZ MCC on mac0 and SAP on low 5 GHZ on mac1 doing SBS
  * @PM_STA_24_STA_5_MCC_SAP_5_HIGH_SBS: MLO STA 2+5/6 GHz, SAP on 5/6 GHz
- * high band, the current hw mode is SBS.
+ * high band, the current hw mode is SBS
+ * @PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS: First SAP on high 5 GHZ & STA on high
+ * 5 GHZ SCC/MCC on mac 0 and second SAP on low 5GHz on mac 1 doing SBS.
  * @PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS: Any 2 link on low 5 GHZ mac
  * and one link on high 5 GHZ freq doing SBS
  * @PM_STA_24_SAP_5_LOW_MCC_STA_5_HIGH_SBS : First STA on 2.4 GHZ & SAP on low
@@ -1287,7 +1291,9 @@ enum policy_mgr_two_connection_mode {
  * @PM_STA_STA_5_LOW_MCC_SAP_5_HIGH_SBS : First STA on high 5 GHZ & Second STA
  * on high 5 GHZ MCC on mac0 and SAP on low 5 GHZ on mac1 doing SBS
  * @PM_STA_24_STA_5_MCC_SAP_5_LOW_SBS: MLO STA 2+5/6 GHz, SAP on 5/6 GHz
- * low band, the current hw mode is SBS.
+ * low band, the current hw mode is SBS
+ * @PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS: First SAP on low 5 GHZ & STA on low 5 GHZ
+ * SCC/MCC on mac0 and second SAP on high 5 GHZ on mac1 doing SBS.
  * @PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS:
  * @PM_SAP_24_STA_5_STA_5_LOW_N_HIGH_SHARE_SBS: The 2.4 GHZ SAP creating MCC/SCC
  * with STA of low 5 GHZ or high 5 GHZ (dynamic SBS) on mac 0 and one STA on
@@ -1350,7 +1356,9 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_NDI_P2P_SCC_MCC_24_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
 
 	PM_SAP_SAP_SAP_SCC_24_SMM,
+	PM_SAP_SAP_STA_SCC_24_SMM = PM_SAP_SAP_SAP_SCC_24_SMM,
 	PM_SAP_SAP_SAP_SCC_5_SMM,
+	PM_SAP_SAP_STA_SCC_5_SMM = PM_SAP_SAP_SAP_SCC_5_SMM,
 	PM_SAP_SAP_SCC_5_STA_24_DBS,
 	PM_SAP_SAP_STA_SCC_5_DBS,
 	PM_STA_STA_5_NAN_DISC_24_DBS,
@@ -1380,6 +1388,8 @@ enum policy_mgr_three_connection_mode {
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_STA_5_MCC_SAP_5_HIGH_SBS =
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+	PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS =
+		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_24_SAP_5_LOW_MCC_STA_5_HIGH_SBS =
 		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
@@ -1392,6 +1402,8 @@ enum policy_mgr_three_connection_mode {
 	PM_STA_STA_5_LOW_MCC_SAP_5_HIGH_SBS =
 		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_24_STA_5_MCC_SAP_5_LOW_SBS =
+		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+	PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS =
 		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS,
 	PM_SAP_24_STA_5_STA_5_LOW_N_HIGH_SHARE_SBS =

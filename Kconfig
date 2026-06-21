@@ -497,6 +497,10 @@ config FEATURE_TSO
 	bool "Enable TCP Segmentation Offload"
 	default n
 
+config DP_FEATURE_USO
+	bool "Enable UDP Segmentation Offload"
+	default n
+
 config FEATURE_TSO_DEBUG
 	bool "Enable TCP Segmentation Offload with debug"
 	depends on FEATURE_TSO
@@ -645,6 +649,10 @@ config ICMP_DISABLE_PS
 
 config QCACLD_FEATURE_SON
 	bool "Enable easymesh for QCACLD"
+	default n
+
+config QCA_SUPPORT_WDS_EXTENDED
+	bool "Enable WDS EXTENDED for SON"
 	default n
 
 config WLAN_FEATURE_MC_BC_4_ADDR

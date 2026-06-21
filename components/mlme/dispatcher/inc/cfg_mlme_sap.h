@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -824,6 +824,35 @@
 #define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
 #endif
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/*
+ * <ini>
+ * enable_wds_ext - Enable/Disable SAP WDS extended functionality
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable WDS (Wireless Distribution System)
+ * extended functionality for SAP mode. When enabled, it allows the SAP
+ * to support extended WDS features for bridging wireless networks.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_SAP_ENABLE_WDS_EXT CFG_INI_BOOL( \
+				"enable_wds_ext", \
+				true, \
+				"Enable/Disable SAP wds extended")
+#define CFG_SAP_ENABLE_WDS_EXT_CFG CFG(CFG_SAP_ENABLE_WDS_EXT)
+#else
+#define CFG_SAP_ENABLE_WDS_EXT_CFG
+#endif
+
 #define CFG_SAP_ALL \
 	CFG_SAP_SAE \
 	CFG(CFG_AP_ENABLE_RANDOM_BSSID) \
@@ -861,6 +890,7 @@
 	CFG(CFG_DISABLE_MCS13_SUPPORT) \
 	CFG(CFG_DISABLE_SAP_BCN_PROT) \
 	CFG(CFG_SAP_PS_WITH_TWT) \
-	CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
+	CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG \
+	CFG_SAP_ENABLE_WDS_EXT_CFG
 
 #endif /* __CFG_MLME_SAP_H */
