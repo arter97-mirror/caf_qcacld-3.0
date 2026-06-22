@@ -28161,12 +28161,15 @@ static int __wlan_hdd_cfg80211_get_power_stats(
 		hdd_debug("Firmware did not provide chip stats");
 	}
 
-	if (!priv->stats.power_stats_valid ||
-	    !priv->stats.tx_rate_stats_valid ||
-	    !priv->stats.rx_rate_stats_valid) {
+	if (!priv->stats.power_stats_valid) {
 		hdd_err("Firmware did not provide valid power stats");
 		ret = -EINVAL;
 		goto put_request;
+	}
+
+	if (!priv->stats.tx_rate_stats_valid ||
+	    !priv->stats.rx_rate_stats_valid) {
+		hdd_debug("Firmware did not provide valid tx and/or rx rate stats");
 	}
 
 	hdd_debug("Received power stats: num_cores=%d, num_tx_rates=%d, num_rx_rates=%d",
