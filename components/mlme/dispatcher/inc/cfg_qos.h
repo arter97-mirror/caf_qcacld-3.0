@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -170,7 +170,7 @@
  * <ini>
  * gRxAggregationSize - Gives an option to configure Rx aggregation size
  * in no of MPDUs
- * @Min: 1
+ * @Min: 0
  * @Max: 1024
  * @Default: 256
  *
@@ -187,7 +187,7 @@
  */
 #define CFG_RX_AGGREGATION_SIZE CFG_INI_UINT( \
 			"gRxAggregationSize", \
-			1, \
+			0, \
 			1024, \
 			256, \
 			CFG_VALUE_OR_DEFAULT, \
