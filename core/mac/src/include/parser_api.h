@@ -2400,5 +2400,17 @@ QDF_STATUS populate_rv_mlo_ie_smd(struct wlan_objmgr_vdev *vdev,
 				  struct pe_session *session,
 				  struct mlo_link_recfg_state_req *req);
 
-#endif /*WLAN_FEATURE_11BN_SMD*/
+QDF_STATUS
+lim_unpack_ieee80211_uhr_link_reconfig_req_payload(
+	uint8_t *frame, uint32_t frame_len,
+	struct wlan_uhr_link_reconfig_req *req);
+#else
+static inline QDF_STATUS
+lim_unpack_ieee80211_uhr_link_reconfig_req_payload(
+	uint8_t *frame, uint32_t frame_len,
+	void *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 #endif /* __PARSE_H__ */

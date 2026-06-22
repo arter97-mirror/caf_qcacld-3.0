@@ -18442,4 +18442,60 @@ sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
 	p_probe_resp->uhr_cap_ie.present = 1;
 }
 #endif
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_unpack_ieee80211_uhr_link_reconfig_req_payload() - Parse UHR Link
+ *   Reconfiguration Request frame into host structure
+ * @frame: Pointer to start of the action frame (Category byte)
+ * @frame_len: Total length of the frame buffer
+ * @req: Output structure populated with parsed fields
+ *
+ * Uses dot11f_unpack_uhr_link_reconfig_req() for the fixed fields and
+ * standard IEs (mlo_ie, oci). Stores the raw SMD BSS Transition Parameters
+ * IE payload blob for higher-layer processing.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+lim_unpack_ieee80211_uhr_link_reconfig_req_payload(
+	uint8_t *frame, uint32_t frame_len,
+	struct wlan_uhr_link_reconfig_req *req)
+{
+	tDot11fuhr_link_reconfig_req dot11f_frm;
+	uint32_t status;
+
+	if (!frame || !frame_len || !req) {
+		pe_err("UHR link reconfig: null input");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_mem_zero(&dot11f_frm, sizeof(dot11f_frm));
+	qdf_mem_zero(req, sizeof(*req));
+
+	status = dot11f_unpack_uhr_link_reconfig_req(NULL, frame, frame_len,
+						     &dot11f_frm, false);
+	if (DOT11F_FAILED(status)) {
+		pe_err("UHR link reconfig unpack failed: 0x%x", status);
+		return QDF_STATUS_E_PROTO;
+	}
+
+	req->dialog_token = dot11f_frm.DialogToken.token;
+	req->type = dot11f_frm.Type.type;
+
+	if (dot11f_frm.smd_bss_trans_params.present) {
+		uint16_t len = dot11f_frm.smd_bss_trans_params.num_data;
+
+		if (len > sizeof(req->smd_bss_trans_params))
+			len = sizeof(req->smd_bss_trans_params);
+
+		qdf_mem_copy(req->smd_bss_trans_params,
+			     dot11f_frm.smd_bss_trans_params.data, len);
+		req->smd_bss_trans_params_len = len;
+		req->smd_bss_trans_params_present = true;
+	}
+
+	req->present = true;
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 /* parser_api.c ends here. */
