@@ -4797,6 +4797,14 @@ wlan_mlme_cfg_get_vht_rx_stbc(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
+wlan_mlme_cfg_get_vht_su_bformer(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = cfg_get(psoc, CFG_VHT_ENABLE_TX_SU_BEAM_FORMER);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_cfg_set_vht_tx_bfee_ant_supp(struct wlan_objmgr_psoc *psoc,
 					uint8_t value)
 {

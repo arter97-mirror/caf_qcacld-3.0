@@ -11698,6 +11698,7 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	uint8_t value = MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
+	bool su_bformer_vht_cap = false;
 
 	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(mac_ctx->psoc, &value);
 
@@ -11715,7 +11716,11 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 	qdf_mem_copy(&mac_ctx->eht_cap_5g,
 		     &cfg->eht_cap_5g,
 		     sizeof(tDot11fIEeht_cap));
-
+	wlan_mlme_cfg_get_vht_su_bformer(mac_ctx->psoc, &su_bformer_vht_cap);
+	if (!su_bformer_vht_cap) {
+		mac_ctx->eht_cap_2g.su_beamformer = 0;
+		mac_ctx->eht_cap_5g.su_beamformer = 0;
+	}
 	/* modify HE Caps field according to INI setting */
 	mac_ctx->eht_cap_2g.bfee_ss_le_80mhz =
 			QDF_MIN(cfg->eht_cap_2g.bfee_ss_le_80mhz,
@@ -12004,6 +12009,7 @@ static void sme_update_tgt_he_nss_cap(struct mac_context *mac_ctx,
 void sme_update_tgt_he_cap(mac_handle_t mac_handle, struct wma_tgt_cfg *cfg)
 {
 	uint8_t value;
+	bool su_bformer_vht_cap = false;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	sme_update_tgt_he_nss_cap(mac_ctx, &cfg->he_cap_2g,
@@ -12048,6 +12054,12 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle, struct wma_tgt_cfg *cfg)
 				QDF_MIN(cfg->he_cap_5g.bfee_sts_lt_80, value);
 	mac_ctx->he_cap_5g.bfee_sts_gt_80 =
 				QDF_MIN(cfg->he_cap_5g.bfee_sts_gt_80, value);
+
+	wlan_mlme_cfg_get_vht_su_bformer(mac_ctx->psoc, &su_bformer_vht_cap);
+	if (!su_bformer_vht_cap) {
+		mac_ctx->he_cap_2g.su_beamformer = 0;
+		mac_ctx->he_cap_5g.su_beamformer = 0;
+	}
 
 	value = QDF_MIN(mac_ctx->he_cap_2g.fragmentation,
 			mac_ctx->mlme_cfg->he_caps.he_dynamic_fragmentation);
