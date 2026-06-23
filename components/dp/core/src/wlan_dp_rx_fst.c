@@ -727,6 +727,47 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx)
 		  "Rx FST detached\n");
 }
 
+#ifdef WLAN_FAST_L2L_RX
+static void dp_rx_fst_cmem_zero_init(struct dp_rx_fst *fst,
+				     hal_soc_handle_t hal_soc_hdl)
+{
+	struct hif_opaque_softc *hif_hdl;
+	uint32_t i, w;
+
+	if (!fst->cmem_ba)
+		return;
+
+	hif_hdl = ((struct hal_soc *)hal_soc_hdl)->hif_handle;
+
+	if (hif_force_wake_request(hif_hdl)) {
+		dp_err("cmem_fst_init: wake request failed");
+		qdf_check_state_before_panic(__func__, __LINE__);
+		return;
+	}
+
+	for (i = 0; i < fst->max_entries; i++) {
+		uint32_t fse_off = fst->cmem_ba + (i * HAL_RX_FST_ENTRY_SIZE);
+
+		for (w = 0; w < NUM_OF_DWORDS_RX_FLOW_SEARCH_ENTRY; w++)
+			HAL_CMEM_WRITE(hal_soc_hdl, fse_off + w * 4, 0);
+	}
+
+	if (hif_force_wake_release(hif_hdl)) {
+		dp_err("cmem_fst_init: wake release failed");
+		qdf_check_state_before_panic(__func__, __LINE__);
+		return;
+	}
+
+	dp_info("cmem_fst_init: zeroed %u FSE slots at cmem_ba=0x%x",
+		fst->max_entries, fst->cmem_ba);
+}
+#else
+static inline void dp_rx_fst_cmem_zero_init(struct dp_rx_fst *fst,
+					    hal_soc_handle_t hal_soc_hdl)
+{
+}
+#endif
+
 /*
  * dp_rx_fst_update_cmem_params() - Update CMEM FST params
  * @soc:		DP SoC context
@@ -742,9 +783,16 @@ void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
+	if (!fst) {
+		dp_err("%s: rx_fst is NULL", __func__);
+		return;
+	}
+
 	fst->max_entries = num_entries;
 	fst->hash_mask = fst->max_entries - 1;
 	fst->cmem_ba = cmem_ba_lo;
+
+	dp_rx_fst_cmem_zero_init(fst, dp_ctx->hal_soc);
 
 	/* Address is not NULL then address is already known during init */
 	if (dp_ctx->fst_in_cmem && dp_ctx->fst_cmem_base == 0)
