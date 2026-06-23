@@ -37860,7 +37860,9 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 					    struct scan_chan_info *info,
 					    struct scan_chan_info *chan)
 {
-	uint8_t idx, info_index, freq_info_num;
+	uint8_t idx, freq_info_num;
+	int info_index;
+	bool ht40_minus = false;
 	enum phy_ch_width scanned_ch_width;
 	const struct bonded_channel_freq *range = NULL;
 	qdf_freq_t start_freq, end_freq, sec_2g_freq;
@@ -37953,7 +37955,17 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 	}
 
 	freq_info_num = info->subband_info.num_chan;
-	info_index = 0;
+
+	/*
+	 * FW fills cca_busy_subband_info[] primary-channel first. For HT40-
+	 * the loop walks sub-channels in ascending frequency order, meaning it
+	 * visits the secondary channel before the primary. Reverse the index
+	 * so that index 0 (primary CCA) maps to the primary sub-channel.
+	 */
+	ht40_minus = (wlan_reg_is_24ghz_ch_freq(info->freq) &&
+		      scanned_ch_width == CH_WIDTH_40MHZ &&
+		      start_freq != info->freq);
+	info_index = ht40_minus ? (freq_info_num - 1) : 0;
 
 	hdd_debug("vdev %d: freq :%d bw %d, range [%d-%d], num_freq:%d",
 		  vdev_id, info->freq, scanned_ch_width, start_freq,
@@ -37964,7 +37976,7 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 			continue;
 
 		if (start_freq > end_freq || info_index >= freq_info_num ||
-		    info_index >= MAX_WIDE_BAND_SCAN_CHAN)
+		    info_index >= MAX_WIDE_BAND_SCAN_CHAN || info_index < 0)
 			break;
 
 		if (chan[idx].freq == start_freq) {
@@ -37980,7 +37992,10 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 				  chan[idx].freq, chan[idx].rx_clear_count,
 				  idx);
 			start_freq += BW_20_MHZ;
-			info_index++;
+			if (ht40_minus)
+				info_index--;
+			else
+				info_index++;
 		}
 	}
 }
