@@ -383,7 +383,11 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 #endif
 
 /* Size in bytes of HW LINK DESC */
+#ifdef CONFIG_BORON
+#define HW_LINK_DESC_SIZE 256
+#else
 #define HW_LINK_DESC_SIZE 128
+#endif
 
 /* Size in bytes of TX Desc (rounded to power of 2) */
 #define TX_DESC_SIZE 128
