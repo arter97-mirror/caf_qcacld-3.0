@@ -673,6 +673,7 @@ struct hdd_peer_stats {
  * @rx_mpdu_count: Number of MPDUs received from this station
  * @fcs_err_count: Number of MPDUs received from this station with an FCS error
  * @rx_dropped_misc: RX packets dropped for unspecified reasons
+ * @bss_param: BSS parameters (dtim, beacon interval, flags)
  * @filled: bitflag of flags using the bits of &enum nl80211_sta_info to
  *  indicate the relevant values in this struct for them
  */
@@ -693,6 +694,7 @@ struct wlan_hdd_station_stats_info {
 	uint32_t rx_mpdu_count;
 	uint32_t fcs_err_count;
 	uint64_t rx_dropped_misc;
+	struct sta_bss_parameters bss_param;
 	uint64_t filled;
 };
 

@@ -1333,6 +1333,10 @@ void lim_update_caps_info_for_bss(struct mac_context *mac_ctx,
 			uint16_t *caps, uint16_t bss_caps);
 void lim_send_set_dtim_period(struct mac_context *mac_ctx, uint8_t dtim_period,
 			      struct pe_session *session);
+void lim_update_vdev_bss_param_dtim(struct pe_session *session,
+				    uint8_t dtim_period);
+void lim_update_vdev_bss_param_use_prot(struct pe_session *session,
+					bool use_prot);
 
 QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
