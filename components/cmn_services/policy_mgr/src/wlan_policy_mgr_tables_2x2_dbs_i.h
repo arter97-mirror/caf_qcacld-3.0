@@ -4521,7 +4521,9 @@ fourth_connection_pcl_dbs_sbs_table
 	[PM_STA_SAP_SCC_5_SAP_24_DBS] = {
 	[PM_STA_MODE] = { PM_24G, PM_24G, PM_24G },
 	[PM_SAP_MODE] = { PM_5G, PM_5G, PM_5G },
-	[PM_P2P_GO_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_P2P_GO_MODE] = { PM_SCC_ON_5_SCC_ON_24,
+			     PM_SCC_ON_5_SCC_ON_24,
+			     PM_SCC_ON_5_SCC_ON_24 } },
 	[PM_NAN_DISC_NDI_24_STA_5_DBS] = {
 	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
 	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
