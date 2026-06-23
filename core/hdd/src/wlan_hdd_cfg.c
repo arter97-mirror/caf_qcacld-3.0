@@ -2717,7 +2717,7 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 	}
 
 	op_mode = link_info->adapter->device_mode;
-	if (op_mode != QDF_STA_MODE) {
+	if (op_mode != QDF_STA_MODE && op_mode != QDF_P2P_CLIENT_MODE) {
 		hdd_debug("vdev %d: op mode %d, CW update not supported",
 			  vdev_id, op_mode);
 		return -EINVAL;

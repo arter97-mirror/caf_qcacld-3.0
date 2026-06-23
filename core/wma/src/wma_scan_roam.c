@@ -802,6 +802,10 @@ wma_roam_update_vdev(tp_wma_handle wma,
 		     QDF_MAC_ADDR_SIZE);
 	lim_fill_roamed_peer_twt_caps(wma->mac_context, vdev_id,
 				      roam_synch_ind_ptr);
+	if (roam_synch_ind_ptr->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
+		wlan_peer_set_key_install_flag(wma->psoc,
+					       roam_synch_ind_ptr->bssid.bytes,
+					       true);
 end:
 	qdf_mem_free(add_sta_params);
 	return status;
