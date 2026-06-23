@@ -508,6 +508,7 @@ struct punc_chan_info {
  * @assoc_req: Used to store association request frame
  * @assocRspLen: Length of @assocRsp
  * @assocRsp: Used to store association response received while associating
+ * @assoc_rsp_protected: Protected bit set in (re)assoc response frame
  * @dph:
  * @parsedAssocReq: Used to store parsed assoc req from various requesting
  *                  station
@@ -838,6 +839,9 @@ struct pe_session {
 
 	uint32_t assocRspLen;
 	uint8_t *assocRsp;
+#ifdef WLAN_FEATURE_11BI_SECURITY
+	bool assoc_rsp_protected;
+#endif
 	tAniSirDph dph;
 	void **parsedAssocReq;
 	uint32_t RICDataLen;

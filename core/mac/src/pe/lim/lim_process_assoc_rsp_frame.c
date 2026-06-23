@@ -1350,6 +1350,21 @@ void lim_update_vdev_bss_param_use_prot(struct pe_session *session,
 					~VDEV_MLME_BSS_PARAM_CTS_PROT;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static void
+lim_save_assoc_rsp_protected(struct pe_session *session_entry,
+			     tpSirMacMgmtHdr hdr)
+{
+	session_entry->assoc_rsp_protected = hdr->fc.wep;
+}
+#else
+static inline void
+lim_save_assoc_rsp_protected(struct pe_session *session_entry,
+			     tpSirMacMgmtHdr hdr)
+{
+}
+#endif
+
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx: Pointer to Global MAC structure
@@ -1604,6 +1619,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session_entry->assocRspLen = frame_body_len;
 		}
 	}
+	lim_save_assoc_rsp_protected(session_entry, hdr);
 
 	lim_update_ric_data(mac_ctx, session_entry, assoc_rsp);
 

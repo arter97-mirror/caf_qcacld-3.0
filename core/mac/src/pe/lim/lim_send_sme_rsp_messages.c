@@ -64,6 +64,9 @@
 #include <wlan_mlo_mgr_link_switch.h>
 #include "wlan_policy_mgr_i.h"
 #include "wlan_mlo_mgr_peer.h"
+#ifdef WLAN_FEATURE_11BI_SECURITY
+#include "wlan_crypto_global_api.h"
+#endif
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -366,6 +369,34 @@ static inline void lim_free_tspec_ie(struct pe_session *pe_session)
 {}
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static void
+lim_set_assoc_encrypted(struct pe_session *pe_session,
+			struct wlan_cm_connect_resp *connect_rsp,
+			QDF_STATUS connect_status)
+{
+	int32_t auth_mode;
+
+	if (!pe_session->assoc_rsp_protected ||
+	    !QDF_IS_STATUS_SUCCESS(connect_status))
+		return;
+
+	auth_mode = wlan_crypto_get_param(pe_session->vdev,
+					  WLAN_CRYPTO_PARAM_AUTH_MODE);
+	if (auth_mode >= 0 &&
+	    (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
+	     QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)))
+		connect_rsp->is_assoc_encrypted = true;
+}
+#else
+static inline void
+lim_set_assoc_encrypted(struct pe_session *pe_session,
+			struct wlan_cm_connect_resp *connect_rsp,
+			QDF_STATUS connect_status)
+{
+}
+#endif
+
 static QDF_STATUS
 lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 					struct pe_session *pe_session,
@@ -429,6 +460,7 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		qdf_mem_copy(connect_ie->assoc_rsp.ptr, pe_session->assocRsp,
 			     connect_ie->assoc_rsp.len);
 	}
+	lim_set_assoc_encrypted(pe_session, connect_rsp, connect_status);
 	connect_rsp->is_wps_connection = pe_session->wps_registration;
 	connect_rsp->is_osen_connection = pe_session->isOSENConnection;
 

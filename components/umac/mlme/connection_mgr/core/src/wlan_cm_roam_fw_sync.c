@@ -797,6 +797,40 @@ cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static void
+cm_set_roam_assoc_encrypted(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *roam_synch_data,
+			    struct cm_vdev_join_rsp *rsp)
+{
+	const struct wlan_frame_hdr *hdr;
+	int32_t auth_mode;
+
+	if (roam_synch_data->reassoc_resp_length <=
+	    sizeof(struct wlan_frame_hdr))
+		return;
+
+	hdr = (const struct wlan_frame_hdr *)
+		((uint8_t *)roam_synch_data +
+		 roam_synch_data->reassoc_resp_offset);
+	if (!(hdr->i_fc[1] & WLAN_FC1_ISWEP))
+		return;
+
+	auth_mode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+	if (auth_mode >= 0 &&
+	    (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
+	     QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)))
+		rsp->connect_rsp.is_assoc_encrypted = true;
+}
+#else
+static inline void
+cm_set_roam_assoc_encrypted(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *roam_synch_data,
+			    struct cm_vdev_join_rsp *rsp)
+{
+}
+#endif
+
 static QDF_STATUS
 cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 		  struct roam_offload_synch_ind *roam_synch_data,
@@ -852,6 +886,8 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	status = cm_populate_connect_ies(roam_synch_data, rsp);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	cm_set_roam_assoc_encrypted(vdev, roam_synch_data, rsp);
 
 	roaming_info = rsp->connect_rsp.roaming_info;
 	roaming_info->auth_status = roam_synch_data->auth_status;
