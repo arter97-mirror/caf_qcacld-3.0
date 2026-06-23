@@ -640,7 +640,7 @@ target_if_cm_roam_auth_offload_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	struct wmi_unified *wmi_handle;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_cm_roam_rx_ops *roam_rx_ops;
-	struct auth_offload_event auth_event = {0};
+	struct auth_offload_event *auth_event = NULL;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -654,22 +654,33 @@ target_if_cm_roam_auth_offload_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
+	auth_event = qdf_mem_malloc(sizeof(*auth_event));
+	if (!auth_event) {
+		target_if_err("Auth event mem alloc failed");
+		return -ENOMEM;
+	}
+	qdf_mem_zero(auth_event, sizeof(*auth_event));
+
 	qdf_status = wmi_extract_auth_offload_event(wmi_handle, event, len,
-						    &auth_event);
+						    auth_event);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		target_if_err("parsing of event failed, %d", qdf_status);
-		return -EINVAL;
+		status = -EINVAL;
+		goto end;
 	}
 
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
 	if (!roam_rx_ops || !roam_rx_ops->roam_auth_offload_event) {
 		target_if_err("No valid roam rx ops");
-		return -EINVAL;
+		status = -EINVAL;
+		goto end;
 	}
-	qdf_status = roam_rx_ops->roam_auth_offload_event(&auth_event);
-	if (QDF_IS_STATUS_ERROR(status))
+	qdf_status = roam_rx_ops->roam_auth_offload_event(auth_event);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
 		status = -EINVAL;
 
+end:
+	qdf_mem_free(auth_event);
 	return status;
 }
 

@@ -1095,9 +1095,7 @@ typedef struct {
 	qdf_mc_timer_t service_ready_ext_timer;
 
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
-						    uint8_t vdev_id,
-						    struct qdf_mac_addr bssid,
-						    uint32_t akm);
+						    struct auth_offload_event *auth_event);
 	QDF_STATUS (*pe_roam_synch_cb)(struct mac_context *mac,
 		uint8_t vdev_id,
 		struct roam_offload_synch_ind *roam_synch_data,

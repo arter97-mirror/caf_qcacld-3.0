@@ -2910,13 +2910,31 @@ struct roam_stats_event {
  * @vdev_id: vdev id
  * @ap_bssid: SAE authentication offload AP MAC Address
  * @ta: SAE authentication offload Tx MAC Address
+ * @mld_addr: MLD address
  * @akm: SAE AKM type
+ * @auth_algo: Authentication algorithm
+ * @pairwise_cipher: Pairwise cipher suite
+ * @group_cipher: Group cipher suite
+ * @group_mgmt_cipher: Group management cipher suite
+ * @rsn_ie_len: Length of RSN information element
+ * @rsn_ie: RSN information element from the candidate AP
+ * @rsnxe_ie_len: Length of RSNXE information element
+ * @rsnxe_ie: RSNXE information element from the candidate AP
  */
 struct auth_offload_event {
 	uint8_t vdev_id;
 	struct qdf_mac_addr ap_bssid;
 	struct qdf_mac_addr ta;
+	struct qdf_mac_addr mld_addr;
 	uint32_t akm;
+	uint32_t pairwise_cipher;
+	uint32_t group_cipher;
+	uint32_t group_mgmt_cipher;
+	uint8_t  auth_algo;
+	uint8_t rsn_ie_len;
+	uint8_t rsn_ie[WLAN_MAX_IE_LEN + 2];
+	uint8_t rsnxe_ie_len;
+	uint8_t rsnxe_ie[WLAN_MAX_IE_LEN + 2];
 };
 
 /**
@@ -3310,6 +3328,7 @@ struct roam_offload_synch_ind {
 	struct wlan_ssid ssid;
 	int8_t tx_mgmt_power;
 	uint32_t auth_status;
+	uint32_t auth_algo;
 	int8_t rssi;
 	uint8_t roam_reason;
 	uint32_t chan_freq;

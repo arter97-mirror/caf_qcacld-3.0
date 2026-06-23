@@ -25,6 +25,7 @@
 #include "wma_api.h"
 #include "wma_tgt_cfg.h"
 #include "i_cds_packet.h"
+#include <wlan_cm_roam_public_struct.h>
 
 #define IS_FEATURE_SUPPORTED_BY_FW(feat_enum_value) \
 				wma_get_fw_wlan_feat_caps(feat_enum_value)
@@ -673,10 +674,8 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
-			struct mac_context *mac,
-			uint8_t vdev_id,
-			struct qdf_mac_addr bssid,
-			uint32_t akm),
+				struct mac_context *mac,
+				struct auth_offload_event *auth_event),
 		pe_roam_synch_fn_t pe_roam_synch_cb,
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
@@ -688,9 +687,7 @@ QDF_STATUS wma_register_roaming_callbacks(
 static inline QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
-			uint8_t vdev_id,
-			struct qdf_mac_addr bssid,
-			uint32_t akm),
+			struct auth_offload_event *auth_event),
 		pe_roam_synch_fn_t pe_roam_synch_cb,
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,

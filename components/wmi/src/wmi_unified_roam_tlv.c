@@ -2487,6 +2487,42 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 
 /**
+ * wmi_roam_synch_strip_ccmp() - Strip CCMP header and MIC from an 11bi
+ * encrypted (re)assoc frame in the roam synch blob.
+ * @frame: pointer to the start of the frame (MAC header)
+ * @frame_len: in/out - caller's stored length field, updated on strip
+ *
+ * For 11bi/EPPKE, FW delivers the (re)assoc frame body CCMP-encrypted:
+ *   [MAC_HDR(24)] [CCMP_HDR(8)] [encrypted body] [MIC(8)]
+ * Shift the body left to close the CCMP header gap, trim the MIC from the
+ * logical length, and clear the Protected Frame bit so all downstream
+ * consumers (lim_process_assoc_rsp_frame, lim_roam_fill_bss_descr, etc.)
+ * see a clean [MAC_HDR][plaintext body] without any per-site adjustments.
+ */
+static void
+wmi_roam_synch_strip_ccmp(uint8_t *frame, uint16_t *frame_len)
+{
+	struct wlan_frame_hdr *hdr = (struct wlan_frame_hdr *)frame;
+	uint16_t hdr_len = sizeof(*hdr);
+	uint16_t body_len;
+
+	if (*frame_len < hdr_len + IEEE80211_CCMP_HEADERLEN +
+			 IEEE80211_CCMP_MICLEN)
+		return;
+
+	if (!(hdr->i_fc[1] & IEEE80211_FC1_WEP))
+		return;
+
+	body_len = *frame_len - hdr_len - IEEE80211_CCMP_HEADERLEN -
+		   IEEE80211_CCMP_MICLEN;
+	qdf_mem_move(frame + hdr_len,
+		     frame + hdr_len + IEEE80211_CCMP_HEADERLEN,
+		     body_len);
+	*frame_len -= (IEEE80211_CCMP_HEADERLEN + IEEE80211_CCMP_MICLEN);
+	hdr->i_fc[1] &= ~IEEE80211_FC1_WEP;
+}
+
+/**
  * wmi_fill_data_synch_frame_event() - Fill the the roam sync data buffer using
  * synch frame event data
  * @rso_cfg: Source buffer
@@ -2552,6 +2588,8 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 		     roam_sync_ind->reassoc_resp_length);
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.reassoc_rsp);
 	rso_cfg->roam_sync_frame_ind.reassoc_rsp = NULL;
+	wmi_roam_synch_strip_ccmp(reassoc_rsp_ptr,
+				  &roam_sync_ind->reassoc_resp_length);
 
 	/* ReAssoc Req data */
 	roam_sync_ind->reassoc_req_offset =
@@ -2568,6 +2606,8 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 		     roam_sync_ind->reassoc_req_length);
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.reassoc_req);
 	rso_cfg->roam_sync_frame_ind.reassoc_req = NULL;
+	wmi_roam_synch_strip_ccmp(reassoc_req_ptr,
+				  &roam_sync_ind->reassoc_req_length);
 }
 
 /**
@@ -2617,6 +2657,8 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 	qdf_mem_copy(reassoc_rsp_ptr,
 		     param_buf->reassoc_rsp_frame,
 		     roam_sync_ind->reassoc_resp_length);
+	wmi_roam_synch_strip_ccmp(reassoc_rsp_ptr,
+				  &roam_sync_ind->reassoc_resp_length);
 
 	/* ReAssoc Req data */
 	roam_sync_ind->reassoc_req_offset =
@@ -2628,6 +2670,8 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 			  roam_sync_ind->reassoc_req_offset;
 	qdf_mem_copy(reassoc_req_ptr, param_buf->reassoc_req_frame,
 		     roam_sync_ind->reassoc_req_length);
+	wmi_roam_synch_strip_ccmp(reassoc_req_ptr,
+				  &roam_sync_ind->reassoc_req_length);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -2840,6 +2884,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	synch_event = param_buf->fixed_param;
 	roam_sync_ind->roamed_vdev_id = synch_event->vdev_id;
 	roam_sync_ind->auth_status = synch_event->auth_status;
+	roam_sync_ind->auth_algo = synch_event->auth_algo;
 	roam_sync_ind->roam_reason = synch_event->roam_reason;
 	roam_sync_ind->rssi = -1 * synch_event->rssi;
 	roam_sync_ind->is_beacon = synch_event->is_beacon;
@@ -3883,8 +3928,13 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 {
 	wmi_roam_preauth_start_event_fixed_param *rso_auth_start_ev;
 	WMI_ROAM_PREAUTH_START_EVENTID_param_tlvs *param_buf;
+	uint32_t rsn_sel;
 
-	param_buf = (WMI_ROAM_PREAUTH_START_EVENTID_param_tlvs *) event;
+	param_buf = (WMI_ROAM_PREAUTH_START_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_debug("received null buf from target");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	rso_auth_start_ev = param_buf->fixed_param;
 	if (!rso_auth_start_ev) {
@@ -3899,7 +3949,44 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 	}
 
 	auth_event->vdev_id = rso_auth_start_ev->vdev_id;
-	auth_event->akm = rso_auth_start_ev->akm_suite_type;
+	auth_event->akm = WLAN_RSN_SEL(rso_auth_start_ev->akm_suite_type);
+
+	auth_event->auth_algo = rso_auth_start_ev->auth_algo;
+	/*
+	 * The FW sends the IEEE cipher suite type (e.g. WLAN_CSE_CCMP), whereas
+	 * wlan_crypto_rsn_suite_to_cipher() parses a 4-byte RSN suite selector
+	 * via LE_READ_4(). Build the selector with WLAN_RSN_SEL() and pass its
+	 * address, the same way akm is handled above.
+	 */
+	rsn_sel = WLAN_RSN_SEL(rso_auth_start_ev->pairwise_cipher);
+	auth_event->pairwise_cipher =
+		wlan_crypto_rsn_suite_to_cipher((const uint8_t *)&rsn_sel);
+
+	if (auth_event->pairwise_cipher >= WLAN_CRYPTO_CIPHER_INVALID) {
+		wmi_debug("Invalid pairwise cipher %u",
+			  auth_event->pairwise_cipher);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rsn_sel = WLAN_RSN_SEL(rso_auth_start_ev->group_cipher);
+	auth_event->group_cipher =
+		wlan_crypto_rsn_suite_to_cipher((const uint8_t *)&rsn_sel);
+
+	if (auth_event->group_cipher >= WLAN_CRYPTO_CIPHER_INVALID) {
+		wmi_debug("Invalid group cipher %u",
+			  auth_event->group_cipher);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rsn_sel = WLAN_RSN_SEL(rso_auth_start_ev->group_mgmt_cipher);
+	auth_event->group_mgmt_cipher =
+		wlan_crypto_rsn_suite_to_cipher((const uint8_t *)&rsn_sel);
+
+	if (auth_event->group_mgmt_cipher >= WLAN_CRYPTO_CIPHER_INVALID) {
+		wmi_debug("Invalid group mgmt cipher %u",
+			  auth_event->group_mgmt_cipher);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->candidate_ap_bssid,
 				   auth_event->ap_bssid.bytes);
@@ -3912,11 +3999,37 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 		return -EINVAL;
 	}
 
+	if (param_buf->rsn_ie && param_buf->num_rsn_ie) {
+		if (param_buf->num_rsn_ie <= WLAN_MAX_IE_LEN + 2) {
+			auth_event->rsn_ie_len = (uint8_t)param_buf->num_rsn_ie;
+			qdf_mem_copy(auth_event->rsn_ie, param_buf->rsn_ie,
+				     auth_event->rsn_ie_len);
+		} else {
+			wmi_debug("rsn_ie length %d exceeds max",
+				  param_buf->num_rsn_ie);
+		}
+	}
+
+	if (param_buf->rsnxe_ie && param_buf->num_rsnxe_ie) {
+		if (param_buf->num_rsnxe_ie <= WLAN_MAX_IE_LEN + 2) {
+			auth_event->rsnxe_ie_len =
+				(uint8_t)param_buf->num_rsnxe_ie;
+			qdf_mem_copy(auth_event->rsnxe_ie, param_buf->rsnxe_ie,
+				     auth_event->rsnxe_ie_len);
+		} else {
+			wmi_debug("rsnxe_ie length %d exceeds max",
+				  param_buf->num_rsnxe_ie);
+		}
+	}
+
 	wmi_debug("Received Roam auth offload event for bss:"
-		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d akm: %d",
+		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d akm: %d auth_algo:%u pairwise_cipher:0x%x group_cipher:0x%x group_mgmt_cipher:0x%x rsn_ie_len:%d rsnxe_ie_len:%d",
 		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes),
 		  QDF_MAC_ADDR_REF(auth_event->ta.bytes),
-		  auth_event->vdev_id, auth_event->akm);
+		  auth_event->vdev_id, auth_event->akm,
+		  auth_event->auth_algo, auth_event->pairwise_cipher,
+		  auth_event->group_cipher, auth_event->group_mgmt_cipher,
+		  auth_event->rsn_ie_len, auth_event->rsnxe_ie_len);
 
 	return QDF_STATUS_SUCCESS;
 }

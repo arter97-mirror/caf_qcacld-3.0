@@ -651,15 +651,11 @@ bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint32_t chan_freq);
  */
 QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
-			       uint8_t vdev_id,
-			       struct qdf_mac_addr bssid,
-			       uint32_t akm);
+			       struct auth_offload_event *auth_event);
 #else
 static inline QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
-			       uint8_t vdev_id,
-			       struct qdf_mac_addr bssid,
-			       uint32_t akm)
+			       struct auth_offload_event *auth_event)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
