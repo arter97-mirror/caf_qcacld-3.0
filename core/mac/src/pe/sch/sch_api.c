@@ -1075,6 +1075,11 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	nBytes = sizeof(tSirMacMgmtHdr) + WLAN_PROBE_RESP_IES_OFFSET +
 		 prb_rsp_ie_len;
 
+	if (nBytes > SIR_MAX_PROBE_RESP_SIZE) {
+		pe_err("nBytes %d greater than max size after IE fill", nBytes);
+		return retCode;
+	}
+
 	pprobeRespParams = qdf_mem_malloc(sizeof(tSendProbeRespParams));
 	if (!pprobeRespParams) {
 		pe_err("malloc failed for bytes %d", nBytes);
