@@ -739,6 +739,7 @@ wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 		}
 	}
 	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_VHT)) {
+		uint8_t max_mcs;
 		uint16_t rx_mcs_map =
 			le16_to_cpu(sta_info->vht_capa.supp_mcs.rx_mcs_map);
 
@@ -754,7 +755,15 @@ wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 				nss = i;
 		}
 		/* max_mcs from highest MCS set in stream 1 of VHT rx_mcs_map */
-		req.max_mcs = VHT_GET_MCS_FOR_NSS(rx_mcs_map, 1);
+		max_mcs = VHT_GET_MCS_FOR_NSS(rx_mcs_map, 1);
+		if (max_mcs == VHT_MCS_0_9)
+			req.max_mcs = 9;
+		else if (max_mcs == VHT_MCS_0_8)
+			req.max_mcs = 8;
+		else if (max_mcs == VHT_MCS_0_7)
+			req.max_mcs = 7;
+		hdd_debug("vht: rx_mcs_map 0x%x max_mcs %u",
+			  rx_mcs_map, req.max_mcs);
 	}
 	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HE)) {
 		req.hecap_present = 1;
