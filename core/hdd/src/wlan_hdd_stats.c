@@ -84,6 +84,7 @@
 #define HDD_INFO_STA_FLAGS              0
 #define HDD_INFO_RX_MPDUS               0
 #define HDD_INFO_FCS_ERROR_COUNT        0
+#define HDD_INFO_RX_DROP_MISC           0
 #else
 #define HDD_INFO_SIGNAL                 BIT(NL80211_STA_INFO_SIGNAL)
 #define HDD_INFO_SIGNAL_AVG             BIT(NL80211_STA_INFO_SIGNAL_AVG)
@@ -105,6 +106,7 @@
 #define HDD_INFO_STA_FLAGS              BIT(NL80211_STA_INFO_STA_FLAGS)
 #define HDD_INFO_RX_MPDUS             BIT_ULL(NL80211_STA_INFO_RX_MPDUS)
 #define HDD_INFO_FCS_ERROR_COUNT      BIT_ULL(NL80211_STA_INFO_FCS_ERROR_COUNT)
+#define HDD_INFO_RX_DROP_MISC         BIT_ULL(NL80211_STA_INFO_RX_DROP_MISC)
 #endif /* kernel version less than 4.0.0 && no_backport */
 
 #define HDD_LINK_STATS_MAX		5
@@ -759,6 +761,7 @@ wlan_hdd_copy_sinfo_to_link_info(struct wlan_hdd_link_info *link_info,
 	hdd_sinfo->tx_failed = sinfo->tx_failed;
 	hdd_sinfo->rx_mpdu_count = sinfo->rx_mpdu_count;
 	hdd_sinfo->fcs_err_count = sinfo->fcs_err_count;
+	hdd_sinfo->rx_dropped_misc = sinfo->rx_dropped_misc;
 
 	link_mac = sta_ctx->conn_info.bssid.bytes;
 	hdd_nofl_debug("copied sinfo for " QDF_MAC_ADDR_FMT " into link_info",
@@ -808,6 +811,7 @@ wlan_hdd_copy_hdd_stats_to_sinfo(struct station_info *sinfo,
 	sinfo->tx_failed = hdd_sinfo->tx_failed;
 	sinfo->rx_mpdu_count = hdd_sinfo->rx_mpdu_count;
 	sinfo->fcs_err_count = hdd_sinfo->fcs_err_count;
+	sinfo->rx_dropped_misc = hdd_sinfo->rx_dropped_misc;
 	sinfo->filled = hdd_sinfo->filled;
 }
 
@@ -843,7 +847,7 @@ static void wlan_hdd_update_sinfo(struct station_info *sinfo,
 			HDD_INFO_TX_BITRATE | HDD_INFO_RX_BITRATE |
 			HDD_INFO_TX_BYTES | HDD_INFO_RX_BYTES |
 			HDD_INFO_RX_PACKETS | HDD_INFO_FCS_ERROR_COUNT |
-			HDD_INFO_RX_MPDUS;
+			HDD_INFO_RX_MPDUS | HDD_INFO_RX_DROP_MISC;
 }
 
 static void
@@ -7377,6 +7381,7 @@ wlan_hdd_update_mld_peer_sinfo(struct hdd_adapter *adapter,
 	hdd_sinfo->tx_failed += sinfo->tx_failed;
 	hdd_sinfo->rx_mpdu_count += sinfo->rx_mpdu_count;
 	hdd_sinfo->fcs_err_count += sinfo->fcs_err_count;
+	hdd_sinfo->rx_dropped_misc += sinfo->rx_dropped_misc;
 }
 
 /*
@@ -8054,9 +8059,13 @@ static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
 {
 	sinfo->rx_mpdu_count = link_info->hdd_stats.peer_stats.rx_count;
 	sinfo->fcs_err_count = link_info->hdd_stats.peer_stats.fcs_count;
-	hdd_debug("RX mpdu count %d fcs_err_count %d",
-		  sinfo->rx_mpdu_count, sinfo->fcs_err_count);
-	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT | HDD_INFO_RX_MPDUS;
+	sinfo->rx_dropped_misc =
+		link_info->hdd_stats.summary_stat.rx_discard_cnt;
+	hdd_debug("RX mpdu count %d fcs_err_count %d rx_dropped_misc %llu",
+		  sinfo->rx_mpdu_count, sinfo->fcs_err_count,
+		  (unsigned long long)sinfo->rx_dropped_misc);
+	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT | HDD_INFO_RX_MPDUS |
+			 HDD_INFO_RX_DROP_MISC;
 }
 #else
 static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
@@ -8990,6 +8999,7 @@ wlan_hdd_update_mlo_sinfo(struct wlan_hdd_link_info *link_info,
 	hdd_sinfo->tx_failed += sinfo->tx_failed;
 	hdd_sinfo->rx_mpdu_count += sinfo->rx_mpdu_count;
 	hdd_sinfo->fcs_err_count += sinfo->fcs_err_count;
+	hdd_sinfo->rx_dropped_misc += sinfo->rx_dropped_misc;
 }
 
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
