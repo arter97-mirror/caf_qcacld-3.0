@@ -974,6 +974,21 @@ QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 	    req->tdls_mgmt.frame_type == TDLS_SETUP_REQUEST ||
 	    req->tdls_mgmt.frame_type == TDLS_SETUP_RESPONSE ||
 	    req->tdls_mgmt.frame_type == TDLS_SETUP_CONFIRM) {
+		/*
+		 * On non-DBS (single MAC) hardware only one ML STA link can be
+		 * active at a time and TDLS always operates on the currently
+		 * active link. Sending a FORCE_MODE_ACTIVE WMI command here is
+		 * unnecessary and harmful: wlan_vdev_get_link_id() returns the
+		 * IEEE link ID of the TDLS vdev (e.g. link_id=1 for the 5 GHz
+		 * link), so the bitmap 1<<link_id is the *partner* link's IEEE
+		 * link ID, which wrongly forces the dormant link active and
+		 * creates a spurious 5 GHz + 2 GHz MCC condition.
+		 */
+		if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+			req->link_active = true;
+			return QDF_STATUS_SUCCESS;
+		}
+
 		status = policy_mgr_is_ml_links_in_mcc_allowed(
 						psoc, req->vdev,
 						ml_sta_vdev_lst,
