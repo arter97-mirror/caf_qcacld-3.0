@@ -705,6 +705,7 @@ struct fse_cache_flush_history {
  * @add_tcp_flow_to_fst: Add tcp flow to the FST table
  * @fisa_initialized: flag to check FISA initialization status
  * @is_fisa_aggr_enabled: flag to check FISA aggregation enable/disable
+ * @rr_ring_id: Round-robin REO ring cursor for new flow assignment
  */
 struct dp_rx_fst {
 	uint8_t *base;
@@ -746,6 +747,7 @@ struct dp_rx_fst {
 	bool add_tcp_flow_to_fst;
 	bool fisa_initialized;
 	bool is_fisa_aggr_enabled;
+	uint8_t rr_ring_id;
 };
 
 /**

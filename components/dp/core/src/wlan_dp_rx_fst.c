@@ -436,6 +436,23 @@ static void dp_rx_sw_ft_hist_deinit(struct dp_fisa_rx_sw_ft *sw_ft,
 }
 #endif
 
+static void dp_fisa_rx_init_rr_cursor(struct dp_rx_fst *fst,
+				      struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	uint8_t ring_map, shifted;
+
+	if (!wlan_cfg_is_rx_rr_enabled(cfg))
+		return;
+
+	ring_map = (uint8_t)wlan_cfg_get_reo_rings_mapping(cfg);
+	if (!ring_map)
+		ring_map = 0xF;
+
+	shifted = ring_map >> 1;
+	fst->rr_ring_id = shifted ? (uint8_t)qdf_ffs(shifted)
+				  : (uint8_t)(qdf_ffs(ring_map) - 1);
+}
+
 QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
@@ -554,6 +571,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->rx_fst = fst;
 	fst->fisa_initialized = true;
 	fst->is_fisa_aggr_enabled = dp_cfg->is_fisa_aggr_enabled;
+
+	dp_fisa_rx_init_rr_cursor(fst, soc->wlan_cfg_ctx);
 	dp_ctx->fisa_lru_del_enable =
 				wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg);
 

@@ -112,6 +112,105 @@ static void dump_tlvs(hal_soc_handle_t hal_soc_hdl, uint8_t *buf,
 }
 #endif
 
+/**
+ * dp_fisa_rx_get_next_rr_ring_id() - Advance the RR cursor to the next
+ *   active ring in the reo_rings_mapping bitmask.
+ * @last_ring_id: current cursor value (equals rdi -
+ *   HAL_REO_DEST_IND_START_OFFSET), i.e. 0-based ring index
+ * @ring_map:     bitmask of active REO destination rings (e.g. 0x0F)
+ *
+ * Walk-through (ring_map=0x0F, 0-based cursor, init=1):
+ *   rr=1 → mask>>(1+1)=0x03, ffs(3)=1  → next=1+1=2
+ *   rr=2 → mask>>(2+1)=0x01, ffs(1)=1  → next=2+1=3
+ *   rr=3 → mask>>(3+1)=0x00 → wrap: ffs(0x0F)-1=0 → next=0
+ *   rr=0 → mask>>(0+1)=0x07, ffs(7)=1  → next=0+1=1
+ *
+ * Shifting by (last_ring_id + 1) excludes the current ring's own bit,
+ * preventing the cursor from producing last_ring_id+1 when that ring
+ * is absent from ring_map (e.g. cursor=3 → 4 for ring_map=0x0F, where
+ * rdi=20 wraps in the HAL remap table back to ring 0).
+ *
+ * On wrap the cursor is set to qdf_ffs(ring_map)-1 (the lowest active
+ * ring index, 0-based) so ring 0 is included in the round-robin after
+ * the first pass; the initial value of 1 merely defers it to avoid
+ * concentrating the first batch of flows on the non-hash-preferred ring.
+ *
+ * Return: next cursor value (0-based);
+ *         rdi = return_value + HAL_REO_DEST_IND_START_OFFSET
+ */
+static uint8_t
+dp_fisa_rx_get_next_rr_ring_id(uint8_t last_ring_id, uint8_t ring_map)
+{
+	uint8_t shifted;
+
+	if (!ring_map)
+		ring_map = 0xF;
+
+	shifted = ring_map >> (last_ring_id + 1);
+	if (shifted)
+		return last_ring_id + qdf_ffs(shifted);
+
+	return qdf_ffs(ring_map) - 1;
+}
+
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static inline
+bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
+{
+	return (tlv_reo_dest_ind == LSR_DEST_RING);
+}
+#else
+static inline
+bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
+{
+	return false;
+}
+#endif
+
+/**
+ * dp_fisa_rx_set_rr_reo_indication() - Override reo_dest_indication with
+ *   the current RR cursor value and advance the cursor.
+ * @reo_dest_indication: pointer to the rdi value to override
+ * @reo_id:              pointer to the NAPI/REO context id (0-based) to set
+ * @fisa_hdl:            FST handle containing rr_ring_id cursor
+ *
+ * Called while holding a per-ring or global FST lock so that concurrent
+ * NAPI threads advancing the cursor for different new flows see distinct
+ * ring assignments.
+ */
+static inline void
+dp_fisa_rx_set_rr_reo_indication(uint32_t *reo_dest_indication,
+				 uint8_t *reo_id,
+				 struct dp_rx_fst *fisa_hdl)
+{
+	struct dp_soc *soc =
+		cdp_soc_t_to_dp_soc(fisa_hdl->dp_ctx->cdp_soc);
+	uint8_t ring_map =
+		(uint8_t)wlan_cfg_get_reo_rings_mapping(soc->wlan_cfg_ctx);
+	uint8_t num_rx_context =
+		(uint8_t)cdp_get_num_rx_contexts(fisa_hdl->dp_ctx->cdp_soc);
+
+	if (!wlan_cfg_is_rx_rr_enabled(soc->wlan_cfg_ctx))
+		return;
+
+	/* LSR flows have already been pinned to the latency-sensitive ring;
+	 * do not overwrite their assignment with the round-robin cursor.
+	 */
+	if (dp_rx_is_routed_to_latency_sensitive_reo(*reo_dest_indication))
+		return;
+
+	*reo_dest_indication = fisa_hdl->rr_ring_id +
+				HAL_REO_DEST_IND_START_OFFSET;
+	*reo_id = fisa_hdl->rr_ring_id % num_rx_context;
+
+	dp_fisa_debug("fisa rr: reo_dest_ind %u reo_id %u ring=%u (ring_map=0x%x)",
+		      *reo_dest_indication, *reo_id, fisa_hdl->rr_ring_id,
+		      ring_map);
+
+	fisa_hdl->rr_ring_id =
+		dp_fisa_rx_get_next_rr_ring_id(fisa_hdl->rr_ring_id, ring_map);
+}
+
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 static
 void dp_fisa_record_pkt(struct dp_fisa_rx_sw_ft *fisa_flow, qdf_nbuf_t nbuf,
@@ -336,8 +435,6 @@ dp_fisa_flow_balance_build_flow_map_tbl(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_spin_unlock_bh(&rx_fst->dp_rx_fst_lock);
 }
 
-#define DP_RX_HASH_START_VALUE 16
-
 /**
  * dp_fisa_update_fst_table - Update fst table for the migrated flows
  * @dp_ctx: dp context
@@ -376,10 +473,12 @@ void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
 		/* Handle the case of hash based routing enabled/disabled */
 		if (flow_details->napi_id > 3)
 			sw_ft_entry->reo_dest_indication =
-						DP_RX_HASH_START_VALUE + flow_details->napi_id - 1;
+				HAL_REO_DEST_IND_START_OFFSET +
+				flow_details->napi_id - 1;
 		else
 			sw_ft_entry->reo_dest_indication =
-						DP_RX_HASH_START_VALUE + flow_details->napi_id;
+				HAL_REO_DEST_IND_START_OFFSET +
+				flow_details->napi_id;
 
 		hal_rx_flow_cmem_update_reo_dst_ind(dp_ctx->hal_soc,
 						    rx_fst->cmem_ba, flow_index,
@@ -791,7 +890,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 	uint32_t skid_count = 0, max_skid_length;
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
 	bool is_fst_updated = false;
-	uint32_t reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
+	uint8_t reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	struct hal_proto_params proto_params;
 
 	if (hal_rx_get_proto_params(fisa_hdl->dp_ctx->hal_soc, rx_tlv_hdr,
@@ -835,6 +934,12 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 						      fisa_hdl->dp_ctx,
 						      hashed_flow_idx);
 
+			/* Apply RR ring assignment before writing FSE so the
+			 * rdi written to DDR already reflects the RR value.
+			 */
+			dp_fisa_rx_set_rr_reo_indication(&reo_dest_indication,
+							 &reo_id,
+							 fisa_hdl);
 			/* Add HW FT entry */
 			sw_ft_entry->hw_fse =
 				dp_rx_fisa_setup_hw_fse(fisa_hdl,
@@ -1642,7 +1747,14 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	elem->peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
 	elem->action_code = DP_FT_ADD;
 
+	/* Advance the RR cursor under dp_rx_fst_lock so concurrent NAPI
+	 * threads cannot race on rr_ring_id and produce duplicate ring
+	 * assignments (lost-update: 2->3->4->2 or 1->2->3->1 sequences).
+	 */
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+	dp_fisa_rx_set_rr_reo_indication(&elem->reo_dest_indication,
+					 &elem->reo_id,
+					 fisa_hdl);
 	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);
 	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
 
@@ -1716,20 +1828,6 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	return sw_ft_entry;
 }
-
-#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
-static inline
-bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
-{
-	return (tlv_reo_dest_ind == LSR_DEST_RING);
-}
-#else
-static inline
-bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
-{
-	return false;
-}
-#endif
 
 #if defined(DP_OFFLOAD_FRAME_WITH_SW_EXCEPTION)
 /*
