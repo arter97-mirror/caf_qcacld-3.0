@@ -7450,6 +7450,46 @@ QDF_STATUS mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+void wlan_mlme_set_npca_support(struct wlan_objmgr_psoc *psoc,
+				struct wlan_psoc_host_mac_phy_caps_ext2 *cap)
+
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	if (!psoc || !cap) {
+		mlme_legacy_err("psoc or caps are NULL");
+		return;
+	}
+
+	if (!cap->npca_support) {
+		mlme_legacy_debug("No NPCA support");
+		return;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return;
+	}
+
+	mlme_obj->cfg.mlme_npca_caps.npca_support = cap->npca_support;
+}
+
+bool wlan_mlme_is_npca_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return false;
+	}
+
+	return mlme_obj->cfg.mlme_npca_caps.npca_support;
+}
 #endif
 
 QDF_STATUS

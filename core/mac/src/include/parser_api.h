@@ -568,6 +568,7 @@ typedef struct sSirAssocRsp {
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_uhr_op_ie uhr_op_ie;
 	struct wlan_uhr_cap_info uhr_cap_ie;
+	struct wlan_npca_caps npca_cap_info;
 #endif
 #ifdef WLAN_FEATURE_11BN_SMD
 	struct wlan_smd_ie smd_ie;

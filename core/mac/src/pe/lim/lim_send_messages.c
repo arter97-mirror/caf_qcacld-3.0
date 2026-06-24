@@ -122,6 +122,34 @@ QDF_STATUS lim_send_switch_chnl_params(struct mac_context *mac,
 
 	/* Clean post csa ocv sa query state */
 	lim_post_csa_ocv_sa_query_check(mac, session, false);
+
+#ifdef WLAN_FEATURE_11BN
+	/* 4a/4b: For STA vdev restart, propagate the AP's UHR operation
+	 * parameters (npca_enabled + full NPCA oper params) to mlme so the
+	 * WMI vdev-start/restart TLV picks them up via uhr_ops.
+	 */
+	if (LIM_IS_STA_ROLE(session) &&
+	    lim_is_session_uhr_capable(session) &&
+	    session->uhr_op_ie.present) {
+		struct wlan_uhr_op_ie *op = &session->uhr_op_ie;
+		uint32_t uhr_ops = 0;
+
+		uhr_ops |= (op->dps_enabled & 0x1)
+					<< WLAN_UHR_OPPARAM_DPS_EN_IDX;
+		uhr_ops |= (op->npca_enabled & 0x1)
+					<< WLAN_UHR_OPPARAM_NPCA_EN_IDX;
+		uhr_ops |= (op->dbe_enabled & 0x1)
+					<< WLAN_UHR_OPPARAM_DBE_EN_IDX;
+		uhr_ops |= (op->p_edca_enabled & 0x1)
+					<< WLAN_UHR_OPPARAM_PEDCA_EN_IDX;
+		uhr_ops |= (op->dbe_bandwidth & ((1 << WLAN_UHR_OPPARAM_DBE_BW_BITS) - 1))
+					<< WLAN_UHR_OPPARAM_DBE_BW_IDX;
+		mlme_obj->proto.uhr_ops_info.uhr_ops = uhr_ops;
+		pe_debug("vdev %d: UHR ops on restart: 0x%x (npca_en:%d)",
+			 session->vdev_id, uhr_ops, op->npca_enabled);
+	}
+#endif
+
 	status = lim_pre_vdev_start(mac, mlme_obj, session);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto send_resp;

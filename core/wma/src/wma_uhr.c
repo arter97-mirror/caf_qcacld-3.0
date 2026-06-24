@@ -411,6 +411,7 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 	uint32_t *mac_cap = peer->peer_uhr_cap_macinfo;
 	uint32_t *dbe_cap = peer->peer_uhr_cap_dbeinfo;
 	uint32_t uhrop_param;
+	struct wlan_uhr_op_ie *uhr_op = &params->uhr_op_ie;
 
 	if (!params->uhr_capable)
 		return;
@@ -418,7 +419,17 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 	peer->uhr_flag = 1;
 	peer->qos_flag = 1;
 
-	uhrop_param = ((uint32_t *)(&params->uhr_op_ie))[1];
+	uhrop_param = 0;
+	if (uhr_op->present) {
+		WMI_UHR_OPS_INFORMATION_PRESENT_SET(uhrop_param, 1);
+		WMI_UHR_OPS_DPS_ENABLED_SET(uhrop_param, uhr_op->dps_enabled);
+		WMI_UHR_OPS_NPCA_ENABLED_SET(uhrop_param, uhr_op->npca_enabled);
+		WMI_UHR_OPS_DBE_ENABLED_SET(uhrop_param, uhr_op->dbe_enabled);
+		WMI_UHR_OPS_PEDCA_ENABLED_SET(uhrop_param,
+					      uhr_op->p_edca_enabled);
+		WMI_UHR_OPS_DBE_BANDWIDTH_SET(uhrop_param,
+					      uhr_op->dbe_bandwidth);
+	}
 	peer->peer_uhr_ops = uhrop_param;
 
 	/* UHR MAC Capabilities */
@@ -543,6 +554,22 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 				 ((uint32_t)uhr_cap->dbe_param[6] << 16);
 			WMI_UHRCAP_DBE_EHT_MCS_MAP_320_SET(dbe_cap, map320);
 		}
+	}
+
+	if (params->npca_cap.npca_supp) {
+		struct wlan_npca_caps *nc = &params->npca_cap;
+		struct wmi_host_npca_param *np = &peer->npca_param;
+
+		np->npca_enabled = nc->npca_supp;
+		np->npca_pri_channel = nc->npca_pri_channel;
+		np->npca_min_dur_threshold = nc->npca_min_dur_threshold;
+		np->npca_switch_delay = nc->npca_switch_delay;
+		np->npca_switch_back_delay = nc->npca_switch_back_delay;
+		np->npca_qsrc = nc->npca_qsrc;
+		np->npca_moplen = nc->npca_moplen;
+		np->npca_disabled_subchan_bm_present =
+					nc->npca_disabled_subchan_bm_present;
+		np->npca_disabled_subchan_bm = nc->npca_disabled_subchan_bm;
 	}
 
 	wma_print_uhr_cap(uhr_cap);

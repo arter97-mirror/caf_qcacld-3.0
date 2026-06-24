@@ -1645,6 +1645,22 @@ QDF_STATUS mlme_update_tgt_uhr_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_mlme_uhr_caps *uhr_cap);
+
+void wlan_mlme_set_npca_support(struct wlan_objmgr_psoc *psoc,
+				struct wlan_psoc_host_mac_phy_caps_ext2 *cap);
+
+bool wlan_mlme_is_npca_supported(struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+void wlan_mlme_set_npca_support(struct wlan_objmgr_psoc *psoc,
+				struct wlan_psoc_host_mac_phy_caps_ext2 *cap)
+{}
+
+static inline
+bool wlan_mlme_is_npca_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 /**

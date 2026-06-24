@@ -1290,6 +1290,17 @@ struct wlan_mlme_uhr_caps {
 	uint16_t num_data;
 	uint8_t data[WLAN_UHR_CAP_IE_MAX_LEN];
 } qdf_packed;
+
+/**
+ * struct wlan_mlme_npca_caps - NPCA capability structure
+ * @npca_support: NPCA (Non-Primary Channel Access) support
+ *
+ * This structure holds the NPCA capability information which is used to
+ * indicate whether NPCA is supported or not.
+ */
+struct wlan_mlme_npca_caps {
+	bool npca_support;
+};
 #endif
 
 /**
@@ -3242,6 +3253,7 @@ struct wlan_mlme_iot {
  * @reduce_pwr_scan_mode : reduce power scan mode enable/disable
  * @passive_chan_discard_mode: discard passive channels
  * @mlme_uhr_caps: UHR related cfg items
+ * @mlme_npca_caps: NPCA related cfg items
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -3300,6 +3312,7 @@ struct wlan_mlme_cfg {
 	uint8_t passive_chan_discard_mode;
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_mlme_uhr_caps mlme_uhr_caps;
+	struct wlan_mlme_npca_caps mlme_npca_caps;
 #endif
 };
 

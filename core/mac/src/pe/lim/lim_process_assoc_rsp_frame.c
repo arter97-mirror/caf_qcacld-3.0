@@ -783,6 +783,85 @@ lim_update_mcs_rate_set(struct wlan_objmgr_vdev *vdev, tDot11fIEHTCaps *ht_cap)
 	mlme_set_mcs_rate(vdev, dst_rate, len);
 }
 
+#ifdef WLAN_FEATURE_11BN
+static inline
+void lim_update_sta_npca_params(struct wlan_objmgr_psoc *psoc,
+				struct pe_session *session_entry,
+				tpSirAssocRsp assoc_resp)
+{
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_objmgr_vdev *vdev = session_entry->vdev;
+	struct wlan_npca_caps *npca_cap;
+	struct wlan_uhr_npca_op_params *npca_op;
+	bool ap_npca_support = false;
+	bool ap_npca_enabled = false;
+
+	if (!vdev) {
+		pe_err("vdev is null");
+		return;
+	}
+
+	if (!vdev->mlo_dev_ctx) {
+		pe_err("mlo dev ctx is null");
+		return;
+	}
+
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_MLME_SB_ID);
+
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		pe_err("sta ctx is null");
+		goto end;
+	}
+
+	npca_cap = &sta_ctx->npca_cap;
+
+	/* 3a: NPCA support intersection — STA cap AND AP UHR cap IE */
+	ap_npca_support = assoc_resp->uhr_cap_ie.npca_support;
+
+	/* 3b: NPCA enable from AP — UHR operation element */
+	ap_npca_enabled = assoc_resp->uhr_op_ie.npca_enabled;
+
+	if (wlan_mlme_is_npca_supported(psoc) && ap_npca_support &&
+	    ap_npca_enabled) {
+		npca_cap->npca_supp = true;
+
+		/* 3c: NPCA oper params from AP — UHR operation element */
+		npca_op = &assoc_resp->uhr_op_ie.npca_params;
+		npca_cap->npca_pri_channel = npca_op->npca_primary_channel;
+		npca_cap->npca_min_dur_threshold =
+					npca_op->npca_min_duration_threshold;
+		npca_cap->npca_switch_delay = npca_op->npca_switch_delay;
+		npca_cap->npca_switch_back_delay =
+					npca_op->npca_switch_back_delay;
+		npca_cap->npca_qsrc = npca_op->initial_npca_qsrc;
+		npca_cap->npca_moplen = npca_op->moplen_npca;
+		npca_cap->npca_disabled_subchan_bm_present =
+					npca_op->disabled_subchan_bmap_present;
+		if (npca_op->disabled_subchan_bmap_present)
+			npca_cap->npca_disabled_subchan_bm =
+					npca_op->disabled_subchannel_bitmap;
+	} else {
+		qdf_mem_zero(npca_cap, sizeof(*npca_cap));
+	}
+
+	pe_debug("NPCA supp:%d enabled:%d pri_ch:%d min_dur:%d sw_dly:%d sw_bk_dly:%d qsrc:%d moplen:%d",
+		 npca_cap->npca_supp, ap_npca_enabled,
+		 npca_cap->npca_pri_channel, npca_cap->npca_min_dur_threshold,
+		 npca_cap->npca_switch_delay, npca_cap->npca_switch_back_delay,
+		 npca_cap->npca_qsrc, npca_cap->npca_moplen);
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+}
+#else
+static inline
+void lim_update_sta_npca_params(struct wlan_objmgr_psoc *psoc,
+				struct pe_session *session_entry,
+				tpSirAssocRsp assoc_resp)
+{}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * lim_update_sta_vdev_punc() - Update puncture set according to assoc resp
@@ -1883,6 +1962,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				     assoc_rsp);
 
 	lim_process_assoc_rsp_t2lm(session_entry, assoc_rsp);
+	lim_update_sta_npca_params(mac_ctx->psoc, session_entry, assoc_rsp);
 
 	bss_desc = &session_entry->lim_join_req->bssDescription;
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);

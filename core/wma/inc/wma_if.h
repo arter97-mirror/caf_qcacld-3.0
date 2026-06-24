@@ -358,6 +358,7 @@ typedef struct {
 	bool uhr_capable;
 	struct wlan_uhr_cap_info uhr_config;
 	struct wlan_uhr_op_ie uhr_op_ie;
+	struct wlan_npca_caps npca_cap;
 #endif
 #ifdef WLAN_FEATURE_11BN_SMD
 	bool roam_enabled;

@@ -9927,6 +9927,27 @@ void lim_add_bss_uhr_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 			     uhr_op, sizeof(*uhr_op));
 }
 
+void lim_add_bss_npca_cap(struct bss_params *add_bss,
+			  struct pe_session *session)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlo_sta *sta_ctx;
+
+	if (!add_bss || !session)
+		return;
+
+	vdev = session->vdev;
+	if (!vdev || !vdev->mlo_dev_ctx)
+		return;
+
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx || !sta_ctx->npca_cap.npca_supp)
+		return;
+
+	qdf_mem_copy(&add_bss->staContext.npca_cap, &sta_ctx->npca_cap,
+		     sizeof(add_bss->staContext.npca_cap));
+}
+
 #define UHR_OP_LEN (WLAN_UHR_UHR_OP_MAX_LEN + UHR_OP_OUI_SIZE * 2 + ONE_BYTE)
 void lim_decide_uhr_op(struct mac_context *mac_ctx, uint32_t *mlme_uhr_ops,
 		       struct pe_session *session)

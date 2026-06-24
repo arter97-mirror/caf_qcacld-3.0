@@ -1887,7 +1887,7 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 					  struct target_psoc_info *tgt_hdl)
 {
 	struct wlan_psoc_host_mac_phy_caps *tmp;
-	struct wlan_psoc_host_mac_phy_caps_ext2 *cap;
+	struct wlan_psoc_host_mac_phy_caps_ext2 *cap = NULL;
 	uint32_t i, j = 0;
 	enum wmi_hw_mode_config_type hw_config_type;
 	uint32_t dbs_mode, sbs_mode;
@@ -2010,6 +2010,10 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_get_hw_mode_params(tmp, &mac1_ss_bw_info);
 			emlsr_mode = HW_MODE_EMLSR;
 		}
+
+		/* Set NPCA support from target */
+		cap = &info->mac_phy_caps_ext2[i];
+		wlan_mlme_set_npca_support(psoc, cap);
 
 		/* Updating HW mode list */
 		policy_mgr_set_hw_mode_params(psoc, mac0_ss_bw_info,

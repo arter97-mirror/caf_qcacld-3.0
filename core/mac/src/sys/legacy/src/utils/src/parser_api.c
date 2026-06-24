@@ -11678,6 +11678,9 @@ populate_dot11f_uhr_caps(struct mac_context *mac, struct pe_session *session)
 	*p_uhr_cap_ie++ = WLAN_EXTN_ELEMID_UHRCAP;
 	len_remaining--;
 
+	uhr_cap_ie->npca_support = wlan_mlme_is_npca_supported(mac->psoc);
+	pe_debug("npca support: %d", uhr_cap_ie->npca_support);
+
 	/* Word0: bits 0..15 (dps_present .. duo_support) */
 	w0 |= (uint16_t)(uhr_cap_ie->dps_present & 0x1) << 0;
 	w0 |= (uint16_t)(uhr_cap_ie->dps_assist_support & 0x1) << 1;

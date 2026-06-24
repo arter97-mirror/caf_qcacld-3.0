@@ -4383,6 +4383,16 @@ void lim_update_sta_uhr_capable(struct mac_context *mac,
 void lim_add_bss_uhr_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp);
 
 /**
+ * lim_add_bss_npca_cap() - Copy NPCA capability from sta_ctx into ADD BSS param
+ * @add_bss: pointer to add bss params
+ * @session: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_add_bss_npca_cap(struct bss_params *add_bss,
+			  struct pe_session *session);
+
+/**
  * lim_update_stads_uhr_caps() - Copy UHR capability into STA DPH hash table
  *                               entry
  * @mac_ctx: pointer to mac context
@@ -4539,6 +4549,11 @@ static inline void
 lim_update_stads_uhr_caps(struct mac_context *mac_ctx,
 			  tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 			  struct pe_session *session_entry)
+{
+}
+
+static inline void lim_add_bss_npca_cap(struct bss_params *add_bss,
+					struct pe_session *session)
 {
 }
 

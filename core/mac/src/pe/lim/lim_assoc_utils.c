@@ -4834,6 +4834,7 @@ static void lim_sta_process_uhr_capability(
 	}
 
 	lim_add_bss_uhr_cap(add_bss_params, assoc_resp);
+	lim_add_bss_npca_cap(add_bss_params, pe_session);
 
 	/* Process UHR capabilities intersection for 6 GHz */
 	if (pe_session->lim_join_req) {
@@ -4856,11 +4857,12 @@ static void lim_sta_process_uhr_capability(
  *
  * Return: None
  */
-static void lim_sta_process_uhr_operation(tpSirAssocRsp assoc_resp)
+static void lim_sta_process_uhr_operation(tpSirAssocRsp assoc_resp,
+					  struct pe_session *pe_session)
 {
 	struct wlan_uhr_op_ie *uhr_op;
 
-	if (!assoc_resp)
+	if (!assoc_resp || !pe_session)
 		return;
 
 	uhr_op = &assoc_resp->uhr_op_ie;
@@ -4868,7 +4870,9 @@ static void lim_sta_process_uhr_operation(tpSirAssocRsp assoc_resp)
 	if (!uhr_op->present)
 		return;
 
-	/* TODO Rest of the function to be implemented later */
+	/* Save AP's UHR operation IE into session for use on vdev restart */
+	qdf_mem_copy(&pe_session->uhr_op_ie, uhr_op,
+		     sizeof(pe_session->uhr_op_ie));
 }
 
 /**
@@ -4902,7 +4906,7 @@ static void lim_update_add_bss_uhr_params(struct mac_context *mac,
 
 	lim_sta_process_uhr_capability(assoc_resp, pAddBssParams, pe_session,
 				       peer);
-	lim_sta_process_uhr_operation(assoc_resp);
+	lim_sta_process_uhr_operation(assoc_resp, pe_session);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
