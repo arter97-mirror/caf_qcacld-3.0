@@ -1260,6 +1260,9 @@ notify:
 		  chandef.center_freq1, chandef.center_freq2,
 		  puncture_bitmap);
 
+	hdd_send_gvp_oper_ctrl_event(adapter->hdd_ctx,
+				     chandef.chan->center_freq,
+				     adapter->device_mode, true);
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 exit:
 	osif_wiphy_unlock(NULL, dev->ieee80211_ptr);
@@ -9116,6 +9119,11 @@ free:
 			hdd_err("start bss complete failed!!");
 			ret = -EINVAL;
 		}
+
+		if (evt_data.status == QDF_STATUS_SUCCESS)
+			hdd_send_gvp_oper_ctrl_event(hdd_ctx, config->chan_freq,
+						     adapter->device_mode,
+						     true);
 	}
 	qdf_mem_free(sme_config);
 objmgr_vdev_put:
@@ -9313,6 +9321,10 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
+		hdd_send_gvp_oper_ctrl_event(hdd_ctx,
+					     ap_ctx->sap_config.chan_freq,
+					     adapter->device_mode, false);
+
 		if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						 link_info->vdev_id)) {
 			wlan_ll_sap_switch_bearer_on_stop_ap(

@@ -858,6 +858,22 @@ uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx);
 int wlan_hdd_merge_avoid_freqs(struct ch_avoid_ind_type *destFreqList,
 		struct ch_avoid_ind_type *srcFreqList);
 
+/**
+ * hdd_send_gvp_oper_ctrl_event() - Send GVP operation control event
+ * @hdd_ctx: HDD context
+ * @chan_freq: channel frequency
+ * @device_mode: device operating mode
+ * @gvp_op_start: true for start, false for stop
+ *
+ * Checks if GVP operation control is enabled and the channel is 6 GHz,
+ * then sends the vendor event to userspace.
+ *
+ * Return: 0 on success, negative errno on failure.
+ */
+int hdd_send_gvp_oper_ctrl_event(struct hdd_context *hdd_ctx,
+				 uint32_t chan_freq,
+				 enum QDF_OPMODE device_mode,
+				 bool gvp_op_start);
 
 /**
  * hdd_bt_activity_cb() - callback function to receive bt activity

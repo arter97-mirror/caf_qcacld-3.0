@@ -755,6 +755,7 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
+	struct wlan_channel *des_chan = vdev->vdev_mlme.des_chan;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -797,6 +798,11 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 		ucfg_mlme_set_ml_link_control_mode(
 				hdd_ctx->psoc,
 				vdev->vdev_objmgr.vdev_id, 0);
+
+	if (des_chan)
+		hdd_send_gvp_oper_ctrl_event(hdd_ctx,
+					     vdev->vdev_mlme.des_chan->ch_freq,
+					     adapter->device_mode, false);
 
 	return QDF_STATUS_SUCCESS;
 }

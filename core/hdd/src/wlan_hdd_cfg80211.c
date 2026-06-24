@@ -1577,6 +1577,69 @@ int wlan_hdd_merge_avoid_freqs(struct ch_avoid_ind_type *destFreqList,
 	}
 	return 0;
 }
+
+static
+int __hdd_send_gvp_oper_ctrl_event(struct hdd_context *hdd_ctx,
+				   struct gvp_op_ctrl *gvp_ctrl)
+{
+	struct sk_buff *skb;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION_INDEX;
+
+	hdd_enter();
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return -EINVAL;
+	}
+
+	if (!gvp_ctrl) {
+		hdd_err("gvp control is null");
+		return -EINVAL;
+	}
+
+	skb = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+					       sizeof(uint8_t) +
+					       NLMSG_HDRLEN,
+					       index, GFP_KERNEL);
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
+		return -ENOMEM;
+	}
+
+	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GVP_OPER_START,
+		       gvp_ctrl->gvp_op_start)) {
+		hdd_err("nla_put failed for gvp_ctrl");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
+
+	hdd_exit();
+	return 0;
+}
+
+int hdd_send_gvp_oper_ctrl_event(struct hdd_context *hdd_ctx,
+				 uint32_t chan_freq,
+				 enum QDF_OPMODE device_mode,
+				 bool gvp_op_start)
+{
+	struct gvp_op_ctrl gvp_ctrl = {0};
+	uint8_t gvp_oper_control;
+	int errno = 0;
+
+	gvp_oper_control = wlan_mlme_get_gvp_op_control(hdd_ctx->psoc);
+	if (wlan_reg_is_6ghz_chan_freq(chan_freq) && gvp_oper_control) {
+		gvp_ctrl.gvp_op_start = gvp_op_start;
+		gvp_ctrl.device_op_mode = device_mode;
+		hdd_debug("Send GVP oper %s request to userspace",
+			  gvp_op_start ? "start" : "stop");
+		errno = __hdd_send_gvp_oper_ctrl_event(hdd_ctx, &gvp_ctrl);
+	}
+	return errno;
+}
+
 /*
  * FUNCTION: wlan_hdd_send_avoid_freq_event
  * This is called when wlan driver needs to send vendor specific
@@ -2394,6 +2457,10 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	FEATURE_EXTERNAL_AUTHENTICATION_EVENT
 #endif
 	FEATURE_TDLS_VENDOR_EVENTS
+	[QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION_INDEX] = {
+		.vendor_id = QCA_NL80211_VENDOR_ID,
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION,
+	},
 };
 
 /**
@@ -10517,6 +10584,14 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 };
 
+static const struct nla_policy
+wlan_hdd_gvp_info_policy [QCA_WLAN_VENDOR_ATTR_GVP_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_GVP_EZ_ENTER] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_START] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_END] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_GVP_POWER_LIMIT] = {.type = NLA_U8 },
+};
+
 /**
  * wlan_hdd_save_default_scan_ies() - API to store the default scan IEs
  * @hdd_ctx: HDD context
@@ -15465,6 +15540,154 @@ hdd_set_cfg_qsh_scan_ctrl(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 #endif /* WLAN_FEATURE_QSH_SCAN */
+
+static int
+__wlan_hdd_cfg80211_set_gvp_tx_power(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data, int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_adapter *sap_adapter;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct wlan_objmgr_vdev *vdev;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_GVP_MAX + 1];
+	struct gvp_ctrl_params gvp_data = {0};
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+	uint32_t cmd_id = 0;
+	uint32_t cfg_val = 0;
+	int ret = 0;
+	uint8_t gvp_oper_control;
+
+	hdd_enter_dev(wdev->netdev);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	gvp_oper_control = wlan_mlme_get_gvp_op_control(hdd_ctx->psoc);
+	hdd_debug("GVP operation INI control: %d", gvp_oper_control);
+	if (gvp_oper_control == 0) {
+		hdd_debug("GVP is disabled");
+		return -ENOTSUPP;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return -EINVAL;
+	}
+	vdev_id = wlan_vdev_get_id(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	if (!hdd_get_adapter(hdd_ctx, QDF_STA_MODE) &&
+	    !hdd_get_adapter(hdd_ctx, QDF_SAP_MODE)) {
+		hdd_err("adapter not found");
+		return -EINVAL;
+	}
+
+	sap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
+	if (sap_adapter)
+		vdev_id = sap_adapter->deflink->vdev_id;
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_GVP_MAX,
+				    data, data_len, wlan_hdd_gvp_info_policy)) {
+		hdd_err("Invalid ATTR");
+		return -EINVAL;
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_GVP_EZ_ENTER;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Device in EZ area %d", cfg_val);
+		gvp_data.ez_enter = cfg_val;
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_START;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u32(tb[cmd_id]);
+		hdd_debug("Start frequency to avoid %d", cfg_val);
+		gvp_data.avoid_start_freq = cfg_val;
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_END;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u32(tb[cmd_id]);
+		hdd_debug("End frequency to avoid %d", cfg_val);
+		gvp_data.avoid_end_freq = cfg_val;
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_GVP_POWER_LIMIT;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("GVP tx power limit %d", cfg_val);
+		gvp_data.gvp_tx_power = cfg_val;
+	}
+
+	if (sap_adapter && gvp_oper_control == 1 && gvp_data.ez_enter == 1) {
+		struct ch_avoid_ind_type ch_avoid = {0};
+
+		if (!gvp_data.avoid_start_freq || !gvp_data.avoid_end_freq ||
+		    gvp_data.avoid_start_freq > gvp_data.avoid_end_freq ||
+		    !wlan_reg_is_6ghz_chan_freq(gvp_data.avoid_start_freq) ||
+		    !wlan_reg_is_6ghz_chan_freq(gvp_data.avoid_end_freq)) {
+			hdd_err("Invalid avoid freq range: start: %u end: %u",
+				gvp_data.avoid_start_freq,
+				gvp_data.avoid_end_freq);
+			return -EINVAL;
+		}
+		hdd_debug("Switch SAP chan, avoid start freq: %d, end freq: %d",
+			  gvp_data.avoid_start_freq, gvp_data.avoid_end_freq);
+		ch_avoid.avoid_freq_range[0].start_freq =
+					gvp_data.avoid_start_freq;
+		ch_avoid.avoid_freq_range[0].end_freq =
+					gvp_data.avoid_end_freq;
+		ch_avoid.ch_avoid_range_cnt = 1;
+		ucfg_reg_unit_simulate_ch_avoid(hdd_ctx->psoc, &ch_avoid);
+	} else if (sap_adapter && gvp_oper_control == 1 &&
+		   gvp_data.ez_enter == 0) {
+		/* Clear channel avoidance on EZ exit */
+		struct ch_avoid_ind_type ch_avoid = {0};
+
+		ch_avoid.ch_avoid_range_cnt = 0;
+		ucfg_reg_unit_simulate_ch_avoid(hdd_ctx->psoc, &ch_avoid);
+	}
+	ret = sme_set_gvp_oper_params(hdd_ctx->mac_handle, vdev_id, &gvp_data,
+				      gvp_oper_control);
+
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_set_gvp_tx_power() - Wrapper to set GVP Tx power
+ * @wiphy:    wiphy structure pointer
+ * @wdev:     Wireless device structure pointer
+ * @data:     Pointer to the data received
+ * @data_len: Length of @data
+ *
+ * This function parses the incoming NL vendor command data attributes and
+ * configures GVP tx power
+ *
+ * Return: 0 on success; errno on failure
+ */
+static int wlan_hdd_cfg80211_set_gvp_tx_power(struct wiphy *wiphy,
+					      struct wireless_dev *wdev,
+					      const void *data, int data_len)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_gvp_tx_power(wiphy, wdev, data,
+						     data_len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
+}
 
 /**
  * typedef independent_setter_fn - independent attribute handler
@@ -29139,6 +29362,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	},
 #endif
 	FEATURE_EXTERNAL_AUTHENTICATION_COMMAND
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_set_gvp_tx_power,
+		vendor_command_policy(wlan_hdd_gvp_info_policy,
+				      QCA_WLAN_VENDOR_ATTR_GVP_MAX)
+	},
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

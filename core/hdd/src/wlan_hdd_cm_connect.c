@@ -2044,6 +2044,9 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	if (adapter->enable_active_apf_mode)
 		hdd_enable_active_apf_mode(link_info);
+
+	hdd_send_gvp_oper_ctrl_event(hdd_ctx, sta_ctx->conn_info.chan_freq,
+				     adapter->device_mode, true);
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO)
