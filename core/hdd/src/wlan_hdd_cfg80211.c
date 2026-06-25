@@ -16204,10 +16204,14 @@ hdd_fill_vdev_up_nss_chains_limits(struct wlan_hdd_link_info *link_info,
 	iter_band = (def_band == NSS_CHAINS_BAND_2GHZ) ? NSS_CHAINS_BAND_5GHZ :
 		    NSS_CHAINS_BAND_2GHZ;
 
-	nss_chains_limits->tx_nss[def_band] = def_tx_cap_nss;
-	nss_chains_limits->rx_nss[def_band] = def_rx_cap_nss;
-	nss_chains_limits->tx_nss[iter_band] = def_tx_cap_nss;
-	nss_chains_limits->rx_nss[iter_band] = def_rx_cap_nss;
+	nss_chains_limits->tx_nss[def_band] =
+			QDF_MIN(def_tx_cap_nss, ini_limits->tx_nss[def_band]);
+	nss_chains_limits->rx_nss[def_band] =
+			QDF_MIN(def_rx_cap_nss, ini_limits->rx_nss[def_band]);
+	nss_chains_limits->tx_nss[iter_band] =
+			QDF_MIN(def_tx_cap_nss, ini_limits->tx_nss[iter_band]);
+	nss_chains_limits->rx_nss[iter_band] =
+			QDF_MIN(def_rx_cap_nss, ini_limits->rx_nss[iter_band]);
 
 	hdd_adapter_for_each_active_link_info(adapter, iter_info) {
 		if (WLAN_HDD_IS_DEFLINK(iter_info))
@@ -16972,11 +16976,16 @@ hdd_resolve_vdev_up_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_
 		}
 
 		/* Chains Resolution, need to keep it after NSS resolution */
-		if (*tx_chains == 255 ||
-		    (*tx_chains == 0 &&
-		     dyn->chains_band_state[i] != BAND_REQ_FORCE)) {
-			*tx_chains = req->tx_nss[i];
-			*rx_chains = req->rx_nss[i];
+		if (*tx_chains == 0 &&
+		    req->nss_band_state[i] == BAND_REQ_FORCE) {
+			*tx_chains = *tx_nss;
+			*rx_chains = *rx_nss;
+			req->chains_band_state[i] = BAND_REQ_FORCE;
+		} else if (*tx_chains == 255 ||
+			   (*tx_chains == 0 &&
+			    dyn->chains_band_state[i] != BAND_REQ_FORCE)) {
+			*tx_chains = *tx_nss;
+			*rx_chains = *rx_nss;
 			req->chains_band_state[i] = BAND_REQ_NO_FORCE;
 		} else if (*tx_chains == 0 &&
 			   dyn->chains_band_state[i] == BAND_REQ_FORCE) {
@@ -17321,15 +17330,17 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 			req->rx_nss[i] = limits->rx_nss[i];
 
 		if (!req->num_tx_chains[i])
-			req->num_tx_chains[i] = limits->num_tx_chains[i];
-		else if (req->num_tx_chains[i] <= max_tx_chains &&
-			 req->num_tx_chains[i] > limits->num_tx_chains[i])
+			req->num_tx_chains[i] = req->tx_nss[i];
+
+		if (req->num_tx_chains[i] <= max_tx_chains &&
+		    req->num_tx_chains[i] > limits->num_tx_chains[i])
 			req->num_tx_chains[i] = limits->num_tx_chains[i];
 
 		if (!req->num_rx_chains[i])
-			req->num_rx_chains[i] = limits->num_rx_chains[i];
-		else if (req->num_rx_chains[i] <= max_rx_chains &&
-			 req->num_rx_chains[i] > limits->num_rx_chains[i])
+			req->num_rx_chains[i] = req->rx_nss[i];
+
+		if (req->num_rx_chains[i] <= max_rx_chains &&
+		    req->num_rx_chains[i] > limits->num_rx_chains[i])
 			req->num_rx_chains[i] = limits->num_rx_chains[i];
 	}
 
