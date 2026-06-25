@@ -494,6 +494,12 @@ static void pmo_core_disable_runtime_pm_offloads(struct wlan_objmgr_psoc *psoc)
 	uint8_t vdev_id;
 	struct wlan_objmgr_vdev *vdev;
 
+	/* Enable path skips SET; skip RESET to keep paths symmetric. */
+	if (pmo_core_is_wow_optimization_enabled(psoc)) {
+		pmo_debug_rl("wow enhanced cap enabled- skip runtime action frame reset");
+		return;
+	}
+
 	/* Iterate through VDEV list */
 	for (vdev_id = 0; vdev_id < WLAN_UMAC_PSOC_MAX_VDEVS; vdev_id++) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
