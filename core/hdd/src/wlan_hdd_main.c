@@ -7556,7 +7556,6 @@ static void hdd_check_wait_for_hw_mode_completion(struct hdd_context *hdd_ctx)
 static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 					    struct wlan_objmgr_vdev *vdev)
 {
-	enum policy_mgr_con_mode mode;
 	struct wlan_objmgr_psoc *psoc;
 	enum QDF_OPMODE op_mode;
 
@@ -7565,13 +7564,8 @@ static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 	 */
 	psoc = wlan_vdev_get_psoc(vdev);
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode,
-						    wlan_vdev_get_id(vdev));
-	if ((policy_mgr_get_connection_count(psoc) == 1 &&
-	     policy_mgr_mode_specific_connection_count(psoc,
-						       mode, NULL) == 1) ||
-	     (!policy_mgr_get_connection_count(psoc) &&
-	     !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx))) {
+	if (!policy_mgr_get_connection_count(psoc) &&
+	    !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx)) {
 		policy_mgr_check_and_stop_opportunistic_timer(
 						psoc,
 						wlan_vdev_get_id(vdev));
