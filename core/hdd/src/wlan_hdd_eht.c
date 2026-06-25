@@ -170,7 +170,8 @@ hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 	iftype_ap->types_mask = BIT(NL80211_IFTYPE_AP);
 }
 
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
+    defined(CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS)
 static struct wiphy_iftype_ext_capab wlan_hdd_ap_iftype_ext_capab = {
 	.iftype = NL80211_IFTYPE_AP,
 };
@@ -219,7 +220,7 @@ void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
 		hdd_ctx->wiphy->num_iftype_ext_capab = 1;
 	}
 }
-#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP && CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS */
 
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 {
