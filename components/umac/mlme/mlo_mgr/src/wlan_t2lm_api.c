@@ -847,7 +847,7 @@ wlan_t2lm_update_peer_mapping_for_add_link(struct wlan_mlo_peer_context *ml_peer
 {
 	struct wlan_prev_t2lm_negotiated_info *t2lm_neg_info;
 	struct wlan_t2lm_info *t2lm_negotiated_info;
-	struct wlan_t2lm_info t2lm_info;
+	struct wlan_t2lm_info t2lm_info = {0};
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *peer;
