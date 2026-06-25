@@ -1063,12 +1063,65 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 }
 
 #define DEFAULT_CFR_NSS 0xff
-#define DEFAULT_CFR_BW  0x1f
+
+/*
+ * Default bandwidth bitmask covers 20/40/80/160 MHz (and 320 MHz on
+ * EHT-capable builds). Bits follow enum nl80211_chan_width: each bit
+ * position equals the enum value.
+ */
+#ifdef WLAN_FEATURE_11BE
+#define DEFAULT_CFR_BW  (BIT(NL80211_CHAN_WIDTH_20_NOHT) | \
+			 BIT(NL80211_CHAN_WIDTH_20)      | \
+			 BIT(NL80211_CHAN_WIDTH_40)      | \
+			 BIT(NL80211_CHAN_WIDTH_80)      | \
+			 BIT(NL80211_CHAN_WIDTH_160)     | \
+			 BIT(NL80211_CHAN_WIDTH_320))
+#else
+#define DEFAULT_CFR_BW  (BIT(NL80211_CHAN_WIDTH_20_NOHT) | \
+			 BIT(NL80211_CHAN_WIDTH_20)      | \
+			 BIT(NL80211_CHAN_WIDTH_40)      | \
+			 BIT(NL80211_CHAN_WIDTH_80)      | \
+			 BIT(NL80211_CHAN_WIDTH_160))
+#endif
+
+/*
+ * cfr_remap_nl_bw_to_wmi() - Convert a bandwidth bitmask indexed by
+ * enum nl80211_chan_width (as accepted from userspace via
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW) into the bitmask expected
+ * by cmn/firmware, indexed by enum WMI_PEER_CFR_CAPTURE_BW /
+ * enum cfr_cwm_width.
+ *
+ * Both NL80211_CHAN_WIDTH_20_NOHT and NL80211_CHAN_WIDTH_20 fold into
+ * the single 20 MHz bit; 320 MHz is handled under WLAN_FEATURE_11BE.
+ */
+static inline uint16_t cfr_remap_nl_bw_to_wmi(uint32_t nl_bw_mask)
+{
+	uint16_t wmi_mask = 0;
+
+	if (nl_bw_mask & (BIT(NL80211_CHAN_WIDTH_20_NOHT) |
+			  BIT(NL80211_CHAN_WIDTH_20)))
+		wmi_mask |= BIT(CFR_CWM_WIDTH20);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_40))
+		wmi_mask |= BIT(CFR_CWM_WIDTH40);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_80))
+		wmi_mask |= BIT(CFR_CWM_WIDTH80);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_160))
+		wmi_mask |= BIT(CFR_CWM_WIDTH160);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_80P80))
+		wmi_mask |= BIT(CFR_CWM_WIDTH80_80);
+#ifdef WLAN_FEATURE_11BE
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_320))
+		wmi_mask |= BIT(CFR_CWM_WIDTH320);
+#endif
+	return wmi_mask;
+}
+
 static QDF_STATUS
 wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 				   struct nlattr *tb[])
 {
 	struct cfr_wlanconfig_param params = { 0 };
+	uint32_t nl_bw = DEFAULT_CFR_BW;
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NUMBER]) {
 		params.grp_id = nla_get_u32(tb[
@@ -1128,12 +1181,12 @@ wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 		hdd_debug("nss %d", params.nss);
 	}
 
-	params.bw = DEFAULT_CFR_BW;
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW]) {
-		params.bw = nla_get_u32(tb[
+		nl_bw = nla_get_u32(tb[
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW]);
-		hdd_debug("bw %d", params.bw);
+		hdd_debug("nl_bw 0x%x", nl_bw);
 	}
+	params.bw = cfr_remap_nl_bw_to_wmi(nl_bw);
 
 	if (params.nss || params.bw) {
 		hdd_debug("set bw nss");
