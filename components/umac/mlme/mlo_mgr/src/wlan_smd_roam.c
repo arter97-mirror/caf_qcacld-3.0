@@ -1392,10 +1392,6 @@ smd_link_recfg_assign_self_link_addr(
 			continue;
 		}
 
-		if (!cm_is_vdev_disconnected(vdev)) {
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
-			continue;
-		}
 		/* todo: add validate vdev mac with link info link_add */
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
 
@@ -1747,6 +1743,12 @@ smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
+	struct mlo_link_recfg_state_tran *tran;
+
+	if (!recfg_ctx) {
+		mlo_err("recfg_ctx is null");
+		return;
+	}
 
 	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
 	if (!psoc) {
@@ -1756,9 +1758,23 @@ smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
 
 	if (!success) {
 		mlo_err("SMD: link recfg completed with failure, aborting");
+		if (recfg_ctx->curr_recfg_req.st_prep_link_recfg) {
+			tran = mlo_link_recfg_get_curr_tran_req(recfg_ctx);
+			if (tran)
+				smd_send_roam_start_status_cmd(recfg_ctx,
+							       &tran->req,
+							       SMD_PREP_STATUS_VDEV_REPURPOSE_FAIL);
+		}
 		recfg_ctx->smd_roam_in_progress = false;
 		recfg_ctx->st_exec_in_progress = false;
 		smd_free_cached_sync_ind(recfg_ctx);
+		mlo_link_recfg_ctx_free_ies(recfg_ctx);
+		qdf_mem_zero(&recfg_ctx->smd_transition_ie,
+			     sizeof(recfg_ctx->smd_transition_ie));
+		recfg_ctx->num_vdev_repurpose_req = 0;
+		recfg_ctx->tgt_ap_link_bitmap = 0;
+		recfg_ctx->current_link_index = 0;
+		smd_cleanup_target_bss_ctx(recfg_ctx);
 		return;
 	}
 
@@ -1769,6 +1785,15 @@ smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
 
 	/* Free the cached copy of sync_ind after the event is delivered */
 	smd_free_cached_sync_ind(recfg_ctx);
+	recfg_ctx->smd_roam_in_progress = false;
+	recfg_ctx->st_exec_in_progress = false;
+	mlo_link_recfg_ctx_free_ies(recfg_ctx);
+	qdf_mem_zero(&recfg_ctx->smd_transition_ie,
+		     sizeof(recfg_ctx->smd_transition_ie));
+	recfg_ctx->num_vdev_repurpose_req = 0;
+	recfg_ctx->tgt_ap_link_bitmap = 0;
+	recfg_ctx->current_link_index = 0;
+	smd_cleanup_target_bss_ctx(recfg_ctx);
 }
 
 void
@@ -1960,6 +1985,47 @@ smd_send_roam_start_status_cmd(struct mlo_link_recfg_context *recfg_ctx,
 }
 
 QDF_STATUS
+/**
+ * smd_cleanup_target_bss_ctx() - Free all prepared target BSS contexts in
+ *                                 smd_ctx and reset the prepared target state.
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * Walks smd_ctx->prepared_targets[], frees each target_bss_ctx and its
+ * per-link link_chan_info allocations, then resets the smd_ctx roaming
+ * state fields. Safe to call on both success and failure paths.
+ */
+static void
+smd_cleanup_target_bss_ctx(struct mlo_link_recfg_context *recfg_ctx)
+{
+	struct smd_context *smd_ctx;
+	struct wlan_mlo_sta *tgt;
+	uint8_t i, k;
+
+	if (!recfg_ctx || !recfg_ctx->ml_dev)
+		return;
+
+	smd_ctx = recfg_ctx->ml_dev->smd_ctx;
+	if (!smd_ctx)
+		return;
+
+	for (i = 0; i < SMD_MAX_PREPARED_TARGETS; i++) {
+		tgt = smd_ctx->prepared_targets[i].target_bss_ctx;
+		if (!tgt)
+			continue;
+		for (k = 0; k < WLAN_MAX_ML_BSS_LINKS; k++) {
+			qdf_mem_free(tgt->links_info[k].link_chan_info);
+			tgt->links_info[k].link_chan_info = NULL;
+		}
+		qdf_mem_free(tgt);
+		smd_ctx->prepared_targets[i].target_bss_ctx = NULL;
+		smd_ctx->prepared_targets[i].prepared = false;
+	}
+	smd_ctx->num_prepared = 0;
+	smd_ctx->active_target_idx = 0;
+	smd_ctx->smd_roaming_in_progress = false;
+	smd_ctx->st_prep_in_progress = false;
+	smd_ctx->st_exec_in_progress = false;
+}
 smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 			   struct mlo_link_recfg_state_req *req)
 {
@@ -2328,6 +2394,28 @@ smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 		return false;
 
 	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
+}
+
+void
+smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_link_recfg_context *recfg_ctx;
+
+	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->link_recfg_ctx)
+		return;
+
+	recfg_ctx = vdev->mlo_dev_ctx->link_recfg_ctx;
+
+	if (!smd_roam_in_progress(recfg_ctx))
+		return;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    mlo_is_link_recfg_in_progress(vdev)) {
+		mlo_link_recfg_sm_deliver_event(
+			recfg_ctx->ml_dev,
+			WLAN_LINK_RECFG_SM_EV_DISCONNECT_IND,
+			0, NULL);
+	}
 }
 
 QDF_STATUS smd_trigger_link_recfg_sm(struct wlan_objmgr_vdev *vdev)
@@ -2817,5 +2905,4 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 
 	return status;
 }
-
 #endif /* WLAN_FEATURE_11BN_SMD */

@@ -33,14 +33,13 @@
  * @SMD_PREP_STATUS_PREP_REQ_TX_NO_ACK: PREP Request frame was not acknowledged
  * @SMD_PREP_STATUS_PREP_RESP_RX_TIMEOUT: PREP Response not received in time
  */
-enum smd_prep_status {
+typedef enum smd_prep_status {
 	SMD_PREP_STATUS_SUCCESS             = 0,
 	SMD_PREP_STATUS_UNSPECIFIC_FAIL     = 1,
 	SMD_PREP_STATUS_VDEV_REPURPOSE_FAIL = 2,
 	SMD_PREP_STATUS_PREP_REQ_TX_NO_ACK  = 3,
 	SMD_PREP_STATUS_PREP_RESP_RX_TIMEOUT = 4,
-};
-
+} smd_prep_status;
 /**
  * smd_fw_roam_start - Handler for SMD roam start event handler
  *
@@ -462,6 +461,17 @@ bool
 smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * smd_roam_link_recfg_abort() - Abort link reconfiguration SM during SMD roam.
+ * @vdev: vdev pointer
+ *
+ * Checks if SMD roaming is in progress and if link reconfiguration is active,
+ * then delivers WLAN_LINK_RECFG_SM_EV_DISCONNECT_IND to abort the SM cleanly.
+ * Called from the roam abort path when the active command times out.
+ */
+void
+smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev);
+
+/**
  * smd_roam_start_link_switch() - Start link switch for SMD roaming
  * @vdev: vdev pointer
  * @cmd: Serialization command pointer
@@ -472,6 +482,10 @@ QDF_STATUS
 smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_serialization_command *cmd);
 #else
+static inline void
+smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
+{
+}
 static inline QDF_STATUS
 smd_roam_link_recfg_set_tx_link_addr(
 			struct mlo_link_recfg_context *recfg_ctx,

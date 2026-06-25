@@ -175,6 +175,23 @@ cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
 		return QDF_STATUS_E_NULL_VALUE;
 
 	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+
+	/*
+	 * If SMD roaming is in progress and link recfg SM is active, but this
+	 * new ROAM_START is for legacy roam (CM_ROAM_NOTIF_ROAM_START), abort
+	 * the link recfg SM so it does not stall.
+	 */
+	if (roam_event &&
+	    roam_event->notif == CM_ROAM_NOTIF_ROAM_START &&
+	    smd_roam_in_progress(recfg_ctx) &&
+	    mlo_is_link_recfg_in_progress(vdev)) {
+		mlo_err("SMD roam in progress, legacy ROAM_START received, aborting link recfg SM");
+		mlo_link_recfg_sm_deliver_event(mlo_dev_ctx,
+						WLAN_LINK_RECFG_SM_EV_DISCONNECT_IND,
+						0, NULL);
+		return QDF_STATUS_SUCCESS;
+	}
+
 	if (roam_event) {
 		recfg_ctx->num_vdev_repurpose_req = roam_event->num_vdev_repurpose_req;
 		recfg_ctx->tgt_ap_link_bitmap = roam_event->notif_params1;
@@ -735,6 +752,8 @@ QDF_STATUS cm_roam_abort_event(struct wlan_objmgr_vdev *vdev)
 	}
 
 	mlme_cm_osif_reset_scan_reject_params(vdev);
+
+	smd_roam_link_recfg_abort(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
