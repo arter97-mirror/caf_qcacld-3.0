@@ -56,6 +56,9 @@
 #include "hif_main.h"
 #endif
 #include "wlan_mlo_mgr_public_api.h"
+#ifdef WLAN_FEATURE_11BN_SMD
+#include "wlan_smd_roam.h"
+#endif
 
 void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -860,6 +863,30 @@ QDF_STATUS hdd_cm_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static bool hdd_cm_smd_roam_skip_netif_stop(struct wlan_objmgr_vdev *vdev,
+					    enum netif_action_type action)
+{
+	if (action != WLAN_STOP_ALL_NETIF_QUEUE)
+		return false;
+
+	if (smd_is_roaming_in_progress(vdev)) {
+		hdd_debug("vdev %d: skip netif queue stop for SMD roam",
+			  wlan_vdev_get_id(vdev));
+		return true;
+	}
+
+	return false;
+}
+#else
+static inline bool
+hdd_cm_smd_roam_skip_netif_stop(struct wlan_objmgr_vdev *vdev,
+				enum netif_action_type action)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 				      enum netif_action_type action,
 				      enum netif_reason_type reason)
@@ -877,6 +904,9 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
+
+	if (hdd_cm_smd_roam_skip_netif_stop(vdev, action))
+		return QDF_STATUS_SUCCESS;
 
 	wlan_hdd_netif_queue_control(link_info->adapter, action, reason);
 
