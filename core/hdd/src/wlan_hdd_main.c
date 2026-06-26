@@ -4171,12 +4171,12 @@ static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t vdev_id;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_peer *peer, *next;
 
 	/* get module id which cause the leak and release ref */
 	wlan_objmgr_for_each_psoc_vdev(psoc, vdev_id, vdev) {
 		wlan_vdev_obj_lock(vdev);
-		wlan_objmgr_for_each_vdev_peer(vdev, peer) {
+		wlan_objmgr_for_each_vdev_peer(vdev, peer, next) {
 			qdf_atomic_t *ref_id_dbg;
 			int ref_id;
 			int32_t refs;
