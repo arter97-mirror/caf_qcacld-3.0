@@ -33,7 +33,6 @@
 #include "wlan_wfa_config_public_struct.h"
 #include "wlan_connectivity_logging.h"
 
-#define MAC_MAX_ADD_IE_LENGTH       2048
 /* Join probe request Retry  timer default (200)ms */
 #define JOIN_PROBE_REQ_TIMER_MS              200
 #define MAX_JOIN_PROBE_REQ                   5
