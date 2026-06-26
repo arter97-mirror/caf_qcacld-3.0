@@ -24746,7 +24746,10 @@ uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
+	/* Skip NL80211_CHAN_WIDTH_20_NOHT (index 0);
+	 * connected STAs use NL80211_CHAN_WIDTH_20
+	 */
+	for (i = NL80211_CHAN_WIDTH_20; i < ARRAY_SIZE(chwidth_info); i++) {
 		if (chwidth_info[i].phy_chwidth == chwidth)
 			return i;
 	}
