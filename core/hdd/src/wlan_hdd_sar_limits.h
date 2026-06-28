@@ -263,6 +263,7 @@ wlan_hdd_sar_limits_policy[QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX + 1];
 	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)                   \
 },
 
+#ifdef WLAN_FEATURE_CTAS
 #define HDD_TAS_METRICS_MAX_CHAINS WLAN_TAS_MAX_CHAINS
 #define HDD_TAS_PLIMIT_MAX_CHAINS HDD_TAS_METRICS_MAX_CHAINS
 
@@ -362,6 +363,9 @@ wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1];
 	vendor_command_policy(wlan_hdd_tas_policy,                      \
 			      QCA_WLAN_VENDOR_ATTR_TAS_MAX)             \
 },
+#else /* WLAN_FEATURE_CTAS */
+#define FEATURE_TAS_VENDOR_COMMANDS
+#endif /* WLAN_FEATURE_CTAS */
 #else /* FEATURE_SAR_LIMITS */
 #define FEATURE_SAR_LIMITS_VENDOR_COMMANDS
 #define FEATURE_TAS_VENDOR_COMMANDS

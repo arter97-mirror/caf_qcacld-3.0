@@ -2100,6 +2100,7 @@ QDF_STATUS tgt_mc_cp_stats_inc_wake_lock_stats(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_CTAS
 bool
 tgt_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
 {
@@ -2150,6 +2151,7 @@ tgt_cp_stats_send_get_tx_power_calling(struct wlan_objmgr_psoc *psoc,
 
 	return tx_ops->send_get_tx_power_calling(psoc, dsi_id);
 }
+#endif /* WLAN_FEATURE_CTAS */
 
 QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    enum stats_req_type type,

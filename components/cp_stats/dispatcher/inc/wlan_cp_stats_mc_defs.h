@@ -82,8 +82,10 @@ enum stats_req_type {
 	TYPE_POWER_DATAPATH_STATS,
 	TYPE_QSH_SCAN_STATS,
 	TYPE_COEX_STATS,
+#ifdef WLAN_FEATURE_CTAS
 	TYPE_TAS_METRICS,
 	TYPE_TAS_CURRENT_PLIMIT,
+#endif /* WLAN_FEATURE_CTAS */
 	TYPE_MAX,
 };
 
@@ -248,6 +250,7 @@ struct medium_assess_data {
 	uint32_t my_rx_count;
 };
 
+#ifdef WLAN_FEATURE_CTAS
 /**
  * struct wlan_tas_chain_metrics - per-chain TX power region (GET_METRICS)
  * @chain_no: antenna chain number
@@ -299,6 +302,7 @@ struct wlan_tas_plimit_event {
 	uint32_t num_chains;
 	struct wlan_tas_chain_plimit chains[WLAN_TAS_MAX_CHAINS];
 };
+#endif /* WLAN_FEATURE_CTAS */
 
 /**
  * struct request_info: details of each request
@@ -334,11 +338,13 @@ struct request_info {
 					  bool last);
 		void (*get_coex_stats_cb)(struct wlan_coex_policy_stats *stats,
 					  void *cookie);
+#ifdef WLAN_FEATURE_CTAS
 		void (*get_tas_metrics_cb)(struct wlan_tas_metrics_event *ev,
 					   void *cookie);
 		void (*get_tas_current_plimit_cb)(
 				struct wlan_tas_plimit_event *ev,
 				void *cookie);
+#endif /* WLAN_FEATURE_CTAS */
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
 					      void *cookie);

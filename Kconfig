@@ -3380,6 +3380,11 @@ config WLAN_TAS_SYSFS
 	bool "Enable TAS sysfs"
 	default n
 
+config WLAN_FEATURE_CTAS
+	bool "Enable C-TAS (Coordinated TAS) feature"
+	depends on CP_STATS
+	default n
+
 config WLAN_FEATURE_SNR_STATS
 	bool "Enable SNR stats"
 	default n

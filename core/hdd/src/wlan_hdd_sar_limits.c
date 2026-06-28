@@ -1431,6 +1431,7 @@ void wlan_hdd_sar_timers_deinit(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_CTAS
 const struct nla_policy
 wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]          = {.type = NLA_U32},
@@ -1874,3 +1875,4 @@ int wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
 
 	return errno;
 }
+#endif /* WLAN_FEATURE_CTAS */

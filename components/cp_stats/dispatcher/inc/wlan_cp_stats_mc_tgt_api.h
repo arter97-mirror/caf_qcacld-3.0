@@ -141,6 +141,7 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    enum stats_req_type type,
 				    struct request_info *req);
 
+#ifdef WLAN_FEATURE_CTAS
 /**
  * tgt_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
  * supports C-TAS power indication and power limit enquiring
@@ -186,6 +187,34 @@ QDF_STATUS tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS tgt_cp_stats_send_get_tx_power_calling(
 					struct wlan_objmgr_psoc *psoc,
 					uint32_t dsi_id);
+#else /* WLAN_FEATURE_CTAS */
+static inline bool
+tgt_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+tgt_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
+			   enum host_tas_direction direction)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
+				   uint32_t dsi_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+tgt_cp_stats_send_get_tx_power_calling(struct wlan_objmgr_psoc *psoc,
+				       uint32_t dsi_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_CTAS */
 
 /**
  * tgt_set_pdev_stats_update_period(): API to set pdev stats update

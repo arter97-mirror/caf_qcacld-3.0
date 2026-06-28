@@ -772,6 +772,19 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_CTAS
+bool
+ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_cp_stats_is_ctas_plim_indication_supported(psoc);
+}
+
+QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
+				       enum host_tas_direction direction)
+{
+	return tgt_cp_stats_send_tas_mode(psoc, direction);
+}
+
 QDF_STATUS
 ucfg_mc_cp_stats_send_get_avg_tx_power(
 		struct wlan_objmgr_psoc *psoc,
@@ -847,6 +860,7 @@ ucfg_mc_cp_stats_send_get_tx_power_calling(
 
 	return status;
 }
+#endif /* WLAN_FEATURE_CTAS */
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
@@ -1693,15 +1707,3 @@ unlock_and_exit:
 	return status;
 }
 #endif
-
-bool
-ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_cp_stats_is_ctas_plim_indication_supported(psoc);
-}
-
-QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-				       enum host_tas_direction direction)
-{
-	return tgt_cp_stats_send_tas_mode(psoc, direction);
-}

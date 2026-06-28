@@ -149,6 +149,28 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 					       enum stats_req_type type,
 					       struct request_info *info);
 
+#ifdef WLAN_FEATURE_CTAS
+/**
+ * ucfg_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
+ * supports C-TAS power indication and power limit enquiring
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if FW supports the capability, false otherwise
+ */
+bool ucfg_cp_stats_is_ctas_plim_indication_supported(
+					struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_cp_stats_send_tas_mode() - Send TAS mode to firmware via cp_stats
+ * @psoc: pointer to psoc object
+ * @direction: TAS direction as enum host_tas_direction; WMI layer converts
+ *             to wmi_plim_direction_type before sending to firmware
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
+				       enum host_tas_direction direction);
+
 /**
  * ucfg_mc_cp_stats_send_get_avg_tx_power() - Query avg TX power from FW
  * @psoc: pointer to psoc object
@@ -181,6 +203,8 @@ ucfg_mc_cp_stats_send_get_tx_power_calling(
 		uint32_t dsi_id,
 		void (*cb)(struct wlan_tas_plimit_event *ev, void *cookie),
 		void *cookie);
+
+#endif /* WLAN_FEATURE_CTAS */
 
 /**
  * wlan_cfg80211_mc_twt_clear_infra_cp_stats() - send request to reset
@@ -482,16 +506,6 @@ struct channel_status *
 ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 				    uint32_t chan_freq);
 
-/**
- * ucfg_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
- * supports C-TAS power indication and power limit enquiring
- * @psoc: pointer to psoc object
- *
- * Return: true if FW supports the capability, false otherwise
- */
-bool ucfg_cp_stats_is_ctas_plim_indication_supported(
-					struct wlan_objmgr_psoc *psoc);
-
 #else /* QCA_SUPPORT_CP_STATS */
 
 void static inline ucfg_mc_cp_stats_register_pmo_handler(void) { };
@@ -605,11 +619,6 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 	return NULL;
 }
 
-static inline bool
-ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
 #endif /* QCA_SUPPORT_CP_STATS */
 
 #ifdef WLAN_FEATURE_POWER_STATISTICS
@@ -625,27 +634,5 @@ ucfg_cp_stats_get_power_datapath_stats(struct wlan_objmgr_pdev *pdev,
 				       struct cp_stats_power_datapath_info *stats);
 
 #endif /* WLAN_FEATURE_POWER_STATISTICS */
-
-/**
- * ucfg_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
- * supports C-TAS power indication and power limit enquiring
- * @psoc: pointer to psoc object
- *
- * Return: true if FW supports the capability, false otherwise
- */
-bool ucfg_cp_stats_is_ctas_plim_indication_supported(
-					struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_cp_stats_send_tas_mode() - Send TAS mode to firmware via cp_stats
- * @psoc: pointer to psoc object
- * @direction: TAS direction as enum host_tas_direction (defined in
- *             wlan_cp_stats_public_structs.h); WMI layer converts to
- *             wmi_plim_direction_type before sending to firmware
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-				       enum host_tas_direction direction);
 
 #endif /* __WLAN_CP_STATS_MC_UCFG_API_H__ */
