@@ -23,6 +23,7 @@
  */
 
 #include "wlan_hdd_main.h"
+#include "wlan_hdd_n79_coex.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_trace.h"
 #include <osif_cm_req.h>
@@ -390,6 +391,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	wlan_mlme_set_ext_mld_cap_supp(hdd_ctx->psoc, false);
 	/* Clear psoc MLO config that includes partner link info */
 	wlan_cm_clear_mlo_allowed_bss_links(hdd_ctx->psoc);
+	hdd_n79_coex_sta_disconnect(hdd_ctx, vdev);
 }
 
 #ifdef WLAN_FEATURE_MSCS

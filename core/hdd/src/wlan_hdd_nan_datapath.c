@@ -28,6 +28,7 @@
 #include <linux/skbuff.h>
 #include <linux/etherdevice.h>
 #include "wlan_hdd_includes.h"
+#include "wlan_hdd_n79_coex.h"
 #include "wlan_hdd_p2p.h"
 #include "osif_sync.h"
 #include "wma_api.h"
@@ -1085,6 +1086,9 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		os_if_nan_set_ndi_state(vdev, NAN_DATA_NDI_CREATED_STATE);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 
+		/* N79 coex: NDI vdev is up — apply 2x2 if on 5 GHz */
+		hdd_n79_coex_nan_update(hdd_ctx->psoc, vdev_id, true);
+
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -1199,6 +1203,8 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	 * indication to the userspace
 	 */
 	if (adapter->device_mode == QDF_NDI_MODE) {
+		/* N79 coex: NDI vdev is going down — clear 2x2 constraint */
+		hdd_n79_coex_nan_update(hdd_ctx->psoc, vdev_id, false);
 		hdd_ndi_ipa_event_deliver(hdd_ctx, adapter,
 					  vdev_id,
 					  WLAN_IPA_AP_DISCONNECT);

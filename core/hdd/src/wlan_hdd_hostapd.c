@@ -155,6 +155,7 @@
 #define MAX_SAP_NUM_CONCURRENCY_WITH_NAN 1
 #endif
 #include "../../core/src/reg_priv_objs.h"
+#include "wlan_hdd_n79_coex.h"
 
 #ifndef BSS_MEMBERSHIP_SELECTOR_HT_PHY
 #define BSS_MEMBERSHIP_SELECTOR_HT_PHY  127
@@ -2881,6 +2882,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			&ap_ctx->sap_context->ch_params);
 
 		hostapd_state->bss_state = BSS_START;
+		hdd_n79_coex_sap_start(hdd_ctx, link_info);
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 		if (vdev) {
 			ucfg_dp_set_bss_state_start(vdev, true);
@@ -3803,6 +3805,7 @@ stopbss:
 		 * re-enabled
 		 */
 		hostapd_state->bss_state = BSS_STOP;
+		hdd_n79_coex_sap_stop(hdd_ctx, link_info);
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 		if (!cds_is_driver_recovering() || cds_is_driver_unloading()) {
 			if (vdev) {

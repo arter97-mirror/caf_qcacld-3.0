@@ -147,6 +147,7 @@
 #include "wlan_cfg80211_interop_issues_ap.h"
 #include "wlan_scan_ucfg_api.h"
 #include "wlan_hdd_coex_config.h"
+#include "wlan_hdd_n79_coex.h"
 #include "wlan_hdd_bcn_recv.h"
 #include "wlan_hdd_connectivity_logging.h"
 #include "wlan_dlm_ucfg_api.h"
@@ -28849,6 +28850,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 				      QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX)
 	},
 	FEATURE_DCS_VENDOR_COMMANDS
+	FEATURE_N79_COEX_COMMANDS
 #ifdef WLAN_FEATURE_QSH_SCAN
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,

@@ -63,6 +63,7 @@
 #include "wma_api.h"
 #include "wlan_hdd_packet_filter_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_hdd_n79_coex.h"
 
 #define MAX_ROAM_COUNT_VALUE (999)
 
@@ -2188,6 +2189,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_configure_wow_commands(vdev, hdd_ctx);
 	hdd_clear_disconnect_receive(adapter);
+	hdd_n79_coex_sta_connect(hdd_ctx, vdev);
 }
 
 static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,
