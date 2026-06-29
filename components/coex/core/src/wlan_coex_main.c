@@ -22,6 +22,7 @@
 #include <wlan_coex_ucfg_api.h>
 #include <wlan_coex_tgt_api.h>
 #include <wlan_coex_main.h>
+#include "wlan_n79_coex.h"
 
 QDF_STATUS wlan_coex_psoc_created_notification(struct wlan_objmgr_psoc *psoc,
 					       void *arg_list)
@@ -34,14 +35,19 @@ QDF_STATUS wlan_coex_psoc_created_notification(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NOMEM;
 
 	psoc_obj->btc_chain_mode = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	status = wlan_coex_n79_psoc_init(psoc_obj, psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(psoc_obj);
+		return status;
+	}
 
-	/* Attach scan private date to psoc */
 	status = wlan_objmgr_psoc_component_obj_attach(psoc,
 						       WLAN_UMAC_COMP_COEX,
 						       psoc_obj,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		coex_err("Failed to attach psoc coex component");
+		wlan_coex_n79_psoc_deinit(psoc_obj);
 		qdf_mem_free(psoc_obj);
 	} else {
 		coex_debug("Coex object attach to psoc successful");
@@ -53,7 +59,7 @@ QDF_STATUS wlan_coex_psoc_created_notification(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_coex_psoc_destroyed_notification(struct wlan_objmgr_psoc *psoc,
 						 void *arg_list)
 {
-	void *psoc_obj;
+	struct coex_psoc_obj *psoc_obj;
 	QDF_STATUS status;
 
 	psoc_obj = wlan_psoc_get_coex_obj(psoc);
@@ -66,10 +72,97 @@ QDF_STATUS wlan_coex_psoc_destroyed_notification(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		coex_err("Failed to detach psoc coex component");
 
+	wlan_coex_n79_psoc_deinit(psoc_obj);
 	qdf_mem_free(psoc_obj);
 
 	return status;
 }
+
+#ifdef FEATURE_N79_COEX
+static QDF_STATUS
+wlan_coex_vdev_created_notification(struct wlan_objmgr_vdev *vdev,
+				    void *arg_list)
+{
+	struct coex_vdev_obj *vdev_obj;
+	QDF_STATUS status;
+
+	vdev_obj = qdf_mem_malloc(sizeof(*vdev_obj));
+	if (!vdev_obj)
+		return QDF_STATUS_E_NOMEM;
+
+	wlan_coex_n79_vdev_init(vdev_obj);
+
+	status = wlan_objmgr_vdev_component_obj_attach(vdev,
+						       WLAN_UMAC_COMP_COEX,
+						       vdev_obj,
+						       QDF_STATUS_SUCCESS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		coex_err("Failed to attach vdev coex component");
+		qdf_mem_free(vdev_obj);
+	}
+
+	return status;
+}
+
+static QDF_STATUS
+wlan_coex_vdev_destroyed_notification(struct wlan_objmgr_vdev *vdev,
+				      void *arg_list)
+{
+	struct coex_vdev_obj *vdev_obj;
+	QDF_STATUS status;
+
+	vdev_obj = wlan_vdev_get_coex_obj(vdev);
+	if (!vdev_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_coex_n79_vdev_deinit(vdev_obj);
+
+	status = wlan_objmgr_vdev_component_obj_detach(vdev,
+						       WLAN_UMAC_COMP_COEX,
+						       vdev_obj);
+	if (QDF_IS_STATUS_ERROR(status))
+		coex_err("Failed to detach vdev coex component");
+
+	qdf_mem_free(vdev_obj);
+
+	return status;
+}
+
+QDF_STATUS wlan_coex_n79_register_vdev_handlers(void)
+{
+	QDF_STATUS status;
+
+	status = wlan_objmgr_register_vdev_create_handler(
+			WLAN_UMAC_COMP_COEX,
+			wlan_coex_vdev_created_notification, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		coex_err("Failed to register vdev create handler");
+		return status;
+	}
+
+	status = wlan_objmgr_register_vdev_destroy_handler(
+			WLAN_UMAC_COMP_COEX,
+			wlan_coex_vdev_destroyed_notification, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		coex_err("Failed to register vdev destroy handler");
+		wlan_objmgr_unregister_vdev_create_handler(
+				WLAN_UMAC_COMP_COEX,
+				wlan_coex_vdev_created_notification, NULL);
+	}
+
+	return status;
+}
+
+void wlan_coex_n79_unregister_vdev_handlers(void)
+{
+	wlan_objmgr_unregister_vdev_destroy_handler(
+			WLAN_UMAC_COMP_COEX,
+			wlan_coex_vdev_destroyed_notification, NULL);
+	wlan_objmgr_unregister_vdev_create_handler(
+			WLAN_UMAC_COMP_COEX,
+			wlan_coex_vdev_created_notification, NULL);
+}
+#endif /* FEATURE_N79_COEX */
 
 QDF_STATUS
 wlan_coex_psoc_init(struct wlan_objmgr_psoc *psoc)

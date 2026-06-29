@@ -47,9 +47,17 @@ QDF_STATUS wlan_coex_init(void)
 		goto fail_psoc_destroy;
 	}
 
-	coex_debug("coex psoc create and delete handler registered");
+	status = wlan_coex_n79_register_vdev_handlers();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto fail_n79_vdev;
+
+	coex_debug("coex psoc/vdev handlers registered");
 	return status;
 
+fail_n79_vdev:
+	wlan_objmgr_unregister_psoc_destroy_handler(
+			WLAN_UMAC_COMP_COEX,
+			wlan_coex_psoc_destroyed_notification, NULL);
 fail_psoc_destroy:
 	wlan_objmgr_unregister_psoc_create_handler(
 			WLAN_UMAC_COMP_COEX,
@@ -61,6 +69,8 @@ fail_create_psoc:
 QDF_STATUS wlan_coex_deinit(void)
 {
 	QDF_STATUS status;
+
+	wlan_coex_n79_unregister_vdev_handlers();
 
 	status = wlan_objmgr_unregister_psoc_destroy_handler(
 			WLAN_UMAC_COMP_COEX,

@@ -28,6 +28,11 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
 
+#ifdef FEATURE_N79_COEX
+#include "qdf_timer.h"
+#include "qdf_atomic.h"
+#endif
+
 #define coex_err(params...) \
 	QDF_TRACE_ERROR(QDF_MODULE_ID_COEX, params)
 #define coex_info(params...) \
@@ -53,6 +58,10 @@ struct wlan_coex_callback {
  * @coex_config_updated: callback functions for each config type, which will
  *  be called when config is updated.
  * @cb: structure to dbam callback
+ * @psoc: back-pointer to owning psoc for timer softirq callbacks
+ * @n79_coex_active: atomic flag; non-zero while N79 RF switch holds Rx chains
+ * @n79_ss_hysteresis_timer: delays spatial-stream restore after N79 inactive
+ * @n79_rx_div_hysteresis_timer: delays Rx-diversity restore after N79 inactive
  */
 struct coex_psoc_obj {
 	enum coex_btc_chain_mode btc_chain_mode;
@@ -60,6 +69,12 @@ struct coex_psoc_obj {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	struct wlan_coex_callback cb;
 #endif
+#ifdef FEATURE_N79_COEX
+	struct wlan_objmgr_psoc *psoc;
+	qdf_atomic_t n79_coex_active;
+	qdf_timer_t n79_ss_hysteresis_timer;
+	qdf_timer_t n79_rx_div_hysteresis_timer;
+#endif /* FEATURE_N79_COEX */
 };
 
 /**
@@ -86,6 +101,40 @@ wlan_psoc_get_coex_obj_fl(struct wlan_objmgr_psoc *psoc,
 	}
 	return psoc_obj;
 }
+
+#ifdef FEATURE_N79_COEX
+/**
+ * struct coex_vdev_obj - per-vdev coex state for N79 coexistence
+ * @saved_rx_nss: rx_nss saved before N79 active WMI; restored on N79 inactive
+ * @saved_rx_chains: num_rx_chains saved before N79 active; restored on inactive
+ * @saved_force: true if the pre-N79 config was USER_FORCE; used to restore
+ *   the correct force_mode in the WMI restore command
+ * @wmi_sent: true if N79 active WMI was sent for this vdev (guards restore)
+ * @n79_restore_pending: restore deferred because TDLS was active when the
+ *   hysteresis timer fired; cleared on vdev disconnect
+ */
+struct coex_vdev_obj {
+	uint8_t saved_rx_nss;
+	uint8_t saved_rx_chains;
+	bool saved_force;
+	bool wmi_sent;
+	bool n79_restore_pending;
+};
+
+/**
+ * wlan_vdev_get_coex_obj() - get per-vdev coex object
+ * @vdev: vdev object
+ *
+ * Return: pointer to coex_vdev_obj, or NULL
+ */
+static inline struct coex_vdev_obj *
+wlan_vdev_get_coex_obj(struct wlan_objmgr_vdev *vdev)
+{
+	return (struct coex_vdev_obj *)
+		wlan_objmgr_vdev_get_comp_private_obj(
+			vdev, WLAN_UMAC_COMP_COEX);
+}
+#endif /* FEATURE_N79_COEX */
 
 /**
  * wlan_coex_psoc_init() - API to initialize coex component
@@ -162,6 +211,31 @@ QDF_STATUS wlan_coex_psoc_created_notification(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_coex_psoc_destroyed_notification(struct wlan_objmgr_psoc *psoc,
 						 void *arg_list);
 
+#ifdef FEATURE_N79_COEX
+/**
+ * wlan_coex_n79_register_vdev_handlers() - register N79 vdev obj handlers
+ *
+ * Return: QDF_STATUS_SUCCESS on success; error otherwise
+ */
+QDF_STATUS wlan_coex_n79_register_vdev_handlers(void);
+
+/**
+ * wlan_coex_n79_unregister_vdev_handlers() - unregister N79 vdev obj handlers
+ */
+void wlan_coex_n79_unregister_vdev_handlers(void);
+#else
+static inline QDF_STATUS
+wlan_coex_n79_register_vdev_handlers(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_coex_n79_unregister_vdev_handlers(void)
+{
+}
+#endif /* FEATURE_N79_COEX */
+
 /**
  * wlan_coex_psoc_set_btc_chain_mode() - private API to set BT coex chain mode
  * for psoc
@@ -196,7 +270,6 @@ coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 /**
  * wlan_dbam_config_send() - private API to send dbam config
