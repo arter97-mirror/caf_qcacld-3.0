@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1647,7 +1647,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 				     QDF_DP_TRACE_RX_HTT_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
 				     qdf_nbuf_data_addr(msdu),
-				     sizeof(qdf_nbuf_data(msdu)), QDF_RX));
+				     qdf_nbuf_len(msdu), QDF_RX));
 
 		qdf_nbuf_trim_tail(msdu,
 				   HTT_RX_BUF_SIZE -
