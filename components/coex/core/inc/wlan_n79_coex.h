@@ -87,6 +87,20 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 				void *arg);
 
 /**
+ * wlan_coex_n79_activate_vdev() - per-vdev iterator for N79-active path
+ * @psoc: psoc object (passed by wlan_objmgr_iterate_obj_list)
+ * @object: vdev object (cast from void * per wlan_objmgr_op_handler)
+ * @arg: unused iterator argument
+ *
+ * Called on the NL80211/vendor-cmd thread via iterate_obj_list. For each
+ * 5 GHz vdev where rx_nss, tx_nss, num_rx_chains, or num_tx_chains exceeds
+ * the N79 limit, applies 2x2 constraint via WMI.
+ */
+void wlan_coex_n79_activate_vdev(struct wlan_objmgr_psoc *psoc,
+				 void *object,
+				 void *arg);
+
+/**
  * wlan_coex_n79_active() - apply N79 active state to all 5 GHz vdevs
  * @psoc: psoc object
  *
@@ -113,10 +127,13 @@ void wlan_coex_n79_inactive(struct wlan_objmgr_psoc *psoc);
  *
  * On connect/start: if N79 is active, applies 2x2 to the new vdev.
  * On disconnect/stop: clears per-vdev saved NSS state.
+ *
+ * Return: QDF_STATUS_SUCCESS on success; QDF_STATUS_E_INVAL if psoc
+ *         coex object is unavailable
  */
-void wlan_coex_n79_event(struct wlan_objmgr_psoc *psoc,
-			 struct wlan_objmgr_vdev *vdev,
-			 enum wlan_coex_n79_event evt);
+QDF_STATUS wlan_coex_n79_event(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       enum wlan_coex_n79_event evt);
 
 /**
  * wlan_coex_n79_nss_chain_vdev_up_req() - handle NSS/chains config update

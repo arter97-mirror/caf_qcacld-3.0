@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +22,9 @@
 #include <wlan_coex_main.h>
 #include <target_if_coex.h>
 #include "wlan_coex_public_structs.h"
+#ifdef FEATURE_N79_COEX
+#include "wlan_mlme_main.h"
+#endif
 
 /**
  * target_if_coex_config_send() - Function to send coex config command
@@ -88,6 +92,54 @@ target_if_coex_get_multi_config_support(struct wlan_objmgr_psoc *psoc)
 				   wmi_service_multiple_coex_config_support);
 }
 
+#ifdef FEATURE_N79_COEX
+/**
+ * target_if_coex_n79_nss_chains_params_send() - send N79 nss/chains to fw
+ * @psoc: psoc object
+ * @vdev_id: vdev identifier
+ * @params: nss and chain parameters
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_coex_n79_nss_chains_params_send(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  struct wlan_mlme_nss_chains *params)
+{
+	wmi_unified_t wmi_handle;
+	struct vdev_nss_chains vdev_params = {0};
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		coex_err("NULL wmi_handle");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_params.rx_nss[NSS_CHAINS_BAND_5GHZ]          =
+		params->rx_nss[NSS_CHAINS_BAND_5GHZ];
+	vdev_params.tx_nss[NSS_CHAINS_BAND_5GHZ]          =
+		params->tx_nss[NSS_CHAINS_BAND_5GHZ];
+	vdev_params.num_rx_chains[NSS_CHAINS_BAND_5GHZ]   =
+		params->num_rx_chains[NSS_CHAINS_BAND_5GHZ];
+	vdev_params.num_tx_chains[NSS_CHAINS_BAND_5GHZ]   =
+		params->num_tx_chains[NSS_CHAINS_BAND_5GHZ];
+	vdev_params.disable_rx_mrc[NSS_CHAINS_BAND_5GHZ]  =
+		params->disable_rx_mrc[NSS_CHAINS_BAND_5GHZ];
+	vdev_params.force_nss_chains = mlme_is_nss_chains_force_config(params);
+
+	return wmi_unified_vdev_nss_chain_params_send(wmi_handle, vdev_id,
+						      &vdev_params);
+}
+#else
+static inline QDF_STATUS
+target_if_coex_n79_nss_chains_params_send(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  struct wlan_mlme_nss_chains *params)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* FEATURE_N79_COEX */
+
 QDF_STATUS
 target_if_coex_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -103,6 +155,8 @@ target_if_coex_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	coex_ops->coex_multi_config_send = target_if_coex_multi_config_send;
 	coex_ops->coex_get_multi_config_support =
 				target_if_coex_get_multi_config_support;
+	coex_ops->vdev_nss_chains_params_send =
+		target_if_coex_n79_nss_chains_params_send;
 
 	return QDF_STATUS_SUCCESS;
 }

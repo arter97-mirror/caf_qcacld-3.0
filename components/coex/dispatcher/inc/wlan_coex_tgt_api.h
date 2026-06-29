@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -75,4 +76,23 @@ QDF_STATUS
 tgt_send_dbam_config(struct wlan_objmgr_vdev *vdev,
 		     struct coex_dbam_config_params *param);
 #endif
+
+#ifdef FEATURE_N79_COEX
+struct wlan_mlme_nss_chains;
+
+/**
+ * tgt_send_n79_coex_nss_chains() - send WMI_VDEV_CHAINMASK_CONFIG_CMDID
+ * for N79 coexistence NSS/chain adjustment
+ * @vdev: target vdev
+ * @params: NSS/chains config (wlan_mlme_nss_chains)
+ *
+ * Obtains wmi_handle via get_wmi_unified_hdl_from_psoc() and calls
+ * SME/HDD layer. Used for both N79-active (2x2) and N79-inactive (restore).
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tgt_send_n79_coex_nss_chains(struct wlan_objmgr_vdev *vdev,
+			     struct wlan_mlme_nss_chains *params);
+#endif /* FEATURE_N79_COEX */
 #endif

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -149,3 +150,39 @@ tgt_send_dbam_config(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef FEATURE_N79_COEX
+#include "wlan_mlme_public_struct.h"
+QDF_STATUS
+tgt_send_n79_coex_nss_chains(struct wlan_objmgr_vdev *vdev,
+			     struct wlan_mlme_nss_chains *params)
+{
+	struct wlan_lmac_if_coex_tx_ops *coex_ops;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!vdev || !params) {
+		coex_err("NULL vdev or params");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		coex_err("NULL psoc");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	coex_debug("vdev%u: WMI set rx_nss=%u rx_chains=%u tx_nss=%u tx_chains=%u",
+		   wlan_vdev_get_id(vdev),
+		   params->rx_nss[NSS_CHAINS_BAND_5GHZ],
+		   params->num_rx_chains[NSS_CHAINS_BAND_5GHZ],
+		   params->tx_nss[NSS_CHAINS_BAND_5GHZ],
+		   params->num_tx_chains[NSS_CHAINS_BAND_5GHZ]);
+
+	coex_ops = wlan_psoc_get_coex_txops(psoc);
+	if (coex_ops && coex_ops->vdev_nss_chains_params_send)
+		return coex_ops->vdev_nss_chains_params_send(
+				psoc, wlan_vdev_get_id(vdev), params);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* FEATURE_N79_COEX */

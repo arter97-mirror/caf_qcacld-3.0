@@ -53,6 +53,17 @@ struct wlan_coex_callback {
 #endif
 
 /**
+ * enum n79_coex_policy - N79 coexistence NSS/chain restriction policy
+ * @N79_COEX_POLICY_DISABLE: no WLAN restriction when N79 is active
+ * @N79_COEX_POLICY_2X2: limit rx_nss, tx_nss, num_rx_chains, num_tx_chains
+ *   to 2 on 5 GHz vdevs while N79 is active (default)
+ */
+enum n79_coex_policy {
+	N79_COEX_POLICY_DISABLE = 0,
+	N79_COEX_POLICY_2X2,
+};
+
+/**
  * struct coex_psoc_obj - coex object definition
  * @btc_chain_mode: BT Coex chain mode.
  * @coex_config_updated: callback functions for each config type, which will
@@ -62,6 +73,13 @@ struct wlan_coex_callback {
  * @n79_coex_active: atomic flag; non-zero while N79 RF switch holds Rx chains
  * @n79_ss_hysteresis_timer: delays spatial-stream restore after N79 inactive
  * @n79_rx_div_hysteresis_timer: delays Rx-diversity restore after N79 inactive
+ * @n79_ss_ms: SS hysteresis timer duration in ms
+ * @n79_rx_div_ms: RxDiv hysteresis timer duration in ms
+ * @n79_coex_policy: INI-configured restriction policy
+ * @n79_limit_rx_nss: max Rx NSS applied when N79 is active
+ * @n79_limit_tx_nss: max Tx NSS applied when N79 is active
+ * @n79_limit_rx_chain: max Rx chains applied when N79 is active
+ * @n79_limit_tx_chain: max Tx chains applied when N79 is active
  */
 struct coex_psoc_obj {
 	enum coex_btc_chain_mode btc_chain_mode;
@@ -74,6 +92,13 @@ struct coex_psoc_obj {
 	qdf_atomic_t n79_coex_active;
 	qdf_timer_t n79_ss_hysteresis_timer;
 	qdf_timer_t n79_rx_div_hysteresis_timer;
+	uint32_t n79_ss_ms;
+	uint32_t n79_rx_div_ms;
+	enum n79_coex_policy n79_coex_policy;
+	uint8_t n79_limit_rx_nss;
+	uint8_t n79_limit_tx_nss;
+	uint8_t n79_limit_rx_chain;
+	uint8_t n79_limit_tx_chain;
 #endif /* FEATURE_N79_COEX */
 };
 
@@ -106,7 +131,9 @@ wlan_psoc_get_coex_obj_fl(struct wlan_objmgr_psoc *psoc,
 /**
  * struct coex_vdev_obj - per-vdev coex state for N79 coexistence
  * @saved_rx_nss: rx_nss saved before N79 active WMI; restored on N79 inactive
+ * @saved_tx_nss: tx_nss saved before N79 active WMI; restored on N79 inactive
  * @saved_rx_chains: num_rx_chains saved before N79 active; restored on inactive
+ * @saved_tx_chains: num_tx_chains saved before N79 active; restored on inactive
  * @saved_force: true if the pre-N79 config was USER_FORCE; used to restore
  *   the correct force_mode in the WMI restore command
  * @wmi_sent: true if N79 active WMI was sent for this vdev (guards restore)
@@ -115,7 +142,9 @@ wlan_psoc_get_coex_obj_fl(struct wlan_objmgr_psoc *psoc,
  */
 struct coex_vdev_obj {
 	uint8_t saved_rx_nss;
+	uint8_t saved_tx_nss;
 	uint8_t saved_rx_chains;
+	uint8_t saved_tx_chains;
 	bool saved_force;
 	bool wmi_sent;
 	bool n79_restore_pending;
