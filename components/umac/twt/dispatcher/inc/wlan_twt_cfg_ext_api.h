@@ -41,31 +41,6 @@ QDF_STATUS
 wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
- * wlan_twt_cfg_get_req_en_dis_vdev_support() - Get TGT capability for
- * per-vdev TWT enable/disable command support for TWT requestor role
- * @psoc: Pointer to global psoc object
- * @val: pointer to output variable; set to true if supported
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_cfg_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
-					 bool *val);
-
-/**
- * wlan_twt_cfg_get_vdev_requestor_flag() - Get per-vdev TWT requestor flag
- * @psoc: Pointer to global psoc object
- * @vdev_id: VDEV ID
- * @val: pointer to output variable; set to true if TWT requestor is enabled
- *       for this vdev (vdev-level TWT path)
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_cfg_get_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id, bool *val);
-
-/**
  * wlan_twt_cfg_get_res_flag() - Get TWT responder flag
  * @psoc: Pointer to global psoc object
  * @vdev_id: VDEV ID

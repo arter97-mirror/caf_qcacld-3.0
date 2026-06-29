@@ -2317,7 +2317,6 @@ wlan_twt_reset_congestion_timeout_on_teardown(
 	QDF_STATUS status;
 	bool twt_session_active;
 	uint8_t mac_id;
-	bool vdev_support = false;
 
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, event->vdev_id);
 	if (mac_id >= MAX_MAC) {
@@ -2326,65 +2325,25 @@ wlan_twt_reset_congestion_timeout_on_teardown(
 		return;
 	}
 
-	wlan_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, &vdev_support);
-	if (vdev_support) {
-		struct wlan_objmgr_vdev *vdev;
-
-		/*
-		 * Vdev-level TWT: check if any TWT session is still active
-		 * on this vdev only. If not, reset the per-vdev congestion
-		 * timeout to INI so the next TWT setup on this vdev will
-		 * re-evaluate the congestion timeout correctly.
-		 */
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-							    event->vdev_id,
-							    WLAN_TWT_ID);
-		if (!vdev) {
-			twt_err("vdev is NULL for vdev_id: %d", event->vdev_id);
-			return;
-		}
-
-		twt_session_active = wlan_twt_check_vdev_active_session(
-				vdev, event->vdev_id, mac_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
-
-		if (twt_session_active) {
-			twt_debug("TWT session still active on vdev%d, not resetting vdev congestion timeout",
-				  event->vdev_id);
-			return;
-		}
-
-		status = wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(
-				psoc, event->vdev_id);
-		if (QDF_IS_STATUS_ERROR(status))
-
-			twt_err("Failed to reset vdev congestion_timeout for vdev%d dialog_id:%d",
-				event->vdev_id, event->dialog_id);
-		else
-			twt_debug("Reset vdev congestion_timeout for vdev%d as no TWT sessions active",
-				  event->vdev_id);
-	} else {
-		/* Check if any TWT session is running on this MAC */
-		twt_session_active = wlan_twt_is_any_session_active_on_mac(
+	/* Check if any TWT session is running on this MAC */
+	twt_session_active = wlan_twt_is_any_session_active_on_mac(
 								psoc, mac_id,
 								event->vdev_id);
-
-		if (twt_session_active) {
-			twt_debug("TWT session still active on MAC%d, not resetting congestion timeout",
-				  mac_id);
-			return;
-		}
-		/* No TWT sessions on this MAC, reset congestion timeout */
-		status = wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
-				psoc, mac_id);
-		if (QDF_IS_STATUS_ERROR(status))
-			twt_err("Failed to reset congestion_timeout for MAC%d dialog_id:%d",
-				mac_id, event->dialog_id);
-		else
-			twt_debug("Reset congestion_timeout for MAC%d as no TWT sessions active",
-				  mac_id);
+	if (twt_session_active) {
+		twt_debug("TWT session still active on MAC%d, not resetting congestion timeout",
+			  mac_id);
+		return;
 	}
 
+	/* No TWT sessions on this MAC, reset congestion timeout */
+	status = wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
+								      mac_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		twt_err("Failed to reset congestion_timeout for MAC%d dialog_id:%d",
+			mac_id, event->dialog_id);
+	else
+		twt_debug("Reset congestion_timeout for MAC%d as no TWT sessions active",
+			  mac_id);
 }
 
 static void

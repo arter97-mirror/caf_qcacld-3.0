@@ -19,19 +19,11 @@
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "wlan_mlme_api.h"
 #include <../../core/src/wlan_twt_main.h>
-#include "twt/core/src/wlan_twt_common.h"
 
 QDF_STATUS
 wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_requestor_flag(psoc, val);
-}
-
-QDF_STATUS
-wlan_twt_cfg_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
-					 bool *val)
-{
-	return wlan_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, val);
 }
 
 QDF_STATUS

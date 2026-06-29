@@ -1954,15 +1954,12 @@ QDF_STATUS wlan_cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
 }
 
 void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
 				    struct element_info *assoc_ie)
 {
 	struct wmi_unified *wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	const uint8_t *ext_cap_ie;
 	struct s_ext_cap *extcap;
-	bool twt_requestor = false;
-	bool vdev_support = false;
-	bool twt_req_support = false;
+	bool twt_requestor = false, twt_req_support = false;
 
 	if (!wmi_handle)
 		return;
@@ -1978,17 +1975,9 @@ void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
 	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
 	/* MBSSID */
 	extcap->multi_bssid = 1;
-	/* TWT requestor: check vdev-level or pdev-level flag based on
-	 * FW service cap to avoid ambiguity between the two paths.
-	 */
+	/* TWT requestor */
 	wlan_twt_get_requestor_cfg(psoc, &twt_requestor);
-	wlan_twt_cfg_get_req_en_dis_vdev_support(psoc, &vdev_support);
-	if (vdev_support)
-		wlan_twt_cfg_get_vdev_requestor_flag(psoc, vdev_id,
-						     &twt_req_support);
-	else
-		wlan_twt_cfg_get_req_flag(psoc, &twt_req_support);
-
+	wlan_twt_cfg_get_req_flag(psoc, &twt_req_support);
 	extcap->twt_requestor_support = twt_requestor && twt_req_support;
 
 }
