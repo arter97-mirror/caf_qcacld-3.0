@@ -1971,6 +1971,12 @@ wlan_cfg80211_peer_enh_cfr_capture(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_err("CFR not supported for MLO");
+		ret = -EINVAL;
+		goto out;
+	}
+
 	if (is_start_capture) {
 		ret = wlan_cfg80211_cfr_set_config(vdev, tb);
 		if (ret) {
