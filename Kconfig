@@ -1842,6 +1842,14 @@ config DP_TX_PACKET_INSPECT_FOR_ILP
 
 config NUM_SOC_PERF_CLUSTER
 	int "enable NUM_SOC_PERF_CLUSTER"
+config WLAN_MAX_CPUS
+	int "Maximum number of CPUs for WLAN driver static arrays"
+	default 8
+	help
+	  Caps NR_CPUS for WLAN driver static arrays to avoid
+	  excessive memory allocation on upstream kernels where
+	  NR_CPUS can be up to 256. Default 8 covers most
+	  mobile/IoT platforms.
 
 config WLAN_OPEN_SOURCE
 	bool "enable WLAN_OPEN_SOURCE"
