@@ -17212,6 +17212,12 @@ hdd_apply_nss_chains_vdev_up_req(struct wlan_hdd_link_info *link_info,
 		goto vdev_ref;
 	}
 
+	if (ucfg_coex_n79_is_active(hdd_ctx->psoc) &&
+	    ucfg_coex_n79_nss_chain_vdev_up_req(vdev, req)) {
+		hdd_debug("N79 active: NSS/chain update rejected, saved for restore");
+		goto vdev_ref;
+	}
+
 	status = hdd_fill_vdev_up_nss_chains_limits(link_info, &limits);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_ref;
