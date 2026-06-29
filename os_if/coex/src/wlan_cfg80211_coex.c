@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -159,3 +159,73 @@ int wlan_cfg80211_coex_set_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
 						       chain_mode,
 						       restart);
 }
+
+#ifdef FEATURE_N79_COEX
+const struct nla_policy
+n79_coex_policy[QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_TYPE] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_N79_COEX_STATE]   = {.type = NLA_U8},
+};
+
+static int
+coex_n79_get_state(struct wiphy *wiphy, struct wlan_objmgr_psoc *psoc)
+{
+	struct sk_buff *skb;
+	uint8_t state;
+
+	state = ucfg_coex_n79_is_active(psoc) ? 1 : 0;
+	coex_debug("N79 vendor cmd: GET state=%u", state);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(
+					wiphy, sizeof(state) + NLMSG_HDRLEN);
+	if (!skb)
+		return -ENOMEM;
+	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_N79_COEX_STATE, state)) {
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	return wlan_cfg80211_vendor_cmd_reply(skb);
+}
+
+int wlan_cfg80211_coex_n79_vendor_cmd(struct wiphy *wiphy,
+				      struct wlan_objmgr_psoc *psoc,
+				      const void *data, int data_len)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_MAX + 1];
+	uint8_t op_type, state;
+	QDF_STATUS status;
+
+	if (wlan_cfg80211_nla_parse(tb,
+				    QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_MAX,
+				    data, data_len, n79_coex_policy)) {
+		coex_err("N79 coex: invalid NL attributes");
+		return -EINVAL;
+	}
+
+	/* OP_TYPE is optional; absent means SET */
+	if (!tb[QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_TYPE])
+		op_type = QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_SET;
+	else
+		op_type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_TYPE]);
+
+	if (op_type == QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_GET)
+		return coex_n79_get_state(wiphy, psoc);
+
+	if (op_type != QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_SET) {
+		coex_err("N79 coex: unknown op_type %u", op_type);
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_N79_COEX_STATE]) {
+		coex_err("N79 coex: missing STATE attribute in SET");
+		return -EINVAL;
+	}
+
+	state = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_N79_COEX_STATE]);
+	coex_debug("N79 vendor cmd: SET state=%u", state);
+
+	status = ucfg_coex_psoc_set_n79_active(psoc, state != 0);
+
+	return qdf_status_to_os_return(status);
+}
+#endif /* FEATURE_N79_COEX */

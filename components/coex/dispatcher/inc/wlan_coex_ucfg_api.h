@@ -179,4 +179,90 @@ ucfg_coex_send_dbam_config(void)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+struct wlan_mlme_nss_chains;
+
+#ifdef FEATURE_N79_COEX
+/**
+ * ucfg_coex_psoc_set_n79_active() - set N79 coex active/inactive state
+ * @psoc: psoc object
+ * @active: true = N79 active (reduce to 2x2); false = N79 inactive (restore)
+ *
+ * On active=true: cancels pending restore timers, sets n79_coex_active,
+ * tears down TDLS if present, then applies 2x2 to all connected 5 GHz vdevs.
+ * On active=false: clears flag and starts both hysteresis timers.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_coex_psoc_set_n79_active(struct wlan_objmgr_psoc *psoc,
+					 bool active);
+
+/**
+ * ucfg_coex_n79_wlan_evt() - dispatch a WLAN connection-state event
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @evt: one of WLAN_COEX_N79_STA_CONNECT/DISCONNECT,
+ *       SAP_START/STOP, NAN_START/STOP
+ *
+ * On connect events: if N79 is active, applies 2x2 to the vdev.
+ * On disconnect events: clears saved per-vdev NSS state.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_coex_n79_wlan_evt(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  enum wlan_coex_n79_event evt);
+
+/**
+ * ucfg_coex_n79_is_active() - query current N79 active state
+ * @psoc: psoc object
+ *
+ * Return: true if N79 coexistence is currently active
+ */
+bool ucfg_coex_n79_is_active(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_coex_n79_nss_chain_vdev_up_req() - handle NSS/chains config update
+ *   when N79 may be active
+ * @vdev: vdev object
+ * @params: requested NSS/chains config (5 GHz fields used)
+ *
+ * If N79 is inactive or the vdev is not on 5 GHz, returns false.
+ * If N79 is active and the requested rx_nss or num_rx_chains exceeds the
+ * N79 limit, saves the values as the restore target and returns true
+ * (request deferred — caller must not apply the config now).
+ *
+ * Return: true if request was deferred; false to proceed with normal apply
+ */
+bool ucfg_coex_n79_nss_chain_vdev_up_req(
+			struct wlan_objmgr_vdev *vdev,
+			const struct wlan_mlme_nss_chains *params);
+#else /* !FEATURE_N79_COEX */
+static inline QDF_STATUS
+ucfg_coex_psoc_set_n79_active(struct wlan_objmgr_psoc *psoc, bool active)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+ucfg_coex_n79_wlan_evt(struct wlan_objmgr_psoc *psoc,
+		       struct wlan_objmgr_vdev *vdev,
+		       enum wlan_coex_n79_event evt)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool ucfg_coex_n79_is_active(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+ucfg_coex_n79_nss_chain_vdev_up_req(
+			struct wlan_objmgr_vdev *vdev,
+			const struct wlan_mlme_nss_chains *params)
+{
+	return false;
+}
+#endif /* FEATURE_N79_COEX */
 #endif

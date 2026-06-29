@@ -25,6 +25,9 @@
 #include "wlan_coex_public_structs.h"
 #include "wlan_coex_tgt_api.h"
 #include "wlan_coex_utils_api.h"
+#ifdef FEATURE_N79_COEX
+#include "wlan_n79_coex.h"
+#endif
 
 QDF_STATUS
 ucfg_coex_register_cfg_updated_handler(struct wlan_objmgr_psoc *psoc,
@@ -166,3 +169,56 @@ ucfg_coex_send_logging_config(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+#ifdef FEATURE_N79_COEX
+QDF_STATUS ucfg_coex_psoc_set_n79_active(struct wlan_objmgr_psoc *psoc,
+					 bool active)
+{
+	struct coex_psoc_obj *psoc_obj;
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	psoc_obj = wlan_psoc_get_coex_obj(psoc);
+	if (!psoc_obj)
+		return QDF_STATUS_E_INVAL;
+
+	if (!!qdf_atomic_read(&psoc_obj->n79_coex_active) == active) {
+		coex_debug("N79 coex already %s, ignore",
+			   active ? "active" : "inactive");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (active)
+		wlan_coex_n79_active(psoc);
+	else
+		wlan_coex_n79_inactive(psoc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ucfg_coex_n79_wlan_evt(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  enum wlan_coex_n79_event evt)
+{
+	return wlan_coex_n79_event(psoc, vdev, evt);
+}
+
+bool ucfg_coex_n79_is_active(struct wlan_objmgr_psoc *psoc)
+{
+	struct coex_psoc_obj *psoc_obj;
+
+	if (!psoc)
+		return false;
+
+	psoc_obj = wlan_psoc_get_coex_obj(psoc);
+	return psoc_obj ? !!qdf_atomic_read(&psoc_obj->n79_coex_active) : false;
+}
+
+bool ucfg_coex_n79_nss_chain_vdev_up_req(
+			struct wlan_objmgr_vdev *vdev,
+			const struct wlan_mlme_nss_chains *params)
+{
+	return wlan_coex_n79_nss_chain_vdev_up_req(vdev, params);
+}
+#endif /* FEATURE_N79_COEX */

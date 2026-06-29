@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,4 +39,36 @@ wlan_cfg80211_coex_set_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
 	return -ENOTSUPP;
 }
 #endif
+
+#ifdef FEATURE_N79_COEX
+#include "qca_vendor.h"
+
+extern const struct nla_policy
+	n79_coex_policy[QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_MAX + 1];
+
+/**
+ * wlan_cfg80211_coex_n79_vendor_cmd() - handle N79 coex vendor command
+ * @wiphy: pointer to wiphy (needed for GET reply)
+ * @psoc: psoc object
+ * @data: NL attribute buffer
+ * @data_len: buffer length
+ *
+ * OP_TYPE is optional; absent means SET.
+ * SET: calls ucfg_coex_psoc_set_n79_active().
+ * GET: returns current active state via cfg80211_vendor_cmd_reply().
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_cfg80211_coex_n79_vendor_cmd(struct wiphy *wiphy,
+				      struct wlan_objmgr_psoc *psoc,
+				      const void *data, int data_len);
+#else
+static inline int
+wlan_cfg80211_coex_n79_vendor_cmd(struct wiphy *wiphy,
+				  struct wlan_objmgr_psoc *psoc,
+				  const void *data, int data_len)
+{
+	return -ENOTSUPP;
+}
+#endif /* FEATURE_N79_COEX */
 #endif
