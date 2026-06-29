@@ -71,10 +71,44 @@ void wlan_tdls_stats_enable_cmd(struct tdls_stats_context *stats_ctx);
  * @enable: true  -> enable TDLS stats forwarding (TDLS_STATS_EV_ENABLE)
  *          false -> disable TDLS stats forwarding (TDLS_STATS_EV_DISABLE)
  *
+ * Sets tdls_stats_context::stats_reporting_enabled and delivers the
+ * corresponding SM event.
+ *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
  */
 QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
 				    bool enable);
+
+/**
+ * wlan_tdls_set_stats_reporting() - Enable or disable TDLS data statistics
+ *                                   reporting.
+ * @psoc:   PSOC object.
+ * @enable: true  -> enable TDLS stats reporting
+ *          false -> disable TDLS stats reporting
+ *
+ * Stores the requested enable/disable value in
+ * tdls_stats_context::stats_reporting_enabled so that the stats-emit
+ * path can check it before forwarding a TDLS stats entry to userspace.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_set_stats_reporting(struct wlan_objmgr_psoc *psoc,
+					 bool enable);
+
+/**
+ * wlan_tdls_set_events_reporting() - Enable or disable TDLS event reporting.
+ * @psoc:   PSOC object.
+ * @enable: true  -> enable TDLS event reporting
+ *          false -> disable TDLS event reporting
+ *
+ * Stores the requested enable/disable value in
+ * tdls_stats_context::events_reporting_enabled so that the event-emit
+ * path can check it before forwarding a TDLS event to userspace.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_set_events_reporting(struct wlan_objmgr_psoc *psoc,
+					  bool enable);
 
 /**
  * wlan_tdls_stats_notify_fw_cap() - Notify the TDLS stats SM that FW service

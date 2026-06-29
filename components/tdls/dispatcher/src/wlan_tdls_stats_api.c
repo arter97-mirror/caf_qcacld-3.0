@@ -96,6 +96,71 @@ QDF_STATUS wlan_tdls_get_tdls_stats(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * wlan_tdls_set_stats_reporting() - Enable or disable TDLS data statistics
+ *                                   reporting.
+ * @psoc:   PSOC object.
+ * @enable: true  -> enable TDLS stats reporting
+ *          false -> disable TDLS stats reporting
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_set_stats_reporting(struct wlan_objmgr_psoc *psoc,
+					 bool enable)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		tdls_err("TDLS stats: soc obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc_obj->stats_ctx) {
+		tdls_err("TDLS stats: context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	soc_obj->stats_ctx->stats_reporting_enabled = enable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_tdls_set_events_reporting() - Enable or disable TDLS event reporting.
+ * @psoc:   PSOC object.
+ * @enable: true  -> enable TDLS event reporting
+ *          false -> disable TDLS event reporting
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS wlan_tdls_set_events_reporting(struct wlan_objmgr_psoc *psoc,
+					  bool enable)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		tdls_err("TDLS events: soc obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc_obj->stats_ctx) {
+		tdls_err("TDLS events: context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	soc_obj->stats_ctx->events_reporting_enabled = enable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * wlan_tdls_stats_notify_fw_cap() - Notify the TDLS stats SM that FW service
  *                                   capability and INI have been finalised.
  * @psoc: PSOC object.

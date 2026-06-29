@@ -413,13 +413,26 @@ typedef void (*tdls_stats_emit_cb)(struct wlan_objmgr_psoc *psoc,
 
 /**
  * struct tdls_stats_context - TDLS stats context (per-PSOC).
- * @psoc:           Back-pointer to the owning PSOC object.
- * @psoc_id:        PSOC identifier, used for debug logging.
- * @sm:             State machine handle (includes the SM lock).
- * @db:             Embedded cache database.  Valid only when
- *                  @db_initialized is true.
- * @db_initialized: True if @db has been successfully initialised.
- *                  Set to false for the DISABLED path (FW capability absent).
+ * @psoc:                    Back-pointer to the owning PSOC object.
+ * @psoc_id:                 PSOC identifier, used for debug logging.
+ * @sm:                      State machine handle (includes the SM lock).
+ * @db:                      Embedded cache database.  Valid only when
+ *                           @db_initialized is true.
+ * @db_initialized:          True if @db has been successfully initialised.
+ *                           Set to false for the DISABLED path (FW capability
+ *                           absent).
+ * @stats_reporting_enabled: True when userspace has enabled TDLS data
+ *                           statistics reporting via
+ *                           %QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS or
+ *                           %QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG.
+ *                           Checked by hdd_tdls_stats_emit_cb() before
+ *                           forwarding a stats entry to userspace.
+ * @events_reporting_enabled: True when userspace has enabled TDLS event
+ *                           reporting via
+ *                           %QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT or
+ *                           %QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG.
+ *                           Checked before forwarding a TDLS event entry to
+ *                           userspace (event path not yet implemented).
  *
  * One instance is allocated per PSOC and is owned by
  * struct wlan_tdls_psoc_obj::stats_ctx.  It is created during PSOC
@@ -441,6 +454,8 @@ struct tdls_stats_context {
 	struct tdls_stats_sm     sm;
 	struct tdls_stats_db     db;
 	bool                     db_initialized;
+	bool                     stats_reporting_enabled;
+	bool                     events_reporting_enabled;
 };
 
 #endif /* _WLAN_TDLS_STATS_PUBLIC_STRUCTS_H_ */

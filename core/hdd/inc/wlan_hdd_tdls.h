@@ -44,7 +44,15 @@ extern const struct nla_policy
 	wlan_hdd_tdls_stats_policy
 	[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX + 1];
 
+extern const struct nla_policy
+	wlan_hdd_tdls_reporting_config_policy
+	[QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_MAX + 1];
+
 #define FEATURE_TDLS_VENDOR_EVENTS                                  \
+[QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT_INDEX] = {                    \
+	.vendor_id = QCA_NL80211_VENDOR_ID,                         \
+	.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT,             \
+},                                                                  \
 [QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS_INDEX] = {                    \
 	.vendor_id = QCA_NL80211_VENDOR_ID,                         \
 	.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS,             \
@@ -63,6 +71,15 @@ extern const struct nla_policy
 	.doit = wlan_hdd_cfg80211_get_tdls_stats,                      \
 	vendor_command_policy(wlan_hdd_tdls_stats_policy,              \
 			      QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX)     \
+},                                                                     \
+{                                                                      \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,                       \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG, \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                          \
+		 WIPHY_VENDOR_CMD_NEED_NETDEV,                         \
+	.doit = wlan_hdd_cfg80211_tdls_reporting_config,               \
+	vendor_command_policy(wlan_hdd_tdls_reporting_config_policy,   \
+			      QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_MAX) \
 },
 #else
 #define FEATURE_TDLS_STATS_VENDOR_COMMANDS
@@ -168,6 +185,30 @@ int wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
 				     const void *data,
 				     int data_len);
+
+/**
+ * wlan_hdd_cfg80211_tdls_reporting_config() - Configure TDLS event and
+ *   statistics reporting simultaneously via
+ *   %QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG.
+ * @wiphy:    pointer to wireless wiphy structure.
+ * @wdev:     pointer to wireless_dev structure.
+ * @data:     Pointer to the data to be passed via vendor interface.
+ *            Contains %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_EVENTS
+ *            and/or %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_STATS
+ *            attributes (both optional, u8, values from
+ *            enum qca_wlan_tdls_config).
+ * @data_len: Length of the data to be passed.
+ *
+ * Parses the incoming NL attributes and calls wlan_tdls_get_tdls_stats()
+ * for the stats path and (when the event path is implemented)
+ * wlan_tdls_get_tdls_events() for the event path.
+ *
+ * Return: 0 on success; negative errno otherwise.
+ */
+int wlan_hdd_cfg80211_tdls_reporting_config(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    const void *data,
+					    int data_len);
 #endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
