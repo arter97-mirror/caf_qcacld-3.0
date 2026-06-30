@@ -1209,6 +1209,68 @@ void lim_send_join_fail_on_vdev(struct mac_context *mac_ctx,
 			session_entry);
 }
 
+static void lim_update_vdev_bss_params(struct pe_session *session_entry,
+				       tpSirAssocRsp assoc_rsp,
+				       struct bss_description *bss_desc)
+{
+	struct vdev_mlme_obj *mlme_obj;
+	struct vdev_mlme_bss_params *bp;
+
+	if (!session_entry->vdev)
+		return;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
+	if (!mlme_obj)
+		return;
+
+	bp = &mlme_obj->mgmt.sta.bss_params;
+	bp->flags = 0;
+	if (bss_desc->bcn_ies.ERPInfo.present &&
+	    bss_desc->bcn_ies.ERPInfo.use_prot)
+		bp->flags |= VDEV_MLME_BSS_PARAM_CTS_PROT;
+	if (assoc_rsp->capabilityInfo.shortPreamble)
+		bp->flags |= VDEV_MLME_BSS_PARAM_SHORT_PREAMBLE;
+	if (assoc_rsp->capabilityInfo.shortSlotTime)
+		bp->flags |= VDEV_MLME_BSS_PARAM_SHORT_SLOT_TIME;
+	bp->dtim_period = bss_desc->bcn_ies.TIM.dtim_period;
+	bp->beacon_interval = bss_desc->beaconInterval;
+}
+
+void lim_update_vdev_bss_param_dtim(struct pe_session *session,
+				    uint8_t dtim_period)
+{
+	struct vdev_mlme_obj *mlme_obj;
+
+	if (!session->vdev)
+		return;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->mgmt.sta.bss_params.dtim_period = dtim_period;
+}
+
+void lim_update_vdev_bss_param_use_prot(struct pe_session *session,
+					bool use_prot)
+{
+	struct vdev_mlme_obj *mlme_obj;
+
+	if (!session->vdev)
+		return;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj)
+		return;
+
+	if (use_prot)
+		mlme_obj->mgmt.sta.bss_params.flags |=
+					VDEV_MLME_BSS_PARAM_CTS_PROT;
+	else
+		mlme_obj->mgmt.sta.bss_params.flags &=
+					~VDEV_MLME_BSS_PARAM_CTS_PROT;
+}
+
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx: Pointer to Global MAC structure
@@ -1861,6 +1923,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (bss_desc->bcn_ies.ERPInfo.present)
 		session_entry->beaconParams.fShortPreamble =
 			!bss_desc->bcn_ies.ERPInfo.barker_preamble;
+
+	lim_update_vdev_bss_params(session_entry, assoc_rsp, bss_desc);
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,
