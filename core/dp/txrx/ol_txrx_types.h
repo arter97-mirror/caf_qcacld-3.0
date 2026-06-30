@@ -885,6 +885,10 @@ struct ol_txrx_pdev_t {
 					/* uint64_t msdu_defrag_mic_err; */
 					uint64_t msdu_mc_dup_drop;
 				} err;
+#define OL_TXRX_CE_COUNT_MAX 12
+				/* packet count per core - per CE id */
+				uint64_t ce_packets[QDF_MAX_AVAILABLE_CPU]
+						   [OL_TXRX_CE_COUNT_MAX];
 			} rx;
 		} priv;
 		struct ol_txrx_stats pub;

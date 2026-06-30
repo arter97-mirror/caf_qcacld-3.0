@@ -1441,6 +1441,11 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 			frag_ind = HTT_RX_IN_ORD_PADDR_IND_FRAG_GET(
 							*msg_word);
 
+			ol_rx_per_ce_stats_update(
+				pdev->txrx_pdev, ce_id,
+				HTT_RX_IN_ORD_PADDR_IND_MSDU_CNT_GET(
+							*(msg_word + 1)));
+
 			if (qdf_unlikely(frag_ind)) {
 				ol_rx_frag_indication_handler(
 				pdev->txrx_pdev, htt_t2h_msg, peer_id,

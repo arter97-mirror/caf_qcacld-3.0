@@ -15048,6 +15048,7 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id)
 	int ret = 0;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hif_opaque_softc *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 
 	hdd_debug("stats_id %d", stats_id);
 
@@ -15060,6 +15061,10 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id)
 		break;
 	case CDP_HIF_STATS:
 		hdd_display_hif_stats();
+		break;
+	case CDP_DP_NAPI_STATS:
+		if (hif_ctx)
+			hif_print_napi_stats(hif_ctx);
 		break;
 	case CDP_NAPI_STATS:
 		if (hdd_display_napi_stats()) {
