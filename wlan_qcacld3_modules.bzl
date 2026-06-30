@@ -97,6 +97,10 @@ _target_chipset_map = {
     "hamoa_la": [
         "kiwi-v2",
     ],
+    "glymur": [
+        "kiwi-v2",
+        "wcn7760",
+    ]
 }
 _target_chipset_map["art16k"] = _target_chipset_map["art"]
 
@@ -2937,7 +2941,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
 
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "hamoa_la":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "hamoa_la" and target != "glymur":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
