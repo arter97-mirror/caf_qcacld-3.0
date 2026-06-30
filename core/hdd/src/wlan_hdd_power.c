@@ -186,6 +186,9 @@ static void hdd_enable_gtk_offload(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
 
+	if (wlan_vdev_is_open_mode(vdev))
+		return;
+
 	status = ucfg_pmo_enable_gtk_offload_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to enable gtk offload");
@@ -313,6 +316,9 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
 {
 	struct pmo_gtk_rsp_req gtk_rsp_request;
 	QDF_STATUS status;
+
+	if (wlan_vdev_is_open_mode(vdev))
+		return;
 
 	/* ensure to get gtk rsp first before disable it*/
 	gtk_rsp_request.callback = wlan_hdd_cfg80211_update_replay_counter_cb;
