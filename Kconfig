@@ -3087,8 +3087,24 @@ config HIF_LARGE_CE_RING_HISTORY
 	int "Enable HIF_LARGE_CE_RING_HISTORY"
 	default 8192
 endif
+
 config WLAN_TAS_SYSFS
 	bool "Enable TAS sysfs"
 	default n
 
+config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE feature"
+	default n
+
+config WLAN_FEATURE_POWER_STATISTICS
+	bool "Enable WLAN_FEATURE_POWER_STATISTICS feature"
+	default n
+
+config SCAN_RANDOM_MAC_ADDR
+	bool "Enable SCAN_RANDOM_MAC_ADDR feature"
+	default n
+
+config FEATURE_DAL_DP_SUPPORT
+	bool "Enable FEATURE_DAL_DP_SUPPORT feature"
+	default n
 endif # QCA_CLD_WLAN
