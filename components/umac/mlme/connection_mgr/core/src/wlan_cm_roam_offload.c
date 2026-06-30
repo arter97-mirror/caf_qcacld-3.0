@@ -5105,7 +5105,8 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 		 * If disabled (legacy behavior), return early as before.
 		 */
 		if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
-						   WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE)) {
+						   WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE) ||
+		    reason == REASON_ROAM_ABORT) {
 			mlme_set_roam_state(psoc, vdev_id, new_roam_state);
 			return QDF_STATUS_SUCCESS;
 		}
