@@ -534,13 +534,9 @@ void dp_get_transmit_mac_addr(struct wlan_dp_link *dp_link,
 		}
 		break;
 	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
 		dp_get_tdls_mac_addr_if_active(dp_link, nbuf,
 					       mac_addr_tx_allowed);
-		break;
-	case QDF_P2P_CLIENT_MODE:
-		if (wlan_cm_is_vdev_active(dp_link->vdev))
-			qdf_copy_macaddr(mac_addr_tx_allowed,
-					 &dp_link->conn_info.bssid);
 		break;
 	default:
 		break;
