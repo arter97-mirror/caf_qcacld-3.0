@@ -1707,6 +1707,15 @@ config FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	bool "Enable CONFIG_FEATURE_WLAN_MCC_TO_SCC_SWITCH"
 	default n
 
+config RECORD_DP_CE_EVTS
+	bool "Enable RECORD_DP_CE_EVTS"
+	default n
+	help
+	This option enables support for recording data path owned
+	copy engine history events.
+
+	choose y to enable the support.
+
 config DP_FT_LOCK_HISTORY
 	bool "Enable DP_FT_LOCK_HISTORY"
 	default n
