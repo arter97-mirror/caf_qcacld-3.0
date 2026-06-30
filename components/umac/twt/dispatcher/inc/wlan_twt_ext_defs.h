@@ -46,6 +46,7 @@
  * @rtwt_responder_enabled: Restricted TWT responder enable or disable
  * @twt_req_ht_vht: TWT requestor support in ht/vht mode
  * @twt_res_ht_vht: TWT responder support in ht/vht mode
+ * @twt_setup_defer_on_scan: defer TWT setup to worker when scan/ROC in progress
  */
 struct twt_mc_cfg_params {
 	bool enable_twt;
@@ -64,6 +65,7 @@ struct twt_mc_cfg_params {
 	bool rtwt_responder_enabled;
 	bool twt_req_ht_vht;
 	bool twt_res_ht_vht;
+	bool twt_setup_defer_on_scan;
 };
 
 /**

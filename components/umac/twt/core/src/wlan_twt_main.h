@@ -347,6 +347,39 @@ void wlan_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 			      struct twt_work_params *params,
 			      uint32_t *next_action);
 
+/**
+ * wlan_twt_set_setup_work_params() - Cache TWT add dialog params for a
+ * deferred setup retry and mark the worker next action as add
+ * @vdev: vdev pointer
+ * @params: TWT add dialog params to cache
+ *
+ * Return: None
+ */
+void wlan_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params);
+
+/**
+ * wlan_twt_get_setup_work_params() - Get the cached TWT add dialog params
+ * for a deferred setup retry
+ * @vdev: vdev pointer
+ * @params: pointer to receive the cached TWT add dialog params
+ * @next_action: pointer to receive the worker next action
+ *
+ * Return: None
+ */
+void wlan_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params,
+				    uint32_t *next_action);
+
+/**
+ * wlan_twt_inc_retry_count() - Increment and return the TWT deferred work
+ *   retry count
+ * @vdev: vdev pointer
+ *
+ * Return: new retry count, or UINT_MAX on error
+ */
+uint32_t wlan_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev);
+
 /*
  * wlan_twt_cfg_get_wake_dur_and_interval() - Get TWT wake duration and wake
  * interval of peer.
@@ -619,6 +652,25 @@ void wlan_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 			      struct twt_work_params *params,
 			      uint32_t *next_action)
 {
+}
+
+static inline
+void wlan_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params)
+{
+}
+
+static inline
+void wlan_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params,
+				    uint32_t *next_action)
+{
+}
+
+static inline
+uint32_t wlan_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev)
+{
+	return UINT_MAX;
 }
 
 QDF_STATUS

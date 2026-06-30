@@ -348,6 +348,39 @@ void ucfg_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 			      uint32_t *next_action);
 
 /**
+ * ucfg_twt_set_setup_work_params() - Cache TWT add dialog params for a
+ * deferred setup retry scheduled on the TWT worker queue
+ * @vdev: vdev pointer
+ * @params: TWT add dialog params to cache
+ *
+ * Return: None
+ */
+void ucfg_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params);
+
+/**
+ * ucfg_twt_get_setup_work_params() - Get cached TWT add dialog params for a
+ * deferred setup retry
+ * @vdev: vdev pointer
+ * @params: pointer to receive cached TWT add dialog params
+ * @next_action: pointer to receive TWT worker next action
+ *
+ * Return: None
+ */
+void ucfg_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params,
+				    uint32_t *next_action);
+
+/**
+ * ucfg_twt_inc_retry_count() - Increment and return the TWT deferred work
+ *   retry count
+ * @vdev: vdev pointer
+ *
+ * Return: new retry count, or UINT_MAX on error
+ */
+uint32_t ucfg_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev);
+
+/**
  * ucfg_twt_cfg_set_requestor() - Set TWT requestor capability
  * @psoc: Pointer to global PSOC object
  * @val: pointer to value to be set
@@ -638,6 +671,25 @@ ucfg_twt_get_work_params(
 		struct twt_work_params *params,
 		uint32_t *next_action)
 {
+}
+
+static inline void
+ucfg_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
+			       struct twt_add_dialog_param *params)
+{
+}
+
+static inline void
+ucfg_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
+			       struct twt_add_dialog_param *params,
+			       uint32_t *next_action)
+{
+}
+
+static inline uint32_t
+ucfg_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev)
+{
+	return UINT_MAX;
 }
 
 static inline

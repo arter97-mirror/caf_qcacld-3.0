@@ -271,6 +271,24 @@ void ucfg_twt_get_work_params(
 	return wlan_twt_get_work_params(vdev, params, next_action);
 }
 
+void ucfg_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params)
+{
+	return wlan_twt_set_setup_work_params(vdev, params);
+}
+
+void ucfg_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params,
+				    uint32_t *next_action)
+{
+	return wlan_twt_get_setup_work_params(vdev, params, next_action);
+}
+
+uint32_t ucfg_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_twt_inc_retry_count(vdev);
+}
+
 bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_twt_get_pmo_allowed(psoc);

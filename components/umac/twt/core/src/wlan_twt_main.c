@@ -2789,6 +2789,7 @@ void wlan_twt_set_work_params(
 	twt_vdev_priv->dialog_id = dialog_id;
 	twt_vdev_priv->is_ps_disabled = is_ps_disabled;
 	twt_vdev_priv->next_action = twt_next_action;
+	twt_vdev_priv->retry_count = 0;
 
 	twt_debug("TWT terminate: dialog_id:%d is_ps_disabled:%d next_action:%d peer mac_addr  "
 		   QDF_MAC_ADDR_FMT, twt_vdev_priv->dialog_id,
@@ -2813,6 +2814,58 @@ void wlan_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 	qdf_copy_macaddr(&params->peer_macaddr, &twt_vdev_priv->peer_macaddr);
 	params->dialog_id = twt_vdev_priv->dialog_id;
 	params->is_ps_disabled = twt_vdev_priv->is_ps_disabled;
+	*next_action = twt_vdev_priv->next_action;
+}
+
+void wlan_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params)
+{
+	struct twt_vdev_priv_obj *twt_vdev_priv;
+
+	twt_vdev_priv = wlan_objmgr_vdev_get_comp_private_obj(
+					vdev, WLAN_UMAC_COMP_TWT);
+	if (!twt_vdev_priv) {
+		twt_err("twt vdev private obj is null");
+		return;
+	}
+
+	twt_vdev_priv->setup_params = *params;
+	twt_vdev_priv->next_action = HOST_TWT_SEND_ADD_CMD;
+	twt_vdev_priv->retry_count = 0;
+
+	twt_debug("TWT setup deferred: vdev:%d dialog_id:%d next_action:%d",
+		  params->vdev_id, params->dialog_id,
+		  twt_vdev_priv->next_action);
+}
+
+uint32_t wlan_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev)
+{
+	struct twt_vdev_priv_obj *twt_vdev_priv;
+
+	twt_vdev_priv = wlan_objmgr_vdev_get_comp_private_obj(
+					vdev, WLAN_UMAC_COMP_TWT);
+	if (!twt_vdev_priv) {
+		twt_err("twt vdev private obj is null");
+		return UINT_MAX;
+	}
+
+	return ++twt_vdev_priv->retry_count;
+}
+
+void wlan_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
+				    struct twt_add_dialog_param *params,
+				    uint32_t *next_action)
+{
+	struct twt_vdev_priv_obj *twt_vdev_priv;
+
+	twt_vdev_priv = wlan_objmgr_vdev_get_comp_private_obj(
+					vdev, WLAN_UMAC_COMP_TWT);
+	if (!twt_vdev_priv) {
+		twt_err("twt vdev private obj is null");
+		return;
+	}
+
+	*params = twt_vdev_priv->setup_params;
 	*next_action = twt_vdev_priv->next_action;
 }
 

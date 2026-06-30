@@ -48,6 +48,12 @@ wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
+wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return wlan_twt_cfg_get_setup_deferred_on_scan(psoc, val);
+}
+
+QDF_STATUS
 wlan_twt_cfg_get_req_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
 					bool *val)
 {

@@ -355,6 +355,17 @@ wlan_twt_cfg_get_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc,
 				      bool *val);
 
 /**
+ * wlan_twt_cfg_get_setup_deferred_on_scan() - get twt_setup_defer_on_scan value
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_setup_deferred_on_scan(struct wlan_objmgr_psoc *psoc,
+					bool *val);
+
+/**
  * wlan_twt_cfg_get_rtwt_responder() - get rtwt responder
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable

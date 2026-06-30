@@ -22,6 +22,7 @@
 #include <wlan_twt_ucfg_api.h>
 #include <wlan_twt_ucfg_ext_api.h>
 #include <wlan_twt_ucfg_ext_cfg.h>
+#include <wlan_twt_cfg_ext_api.h>
 #include <osif_twt_req.h>
 #include <osif_twt_ext_req.h>
 #include <wlan_policy_mgr_api.h>
@@ -42,6 +43,8 @@
 #define TWT_MAX_NEXT_TWT_SIZE                   3
 #define TWT_DEL_DIALOG_REQ_MAX_RETRY            10
 #define TWT_TEARDOWN_IN_PS_DISABLE_WAIT_TIME    500
+#define TWT_SETUP_REQ_MAX_RETRY                 10
+#define TWT_SETUP_BUSY_WAIT_TIME                500
 
 static const struct nla_policy
 qca_wlan_vendor_twt_add_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1] = {
@@ -545,7 +548,7 @@ osif_send_twt_delete_cmd(struct wlan_objmgr_vdev *vdev,
 
 	ucfg_twt_set_work_params(vdev, peer_mac, dialog_id, is_ps_disabled,
 				 twt_next_action);
-	qdf_sched_work(0, &vdev->twt_work);
+	qdf_delayed_work_start(&vdev->twt_work, 0);
 }
 
 static int
@@ -1090,21 +1093,106 @@ int osif_twt_get_capabilities(struct wlan_objmgr_vdev *vdev)
 	return qdf_status_to_os_return(status);
 }
 
+/**
+ * osif_twt_setup_send() - Send the TWT add dialog request to the target
+ * @vdev: vdev context
+ * @psoc: psoc context
+ * @params: TWT add dialog params
+ *
+ * Performs the actual TWT setup send sequence after the command has been
+ * validated and allowed. For STA / P2P-CLI this includes the requestor
+ * congestion-timeout enable dance. Called both from the synchronous setup
+ * path and from the deferred worker retry path.
+ *
+ * Return: 0 on success, else negative errno
+ */
+static int osif_twt_setup_send(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_objmgr_psoc *psoc,
+			       struct twt_add_dialog_param *params)
+{
+	int ret = 0;
+	uint8_t vdev_id = params->vdev_id;
+	uint8_t mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
+	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(vdev);
+	uint32_t congestion_timeout = 0, reason;
+	bool vdev_support = false;
+
+	/*
+	 * For initiating broadcast TWT, userspace would send broadcast
+	 * TWT with dialog ID 0 and the parameters will be sent via
+	 * the TWT_ADD_DIALOG command to the firmware
+	 */
+	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE)
+		return osif_send_twt_setup_req(vdev, psoc, params);
+
+	/*
+	 * If FW supports per-vdev TWT en/dis for requestor role, use the
+	 * per-vdev congestion timeout so that each vdev (STA, P2P-CLI etc.)
+	 * is tracked independently. Otherwise fall back to the mac-level
+	 * congestion timeout (legacy pdev-level path).
+	 */
+	ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, &vdev_support);
+	if (vdev_support)
+		ucfg_twt_cfg_get_vdev_congestion_timeout(psoc, vdev_id,
+							 &congestion_timeout);
+	else
+		ucfg_twt_cfg_get_congestion_timeout_per_mac(psoc, mac_id,
+							    &congestion_timeout);
+
+	if (congestion_timeout) {
+		reason = HOST_TWT_DISABLE_REASON_CHANGE_CONGESTION_TIMEOUT;
+		ret = osif_twt_send_requestor_disable_cmd(psoc, mac_id,
+							  reason, vdev_id);
+		if (ret) {
+			osif_err("Failed to disable TWT");
+			return -EOPNOTSUPP;
+		}
+	}
+
+	if (vdev_support)
+		ucfg_twt_cfg_set_vdev_congestion_timeout(psoc, vdev_id, 0);
+	else
+		ucfg_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, 0);
+
+	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id, vdev_id);
+	if (ret) {
+		osif_err("Failed to Enable TWT");
+		ret = -EOPNOTSUPP;
+		goto end;
+	}
+
+	ret = osif_send_twt_setup_req(vdev, psoc, params);
+	if (ret)
+		goto end;
+
+	return 0;
+
+end:
+	if (congestion_timeout) {
+		if (vdev_support)
+			ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(
+					psoc, vdev_id);
+		else
+			ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
+					psoc, mac_id);
+	}
+
+	return ret;
+}
+
 int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 		       struct nlattr *twt_param_attr)
 {
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1];
 	struct wlan_objmgr_psoc *psoc;
 	int ret = 0;
-	uint8_t vdev_id, mac_id;
+	uint8_t vdev_id;
 	struct twt_add_dialog_param params = {0};
 	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(vdev);
-	uint32_t congestion_timeout = 0, reason;
 	uint8_t peer_cap;
 	QDF_STATUS qdf_status;
 	struct wlan_channel *bss_chan;
 	uint8_t band;
-	bool vdev_support = false;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1121,7 +1209,6 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	params.vdev_id = vdev_id;
-	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
 
 	ret = osif_twt_parse_add_dialog_attrs(tb2, &params);
 	if (ret)
@@ -1177,77 +1264,25 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	}
 
 	ret = osif_is_twt_command_allowed(psoc, vdev, WLAN_TWT_SETUP);
-	if (ret == -EBUSY)
-		return ret;
+	if (ret == -EBUSY &&
+	    (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)) {
+		bool defer_on_scan = false;
 
+		wlan_twt_cfg_get_setup_defer_on_scan(psoc, &defer_on_scan);
+		if (defer_on_scan) {
+			osif_debug("vdev:%d TWT setup busy, defer to worker",
+				   vdev_id);
+			ucfg_twt_set_setup_work_params(vdev, &params);
+			qdf_delayed_work_start(&vdev->twt_work, 0);
+			return 0;
+		}
+	}
 	if (ret) {
 		osif_err("TWT setup command not allowed");
 		return -EOPNOTSUPP;
 	}
 
-	/*
-	 * For initiating broadcast TWT, userspace would send broadcast
-	 * TWT with dialog ID 0 and the parameters will be sent via
-	 * the TWT_ADD_DIALOG command to the firmware
-	 */
-	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE)
-		return osif_send_twt_setup_req(vdev, psoc, &params);
-
-	/*
-	 * If FW supports per-vdev TWT en/dis for requestor role, use the
-	 * per-vdev congestion timeout so that each vdev (STA, P2P-CLI etc.)
-	 * is tracked independently. Otherwise fall back to the mac-level
-	 * congestion timeout (legacy pdev-level path).
-	 */
-
-	ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, &vdev_support);
-	if (vdev_support)
-		ucfg_twt_cfg_get_vdev_congestion_timeout(psoc, vdev_id,
-							 &congestion_timeout);
-	else
-		ucfg_twt_cfg_get_congestion_timeout_per_mac(
-							psoc, mac_id,
-							&congestion_timeout);
-
-	if (congestion_timeout) {
-		reason = HOST_TWT_DISABLE_REASON_CHANGE_CONGESTION_TIMEOUT;
-		ret = osif_twt_send_requestor_disable_cmd(psoc, mac_id,
-							  reason, vdev_id);
-		if (ret) {
-			osif_err("Failed to disable TWT");
-			return -EOPNOTSUPP;
-		}
-	}
-
-	if (vdev_support)
-		ucfg_twt_cfg_set_vdev_congestion_timeout(psoc, vdev_id, 0);
-	else
-		ucfg_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, 0);
-
-	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id, vdev_id);
-	if (ret) {
-		osif_err("Failed to Enable TWT");
-		ret = -EOPNOTSUPP;
-		goto end;
-	}
-
-	ret = osif_send_twt_setup_req(vdev, psoc, &params);
-	if (ret)
-		goto end;
-
-	return 0;
-
-end:
-	if (congestion_timeout) {
-		if (vdev_support)
-			ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(
-					psoc, vdev_id);
-		else
-			ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
-					psoc, mac_id);
-	}
-
-	return ret;
+	return osif_twt_setup_send(vdev, psoc, &params);
 }
 
 /**
@@ -3143,20 +3178,72 @@ static void osif_twt_teardown_req_retry(struct wlan_objmgr_vdev *vdev,
 					struct wlan_objmgr_psoc *psoc,
 					struct twt_del_dialog_param params)
 {
-	int retries = 1;
+	uint32_t retries;
 	int ret;
 
-	while (retries < TWT_DEL_DIALOG_REQ_MAX_RETRY) {
-		qdf_sleep(TWT_TEARDOWN_IN_PS_DISABLE_WAIT_TIME);
+	ret = osif_send_sta_twt_teardown_req(vdev, psoc, &params);
+	if (ret != -EBUSY)
+		return;
+
+	retries = ucfg_twt_inc_retry_count(vdev);
+	if (retries < TWT_DEL_DIALOG_REQ_MAX_RETRY) {
 		osif_debug("Implicitly TWT teardown req retry count:%d", retries);
-		ret = osif_send_sta_twt_teardown_req(vdev, psoc, &params);
-		if (ret != -EBUSY)
-			break;
-		retries++;
+		qdf_delayed_work_start(&vdev->twt_work,
+				       TWT_TEARDOWN_IN_PS_DISABLE_WAIT_TIME);
+		return;
 	}
 
-	if (retries >= TWT_DEL_DIALOG_REQ_MAX_RETRY)
-		osif_debug("TWT Del Dialog req max retries reached");
+	osif_debug("TWT Del Dialog req max retries reached");
+}
+
+/**
+ * osif_twt_setup_req_retry() - Worker-thread retry of a deferred TWT setup
+ * @vdev: vdev context
+ * @psoc: psoc context
+ *
+ * Runs on the TWT worker thread (not the caller thread). Re-checks the TWT
+ * command gate; if still busy and below the retry limit, reschedules the
+ * delayed work for another attempt after TWT_SETUP_BUSY_WAIT_TIME ms rather
+ * than sleeping on the worker thread.
+ *
+ * Return: None
+ */
+static void osif_twt_setup_req_retry(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_objmgr_psoc *psoc)
+{
+	struct twt_add_dialog_param params = {0};
+	uint32_t next_action;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	uint32_t retries;
+	int ret;
+
+	ucfg_twt_get_setup_work_params(vdev, &params, &next_action);
+
+	ret = osif_is_twt_command_allowed(psoc, vdev, WLAN_TWT_SETUP);
+	if (ret == -EBUSY) {
+		retries = ucfg_twt_inc_retry_count(vdev);
+		if (retries < TWT_SETUP_REQ_MAX_RETRY) {
+			osif_debug("vdev:%d deferred TWT setup retry count:%d",
+				   vdev_id, retries);
+			qdf_delayed_work_start(&vdev->twt_work,
+					       TWT_SETUP_BUSY_WAIT_TIME);
+			return;
+		}
+		osif_err("vdev:%d deferred TWT setup max retries reached",
+			 vdev_id);
+		return;
+	}
+
+	if (ret) {
+		osif_err("vdev:%d deferred TWT setup not allowed, ret:%d)",
+			 vdev_id, ret);
+		return;
+	}
+
+	ret = osif_twt_setup_send(vdev, psoc, &params);
+	if (ret)
+		osif_err("vdev:%d deferred TWT setup send failed:%d",
+			 vdev_id, ret);
 }
 
 void __osif_twt_work_handler(struct wlan_objmgr_vdev *vdev)
@@ -3176,6 +3263,11 @@ void __osif_twt_work_handler(struct wlan_objmgr_vdev *vdev)
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	ucfg_twt_get_work_params(vdev, &twt_work_params, &next_action);
+
+	if (next_action == HOST_TWT_SEND_ADD_CMD) {
+		osif_twt_setup_req_retry(vdev, psoc);
+		return;
+	}
 
 	if (next_action != HOST_TWT_SEND_DELETE_CMD) {
 		osif_debug("Do not send STA teardown req as TWT renegotiation or power save work is not scheduled");
@@ -3226,16 +3318,14 @@ void osif_twt_work_handler(void *data)
 
 QDF_STATUS osif_twt_create_work(struct wlan_objmgr_vdev *vdev)
 {
-	qdf_create_work(0, &vdev->twt_work,
-			osif_twt_work_handler, vdev);
-
-	return QDF_STATUS_SUCCESS;
+	return qdf_delayed_work_create(&vdev->twt_work,
+				       osif_twt_work_handler, vdev);
 }
 
 QDF_STATUS osif_twt_destroy_work(struct wlan_objmgr_vdev *vdev)
 {
-	qdf_flush_work(&vdev->twt_work);
-	qdf_destroy_work(NULL, &vdev->twt_work);
+	qdf_delayed_work_stop_sync(&vdev->twt_work);
+	qdf_delayed_work_destroy(&vdev->twt_work);
 
 	return QDF_STATUS_SUCCESS;
 }

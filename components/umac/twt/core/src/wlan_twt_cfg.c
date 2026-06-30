@@ -74,6 +74,8 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
 	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
 	twt_cfg->disable_twt_on_scan = cfg_get(psoc, CFG_DISABLE_TWT_ON_SCAN);
+	twt_cfg->twt_setup_defer_on_scan =
+				cfg_get(psoc, CFG_TWT_SETUP_DEFER_ON_SCAN);
 	twt_cfg->flex_twt_sched = cfg_default(CFG_HE_FLEX_TWT_SCHED);
 	twt_cfg->req_flag = false;
 	twt_cfg->rtwt_requestor_enabled = CFG_GET_RTWT_REQ(rtwt_conf);
@@ -565,6 +567,23 @@ wlan_twt_cfg_get_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = twt_psoc_obj->cfg_params.disable_twt_on_scan;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_setup_deferred_on_scan(struct wlan_objmgr_psoc *psoc,
+					bool *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = cfg_default(CFG_TWT_SETUP_DEFER_ON_SCAN);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->cfg_params.twt_setup_defer_on_scan;
 
 	return QDF_STATUS_SUCCESS;
 }

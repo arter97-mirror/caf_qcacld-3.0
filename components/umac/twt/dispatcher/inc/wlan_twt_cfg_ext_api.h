@@ -88,6 +88,17 @@ QDF_STATUS
 wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * wlan_twt_cfg_get_setup_defer_on_scan() - Get TWT setup defer on scan flag
+ * @psoc: Pointer to global psoc object
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc,
+				     bool *val);
+
+/**
  * wlan_twt_cfg_get_req_support_for_ht_vht() - Get TWT requestor support for
  * ht/vht mode
  * @psoc: Pointer to global psoc object
@@ -276,6 +287,12 @@ wlan_twt_get_requestor_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return QDF_STATUS_SUCCESS;
 }

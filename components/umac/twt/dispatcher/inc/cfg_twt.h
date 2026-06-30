@@ -321,6 +321,32 @@
 		false, \
 		"disable twt info frame")
 
+/*
+ * <ini>
+ * twt_setup_defer_on_scan - Defer TWT setup when scan or ROC is in progress.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * When enabled, a TWT setup request that arrives while a scan or ROC is
+ * active is deferred to a driver worker thread and retried automatically
+ * once the busy condition clears.  When disabled (default), the request
+ * fails immediately with -EOPNOTSUPP so the caller is responsible for
+ * retrying at an appropriate time.
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_TWT_SETUP_DEFER_ON_SCAN CFG_INI_BOOL( \
+		"twt_setup_defer_on_scan", \
+		true, \
+		"defer TWT setup when scan/ROC in progress")
+
 #define CFG_HE_FLEX_TWT_SCHED CFG_BOOL( \
 				"he_flex_twt_sched", \
 				1, \
@@ -383,7 +409,8 @@
 	CFG(CFG_DISABLE_TWT_ON_SCAN) \
 	CFG(CFG_DISABLE_TWT_INFO_FRAME) \
 	CFG(CFG_RTWT_REQ_RESP) \
-	CFG(CFG_TWT_REQ_RESP_HT_VHT)
+	CFG(CFG_TWT_REQ_RESP_HT_VHT) \
+	CFG(CFG_TWT_SETUP_DEFER_ON_SCAN)
 #elif !defined(WLAN_SUPPORT_TWT) && !defined(WLAN_TWT_CONV_SUPPORTED)
 #define CFG_TWT_ALL
 #endif
