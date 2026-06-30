@@ -7090,6 +7090,9 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	uint32_t band_capability = 0, band_mask = 0, scan_band_mask = 0;
 	struct wlan_diag_roam_scan_done *wlan_diag_event = NULL;
 
+	if (scan->type == ROAM_STATS_SCAN_TYPE_NO_SCAN)
+		return;
+
 	wlan_diag_event = qdf_mem_malloc(sizeof(*wlan_diag_event));
 	if (!wlan_diag_event) {
 		mlme_err("Mem malloc failed for wlan_diag_event");
@@ -7187,6 +7190,9 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_roam_scan_start);
+
+	if (scan_data->type == ROAM_STATS_SCAN_TYPE_NO_SCAN)
+		return;
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
@@ -7438,6 +7444,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT
 	 * ROAM_FAIL_REASON_CURR_AP_STILL_OK
 	 * ROAM_FAIL_REASON_SCAN_START
+	 * ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO
 	 */
 	wlan_diag_event.is_roam_successful = true;
 
@@ -7450,6 +7457,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	    res->fail_reason ==
 		ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT ||
 	    res->fail_reason == ROAM_FAIL_REASON_SCAN_START ||
+	    res->fail_reason == ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO ||
 	    res->fail_reason == ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED ||
 	    res->fail_reason == ROAM_FAIL_REASON_TTLM_REQUIRED ||
 	    res->fail_reason == ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED)
