@@ -2149,6 +2149,9 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dp_info("DP VDEV OBJ create notification, vdev_id %d",
 		wlan_vdev_get_id(vdev));
 
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_NAN_DISC_MODE)
+		return QDF_STATUS_SUCCESS;
+
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
 		dp_err("Failed to get psoc");
@@ -2290,6 +2293,9 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	dp_info("DP VDEV OBJ destroy notification, vdev_id %d",
 		wlan_vdev_get_id(vdev));
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_NAN_DISC_MODE)
+		return QDF_STATUS_SUCCESS;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (!dp_link) {
