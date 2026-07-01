@@ -1345,9 +1345,7 @@ hdd_update_sta_nss_in_disconnect(struct wlan_hdd_link_info *link_info,
 				 uint8_t tx_nss, uint8_t rx_nss)
 {
 	struct wlan_mlme_nss_chains user_cfg = {0};
-	struct wlan_mlme_nss_chains limits = {0};
 	enum nss_chains_band_info band;
-	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
@@ -1356,23 +1354,7 @@ hdd_update_sta_nss_in_disconnect(struct wlan_hdd_link_info *link_info,
 		hdd_populate_vdev_nss(&user_cfg, tx_nss, rx_nss, band);
 	}
 
-	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits,
-						      WLAN_MLME_CFG_SRC_GLOBAL);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
-
-	status = hdd_resolve_non_force_nss_chains_fields(link_info,
-							 &user_cfg, &limits);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
-
-	status = sme_nss_chains_update_no_session(mac_handle, &user_cfg,
-						  link_info->vdev_id);
-	if (status == QDF_STATUS_E_ALREADY || QDF_IS_STATUS_ERROR(status))
-		return;
-
-	/* Propagate to MLO links and update per-band IEs */
-	hdd_update_vdev_nss_chains_config(link_info, true);
+	hdd_apply_nss_chains_vdev_init_req(link_info, &user_cfg);
 }
 
 QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,

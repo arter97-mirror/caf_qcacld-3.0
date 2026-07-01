@@ -17382,11 +17382,43 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+hdd_apply_nss_chains_vdev_init_req(struct wlan_hdd_link_info *link_info,
+				   struct wlan_mlme_nss_chains *req)
+{
+	QDF_STATUS status;
+	struct wlan_mlme_nss_chains limits = {0};
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits,
+						      WLAN_MLME_CFG_SRC_GLOBAL);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = hdd_resolve_non_force_nss_chains_fields(link_info, req,
+							 &limits);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = sme_nss_chains_update_no_session(hdd_ctx->mac_handle, req,
+						  link_info->vdev_id);
+	if (QDF_IS_STATUS_ERROR(status) && status != QDF_STATUS_E_ALREADY)
+		return status;
+
+	/*
+	 * Propagate to MLO links and update per-band IEs. Also called when
+	 * E_ALREADY: vdev ini_cfg is already at the requested NSS, but
+	 * user_nss_ctx was cleared at disconnect. Without refreshing it here,
+	 * hdd_store_nss_chains_cfg_in_vdev() at the next connect-start falls
+	 * through to startup_cfg (stale 2x2) and overwrites dynamic_cfg.
+	 */
+	return hdd_update_vdev_nss_chains_config(link_info, true);
+}
+
 static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 					struct nlattr *tb[])
 {
 	struct wlan_mlme_nss_chains req = {0};
-	struct wlan_mlme_nss_chains limits = {0};
 	struct wlan_objmgr_vdev *vdev;
 	enum wlan_vendor_nss_chains_req_type nss_req_type, chains_req_type;
 	QDF_STATUS status;
@@ -17429,33 +17461,13 @@ static int hdd_config_vendor_nss_chains(struct wlan_hdd_link_info *link_info,
 		return hdd_apply_nss_chains_vdev_up_req(link_info, &req, true);
 	}
 
-	status = hdd_fill_vdev_init_nss_chains_limits(link_info, &limits,
-						       WLAN_MLME_CFG_SRC_GLOBAL);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto vdev_ref;
-
-	status = hdd_resolve_non_force_nss_chains_fields(link_info, &req,
-							 &limits);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto vdev_ref;
-
-	status = sme_nss_chains_update_no_session(hdd_ctx->mac_handle, &req,
-						  link_info->vdev_id);
-	if (QDF_IS_STATUS_ERROR(status) && status != QDF_STATUS_E_ALREADY)
-		goto vdev_ref;
-
-	if (status != QDF_STATUS_E_ALREADY) {
-		status = hdd_update_vdev_nss_chains_config(link_info, true);
-		if (QDF_IS_STATUS_ERROR(status))
-			goto vdev_ref;
-	}
-
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	status = hdd_apply_nss_chains_vdev_init_req(link_info, &req);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
 	return 0;
-
-vdev_ref:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	return -EINVAL;
 }
 
 /* vtable for interdependent setters */

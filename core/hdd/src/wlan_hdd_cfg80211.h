@@ -1415,7 +1415,23 @@ bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
 	return false;
 }
 #endif
-#endif /* end of file */
+
+/**
+ * hdd_apply_nss_chains_vdev_init_req() - Apply NSS/chains config in disconnected state
+ * @link_info: Link info pointer in HDD adapter
+ * @req: requested NSS/chains config (resolved in place against hw limits)
+ *
+ * Common helper for the disconnect-state NSS update path shared by
+ * hdd_config_vendor_nss_chains() and hdd_update_sta_nss_in_disconnect().
+ * Validates the request against psoc limits, writes to vdev ini_cfg and
+ * dynamic_cfg, and refreshes user_nss_ctx so that hdd_store_nss_chains_cfg_in_vdev()
+ * at the next connect-start uses the correct value instead of startup_cfg.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_apply_nss_chains_vdev_init_req(struct wlan_hdd_link_info *link_info,
+				   struct wlan_mlme_nss_chains *req);
 
 /**
  * hdd_fill_vdev_init_nss_chains_limits() - Fetch per-mode NSS/chains limits
@@ -1454,3 +1470,4 @@ hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
 QDF_STATUS
 hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info,
 				  bool set_ies);
+#endif /* end of file */
