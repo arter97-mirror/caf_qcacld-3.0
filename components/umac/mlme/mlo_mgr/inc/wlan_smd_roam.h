@@ -121,6 +121,18 @@ bool
 smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx);
 
 /**
+ * smd_roam_exec_in_progress() - API to check if SMD ST execution is ongoing
+ * @mlo_dev_ctx: MLO device context
+ *
+ * API to check if SMD ST execution (link switch) is currently in progress
+ * on the given MLO device context.
+ *
+ * Return: boolean value true or false
+ */
+bool
+smd_roam_exec_in_progress(struct wlan_mlo_dev_context *mlo_dev_ctx);
+
+/**
  * smd_uhr_link_recfg_send_request_frame() - API to send Link Recfg request
  * @recfg_ctx: Link reconfiguration context
  * @req: Link reconfiguration state request
@@ -435,21 +447,20 @@ QDF_STATUS
 smd_trigger_link_recfg_sm(struct wlan_objmgr_vdev *vdev);
 
 /**
- * smd_handle_cm_roam_sync_pending() - Handle E_PENDING from cm_sm_deliver_event
+ * smd_handle_cm_roam_sync_pending() - Handle SMD async ST execution pending
  * @vdev: Assoc vdev pointer
- * @status: Status returned by cm_sm_deliver_event(ROAM_SYNC)
  *
  * Called in cm_fw_roam_sync_req() immediately after cm_sm_deliver_event()
- * returns (CM lock is already released at this point). If status is
- * E_PENDING it means smd_fw_roam_sync() deferred SM execution; this
- * function checks smd_roam_in_progress and calls smd_trigger_link_recfg_sm().
+ * returns (CM lock is already released at this point). Checks
+ * smd_is_roaming_in_progress() and smd_roam_exec_in_progress() to determine
+ * if smd_fw_roam_sync() deferred SM execution for this vdev; if so, calls
+ * smd_trigger_link_recfg_sm().
  *
- * Return: true if E_PENDING was handled (caller should skip RSO stop and
- *         return), false otherwise.
+ * Return: true if SMD execution was pending and handled (caller should skip
+ *         RSO stop and return), false otherwise.
  */
 bool
-smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
-				QDF_STATUS status);
+smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev);
 
 /**
  * smd_exec_complete() - Complete SMD roaming execution
@@ -631,8 +642,13 @@ smd_fw_roam_sync(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline bool
-smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
-				QDF_STATUS status)
+smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline bool
+smd_roam_exec_in_progress(struct wlan_mlo_dev_context *mlo_dev_ctx)
 {
 	return false;
 }

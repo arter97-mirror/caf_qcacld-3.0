@@ -146,7 +146,7 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_SYNC,
 				     event_data_len, event);
 
-	if (smd_handle_cm_roam_sync_pending(vdev, status))
+	if (smd_handle_cm_roam_sync_pending(vdev))
 		goto done;
 
 	if (QDF_IS_STATUS_ERROR(status)) {

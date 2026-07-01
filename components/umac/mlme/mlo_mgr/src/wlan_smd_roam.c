@@ -768,7 +768,7 @@ smd_handle_multi_to_single_link_roaming(
 		return false;
 	}
 
-	mlo_debug("SMD: Multi-link to Single-link roaming detected");
+	mlo_debug("SMD: Single/Multi-link to Single-link roaming detected");
 
 	/* Find vdev marked for cleanup (cleanup_vdev == 1) */
 	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req; i++) {
@@ -1136,6 +1136,147 @@ smd_roam_prep_ml_to_sl_ml_handler(
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * smd_send_roam_start_status_cmd() - Send SMD roam start status to firmware
+ * @recfg_ctx: Link reconfiguration context
+ * @req: Link reconfiguration state request whose add_link_info has been
+ *       updated with per-link PREP response status codes by
+ *       mlo_link_recfg_update_state_req_from_rsp() (i.e. tran->req)
+ * @prep_status: Overall ST Prep phase result; one of enum smd_prep_status.
+ *               SMD_PREP_STATUS_SUCCESS instructs FW to proceed with ST Exec.
+ *
+ * This function sends the host's response to firmware's SMD start notification.
+ * It includes the SMD transition IE from AP, per-link PREP response status,
+ * and KCK for per AP-MLD PTK mode.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+smd_send_roam_start_status_cmd(struct mlo_link_recfg_context *recfg_ctx,
+			       struct mlo_link_recfg_state_req *req,
+			       enum smd_prep_status prep_status)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_cm_roam_tx_ops *tx_ops;
+	struct wlan_roam_smd_start_status_params params = {0};
+	struct wlan_mlo_link_recfg_info *add_link_info;
+	QDF_STATUS status;
+	uint8_t vdev_id;
+	uint8_t i;
+
+	if (!recfg_ctx || !req) {
+		mlo_err("recfg_ctx %pK or req %pK is null", recfg_ctx, req);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
+	if (!psoc) {
+		mlo_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLO_MGR_ID);
+	if (!vdev) {
+		mlo_err("vdev is null for id %d", vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
+	if (!tx_ops || !tx_ops->send_smd_roam_start_status_cmd) {
+		mlo_err("TX ops not registered");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	params.vdev_id = vdev_id;
+	params.status = prep_status;
+
+	/* Populate SMD transition IE received from FW */
+	if (recfg_ctx->smd_transition_ie.ie_len) {
+		params.smd_transition_ie_len =
+				recfg_ctx->smd_transition_ie.ie_len;
+		params.smd_transition_ie =
+				recfg_ctx->smd_transition_ie.ie_data;
+	}
+
+	/* Populate per-link PREP response status from add_link_info.
+	 * Status codes are written into tran->req by
+	 * mlo_link_recfg_update_state_req_from_rsp() before this call.
+	 */
+	add_link_info = &req->add_link_info;
+	params.num_prep_status = add_link_info->num_links;
+	for (i = 0; i < add_link_info->num_links &&
+	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		params.prep_status_list[i].ieee_link_id =
+				add_link_info->link[i].link_id;
+		params.prep_status_list[i].status =
+				add_link_info->link[i].status_code;
+	}
+
+	/* Copy KCK for per AP-MLD PTK mode if provided */
+	if (add_link_info->kck_len > 0) {
+		params.kck_len = add_link_info->kck_len;
+		params.kck = add_link_info->kck;
+	}
+
+	mlo_debug("Sending SMD start status: vdev_id=%u status=%u ie_len=%u num_prep_status=%u kck_len=%u",
+		  params.vdev_id, params.status, params.smd_transition_ie_len,
+		  params.num_prep_status, params.kck_len);
+
+	status = tx_ops->send_smd_roam_start_status_cmd(psoc, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("Failed to send SMD roam start status cmd, status: %d",
+			status);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+	return status;
+}
+
+/**
+ * smd_cleanup_target_bss_ctx() - Free all prepared target BSS contexts in
+ *                                 smd_ctx and reset the prepared target state.
+ * @recfg_ctx: Link reconfiguration context
+ *
+ * Walks smd_ctx->prepared_targets[], frees each target_bss_ctx and its
+ * per-link link_chan_info allocations, then resets the smd_ctx roaming
+ * state fields. Safe to call on both success and failure paths.
+ */
+static void
+smd_cleanup_target_bss_ctx(struct mlo_link_recfg_context *recfg_ctx)
+{
+	struct smd_context *smd_ctx;
+	struct wlan_mlo_sta *tgt;
+	uint8_t i, k;
+
+	if (!recfg_ctx || !recfg_ctx->ml_dev)
+		return;
+
+	smd_ctx = recfg_ctx->ml_dev->smd_ctx;
+	if (!smd_ctx)
+		return;
+
+	for (i = 0; i < SMD_MAX_PREPARED_TARGETS; i++) {
+		tgt = smd_ctx->prepared_targets[i].target_bss_ctx;
+		if (!tgt)
+			continue;
+		for (k = 0; k < WLAN_MAX_ML_BSS_LINKS; k++) {
+			qdf_mem_free(tgt->links_info[k].link_chan_info);
+			tgt->links_info[k].link_chan_info = NULL;
+		}
+		qdf_mem_free(tgt);
+		smd_ctx->prepared_targets[i].target_bss_ctx = NULL;
+		smd_ctx->prepared_targets[i].prepared = false;
+	}
+	smd_ctx->num_prepared = 0;
+	smd_ctx->active_target_idx = 0;
+	smd_ctx->smd_roaming_in_progress = false;
+	smd_ctx->st_prep_in_progress = false;
+	smd_ctx->st_exec_in_progress = false;
+}
+
 QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc;
@@ -1172,6 +1313,15 @@ QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 		mlme_err("SMD: vdev %d is NOT in roaming state",
 			 wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (smd_roam_in_progress(recfg_ctx) &&
+	    mlo_is_link_recfg_in_progress(vdev)) {
+		mlo_err("SMD roam in progress, legacy ROAM_START received, aborting link recfg SM");
+		mlo_link_recfg_sm_deliver_event(mlo_dev_ctx,
+						WLAN_LINK_RECFG_SM_EV_DISCONNECT_IND,
+						0, NULL);
+		return QDF_STATUS_SUCCESS;
 	}
 
 	/* Validate VDEV repurpose TLVs */
@@ -1577,7 +1727,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		recfg_req->del_link_info.num_links) &&
 		recfg_req->st_exec_link_recfg) {
 		/* Handle ST Exec Request to add Target AP links */
-		mlo_debug("Handle ST Exec Request to add Target AP links");
+		mlo_debug("Handle ST Exec Request to add target AP link/del current AP link");
 		recfg_req->recfg_type = link_recfg_st_exec_add_link;
 		next->req.recfg_type = recfg_req->recfg_type;
 		next->state = WLAN_LINK_RECFG_S_DEL_LINK;
@@ -1588,6 +1738,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		next->state = WLAN_LINK_RECFG_S_ADD_LINK;
 		next->event = WLAN_LINK_RECFG_SM_EV_SMD_ADD_LINK;
 		next->req.add_link_info = recfg_req->add_link_info;
+		next->req.del_link_info = recfg_req->del_link_info;
 		next->abort_handler = NULL;
 		next++;
 		next->state = WLAN_LINK_RECFG_S_COMPLETED;
@@ -1613,6 +1764,19 @@ smd_roam_in_progress(struct mlo_link_recfg_context *recfg_ctx)
 	}
 
 	return recfg_ctx->smd_roam_in_progress;
+}
+
+bool
+smd_roam_exec_in_progress(struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	struct mlo_link_recfg_context *recfg_ctx;
+
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
+		return false;
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+
+	return recfg_ctx->st_exec_in_progress;
 }
 
 struct wlan_mlo_link_recfg_bss_info *
@@ -1831,7 +1995,7 @@ smd_host_link_switch_validate_request(struct wlan_objmgr_vdev *vdev,
 		/* Disconnect-only: new_ieee_link_id is intentionally INVALID.
 		 * Only curr_ieee_link_id needs to be valid.
 		 */
-		if (req->curr_ieee_link_id >= WLAN_INVALID_LINK_ID) {
+		if (req->curr_ieee_link_id == WLAN_INVALID_LINK_ID) {
 			mlo_err("REMOVE_LINK: invalid curr link id %d",
 				req->curr_ieee_link_id);
 			return QDF_STATUS_E_INVAL;
@@ -1929,147 +2093,6 @@ smd_get_prepared_ap_link_info(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return NULL;
-}
-
-/**
- * smd_send_roam_start_status_cmd() - Send SMD roam start status to firmware
- * @recfg_ctx: Link reconfiguration context
- * @req: Link reconfiguration state request whose add_link_info has been
- *       updated with per-link PREP response status codes by
- *       mlo_link_recfg_update_state_req_from_rsp() (i.e. tran->req)
- * @prep_status: Overall ST Prep phase result; one of enum smd_prep_status.
- *               SMD_PREP_STATUS_SUCCESS instructs FW to proceed with ST Exec.
- *
- * This function sends the host's response to firmware's SMD start notification.
- * It includes the SMD transition IE from AP, per-link PREP response status,
- * and KCK for per AP-MLD PTK mode.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-static QDF_STATUS
-smd_send_roam_start_status_cmd(struct mlo_link_recfg_context *recfg_ctx,
-			       struct mlo_link_recfg_state_req *req,
-			       enum smd_prep_status prep_status)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_cm_roam_tx_ops *tx_ops;
-	struct wlan_roam_smd_start_status_params params = {0};
-	struct wlan_mlo_link_recfg_info *add_link_info;
-	QDF_STATUS status;
-	uint8_t vdev_id;
-	uint8_t i;
-
-	if (!recfg_ctx || !req) {
-		mlo_err("recfg_ctx %pK or req %pK is null", recfg_ctx, req);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = mlo_link_recfg_get_psoc(recfg_ctx);
-	if (!psoc) {
-		mlo_err("psoc is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLO_MGR_ID);
-	if (!vdev) {
-		mlo_err("vdev is null for id %d", vdev_id);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
-	if (!tx_ops || !tx_ops->send_smd_roam_start_status_cmd) {
-		mlo_err("TX ops not registered");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	params.vdev_id = vdev_id;
-	params.status = prep_status;
-
-	/* Populate SMD transition IE received from FW */
-	if (recfg_ctx->smd_transition_ie.ie_len) {
-		params.smd_transition_ie_len =
-				recfg_ctx->smd_transition_ie.ie_len;
-		params.smd_transition_ie =
-				recfg_ctx->smd_transition_ie.ie_data;
-	}
-
-	/* Populate per-link PREP response status from add_link_info.
-	 * Status codes are written into tran->req by
-	 * mlo_link_recfg_update_state_req_from_rsp() before this call.
-	 */
-	add_link_info = &req->add_link_info;
-	params.num_prep_status = add_link_info->num_links;
-	for (i = 0; i < add_link_info->num_links &&
-	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		params.prep_status_list[i].ieee_link_id =
-				add_link_info->link[i].link_id;
-		params.prep_status_list[i].status =
-				add_link_info->link[i].status_code;
-	}
-
-	/* Copy KCK for per AP-MLD PTK mode if provided */
-	if (add_link_info->kck_len > 0) {
-		params.kck_len = add_link_info->kck_len;
-		params.kck = add_link_info->kck;
-	}
-
-	mlo_debug("Sending SMD start status: vdev_id=%u status=%u ie_len=%u num_prep_status=%u kck_len=%u",
-		  params.vdev_id, params.status, params.smd_transition_ie_len,
-		  params.num_prep_status, params.kck_len);
-
-	status = tx_ops->send_smd_roam_start_status_cmd(psoc, &params);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlo_err("Failed to send SMD roam start status cmd, status: %d",
-			status);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-	return status;
-}
-
-/**
- * smd_cleanup_target_bss_ctx() - Free all prepared target BSS contexts in
- *                                 smd_ctx and reset the prepared target state.
- * @recfg_ctx: Link reconfiguration context
- *
- * Walks smd_ctx->prepared_targets[], frees each target_bss_ctx and its
- * per-link link_chan_info allocations, then resets the smd_ctx roaming
- * state fields. Safe to call on both success and failure paths.
- */
-static void
-smd_cleanup_target_bss_ctx(struct mlo_link_recfg_context *recfg_ctx)
-{
-	struct smd_context *smd_ctx;
-	struct wlan_mlo_sta *tgt;
-	uint8_t i, k;
-
-	if (!recfg_ctx || !recfg_ctx->ml_dev)
-		return;
-
-	smd_ctx = recfg_ctx->ml_dev->smd_ctx;
-	if (!smd_ctx)
-		return;
-
-	for (i = 0; i < SMD_MAX_PREPARED_TARGETS; i++) {
-		tgt = smd_ctx->prepared_targets[i].target_bss_ctx;
-		if (!tgt)
-			continue;
-		for (k = 0; k < WLAN_MAX_ML_BSS_LINKS; k++) {
-			qdf_mem_free(tgt->links_info[k].link_chan_info);
-			tgt->links_info[k].link_chan_info = NULL;
-		}
-		qdf_mem_free(tgt);
-		smd_ctx->prepared_targets[i].target_bss_ctx = NULL;
-		smd_ctx->prepared_targets[i].prepared = false;
-	}
-	smd_ctx->num_prepared = 0;
-	smd_ctx->active_target_idx = 0;
-	smd_ctx->smd_roaming_in_progress = false;
-	smd_ctx->st_prep_in_progress = false;
-	smd_ctx->st_exec_in_progress = false;
 }
 
 QDF_STATUS
@@ -2555,24 +2578,27 @@ fail:
 	return status;
 }
 
-bool smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev,
-				     QDF_STATUS status)
+bool smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS trigger_status;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 
-	if (status != QDF_STATUS_E_PENDING)
+	if (!vdev)
 		return false;
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
-	if (mlo_dev_ctx && mlo_dev_ctx->link_recfg_ctx &&
-	    smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx)) {
-		trigger_status = smd_trigger_link_recfg_sm(vdev);
-		if (QDF_IS_STATUS_ERROR(trigger_status)) {
-			mlo_err("SMD: trigger_link_recfg_sm failed: %d",
-				trigger_status);
-			return false;
-		}
+	if (!mlo_dev_ctx)
+		return false;
+
+	if (!smd_is_roaming_in_progress(vdev) ||
+	    !smd_roam_exec_in_progress(mlo_dev_ctx))
+		return false;
+
+	trigger_status = smd_trigger_link_recfg_sm(vdev);
+	if (QDF_IS_STATUS_ERROR(trigger_status)) {
+		mlo_err("SMD: trigger_link_recfg_sm failed: %d",
+			trigger_status);
+		return false;
 	}
 
 	return true;
@@ -2850,33 +2876,6 @@ smd_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev)
 		return FW_SMD_ROAM_SYNC_TIMEOUT;
 
 	return FW_ROAM_SYNC_TIMEOUT;
-}
-
-bool wlan_is_smd_roam_sync(struct roam_offload_synch_ind *sync_ind)
-{
-	return sync_ind && sync_ind->num_vdev_repurpose_req > 0;
-}
-
-QDF_STATUS wlan_smd_roam_sync_status(QDF_STATUS status)
-{
-	if (status == QDF_STATUS_E_PENDING)
-		return QDF_STATUS_SUCCESS;
-	return status;
-}
-
-bool
-smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
-
-	if (!vdev)
-		return false;
-
-	mlo_dev_ctx = vdev->mlo_dev_ctx;
-	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
-		return false;
-
-	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
 }
 
 /**
