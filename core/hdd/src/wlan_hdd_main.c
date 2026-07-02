@@ -21783,6 +21783,7 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 		hdd_nofl_debug("Received WiFi disable from framework\n");
 		if (!cds_is_driver_loaded())
 			goto exit;
+		hdd_inform_wifi_off();
 
 		is_wlan_force_disabled = hdd_get_wlan_driver_status();
 		if (is_wlan_force_disabled)
