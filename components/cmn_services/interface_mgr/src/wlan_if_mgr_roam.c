@@ -1087,7 +1087,8 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 
 	if (op_mode == QDF_P2P_CLIENT_MODE &&
 	    wlan_reg_is_dfs_for_freq(pdev, chan_freq) &&
-	    wlan_p2p_is_vdev_wfd_r2_mode(vdev)) {
+	    wlan_p2p_is_vdev_wfd_r2_mode(vdev) &&
+	    wlan_p2p_fw_support_ap_assist_dfs_group(psoc)) {
 		const uint8_t *ie;
 		uint16_t ie_len;
 		bool is_dfs_owner = false, is_valid_ap_assist = false;
@@ -1101,11 +1102,6 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 						  NULL, NULL, NULL, NULL);
 		if (is_dfs_owner)
 			goto end;
-
-		if (!wlan_p2p_fw_support_ap_assist_dfs_group(psoc)) {
-			ifmgr_debug("FW doesn't support assisted AP for P2P");
-			return QDF_STATUS_E_INVAL;
-		}
 
 		if (!is_valid_ap_assist) {
 			ifmgr_debug("Invalid AP assist params");

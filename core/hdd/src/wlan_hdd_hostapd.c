@@ -9154,7 +9154,7 @@ hdd_check_ap_assist_dfs_group_start_req(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
-	bool is_dfs_master = 0, is_fw_cap = false;
+	bool is_dfs_master = 0;
 	bool is_valid_ap_assist = false, is_go_dfs_owner = false;
 	struct qdf_mac_addr ap_bssid;
 
@@ -9177,8 +9177,6 @@ hdd_check_ap_assist_dfs_group_start_req(struct wlan_hdd_link_info *link_info,
 		goto vdev_ref;
 	}
 
-	is_fw_cap = ucfg_p2p_fw_support_ap_assist_dfs_group(psoc);
-
 	status = ucfg_p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len,
 						       true, freq, true);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -9190,9 +9188,8 @@ hdd_check_ap_assist_dfs_group_start_req(struct wlan_hdd_link_info *link_info,
 						   &is_valid_ap_assist, NULL,
 						   &ap_bssid, NULL, NULL);
 
-	if (is_go_dfs_owner || !is_valid_ap_assist || !is_fw_cap) {
-		hdd_debug("error GO DFS owner %d, FW CAP %d",
-			  is_go_dfs_owner, is_fw_cap);
+	if (is_go_dfs_owner || !is_valid_ap_assist) {
+		hdd_debug("error GO DFS owner %d", is_go_dfs_owner);
 		status = QDF_STATUS_E_FAILURE;
 		goto vdev_ref;
 	}
@@ -10469,7 +10466,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		}
 
 		if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq) &&
-		    ucfg_p2p_is_vdev_wfd_r2_mode(vdev)) {
+		    ucfg_p2p_is_vdev_wfd_r2_mode(vdev) &&
+		    ucfg_p2p_fw_support_ap_assist_dfs_group(hdd_ctx->psoc)) {
 			status = hdd_check_ap_assist_dfs_group_start_req(link_info,
 									 params->beacon.tail,
 									 params->beacon.tail_len,

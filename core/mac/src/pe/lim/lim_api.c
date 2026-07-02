@@ -754,7 +754,9 @@ void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session)
 	qdf_mem_zero(dfs_p2p_info, sizeof(*dfs_p2p_info));
 	if (!wlan_reg_is_dfs_for_freq(wlan_vdev_get_pdev(pe_session->vdev),
 				      pe_session->curr_op_freq) ||
-	    !wlan_p2p_is_vdev_wfd_r2_mode(pe_session->vdev)) {
+	    !wlan_p2p_is_vdev_wfd_r2_mode(pe_session->vdev) ||
+	    !wlan_p2p_fw_support_ap_assist_dfs_group(
+				wlan_vdev_get_psoc(pe_session->vdev))) {
 		return;
 	}
 

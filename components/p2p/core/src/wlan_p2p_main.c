@@ -2032,7 +2032,8 @@ bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 
 QDF_STATUS p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev)
 {
-	if (!p2p_is_vdev_wfd_r2_mode(vdev))
+	if (!p2p_is_vdev_wfd_r2_mode(vdev) ||
+	    !p2p_fw_support_ap_assist_dfs_group(wlan_vdev_get_psoc(vdev)))
 		return QDF_STATUS_SUCCESS;
 
 	switch (wlan_vdev_mlme_get_opmode(vdev)) {

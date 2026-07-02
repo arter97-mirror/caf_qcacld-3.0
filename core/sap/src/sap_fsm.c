@@ -4342,7 +4342,8 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ctx->chan_freq))
 			is_dfs = false;
 
-		if (is_dfs && wlan_p2p_is_vdev_wfd_r2_mode(sap_ctx->vdev)) {
+		if (is_dfs && wlan_p2p_is_vdev_wfd_r2_mode(sap_ctx->vdev) &&
+		    wlan_p2p_fw_support_ap_assist_dfs_group(mac_ctx->psoc)) {
 			wlan_p2p_get_ap_assist_dfs_params(sap_ctx->vdev,
 							  &is_dfs_owner,
 							  &is_valid_ap_assist,

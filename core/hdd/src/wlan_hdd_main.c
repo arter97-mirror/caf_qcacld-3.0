@@ -964,7 +964,8 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 
 	if (adapter->device_mode == QDF_P2P_GO_MODE &&
 	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, chan_freq) &&
-	    ucfg_p2p_is_vdev_wfd_r2_mode(vdev)) {
+	    ucfg_p2p_is_vdev_wfd_r2_mode(vdev) &&
+	    ucfg_p2p_fw_support_ap_assist_dfs_group(hdd_ctx->psoc)) {
 		bool is_go_dfs_owner = false, is_valid_ap_assist = false;
 		qdf_freq_t vdev_freq = 0, ap_freq = 0;
 		uint8_t opclass = 0, ap_chan = 0;
