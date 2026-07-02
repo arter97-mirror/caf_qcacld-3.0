@@ -63,6 +63,7 @@
 #include "wlan_mlme_public_struct.h"
 #include <wlan_mlo_mgr_link_switch.h>
 #include "wlan_policy_mgr_i.h"
+#include "wlan_mlo_mgr_peer.h"
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
