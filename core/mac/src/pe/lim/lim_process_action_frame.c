@@ -1967,6 +1967,36 @@ lim_prepare_n_send_ttlm_action_rsp_frame(struct wlan_objmgr_peer *peer,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_process_protected_uhr_action_frame() - Process Protected UHR action
+ * @session: PE session
+ * @action_hdr: Pointer to action frame header
+ * @rx_pkt_info: Pointer to RX packet info
+ *
+ * Return: none
+ */
+static void
+lim_process_protected_uhr_action_frame(struct pe_session *session,
+				       tpSirMacActionFrameHdr action_hdr,
+				       uint8_t *rx_pkt_info)
+{
+	if (action_hdr->actionID == UHR_LINK_RECONFIG_RESPONSE) {
+		mlo_debug("Received UHR Link Reconfig Response");
+		mlo_uhr_link_recfg_rx_rsp(session->vdev,
+					  WLAN_LINK_RECFG_SM_EV_RX_RSP,
+					  rx_pkt_info);
+	}
+}
+#else
+static inline void
+lim_process_protected_uhr_action_frame(struct pe_session *session,
+				       tpSirMacActionFrameHdr action_hdr,
+				       uint8_t *rx_pkt_info)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 /**
  * lim_process_action_frame() - to process action frames
  * @mac_ctx: Pointer to Global MAC structure
@@ -2520,6 +2550,10 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			pe_err("Unhandled T2LM/EPCS/Link recfg rsp action frame");
 			break;
 		}
+		break;
+	case ACTION_CATEGORY_PROTECTED_UHR:
+		lim_process_protected_uhr_action_frame(session, action_hdr,
+						       rx_pkt_info);
 		break;
 	default:
 		pe_debug_rl("Action category: %d not handled",
