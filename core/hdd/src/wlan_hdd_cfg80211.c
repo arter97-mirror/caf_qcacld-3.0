@@ -8701,6 +8701,8 @@ hdd_convert_to_drv_ratemask_type(enum qca_wlan_ratemask_params_type type)
 		return RATEMASK_PARAMS_TYPE_HE;
 	case QCA_WLAN_RATEMASK_PARAMS_TYPE_EHT:
 		return RATEMASK_PARAMS_TYPE_EHT;
+	case QCA_WLAN_RATEMASK_PARAMS_TYPE_UHR:
+		return RATEMASK_PARAMS_TYPE_UHR;
 	default:
 		return RATEMASK_PARAMS_TYPE_MAX;
 	}
@@ -8906,14 +8908,14 @@ static int hdd_set_ratemask_params(struct hdd_adapter *adapter,
 			hdd_convert_vht_mcs_bitmap_to_fw_format(bitmap);
 		}
 
-		hdd_debug("rate_type:%d, lower32 0x%x, lower32_2 0x%x, higher32 0x%x, higher32_2 0x%x",
+		hdd_debug("rate_type:%d, lower32 0x%x, higher32 0x%x, lower32_2 0x%x, higher32_2 0x%x",
 			  ratemask_type, bitmap[0], bitmap[1],
 			  bitmap[2], bitmap[3]);
 
 		rate_params[num_ratemask].type = ratemask_type;
 		rate_params[num_ratemask].lower32 = bitmap[0];
-		rate_params[num_ratemask].lower32_2 = bitmap[1];
-		rate_params[num_ratemask].higher32 = bitmap[2];
+		rate_params[num_ratemask].higher32 = bitmap[1];
+		rate_params[num_ratemask].lower32_2 = bitmap[2];
 		rate_params[num_ratemask].higher32_2 = bitmap[3];
 		tmp_attr = tb2[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_LINK_ID];
 		if (tmp_attr) {
