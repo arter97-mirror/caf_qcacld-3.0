@@ -53,6 +53,13 @@
 #define DP_STC_QUOTA_MEDIUM_USAGE 8
 #define DP_STC_QUOTA_LOW_USAGE 24
 
+/* stc_allowed bit flags */
+#define DP_STC_VOTE_KNOWN BIT(0)
+#define DP_STC_VOTE_OTHER BIT(1)
+#define DP_STC_VOTE_ALL   (DP_STC_VOTE_KNOWN | DP_STC_VOTE_OTHER)
+
+#define DP_STC_KNOWN_CALLER_NAME "wifi_qos_daemon"
+
 /*
  * Value of WLAN_DP_STC_BK_PKT_THRESH is dependent on the value of
  * WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS.
@@ -3809,10 +3816,10 @@ static void wlan_dp_stc_notify_classified_flows_cleanup(
  * wlan_dp_stc_runtime_disable() - Clean up flows, detach STC, update state
  * @dp_ctx: DP context
  *
- * Called from wlan_dp_stc_runtime_work_handler() when state is DISABLING.
+ * Called from wlan_dp_stc_runtime_work_handler() when state is STOPPING.
  * Cleans up TX/RX flow state, sends firmware DELETE notifications for
  * classified flows, and calls detach to stop timers and free all resources.
- * Sets state to DISABLED on success, ENABLED on failure.
+ * Sets state to STOPPED on success, STARTED on failure.
  */
 static void wlan_dp_stc_runtime_disable(struct wlan_dp_psoc_context *dp_ctx)
 {
@@ -3823,11 +3830,11 @@ static void wlan_dp_stc_runtime_disable(struct wlan_dp_psoc_context *dp_ctx)
 	if (!dp_stc) {
 		dp_err("STC: dp_stc is NULL");
 		qdf_atomic_set(&stc_ctx->state,
-			       DP_STC_STATE_DISABLED);
+			       DP_STC_STATE_STOPPED);
 		return;
 	}
 
-	dp_info("STC: Disable started");
+	dp_info("STC: Stop initiated");
 
 	/* Stop periodic work and sampling timer before touching flow state
 	 * to avoid concurrent access during cleanup.
@@ -3841,13 +3848,13 @@ static void wlan_dp_stc_runtime_disable(struct wlan_dp_psoc_context *dp_ctx)
 	status = wlan_dp_stc_detach(dp_ctx);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		dp_info("STC: Disable completed");
+		dp_info("STC: Stop completed");
 		qdf_atomic_set(&stc_ctx->state,
-			       DP_STC_STATE_DISABLED);
+			       DP_STC_STATE_STOPPED);
 	} else {
 		dp_err("STC: failed, status %d", status);
 		qdf_atomic_set(&stc_ctx->state,
-			       DP_STC_STATE_ENABLED);
+			       DP_STC_STATE_STARTED);
 	}
 }
 
@@ -3901,19 +3908,19 @@ static void wlan_dp_stc_runtime_enable(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
 	QDF_STATUS status;
 
-	dp_info("STC: Enable started");
+	dp_info("STC: Start initiated");
 
 	status = wlan_dp_stc_attach(dp_ctx);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		dp_info("STC: Enable completed");
+		dp_info("STC: Start completed");
 		wlan_dp_stc_sync_active_peers(dp_ctx);
 		qdf_atomic_set(&stc_ctx->state,
-			       DP_STC_STATE_ENABLED);
+			       DP_STC_STATE_STARTED);
 	} else {
 		dp_err("STC: failed, status %d", status);
 		qdf_atomic_set(&stc_ctx->state,
-			       DP_STC_STATE_DISABLED);
+			       DP_STC_STATE_STOPPED);
 	}
 }
 
@@ -3933,9 +3940,9 @@ static void wlan_dp_stc_runtime_work_handler(void *arg)
 
 	dp_info("STC: state %d", state);
 
-	if (state == DP_STC_STATE_ENABLING)
+	if (state == DP_STC_STATE_STARTING)
 		wlan_dp_stc_runtime_enable(dp_ctx);
-	else if (state == DP_STC_STATE_DISABLING)
+	else if (state == DP_STC_STATE_STOPPING)
 		wlan_dp_stc_runtime_disable(dp_ctx);
 }
 
@@ -3944,6 +3951,7 @@ QDF_STATUS wlan_dp_stc_ctx_init(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_stc_ctx *stc_ctx = &dp_ctx->stc_ctx;
 
 	qdf_atomic_init(&stc_ctx->state);
+	stc_ctx->stc_allowed = DP_STC_VOTE_OTHER;
 	return qdf_create_work(0, &stc_ctx->stc_state_work,
 			       wlan_dp_stc_runtime_work_handler, stc_ctx);
 }
@@ -3967,9 +3975,15 @@ QDF_STATUS wlan_dp_stc_pdev_create_handler(struct wlan_dp_psoc_context *dp_ctx)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	/* Wait for START vendor command before enabling STC. */
-	dp_info("STC: state %d, waiting for START cmd",
-		qdf_atomic_read(&stc_ctx->state));
+	dp_info("STC: state %d stc_allowed=0x%x",
+		qdf_atomic_read(&stc_ctx->state),
+		stc_ctx->stc_allowed);
+
+	if ((stc_ctx->stc_allowed & DP_STC_VOTE_ALL) == DP_STC_VOTE_ALL) {
+		qdf_atomic_set(&stc_ctx->state, DP_STC_STATE_STARTING);
+		wlan_dp_stc_runtime_enable(dp_ctx);
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -3988,13 +4002,22 @@ void wlan_dp_stc_pdev_detach_handler(struct wlan_dp_psoc_context *dp_ctx)
 	 */
 	qdf_cancel_work(&stc_ctx->stc_state_work);
 
-	/* Ideally only ENABLING/DISABLING need normalisation, but there is no
-	 * vendor command to send STOP before idle shutdown. Reset to DISABLED
+	/* Ideally only STARTING/STOPPING need normalisation, but there is no
+	 * vendor command to send STOP before idle shutdown. Reset to STOPPED
 	 * unconditionally so the next pdev create starts from a clean state.
+	 * stc_allowed is preserved intentionally — votes survive pdev recycle
+	 * and SSR so the state machine resumes correctly on next pdev create.
 	 */
-	qdf_atomic_set(&stc_ctx->state, DP_STC_STATE_DISABLED);
+	qdf_atomic_set(&stc_ctx->state, DP_STC_STATE_STOPPED);
 
 	wlan_dp_stc_detach(dp_ctx);
+}
+
+static inline bool
+wlan_dp_stc_is_known_caller(void)
+{
+	return !qdf_str_ncmp(qdf_get_current_comm(), DP_STC_KNOWN_CALLER_NAME,
+			     qdf_str_len(DP_STC_KNOWN_CALLER_NAME));
 }
 
 /**
@@ -4002,15 +4025,36 @@ void wlan_dp_stc_pdev_detach_handler(struct wlan_dp_psoc_context *dp_ctx)
  * @stc_ctx: STC runtime context
  * @action: requested action (START or STOP)
  *
- * Reads current state and transitions it:
- *   DISABLED -> START : set ENABLING, schedule work, return SUCCESS
- *   ENABLED -> STOP : set DISABLING, schedule work, return SUCCESS
- *   ENABLED -> START : already enabled, return SUCCESS
- *   DISABLED -> STOP : already disabled, return SUCCESS
- *   ENABLING -> START : enable already in progress, return SUCCESS
- *   DISABLING -> STOP : disable already in progress, return SUCCESS
- *   ENABLING -> STOP : return E_AGAIN (retry after enable completes)
- *   DISABLING -> START : return E_AGAIN (retry after disable completes)
+ * Vote transition table (known=bit0, other=bit1):
+ * +------------------+--------+--------+------------------+---------+
+ * | Previous         | Next   | Action | Result           | Return  |
+ * | known|other|STC  | Caller |        | known|other|STC  |         |
+ * +------------------+--------+--------+------------------+---------+
+ * | 0 | 1 | STOPPED  | known  | START  | 1 | 1 | STARTING | SUCCESS |
+ * | 0 | 1 | STOPPED  | known  | STOP   | 0 | 1 | STOPPED  | SUCCESS |
+ * | 0 | 1 | STOPPED  | other  | START  | 0 | 1 | STOPPED  | SUCCESS |
+ * | 0 | 1 | STOPPED  | other  | STOP   | 0 | 0 | STOPPED  | SUCCESS |
+ * | 1 | 0 | STOPPED  | known  | START  | 1 | 0 | STOPPED  | SUCCESS |
+ * | 1 | 0 | STOPPED  | known  | STOP   | 0 | 0 | STOPPED  | SUCCESS |
+ * | 1 | 0 | STOPPED  | other  | START  | 1 | 1 | STARTING | SUCCESS |
+ * | 1 | 0 | STOPPED  | other  | STOP   | 1 | 0 | STOPPED  | SUCCESS |
+ * | 0 | 0 | STOPPED  | known  | START  | 1 | 0 | STOPPED  | SUCCESS |
+ * | 0 | 0 | STOPPED  | known  | STOP   | 0 | 0 | STOPPED  | SUCCESS |
+ * | 0 | 0 | STOPPED  | other  | START  | 0 | 1 | STOPPED  | SUCCESS |
+ * | 0 | 0 | STOPPED  | other  | STOP   | 0 | 0 | STOPPED  | SUCCESS |
+ * | 1 | 1 | STARTED  | known  | START  | 1 | 1 | STARTED  | SUCCESS |
+ * | 1 | 1 | STARTED  | known  | STOP   | 0 | 1 | STOPPING | SUCCESS |
+ * | 1 | 1 | STARTED  | other  | START  | 1 | 1 | STARTED  | SUCCESS |
+ * | 1 | 1 | STARTED  | other  | STOP   | 1 | 0 | STOPPING | SUCCESS |
+ * | x | x | STARTING | known  | START  | x | x | STARTING | SUCCESS |
+ * | x | x | STARTING | known  | STOP   | x | x | STARTING | E_AGAIN |
+ * | x | x | STARTING | other  | START  | x | x | STARTING | SUCCESS |
+ * | x | x | STARTING | other  | STOP   | x | x | STARTING | E_AGAIN |
+ * | x | x | STOPPING | known  | START  | x | x | STOPPING | E_AGAIN |
+ * | x | x | STOPPING | known  | STOP   | x | x | STOPPING | SUCCESS |
+ * | x | x | STOPPING | other  | START  | x | x | STOPPING | E_AGAIN |
+ * | x | x | STOPPING | other  | STOP   | x | x | STOPPING | SUCCESS |
+ * +------------------+--------+--------+------------------+---------+
  *
  * Return: QDF_STATUS
  */
@@ -4018,32 +4062,62 @@ static QDF_STATUS
 wlan_dp_stc_apply_runtime_action(struct wlan_dp_stc_ctx *stc_ctx,
 				 enum qca_async_stats_action action)
 {
+	bool is_known = wlan_dp_stc_is_known_caller();
 	uint8_t cur_state = qdf_atomic_read(&stc_ctx->state);
 
-	dp_info("STC: cur_state %d action %d",
-		cur_state, action);
+	dp_info("STC: caller=%s cur_state=%d action=%d stc_allowed=0x%x",
+		qdf_get_current_comm(), cur_state, action,
+		stc_ctx->stc_allowed);
 
 	switch (cur_state) {
-	case DP_STC_STATE_DISABLED:
+	case DP_STC_STATE_STOPPED:
+		if (!is_known && !(stc_ctx->stc_allowed & DP_STC_VOTE_KNOWN) &&
+		    !(stc_ctx->stc_allowed & DP_STC_VOTE_OTHER)) {
+			if (action == QCA_ASYNC_STATS_ACTION_START)
+				stc_ctx->stc_allowed |= DP_STC_VOTE_OTHER;
+			dp_err("STC: action %d rejected, stc_allowed not set",
+			       action);
+			return QDF_STATUS_E_PERM;
+		}
 		if (action == QCA_ASYNC_STATS_ACTION_START) {
+			if (is_known)
+				stc_ctx->stc_allowed |= DP_STC_VOTE_KNOWN;
+			else
+				stc_ctx->stc_allowed |= DP_STC_VOTE_OTHER;
+
+			if ((stc_ctx->stc_allowed & DP_STC_VOTE_ALL) !=
+			    DP_STC_VOTE_ALL)
+				break;
+
 			qdf_atomic_set(&stc_ctx->state,
-				       DP_STC_STATE_ENABLING);
-			dp_info("STC: state DISABLED -> ENABLING, enable work scheduled");
+				       DP_STC_STATE_STARTING);
+			dp_info("STC: state STOPPED -> STARTING, start work scheduled");
 			qdf_sched_work(0, &stc_ctx->stc_state_work);
+		} else if (action == QCA_ASYNC_STATS_ACTION_STOP) {
+			if (is_known) {
+				stc_ctx->stc_allowed &= ~DP_STC_VOTE_KNOWN;
+				dp_info("STC: allowed cleared");
+			} else {
+				stc_ctx->stc_allowed &= ~DP_STC_VOTE_OTHER;
+			}
 		}
 		break;
-	case DP_STC_STATE_ENABLED:
+	case DP_STC_STATE_STARTED:
 		if (action == QCA_ASYNC_STATS_ACTION_STOP) {
+			if (is_known)
+				stc_ctx->stc_allowed &= ~DP_STC_VOTE_KNOWN;
+			else
+				stc_ctx->stc_allowed &= ~DP_STC_VOTE_OTHER;
 			qdf_atomic_set(&stc_ctx->state,
-				       DP_STC_STATE_DISABLING);
-			dp_info("STC: state ENABLED -> DISABLING, disable work scheduled");
+				       DP_STC_STATE_STOPPING);
+			dp_info("STC: state STARTED -> STOPPING, stop work scheduled");
 			qdf_sched_work(0, &stc_ctx->stc_state_work);
 		}
 		break;
-	case DP_STC_STATE_ENABLING:
+	case DP_STC_STATE_STARTING:
 		return action == QCA_ASYNC_STATS_ACTION_START ?
 			QDF_STATUS_SUCCESS : QDF_STATUS_E_AGAIN;
-	case DP_STC_STATE_DISABLING:
+	case DP_STC_STATE_STOPPING:
 		return action == QCA_ASYNC_STATS_ACTION_STOP ?
 			QDF_STATUS_SUCCESS : QDF_STATUS_E_AGAIN;
 	}

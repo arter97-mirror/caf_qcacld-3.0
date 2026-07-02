@@ -1284,7 +1284,7 @@ wlan_dp_stc_is_predictive_roaming_enabled(
  * wlan_dp_stc_ctx_init() - Initialise the always-present STC runtime context
  * @dp_ctx: DP context
  *
- * Initialises state to DP_STC_STATE_DISABLED and creates the deferred
+ * Initialises state to DP_STC_STATE_STOPPED and creates the deferred
  * stc_state_work item. STC is NOT started automatically — it starts
  * only when a START vendor command is received.
  * Called once from dp_allocate_ctx().
