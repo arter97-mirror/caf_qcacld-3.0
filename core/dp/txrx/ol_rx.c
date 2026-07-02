@@ -802,6 +802,13 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 	struct ol_txrx_peer_t *peer;
 	int sec_index, i;
 
+	if (sec_type >= htt_num_sec_types) {
+		ol_txrx_err(
+			"Invalid sec_type %d from FW for peer ID %d - skipping security inits",
+			sec_type, peer_id);
+		return;
+	}
+
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (!peer) {
 		ol_txrx_err(
