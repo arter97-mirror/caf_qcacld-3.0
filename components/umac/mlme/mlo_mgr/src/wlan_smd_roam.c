@@ -1312,8 +1312,7 @@ smd_uhr_link_recfg_send_request_frame(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 	vdev_id = wlan_vdev_get_id(vdev);
-	/* TODO: Update below API with UHR link reconfig */
-	status = lim_send_link_recfg_action_req_frame(vdev_id,
+	status = lim_send_uhr_link_recfg_st_prep_req_frame(vdev_id,
 						      (uint8_t *)&req->peer_mac,
 						      &args, req);
 
@@ -3141,4 +3140,168 @@ bool smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev)
 {
 	return cm_is_vdev_smd_roam_sync_in_progress(vdev);
 }
+
+QDF_STATUS
+smd_link_recfg_parse_perptk_ies(
+	struct wlan_mlo_link_recfg_rsp *link_recfg_rsp,
+	uint8_t *opt, uint32_t remaining)
+{
+	while (remaining >= MIN_IE_LEN) {
+		uint8_t eid = opt[0];
+		uint8_t elen = opt[1];
+
+		if (remaining < (uint32_t)(MIN_IE_LEN + elen)) {
+			mlo_err("Optional IE truncated: eid=%u len=%u rem=%u",
+				eid, elen, remaining);
+			break;
+		}
+
+		if (eid == WLAN_ELEMID_EXTN_ELEM && elen >= 1) {
+			uint8_t ext_id = opt[2];
+			uint8_t payload_len = elen - 1;
+
+			switch (ext_id) {
+			case WLAN_EXTN_ELEMID_KEY_DELIVERY:
+				if (!link_recfg_rsp->key_delivery.ptr) {
+					link_recfg_rsp->key_delivery.ptr =
+						qdf_mem_malloc(payload_len);
+					if (!link_recfg_rsp->key_delivery.ptr)
+						return QDF_STATUS_E_NOMEM;
+					qdf_mem_copy(link_recfg_rsp->key_delivery.ptr,
+						     opt + MIN_IE_LEN + 1,
+						     payload_len);
+					link_recfg_rsp->key_delivery.len = payload_len;
+					mlo_debug("Parsed Key Delivery IE len=%u",
+						  payload_len);
+				}
+				break;
+			case WLAN_EXTN_ELEMID_MSCS_DESCRIPTOR:
+				if (!link_recfg_rsp->mscs_descriptor.ptr) {
+					link_recfg_rsp->mscs_descriptor.ptr =
+						qdf_mem_malloc(payload_len);
+					if (!link_recfg_rsp->mscs_descriptor.ptr)
+						return QDF_STATUS_E_NOMEM;
+					qdf_mem_copy(link_recfg_rsp->mscs_descriptor.ptr,
+						     opt + MIN_IE_LEN + 1,
+						     payload_len);
+					link_recfg_rsp->mscs_descriptor.len = payload_len;
+					mlo_debug("Parsed MSCS Descriptor IE len=%u",
+						  payload_len);
+				}
+				break;
+			case WLAN_EXTN_ELEMID_DH_PARAM:
+				if (!link_recfg_rsp->diffie_hellman_param.ptr) {
+					link_recfg_rsp->diffie_hellman_param.ptr =
+						qdf_mem_malloc(payload_len);
+					if (!link_recfg_rsp->diffie_hellman_param.ptr)
+						return QDF_STATUS_E_NOMEM;
+					qdf_mem_copy(link_recfg_rsp->diffie_hellman_param.ptr,
+						     opt + MIN_IE_LEN + 1,
+						     payload_len);
+					link_recfg_rsp->diffie_hellman_param.len = payload_len;
+					mlo_debug("Parsed DH Parameter IE len=%u",
+						  payload_len);
+				}
+				break;
+			case WLAN_EXTN_ELEMID_NONCE:
+				if (!link_recfg_rsp->nonce.ptr) {
+					link_recfg_rsp->nonce.ptr =
+						qdf_mem_malloc(payload_len);
+					if (!link_recfg_rsp->nonce.ptr)
+						return QDF_STATUS_E_NOMEM;
+					qdf_mem_copy(link_recfg_rsp->nonce.ptr,
+						     opt + MIN_IE_LEN + 1,
+						     payload_len);
+					link_recfg_rsp->nonce.len = payload_len;
+					mlo_debug("Parsed Nonce IE len=%u",
+						  payload_len);
+				}
+				break;
+			case WLAN_EXTN_ELEMID_MIC:
+				if (!link_recfg_rsp->mic.ptr) {
+					link_recfg_rsp->mic.ptr =
+						qdf_mem_malloc(payload_len);
+					if (!link_recfg_rsp->mic.ptr)
+						return QDF_STATUS_E_NOMEM;
+					qdf_mem_copy(link_recfg_rsp->mic.ptr,
+						     opt + MIN_IE_LEN + 1,
+						     payload_len);
+					link_recfg_rsp->mic.len = payload_len;
+					mlo_debug("Parsed MIC IE len=%u",
+						  payload_len);
+				}
+				break;
+			default:
+				break;
+			}
+		}
+
+		opt += MIN_IE_LEN + elen;
+		remaining -= MIN_IE_LEN + elen;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+smd_link_recfg_free_perptk_ies(struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
+{
+	if (link_recfg_rsp->key_delivery.ptr) {
+		qdf_mem_free(link_recfg_rsp->key_delivery.ptr);
+		link_recfg_rsp->key_delivery.ptr = NULL;
+		link_recfg_rsp->key_delivery.len = 0;
+	}
+	if (link_recfg_rsp->mscs_descriptor.ptr) {
+		qdf_mem_free(link_recfg_rsp->mscs_descriptor.ptr);
+		link_recfg_rsp->mscs_descriptor.ptr = NULL;
+		link_recfg_rsp->mscs_descriptor.len = 0;
+	}
+	if (link_recfg_rsp->diffie_hellman_param.ptr) {
+		qdf_mem_free(link_recfg_rsp->diffie_hellman_param.ptr);
+		link_recfg_rsp->diffie_hellman_param.ptr = NULL;
+		link_recfg_rsp->diffie_hellman_param.len = 0;
+	}
+	if (link_recfg_rsp->nonce.ptr) {
+		qdf_mem_free(link_recfg_rsp->nonce.ptr);
+		link_recfg_rsp->nonce.ptr = NULL;
+		link_recfg_rsp->nonce.len = 0;
+	}
+	if (link_recfg_rsp->mic.ptr) {
+		qdf_mem_free(link_recfg_rsp->mic.ptr);
+		link_recfg_rsp->mic.ptr = NULL;
+		link_recfg_rsp->mic.len = 0;
+	}
+}
+
+void
+smd_link_recfg_cleanup_rsp(struct mlo_link_recfg_context *ctx,
+			   struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
+{
+	if (link_recfg_rsp->oci_ie.ptr) {
+		qdf_mem_free(link_recfg_rsp->oci_ie.ptr);
+		link_recfg_rsp->oci_ie.ptr = NULL;
+		link_recfg_rsp->oci_ie.len = 0;
+	}
+	if (link_recfg_rsp->mlo_ie.ptr) {
+		qdf_mem_free(link_recfg_rsp->mlo_ie.ptr);
+		link_recfg_rsp->mlo_ie.ptr = NULL;
+		link_recfg_rsp->mlo_ie.len = 0;
+	}
+	if (link_recfg_rsp->smd_bss_trans_params.ptr) {
+		qdf_mem_free(link_recfg_rsp->smd_bss_trans_params.ptr);
+		link_recfg_rsp->smd_bss_trans_params.ptr = NULL;
+		link_recfg_rsp->smd_bss_trans_params.len = 0;
+	}
+	smd_link_recfg_free_perptk_ies(link_recfg_rsp);
+	if (ctx->rsp_frame.ptr) {
+		qdf_mem_free(ctx->rsp_frame.ptr);
+		ctx->rsp_frame.ptr = NULL;
+		ctx->rsp_frame.len = 0;
+	}
+	if (ctx->rsp_rx_frame.ptr) {
+		qdf_mem_free(ctx->rsp_rx_frame.ptr);
+		ctx->rsp_rx_frame.ptr = NULL;
+		ctx->rsp_rx_frame.len = 0;
+	}
+}
+
 #endif /* WLAN_FEATURE_11BN_SMD */
