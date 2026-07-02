@@ -19607,6 +19607,11 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("number of frames to send Link reconfig request: %d",
 			  recfg_info.num_frame);
 		nla_for_each_nested(curr_attr, tb2[cmd_id], rem) {
+			if (i >= MAX_NUM_FRAMES) {
+				hdd_err("vdev %d: reconfig frame count exceeds max %d",
+					link_info->vdev_id, MAX_NUM_FRAMES);
+				goto send_err;
+			}
 			if (wlan_cfg80211_nla_parse_nested(
 					tb3,
 					QCA_WLAN_VENDOR_ATTR_RECONFIG_MAX,
