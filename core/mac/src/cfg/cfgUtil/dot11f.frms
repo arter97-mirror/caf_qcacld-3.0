@@ -493,6 +493,11 @@ FF count (1)
     count, 1;
 }
 
+FF Type (1)                               // IEEE 802.11bn D1.3 UHR action type
+{
+    type, 1;
+}
+
 IE addba_extn_element(EID_ADDBA_EXTN_ELEMENT)
 {
     {
@@ -3742,6 +3747,13 @@ IE uhr_op (EID_EXTN_ID_ELEMENT) OUI (0x97)
     data[2];
 }
 
+// IEEE 802.11bn D1.3 Section 9.4.2.357 - SMD BSS Transition Parameters
+// Element ID = 255 (extended), Extension ID = 0x9B (155)
+IE smd_bss_trans_params (EID_EXTN_ID_ELEMENT) OUI (0x9B)
+{
+    data[1..256];
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                                MULTIIEs                                 //
 /////////////////////////////////////////////////////////////////////////////
@@ -5238,6 +5250,18 @@ FRAME channel_usage_resp
     FF    Action;
     FF    DialogToken;
     MANDIE channel_usage;
+}
+
+// IEEE 802.11bn D1.3 Section 9.6.43.3 - UHR Link Reconfiguration Request
+FRAME uhr_link_reconfig_req
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    FF    Type;
+    MANDIE  mlo_ie;
+    OPTIE   oci;
+    OPTIE   smd_bss_trans_params;
 }
 
 FRAME link_recfg_req
