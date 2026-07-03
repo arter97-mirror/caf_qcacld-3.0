@@ -258,6 +258,11 @@ QDF_STATUS tgt_tdls_mgmt_frame_process_rx_cb(
 		vdev_id = wlan_vdev_get_id(vdev);
 	}
 
+	if (mgmt_rx_params->buf_len < TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET) {
+		tdls_err("TDLS: frame too short %u", mgmt_rx_params->buf_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	rx_mgmt_event = qdf_mem_malloc_atomic(sizeof(*rx_mgmt_event));
 	if (!rx_mgmt_event)
 		return QDF_STATUS_E_NOMEM;

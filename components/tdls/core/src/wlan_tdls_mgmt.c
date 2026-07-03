@@ -271,6 +271,11 @@ static struct tdls_vdev_priv_obj
 	if (!tdls_vdev || !rx_mgmt)
 		return NULL;
 
+	if (rx_mgmt->frame_len < TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET) {
+		tdls_err("TDLS MLO: frame too short %u", rx_mgmt->frame_len);
+		return tdls_vdev;
+	}
+
 	ies = &rx_mgmt->buf[TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET];
 	ie_len = rx_mgmt->frame_len - TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET;
 
@@ -279,6 +284,16 @@ static struct tdls_vdev_priv_obj
 								  ies, ie_len);
 	if (!linkid_ie)
 		return tdls_vdev;
+
+	if ((const uint8_t *)linkid_ie + sizeof(*linkid_ie) > ies + ie_len) {
+		tdls_err("TDLS MLO: link id IE truncated");
+		return tdls_vdev;
+	}
+
+	if (linkid_ie->len < (sizeof(*linkid_ie) - 2)) {
+		tdls_err("TDLS MLO: link id IE too short %u", linkid_ie->len);
+		return tdls_vdev;
+	}
 
 	pdev = wlan_vdev_get_pdev(tdls_vdev->vdev);
 	if (!pdev)
@@ -315,13 +330,23 @@ static bool tdls_check_peer_mlo_dev(struct wlan_objmgr_vdev *vdev,
 	if (!vdev || !rx_mgmt)
 		return QDF_STATUS_E_INVAL;
 
+	if (rx_mgmt->frame_len < TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET) {
+		tdls_err("TDLS MLO: frame too short %u", rx_mgmt->frame_len);
+		return false;
+	}
+
 	ies = &rx_mgmt->buf[TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET];
 	ie_len = rx_mgmt->frame_len - TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET;
 
 	ie = wlan_get_ie_ptr_from_eid(elem_id_param, ies, ie_len);
-	if (ie)
-		qdf_trace_hex_dump(QDF_MODULE_ID_TDLS, QDF_TRACE_LEVEL_DEBUG,
-				   (void *)&ie[0], ie[1] + 2);
+	if (ie) {
+		uint32_t rem = ie_len - (uint32_t)(ie - ies);
+
+		if (rem >= 2 && (uint32_t)ie[1] + 2 <= rem)
+			qdf_trace_hex_dump(QDF_MODULE_ID_TDLS,
+					   QDF_TRACE_LEVEL_DEBUG,
+					   (void *)ie, (uint32_t)ie[1] + 2);
+	}
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(&ext_id_param,
 					     1, ies, ie_len);
