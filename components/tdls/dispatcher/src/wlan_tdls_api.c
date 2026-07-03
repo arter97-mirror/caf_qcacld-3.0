@@ -773,30 +773,63 @@ QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 	return tdls_update_peer_kickout_count(vdev, macaddr);
 }
 
+static bool
+tdls_peer_key_install_allowed(struct tdls_vdev_priv_obj *vdev_obj,
+			      struct qdf_mac_addr *mac_addr)
+{
+	struct tdls_peer *curr_peer;
+
+	if (!vdev_obj)
+		return false;
+
+	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
+	if (!curr_peer)
+		return false;
+
+	return curr_peer->valid_entry &&
+	       (curr_peer->link_status == TDLS_LINK_CONNECTING ||
+		curr_peer->link_status == TDLS_LINK_CONNECTED);
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool
+tdls_is_key_install_allowed_ml_vdev(struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr *mac_addr)
+{
+	struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+	uint16_t num_links = 0, i;
+	bool allowed = false;
+
+	mlo_get_ml_vdev_list(vdev, &num_links, vdev_list);
+
+	for (i = 0; i < num_links; i++) {
+		if (vdev_list[i] != vdev &&
+		    tdls_peer_key_install_allowed(
+				wlan_vdev_get_tdls_vdev_obj(vdev_list[i]),
+				mac_addr))
+			allowed = true;
+		mlo_release_vdev_ref(vdev_list[i]);
+	}
+
+	return allowed;
+}
+#else
+static inline bool
+tdls_is_key_install_allowed_ml_vdev(struct wlan_objmgr_vdev *vdev,
+				    struct qdf_mac_addr *mac_addr)
+{
+	return false;
+}
+#endif
+
 bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
 				      struct qdf_mac_addr *mac_addr)
 {
-	struct tdls_vdev_priv_obj *vdev_obj;
-	struct tdls_peer *curr_peer;
-
-	vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
-	if (!vdev_obj) {
-		tdls_err("vdev_obj: %pK is null", vdev_obj);
-		return false;
-	}
-
-	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
-	if (!curr_peer) {
-		tdls_err("tdls peer is null");
-		return false;
-	}
-
-	if (curr_peer->valid_entry &&
-	    (curr_peer->link_status == TDLS_LINK_CONNECTING ||
-	     curr_peer->link_status == TDLS_LINK_CONNECTED))
+	if (tdls_peer_key_install_allowed(wlan_vdev_get_tdls_vdev_obj(vdev),
+					  mac_addr))
 		return true;
 
-	return false;
+	return tdls_is_key_install_allowed_ml_vdev(vdev, mac_addr);
 }
 
 void wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
