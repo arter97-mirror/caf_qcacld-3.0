@@ -10223,6 +10223,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_QSH_SCAN_CTRL] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_AUX_LISTEN] = {
+		.type = NLA_U8},
 };
 
 
@@ -15227,6 +15229,30 @@ hdd_set_cfg_sta_dfs_ch_peer_scc(struct wlan_hdd_link_info *link_info,
 	return errno;
 }
 
+/**
+ * hdd_set_cfg_aux_listen() - enable / disable the AUX listen feature
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int hdd_set_cfg_aux_listen(struct wlan_hdd_link_info *link_info,
+				  const struct nlattr *attr)
+{
+	uint8_t val;
+
+	val = nla_get_u8(attr);
+	hdd_debug("Received cfg_aux_listen value %d", val);
+	val = !val;
+
+	/* Cache the value in the adapter to restore in case of an SSR */
+	link_info->adapter->aux_l_disable = val;
+
+	return wma_cli_set_command(link_info->vdev_id,
+				   wmi_vdev_param_aux_l_disable,
+				   val, VDEV_CMD);
+}
+
 #ifdef WLAN_FEATURE_QSH_SCAN
 /**
  * hdd_set_cfg_qsh_scan_ctrl() - Control QSH scan suppression
@@ -15458,6 +15484,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_cfg_sta_indoor_ch_peer_scc},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P,
 	 hdd_set_cfg_sta_dfs_ch_peer_scc},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_AUX_LISTEN,
+	 hdd_set_cfg_aux_listen},
 #ifdef WLAN_FEATURE_QSH_SCAN
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_QSH_SCAN_CTRL,
 	 hdd_set_cfg_qsh_scan_ctrl},

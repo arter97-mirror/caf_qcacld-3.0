@@ -8046,6 +8046,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	hdd_update_dynamic_tsf_sync(adapter);
 	adapter->is_link_up_service_needed = false;
 	adapter->send_mode_change = true;
+	adapter->aux_l_disable = false;
 
 	/* Cache station count initialize to zero */
 	qdf_atomic_init(&adapter->cache_sta_count);

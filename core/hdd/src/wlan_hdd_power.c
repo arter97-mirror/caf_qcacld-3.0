@@ -2223,6 +2223,33 @@ static inline void hdd_restore_dbam_config(struct hdd_context *hdd_ctx)
 #endif
 
 /**
+ * hdd_restore_aux_listen_config() - restore and send cached aux listen
+ * config to fw after SSR
+ * @hdd_ctx: HDD context
+ *
+ * Return: void
+ */
+static void hdd_restore_aux_listen_config(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (hdd_is_interface_up(adapter)) {
+			hdd_debug("Restore AUX_L config: vdev_id:%d aux_l_disable:%d",
+				  adapter->deflink->vdev_id,
+				  adapter->aux_l_disable);
+
+			wma_cli_set_command(adapter->deflink->vdev_id,
+					    wmi_vdev_param_aux_l_disable,
+					    adapter->aux_l_disable, VDEV_CMD);
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+}
+
+/**
  * hdd_restore_dual_sta_config() - Restore dual sta configuration
  * @hdd_ctx: pointer to struct hdd_context
  *
@@ -2405,6 +2432,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 	hdd_send_default_scan_ies(hdd_ctx);
 	hdd_restore_dual_sta_config(hdd_ctx);
 	hdd_restore_dbam_config(hdd_ctx);
+	hdd_restore_aux_listen_config(hdd_ctx);
 	hdd_info("WLAN host driver reinitiation completed!");
 
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);
