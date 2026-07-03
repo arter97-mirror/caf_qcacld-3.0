@@ -3270,7 +3270,9 @@ struct wlan_mlme_iot {
  *				 dynamic NSS chain support
  * @reduce_pwr_scan_mode : reduce power scan mode enable/disable
  * @passive_chan_discard_mode: discard passive channels
- * @mlme_uhr_caps: UHR related cfg items
+ * @mlme_uhr_caps: UHR aggregate caps (OR of all bands)
+ * @mlme_uhr_caps_2g: UHR caps for 2.4 GHz band
+ * @mlme_uhr_caps_5g: UHR caps for 5/6 GHz band
  * @mlme_npca_caps: NPCA related cfg items
  */
 struct wlan_mlme_cfg {
@@ -3330,6 +3332,8 @@ struct wlan_mlme_cfg {
 	uint8_t passive_chan_discard_mode;
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_mlme_uhr_caps mlme_uhr_caps;
+	struct wlan_mlme_uhr_caps mlme_uhr_caps_2g;
+	struct wlan_mlme_uhr_caps mlme_uhr_caps_5g;
 	struct wlan_mlme_npca_caps mlme_npca_caps;
 #endif
 };

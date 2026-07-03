@@ -79,7 +79,8 @@ hdd_update_wiphy_uhr_caps_6ghz(struct hdd_context *hdd_ctx,
 
 void hdd_update_wiphy_uhr_cap(struct hdd_context *hdd_ctx)
 {
-	struct wlan_mlme_uhr_caps uhr_cap_cfg;
+	struct wlan_mlme_uhr_caps uhr_cap_2g;
+	struct wlan_mlme_uhr_caps uhr_cap_5g;
 	struct ieee80211_supported_band *band_2g =
 			hdd_ctx->wiphy->bands[HDD_NL80211_BAND_2GHZ];
 	struct ieee80211_supported_band *band_5g =
@@ -95,7 +96,11 @@ void hdd_update_wiphy_uhr_cap(struct hdd_context *hdd_ctx)
 	if (!uhr_capab)
 		return;
 
-	status = ucfg_mlme_cfg_get_uhr_caps(hdd_ctx->psoc, &uhr_cap_cfg);
+	status = ucfg_mlme_cfg_get_uhr_caps_2g(hdd_ctx->psoc, &uhr_cap_2g);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	status = ucfg_mlme_cfg_get_uhr_caps_5g(hdd_ctx->psoc, &uhr_cap_5g);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -106,7 +111,7 @@ void hdd_update_wiphy_uhr_cap(struct hdd_context *hdd_ctx)
 			(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
 		band_2g->iftype_data = hdd_ctx->iftype_data_2g;
 
-		hdd_ctx->iftype_data_2g->uhr_cap.has_uhr = uhr_cap_cfg.present;
+		hdd_ctx->iftype_data_2g->uhr_cap.has_uhr = uhr_cap_2g.present;
 		if (!hdd_ctx->iftype_data_2g->uhr_cap.has_uhr) {
 			hdd_debug("2.4 GHz UHR caps not present");
 			hdd_ctx->iftype_data_2g->uhr_cap.has_uhr = false;
@@ -128,7 +133,7 @@ band_5ghz:
 			(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
 		band_5g->iftype_data = hdd_ctx->iftype_data_5g;
 
-		hdd_ctx->iftype_data_5g->uhr_cap.has_uhr = uhr_cap_cfg.present;
+		hdd_ctx->iftype_data_5g->uhr_cap.has_uhr = uhr_cap_5g.present;
 		if (!hdd_ctx->iftype_data_5g->uhr_cap.has_uhr) {
 			hdd_debug("5 GHz UHR caps not present");
 			hdd_ctx->iftype_data_5g->uhr_cap.has_uhr = false;
@@ -143,7 +148,7 @@ band_5ghz:
 	}
 
 band_6ghz:
-	hdd_update_wiphy_uhr_caps_6ghz(hdd_ctx, &uhr_cap_cfg);
+	hdd_update_wiphy_uhr_caps_6ghz(hdd_ctx, &uhr_cap_5g);
 
 	hdd_exit();
 }

@@ -1729,6 +1729,26 @@ QDF_STATUS mlme_update_tgt_uhr_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_mlme_uhr_caps *uhr_cap);
 
+/**
+ * mlme_cfg_get_uhr_caps_2g() - Get 2.4 GHz UHR capability info
+ * @psoc: pointer to psoc object
+ * @uhr_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS mlme_cfg_get_uhr_caps_2g(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_mlme_uhr_caps *uhr_cap);
+
+/**
+ * mlme_cfg_get_uhr_caps_5g() - Get 5/6 GHz UHR capability info
+ * @psoc: pointer to psoc object
+ * @uhr_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS mlme_cfg_get_uhr_caps_5g(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_mlme_uhr_caps *uhr_cap);
+
 void wlan_mlme_set_npca_support(struct wlan_objmgr_psoc *psoc,
 				struct wlan_psoc_host_mac_phy_caps_ext2 *cap);
 

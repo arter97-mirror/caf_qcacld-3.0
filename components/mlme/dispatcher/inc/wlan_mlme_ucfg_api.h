@@ -4311,6 +4311,34 @@ QDF_STATUS ucfg_mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
 {
 	return mlme_cfg_get_uhr_caps(psoc, uhr_cap);
 }
+
+/**
+ * ucfg_mlme_cfg_get_uhr_caps_2g() - Get 2.4 GHz UHR capability info
+ * @psoc: pointer to psoc object
+ * @uhr_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_cfg_get_uhr_caps_2g(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_uhr_caps *uhr_cap)
+{
+	return mlme_cfg_get_uhr_caps_2g(psoc, uhr_cap);
+}
+
+/**
+ * ucfg_mlme_cfg_get_uhr_caps_5g() - Get 5/6 GHz UHR capability info
+ * @psoc: pointer to psoc object
+ * @uhr_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_cfg_get_uhr_caps_5g(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_uhr_caps *uhr_cap)
+{
+	return mlme_cfg_get_uhr_caps_5g(psoc, uhr_cap);
+}
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO

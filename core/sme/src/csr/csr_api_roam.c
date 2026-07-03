@@ -1874,15 +1874,22 @@ void csr_update_session_uhr_cap(struct mac_context *mac_ctx,
 				struct csr_roam_session *session,
 				struct wlan_objmgr_vdev *vdev)
 {
+	struct wlan_mlme_uhr_caps *src_caps;
 	struct wlan_mlme_uhr_caps *uhr_cap;
 	struct mlme_legacy_priv *mlme_priv;
+	qdf_freq_t op_freq;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
 		return;
 
-	qdf_mem_copy(&mlme_priv->uhr_config,
-		     &mac_ctx->mlme_cfg->mlme_uhr_caps,
+	op_freq = wlan_get_operation_chan_freq(vdev);
+	if (wlan_reg_is_24ghz_ch_freq(op_freq))
+		src_caps = &mac_ctx->mlme_cfg->mlme_uhr_caps_2g;
+	else
+		src_caps = &mac_ctx->mlme_cfg->mlme_uhr_caps_5g;
+
+	qdf_mem_copy(&mlme_priv->uhr_config, src_caps,
 		     sizeof(mlme_priv->uhr_config));
 	uhr_cap = &mlme_priv->uhr_config;
 	uhr_cap->present = true;
