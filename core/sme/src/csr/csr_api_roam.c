@@ -14027,24 +14027,34 @@ static ePhyChanBondState csr_get_cb_mode_from_ies(struct mac_context *mac,
 	if (!pIes->HTInfo.present)
 		return PHY_SINGLE_CHANNEL_CENTERED;
 
-	if (!pIes->RSNOpaque.present) {
-		sme_debug("RSN IE not present");
-		return PHY_SINGLE_CHANNEL_CENTERED;
-	}
-
-	status = wlan_get_crypto_params_from_opaquersn(&crypto_params,
+	/*
+	 * Only force 20MHz when RSN/WPA is actually present and TKIP is the
+	 * only pairwise cipher offered.
+	 */
+	if (pIes->RSNOpaque.present) {
+		status = wlan_get_crypto_params_from_opaquersn(&crypto_params,
 						pIes->RSNOpaque.data,
 						pIes->RSNOpaque.num_data);
-	if (status != QDF_STATUS_SUCCESS) {
-		sme_debug("Failed to get RSN Caps");
-		return PHY_SINGLE_CHANNEL_CENTERED;
-	}
+		if (status != QDF_STATUS_SUCCESS) {
+			sme_debug("Failed to get RSN Caps");
+			return PHY_SINGLE_CHANNEL_CENTERED;
+		}
 
-	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
-	if (HAS_PARAM(crypto_params.ucastcipherset, WLAN_CRYPTO_CIPHER_TKIP)) {
-		sme_debug("No channel bonding in TKIP mode, ucast: %x",
-			  crypto_params.ucastcipherset);
-		return PHY_SINGLE_CHANNEL_CENTERED;
+		/* In Case WPA2 and TKIP is the only cipher suite in Pairwise */
+		if (crypto_params.ucastcipherset ==
+		    (uint32_t)(1 << WLAN_CRYPTO_CIPHER_TKIP)) {
+			sme_debug("No channel bonding in TKIP mode, ucast: %x",
+				  crypto_params.ucastcipherset);
+			return PHY_SINGLE_CHANNEL_CENTERED;
+		}
+	} else if (pIes->WPA.present) {
+		/* In Case only WPA1 is present and TKIP is the only cipher */
+		if (pIes->WPA.unicast_cipher_count == 1 &&
+		    !qdf_mem_cmp(&pIes->WPA.unicast_ciphers[0][0],
+				 "\x00\x50\xf2\x02", 4)) {
+			sme_debug("No channel bonding in WPA-TKIP mode");
+			return PHY_SINGLE_CHANNEL_CENTERED;
+		}
 	}
 
 	/*
