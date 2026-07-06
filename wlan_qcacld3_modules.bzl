@@ -61,6 +61,9 @@ _target_chipset_map = {
     "alor-le": [
         "wcn7750",
     ],
+    "pebble-le": [
+        "wcn7750",
+    ],
     "sdxkova": [
         "kiwi-v2",
     ],
@@ -2941,7 +2944,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
 
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "hamoa_la" and target != "glymur":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "hamoa_la" and target != "glymur" and target != "pebble-le":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -3044,7 +3047,7 @@ def define_dist(target, variant, chipsets):
             destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         )
 
-    if target != "sdxkova" and target != "alor-le":
+    if target != "sdxkova" and target != "alor-le" and target != "pebble-le":
         pkg_files(
             name = tv + "_dist_files",
             srcs = dataList,

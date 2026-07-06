@@ -35,6 +35,7 @@ lv_variants = [
 le_targets = [
     # keep sorted
     "alor-le",
+    "pebble-le",
     "sun-allyes",
 ]
 
