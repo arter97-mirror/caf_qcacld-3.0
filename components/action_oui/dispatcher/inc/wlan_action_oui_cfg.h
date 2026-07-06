@@ -1258,6 +1258,37 @@
 	"000CE7 00 03 3ED2E5000000 E0", \
 	"Used to enable early RX feature for specified APs")
 
+/*
+ * <ini>
+ * CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE - Used to disable FW's OUI
+ * BPCC-triggered WOW wakeup for specified IoT APs that change BPCC
+ * very frequently
+ *
+ * Example OUIs: (All values in Hex)
+ * gActionOUIDisableBPCCWowWake=00E04C 03 020160 E0 01
+ *       OUI: 00E04C
+ *       OUI data Len: 03
+ *       OUI Data : 020160
+ *       OUI data Mask: E0 - 11100000
+ *       Info Mask : 01 - only OUI present in Info mask
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE CFG_INI_STRING( \
+	"gActionOUIDisableBPCCWowWake", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"", \
+	"disable OUI BPCC-triggered WOW wakeup for specified AP")
+
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -1290,6 +1321,7 @@
 	CFG(CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK) \
 	CFG(CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P) \
 	CFG(CFG_ACTION_OUI_EARLY_RX) \
+	CFG(CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 
 /* Action OUI V2 ini use different name format XXX_V2, support operator

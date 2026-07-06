@@ -278,6 +278,10 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 		      [ACTION_OUI_EARLY_RX],
 		      cfg_get(psoc, CFG_ACTION_OUI_EARLY_RX),
 		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str
+		      [ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE],
+		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE),
+		      ACTION_OUI_MAX_STR_LEN);
 	qdf_str_lcopy(psoc_priv->action_oui_str[nss_action_id],
 		      cfg_default(CFG_ACTION_OUI_DEFAULT_NSS_LIST),
 		      ACTION_OUI_MAX_STR_LEN);
