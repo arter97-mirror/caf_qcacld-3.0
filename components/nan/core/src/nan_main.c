@@ -1706,7 +1706,7 @@ static QDF_STATUS nan_handle_schedule_update(
 	struct wlan_objmgr_psoc *psoc;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
 	struct wlan_objmgr_peer *peer = NULL;
-	struct qdf_mac_addr peer_ndi_addr;
+	struct qdf_mac_addr peer_ndi_addr = {0};
 	QDF_STATUS status;
 	uint8_t i;
 
@@ -1770,7 +1770,10 @@ static QDF_STATUS nan_handle_schedule_update(
 			  QDF_MAC_ADDR_REF(peer_ndi_addr.bytes));
 	}
 
-	ndi_update_ndp_session(ind->vdev, &ind->peer_addr, &ind->ch[0]);
+	if (!qdf_is_macaddr_zero(&peer_ndi_addr))
+		ndi_update_ndp_session(ind->vdev, &peer_ndi_addr, &ind->ch[0]);
+	else
+		nan_err("Failed to resolve NDI addr for schedule update, skip session update");
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, ind->vdev,
 						     NDP_SCHEDULE_UPDATE, ind);
 
