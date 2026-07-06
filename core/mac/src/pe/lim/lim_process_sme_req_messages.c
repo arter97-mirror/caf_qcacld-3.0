@@ -3300,6 +3300,38 @@ set_param:
 }
 
 void
+lim_cfg_disable_bpcc_wow_wake_for_iot_ap(struct mac_context *mac_ctx,
+					 struct pe_session *session,
+					 struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
+	uint16_t ie_len;
+	bool disable_bpcc_wake;
+
+	if (!bss_desc)
+		return;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
+
+	disable_bpcc_wake = wlan_action_oui_search(
+			mac_ctx->psoc, &vendor_ap_search_attr,
+			ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE) ? 1 : 0;
+
+	pe_debug("BPCC WOW wake disable_bpcc_wake=%d vdev_id=%d",
+		 disable_bpcc_wake, session->vdev_id);
+
+	if (!disable_bpcc_wake)
+		return;
+
+	wma_cli_set_command(session->vdev_id,
+			    wmi_vdev_param_disable_oui_bpcc_wow_wake,
+			    disable_bpcc_wake, VDEV_CMD);
+}
+
+void
 lim_cfg_early_rx_check_oui(struct mac_context *mac_ctx,
 			   struct pe_session *session,
 			   struct bss_description *bss_desc)
@@ -4797,6 +4829,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 
 	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc, false);
 	lim_set_amsdu_for_2g_oui(mac_ctx, session, bss_desc);
+	lim_cfg_disable_bpcc_wow_wake_for_iot_ap(mac_ctx, session, bss_desc);
 	lim_cfg_early_rx_check_oui(mac_ctx, session, bss_desc);
 
 	lim_copy_ml_partner_info_to_session(session, req);

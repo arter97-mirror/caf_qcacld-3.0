@@ -3399,6 +3399,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	lim_cfg_dsmps_for_iot_ap(mac_ctx, ft_session_ptr, bss_desc, true);
 	lim_set_amsdu_for_2g_oui(mac_ctx, ft_session_ptr, bss_desc);
+	lim_cfg_disable_bpcc_wow_wake_for_iot_ap(mac_ctx, ft_session_ptr,
+						 bss_desc);
 	lim_cfg_early_rx_check_oui(mac_ctx, ft_session_ptr, bss_desc);
 
 	qdf_mem_free(bss_desc);

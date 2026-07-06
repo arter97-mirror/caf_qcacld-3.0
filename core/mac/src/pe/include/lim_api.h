@@ -1220,6 +1220,24 @@ void lim_set_amsdu_for_2g_oui(struct mac_context *mac_ctx,
 			      struct bss_description *bss_desc);
 
 /**
+ * lim_cfg_disable_bpcc_wow_wake_for_iot_ap() - Configure OUI BPCC WOW
+ * wake for IOT AP
+ * @mac_ctx: mac context
+ * @session: pe session
+ * @bss_desc: bss descriptor
+ *
+ * Query action OUI database for IoT AP, send VDEV param to FW to
+ * disable WOW wakeup triggered by BPCC change for the connected AP
+ * if it matches the configured OUI list.
+ *
+ * Return: None
+ */
+void
+lim_cfg_disable_bpcc_wow_wake_for_iot_ap(struct mac_context *mac_ctx,
+					 struct pe_session *session,
+					 struct bss_description *bss_desc);
+
+/**
  * lim_cfg_early_rx_check_oui() - Configure early RX for AP with beacon drift
  * @mac_ctx: mac context
  * @session: pe session
