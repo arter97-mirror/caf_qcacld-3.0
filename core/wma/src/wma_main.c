@@ -8083,6 +8083,21 @@ int wma_rx_ready_event(void *handle, uint8_t *cmd_param_info,
 }
 
 /**
+ * wma_is_wmi_init_cmd_sent() - check if WMI init command has been sent
+ *
+ * Return: true if WMI init command was sent to firmware, false otherwise
+ */
+bool wma_is_wmi_init_cmd_sent(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma || !wma->wmi_handle)
+		return false;
+
+	return wmi_is_init_cmd_sent(wma->wmi_handle);
+}
+
+/**
  * wma_wait_for_ready_event() - wait for wma ready event
  * @handle: wma handle
  *

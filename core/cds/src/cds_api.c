@@ -1242,11 +1242,15 @@ QDF_STATUS cds_pre_enable(void)
 	return QDF_STATUS_SUCCESS;
 
 stop_wmi:
-	/* Send pdev suspend to fw otherwise FW is not aware that
-	 * host is freeing resources.
+	/* Stop WMI work and send pdev suspend to fw so FW is aware that host
+	 * is freeing resources. Suspend is skipped if WMI init was never sent
+	 * since firmware has not progressed far enough to handle it.
 	 */
-	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
-		cds_suspend_target(gp_cds_context->wma_context);
+	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state())) {
+		wma_wmi_work_close();
+		if (wma_is_wmi_init_cmd_sent())
+			cds_suspend_target(gp_cds_context->wma_context);
+	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 
