@@ -112,12 +112,9 @@ struct dp_dhcp_stats {
 #define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
 #endif
 
+/* Use QDF_MAX_AVAILABLE_CPU which caps NR_CPUS to WLAN_MAX_CPUS */
 #ifndef NUM_CPUS
-#ifdef QCA_CONFIG_SMP
-#define NUM_CPUS NR_CPUS
-#else
-#define NUM_CPUS 1
-#endif
+#define NUM_CPUS QDF_MAX_AVAILABLE_CPU
 #endif
 
 /**
