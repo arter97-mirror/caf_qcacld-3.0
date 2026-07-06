@@ -2665,6 +2665,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CONFIG_MLO_SAP_LINK_REMOVAL",
         },
+        {
+            "pattern": "mld_capa_and_ops: MLD capabilities and operations (for MLO)",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS",
+        },
     ]
 
     cmd = 'touch "$@"\n'

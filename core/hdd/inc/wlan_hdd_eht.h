@@ -70,7 +70,8 @@ void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
  */
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx);
 
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
+    defined(CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS)
 /**
  * hdd_update_wiphy_mlo_sap_cap() - set MLO SAP EML/MLD caps in wiphy
  * @hdd_ctx: HDD context

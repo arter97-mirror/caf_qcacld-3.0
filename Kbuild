@@ -3551,6 +3551,13 @@ found = $(shell if grep -qF "cfg80211_link_reconfig_removal_params" $(srctree)/i
 ifeq ($(findstring yes, $(found)), yes)
 CONFIG_MLO_SAP_LINK_REMOVAL := y
 endif
+found_backport = $(shell if grep -qF "wiphy_iftype_ext_capab2" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifneq ($(findstring yes, $(found_backport)), yes)
+found = $(shell if grep -qF "mld_capa_and_ops: MLD capabilities and operations (for MLO)" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+CONFIG_CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS := y
+endif
+endif
 endif
 
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
@@ -4553,6 +4560,7 @@ ccflags-$(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE) += -DDP_FEATURE_RX_BUFFER_RECYCLE
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 ccflags-$(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP) += -DWLAN_FEATURE_MULTI_LINK_SAP
 ccflags-$(CONFIG_MLO_SAP_LINK_REMOVAL) += -DWLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+ccflags-$(CONFIG_CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS) += -DCFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS
 endif
 ccflags-$(CONFIG_WLAN_FEATURE_11BE_MLO) += -DWLAN_SUPPORT_11BE_D3_0
 ccflags-$(CONFIG_WLAN_MCAST_MLO_SAP) += -DWLAN_MCAST_MLO_SAP
