@@ -1729,14 +1729,14 @@
 #define WE_GET_GTX_STEP                 52
 /*
  * <ioctl>
- * get_gtxMinTpc - Get the tx miminum tpc
+ * get_gtxMinTpc - Get the tx minimum tpc
  *
  * @INPUT: None
  *
  * @OUTPUT: TPC
  * wlan0     get_gtxMinTpc:0
  *
- * This IOCTL is used to get tx miminum tpc
+ * This IOCTL is used to get tx minimum tpc
  *
  * @E.g: iwpriv wlan0 get_gtxMinTpc
  *
@@ -9796,4 +9796,3 @@ void hdd_wext_unregister(struct net_device *dev,
 	if (!rtnl_held)
 		rtnl_unlock();
 }
-

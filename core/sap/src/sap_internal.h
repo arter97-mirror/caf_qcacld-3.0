@@ -457,7 +457,7 @@ sap_validate_chan(struct sap_context *sap_context,
  * which MDM device's AP with MCC was detected. This function checks if given
  * channel is present in that list.
  *
- * Return: true, if channel was present, false othersie.
+ * Return: true, if channel was present, false otherwise.
  */
 bool
 sap_check_in_avoid_ch_list(struct sap_context *sap_ctx, uint8_t channel);

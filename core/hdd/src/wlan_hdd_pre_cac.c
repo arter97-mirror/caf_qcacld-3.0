@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -381,7 +381,7 @@ pre_cac_adapter_created:
 	 * will continue to operate on the same bandwidth as that of the 2.4GHz
 	 * operations. Only bandwidths 20MHz/40MHz are possible on 2.4GHz band.
 	 * Now some customer request to start AP on higher BW such as 80Mhz.
-	 * Hence use max possible supported BW based on phymode configurated
+	 * Hence use max possible supported BW based on phymode configured
 	 * on SAP.
 	 */
 	cac_ch_width = wlansap_get_max_bw_by_phymode(hdd_ap_ctx->sap_context);

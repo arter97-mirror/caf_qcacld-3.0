@@ -438,7 +438,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp);
 
 /**
- * cm_is_vdevid_connected() - check if vdev_id is in conneted state
+ * cm_is_vdevid_connected() - check if vdev_id is in connected state
  * @pdev: pdev pointer
  * @vdev_id: vdev ID
  *
@@ -447,7 +447,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
- * cm_is_vdevid_active() - check if vdev_id is in conneted/roaming state
+ * cm_is_vdevid_active() - check if vdev_id is in connected/roaming state
  * @pdev: pdev pointer
  * @vdev_id: vdev ID
  *
@@ -803,13 +803,15 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * cm_get_ml_partner_info() - Fill ML partner info from scan entry
+ * @psoc: psoc object
  * @conn_req: Connect request pointer
  * @mlo_support_link_num: Supported Link Count
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_get_ml_partner_info(struct cm_connect_req *conn_req,
+cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
+		       struct cm_connect_req *conn_req,
 		       uint8_t mlo_support_link_num);
 #endif
 #endif /* __WLAN_CM_VDEV_API_H__ */

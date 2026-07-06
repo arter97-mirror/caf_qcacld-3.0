@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012, 2014-2016, 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,7 +35,7 @@
  *        acceptable frm format
  * @details
  *     For native wifi format, the function will add Qos control field
- *  based on peer's QOS capbabilities .
+ *  based on peer's QOS capabilities .
  *     For 802.3 format, the function will transform to 802.11 format
  *  with or without QOS control field based on peer's QOS capabilities.
  * @param vdev - handle to vdev object

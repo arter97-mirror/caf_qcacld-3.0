@@ -1567,12 +1567,16 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
 			pDot11f->supportedChannelWidthSet = 0;
-		} else {
-			if (pe_session->ch_width <= CH_WIDTH_80MHZ)
-				pDot11f->supportedChannelWidthSet = 0;
-		}
+
+		if (pe_session->ch_width < CH_WIDTH_80MHZ ||
+		    (pe_session->ch_width == CH_WIDTH_80MHZ &&
+		     wlan_mlme_get_max_curr_bw(
+				mac->pdev,
+				pe_session->curr_op_freq,
+				CH_WIDTH_160MHZ) < CH_WIDTH_160MHZ))
+			pDot11f->supportedChannelWidthSet = 0;
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -1883,10 +1887,10 @@ populate_dot11f_ext_cap(struct mac_context *mac,
 		p_ext_cap->beacon_protection_enable = pe_session ?
 			mlme_get_bigtk_support(pe_session->vdev) : false;
 	}
-	if ((opmode == QDF_P2P_GO_MODE || opmode == QDF_P2P_CLIENT_MODE) &&
-	    wlan_p2p_fw_support_ap_assist_dfs_group(mac->psoc)) {
+	if (opmode == QDF_P2P_GO_MODE || opmode == QDF_P2P_CLIENT_MODE) {
 		p_ext_cap->chan_usage = true;
-		p_ext_cap->cap_notif_support = true;
+		if (wlan_p2p_fw_support_ap_assist_dfs_group(mac->psoc))
+			p_ext_cap->cap_notif_support = true;
 	}
 
 	populate_dot11f_twt_extended_caps(mac, vdev_id, pDot11f);
@@ -3692,7 +3696,7 @@ sir_convert_assoc_req_frame2_eht_struct(tDot11fAssocRequest *ar,
 /**
  * mlo_parse_peer_eml_cap: Parse eml capability info
  * @p_assoc_req: assoc req buffer pointer
- * @eml_cap: eml capablility info
+ * @eml_cap: eml capability info
  *
  * Return: None
  */
@@ -3725,7 +3729,7 @@ mlo_parse_peer_eml_cap(tpSirAssocReq p_assoc_req, uint16_t eml_cap)
 /**
  * mlo_parse_peer_mld_cap: Parse mld capability info
  * @p_assoc_req: Assoc request received
- * @mld_cap: mld capablility info
+ * @mld_cap: mld capability info
  *
  * Return: None
  */
@@ -8366,7 +8370,9 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		 */
 		if (session->opmode == QDF_STA_MODE ||
 		    session->opmode == QDF_P2P_CLIENT_MODE) {
-			max_ch_width = wlan_mlme_get_max_bw();
+			max_ch_width = wlan_mlme_get_max_curr_bw(mac_ctx->pdev,
+								 freq,
+								 CH_WIDTH_160MHZ);
 			if ((ch_width == CH_WIDTH_80MHZ) &&
 			    (max_ch_width >= CH_WIDTH_160MHZ))
 				ch_width = CH_WIDTH_160MHZ;
@@ -8402,7 +8408,11 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		he_cap->chan_width_0 = 0;
 		he_cap->chan_width_4 = 0;
 		he_cap->chan_width_6 = 0;
-		if (ch_width <= CH_WIDTH_80MHZ) {
+		if (ch_width < CH_WIDTH_40MHZ) {
+			he_cap->chan_width_1 = 0;
+			he_cap->chan_width_2 = 0;
+			he_cap->chan_width_3 = 0;
+		} else if (ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
 		} else if (ch_width == CH_WIDTH_160MHZ) {

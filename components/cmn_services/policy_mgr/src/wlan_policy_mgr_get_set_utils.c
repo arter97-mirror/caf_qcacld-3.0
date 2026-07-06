@@ -5127,7 +5127,7 @@ policy_mgr_trigger_roam_on_link_removal(struct wlan_objmgr_vdev *vdev)
  *
  * If MLO_LINK_FORCE_MODE_INACTIVE_NUM force mode with control flag -
  * "dynamic_force_link_num" enabled was sent to firmware,
- * host will need to select same num of links to be dyamic inactive
+ * host will need to select same num of links to be dynamic inactive
  * links. And move corresponding vdevs to disabled policy mgr connection table.
  *
  * Return: void
@@ -8171,7 +8171,7 @@ static void policy_mgr_restore_no_force(struct wlan_objmgr_psoc *psoc,
 					MLO_LINK_FORCE_MODE_NO_FORCE,
 					num_mlo, mlo_vdev_lst);
 		/* If concurrency vdev is coming up and force active bitmap
-		 * is present, we need to wait for the respone of no force
+		 * is present, we need to wait for the response of no force
 		 * command.
 		 */
 		if (force_cmd.force_active_bitmap && conc_con_coming_up) {
@@ -8565,7 +8565,7 @@ policy_mgr_handle_ml_sta_link_concurrency(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 
 	/*
-	 * Skip this in case of SAP/P2P Concurrencies, to avoid renable of
+	 * Skip this in case of SAP/P2P Concurrencies, to avoid re-enable of
 	 * the link, disabled by SAP/P2P logic, as this API only consider
 	 * STA specific counts and ignore other counts.
 	 */
@@ -8968,23 +8968,11 @@ policy_mgr_handle_mcc_ml_sta(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
- * policy_mgr_sta_ml_link_enable_allowed() - Check with given ML links and
- * existing concurrencies, a disabled ml link can be enabled back.
- * @psoc: psoc ctx
- * @num_disabled_ml_sta: Number of existing disabled links
- * @num_ml_sta: Number of total ML STA links
- * @ml_freq_lst: ML STA freq list
- * @ml_vdev_lst: ML STA vdev id list
- *
- * Return: if link can be enabled or not
- */
-static bool
-policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
-				      uint8_t num_disabled_ml_sta,
-				      uint8_t num_ml_sta,
-				      qdf_freq_t *ml_freq_lst,
-				      uint8_t *ml_vdev_lst)
+bool policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
+					   uint8_t num_disabled_ml_sta,
+					   uint8_t num_ml_sta,
+					   qdf_freq_t *ml_freq_lst,
+					   uint8_t *ml_vdev_lst)
 {
 	union conc_ext_flag conc_ext_flags;
 	uint8_t disabled_link_vdev_id;
@@ -9056,7 +9044,7 @@ policy_mgr_handle_sap_cli_go_ml_sta_up_csa(struct wlan_objmgr_psoc *psoc,
 	/*
 	 * eMLSR API policy_mgr_handle_emlsr_sta_concurrency() takes care of
 	 * eMLSR concurrencies. Currently, eMLSR STA can't operate with any
-	 * cocurrent mode, i.e. one link gets force-disabled when a new
+	 * concurrent mode, i.e. one link gets force-disabled when a new
 	 * concurrecy is coming up.
 	 */
 	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL)) {
@@ -9109,7 +9097,7 @@ policy_mgr_handle_sap_cli_go_ml_sta_up_csa(struct wlan_objmgr_psoc *psoc,
 enable_link:
 
 	/*
-	 * if no affected link and link can be allowed to enable then renable
+	 * if no affected link and link can be allowed to enable then re-enable
 	 * the disabled link.
 	 */
 	if (policy_mgr_sta_ml_link_enable_allowed(psoc, num_disabled_ml_sta,
@@ -9425,7 +9413,7 @@ policy_mgr_pick_link_vdev_from_inactive_list(
 	policy_mgr_store_and_del_conn_info_by_vdev_id(
 			psoc, wlan_vdev_get_id(vdev),
 			info, &num_del);
-	/* pick one inactive parnter link and make it active */
+	/* pick one inactive partner link and make it active */
 	for (i = 0; i < inactive_vdev_num; i++) {
 		struct wlan_objmgr_vdev *partner_vdev;
 
@@ -9630,7 +9618,7 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	/* pick one inactive parnter link and make it active */
+	/* pick one inactive partner link and make it active */
 	if (num_active_ml_sta < num_ml_sta)
 		policy_mgr_pick_link_vdev_from_inactive_list(
 				psoc, vdev, num_disabled_ml_sta,
@@ -9642,7 +9630,7 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)
 		/* find one inactive link can be active, send it to fw with
 		 * the removed link together.
 		 */
-		policy_mgr_debug("active parnter vdev %d, inactive removal vdev %d",
+		policy_mgr_debug("active partner vdev %d, inactive removal vdev %d",
 				 picked_vdev_id, vdev_id);
 		policy_mgr_mlo_sta_set_link_ext(
 				psoc, MLO_LINK_FORCE_REASON_LINK_REMOVAL,
@@ -10388,7 +10376,7 @@ policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlo_link_info *link_info;
-	uint8_t iter, cnt = 0;
+	uint8_t iter;
 	uint8_t *link_mac_addr;
 	uint32_t link_bitmap = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -10420,19 +10408,12 @@ policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("Num active links: %d", force_active_cnt);
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
-		if (cnt >= force_active_cnt)
-			break;
 		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
 			link_info++;
 			continue;
 		}
 
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr)) {
-			link_info++;
-			continue;
-		}
-
-		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
 			link_info++;
 			continue;
 		}
@@ -10993,36 +10974,47 @@ policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
 	if (mode != PM_PASSTHRU_MODE && !conn_count)
 		return true;
 
-	if (mode == PM_PASSTHRU_MODE) {
+	switch (mode) {
+	case PM_PASSTHRU_MODE:
 		if (!pcl || !pcl->pcl_len)
 			return true;
 
+		policy_mgr_err("Unexpected scenario for Passthru mode ch_freq:%d pcl len:%d",
+			       ch_freq, pcl->pcl_len);
+		return false;
+	case PM_STA_MODE:
+		/*
+		 * STA + Passthru SCC concurrency is always supported
+		 * irrespective of HW capability.
+		 */
+		if (pm_conc_connection_list[list[0]].freq == ch_freq)
+			return true;
+
+		if (!pcl || !pcl->pcl_len) {
+			if (policy_mgr_2_freq_same_mac_in_dbs(psoc,
+						      pm_conc_connection_list[list[0]].freq,
+						      ch_freq))
+				return false;
+			else
+				return true;
+		}
+
 		for (i = 0; i < pcl->pcl_len; i++) {
 			if (pcl->pcl_list[i] == ch_freq) {
-				policy_mgr_debug("Passthrough mode allowed on %dMhz",
+				policy_mgr_debug("%s mode allowed on %dMhz",
+						 device_mode_to_string(mode),
 						 ch_freq);
 				return true;
 			}
 		}
 
-		policy_mgr_debug("Passthrough mode not allowed on %dMhz",
-				 ch_freq);
-		return false;
-	}
+		policy_mgr_debug("%s mode not allowed on %dMhz",
+				 device_mode_to_string(mode), ch_freq);
 
-	/*
-	 * This would only happen for DBS hw as we would reject inital
-	 * STA connection in case of non-DBS hw.
-	 */
-	if (mode == PM_STA_MODE &&
-	    policy_mgr_2_freq_same_mac_in_dbs(psoc,
-					      pm_conc_connection_list[list[0]].freq,
-					      ch_freq)) {
-		policy_mgr_debug("STA CSA to %dMHz not allowed", ch_freq);
 		return false;
+	default:
+		return true;
 	}
-
-	return true;
 }
 #else
 static inline bool
@@ -12481,6 +12473,12 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 					psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
 
+	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
+		cc_count = cc_count +
+			   policy_mgr_get_mode_specific_conn_info(
+					psoc, &op_ch_freq_list[cc_count],
+					&vdev_id[cc_count], PM_PASSTHRU_MODE);
+
 	if (!cc_count) {
 		*ok = true;
 		return QDF_STATUS_SUCCESS;
@@ -13833,11 +13831,11 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	 * return false for 5745 and 5180 and finally this function
 	 * return false, no force SCC on SAP2.
 	 * Add mcc conntion count check for SAP2, if SAP 2 channel
-	 * is different from all of exsting 2 or more connections, then
+	 * is different from all of existing 2 or more connections, then
 	 * try to force SCC on SAP 2.
 	 */
 	if (num_mcc_conn > 1 && !num_scc_conn) {
-		policy_mgr_debug("sap vdev %d has chan %d diff with %d exsting conn",
+		policy_mgr_debug("sap vdev %d has chan %d diff with %d existing conn",
 				 vdev_id, freq, num_mcc_conn);
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		return true;
@@ -14296,7 +14294,7 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("AP AP mcc not allowed, try to override 2nd SAP/GO chan");
 		return false;
 	}
-	/* For SCC case & bandwdith > 20, the center frequency have to be
+	/* For SCC case & bandwidth > 20, the center frequency have to be
 	 * same to avoid target MCC on different center frequency even though
 	 * primary channel are same.
 	 */

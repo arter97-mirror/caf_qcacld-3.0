@@ -1973,8 +1973,15 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	ucfg_dp_periodic_sta_stats_start(vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev))
-		hdd_send_ps_config_to_fw(adapter);
+	/* Set MLO power save configuration after connection complete */
+	if (wlan_hdd_is_mlo_connection(link_info) &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		hdd_debug("MLO assoc link connected, setting power save to %d",
+			  adapter->allow_power_save);
+		wlan_hdd_set_mlo_ps(adapter, adapter->allow_power_save,
+				    0, -1);
+	}
+
 	hdd_clear_disconnect_receive(adapter);
 }
 

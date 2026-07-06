@@ -1258,7 +1258,7 @@ end:
  * @mac_ctx - global MAC context
  * @sta_mac - station MAC
  *
- * This function checks if diassociation or deauthentication is pending for
+ * This function checks if disassociation or deauthentication is pending for
  * given station MAC address.
  *
  * Return: true if pending and false otherwise.

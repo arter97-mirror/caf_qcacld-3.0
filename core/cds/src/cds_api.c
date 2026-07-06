@@ -819,7 +819,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	ol_ctx = cds_get_context(QDF_MODULE_ID_BMI);
 	status = bmi_download_firmware(ol_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		cds_alert("BMI FIALED status:%d", status);
+		cds_alert("BMI FAILED status:%d", status);
 		goto err_bmi_close;
 	}
 
@@ -2277,7 +2277,7 @@ enum wifi_driver_log_level cds_get_ring_log_level(uint32_t ring_id)
 }
 
 /**
- * cds_set_multicast_logging() - Set mutlicast logging value
+ * cds_set_multicast_logging() - Set multicast logging value
  * @value: Value of multicast logging
  *
  * Set the multicast logging value which will indicate

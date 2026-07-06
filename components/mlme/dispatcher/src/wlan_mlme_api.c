@@ -1699,6 +1699,24 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 }
 #endif
 
+enum phy_ch_width wlan_mlme_get_max_curr_bw(struct wlan_objmgr_pdev *pdev,
+					    qdf_freq_t curr_op_freq,
+					    enum phy_ch_width chan_bw)
+{
+	struct ch_params ch_params;
+
+	ch_params.ch_width = chan_bw;
+	wlan_reg_set_channel_params_for_pwrmode(pdev,
+						curr_op_freq,
+						0, &ch_params,
+						REG_CURRENT_PWR_MODE);
+	mlme_debug("reg bw %d chan bw %d",
+		   ch_params.ch_width, chan_bw);
+
+	return ch_params.ch_width;
+}
+
+
 QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 				      enum phy_ch_width *ch_width,
 				      enum wlan_phymode *phy_mode)
@@ -6089,7 +6107,7 @@ wlan_mlme_get_mgmt_6ghz_rate_support(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 wlan_mlme_get_status_ring_buffer(struct wlan_objmgr_psoc *psoc,
-				 bool *enable_ring_buffer)
+				 uint32_t *enable_ring_buffer)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 

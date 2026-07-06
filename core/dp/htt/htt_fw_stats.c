@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -308,7 +308,7 @@ htt_t2h_stats_pdev_stats_print(struct wlan_dbg_stats *wlan_pdev_stats,
 	qdf_nofl_info("phy underrun      :%d", tx->phy_underrun);
 	/* Num PPDUs cleaned up in TX abort */
 	qdf_nofl_info("tx_abort          :%d", tx->tx_abort);
-	/* Num MPDUs requed by SW */
+	/* Num MPDUs requeued by SW */
 	qdf_nofl_info("mpdus_requed      :%d", tx->mpdus_requed);
 	/* Excessive retries */
 #if defined(AR900B)
@@ -441,7 +441,7 @@ htt_t2h_stats_rx_reorder_stats_print(struct rx_reorder_stats *stats_ptr,
 		      stats_ptr->invalid_peer_a2_in_ast);
 	qdf_nofl_info("  %u MPDUs with invalid peer but A3 found in AST",
 		      stats_ptr->invalid_peer_a3_in_ast);
-	qdf_nofl_info("  %u MPDUs with invalid peer, Broadcast or Mulitcast frame",
+	qdf_nofl_info("  %u MPDUs with invalid peer, Broadcast or Multicast frame",
 		      stats_ptr->invalid_peer_bmc_mpdus);
 	qdf_nofl_info("  %u MSDUs with err attention word",
 		      stats_ptr->rxdesc_err_att);

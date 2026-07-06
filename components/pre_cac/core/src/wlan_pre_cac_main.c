@@ -209,7 +209,7 @@ void pre_cac_clean_up(struct wlan_objmgr_psoc *psoc)
 		return;
 
 	if (pre_cac_is_active(psoc) && psoc_priv->pre_cac_work.fn) {
-		pre_cac_debug("pre_cac_work already shceduled");
+		pre_cac_debug("pre_cac_work already scheduled");
 		return;
 	}
 	pre_cac_get_vdev_id(psoc, &vdev_id);

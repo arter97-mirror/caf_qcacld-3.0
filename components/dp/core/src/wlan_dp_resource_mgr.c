@@ -15,6 +15,7 @@
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_ctrl.h>
 #include "cfg_ucfg_api.h"
+#include <wlan_dp_api.h>
 
 /*DP resource MAP used in resource level selection*/
 static struct wlan_dp_resource_map dp_resource_map[] = {

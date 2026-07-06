@@ -475,17 +475,17 @@ const char *lim_bss_type_to_string(const uint16_t bss_type);
  *                      This value is derived from "Supported MCS Set field"
  *                      inside the HT capability element.
  * @vhtRxMCSMap: Indicates the Maximum MCS(VHT) that can be received for each
- *                number of spacial streams
+ *                number of spatial streams
  * @vhtRxHighestDataRate: Indicate the highest VHT data rate that the STA is
  *                         able to receive
  * @vhtTxMCSMap: Indicates the Maximum MCS(VHT) that can be transmitted for
- *                each number of spacial streams
+ *                each number of spatial streams
  * @vhtTxHighestDataRate: Indicate the highest VHT data rate that the STA is
  *                         able to transmit
  * @he_rx_mcs: Indicates the Maximum MCS(HE) that can be received for each
- *              number of spacial streams
+ *              number of spatial streams
  * @he_tx_mcs: Indicates the Maximum MCS(HE) that can be transmitted for each
- *              number of spacial streams
+ *              number of spatial streams
  * @bw_20_rx_max_nss_for_mcs_0_to_7: Indicates MAX RX NSS for MCS from 0 to 7
  * @bw_20_tx_max_nss_for_mcs_0_to_7: Indicates MAX TX NSS for MCS from 0 to 7
  * @bw_20_rx_max_nss_for_mcs_8_and_9: Indicates MAX RX NSS for MCS from 8 9
@@ -3560,7 +3560,7 @@ struct sir_rx_threshold {
  * struct sir_wifi_ll_ext_stats_threshold - Threshold for stats update
  * @period: MAC counter indication period (unit in ms)
  * @enable: if threshold mechanism is enabled or disabled
- * @enable_bitmap: whether dedicated threshold is enabed.
+ * @enable_bitmap: whether dedicated threshold is enabled.
  *     Every MAC counter has a dedicated threshold. If the dedicated
  *     threshold is not set in the bitmap, global threshold will take
  *     effect.
@@ -4328,13 +4328,13 @@ QDF_STATUS umac_send_mb_message_to_mac(void *msg);
 
 /**
  * struct scan_chan_info - channel info
- * @freq: radio frequence
+ * @freq: radio frequency
  * @cmd flag: cmd flag
  * @noise_floor: noise floor
  * @cycle_count: cycle count
  * @rx_clear_count: rx clear count
  * @tx_frame_count: TX frame count
- * @clock_freq: clock frequence MHZ
+ * @clock_freq: clock frequency MHZ
  * @cca_busy_subband_info: CCA busy for each possible 20Mhz subbands
  * of the wideband scan channel
  */
@@ -4490,7 +4490,7 @@ struct ppet_hdr {
 #define HE_6G_TX_ANT_PATTERN_BIT_POS 13
 
 /*
- * Following formuala has been arrived at using karnaugh map and unit tested
+ * Following formula has been arrived at using karnaugh map and unit tested
  * with sample code. Take MCS for each NSS as 2 bit value first and solve for
  * 2 bit intersection of NSS. Use following table/Matrix as guide for solving
  * K-Maps
@@ -4537,7 +4537,7 @@ struct ppet_hdr {
 		HE_GET_MCS_FOR_NSS(mcs_2, 8)) << HE_MCS_NSS_SHIFT(8))
 
 /*
- * Following formuala has been arrived at using karnaugh map and unit tested
+ * Following formula has been arrived at using karnaugh map and unit tested
  * with sample code. Take MCS for each NSS as 2 bit value first and solve for
  * 2 bit intersection of NSS. Use following table/Matrix as guide for solving
  * K-Maps
@@ -5034,6 +5034,23 @@ struct start_bss_config {
 	uint32_t dfs_regdomain;
 	struct ssirrnrie rnrie;
 	uint8_t curr_conn_count;
+};
+
+/**
+ * struct sir_passthru_peer_setup_msg - msg used for passthru peer setup
+ * @message_type: message type
+ * @vdev_id: vdev id
+ * @peer_mac_addr: peer MAC address
+ */
+struct sir_passthru_peer_setup_msg {
+	uint16_t message_type;
+	uint16_t vdev_id;
+	struct qdf_mac_addr peer_mac_addr;
+	enum phy_ch_width ch_width;
+	uint32_t dot11mode;
+	uint8_t gi_val;
+	uint8_t nss;
+	uint8_t max_mcs;
 };
 
 #endif /* __SIR_API_H */

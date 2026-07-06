@@ -6530,7 +6530,7 @@ static void hdd_fill_sinfo_eht_rate_info(struct rate_info *rate_info,
  * hdd_is_eht_flag_set() - Check if EHT flag is set
  * @rate_info: Pointer to rate info
  *
- * Return: Return true if EHT flag is set, else return flase
+ * Return: Return true if EHT flag is set, else return false
  */
 static bool hdd_is_eht_flag_set(struct rate_info *rate_info)
 {
@@ -8109,6 +8109,7 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 			    struct wlan_hdd_link_info *link_info)
 {
 	uint8_t preamble = link_info->hdd_stats.class_a_stat.rx_preamble;
+	uint32_t rx_mcs = link_info->hdd_stats.class_a_stat.rx_mcs_index;
 
 	sinfo->rxrate.nss = link_info->hdd_stats.class_a_stat.rx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
@@ -8125,6 +8126,11 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 		 * In this case, using FW rates which was set previously.
 		 */
 		hdd_debug("Driver failed to get rate, reporting FW rate");
+		return;
+	}
+
+	if (rx_mcs == INVALID_MCS_IDX) {
+		hdd_warn("Invalid rx mcs index, reporting FW rate");
 		return;
 	}
 
@@ -9769,7 +9775,7 @@ int wlan_hdd_get_rcpi(struct hdd_adapter *adapter,
 	adapter->rcpi.mac_addr = priv->mac_addr;
 	adapter->rcpi.rcpi = priv->rcpi;
 	if (qdf_mem_cmp(&mac_addr, &priv->mac_addr, sizeof(mac_addr))) {
-		hdd_err("mis match of mac addr from call-back");
+		hdd_err("mismatch of mac addr from call-back");
 		status = -EINVAL;
 		goto out;
 	}

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -66,6 +66,7 @@
 #include "lim_prop_exts_utils.h"
 #include "dph_hash_table.h"
 #include "wma_types.h"
+#include "wma.h"
 #include "cds_regdomain.h"
 #include "cds_utils.h"
 #include "wlan_mlo_mgr_sta.h"
@@ -1099,6 +1100,26 @@ static void lim_tdls_set_he_chan_width(struct mac_context *mac,
 		heCap->chan_width_4 = 0;
 		heCap->chan_width_5 = 0;
 		heCap->chan_width_6 = 0;
+	} else if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
+		uint32_t fw_vht_ch_wd = wma_get_vht_ch_width();
+
+		/*
+		 * In 6 GHz, check if FW supports 160 MHz. If FW doesn't
+		 * advertise 160 MHz support, cap the TDLS peer HE caps
+		 * bandwidth to 80 MHz to avoid FW downgrading to 20 MHz.
+		 */
+		if (fw_vht_ch_wd < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+			pe_debug("FW max BW %d, capping TDLS HE caps to 80 MHz in 6 GHz",
+				 fw_vht_ch_wd);
+			heCap->chan_width_2 = 0;
+			heCap->chan_width_3 = 0;
+		}
+		/*
+		 * chan_width_4 (26-tone RU in 2.4 GHz) and chan_width_5
+		 * (26-tone RU in 5 GHz) are not applicable in 6 GHz band.
+		 */
+		heCap->chan_width_4 = 0;
+		heCap->chan_width_5 = 0;
 	}
 }
 

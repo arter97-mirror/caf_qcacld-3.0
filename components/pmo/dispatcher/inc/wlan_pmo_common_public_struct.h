@@ -56,6 +56,7 @@
 #define IGMP_QUERY_ADDRESS 0x10000e0
 
 #define WOW_LARGE_RX_RTPM_DELAY 1200
+#define WOW_TBTT_NACK_RETRY_RTPM_DELAY 44
 
 /**
  * enum pmo_vdev_param_id: tell vdev param id
@@ -367,8 +368,8 @@ enum pmo_page_fault_action {
  * @active_mode_offload: true if psoc supports active mode offload else false
  * @ap_arpns_support: true if psoc supports arp ns for ap mode
  * @d0_wow_supported: true if psoc supports D0 wow command
- * @ra_ratelimit_enable: true when ra filtering ins eanbled else false
- * @ra_priority_enable: true when ra priority ins eanbled else false
+ * @ra_ratelimit_enable: true when ra filtering ins enabled else false
+ * @ra_priority_enable: true when ra priority ins enabled else false
  * @ra_ratelimit_interval: ra packets interval
  * @magic_ptrn_enable: true when magic pattern is enabled else false
  * @deauth_enable: true when wake up on deauth is enabled else false

@@ -570,7 +570,7 @@ static inline int pld_ipci_mhi_state(struct device *dev)
 	return icnss_get_mhi_state(dev);
 }
 
-#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+#ifdef FEATURE_DT_CPU_MASK_DP_INTR
 static inline void
 pld_ipci_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
 					    unsigned int *cpumask)
@@ -596,7 +596,7 @@ pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 						 unsigned int *cpumask)
 {
 }
-#endif /* CONFIG_DT_CPU_MASK_DP_INTR */
+#endif /* FEATURE_DT_CPU_MASK_DP_INTR */
 
 static inline
 int pld_ipci_request_bus_bandwidth(struct device *dev, int bandwidth)

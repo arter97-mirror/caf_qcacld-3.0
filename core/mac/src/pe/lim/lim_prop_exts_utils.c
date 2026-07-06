@@ -216,7 +216,7 @@ static void lim_check_is_he_mcs_valid(struct pe_session *session,
 		session->dot11mode = MLME_DOT11_MODE_11AC;
 	else
 		session->dot11mode = MLME_DOT11_MODE_11N;
-	pe_err("vdev %d: Invalid LT80 MCS map 0x%x with NSS %d, falback to dot11mode %d",
+	pe_err("vdev %d: Invalid LT80 MCS map 0x%x with NSS %d, fallback to dot11mode %d",
 	       session->vdev_id, mcs_map, session->nss, session->dot11mode);
 }
 

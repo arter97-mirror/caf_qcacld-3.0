@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,7 +60,7 @@
  *  2) Unicast Pattern
  *
  * However note that WoWL will not be enabled by default by HDD. WoWL
- * needs to enabled explcitly by exercising the iwpriv command.
+ * needs to enabled explicitly by exercising the iwpriv command.
  *
  * HDD will expose an API that accepts patterns as Hex string in the
  * following format:

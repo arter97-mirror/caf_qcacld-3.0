@@ -1648,7 +1648,7 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  * wlansap_get_safe_channel_from_pcl_and_acs_range() - Get safe channel for SAP
  * restart
  * @sap_ctx: sap context
- * @ch_width: selected channel bandwdith
+ * @ch_width: selected channel bandwidth
  *
  * Get a safe channel to restart SAP. PCL already takes into account the
  * unsafe channels. So, the PCL is validated with the ACS range to provide
@@ -1866,7 +1866,7 @@ static inline qdf_freq_t wlansap_dcs_get_freq(struct sap_context *sap_context)
  * wlansap_filter_vendor_unsafe_ch_freq() - filter sap acs ch list by
  *  vendor unsafe ch freq ranges
  * @sap_context: sap context
- * @sap_config: sap conifg
+ * @sap_config: sap config
  *
  * This function is used to filter out unsafe channel frequency from acs
  * channel frequency list based on vendor unsafe channel frequency ranges.

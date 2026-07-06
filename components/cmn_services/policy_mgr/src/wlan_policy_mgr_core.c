@@ -771,7 +771,7 @@ void policy_mgr_restore_deleted_conn_info(struct wlan_objmgr_psoc *psoc,
 		     num_cxn_del * sizeof(*info));
 	pm_ctx->no_of_active_sessions[info->mode] += num_cxn_del;
 	for (i = 0; i < num_cxn_del; i++)
-		policy_mgr_debug("Restored the deleleted conn info, vdev:%d, index:%d",
+		policy_mgr_debug("Restored the deleted conn info, vdev:%d, index:%d",
 				 info[i].vdev_id, conn_index++);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }
@@ -4704,6 +4704,52 @@ rel_ref:
 }
 
 /**
+ * policy_mgr_update_band_info_for_p2p() - Check band preference for P2P GO
+ * @pm_ctx: Pointer to pm_ctx
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @vdev_id: vdev id
+ * @allow_6ghz: if 6 Ghz can be allowed
+ * @allow_2ghz_only: if only 2.4 Ghz is allowed
+ *
+ * Return: void.
+ */
+static void
+policy_mgr_update_band_info_for_p2p(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				    qdf_freq_t sap_ch_freq,
+				    uint8_t vdev_id, bool *allow_6ghz,
+				    bool *allow_2ghz_only)
+{
+	uint8_t peer_band = 0;
+	qdf_freq_t user_freq;
+
+	user_freq = policy_mgr_get_user_config_sap_freq(pm_ctx->psoc, vdev_id);
+	if (!user_freq)
+		user_freq = sap_ch_freq;
+
+	if (pm_ctx->hdd_cbacks.hdd_get_sap_connected_sta_band)
+		peer_band =
+		 pm_ctx->hdd_cbacks.hdd_get_sap_connected_sta_band(pm_ctx->psoc,
+								   vdev_id);
+	/*
+	 * If peer_band is 0, it mean no peer is connected OR
+	 * peer didn't advertised band info OR GO is starting.
+	 * so allow only the original user or lower bands.
+	 */
+	if (!peer_band) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(user_freq))
+			*allow_2ghz_only = true;
+		else if (WLAN_REG_IS_5GHZ_CH_FREQ(user_freq))
+			*allow_6ghz = false;
+	}
+
+	/* If peer_band does not support the band, skip the band */
+	if (peer_band && !(peer_band & BIT(REG_BAND_5G)))
+		*allow_2ghz_only = true;
+	if (peer_band && !(peer_band & BIT(REG_BAND_6G)))
+		*allow_6ghz = false;
+}
+
+/**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
  * @psoc: Pointer to Psoc
@@ -4816,6 +4862,16 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 	if (wlan_nan_is_disc_active(psoc))
 		nan_scc_freq = policy_mgr_get_sap_scc_freq_nan_present(psoc);
+
+	/*
+	 * Update band pref for GO in non-DBS, to avoid GO moving
+	 * to band which is not supported by CLI.
+	 * If CLI is not connected, avoid upgrading the band.
+	 */
+	if (!is_dbs && op_mode == QDF_P2P_GO_MODE)
+		policy_mgr_update_band_info_for_p2p(pm_ctx, sap_ch_freq,
+						    vdev_id, &allow_6ghz,
+						    &allow_2ghz_only);
 
 	/*
 	 * The preferred force SCC channel is SAP original channel,

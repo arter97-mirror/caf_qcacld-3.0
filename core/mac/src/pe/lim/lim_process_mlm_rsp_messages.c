@@ -681,7 +681,7 @@ void lim_process_mlm_assoc_cnf(struct mac_context *mac_ctx,
 	if (session_entry->limSmeState != eLIM_SME_WT_ASSOC_STATE ||
 		 LIM_IS_AP_ROLE(session_entry)) {
 		/*
-		 * Should not have received Assocication confirm
+		 * Should not have received Association confirm
 		 * from MLM in other states OR on AP.
 		 * Log error
 		 */
@@ -1478,6 +1478,82 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 	return;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      tAddStaParams *add_sta_rsp)
+{
+	tpDphHashNode sta_ds;
+	uint16_t peer_idx;
+
+	if (!add_sta_rsp) {
+		pe_err("Invalid add_sta_rsp");
+		return;
+	}
+
+	pe_debug("PASSTHRU: ADD_STA_RSP for MAC addr " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(add_sta_rsp->staMac));
+	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
+	sta_ds = dph_lookup_hash_entry(mac_ctx, add_sta_rsp->staMac, &peer_idx,
+				       &session->dph.dphHashTable);
+	if (!sta_ds) {
+		pe_err("PASSTHRU: ADD_STA_RSP for unknown MAC addr "
+		       QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(add_sta_rsp->staMac));
+		qdf_mem_free(add_sta_rsp);
+		return;
+	}
+
+	if (add_sta_rsp->status != QDF_STATUS_SUCCESS) {
+		pe_err("PASSTHRU: ADD_STA_RSP error %x for MAC addr: "
+		       QDF_MAC_ADDR_FMT, add_sta_rsp->status,
+		       QDF_MAC_ADDR_REF(add_sta_rsp->staMac));
+		/* delete the sta_ds allocated during ADD STA */
+		lim_delete_dph_hash_entry(mac_ctx, add_sta_rsp->staMac,
+					  peer_idx, session);
+		qdf_mem_free(add_sta_rsp);
+		return;
+	}
+	sta_ds->valid = 1;
+	sta_ds->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
+	qdf_mem_free(add_sta_rsp);
+}
+
+static void lim_process_passthru_del_sta_rsp(struct mac_context *mac_ctx,
+					     struct scheduler_msg *lim_msg,
+					     struct pe_session *pe_session)
+{
+	tpDeleteStaParams del_sta_params = (tpDeleteStaParams) lim_msg->bodyptr;
+
+	if (!del_sta_params) {
+		pe_err("del_sta_params is NULL");
+		return;
+	}
+	if (!LIM_IS_PASSTHRU_ROLE(pe_session)) {
+		pe_err("Session %d is not passthru role",
+		       del_sta_params->sessionId);
+		goto skip_event;
+	}
+	if (QDF_STATUS_SUCCESS != del_sta_params->status)
+		pe_info("Delete STA failed: AssocID %d MAC " QDF_MAC_ADDR_FMT,
+			del_sta_params->assocId,
+			QDF_MAC_ADDR_REF(del_sta_params->staMac));
+	else
+		pe_info("Deleted STA AssocID %d MAC " QDF_MAC_ADDR_FMT,
+			del_sta_params->assocId,
+			QDF_MAC_ADDR_REF(del_sta_params->staMac));
+skip_event:
+	qdf_mem_free(del_sta_params);
+	lim_msg->bodyptr = NULL;
+}
+#else
+static inline
+void lim_process_passthru_del_sta_rsp(struct mac_context *mac_ctx,
+				      struct scheduler_msg *lim_msg,
+				      struct pe_session *pe_session)
+{
+}
+#endif
 
 /**
  * lim_process_mlm_add_sta_rsp()
@@ -1874,6 +1950,11 @@ void lim_process_mlm_del_sta_rsp(struct mac_context *mac_ctx,
 		lim_process_ndi_del_sta_rsp(mac_ctx, msg, session_entry);
 		return;
 	}
+
+	if (LIM_IS_PASSTHRU_ROLE(session_entry)) {
+		lim_process_passthru_del_sta_rsp(mac_ctx, msg, session_entry);
+		return;
+	}
 	lim_process_sta_mlm_del_sta_rsp(mac_ctx, msg, session_entry);
 }
 
@@ -1885,7 +1966,7 @@ void lim_process_mlm_del_sta_rsp(struct mac_context *mac_ctx,
  *
  * Process WMA_DEL_STA_RSP for AP role
  *
- * Retunrn: None
+ * Return: None
  */
 void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac_ctx,
 					   struct scheduler_msg *msg,
@@ -3645,7 +3726,7 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 	    scheduler_post_message(QDF_MODULE_ID_PE,
 				   QDF_MODULE_ID_SME,
 				   QDF_MODULE_ID_SME, &message)) {
-		pe_err("Failed to post message montior mode vdev up");
+		pe_err("Failed to post message monitor mode vdev up");
 	}
 }
 

@@ -5210,6 +5210,9 @@ void lim_passthrough_init_session(struct mac_context *mac_ptr,
 {
 	struct pe_session *psession_entry;
 	uint8_t session_id;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_vht_config vht_config;
+	struct wlan_ht_config ht_caps;
 
 	psession_entry = pe_create_session(mac_ptr, msg->bss_id.bytes,
 					   &session_id,
@@ -5221,6 +5224,28 @@ void lim_passthrough_init_session(struct mac_context *mac_ptr,
 			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(msg->bss_id.bytes));
 		return;
 	}
+	lim_init_peer_idxpool(mac_ptr, psession_entry);
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(psession_entry->vdev);
+	if (!vdev_mlme) {
+		pe_err("VDEV mlme obj is NULL");
+		return;
+	}
+	vht_config.caps = vdev_mlme->proto.vht_info.caps;
+	vht_config.su_beam_formee = 0;
+	vht_config.su_beam_former = 0;
+	vht_config.csnof_beamformer_antSup = 0;
+	vht_config.mu_beam_formee = 0;
+	vht_config.shortgi160and80plus80 = 0;
+	vht_config.supported_channel_widthset = 0;
+
+	psession_entry->vht_config = vht_config;
+
+	ht_caps.caps = vdev_mlme->proto.ht_info.ht_caps;
+	psession_entry->ht_config = ht_caps.ht_caps;
+
+	pe_debug("cur_op_freq %d HT capability 0x%x VHT capability 0x%x",
+		 psession_entry->curr_op_freq, ht_caps.caps, vht_config.caps);
 }
 
 void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
@@ -5235,5 +5260,243 @@ void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 					      WLAN_VDEV_SM_EV_DOWN, 0, NULL);
 		pe_delete_session(mac_ptr, session);
 	}
+}
+
+static void
+lim_passthru_update_rate_set(struct mac_context *mac, tDphHashNode *sta,
+			     struct pe_session *pe_session,
+			     struct sir_passthru_peer_setup_msg *msg)
+{
+	uint32_t i, j, is_a_rate;
+	tSirMacRateSet temp_rate_set;
+	uint32_t phymode;
+	uint8_t mcsSet[SIZE_OF_SUPPORTED_MCS_SET];
+	struct supported_rates *rates;
+	uint8_t a_rateindex = 0;
+	uint8_t b_rateindex = 0;
+	uint8_t nss;
+	qdf_size_t val_len;
+	uint8_t validBytes;
+
+	is_a_rate = 0;
+
+	lim_get_basic_rates(&temp_rate_set, pe_session->curr_op_freq);
+	lim_get_phy_mode(mac, &phymode, pe_session);
+
+	rates = &sta->supportedRates;
+	qdf_mem_zero(rates, sizeof(*rates));
+
+	for (j = 0; j < temp_rate_set.numRates; j++) {
+		if ((b_rateindex > SIR_NUM_11B_RATES) ||
+		    (a_rateindex > SIR_NUM_11A_RATES)) {
+			pe_warn("Invalid number of rates (11b->%d, 11a->%d)",
+				b_rateindex, a_rateindex);
+			return;
+		}
+		if (sirIsArate(temp_rate_set.rate[j] & 0x7f)) {
+			is_a_rate = 1;
+			if (a_rateindex < SIR_NUM_11A_RATES)
+				rates->llaRates[a_rateindex++] =
+						temp_rate_set.rate[j];
+		} else {
+			if (b_rateindex < SIR_NUM_11B_RATES)
+				rates->llbRates[b_rateindex++] =
+						temp_rate_set.rate[j];
+		}
+	}
+
+	nss = QDF_MIN(msg->nss, pe_session->nss);
+
+	validBytes = VALID_MCS_SIZE / 8;
+
+	/* compute the matching MCS rate set,
+	 * if peer is 11n capable and self mode is 11n */
+	if (sta->mlmStaContext.htCapability) {
+		val_len = SIZE_OF_SUPPORTED_MCS_SET;
+		if (wlan_mlme_get_cfg_str(
+			mcsSet,
+			&mac->mlme_cfg->rates.supported_mcs_set,
+			&val_len) != QDF_STATUS_SUCCESS) {
+			/* Could not get rateset from CFG. Log error. */
+			pe_err("could not retrieve supportedMCSSet");
+			return;
+		}
+
+		for (i = 0; i < validBytes; i++)
+			sta->supportedRates.supportedMCSSet[i] =
+				mcsSet[i];
+
+		pe_debug("MCS Rate Set Bitmap from CFG and DPH");
+		for (i = 0; i < SIR_MAC_MAX_SUPPORTED_MCS_SET; i++) {
+			pe_debug("%x %x", mcsSet[i],
+				 sta->supportedRates.supportedMCSSet[i]);
+		}
+	} else {
+		nss = 1;
+	}
+	sta->nss = nss;
+}
+
+static void
+lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
+				   struct pe_session *pe_session,
+				   struct sir_passthru_peer_setup_msg *msg)
+{
+	tDot11fIEHTCaps ht_caps = {0};
+	tDot11fIEVHTCaps vht_caps = {0};
+	uint16_t capability;
+
+	if (IS_DOT11_MODE_HT(msg->dot11mode)) {
+		pe_debug("Populate HT caps");
+		populate_dot11f_ht_caps(mac, pe_session, &ht_caps);
+		sta->mlmStaContext.htCapability = 1;
+		sta->htGreenfield = ht_caps.greenField;
+		if (msg->ch_width > CH_WIDTH_20MHZ)
+			sta->htSupportedChannelWidthSet = 1;
+		else
+			sta->htSupportedChannelWidthSet = 0;
+
+		pe_debug("sta->htSupportedChannelWidthSet: 0x%x",
+			 sta->htSupportedChannelWidthSet);
+
+		sta->ch_width = sta->htSupportedChannelWidthSet;
+		sta->htMIMOPSState = ht_caps.mimoPowerSave;
+		sta->htMaxAmsduLength = ht_caps.maximalAMSDUsize;
+		sta->htAMpduDensity = ht_caps.mpduDensity;
+		sta->htDsssCckRate40MHzSupport = ht_caps.dsssCckMode40MHz;
+		sta->htShortGI20Mhz = ht_caps.shortGI20MHz;
+		sta->htShortGI40Mhz = ht_caps.shortGI40MHz;
+		sta->htMaxRxAMpduFactor = ht_caps.maxRxAMPDUFactor;
+		lim_fill_rx_highest_supported_rate(mac,
+						   &sta->supportedRates.
+						   rxHighestDataRate,
+						   ht_caps.supportedMCSSet);
+	} else {
+		sta->mlmStaContext.htCapability = 0;
+	}
+	lim_passthru_update_rate_set(mac, sta, pe_session, msg);
+	if (IS_DOT11_MODE_VHT(msg->dot11mode)) {
+		pe_debug("Populate VHT caps");
+		populate_dot11f_vht_caps(mac, pe_session, &vht_caps);
+		sta->mlmStaContext.vhtCapability = 1;
+
+		sta->vhtSupportedChannelWidthSet =
+			WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+
+		switch (msg->ch_width) {
+		case CH_WIDTH_80MHZ:
+		case CH_WIDTH_80P80MHZ:
+			sta->vhtSupportedChannelWidthSet =
+					WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+			break;
+		case CH_WIDTH_160MHZ:
+			sta->vhtSupportedChannelWidthSet =
+					WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+			break;
+		default:
+			sta->vhtSupportedChannelWidthSet =
+					WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+			break;
+		}
+		if (sta->htSupportedChannelWidthSet) {
+			if (sta->vhtSupportedChannelWidthSet >
+			    WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+				sta->ch_width = CH_WIDTH_160MHZ;
+			else
+				sta->ch_width =
+					   sta->vhtSupportedChannelWidthSet + 1;
+		} else {
+			sta->ch_width = CH_WIDTH_20MHZ;
+		}
+
+		pe_debug("vhtSuppChWidth %hu htSuppChWidth %hu sta_ch_width %d",
+			 sta->vhtSupportedChannelWidthSet,
+			 sta->htSupportedChannelWidthSet,
+			 sta->ch_width);
+
+		sta->vhtLdpcCapable = vht_caps.ldpcCodingCap;
+		sta->vhtBeamFormerCapable = 0;
+		lim_populate_vht_mcs_set(mac, &sta->supportedRates, &vht_caps,
+					 pe_session, sta->nss,
+					 NULL);
+	} else {
+		sta->mlmStaContext.vhtCapability = 0;
+		sta->vhtSupportedChannelWidthSet =
+			WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+	}
+	/* Lets enable QOS parameter */
+	sta->qosMode = 1;
+	sta->wmeEnabled = 1;
+	sta->lleEnabled = 0;
+	capability = (1 << CAPABILITIES_QOS_OFFSET);
+	sta->mlmStaContext.capabilityInfo =
+		(*(tSirMacCapabilityInfo *) &capability);
+}
+
+void lim_passthrough_peer_setup(struct mac_context *mac,
+				struct sir_passthru_peer_setup_msg *msg)
+{
+	struct pe_session *session;
+	tpDphHashNode sta = NULL;
+	struct wlan_objmgr_peer *peer;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint16_t aid = 0;
+
+	session = pe_find_session_by_vdev_id(mac, msg->vdev_id);
+	if (!session) {
+		pe_err("PE Session does not exist for given sme sessionId: %d",
+		       msg->vdev_id);
+		return;
+	}
+	if (!LIM_IS_PASSTHRU_ROLE(session)) {
+		pe_err("PE Session is not PASSTHRU mode");
+		return;
+	}
+	pe_debug("vdev:%d Passthru peer setup Request Received",
+		 msg->vdev_id);
+	pe_debug("dot11mode %d, ch_width %d, gi %d, nss %d, max_mcs %d",
+		 msg->dot11mode, msg->ch_width, msg->gi_val, msg->nss,
+		 msg->max_mcs);
+
+	sta = dph_lookup_hash_entry(mac, msg->peer_mac_addr.bytes, &aid,
+				       &session->dph.dphHashTable);
+	if (sta) {
+		pe_err("vdev:%d entry for peer: " QDF_MAC_ADDR_FMT " already exist, cannot add new entry",
+		       session->vdev_id,
+		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		return;
+	}
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc, msg->peer_mac_addr.bytes,
+					   WLAN_LEGACY_MAC_ID);
+	if (peer) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		pe_err("vdev:%d peer_obj entry for peer: " QDF_MAC_ADDR_FMT " already exist, cannot add new entry",
+		       session->vdev_id,
+		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		return;
+	}
+	if (!sta) {
+		aid = lim_assign_peer_idx(mac, session);
+		if (!aid) {
+			pe_err("No more free AID for peer: "QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+			return;
+		}
+		pe_debug("Aid: %d, for peer: " QDF_MAC_ADDR_FMT, aid,
+			 QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		sta = dph_add_hash_entry(mac, msg->peer_mac_addr.bytes,
+					 aid, &session->dph.dphHashTable);
+		if (!sta) {
+			lim_release_peer_idx(mac, aid, session);
+			pe_err("vdev::%d add hash entry failed",
+			       session->vdev_id);
+			return;
+		}
+	}
+	lim_passthru_update_hash_node_info(mac, sta, session, msg);
+	sta->staType = STA_ENTRY_PASSTHRU_PEER;
+	status = lim_add_sta(mac, sta, false, session);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("vdev::%d add sta failed", session->vdev_id);
 }
 #endif

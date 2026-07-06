@@ -2435,6 +2435,7 @@ struct policy_mgr_sme_cbacks {
  * @wlan_get_sap_acs_band: get acs band from sap config
  * @wlan_check_cc_intf_cb: get interference frequency of input SAP/GO interface
  * @wlan_set_tx_rx_nss_cb: set NSS dynamically for STA
+ * @hdd_get_sap_connected_sta_band: Get bands supported by connected STA to SAP
  */
 struct policy_mgr_hdd_cbacks {
 	QDF_STATUS (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -2469,6 +2470,8 @@ struct policy_mgr_hdd_cbacks {
 	QDF_STATUS (*wlan_set_tx_rx_nss_cb)(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id, uint8_t tx_nss,
 					    uint8_t rx_nss);
+	uint8_t (*hdd_get_sap_connected_sta_band)(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id);
 };
 
 /**
@@ -3295,7 +3298,7 @@ uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_mode_specific_vdev_id() - provides the
- * vdev id of the pecific mode
+ * vdev id of the specific mode
  * @psoc: PSOC object information
  * @mode: type of connection
  *
@@ -4052,7 +4055,7 @@ bool policy_mgr_is_scan_simultaneous_capable(struct wlan_objmgr_psoc *psoc);
  * policy_mgr_set_user_cfg() - Function to set user cfg variables
  * required by policy manager component
  * @psoc: PSOC object information
- * @user_cfg: User config valiables structure pointer
+ * @user_cfg: User config variables structure pointer
  *
  * This function sets the user cfg variables required by policy
  * manager
@@ -5275,7 +5278,7 @@ QDF_STATUS policy_mgr_stop_emlsr_opportunistic_timer(
  * restart.
  * The API may queue the CSA request to run the CSA in workqueue thread.
  * If always_wait_set_link flag is true, the API will only set link and
- * wait for respone, it will not queue the CSA request.
+ * wait for response, it will not queue the CSA request.
  *
  * Return: QDF_STATUS_E_PENDING - CSA is postponed to work thread.
  * QDF_STATUS_SUCCESS - CSA can execute as normal.
@@ -5352,7 +5355,7 @@ policy_mgr_is_ml_links_in_mcc_allowed(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_is_vdev_high_tput_or_low_latency() - Check vdev has
- * high througput or low latency flag
+ * high throughput or low latency flag
  * @psoc: PSOC object information
  * @vdev_id: vdev id
  *
@@ -5518,6 +5521,23 @@ bool policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc);
 
+/*
+ * policy_mgr_sta_ml_link_enable_allowed() - Check with given ML links and
+ * existing concurrencies, a disabled ml link can be enabled back.
+ * @psoc: psoc ctx
+ * @num_disabled_ml_sta: Number of existing disabled links
+ * @num_ml_sta: Number of total ML STA links
+ * @ml_freq_lst: ML STA freq list
+ * @ml_vdev_lst: ML STA vdev id list
+ *
+ * Return: if link can be enabled or not
+ */
+bool
+policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
+				      uint8_t num_disabled_ml_sta,
+				      uint8_t num_ml_sta,
+				      qdf_freq_t *ml_freq_lst,
+				      uint8_t *ml_vdev_lst);
 /**
  * policy_mgr_is_mlo_in_mode_sbs() - Check whether MLO present is SBS (with both
  * links on 5/6 ghz band)
@@ -5978,7 +5998,7 @@ QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
  * ll_type_any AP type and return freq for that SAP if profile set is latency
- * sensitive or throghput sensitive.
+ * sensitive or throughput sensitive.
  *
  * Return: freq if it's LL SAP otherwise 0
  *
@@ -6005,7 +6025,7 @@ qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc);
  * @psoc: PSOC object
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
- * ll_ht_type AP type and return freq for that SAP if profile set is throghput
+ * ll_ht_type AP type and return freq for that SAP if profile set is throughput
  * sensitive.
  *
  * Return: freq if it's HT LL SAP otherwise 0
@@ -6046,7 +6066,7 @@ policy_mgr_is_conc_sap_present_on_sta_freq(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_get_connection_count_with_ch_freq() - Get number of active
- * connections on the channel frequecy
+ * connections on the channel frequency
  * @ch_freq: channel frequency
  *
  * Return: number of active connection on the specific frequency

@@ -2219,6 +2219,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	case PLD_FW_DOWN:
 		hdd_debug("Received firmware down indication");
 		hdd_dump_log_buffer(NULL, NULL);
+		hif_set_target_access_allowed(false);
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 		hdd_init_start_completion();
@@ -2276,6 +2277,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		break;
 	case PLD_BUS_EVENT:
 		hdd_debug("Bus event received");
+		hif_set_target_access_allowed(false);
 
 		/* Currently only link_down and link_resume_fail taken care.
 		 * Need to extend event buffer to define more bus info,

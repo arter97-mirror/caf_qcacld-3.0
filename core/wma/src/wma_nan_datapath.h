@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -86,7 +86,7 @@ QDF_STATUS wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
  * wma_is_ndi_active() - Determines of the nan data iface is active
  * @wma_handle: handle to wma context
  *
- * Returns: true if ndi active, flase otherwise
+ * Returns: true if ndi active, false otherwise
  */
 static inline bool wma_is_ndi_active(tp_wma_handle wma_handle)
 {

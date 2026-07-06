@@ -52,6 +52,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wma.h"
 #include "wlan_hdd_apf.h"
+#include "wlan_mlo_mgr_public_api.h"
 
 void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -766,8 +767,10 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 						     rsp->req.req.source);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
-	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,
-					   vdev->vdev_objmgr.vdev_id, 0);
+	if (!wlan_mlo_mgr_is_link_switch_in_progress(vdev))
+		ucfg_mlme_set_ml_link_control_mode(
+				hdd_ctx->psoc,
+				vdev->vdev_objmgr.vdev_id, 0);
 
 	return QDF_STATUS_SUCCESS;
 }

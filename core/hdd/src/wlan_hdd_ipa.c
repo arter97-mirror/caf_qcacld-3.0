@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -221,7 +221,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	ucfg_dp_event_eapol_log(nbuf, QDF_RX);
 	qdf_dp_trace_log_pkt(adapter->deflink->vdev_id,
 			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID,
-			     adapter->device_mode);
+			     adapter->device_mode, 0);
 	DPTRACE(qdf_dp_trace(nbuf,
 			     QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,
@@ -410,7 +410,7 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 	}
 
 	/* Always select the primary pipe for connection that is EHT160 or
-	 * EHT320 due to higher tput requiements.
+	 * EHT320 due to higher tput requirements.
 	 */
 	if (conn.wlan_80211_mode == QCA_WLAN_802_11_MODE_11BE &&
 	    (conn.ch_width == CH_WIDTH_160MHZ ||

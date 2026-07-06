@@ -2620,7 +2620,7 @@ csr_roam_issue_deauth_sta_cmd(struct mac_context *mac,
 /**
  * csr_get_peer_stats_cb - Peer stats callback
  * @ev: stats event
- * @cookie: Void pointer to mac contaxt
+ * @cookie: Void pointer to mac context
  *
  * Return: None
  */
@@ -2666,7 +2666,7 @@ disconnect_stats_complete:
 
 /**
  * csr_get_peer_stats - Get Peer stats
- * @mac: MAC contaxt
+ * @mac: MAC context
  * @session_id: Current session id
  * @peer_mac: Peer mac address
  *
@@ -3703,7 +3703,7 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	sme_qos_csr_event_ind(mac_ctx, (uint8_t)sessionId,
 			      SME_QOS_CSR_SET_KEY_SUCCESS_IND, NULL);
 #ifdef FEATURE_WLAN_ESE
-	/* Send Adjacent AP repot to new AP. */
+	/* Send Adjacent AP report to new AP. */
 	if (result == eCSR_ROAM_RESULT_AUTHENTICATED &&
 	    session->isPrevApInfoValid &&
 	    wlan_cm_get_ese_assoc(mac_ctx->pdev, sessionId)) {

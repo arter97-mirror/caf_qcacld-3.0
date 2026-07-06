@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -136,7 +136,7 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_cfg80211_tdls_configure_mode() - configure tdls mode
  * @vdev: vdev obj manager
- * @trigger_mode: tdls trgger mode
+ * @trigger_mode: tdls trigger mode
  *
  * Return: 0 for success; negative errno otherwise
  */

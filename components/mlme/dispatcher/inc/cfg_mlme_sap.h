@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -548,7 +548,7 @@
 
 /*
  * <ini>
- * gEnableApRandomBssid - Create ramdom BSSID
+ * gEnableApRandomBssid - Create random BSSID
  * @Min: 0
  * @Max: 1
  * @Default: 0
@@ -567,7 +567,7 @@
 #define CFG_AP_ENABLE_RANDOM_BSSID CFG_INI_BOOL( \
 	"gEnableApRandomBssid", \
 	0, \
-	"Create ramdom BSSID")
+	"Create random BSSID")
 
 /*
  * <ini>

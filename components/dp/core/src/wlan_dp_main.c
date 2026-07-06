@@ -430,7 +430,7 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx)
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
 		/*
 		 * If timeout happens for one interface better to bail out
-		 * instead of waiting for other intefaces task completion
+		 * instead of waiting for other interfaces task completion
 		 */
 		if (qdf_atomic_read(&dp_intf->num_active_task))
 			if (dp_intf_wait_for_task_complete(dp_intf))

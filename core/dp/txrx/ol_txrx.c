@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3048,7 +3048,7 @@ QDF_STATUS ol_txrx_peer_state_update(struct cdp_soc_t *soc_hdl,
 	 */
 	if (peer_ref_cnt > 0)
 		/*
-		 * Set the state after the Pause to avoid the race condiction
+		 * Set the state after the Pause to avoid the race condition
 		 * with ADDBA check in tx path
 		 */
 		peer->state = state;

@@ -3027,7 +3027,7 @@ int pld_oem_event_smem_write(struct device *dev, int flags, const __u8 *data,
 }
 #endif
 
-#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+#ifdef FEATURE_DT_CPU_MASK_DP_INTR
 void pld_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
 					    unsigned int *cpumask)
 {
