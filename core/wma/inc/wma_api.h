@@ -166,6 +166,13 @@ int wma_rx_service_ready_ext2_event(void *handle, uint8_t *ev, uint32_t len);
 
 QDF_STATUS wma_wait_for_ready_event(WMA_HANDLE handle);
 
+/**
+ * wma_is_wmi_init_cmd_sent() - check if WMI init command has been sent
+ *
+ * Return: true if WMI init command was sent to firmware, false otherwise
+ */
+bool wma_is_wmi_init_cmd_sent(void);
+
 int wma_cli_get_command(int vdev_id, int param_id, int vpdev);
 int wma_cli_set_command(int vdev_id, int param_id, uint32_t sval, int vpdev);
 int wma_cli_set2_command(int vdev_id, int param_id, uint32_t sval1,
