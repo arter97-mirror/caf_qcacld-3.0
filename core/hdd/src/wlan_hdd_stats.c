@@ -41,7 +41,6 @@
 #include <wlan_cfg80211_mc_cp_stats.h>
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "wlan_mlme_ucfg_api.h"
-#include "wlan_mlme_ucfg_api.h"
 #include "wlan_hdd_sta_info.h"
 #include "cdp_txrx_misc.h"
 #include "cdp_txrx_host_stats.h"
@@ -8904,6 +8903,8 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 							     peer_addr);
 	if (!stats) {
 		hdd_err_rl("Failed to get peer_stats");
+		hdd_stats->class_a_stat.is_tx_rate_version_checked = true;
+		hdd_stats->class_a_stat.tx_rate_version = 0;
 		return;
 	}
 
