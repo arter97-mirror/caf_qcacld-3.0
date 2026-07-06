@@ -80,6 +80,7 @@ _target_chipset_map = {
     ],
     "hamoa": [
         "kiwi-v2",
+        "wcn7760",
     ],
     "art": [
         "peach-v2",
