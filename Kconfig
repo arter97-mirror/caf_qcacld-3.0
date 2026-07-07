@@ -705,6 +705,10 @@ config HIF_CE_DEBUG_DATA_BUF
 	bool "Enable HIF_CE_DEBUG_DATA_BUF"
 	default n
 
+config HIF_CE_TX_DESC_DATA_DEBUG
+	bool "Enable HIF_CE_TX_DESC_DATA_DEBUG"
+	default n
+
 config HIF_CPU_PERF_AFFINE_MASK
 	bool "Enable HIF_CPU_PERF_AFFINE_MASK"
 	default n
