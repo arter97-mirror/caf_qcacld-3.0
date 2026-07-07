@@ -301,6 +301,14 @@ QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state);
 
 /*
+ * nan_vdev_delete: Deletes NAN vdev
+ * @psoc: PSOC object
+ *
+ * Return: status of operation
+ */
+QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc);
+
+/*
  * nan_discovery_pre_enable: Takes steps before sending NAN Enable to Firmware
  * @pdev: pdev object
  * @nan_ch_freq: Primary social channel for NAN Discovery

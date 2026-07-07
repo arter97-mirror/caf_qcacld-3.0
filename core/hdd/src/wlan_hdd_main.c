@@ -4854,6 +4854,17 @@ void hdd_register_ndp_update_peer_bw_cb(struct nan_callbacks *cb_obj)
 }
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+static void hdd_nan_set_vdev_destroy_cb(struct nan_callbacks *cb_obj)
+{
+	cb_obj->nan_vdev_destroy_cb = hdd_nan_vdev_destroy;
+}
+#else
+static inline void hdd_nan_set_vdev_destroy_cb(struct nan_callbacks *cb_obj)
+{
+}
+#endif
+
 static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct nan_callbacks cb_obj = {0};
@@ -4871,9 +4882,9 @@ static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 
 	cb_obj.nan_concurrency_update = hdd_nan_concurrency_update;
 	cb_obj.set_mc_list = hdd_update_multicast_list;
-
 	hdd_register_sr_concurrency_cb(&cb_obj);
 	hdd_register_ndp_update_peer_bw_cb(&cb_obj);
+	hdd_nan_set_vdev_destroy_cb(&cb_obj);
 
 	os_if_nan_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }

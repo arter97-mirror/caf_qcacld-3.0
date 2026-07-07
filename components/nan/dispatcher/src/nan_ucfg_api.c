@@ -573,6 +573,13 @@ void nan_regiser_cluster_event_cb(struct nan_psoc_priv_obj *psoc_obj,
 	psoc_obj->cb_obj.os_if_nan_process_cluster_event =
 				cb_obj->os_if_nan_process_cluster_event;
 }
+
+static inline
+void nan_register_nan_vdev_destroy_cb(struct nan_psoc_priv_obj *psoc_obj,
+				      struct nan_callbacks *cb_obj)
+{
+	psoc_obj->cb_obj.nan_vdev_destroy_cb = cb_obj->nan_vdev_destroy_cb;
+}
 #else
 static inline
 void nan_regiser_dw_notif_cb(struct nan_psoc_priv_obj *psoc_obj,
@@ -583,6 +590,12 @@ void nan_regiser_dw_notif_cb(struct nan_psoc_priv_obj *psoc_obj,
 static inline
 void nan_regiser_cluster_event_cb(struct nan_psoc_priv_obj *psoc_obj,
 				  struct nan_callbacks *cb_obj)
+{
+}
+
+static inline
+void nan_register_nan_vdev_destroy_cb(struct nan_psoc_priv_obj *psoc_obj,
+				      struct nan_callbacks *cb_obj)
 {
 }
 #endif
@@ -620,6 +633,8 @@ int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	psoc_obj->cb_obj.set_mc_list = cb_obj->set_mc_list;
 	nan_regiser_dw_notif_cb(psoc_obj, cb_obj);
 	nan_regiser_cluster_event_cb(psoc_obj, cb_obj);
+
+	nan_register_nan_vdev_destroy_cb(psoc_obj, cb_obj);
 	nan_register_sr_concurrency_callback(psoc_obj, cb_obj);
 	nan_regiser_ndp_update_peer_bw_cb(psoc_obj, cb_obj);
 
@@ -786,6 +801,33 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 			}
 			break;
 		}
+	case NAN_CHANGE_CONF_REQ: {
+			struct nan_change_conf_req *req = in_req;
+
+			psoc = req->psoc;
+			psoc_priv = nan_get_psoc_priv_obj(psoc);
+			if (!psoc_priv) {
+				nan_err("nan psoc priv object is NULL");
+				return QDF_STATUS_E_INVAL;
+			}
+
+			if (policy_mgr_is_sta_mon_concurrency(psoc))
+				return QDF_STATUS_E_INVAL;
+
+			/*
+			 * Take a psoc reference while it is being used by the
+			 * NAN requests.
+			 */
+			status =  wlan_objmgr_psoc_try_get_ref(psoc,
+							       WLAN_NAN_ID);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				nan_err("Couldn't obtain psoc ref");
+				return status;
+			}
+
+			len = sizeof(struct nan_change_conf_req);
+			break;
+		}
 	case NAN_DISABLE_REQ: {
 			struct nan_disable_req *req = in_req;
 
@@ -852,7 +894,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 	msg.callback = nan_discovery_scheduled_handler;
 	msg.flush_callback = nan_discovery_flush_callback;
 
-	if (req_type == NAN_GENERIC_REQ)
+	if (req_type == NAN_GENERIC_REQ || req_type == NAN_CHANGE_CONF_REQ)
 		goto post_msg;
 
 	request = osif_request_alloc(&params);
@@ -876,7 +918,7 @@ post_msg:
 		nan_discovery_flush_callback(&msg);
 	}
 
-	if (req_type != NAN_GENERIC_REQ) {
+	if (req_type != NAN_GENERIC_REQ && req_type != NAN_CHANGE_CONF_REQ) {
 		recovery = cds_is_driver_recovering();
 		if (!recovery)
 			err = osif_request_wait_for_response(request);
@@ -902,8 +944,10 @@ post_msg:
 				nan_disable_cleanup(psoc);
 			}
 		}
-		if (req_type == NAN_DISABLE_REQ)
+		if (req_type == NAN_DISABLE_REQ) {
 			psoc_priv->is_explicit_disable = false;
+			nan_vdev_delete(psoc);
+		}
 		osif_request_put(request);
 	}
 

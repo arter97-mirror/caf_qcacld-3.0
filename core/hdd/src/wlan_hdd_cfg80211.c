@@ -37744,17 +37744,279 @@ wlan_hdd_cfg80211_external_auth(struct wiphy *wiphy,
 
 #if defined(WLAN_FEATURE_NAN) && \
 	   (KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE)
-static int
-wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy, struct wireless_dev *wdev,
-			    struct cfg80211_nan_conf *conf)
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * __wlan_hdd_cfg80211_stop_nan() - Stop NAN discovery (internal implementation)
+ * @wiphy: Pointer to wireless phy structure
+ * @wdev: Pointer to wireless device structure
+ *
+ * This is the internal implementation function that stops NAN discovery.
+ * It performs validation checks and calls the lower layer os_if_nan_stop()
+ * function to stop NAN on the specified vdev.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int __wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy,
+					struct wireless_dev *wdev)
 {
-	return -EOPNOTSUPP;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct hdd_adapter *adapter;
+
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("Failed to get adapter from netdev");
+		return -EINVAL;
+	}
+
+	hdd_enter_dev(dev);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam())
+		return -EPERM;
+
+	if (!wlan_hdd_nan_is_supported(hdd_ctx))
+		return -EPERM;
+
+	if (hdd_is_connection_in_progress(NULL, NULL))
+		return -EAGAIN;
+
+	return os_if_nan_stop(hdd_ctx->psoc, adapter->deflink->vdev_id);
 }
 
+/**
+ * wlan_hdd_cfg80211_stop_nan() - Stop NAN discovery (cfg80211 callback)
+ * @wiphy: Pointer to wireless phy structure
+ * @wdev: Pointer to wireless device structure
+ *
+ * This is the cfg80211 callback function for stopping NAN discovery.
+ * It provides synchronization protection using osif_vdev_sync operations
+ * and calls the internal __wlan_hdd_cfg80211_stop_nan() function to
+ * perform the actual stop operation.
+ *
+ * Return: None
+ */
+static void
+wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return;
+
+	errno = __wlan_hdd_cfg80211_stop_nan(wiphy, wdev);
+	if (errno)
+		hdd_err("stop_nan failed with errno: %d", errno);
+	osif_vdev_sync_op_stop(vdev_sync);
+}
+
+/**
+ * __wlan_hdd_cfg80211_start_nan() - Start NAN discovery
+ * internal implementation
+ * @wiphy: Pointer to wireless phy structure
+ * @wdev: Pointer to wireless device structure
+ * @conf: Pointer to NAN configuration structure
+ *
+ * This is the internal implementation function that starts NAN discovery.
+ * It performs validation checks, creates vdev if needed, and calls the lower
+ * layer os_if_nan_start() function to start NAN on the specified vdev.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int __wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 struct cfg80211_nan_conf *conf)
+{
+	int ret_val;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	hdd_enter_dev(dev);
+
+	ret_val = wlan_hdd_validate_context(hdd_ctx);
+	if (ret_val)
+		return ret_val;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err_rl("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	if (!wlan_hdd_nan_is_supported(hdd_ctx)) {
+		hdd_debug_rl("NAN is not supported");
+		return -EPERM;
+	}
+
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Connection refused: conn in progress");
+		return -EAGAIN;
+	}
+	ret_val = hdd_vdev_create(adapter->deflink);
+	if (ret_val) {
+		hdd_err("failed to create vdev: %d", ret_val);
+		return ret_val;
+	}
+	return os_if_nan_start(hdd_ctx->psoc, hdd_ctx->pdev,
+			       adapter->deflink->vdev_id, conf);
+}
+
+/**
+ * wlan_hdd_cfg80211_start_nan() - Start NAN discovery (cfg80211 callback)
+ * @wiphy: Pointer to wireless phy structure
+ * @wdev: Pointer to wireless device structure
+ * @conf: Pointer to NAN configuration structure
+ *
+ * This is the cfg80211 callback function for starting NAN discovery.
+ * It provides synchronization protection using osif_vdev_sync operations
+ * and calls the internal __wlan_hdd_cfg80211_start_nan() function to
+ * perform the actual start operation.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       struct cfg80211_nan_conf *conf)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_start_nan(wiphy, wdev, conf);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * __wlan_hdd_cfg80211_nan_change_conf() - Change NAN configuration
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @conf: Pointer to NAN configuration
+ * @changes: Bitmap of changes to apply
+ *
+ * This function handles the NAN configuration change request from cfg80211.
+ * It validates the context, checks if NAN is supported, and forwards the
+ * configuration change request to the OS interface layer.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int __wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       struct cfg80211_nan_conf *conf,
+					       u32 changes)
+{
+	int ret_val;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct hdd_adapter *adapter;
+
+	/* Validate hdd_ctx first */
+	ret_val = wlan_hdd_validate_context(hdd_ctx);
+	if (ret_val)
+		return ret_val;
+
+	/* Validate dev */
+	if (!dev) {
+		hdd_err("Invalid net device");
+		return -EINVAL;
+	}
+
+	hdd_enter_dev(dev);
+
+	/* Get and validate adapter */
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err_rl("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	if (!wlan_hdd_nan_is_supported(hdd_ctx)) {
+		hdd_debug_rl("NAN is not supported");
+		return -EPERM;
+	}
+
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Connection refused: conn in progress");
+		return -EAGAIN;
+	}
+
+	return os_if_nan_change_conf(hdd_ctx->psoc,  hdd_ctx->pdev,
+				     adapter->deflink->vdev_id, conf, changes);
+}
+
+/**
+ * wlan_hdd_cfg80211_nan_change_conf() - Change NAN configuration wrapper
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @conf: Pointer to NAN configuration
+ * @changes: Bitmap of changes to apply
+ *
+ * This is a wrapper function that provides synchronization for the NAN
+ * configuration change operation. It ensures proper VDEV synchronization
+ * before calling the actual implementation function.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     struct cfg80211_nan_conf *conf,
+					     u32 changes)
+{
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_nan_change_conf(wiphy, wdev, conf, changes);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+#else
 static void
 wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 }
+
+static int wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       struct cfg80211_nan_conf *conf)
+{
+	return -EOPNOTSUPP;
+}
+
+static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     struct cfg80211_nan_conf *conf,
+					     u32 changes)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 
 static int wlan_hdd_cfg80211_add_nan_func(struct wiphy *wiphy,
 					  struct wireless_dev *wdev,
@@ -37767,14 +38029,6 @@ static void wlan_hdd_cfg80211_del_nan_func(struct wiphy *wiphy,
 					   struct wireless_dev *wdev,
 					   u64 cookie)
 {
-}
-
-static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
-					     struct wireless_dev *wdev,
-					     struct cfg80211_nan_conf *conf,
-					     u32 changes)
-{
-	return -EOPNOTSUPP;
 }
 #endif
 

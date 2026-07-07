@@ -563,6 +563,32 @@ ref_rel:
 	return status;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	if (!ucfg_nan_is_fw_support_standard_mode(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (psoc_nan_obj->cb_obj.nan_vdev_destroy_cb)
+		psoc_nan_obj->cb_obj.nan_vdev_destroy_cb(psoc);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state)
 {
@@ -2179,6 +2205,27 @@ static QDF_STATUS nan_discovery_enable_req(struct nan_enable_req *req)
 	return tx_ops->nan_discovery_req_tx(req, NAN_ENABLE_REQ);
 }
 
+static QDF_STATUS nan_discovery_change_conf_req(
+					struct nan_change_conf_req *req)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_nan_tx_ops *tx_ops;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(req->psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	tx_ops = &psoc_nan_obj->tx_ops;
+	if (!tx_ops->nan_discovery_req_tx) {
+		nan_err("NAN Discovery tx op is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return tx_ops->nan_discovery_req_tx(req, NAN_CHANGE_CONF_REQ);
+}
+
 static QDF_STATUS nan_discovery_generic_req(struct nan_generic_req *req)
 {
 	struct nan_psoc_priv_obj *psoc_nan_obj;
@@ -2215,6 +2262,9 @@ QDF_STATUS nan_discovery_flush_callback(struct scheduler_msg *msg)
 	case NAN_DISABLE_REQ:
 		psoc = ((struct nan_disable_req *)msg->bodyptr)->psoc;
 		break;
+	case NAN_CHANGE_CONF_REQ:
+		psoc = ((struct nan_change_conf_req *)msg->bodyptr)->psoc;
+		break;
 	case NAN_GENERIC_REQ:
 		psoc = ((struct nan_generic_req *)msg->bodyptr)->psoc;
 		break;
@@ -2248,6 +2298,9 @@ QDF_STATUS nan_discovery_scheduled_handler(struct scheduler_msg *msg)
 		break;
 	case NAN_GENERIC_REQ:
 		status = nan_discovery_generic_req(msg->bodyptr);
+		break;
+	case NAN_CHANGE_CONF_REQ:
+		status = nan_discovery_change_conf_req(msg->bodyptr);
 		break;
 	default:
 		nan_err("Unsupported request type: %d", msg->type);

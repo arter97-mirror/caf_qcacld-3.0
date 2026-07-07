@@ -141,6 +141,39 @@ void hdd_nan_concurrency_update(void)
 	hdd_exit();
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+void hdd_nan_vdev_destroy(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(
+			psoc, QDF_NAN_DISC_MODE, WLAN_NAN_ID);
+	if (!vdev) {
+		hdd_err("NAN vdev not found");
+		return;
+	}
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	if (!link_info) {
+		hdd_err("Failed to find link_info");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+		return;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	hdd_vdev_destroy(link_info);
+}
+#endif
+
 #ifdef WLAN_FEATURE_NAN
 #ifdef WLAN_FEATURE_SR
 void hdd_nan_sr_concurrency_update(struct nan_event_params *nan_evt)

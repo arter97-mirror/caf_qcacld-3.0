@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -158,6 +159,47 @@ static inline QDF_STATUS os_if_nan_set_ndp_delete_transaction_id(
 {
 	return ucfg_nan_set_ndp_delete_transaction_id(vdev, val);
 }
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * os_if_nan_stop() - Stop NAN discovery
+ * @psoc: Pointer to psoc object
+ * @vdev_id: NAN vdev id
+ *
+ * This function stops NAN discovery on the specified vdev.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * os_if_nan_start() - start nan
+ * @psoc: Pointer to psoc
+ * @pdev: pointer to pdev object
+ * @vdev_id: NAN vdev id
+ * @conf: nan configuration
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
+		    struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		    struct cfg80211_nan_conf *conf);
+
+/**
+ * os_if_nan_change_conf() - nan change config
+ * @psoc: psoc object
+ * @pdev: pointer to pdev object
+ * @vdev_id: NAN vdev id
+ * @conf: nan config
+ * @changes: nan config changes
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+			  struct cfg80211_nan_conf *conf,
+			  u32 changes);
+#endif
 
 /**
  * os_if_process_nan_req: os_if api to handle NAN requests attached to the
