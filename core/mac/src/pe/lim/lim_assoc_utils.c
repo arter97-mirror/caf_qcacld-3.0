@@ -1189,15 +1189,7 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 		return;
 	}
 
-	if (!sta_ds) {
-		/* As this is peer rates, take Tx nss for self Rx NSS
-		 * and vice-versa
-		 */
-		lim_extract_vht_caps_txrx_nss(vht_caps, &rx_nss, &tx_nss);
-	} else {
-		tx_nss = sta_ds->cap_tx_nss;
-		rx_nss = sta_ds->cap_rx_nss;
-	}
+	lim_extract_vht_caps_txrx_nss(vht_caps, &rx_nss, &tx_nss);
 
 	switch (vht_caps->supportedChannelWidthSet) {
 	case VHT_CAP_NO_160M_SUPP:
@@ -1228,15 +1220,16 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 			sta_ds->vht_80p80mhz_nss = (tx_nss * 3) / 4;
 		} else if (vht_caps->extended_nss_bw_supp ==
 			   VHT_EXTD_NSS_2X_NSS_160_1X_NSS_80P80) {
-			if (tx_nss > (session->cap_tx_nss / 2)) {
+			if (tx_nss > (VHT_MAX_NSS / 2)) {
 				pe_debug("Invalid extnd nss bw support val");
 				sta_ds->vht_80p80mhz_nss = tx_nss / 2;
 				break;
 			}
 			sta_ds->vht_160mhz_nss = tx_nss * 2;
-			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS ||
+			if (((session->cap_tx_nss * 2) > WLAN_MAX_VDEV_NSS) ||
 			    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
+			session->cap_tx_nss *= 2;
 		} else {
 			sta_ds->vht_80p80mhz_nss = 0;
 		}
@@ -1244,13 +1237,14 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 	case VHT_CAP_160_AND_80P80_SUPP:
 		if (vht_caps->extended_nss_bw_supp ==
 		    VHT_EXTD_NSS_2X_NSS_80_1X_NSS_80P80) {
-			if (tx_nss > (session->cap_tx_nss / 2)) {
+			if (tx_nss > (VHT_MAX_NSS / 2)) {
 				pe_debug("Invalid extnd nss bw support val");
 				break;
 			}
-			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS ||
+			if (((session->cap_tx_nss * 2) > WLAN_MAX_VDEV_NSS) ||
 			    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
+			session->cap_tx_nss *= 2;
 		} else {
 			sta_ds->vht_160mhz_nss = tx_nss;
 			sta_ds->vht_80p80mhz_nss = tx_nss;
@@ -1262,6 +1256,10 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 	}
 	pe_debug("AP Nss config: 160MHz: %d, 80P80MHz %d",
 		 sta_ds->vht_160mhz_nss, sta_ds->vht_80p80mhz_nss);
+	sta_ds->vht_160mhz_nss = QDF_MIN(sta_ds->vht_160mhz_nss,
+					 session->cap_tx_nss);
+	sta_ds->vht_80p80mhz_nss = QDF_MIN(sta_ds->vht_80p80mhz_nss,
+					   session->cap_tx_nss);
 	pe_debug("Session Nss config: 160MHz: %d, 80P80MHz %d, session Nss %d",
 		 sta_ds->vht_160mhz_nss, sta_ds->vht_80p80mhz_nss,
 		 session->cap_tx_nss);
