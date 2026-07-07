@@ -1173,6 +1173,9 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	}
 
 	ret = osif_is_twt_command_allowed(psoc, vdev, WLAN_TWT_SETUP);
+	if (ret == -EBUSY)
+		return ret;
+
 	if (ret) {
 		osif_err("TWT setup command not allowed");
 		return -EOPNOTSUPP;
