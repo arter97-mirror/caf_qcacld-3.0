@@ -3109,6 +3109,8 @@ enum mlme_reg_srd_master_modes {
  * peer-to-peer connections and from SCC.
  * @sta_dfs_ch_peer_scc: Support STA connected DFS channel for
  * peer-to-peer connections and form SCC.
+ * @enable_social_channels_on_2g_disable: Enable 2.4 GHz social channels
+ * (2412/2437/2462) for P2P/NAN discovery when 2.4 GHz band is disabled.
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -3145,6 +3147,7 @@ struct wlan_mlme_reg {
 #endif
 	uint8_t sta_indoor_ch_peer_scc;
 	bool sta_dfs_ch_peer_scc;
+	bool enable_social_channels_on_2g_disable;
 };
 
 #define IOT_AGGR_INFO_MAX_NUM 32

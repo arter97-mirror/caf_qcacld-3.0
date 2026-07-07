@@ -4654,6 +4654,9 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->sta_dfs_ch_peer_scc =
 		cfg_get(psoc, CFG_ENABLE_STA_DFS_CH_PEER_SCC);
 
+	reg->enable_social_channels_on_2g_disable =
+		cfg_get(psoc, CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE);
+
 	mlme_init_afc_cfg(psoc, reg);
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);

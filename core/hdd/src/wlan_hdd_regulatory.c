@@ -368,6 +368,10 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 		ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl(hdd_ctx->psoc);
 	config_vars->p2p_indoor_ch_support =
 		ucfg_p2p_get_indoor_ch_support(hdd_ctx->psoc);
+
+	ucfg_mlme_get_enable_social_channels_on_2g_disable(hdd_ctx->psoc,
+							   &value);
+	config_vars->enable_social_channels_on_2g_disable = value;
 }
 
 /**

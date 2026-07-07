@@ -6158,4 +6158,16 @@ ucfg_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_set_p2p_gc_keep_awake_during_noa(psoc, value);
 }
 
+/**
+ * ucfg_mlme_get_enable_social_channels_on_2g_disable() - get social
+ * channels on 2 GHz band disable support info
+ * @psoc: pointer to psoc object
+ * @value: social channels on 2 GHz band disable flag pointer
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_enable_social_channels_on_2g_disable(
+		struct wlan_objmgr_psoc *psoc, bool *value);
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */

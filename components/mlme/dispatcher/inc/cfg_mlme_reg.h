@@ -605,6 +605,34 @@ enum ignore_fw_coex_info_modes {
 	0, \
 	"enable/disable sta_dfs_ch_peer_scc")
 
+/*
+ * <ini>
+ * gEnableSocialChannelsOn2gDisable - Enable 2 GHz social channels
+ * when 2 GHz band is disabled
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When set to 1 and the 2.4 GHz band is disabled (e.g. 5G only, 6G only,
+ * or 5G+6G band config), the 2.4 GHz social channels (2412, 2437, 2462 MHz)
+ * are kept enabled so that P2P and NAN discovery can still operate. When
+ * set to 0, these channels are disabled along with the rest of the 2.4 GHz
+ * band, and P2P/NAN discovery will not be able to use them while 2 GHz
+ * band is disabled.
+ *
+ * Related: BandCapability
+ *
+ * Supported Feature: P2P/NAN
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE CFG_INI_BOOL( \
+	"gEnableSocialChannelsOn2gDisable", \
+	0, \
+	"Enable social channels when 2 GHz band is disabled")
+
 #define CFG_REG_ALL \
 	CFG_COEX_UNSAFE_CHAN_ALL \
 	CFG(CFG_SELF_GEN_FRM_PWR) \
@@ -623,6 +651,7 @@ enum ignore_fw_coex_info_modes {
 	CFG_C2C_SUPPORT \
 	CFG(CFG_DFS_CHANNEL_SUPPORT_FOR_NAN) \
 	CFG(CFG_ENABLE_STA_INDOOR_CH_PEER_SCC) \
-	CFG(CFG_ENABLE_STA_DFS_CH_PEER_SCC)
+	CFG(CFG_ENABLE_STA_DFS_CH_PEER_SCC) \
+	CFG(CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE)
 
 #endif /* CFG_MLME_REG_H__ */
