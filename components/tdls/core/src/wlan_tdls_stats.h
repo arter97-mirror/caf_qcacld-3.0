@@ -310,6 +310,9 @@ void tdls_stats_record_peer_add(struct tdls_soc_priv_obj *soc_obj,
  * in the RX data path and posts a TDLS_CMD_STATS_DP_PKT message.
  * The type, subtype, and reason_code are already mapped from the raw
  * action_code and dot11_reason before this function is called.
+ * For TDLS_STATS_TEARDOWN entries, skips recording if the peer's
+ * teardown_stats_recorded flag is already set (see
+ * tdls_stats_record_peer_teardown() and wlan_tdls_record_mgmt_tx_complete()).
  * No-op if soc_obj->stats_ctx is NULL.
  */
 void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,

@@ -683,6 +683,24 @@ void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
 		peer = tdls_find_all_peer(soc_obj, peer_mac);
 
 	if (peer) {
+		/*
+		 * For teardown frames, avoid a duplicate stats entry when
+		 * the host-driven decision path i.e
+		 * tdls_stats_record_peer_teardown has already recorded this
+		 * same teardown cycle for the peer.
+		 */
+		if (type == TDLS_STATS_TEARDOWN) {
+			if (peer->teardown_stats_recorded) {
+				tdls_debug("TDLS stats: mgmt_tx_complete teardown already recorded, skip peer "
+					  QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(peer_mac));
+				return;
+			}
+			peer->teardown_stats_recorded = true;
+			tdls_debug("TDLS stats: mgmt_tx_complete set teardown_stats_recorded for peer "
+				  QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(peer_mac));
+		}
 		entry.rssi = peer->rssi;
 		if (!entry.channel && peer->vdev_priv)
 			entry.channel =

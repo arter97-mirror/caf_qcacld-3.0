@@ -1221,8 +1221,27 @@ void tdls_stats_record_dp_pkt(struct tdls_soc_priv_obj *soc_obj,
 							  WLAN_UMAC_COMP_TDLS);
 	if (tdls_vdev) {
 		peer = tdls_find_peer(tdls_vdev, macaddr);
-		if (peer)
+		if (peer) {
+			/*
+			 * For teardown frames, avoid a duplicate stats entry
+			 * when tdls_stats_record_peer_teardown or
+			 * wlan_tdls_record_mgmt_tx_complete has already
+			 * recorded this same teardown cycle for the peer.
+			 */
+			if (type == TDLS_STATS_TEARDOWN) {
+				if (peer->teardown_stats_recorded) {
+					tdls_debug("TDLS stats: dp_pkt teardown already recorded, skip peer "
+						  QDF_MAC_ADDR_FMT,
+						  QDF_MAC_ADDR_REF(macaddr));
+					return;
+				}
+				peer->teardown_stats_recorded = true;
+				tdls_debug("TDLS stats: dp_pkt set teardown_stats_recorded for peer "
+					  QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(macaddr));
+			}
 			entry.rssi = peer->rssi;
+		}
 	}
 
 	entry.ts_ms       = qdf_get_time_of_the_day_ms();
@@ -1301,8 +1320,25 @@ void tdls_stats_record_peer_teardown(struct tdls_soc_priv_obj *soc_obj,
 	tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
 	if (tdls_vdev_obj) {
 		peer = tdls_find_peer(tdls_vdev_obj, macaddr);
-		if (peer)
+		if (peer) {
+			/*
+			 * Avoid a duplicate teardown stats entry when the
+			 * wlan_tdls_record_mgmt_tx_complete
+			 * has already recorded this same teardown cycle for
+			 * the peer.
+			 */
+			if (peer->teardown_stats_recorded) {
+				tdls_debug("TDLS stats: peer_teardown teardown already recorded, skip peer "
+					  QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(macaddr));
+				return;
+			}
+			peer->teardown_stats_recorded = true;
+			tdls_debug("TDLS stats: peer_teardown set teardown_stats_recorded for peer "
+				  QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(macaddr));
 			entry.rssi = peer->rssi;
+		}
 	}
 	tdls_stats_entry_fill_vdev_info(&entry, soc_obj->soc);
 

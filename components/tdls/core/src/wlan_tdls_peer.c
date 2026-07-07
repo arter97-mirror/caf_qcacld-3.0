@@ -923,6 +923,12 @@ void tdls_set_peer_link_status(struct tdls_peer *peer,
 
 	old_status = peer->link_status;
 	peer->link_status = link_status;
+	if (link_status == TDLS_LINK_CONNECTED) {
+		peer->teardown_stats_recorded = false;
+		tdls_debug("TDLS stats: reset teardown_stats_recorded for peer "
+			  QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(peer->peer_mac.bytes));
+	}
 	tdls_debug("vdev:%d new state: %s old state:%s reason %d peer:" QDF_MAC_ADDR_FMT,
 		   wlan_vdev_get_id(vdev_obj->vdev),
 		   tdls_link_status_str(link_status),

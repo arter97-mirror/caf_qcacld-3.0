@@ -348,6 +348,8 @@ struct tdls_peer_mlme_info {
  * @rssi: rssi
  * @tdls_support: tdls support
  * @link_status: tdls link status
+ * @teardown_stats_recorded: whether teardown stats have already been
+ *                           recorded for the current teardown cycle
  * @is_responder: is responder
  * @discovery_processed: discovery processed
  * @discovery_attempt: discovery attempt
@@ -383,6 +385,7 @@ struct tdls_peer {
 	int8_t rssi;
 	enum tdls_peer_capab tdls_support;
 	enum tdls_link_state link_status;
+	bool teardown_stats_recorded;
 	uint8_t is_responder;
 	uint8_t discovery_processed;
 	uint16_t discovery_attempt;
