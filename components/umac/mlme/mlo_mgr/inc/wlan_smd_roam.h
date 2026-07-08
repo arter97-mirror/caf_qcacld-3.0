@@ -273,6 +273,20 @@ smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 		       struct mlo_link_recfg_state_req *req);
 
 /**
+ * smd_roam_prep_fail() - Send SMD roam start status to FW on prep failure
+ * @recfg_ctx: Link Recfg ctx pointer
+ * @req: Link recfg state req pointer (tran->req with updated status codes)
+ *
+ * Thin wrapper around smd_send_roam_start_status_cmd() called when ST Prep
+ * fails. Always passes SMD_PREP_STATUS_UNSPECIFIC_FAIL.
+ *
+ * Return: QDF_STATUS success or failure
+ */
+QDF_STATUS
+smd_roam_prep_fail(struct mlo_link_recfg_context *recfg_ctx,
+		    struct mlo_link_recfg_state_req *req);
+
+/**
  * smd_add_prepared_target_links_in_smd_ctx() - Add prepared target links to SMD context
  * @recfg_ctx: Link reconfiguration context
  * @req: Link reconfiguration state request
@@ -774,6 +788,13 @@ smd_roam_link_switch_disconnect_done(struct wlan_objmgr_vdev *vdev,
 static inline QDF_STATUS
 smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 		       struct mlo_link_recfg_state_req *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+smd_roam_prep_fail(struct mlo_link_recfg_context *recfg_ctx,
+		    struct mlo_link_recfg_state_req *req)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

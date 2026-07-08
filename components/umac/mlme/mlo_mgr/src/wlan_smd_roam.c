@@ -2327,6 +2327,15 @@ smd_roam_prep_complete(struct mlo_link_recfg_context *recfg_ctx,
 	return smd_send_roam_start_status_cmd(recfg_ctx, req,
 					      SMD_PREP_STATUS_SUCCESS);
 }
+
+QDF_STATUS
+smd_roam_prep_fail(struct mlo_link_recfg_context *recfg_ctx,
+		    struct mlo_link_recfg_state_req *req)
+{
+	return smd_send_roam_start_status_cmd(recfg_ctx, req,
+					      SMD_PREP_STATUS_UNSPECIFIC_FAIL);
+}
+
 struct mlo_link_info *
 smd_get_prep_ap_link_info(struct wlan_objmgr_vdev *vdev,
 			  struct wlan_mlo_link_switch_req *req)
