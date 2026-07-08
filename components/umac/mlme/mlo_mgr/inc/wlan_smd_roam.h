@@ -464,6 +464,22 @@ wlan_smd_roam_sync_status(QDF_STATUS status);
 void smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * smd_roam_build_connect_rsp() - Build connect rsp for SMD roam indication
+ * @vdev: New assoc vdev receiving EV_SMD_EXEC_COMPLETE
+ *
+ * Allocates and populates a struct wlan_cm_connect_resp (MLO partner links,
+ * KCK/KEK, ST Prep/Exec Request/Response frames, target AP MLD address)
+ * so mlme_cm_osif_connect_complete() can deliver cfg80211_roamed() and
+ * QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH to userspace for SMD roams.
+ * Must be called before smd_roam_cleanup_ies() frees the source buffers.
+ *
+ * Return: allocated rsp (caller frees with wlan_cm_free_connect_resp()),
+ * NULL on failure
+ */
+struct wlan_cm_connect_resp *
+smd_roam_build_connect_rsp(struct wlan_objmgr_vdev *vdev);
+
+/**
  * smd_roam_update_deflink() - Update adapter->deflink after SMD roam.
  * @vdev: New assoc vdev receiving EV_SMD_EXEC_COMPLETE
  *
@@ -754,6 +770,12 @@ smd_roam_link_recfg_set_tx_link_addr(
 static inline void
 smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev)
 {
+}
+
+static inline struct wlan_cm_connect_resp *
+smd_roam_build_connect_rsp(struct wlan_objmgr_vdev *vdev)
+{
+	return NULL;
 }
 
 static inline void

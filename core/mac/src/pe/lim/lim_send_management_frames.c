@@ -9423,6 +9423,90 @@ out:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_store_uhr_st_prep_req_frame() - Store UHR Link Recfg ST Prep Request
+ * @mac_ctx: MAC context
+ * @frame_ptr: Pointer to the transmitted ST Prep Request action frame
+ * @num_bytes: Length of the frame in bytes
+ * @vdev_id: VDEV ID
+ *
+ * Deep copies the ST Prep Request action frame into
+ * recfg_ctx->st_prep_req_frame so it can be reported to userspace on SMD
+ * roam completion. Mirrors lim_store_link_recfg_req_frame(), which stores
+ * the EHT link reconfiguration request frame into recfg_ctx->req_frame.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+lim_store_uhr_st_prep_req_frame(struct mac_context *mac_ctx,
+				uint8_t *frame_ptr, uint32_t num_bytes,
+				uint8_t vdev_id)
+{
+	struct pe_session *pe_session;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mlo_link_recfg_context *ctx;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!num_bytes || !frame_ptr)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!pe_session ||
+	    pe_session->opmode != QDF_STA_MODE ||
+	    !pe_session->vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+	vdev = pe_session->vdev;
+	if (!vdev->mlo_dev_ctx) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+	ctx = vdev->mlo_dev_ctx->link_recfg_ctx;
+	if (!ctx) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	if (ctx->st_prep_req_frame.ptr) {
+		qdf_mem_free(ctx->st_prep_req_frame.ptr);
+		ctx->st_prep_req_frame.ptr = NULL;
+		ctx->st_prep_req_frame.len = 0;
+	}
+
+	ctx->st_prep_req_frame.len = num_bytes;
+	if (!ctx->st_prep_req_frame.len) {
+		pe_err("ST Prep Req Frame len is 0");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	ctx->st_prep_req_frame.ptr = qdf_mem_malloc(ctx->st_prep_req_frame.len);
+	if (ctx->st_prep_req_frame.ptr) {
+		qdf_mem_copy(ctx->st_prep_req_frame.ptr,
+			     frame_ptr,
+			     ctx->st_prep_req_frame.len);
+		pe_debug("ST Prep Req Frame len is %d",
+			 ctx->st_prep_req_frame.len);
+	} else {
+		ctx->st_prep_req_frame.len = 0;
+		status = QDF_STATUS_E_NOMEM;
+	}
+
+out:
+	return status;
+}
+#else
+static inline QDF_STATUS
+lim_store_uhr_st_prep_req_frame(struct mac_context *mac_ctx,
+				uint8_t *frame_ptr, uint32_t num_bytes,
+				uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 QDF_STATUS
 lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 				     uint8_t *peer_mac,
@@ -10697,6 +10781,8 @@ lim_send_uhr_link_recfg_st_prep_req_frame(
 			rv_mlie_len, smd_bss_trans_ie_len, dh_ie_len, nonce_ie_len);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			frame_ptr, num_bytes);
+	lim_store_uhr_st_prep_req_frame(mac_ctx, frame_ptr, num_bytes,
+					vdev_id);
 	qdf_status = wma_tx_frame(mac_ctx, pkt_ptr, num_bytes,
 			TXRX_FRM_802_11_MGMT,
 			ANI_TXDIR_TODS,
