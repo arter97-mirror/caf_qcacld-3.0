@@ -6577,14 +6577,16 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *primary_vdev,
 
 	link_vdev = cur_link_info->vdev;
 	if (link_vdev) {
-		status = ucfg_dp_update_link_mac_addr(link_vdev, new_self_mac,
-						      true);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_debug("Failed to update DP link mac for vdev %d",
-				  vdev_id);
-			return status;
+		if (!qdf_is_macaddr_equal(old_self_mac, new_self_mac)) {
+			status = ucfg_dp_update_link_mac_addr(link_vdev,
+							      new_self_mac,
+							      true);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_debug("Failed to update DP link mac for vdev %d",
+					  vdev_id);
+				return status;
+			}
 		}
-
 		wlan_vdev_mlme_set_linkaddr(link_vdev, new_self_mac->bytes);
 		wlan_vdev_mlme_set_macaddr(link_vdev, new_self_mac->bytes);
 	}

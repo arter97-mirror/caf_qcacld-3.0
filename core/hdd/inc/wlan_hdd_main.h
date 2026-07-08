@@ -5862,15 +5862,16 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 
 /**
  * hdd_roam_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
- * mac addr update due to roaming.
+ * mac addr during roaming.
  * @primary_vdev: VDEV undergoing roaming
  * @vdev_id: vdev ID for which the HDD MAC address needs to be updated
  * @old_self_mac: Current self link mac of VDEV
- * @new_self_mac: New self link mac of VDEV
+ * @new_self_mac: New self link mac of VDEV (may equal @old_self_mac)
  *
- * Check if both @old_self_mac and @new_self_mac are part of adapter
- * corresponding to @vdev_id. Then take necessary actions to support
- * MAC update and update DP to change link MAC address to new link's address.
+ * Always called for every link during roam sync, including links whose
+ * MAC address has not changed. Syncs vdev_mlme macaddr/linkaddr to the
+ * FW-assigned per-link MAC. When @old_self_mac != @new_self_mac, also
+ * updates DP with the new link MAC address.
  *
  * Return: QDF_STATUS
  */
