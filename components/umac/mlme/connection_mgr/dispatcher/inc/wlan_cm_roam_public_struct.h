@@ -369,6 +369,10 @@ struct rso_chan_info {
  * @hi_rssi_scan_rssi_delta:
  * @hi_rssi_scan_delay:
  * @hi_rssi_scan_rssi_ub:
+ * @hbr_periodic_scan_enable: Enable periodic High-Band Roaming scan
+ * @hbr_periodic_rssi_delta: RSSI delta for HBR periodic scan trigger
+ * @hbr_periodic_2g_scan_interval: HBR periodic 2G scan interval in seconds
+ * @hbr_periodic_5g_scan_interval: HBR periodic 5G scan interval in seconds
  * @pref_chan_info:
  * @full_roam_scan_period:
  * @enable_scoring_for_roam:
@@ -419,6 +423,10 @@ struct rso_cfg_params {
 	uint32_t hi_rssi_scan_rssi_delta;
 	uint32_t hi_rssi_scan_delay;
 	int32_t hi_rssi_scan_rssi_ub;
+	bool hbr_periodic_scan_enable;
+	uint32_t hbr_periodic_rssi_delta;
+	uint32_t hbr_periodic_2g_scan_interval;
+	uint32_t hbr_periodic_5g_scan_interval;
 	struct rso_chan_info pref_chan_info;
 	uint32_t full_roam_scan_period;
 	bool enable_scoring_for_roam;
@@ -2027,6 +2035,10 @@ enum wlan_roam_offload_scan_rssi_flags {
  * @hi_rssi_scan_max_count: 5G scan max count
  * @hi_rssi_scan_rssi_delta: 5G scan rssi change threshold value
  * @hi_rssi_scan_rssi_ub: 5G scan upper bound
+ * @hbr_periodic_scan_enable: Enable periodic High-Band Roaming scan
+ * @hbr_periodic_rssi_delta: RSSI delta for HBR periodic scan trigger
+ * @hbr_periodic_2g_scan_interval: HBR periodic 2G scan interval in seconds
+ * @hbr_periodic_5g_scan_interval: HBR periodic 5G scan interval in seconds
  * @raise_rssi_thresh_5g: flag to determine penalty and boost thresholds
  * @drop_rssi_thresh_5g: flag to determine penalty and boost thresholds
  * @vdev_id: vdev id
@@ -2068,6 +2080,10 @@ struct wlan_roam_offload_scan_rssi_params {
 	uint32_t hi_rssi_scan_max_count;
 	uint32_t hi_rssi_scan_rssi_delta;
 	int32_t hi_rssi_scan_rssi_ub;
+	bool hbr_periodic_scan_enable;
+	uint32_t hbr_periodic_rssi_delta;
+	uint32_t hbr_periodic_2g_scan_interval;
+	uint32_t hbr_periodic_5g_scan_interval;
 	int raise_rssi_thresh_5g;
 	int drop_rssi_thresh_5g;
 	uint8_t vdev_id;

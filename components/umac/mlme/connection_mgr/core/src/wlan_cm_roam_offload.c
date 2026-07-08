@@ -1494,6 +1494,14 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	params->hi_rssi_scan_rssi_ub =
 		rso_cfg->cfg_param.hi_rssi_scan_rssi_ub;
+	params->hbr_periodic_scan_enable =
+		rso_cfg->cfg_param.hbr_periodic_scan_enable;
+	params->hbr_periodic_rssi_delta =
+		rso_cfg->cfg_param.hbr_periodic_rssi_delta;
+	params->hbr_periodic_2g_scan_interval =
+		rso_cfg->cfg_param.hbr_periodic_2g_scan_interval;
+	params->hbr_periodic_5g_scan_interval =
+		rso_cfg->cfg_param.hbr_periodic_5g_scan_interval;
 	params->raise_rssi_thresh_5g = lfr_cfg->rssi_boost_threshold_5g;
 	params->dense_rssi_thresh_offset = lfr_cfg->roam_dense_rssi_thre_offset;
 	params->dense_min_aps_cnt = lfr_cfg->roam_dense_min_aps;

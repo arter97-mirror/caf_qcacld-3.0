@@ -1994,6 +1994,14 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 
 	cfg_params->hi_rssi_scan_rssi_ub =
 		mlme_obj->cfg.lfr.roam_scan_hi_rssi_ub;
+	cfg_params->hbr_periodic_scan_enable =
+		mlme_obj->cfg.lfr.hbr_periodic_scan_enable;
+	cfg_params->hbr_periodic_rssi_delta =
+		mlme_obj->cfg.lfr.hbr_periodic_rssi_delta;
+	cfg_params->hbr_periodic_2g_scan_interval =
+		mlme_obj->cfg.lfr.hbr_periodic_2g_scan_interval;
+	cfg_params->hbr_periodic_5g_scan_interval =
+		mlme_obj->cfg.lfr.hbr_periodic_5g_scan_interval;
 	cfg_params->roam_rssi_diff =
 		mlme_obj->cfg.lfr.roam_rssi_diff;
 	cfg_params->roam_rssi_diff_6ghz =

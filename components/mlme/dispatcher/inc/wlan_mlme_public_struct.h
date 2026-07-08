@@ -2385,6 +2385,10 @@ struct fw_scan_channels {
  * @roam_scan_hi_rssi_delta: RSSI Delta for scan trigger
  * @roam_scan_hi_rssi_delay: Minimum delay between 5GHz scans
  * @roam_scan_hi_rssi_ub: Upper bound after which 5GHz scan
+ * @hbr_periodic_scan_enable: Enable periodic High-Band Roaming scan
+ * @hbr_periodic_rssi_delta: RSSI delta for HBR periodic scan trigger
+ * @hbr_periodic_2g_scan_interval: HBR periodic 2G scan interval in seconds
+ * @hbr_periodic_5g_scan_interval: HBR periodic 5G scan interval in seconds
  * @roam_prefer_5ghz: Prefer roaming to 5GHz Bss
  * @roam_intra_band: Prefer roaming within Band
  * @enable_adaptive_11r: Flag to check if adaptive 11r ini is enabled
@@ -2539,6 +2543,10 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_scan_hi_rssi_delta;
 	uint32_t roam_scan_hi_rssi_delay;
 	uint32_t roam_scan_hi_rssi_ub;
+	bool hbr_periodic_scan_enable;
+	uint32_t hbr_periodic_rssi_delta;
+	uint32_t hbr_periodic_2g_scan_interval;
+	uint32_t hbr_periodic_5g_scan_interval;
 	bool roam_prefer_5ghz;
 	bool roam_intra_band;
 #ifdef WLAN_ADAPTIVE_11R

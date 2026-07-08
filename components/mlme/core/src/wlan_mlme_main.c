@@ -3818,6 +3818,14 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_HI_RSSI_DELAY);
 	lfr->roam_scan_hi_rssi_ub =
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_HI_RSSI_UB);
+	lfr->hbr_periodic_scan_enable =
+		cfg_get(psoc, CFG_LFR_HBR_PERIODIC_SCAN_ENABLE);
+	lfr->hbr_periodic_rssi_delta =
+		cfg_get(psoc, CFG_LFR_HBR_PERIODIC_RSSI_DELTA);
+	lfr->hbr_periodic_2g_scan_interval =
+		cfg_get(psoc, CFG_LFR_HBR_PERIODIC_2G_SCAN_INTERVAL);
+	lfr->hbr_periodic_5g_scan_interval =
+		cfg_get(psoc, CFG_LFR_HBR_PERIODIC_5G_SCAN_INTERVAL);
 	lfr->roam_prefer_5ghz =
 		cfg_get(psoc, CFG_LFR_ROAM_PREFER_5GHZ);
 	lfr->roam_intra_band =

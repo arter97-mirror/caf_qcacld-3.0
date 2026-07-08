@@ -233,6 +233,14 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 	rssi_threshold_fp->rssi_thresh_offset_5g =
 		roam_req->rssi_thresh_offset_5g;
 	rssi_threshold_fp->flags = roam_req->flags;
+	rssi_threshold_fp->hbr_periodic_roam_scan_enable =
+			roam_req->hbr_periodic_scan_enable;
+	rssi_threshold_fp->hbr_periodic_rssi_delta =
+			roam_req->hbr_periodic_rssi_delta;
+	rssi_threshold_fp->hbr_periodic_2g_scan_interval_sec =
+			roam_req->hbr_periodic_2g_scan_interval;
+	rssi_threshold_fp->hbr_periodic_5g_scan_interval_sec =
+			roam_req->hbr_periodic_5g_scan_interval;
 
 	buf_ptr += sizeof(wmi_roam_scan_rssi_threshold_fixed_param);
 	WMITLV_SET_HDR(buf_ptr,

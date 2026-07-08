@@ -2218,6 +2218,107 @@ enum roam_bg_scan {
 
 /*
  * <ini>
+ * hbr_periodic_scan_enable - Enable periodic High-Band Roaming scan
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable periodic scanning for High-Band Roaming (HBR).
+ * Only enabled for pixel devices.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_HBR_PERIODIC_SCAN_ENABLE CFG_INI_BOOL( \
+	"hbr_periodic_scan_enable", \
+	0, \
+	"Enable periodic High-Band Roaming scan")
+
+/*
+ * <ini>
+ * hbr_periodic_rssi_delta - RSSI delta for HBR periodic scan trigger
+ * @Min: 0
+ * @Max: 50
+ * @Default: 5
+ *
+ * This ini is used to configure the RSSI delta used to trigger an HBR
+ * periodic scan.
+ *
+ * Related: hbr_periodic_scan_enable
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_HBR_PERIODIC_RSSI_DELTA CFG_INI_UINT( \
+	"hbr_periodic_rssi_delta", \
+	0, \
+	50, \
+	5, \
+	CFG_VALUE_OR_DEFAULT, \
+	"RSSI delta for HBR periodic scan trigger")
+
+/*
+ * <ini>
+ * hbr_periodic_2g_scan_interval - HBR periodic 2G scan interval
+ * @Min: 0
+ * @Max: 6000
+ * @Default: 60
+ *
+ * This ini is used to configure the periodic scan interval, in seconds,
+ * for 2.4GHz when HBR periodic scan is enabled.
+ *
+ * Related: hbr_periodic_scan_enable
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_HBR_PERIODIC_2G_SCAN_INTERVAL CFG_INI_UINT( \
+	"hbr_periodic_2g_scan_interval", \
+	0, \
+	6000, \
+	60, \
+	CFG_VALUE_OR_DEFAULT, \
+	"HBR periodic 2G scan interval in seconds")
+
+/*
+ * <ini>
+ * hbr_periodic_5g_scan_interval - HBR periodic 5G scan interval
+ * @Min: 0
+ * @Max: 6000
+ * @Default: 240
+ *
+ * This ini is used to configure the periodic scan interval, in seconds,
+ * for 5GHz when HBR periodic scan is enabled.
+ *
+ * Related: hbr_periodic_scan_enable
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_HBR_PERIODIC_5G_SCAN_INTERVAL CFG_INI_UINT( \
+	"hbr_periodic_5g_scan_interval", \
+	0, \
+	6000, \
+	240, \
+	CFG_VALUE_OR_DEFAULT, \
+	"HBR periodic 5G scan interval in seconds")
+
+/*
+ * <ini>
  * gRoamPrefer5GHz - Prefer roaming to 5GHz Bss
  * @Min: 0
  * @Max: 1
@@ -3658,6 +3759,10 @@ enum roam_bg_scan {
 	CFG(CFG_LFR_ROAM_SCAN_HI_RSSI_DELTA) \
 	CFG(CFG_LFR_ROAM_SCAN_HI_RSSI_DELAY) \
 	CFG(CFG_LFR_ROAM_SCAN_HI_RSSI_UB) \
+	CFG(CFG_LFR_HBR_PERIODIC_SCAN_ENABLE) \
+	CFG(CFG_LFR_HBR_PERIODIC_RSSI_DELTA) \
+	CFG(CFG_LFR_HBR_PERIODIC_2G_SCAN_INTERVAL) \
+	CFG(CFG_LFR_HBR_PERIODIC_5G_SCAN_INTERVAL) \
 	CFG(CFG_LFR_ROAM_PREFER_5GHZ) \
 	CFG(CFG_LFR_ROAM_INTRA_BAND) \
 	CFG(CFG_LFR_ROAM_SCAN_N_PROBES) \
