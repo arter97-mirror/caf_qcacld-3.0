@@ -62,6 +62,17 @@ struct action_oui_priv {
 };
 
 /**
+ * enum action_oui_state - allocation state of @oui_priv in
+ * struct action_oui_psoc_priv
+ * @ACTION_OUI_DEINIT: oui_priv is not allocated (or has been freed)
+ * @ACTION_OUI_INIT: oui_priv is allocated and safe to dereference
+ */
+enum action_oui_state {
+	ACTION_OUI_DEINIT,
+	ACTION_OUI_INIT,
+};
+
+/**
  * struct action_oui_psoc_priv - Private object to be stored in psoc
  * @psoc: pointer to psoc object
  * @action_oui_enable: action oui enable config
@@ -70,6 +81,7 @@ struct action_oui_priv {
  * @host_only_extensions: total host only only extensions from all actions
  * @max_extensions: Max no. of extensions that can be configured to the firmware
  * @oui_priv: array of pointers used to refer each action info
+ * @state: current allocation state of @oui_priv
  * @tx_ops: call-back functions to send OUIs to firmware
  * @is_action_oui_v2_enabled: Is action oui v2 enabled
  * @is_action_oui_v2_used: Is action oui v2 used per action id
@@ -82,6 +94,7 @@ struct action_oui_psoc_priv {
 	uint32_t host_only_extensions;
 	uint32_t max_extensions;
 	struct action_oui_priv *oui_priv[ACTION_OUI_MAXIMUM_ID];
+	enum action_oui_state state;
 	struct action_oui_tx_ops tx_ops;
 	bool is_action_oui_v2_enabled;
 	bool is_action_oui_v2_used[ACTION_OUI_MAXIMUM_ID];
