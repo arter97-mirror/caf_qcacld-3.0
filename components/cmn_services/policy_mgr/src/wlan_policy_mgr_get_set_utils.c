@@ -7745,6 +7745,10 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 		req->param.control_flags.dont_reschedule_workqueue = true;
 	if (link_control_flags & link_ctrl_f_link_recfg)
 		req->param.control_flags.set_link_for_recfg = true;
+	if (link_control_flags & link_ctrl_f_smd_link_recfg) {
+		req->param.control_flags.set_link_for_recfg = true;
+		req->param.control_flags.set_link_for_smd_recfg = true;
+	}
 
 	status =
 	wlan_vdev_get_bss_peer_mld_mac(vdev,

@@ -154,6 +154,10 @@ enum sap_csa_reason_code {
  * @link_ctrl_f_dont_reschedule_workqueue: don't reschedule force scc workqueue
  * after set link response
  * @link_ctrl_f_link_recfg: link recfg set link. It will not be serialized
+ * @link_ctrl_f_smd_link_recfg: link recfg set link issued from the SMD roam
+ * path. Like @link_ctrl_f_link_recfg it will not be serialized, but the
+ * SMD path never queues a WLAN_SER_CMD_LINK_RECFG command, so downstream
+ * active-cmd guards must be skipped for this flag as well.
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
@@ -164,6 +168,7 @@ enum link_control_flags {
 	link_ctrl_f_dont_update_disallow_bitmap = 1 << 5,
 	link_ctrl_f_dont_reschedule_workqueue = 1 << 6,
 	link_ctrl_f_link_recfg =                1 << 7,
+	link_ctrl_f_smd_link_recfg =             1 << 8,
 };
 
 /* Define the max number of consecutive re-evaluate number. usually, we have
