@@ -692,7 +692,7 @@ void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_cfr *pcfr;
 
-	cfr_info("CFR v3 data vdev_id %d len %u", vdev_id, data_len);
+	cfr_info_rl("CFR v3 data vdev_id %d len %u", vdev_id, data_len);
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		cfr_err("HDD context is NULL");
@@ -723,9 +723,9 @@ void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
 		goto put_vdev;
 	}
 
-	cfr_info("CFR v3 report_only_last_frame %d lock_init %d",
-		 pcfr->report_only_last_frame,
-		 pcfr->report_interval_lock_initialised);
+	cfr_info_rl("CFR v3 report_only_last_frame %d lock_init %d",
+		    pcfr->report_only_last_frame,
+		    pcfr->report_interval_lock_initialised);
 
 	/* When report-only-last-frame is set, cache the frame and defer
 	 * delivery to the report interval timer; otherwise send immediately.
