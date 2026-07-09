@@ -9061,6 +9061,10 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 			he_cap->chan_width_3 = 0;
 		} else if (ch_width == CH_WIDTH_160MHZ) {
 			he_cap->chan_width_3 = 0;
+		} else if (ch_width == CH_WIDTH_320MHZ) {
+			he_cap->chan_width_1 = 1;
+			he_cap->chan_width_2 = 1;
+			he_cap->chan_width_3 = 0;
 		}
 	}
 
@@ -11057,7 +11061,8 @@ static void
 populate_dot11f_revise_eht_caps(struct pe_session *session,
 				tDot11fIEeht_cap *eht_cap)
 {
-	if (session->ch_width != CH_WIDTH_320MHZ) {
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq) ||
+	    session->ch_width != CH_WIDTH_320MHZ) {
 		eht_cap->support_320mhz_6ghz = 0;
 		eht_cap->bfee_ss_320mhz = 0;
 	}
