@@ -424,6 +424,13 @@ config FEATURE_COEX
 	bool "Enable FEATURE_COEX"
 	default n
 
+config FEATURE_N79_COEX
+	bool "Enable N79 5GHz antenna sharing coexistence"
+	depends on FEATURE_COEX
+	default n
+	help
+	  N79-WLAN 5GHz antenna sharing coexistence support.
+
 config FEATURE_CONCURRENCY_MATRIX
 	bool "Enable FEATURE_CONCURRENCY_MATRIX"
 	default n

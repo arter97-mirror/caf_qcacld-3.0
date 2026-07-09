@@ -2904,9 +2904,15 @@ COEX_OBJS := $(COEX_TGT_SRC)/target_if_coex.o                 \
 		 $(COEX_DISPATCHER_SRC)/wlan_coex_tgt_api.o       \
 		 $(COEX_DISPATCHER_SRC)/wlan_coex_utils_api.o       \
 		 $(COEX_DISPATCHER_SRC)/wlan_coex_ucfg_api.o
+
+ifeq ($(CONFIG_FEATURE_N79_COEX), y)
+COEX_OBJS        += $(COEX_CORE_SRC)/wlan_n79_coex.o
+WLAN_HDD_N79_OBJS += $(HDD_SRC_DIR)/wlan_hdd_n79_coex.o
+endif
 endif
 
 $(call add-wlan-objs,coex,$(COEX_OBJS))
+$(call add-wlan-objs,hdd_n79,$(WLAN_HDD_N79_OBJS))
 
 ###### COAP ########
 ifeq ($(CONFIG_WLAN_FEATURE_COAP), y)
@@ -3826,6 +3832,9 @@ ccflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 ccflags-$(CONFIG_DP_BE_WAR) += -DDP_BE_WAR
 ccflags-$(CONFIG_DRIVER_PASSTHRU_MODE) += -DDRIVER_PASSTHRU_MODE
 
+ifeq ($(CONFIG_FEATURE_COEX), y)
+ccflags-$(CONFIG_FEATURE_N79_COEX) += -DFEATURE_N79_COEX
+endif
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 ccflags-y += -DCONFIG_PLD_IPCIE_FW_SIM
 endif

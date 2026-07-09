@@ -441,6 +441,10 @@
 #define FEATURE_COEX (1)
 #endif
 
+#ifdef CONFIG_FEATURE_N79_COEX
+#define FEATURE_N79_COEX (1)
+#endif
+
 #ifdef CONFIG_HOST_WAKEUP_OVER_QMI
 #define HOST_WAKEUP_OVER_QMI (1)
 #endif

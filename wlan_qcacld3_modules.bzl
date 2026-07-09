@@ -1030,6 +1030,12 @@ _conditional_srcs = {
             "os_if/coex/src/wlan_cfg80211_coex.c",
         ],
     },
+    "CONFIG_FEATURE_N79_COEX": {
+        True: [
+            "components/coex/core/src/wlan_n79_coex.c",
+            "core/hdd/src/wlan_hdd_n79_coex.c",
+        ],
+    },
     "CONFIG_FEATURE_CONCURRENCY_MATRIX": {
         True: [
             "core/hdd/src/wlan_hdd_concurrency_matrix.c",
