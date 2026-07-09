@@ -2264,6 +2264,8 @@ uint16_t hdd_get_queue_index(uint16_t up, bool is_critical)
 static
 uint16_t hdd_get_queue_index(uint16_t up, bool is_critical)
 {
+	if (qdf_unlikely(is_critical))
+		return HDD_LINUX_AC_VO;
 	return __hdd_get_queue_index(up);
 }
 #endif
