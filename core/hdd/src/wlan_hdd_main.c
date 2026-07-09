@@ -4165,6 +4165,7 @@ static int hdd_debug_domain_set(enum qdf_debug_domain domain)
 
 #define hdd_debug_domain_get() qdf_debug_domain_get()
 #else
+#ifdef WLAN_OBJMGR_REF_ID_DEBUG
 static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t vdev_id;
@@ -4186,6 +4187,11 @@ static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 		wlan_vdev_obj_unlock(vdev);
 	}
 }
+#else
+static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
 
 static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 {
