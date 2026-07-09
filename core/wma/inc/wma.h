@@ -199,6 +199,9 @@
 #define WMA_QOS_NULL_TX_REQ 0x12
 #define WMA_QOS_NULL_TX_TIMEOUT 2000
 
+/* Peer create response for passthru (Wondertap) NEW peer */
+#define WMA_PASSTHRU_PEER_CREATE_RESPONSE 0x13
+
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT

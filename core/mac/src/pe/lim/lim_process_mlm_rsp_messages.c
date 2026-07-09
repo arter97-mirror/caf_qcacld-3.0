@@ -1522,6 +1522,7 @@ static void lim_process_passthru_del_sta_rsp(struct mac_context *mac_ctx,
 					     struct pe_session *pe_session)
 {
 	tpDeleteStaParams del_sta_params = (tpDeleteStaParams) lim_msg->bodyptr;
+	tpDphHashNode sta_ds;
 
 	if (!del_sta_params) {
 		pe_err("del_sta_params is NULL");
@@ -1532,14 +1533,35 @@ static void lim_process_passthru_del_sta_rsp(struct mac_context *mac_ctx,
 		       del_sta_params->sessionId);
 		goto skip_event;
 	}
-	if (QDF_STATUS_SUCCESS != del_sta_params->status)
+
+	sta_ds = dph_get_hash_entry(mac_ctx, del_sta_params->assocId,
+				    &pe_session->dph.dphHashTable);
+	if (!sta_ds) {
+		pe_err("DPH Entry for STA %X is missing",
+		       del_sta_params->assocId);
+		goto skip_event;
+	}
+
+	if (QDF_STATUS_SUCCESS != del_sta_params->status) {
 		pe_info("Delete STA failed: AssocID %d MAC " QDF_MAC_ADDR_FMT,
 			del_sta_params->assocId,
 			QDF_MAC_ADDR_REF(del_sta_params->staMac));
-	else
-		pe_info("Deleted STA AssocID %d MAC " QDF_MAC_ADDR_FMT,
-			del_sta_params->assocId,
-			QDF_MAC_ADDR_REF(del_sta_params->staMac));
+		goto skip_event;
+	}
+
+	pe_info("Deleted STA AssocID %d MAC " QDF_MAC_ADDR_FMT,
+		del_sta_params->assocId,
+		QDF_MAC_ADDR_REF(del_sta_params->staMac));
+
+	/*
+	 * Only release the DPH entry/AID once FW has actually confirmed the
+	 * delete -- doing this at send time (in lim_passthru_peer_del())
+	 * would let a NEW for this MAC reuse the slot before FW's delete
+	 * completes.
+	 */
+	lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr,
+				  del_sta_params->assocId, pe_session);
+	lim_release_peer_idx(mac_ctx, del_sta_params->assocId, pe_session);
 skip_event:
 	qdf_mem_free(del_sta_params);
 	lim_msg->bodyptr = NULL;

@@ -1710,6 +1710,51 @@ static void wma_add_passthru_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 	 * updateSta=1, create_only=0: UPDATE action — assoc only (no create)
 	 */
 	if (!add_sta->updateSta) {
+		if (add_sta->create_only &&
+		    wlan_psoc_nif_fw_ext_cap_get(wma->psoc,
+						 WLAN_SOC_F_PEER_CREATE_RESP)) {
+			/*
+			 * Hold WMA_ADD_STA_RSP until the real
+			 * WMI_PEER_CREATE_CONF_EVENTID (or its timeout) so a
+			 * same-MAC delete posted right after this NEW cannot
+			 * race FW's peer-create before it completes.
+			 */
+			wma_acquire_wakelock(&wma->wmi_cmd_rsp_wake_lock,
+					     WMA_PEER_CREATE_RESPONSE_TIMEOUT);
+			msg = wma_fill_hold_req(wma, add_sta->smesessionId,
+						WMA_PEER_CREATE_REQ,
+						WMA_PASSTHRU_PEER_CREATE_RESPONSE,
+						add_sta->staMac, add_sta,
+						WMA_PEER_CREATE_RESPONSE_TIMEOUT);
+			if (!msg) {
+				wma_err("vdev:%d failed to fill peer create req for "
+					QDF_MAC_ADDR_FMT,
+					add_sta->smesessionId,
+					QDF_MAC_ADDR_REF(add_sta->staMac));
+				wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+				add_sta->status = QDF_STATUS_E_FAILURE;
+				goto send_rsp;
+			}
+
+			status = wma_create_peer(wma, add_sta->staMac, add_sta,
+						 WMI_PEER_TYPE_DEFAULT,
+						 add_sta->smesessionId, NULL,
+						 false);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				wma_err("Failed to create peer for "
+					QDF_MAC_ADDR_FMT,
+					QDF_MAC_ADDR_REF(add_sta->staMac));
+				wma_remove_req(wma, add_sta->smesessionId,
+					       WMA_PASSTHRU_PEER_CREATE_RESPONSE);
+				wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+				add_sta->status = status;
+				goto send_rsp;
+			}
+
+			/* wait for WMI_PEER_CREATE_CONF_EVENTID */
+			return;
+		}
+
 		status = wma_create_peer(wma, add_sta->staMac, add_sta,
 					 WMI_PEER_TYPE_DEFAULT,
 					 add_sta->smesessionId, NULL, false);
@@ -1730,9 +1775,6 @@ static void wma_add_passthru_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 			goto send_rsp;
 		}
 	}
-
-	if (add_sta->create_only)
-		goto send_rsp;
 
 	/* WMI_PEER_ASSOC_CMDID */
 	if (wmi_service_enabled(wma->wmi_handle, wmi_service_peer_assoc_conf)) {
@@ -2796,6 +2838,18 @@ static int wma_peer_create_resp_notify(tp_wma_handle wma,
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 
 		return 0;
+
+	case WMA_PASSTHRU_PEER_CREATE_RESPONSE: {
+		tpAddStaParams add_sta = (tpAddStaParams)rsp_data;
+
+		add_sta->status = status;
+		qdf_mem_free(req_msg);
+		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+		wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP,
+					   (void *)add_sta, 0);
+
+		return 0;
+	}
 	}
 
 	qdf_mem_free(rsp_data);
@@ -5002,6 +5056,29 @@ void wma_hold_req_timer(void *data)
 					      pAddStaParams->updateSta, NULL,
 					      QDF_STATUS_E_FAILURE);
 		qdf_mem_free(tgt_req->user_data);
+	} else if ((tgt_req->msg_type == WMA_PEER_CREATE_REQ) &&
+		   (tgt_req->type == WMA_PASSTHRU_PEER_CREATE_RESPONSE)) {
+		tpAddStaParams add_sta =
+			(tpAddStaParams)tgt_req->user_data;
+
+		wma_err("WMA_PASSTHRU_PEER_CREATE_RESPONSE timed out for vdev_id %d",
+			tgt_req->vdev_id);
+
+		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash))
+			wma_trigger_recovery_assert_on_fw_timeout(
+				WMA_PASSTHRU_PEER_CREATE_RESPONSE,
+				WMA_PEER_CREATE_RESPONSE_TIMEOUT);
+
+		if (!add_sta) {
+			wma_err("vdev:%d msg_type:%d req_type: %d Invalid target request user data",
+				tgt_req->vdev_id, tgt_req->msg_type,
+				tgt_req->type);
+			goto timer_destroy;
+		}
+
+		add_sta->status = QDF_STATUS_E_TIMEOUT;
+		wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP,
+					   (void *)add_sta, 0);
 	} else if (tgt_req->type == WMA_QOS_NULL_TX_REQ) {
 		wma_qos_null_tx_timeout_handler(wma, tgt_req);
 	} else {
