@@ -31,6 +31,8 @@
 #include "reg_services_public_struct.h"
 #include "wlan_osif_priv.h"
 #include "osif_psoc_sync.h"
+#include "qdf_threads.h"
+#include "qdf_str.h"
 
 #define TX_PB_DMA_SIZE (100 * 1024)
 #define TXPB_MAX_REQ_COUNT 5
@@ -57,6 +59,10 @@
 #define COOKIE                QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_COOKIE
 #define CMD_APP_START         QCA_WLAN_VENDOR_IQ_INFERENCE_CMD_APP_START
 #define CMD_APP_STOP          QCA_WLAN_VENDOR_IQ_INFERENCE_CMD_APP_STOP
+#define TXPB_VOTE_KNOWN       BIT(0)  /* wifi_qos_daemon allows TXPB to run */
+#define TXPB_VOTE_OTHER       BIT(1)  /* other app allows TXPB to run */
+#define TXPB_ALLOWED_MASK     (TXPB_VOTE_KNOWN | TXPB_VOTE_OTHER)
+#define TXPB_QOS_DAEMON_NAME  "wifi_qos_daemon"
 #define CMD_RESULT            QCA_WLAN_VENDOR_IQ_INFERENCE_CMD_RESULT
 #define CMD_FAILURE           QCA_WLAN_VENDOR_IQ_INFERENCE_CMD_FAILURE
 #define STAGE_FIRST_PASS      QCA_WLAN_VENDOR_IQ_INFERENCE_STAGE_FIRST_PASS
@@ -961,6 +967,18 @@ QDF_STATUS hdd_txpb_wifi_off_app_stop(struct hdd_context *hdd_ctx)
 }
 
 /**
+ * hdd_txpb_is_known_caller() - Check if caller is the known daemon
+ *
+ * Return: true if the calling process is wifi_qos_daemon, false for
+ * any other app
+ */
+static bool hdd_txpb_is_known_caller(void)
+{
+	return !qdf_str_ncmp(qdf_get_current_comm(), TXPB_QOS_DAEMON_NAME,
+			      qdf_str_len(TXPB_QOS_DAEMON_NAME));
+}
+
+/**
  * hdd_tx_pb_configure - Process the Tx Power boost config
  * operation in the received vendor command
  * @hdd_ctx: HDD context
@@ -978,6 +996,7 @@ static int hdd_tx_pb_configure(struct hdd_context *hdd_ctx,
 	uint32_t id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct reg_txpb_cmn_params params = {0};
+	bool is_known;
 
 	if (!hdd_ctx->tx_pb.tx_powerboost_enabled) {
 		hdd_warn("TPB: feature is not enabled");
@@ -996,6 +1015,15 @@ static int hdd_tx_pb_configure(struct hdd_context *hdd_ctx,
 	oper = nla_get_u32(oper_attr);
 	hdd_debug("TPB: Inference cmd type: %d", oper);
 
+	is_known = hdd_txpb_is_known_caller();
+
+	if (!is_known && oper != CMD_APP_START && oper != CMD_APP_STOP) {
+		hdd_err("TPB: Unknown caller not allowed to send cmd: %d",
+			oper);
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
 	if ((oper == CMD_FAILURE) || (oper == CMD_RESULT) ||
 		(oper == CMD_APP_STOP)) {
 		qdf_runtime_pm_allow_suspend(&hdd_ctx->tx_pb.txpb_runtime_lock);
@@ -1010,6 +1038,18 @@ static int hdd_tx_pb_configure(struct hdd_context *hdd_ctx,
 
 	switch (oper) {
 	case CMD_APP_START:
+		if (is_known)
+			hdd_ctx->tx_pb.txpb_allowed |= TXPB_VOTE_KNOWN;
+		else
+			hdd_ctx->tx_pb.txpb_allowed |= TXPB_VOTE_OTHER;
+
+		if ((hdd_ctx->tx_pb.txpb_allowed & TXPB_ALLOWED_MASK) !=
+		    TXPB_ALLOWED_MASK) {
+			hdd_debug("TPB: APP_START deferred, allowed: 0x%x",
+				  hdd_ctx->tx_pb.txpb_allowed);
+			break;
+		}
+
 		status = hdd_txpb_inference_app_start(hdd_ctx);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto end;
@@ -1035,6 +1075,11 @@ static int hdd_tx_pb_configure(struct hdd_context *hdd_ctx,
 		break;
 
 	case CMD_APP_STOP:
+		if (is_known)
+			hdd_ctx->tx_pb.txpb_allowed &= ~TXPB_VOTE_KNOWN;
+		else
+			hdd_ctx->tx_pb.txpb_allowed &= ~TXPB_VOTE_OTHER;
+
 		status = hdd_txpb_inference_app_stop(hdd_ctx, &params);
 
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -1121,6 +1166,8 @@ QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx)
 		hdd_warn("TPB: feature not enabled");
 		return QDF_STATUS_SUCCESS;
 	}
+
+	hdd_ctx->tx_pb.txpb_allowed = TXPB_VOTE_OTHER;
 
 	status = hdd_tx_powerboost_init_dma(hdd_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
