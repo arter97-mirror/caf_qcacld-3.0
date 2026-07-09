@@ -143,13 +143,15 @@ void tgt_tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
  * tgt_tdls_delete_all_peers_indication()- Indication to tdls component
  * @psoc: soc object
  * @session_id: session id
+ * @reason: reason for deleting all TDLS peers
  *
  * This function called from legacy lim to tdls component to delete tdls peers.
  *
  * Return: None
  */
 void tgt_tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					  uint32_t session_id);
+					  uint32_t session_id,
+					  enum wlan_tdls_peer_delete_reason reason);
 
 /**
  * tgt_tdls_request_stats_info() - Send WMI_REQUEST_STATS_INFO_CMDID to FW

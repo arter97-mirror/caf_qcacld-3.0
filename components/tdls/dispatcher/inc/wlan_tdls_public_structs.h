@@ -121,12 +121,18 @@
  * @TDLS_PEER_DEL_REASON_VDEV_REPURPOSE: Delete TDLS peers due to vdev repurpose
  * @TDLS_PEER_DEL_REASON_LINK_STATE_SWITCH: Delete TDLS peers due to link state
  * switch
+ * @TDLS_PEER_DEL_REASON_CSA: Delete TDLS peers due to a BSS channel switch
+ * (CSA) announced by the AP
+ * @TDLS_PEER_DEL_REASON_DEAUTH_LEAVING: Delete TDLS peers due to a deauth
+ * frame received from the AP, indicating the STA is leaving the BSS
  */
 enum wlan_tdls_peer_delete_reason {
 	TDLS_PEER_DEL_REASON_NONE = 0,
 	TDLS_PEER_DEL_REASON_ROAMING = 1,
 	TDLS_PEER_DEL_REASON_VDEV_REPURPOSE = 2,
 	TDLS_PEER_DEL_REASON_LINK_STATE_SWITCH = 3,
+	TDLS_PEER_DEL_REASON_CSA = 4,
+	TDLS_PEER_DEL_REASON_DEAUTH_LEAVING = 5,
 };
 
 /**
@@ -1280,9 +1286,11 @@ struct tdls_sta_notify_params {
 /**
  * struct tdls_delete_all_peers_params - TDLS set mode params
  * @vdev: vdev object
+ * @reason: reason for deleting all TDLS peers
  */
 struct tdls_delete_all_peers_params {
 	struct wlan_objmgr_vdev *vdev;
+	enum wlan_tdls_peer_delete_reason reason;
 };
 
 /**

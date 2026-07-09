@@ -923,6 +923,7 @@ void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
  * allowed for the vdev based on current concurrency.
  * @psoc: soc object
  * @vdev_id: vdev id
+ * @reason: reason for deleting all TDLS peers
  *
  * Notify tdls component to cleanup all peers based on current concurrency
  * combination.
@@ -931,7 +932,8 @@ void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS
 tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id);
+					 uint8_t vdev_id,
+					 enum wlan_tdls_peer_delete_reason reason);
 
 /**
  * tdls_get_opclass_from_bandwidth() - Return opclass for corresponding BW and

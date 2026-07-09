@@ -516,7 +516,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				if (IS_CURRENT_BSSID(mac_ctx, addr, pe_session))
 					lim_delete_tdls_peers(mac_ctx,
 							      pe_session,
-							      TDLS_PEER_DEL_REASON_NONE);
+							      TDLS_PEER_DEL_REASON_DEAUTH_LEAVING);
 #endif
 			/**
 			 * This could be Deauthentication frame from

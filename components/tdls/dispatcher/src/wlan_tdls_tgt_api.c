@@ -349,9 +349,10 @@ void tgt_tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
 }
 
 void tgt_tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					  uint32_t session_id)
+					  uint32_t session_id,
+					  enum wlan_tdls_peer_delete_reason reason)
 {
-	tdls_check_and_indicate_delete_all_peers(psoc, session_id);
+	tdls_check_and_indicate_delete_all_peers(psoc, session_id, reason);
 }
 
 /**

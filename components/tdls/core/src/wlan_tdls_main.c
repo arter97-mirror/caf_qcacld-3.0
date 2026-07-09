@@ -579,8 +579,32 @@ static void tdls_get_all_peers_from_list(
 }
 
 /**
+ * tdls_stats_reason_from_delete_reason() - Map a TDLS peer delete reason to
+ * the corresponding TDLS stats reason code.
+ * @reason: reason the TDLS peers are being deleted/torn down
+ *
+ * Return: enum tdls_stats_reason_code matching @reason, or
+ * TDLS_STATS_REASON_GENERAL if there is no specific mapping.
+ */
+static enum tdls_stats_reason_code
+tdls_stats_reason_from_delete_reason(enum wlan_tdls_peer_delete_reason reason)
+{
+	switch (reason) {
+	case TDLS_PEER_DEL_REASON_ROAMING:
+		return TDLS_STATS_REASON_ROAMED;
+	case TDLS_PEER_DEL_REASON_CSA:
+		return TDLS_STATS_REASON_BSS_CHANNEL_SWITCH;
+	case TDLS_PEER_DEL_REASON_DEAUTH_LEAVING:
+		return TDLS_STATS_REASON_DEAUTH_LEAVING;
+	default:
+		return TDLS_STATS_REASON_GENERAL;
+	}
+}
+
+/**
  * tdls_process_reset_all_peers() - Reset all tdls peers
  * @vdev: vdev object
+ * @reason: reason the TDLS peers are being torn down
  *
  * This function is called to reset all tdls peers and
  * notify upper layers of teardown indication
@@ -588,7 +612,9 @@ static void tdls_get_all_peers_from_list(
  * Return: QDF_STATUS
  */
 
-static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
+static QDF_STATUS
+tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev,
+			     enum wlan_tdls_peer_delete_reason reason)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t staidx;
@@ -596,6 +622,8 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 	struct tdls_vdev_priv_obj *tdls_vdev;
 	struct tdls_soc_priv_obj *tdls_soc;
 	uint8_t reset_session_id;
+	enum tdls_stats_reason_code stats_reason =
+			tdls_stats_reason_from_delete_reason(reason);
 
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev, &tdls_soc);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -628,7 +656,7 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 		 */
 		tdls_stats_record_peer_teardown(tdls_soc, vdev,
 						curr_peer->peer_mac.bytes,
-						TDLS_STATS_REASON_GENERAL);
+						stats_reason);
 
 		/* Indicate teardown to supplicant */
 		status = tdls_indicate_teardown(
@@ -676,7 +704,8 @@ static QDF_STATUS tdls_reset_all_peers(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	status = tdls_process_reset_all_peers(delete_all_peers_ind->vdev);
+	status = tdls_process_reset_all_peers(delete_all_peers_ind->vdev,
+					      delete_all_peers_ind->reason);
 
 	wlan_objmgr_vdev_release_ref(delete_all_peers_ind->vdev,
 				     WLAN_TDLS_SB_ID);
@@ -2259,7 +2288,8 @@ QDF_STATUS tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
 
 static
 QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id)
+					    uint8_t vdev_id,
+					    enum wlan_tdls_peer_delete_reason reason)
 {
 	struct scheduler_msg msg = {0, };
 	struct tdls_delete_all_peers_params *indication;
@@ -2279,6 +2309,7 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 	}
 
 	indication->vdev = vdev;
+	indication->reason = reason;
 
 	msg.bodyptr = indication;
 	msg.callback = tdls_process_cmd;
@@ -2300,7 +2331,8 @@ QDF_STATUS tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id)
+					 uint8_t vdev_id,
+					 enum wlan_tdls_peer_delete_reason reason)
 {
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t pdev_id;
@@ -2329,7 +2361,7 @@ tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return tdls_delete_all_peers_indication(psoc, vdev_id);
+	return tdls_delete_all_peers_indication(psoc, vdev_id, reason);
 }
 
 /**

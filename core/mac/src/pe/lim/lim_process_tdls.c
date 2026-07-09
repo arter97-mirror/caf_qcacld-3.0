@@ -4673,7 +4673,7 @@ QDF_STATUS lim_delete_tdls_peers(struct mac_context *mac_ctx,
 	lim_check_aid_and_delete_peer(mac_ctx, session_entry);
 
 	tgt_tdls_delete_all_peers_indication(mac_ctx->psoc,
-					     session_entry->vdev_id);
+					     session_entry->vdev_id, reason);
 
 	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
 		return QDF_STATUS_SUCCESS;
