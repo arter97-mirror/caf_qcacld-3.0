@@ -1577,12 +1577,16 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
+		uint8_t rso_reason = REASON_CONNECT;
+
 		if (policy_mgr_is_chan_switch_in_progress(psoc) ||
-		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))
+		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc)) {
 			rso_cmd = WLAN_ROAM_RSO_STOPPED;
+			rso_reason = REASON_ROAM_MCC_SCC_TRANSITION;
+		}
 
 		wlan_cm_roam_state_change(pdev, vdev_id,
-					  rso_cmd, REASON_CONNECT);
+					  rso_cmd, rso_reason);
 	} else if (!is_host_4way_hs_supported) {
 		/*
 		 * STA is just in associated state here, RSO

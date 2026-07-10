@@ -3394,7 +3394,8 @@ cm_roam_scan_offload_fill_rso_configs(struct wlan_objmgr_psoc *psoc,
 		if (reason == REASON_ROAM_STOP_ALL ||
 		    reason == REASON_DISCONNECTED ||
 		    reason == REASON_ROAM_SYNCH_FAILED ||
-		    reason == REASON_ROAM_SET_PRIMARY) {
+		    reason == REASON_ROAM_SET_PRIMARY ||
+		    reason == REASON_ROAM_MCC_SCC_TRANSITION) {
 			mode = WMI_ROAM_SCAN_MODE_NONE;
 		} else {
 			if (wlan_is_roam_offload_enabled(mlme_obj->cfg.lfr))
@@ -3992,6 +3993,8 @@ static void cm_fill_stop_reason(struct wlan_roam_stop_config *stop_req,
 		stop_req->reason = REASON_OS_REQUESTED_ROAMING_NOW;
 	else if (reason == REASON_ROAM_SET_PRIMARY)
 		stop_req->reason = REASON_ROAM_SET_PRIMARY;
+	else if (reason == REASON_ROAM_MCC_SCC_TRANSITION)
+		stop_req->reason = REASON_ROAM_MCC_SCC_TRANSITION;
 	else
 		stop_req->reason = REASON_SME_ISSUED;
 }
