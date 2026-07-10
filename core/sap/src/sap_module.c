@@ -1472,12 +1472,15 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 			ch_width = QDF_MIN(ch_width, tgt_ch_params->ch_width);
 
 		if (ch_width == CH_WIDTH_320MHZ &&
-		    policy_mgr_is_conn_lead_to_bw_downgrade(mac->psoc,
-							    sap_context->vdev_id,
-							    chan_freq,
-							    ch_width))
-			ch_width = wlan_mlme_get_ap_oper_ch_width(
-							sap_context->vdev);
+		    policy_mgr_is_hw_dbs_capable(mac->psoc) &&
+		    policy_mgr_is_conn_lead_to_bw_downgrade(
+					mac->psoc,
+					sap_context->vdev_id,
+					chan_freq, ch_width)) {
+			ch_width = CH_WIDTH_160MHZ;
+			wlan_mlme_set_ap_oper_ch_width(sap_context->vdev,
+						       ch_width);
+		}
 	}
 	ch_params.ch_width = ch_width;
 	if (tgt_ch_params)

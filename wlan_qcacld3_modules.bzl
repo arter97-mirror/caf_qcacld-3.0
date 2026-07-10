@@ -173,7 +173,6 @@ _hw_header_map = {
 
 _fixed_includes = [
     "configs/default_config.h",
-    "configs/config_to_feature.h",
 ]
 
 _fixed_ipaths = [
@@ -2603,6 +2602,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     iglobs = []
     for i in _fixed_includes:
         iglobs.append(i)
+    iglobs.append("configs/config_to_feature.h")
     for i in ipaths:
         iglobs.append("{}/*.h".format(i))
         iglobs.append("{}/**/*.h".format(i))
@@ -2665,6 +2665,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CONFIG_MLO_SAP_LINK_REMOVAL",
         },
+        {
+            "pattern": "mld_capa_and_ops: MLD capabilities and operations (for MLO)",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS",
+        },
     ]
 
     cmd = 'touch "$@"\n'
@@ -2699,6 +2704,12 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     copts.append("-Wno-enum-compare")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
+    # Static source file: plain repo-relative path is correct here
+    # (same convention as default_config.h via _fixed_includes).
+    # $(location) is only needed for genrule outputs whose sandbox
+    # path is not known until build time.
+    copts.append("-include")
+    copts.append("configs/config_to_feature.h")
 
     native.genrule(
         name = "configs/{}_defconfig_generate_consolidate".format(tvc),
