@@ -1216,7 +1216,7 @@ QDF_STATUS policy_mgr_get_radio_combinations(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct radio_combination *radio_comb;
 	uint32_t i;
-	bool dbs_or_sbs_enabled = false;
+	bool sbs_enabled, dbs_enabled;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1225,13 +1225,14 @@ QDF_STATUS policy_mgr_get_radio_combinations(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*comb_num = 0;
-	if (policy_mgr_is_hw_dbs_capable(psoc) ||
-	    policy_mgr_is_hw_sbs_capable(psoc))
-		dbs_or_sbs_enabled = true;
+	sbs_enabled = policy_mgr_is_hw_sbs_capable(psoc);
+	dbs_enabled = policy_mgr_is_hw_dbs_capable(psoc);
 
 	for (i = 0; i < pm_ctx->radio_comb_num; i++) {
 		radio_comb = &pm_ctx->radio_combinations[i];
-		if (!dbs_or_sbs_enabled && radio_comb->hw_mode != MODE_SMM)
+		if (!dbs_enabled && radio_comb->hw_mode == MODE_DBS)
+			continue;
+		if (!sbs_enabled && radio_comb->hw_mode == MODE_SBS)
 			continue;
 		if (*comb_num >= comb_max) {
 			policy_mgr_err("out of buffer %d max %d",
