@@ -9742,13 +9742,13 @@ static void lim_intersect_uhr_caps(struct wlan_uhr_cap_info *rcvd_uhr,
 				rcvd_uhr->elr_tx_support;
 	/*
 	 * DPS cross-intersection:
-	 * peer dps_present = STA dps_assist_support & AP dps_present
-	 * peer dps_assist_support = STA dps_present & AP dps_assist_support
+	 * peer dps_present = STA dps_present & AP dps_assist_support
+	 * peer dps_assist_support = STA dps_assist_support & AP dps_present
 	 */
-	peer_uhr->dps_present = session_uhr->dps_assist_support &
-				rcvd_uhr->dps_present;
-	peer_uhr->dps_assist_support = session_uhr->dps_present &
-				       rcvd_uhr->dps_assist_support;
+	peer_uhr->dps_present = session_uhr->dps_present &
+				rcvd_uhr->dps_assist_support;
+	peer_uhr->dps_assist_support = session_uhr->dps_assist_support &
+				       rcvd_uhr->dps_present;
 
 	pe_debug("vdev %d: UHR DPS intersection: peer_dps_present=%d peer_dps_assist=%d",
 		 session->vdev_id,
