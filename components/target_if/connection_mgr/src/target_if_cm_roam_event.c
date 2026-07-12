@@ -136,7 +136,8 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	    roam_event->reason == ROAM_REASON_HO_FAILED)
 		target_if_stop_rso_stop_timer(roam_event);
 
-	if (roam_event->reason == ROAM_REASON_DEAUTH) {
+	if (roam_event->reason == ROAM_REASON_DEAUTH ||
+	    roam_event->reason == ROAM_REASON_HO_FAILED) {
 		target_if_debug("deauth: set sw routing false!");
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, roam_event->vdev_id,
 							    WLAN_PSOC_TARGET_IF_ID);
