@@ -1986,7 +1986,7 @@ smd_create_link_recfg_transition_list(struct mlo_link_recfg_context *recfg_ctx,
 		next->abort_handler = NULL;
 		next++;
 		next->state = WLAN_LINK_RECFG_S_COMPLETED;
-		next->event = WLAN_LINK_RECFG_SM_EV_SMD_ROAM_COMPLETED;
+		next->event = WLAN_LINK_RECFG_SM_EV_COMPLETED;
 		next->req.del_link_info = recfg_req->del_link_info;
 		next->req.add_link_info = recfg_req->add_link_info;
 		next->abort_handler = NULL;
@@ -2927,8 +2927,14 @@ void smd_remove_roam_cmd(struct cnx_mgr *cm_ctx)
 	roam_req = cm_get_first_roam_command(cm_ctx->vdev);
 	if (roam_req)
 		cm_id = roam_req->cm_id;
-	if (cm_id != CM_ID_INVALID)
+	if (cm_id != CM_ID_INVALID) {
+		/* For SMD roaming the active cm id needs to
+		 * be updated again to ensure removal of request
+		 * as the link switch connect/disconnect resets it
+		 */
+		cm_ctx->active_cm_id = cm_id;
 		cm_remove_cmd(cm_ctx, &cm_id);
+	}
 }
 
 QDF_STATUS
@@ -3213,8 +3219,7 @@ smd_roam_link_switch_disconnect_done(struct wlan_objmgr_vdev *vdev,
 		mlo_debug("VDEV %d REMOVE_LINK disconnect done, completing",
 			  req->vdev_id);
 		status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
-		if (QDF_IS_STATUS_ERROR(status))
-			mlo_mgr_remove_link_switch_cmd(vdev);
+		mlo_mgr_remove_link_switch_cmd(vdev);
 		return status;
 	}
 
@@ -3630,6 +3635,8 @@ smd_link_recfg_ctx_cleanup(struct mlo_link_recfg_context *recfg_ctx)
 	recfg_ctx->smd_roam_in_progress = false;
 	recfg_ctx->current_link_index = 0;
 	recfg_ctx->st_exec_in_progress = false;
+	recfg_ctx->curr_recfg_req.st_exec_link_recfg = false;
+	recfg_ctx->curr_recfg_req.st_prep_link_recfg = false;
 
 	mlo_link_recfg_ctx_free_ies(recfg_ctx);
 }
