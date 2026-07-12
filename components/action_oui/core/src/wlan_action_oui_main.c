@@ -447,17 +447,18 @@ exit:
 	return status;
 }
 
-void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-			    bool load_default_config)
+QDF_STATUS action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+				  bool load_default_config)
 {
 	struct action_oui_psoc_priv *psoc_priv;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	ACTION_OUI_ENTER();
 
 	psoc_priv = action_oui_psoc_get_priv(psoc);
 	if (!psoc_priv) {
 		action_oui_err("psoc priv is NULL");
+		status = QDF_STATUS_E_INVAL;
 		goto exit;
 	}
 
@@ -479,6 +480,7 @@ void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
 	action_oui_send_config(psoc);
 exit:
 	ACTION_OUI_EXIT();
+	return status;
 }
 
 void action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc)

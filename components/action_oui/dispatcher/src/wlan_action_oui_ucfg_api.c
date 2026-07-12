@@ -80,10 +80,10 @@ void ucfg_action_oui_deinit(void)
 	ACTION_OUI_EXIT();
 }
 
-void ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-				 bool load_default_config)
+QDF_STATUS ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+				       bool load_default_config)
 {
-	action_oui_psoc_enable(psoc, load_default_config);
+	return action_oui_psoc_enable(psoc, load_default_config);
 }
 
 void ucfg_action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc)

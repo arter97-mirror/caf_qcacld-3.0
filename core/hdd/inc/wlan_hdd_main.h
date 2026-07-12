@@ -5372,9 +5372,9 @@ void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc,
  * hdd_component_psoc_enable() - Trigger psoc enable for CLD Components
  * @psoc: Pointer to psoc object
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc);
 
 /**
  * hdd_component_psoc_disable() - Trigger psoc disable for CLD Components

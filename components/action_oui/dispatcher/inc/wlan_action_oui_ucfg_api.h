@@ -71,10 +71,10 @@ bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id);
  * @load_default_config: flag to indicate if we need to load
  * default config or not.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-				 bool load_default_config);
+QDF_STATUS ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+				       bool load_default_config);
 
 /**
  * ucfg_action_oui_psoc_disable() - Notify action oui psoc disable
@@ -383,12 +383,13 @@ void ucfg_action_oui_deinit(void)
  *
  * In case of SSR, we don't need to load default config and
  * send previously configured action oui IDs.
- * Return: None
+ * Return: QDF_STATUS
  */
 static inline
-void ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-				 bool load_default_config)
+QDF_STATUS ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+				       bool load_default_config)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 /**

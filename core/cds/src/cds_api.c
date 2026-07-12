@@ -1409,7 +1409,12 @@ QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc)
 	}
 
 	/* Trigger psoc enable for CLD components */
-	hdd_component_psoc_enable(psoc);
+	qdf_status = hdd_component_psoc_enable(psoc);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		cds_err("hdd_component_psoc_enable failed; status:%d",
+			qdf_status);
+		goto err_soc_target_detach;
+	}
 
 	return QDF_STATUS_SUCCESS;
 

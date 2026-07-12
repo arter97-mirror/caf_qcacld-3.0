@@ -146,10 +146,10 @@ wlan_action_oui_restore_default_and_send(
  * @load_default_config: flag to indicate if we need to load
  * default config or not.
  *
- * Return: void
+ * Return: QDF_STATUS
  */
-void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-			    bool load_default_config);
+QDF_STATUS action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+				  bool load_default_config);
 
 /**
  * action_oui_psoc_disable() - Notify action OUI psoc disable
@@ -352,9 +352,10 @@ wlan_action_oui_restore_default_and_send(
 }
 
 static inline
-void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-			    bool load_default_config)
+QDF_STATUS action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
+				  bool load_default_config)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline

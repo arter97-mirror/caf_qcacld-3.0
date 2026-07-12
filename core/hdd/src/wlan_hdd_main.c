@@ -22523,8 +22523,10 @@ void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc, bool is_recovering)
 		ucfg_crypto_flush_entries(psoc);
 }
 
-void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
+	QDF_STATUS status;
+
 	ocb_psoc_enable(psoc);
 	disa_psoc_enable(psoc);
 	nan_psoc_enable(psoc);
@@ -22535,9 +22537,11 @@ void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_fwol_psoc_enable(psoc);
 	ucfg_ll_sap_psoc_enable(psoc);
 	if (!cds_is_driver_recovering())
-		ucfg_action_oui_psoc_enable(psoc, true);
+		status = ucfg_action_oui_psoc_enable(psoc, true);
 	else
-		ucfg_action_oui_psoc_enable(psoc, false);
+		status = ucfg_action_oui_psoc_enable(psoc, false);
+
+	return status;
 }
 
 void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
