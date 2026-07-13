@@ -81,6 +81,9 @@ static void wma_convert_uhr_cap(struct wlan_uhr_cap_info *uhr_cap,
 	uhr_cap->bounded_ess = WMI_UHRCAP_MAC_BOUNDED_ESS_GET(mac_cap);
 	uhr_cap->btm_assurance = WMI_UHRCAP_MAC_BTM_ASSURANCE_GET(mac_cap);
 	uhr_cap->cobf_support = WMI_UHRCAP_MAC_COBF_SUPPORT_GET(mac_cap);
+	uhr_cap->co_sr_support = WMI_UHRCAP_MAC_COSR_SUPPORT_GET(mac_cap);
+	uhr_cap->mapc_enh_meas_support =
+			WMI_UHRCAP_MAC_MAPC_ENH_MEAS_GET(mac_cap);
 
 	/* UHR PHY capabilities */
 	uhr_cap->max_nss_rx_ndp_sounding_80mhz =
@@ -205,6 +208,8 @@ static void wma_aggregate_uhr_cap(struct wlan_uhr_cap_info *aggr_uhr_cap,
 	aggr_uhr_cap->bounded_ess |= uhr_cap->bounded_ess;
 	aggr_uhr_cap->btm_assurance |= uhr_cap->btm_assurance;
 	aggr_uhr_cap->cobf_support |= uhr_cap->cobf_support;
+	aggr_uhr_cap->co_sr_support |= uhr_cap->co_sr_support;
+	aggr_uhr_cap->mapc_enh_meas_support |= uhr_cap->mapc_enh_meas_support;
 
 	/* UHR PHY capabilities */
 	aggr_uhr_cap->max_nss_rx_ndp_sounding_80mhz |=
@@ -279,8 +284,9 @@ static void wma_print_uhr_cap(struct wlan_uhr_cap_info *uhr_cap)
 		       uhr_cap->param_update_adv_notify,
 		       uhr_cap->update_ind_in_tim, uhr_cap->bounded_ess,
 		       uhr_cap->btm_assurance);
-	wma_nofl_debug(" Co-BF 0x%01x",
-		       uhr_cap->cobf_support);
+	wma_nofl_debug(" Co-BF 0x%01x Co-SR 0x%01x MAPC Enh Meas 0x%01x",
+		       uhr_cap->cobf_support, uhr_cap->co_sr_support,
+		       uhr_cap->mapc_enh_meas_support);
 	wma_nofl_debug("UHR PHY Caps: Max NSS RX NDP Sounding: 80MHz 0x%01x 160MHz 0x%01x 320MHz 0x%01x",
 		       uhr_cap->max_nss_rx_ndp_sounding_80mhz,
 		       uhr_cap->max_nss_rx_ndp_sounding_160mhz,
@@ -469,6 +475,9 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 	WMI_UHRCAP_MAC_BOUNDED_ESS_SET(mac_cap, uhr_cap->bounded_ess);
 	WMI_UHRCAP_MAC_BTM_ASSURANCE_SET(mac_cap, uhr_cap->btm_assurance);
 	WMI_UHRCAP_MAC_COBF_SUPPORT_SET(mac_cap, uhr_cap->cobf_support);
+	WMI_UHRCAP_MAC_COSR_SUPPORT_SET(mac_cap, uhr_cap->co_sr_support);
+	WMI_UHRCAP_MAC_MAPC_ENH_MEAS_SET(mac_cap,
+					 uhr_cap->mapc_enh_meas_support);
 
 	/* UHR PHY Capabilities */
 	WMI_UHRCAP_PHY_MAX_NSS_RX_80_SET(

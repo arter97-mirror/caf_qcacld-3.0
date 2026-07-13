@@ -6492,21 +6492,25 @@ uint8_t lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 	w1 |= (uint16_t)(dot11_cap.txspg_support & 0x1) << 4;
 	w1 |= (uint16_t)(dot11_cap.txop_return_support_intxspg & 0x1) << 5;
 	w1 |= (uint16_t)(dot11_cap.uhr_op_mode_param_update_timeout & 0x0F) << 6;
-	w1 |= (uint16_t)(dot11_cap.param_update_adv_notify & 0x07) << 10;
-	/* update_ind_in_tim B29-B31 (low 3 bits) at w1[13:15] */
-	w1 |= (uint16_t)(dot11_cap.update_ind_in_tim & 0x07) << 13;
+	/* 5-bit field at w1[14:10] */
+	w1 |= (uint16_t)(dot11_cap.param_update_adv_notify & 0x1F) << 10;
+	/* update_ind_in_tim B31 (low 1 bit) at w1[15] */
+	w1 |= (uint16_t)(dot11_cap.update_ind_in_tim & 0x01) << 15;
 	*p++ = w1 & 0xff;
 	*p++ = (w1 >> 8) & 0xff;
 
 	/* Word 2: B32-B47
-	 * update_ind_in_tim B32-B33 (high 2 bits) at w2[1:0]
-	 * bounded_ess B34 at w2[2], btm_assurance B35 at w2[3]
-	 * cobf_support B36 at w2[4], B37-B47 reserved = 0
+	 * update_ind_in_tim B32-B35 (high 4 bits) at w2[3:0]
+	 * bounded_ess B36 at w2[4], btm_assurance B37 at w2[5]
+	 * cobf_support B38 at w2[6], co_sr_support B39 at w2[7]
+	 * mapc_enh_meas_support B40 at w2[8], B41-B47 reserved = 0
 	 */
-	w2 |= (uint16_t)((dot11_cap.update_ind_in_tim >> 3) & 0x03) << 0;
-	w2 |= (uint16_t)(dot11_cap.bounded_ess & 0x1) << 2;
-	w2 |= (uint16_t)(dot11_cap.btm_assurance & 0x1) << 3;
-	w2 |= (uint16_t)(dot11_cap.cobf_support & 0x1) << 4;
+	w2 |= (uint16_t)((dot11_cap.update_ind_in_tim >> 1) & 0x0F) << 0;
+	w2 |= (uint16_t)(dot11_cap.bounded_ess & 0x1) << 4;
+	w2 |= (uint16_t)(dot11_cap.btm_assurance & 0x1) << 5;
+	w2 |= (uint16_t)(dot11_cap.cobf_support & 0x1) << 6;
+	w2 |= (uint16_t)(dot11_cap.co_sr_support & 0x1) << 7;
+	w2 |= (uint16_t)(dot11_cap.mapc_enh_meas_support & 0x1) << 8;
 	*p++ = w2 & 0xff;
 	*p++ = (w2 >> 8) & 0xff;
 
