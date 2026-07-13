@@ -200,6 +200,28 @@ QDF_STATUS wlan_mlme_get_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 				     *ht_cap_info);
 
 /**
+ * wlan_mlme_get_ht_rx_stbc_orig() - Get the original(target/ini resolved)
+ * HT RX STBC capability, unaffected by runtime rx_stbc toggles
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_get_ht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc,
+					 bool *value);
+
+/**
+ * wlan_mlme_set_ht_rx_stbc_orig() - Set the original(target/ini resolved)
+ * HT RX STBC capability
+ * @psoc: pointer to psoc object
+ * @value: data to be set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_ht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc,
+					 bool value);
+
+/**
  * wlan_mlme_get_manufacturer_name() - get manufacturer name
  * @psoc: pointer to psoc object
  * @pbuf: pointer of the buff which will be filled for the caller
@@ -2404,6 +2426,17 @@ wlan_mlme_cfg_set_vht_tx_stbc(struct wlan_objmgr_psoc *psoc, bool value);
  */
 QDF_STATUS
 wlan_mlme_cfg_get_vht_rx_stbc(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * wlan_mlme_cfg_get_vht_rx_stbc_orig() - gets the original(target/ini
+ * resolved) vht rx stbc capability, unaffected by runtime rx_stbc toggles
+ * @psoc: psoc context
+ * @value: pointer to get required data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_cfg_get_vht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc, bool *value);
 
 /**
  * wlan_mlme_cfg_set_vht_rx_stbc() - sets vht rx stbc into

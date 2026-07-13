@@ -232,6 +232,40 @@ QDF_STATUS ucfg_mlme_set_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_set_ht_cap_info(psoc, ht_cap_info);
 }
 
+/**
+ * ucfg_mlme_get_ht_rx_stbc_orig() - Get the original(target/ini resolved)
+ * HT RX STBC capability, unaffected by runtime rx_stbc toggles
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_get_ht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc,
+					 bool *value)
+{
+	return wlan_mlme_get_ht_rx_stbc_orig(psoc, value);
+}
+
+/**
+ * ucfg_mlme_set_ht_rx_stbc_orig() - Set the original(target/ini resolved)
+ * HT RX STBC capability
+ * @psoc: pointer to psoc object
+ * @value: data to be set
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_ht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc,
+					 bool value)
+{
+	return wlan_mlme_set_ht_rx_stbc_orig(psoc, value);
+}
+
 static inline
 QDF_STATUS ucfg_disable_dynamic_smps(struct wlan_objmgr_psoc *psoc)
 {
@@ -2544,6 +2578,22 @@ ucfg_mlme_cfg_get_vht_rx_stbc(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
+ * ucfg_mlme_cfg_get_vht_rx_stbc_orig() - gets the original(target/ini
+ * resolved) vht rx stbc capability, unaffected by runtime rx_stbc toggles
+ * @psoc: psoc context
+ * @value: pointer to get required data
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_cfg_get_vht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	return wlan_mlme_cfg_get_vht_rx_stbc_orig(psoc, value);
+}
+
+/**
  * ucfg_mlme_cfg_set_vht_tx_bfee_ant_supp() - sets vht Beamformee antenna
  * support cap into cfg item
  * @psoc: psoc context
@@ -4137,6 +4187,13 @@ QDF_STATUS ucfg_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
 					    uint8_t *value)
 {
 	return wlan_mlme_cfg_get_enable_ul_ofdm(psoc, value);
+}
+#else
+static inline
+QDF_STATUS ucfg_mlme_cfg_get_he_caps(struct wlan_objmgr_psoc *psoc,
+				     tDot11fIEhe_cap *he_cap)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

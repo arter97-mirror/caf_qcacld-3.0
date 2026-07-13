@@ -2525,7 +2525,11 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value)
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	int ret;
 	QDF_STATUS status;
-	struct mlme_ht_capabilities_info ht_cap_info;
+	bool ht_rx_stbc;
+	bool vht_rx_stbc;
+	tDot11fIEhe_cap he_cap_info = {0};
+	int ht_value = value, vht_value = value;
+	int he_lt_80mhz_value = value, he_gt_80mhz_value = value;
 
 	hdd_debug("%d", value);
 
@@ -2536,25 +2540,64 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value)
 
 	if (value) {
 		/* make sure HT capabilities allow this */
-		status = ucfg_mlme_get_ht_cap_info(hdd_ctx->psoc,
-						   &ht_cap_info);
+		status = ucfg_mlme_get_ht_rx_stbc_orig(hdd_ctx->psoc,
+						       &ht_rx_stbc);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failed to get HT capability info");
 			return -EIO;
 		}
-		if (!ht_cap_info.rx_stbc) {
-			hdd_warn("RX STBC not supported");
-			return -EINVAL;
+
+		if (!ht_rx_stbc) {
+			hdd_debug("HT RX STBC not supported, skip HT");
+			ht_value = 0;
+		}
+
+		/* make sure VHT capabilities allow this */
+		status = ucfg_mlme_cfg_get_vht_rx_stbc_orig(hdd_ctx->psoc,
+							    &vht_rx_stbc);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get VHT capability info");
+			return -EIO;
+		}
+
+		if (!vht_rx_stbc) {
+			hdd_debug("VHT RX STBC not supported, skip VHT");
+			vht_value = 0;
+		}
+
+		/* make sure HE capabilities allow this */
+		status = ucfg_mlme_cfg_get_he_caps(hdd_ctx->psoc,
+						   &he_cap_info);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get HE capability info");
+			return -EIO;
+		}
+
+		if (!he_cap_info.rx_stbc_lt_80mhz) {
+			hdd_debug("HE RX STBC LT80 not supported, skip");
+			he_lt_80mhz_value = 0;
+		}
+
+		if (!he_cap_info.rx_stbc_gt_80mhz) {
+			hdd_debug("HE RX STBC GT80 not supported, skip");
+			he_gt_80mhz_value = 0;
 		}
 	}
 	ret = sme_update_ht_config(mac_handle, link_info->vdev_id,
 				   WNI_CFG_HT_CAP_INFO_RX_STBC,
-				   value);
+				   ht_value);
 	if (ret)
 		hdd_err("Failed to set RX STBC value");
 
-	ret = sme_update_he_rx_stbc_cap(mac_handle,
-					link_info->vdev_id, value);
+	ret = sme_update_vht_rx_stbc_cap(mac_handle,
+					 link_info->vdev_id, vht_value);
+	if (ret)
+		hdd_err("Failed to set VHT RX STBC value");
+
+	ret = sme_update_he_rx_stbc_cap(mac_handle, link_info->vdev_id,
+					he_lt_80mhz_value,
+					he_gt_80mhz_value);
 	if (ret)
 		hdd_err("Failed to set HE RX STBC value");
 

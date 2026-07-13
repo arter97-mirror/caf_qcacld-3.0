@@ -8792,6 +8792,7 @@ int sme_update_ht_config(mac_handle_t mac_handle, uint8_t vdev_id,
 		break;
 	case WNI_CFG_HT_CAP_INFO_RX_STBC:
 		ht_cap_info.ht_caps.rx_stbc = value;
+		mac->mlme_cfg->ht_caps.ht_cap_info.rx_stbc = value;
 		break;
 	case WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ:
 		value = value ? 1 : 0; /* HT SGI can be only 1 or 0 */
@@ -12789,29 +12790,30 @@ int sme_update_he_tx_stbc_cap(mac_handle_t mac_handle, uint8_t session_id,
 }
 
 int sme_update_he_rx_stbc_cap(mac_handle_t mac_handle, uint8_t session_id,
-			      int value)
+			      int lt_80mhz_value, int gt_80mhz_value)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
-	uint32_t he_cap_val = 0;
+	uint32_t lt_80mhz_val = 0, gt_80mhz_val = 0;
 
-	he_cap_val = value ? 1 : 0;
+	lt_80mhz_val = lt_80mhz_value ? 1 : 0;
+	gt_80mhz_val = gt_80mhz_value ? 1 : 0;
 	session = CSR_GET_SESSION(mac_ctx, session_id);
 
 	if (!session) {
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
-	if (he_cap_val <= 1)
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_stbc_lt_80mhz =
-		he_cap_val;
-	else
-		return -EINVAL;
-	if (he_cap_val <= 1)
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_stbc_gt_80mhz =
-		he_cap_val;
-	else
-		return -EINVAL;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_stbc_lt_80mhz =
+		lt_80mhz_val;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_stbc_gt_80mhz =
+		gt_80mhz_val;
+
+	mac_ctx->he_cap_2g.rx_stbc_lt_80mhz = lt_80mhz_val;
+	mac_ctx->he_cap_2g.rx_stbc_gt_80mhz = gt_80mhz_val;
+	mac_ctx->he_cap_5g.rx_stbc_lt_80mhz = lt_80mhz_val;
+	mac_ctx->he_cap_5g.rx_stbc_gt_80mhz = gt_80mhz_val;
+
 	csr_update_session_he_cap(mac_ctx, session);
 	return 0;
 }
@@ -14075,6 +14077,41 @@ void sme_set_pdev_ht_vht_ies(mac_handle_t mac_handle, bool enable2x2)
 
 		sme_release_global_lock(&mac_ctx->sme);
 	}
+}
+
+int sme_update_vht_rx_stbc_cap(mac_handle_t mac_handle, uint8_t session_id,
+			       int value)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_vht_config vht_cap_info;
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, session_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return -EIO;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return -EIO;
+	}
+
+	vht_cap_info.caps = vdev_mlme->proto.vht_info.caps;
+	vht_cap_info.rx_stbc = value ? 1 : 0;
+	vdev_mlme->proto.vht_info.caps = vht_cap_info.caps;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	mac_ctx->mlme_cfg->vht_caps.vht_cap_info.rx_stbc = value ? 1 : 0;
+
+	return 0;
 }
 
 void sme_get_sap_vdev_type_nss(mac_handle_t mac_handle, uint8_t *vdev_nss,

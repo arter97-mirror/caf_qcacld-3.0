@@ -681,6 +681,8 @@ struct mlme_ht_info_field_3 {
  * @max_num_amsdu: Max number of AMSDU
  * @tx_ldpc_enable: Enable Tx LDPC
  * @short_slot_time_enabled: Enabled/disable short slot time
+ * @rx_stbc_orig: original(target/ini resolved) HT RX STBC capability,
+ *                not updated by runtime rx_stbc toggles
  */
 struct wlan_mlme_ht_caps {
 	struct mlme_ht_capabilities_info ht_cap_info;
@@ -696,6 +698,7 @@ struct wlan_mlme_ht_caps {
 	uint8_t max_num_amsdu;
 	uint8_t tx_ldpc_enable;
 	bool short_slot_time_enabled;
+	bool rx_stbc_orig;
 };
 
 #define MLME_CFG_WPS_UUID_MAX_LEN    16
@@ -998,9 +1001,12 @@ struct mlme_vht_capabilities_info {
 /**
  * struct wlan_mlme_vht_caps - VHT Capabilities related config items
  * @vht_cap_info: VHT capabilities Info Structure
+ * @rx_stbc_orig: original(target/ini resolved) VHT RX STBC capability,
+ *                not updated by runtime rx_stbc toggles
  */
 struct wlan_mlme_vht_caps {
 	struct mlme_vht_capabilities_info vht_cap_info;
+	bool rx_stbc_orig;
 };
 
 /**

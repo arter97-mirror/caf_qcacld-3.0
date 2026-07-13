@@ -153,6 +153,34 @@ QDF_STATUS wlan_mlme_set_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_get_ht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc,
+					 bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.ht_caps.rx_stbc_orig;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_set_ht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc,
+					 bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.ht_caps.rx_stbc_orig = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 wlan_mlme_disable_ht_dynamic_smps(struct wlan_objmgr_psoc *psoc)
 {
@@ -4799,6 +4827,20 @@ wlan_mlme_cfg_get_vht_rx_stbc(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
+wlan_mlme_cfg_get_vht_rx_stbc_orig(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.vht_caps.rx_stbc_orig;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_cfg_get_vht_su_bformer(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	*value = cfg_get(psoc, CFG_VHT_ENABLE_TX_SU_BEAM_FORMER);
@@ -5422,17 +5464,24 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 	if (vht_cap_info->short_gi_80mhz && !vht_cap->vht_short_gi_80)
 		vht_cap_info->short_gi_80mhz = vht_cap->vht_short_gi_80;
 
-	/* Set VHT TX/RX STBC cap */
+	/* Set VHT TX STBC cap */
 	if (vht_cap_info->enable_mimo) {
 		if (vht_cap_info->tx_stbc && !vht_cap->vht_tx_stbc)
 			vht_cap_info->tx_stbc = vht_cap->vht_tx_stbc;
-
-		if (vht_cap_info->rx_stbc && !vht_cap->vht_rx_stbc)
-			vht_cap_info->rx_stbc = vht_cap->vht_rx_stbc;
 	} else {
 		vht_cap_info->tx_stbc = 0;
-		vht_cap_info->rx_stbc = 0;
 	}
+
+	/* Set VHT RX STBC cap based on gEnableRXSTBC ini and f/w caps */
+	if (vht_cap_info->rx_stbc && !vht_cap->vht_rx_stbc)
+		vht_cap_info->rx_stbc = vht_cap->vht_rx_stbc;
+
+	/*
+	 * Snapshot the resolved RX STBC capability as the immutable
+	 * baseline, since vht_cap_info->rx_stbc itself gets overwritten
+	 * by runtime rx_stbc toggles (hdd_set_rx_stbc()).
+	 */
+	mlme_obj->cfg.vht_caps.rx_stbc_orig = vht_cap_info->rx_stbc;
 
 	/* Set VHT SU Beamformer cap */
 	if (vht_cap_info->su_bformer && !vht_cap->vht_su_bformer)
