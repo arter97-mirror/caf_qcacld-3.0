@@ -1367,6 +1367,15 @@ wma_fill_rx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 			 wmi_peer_rx, wmi_rx, peer_stats);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	/* Check if num_rx_stats is sufficient to avoid buffer overflow */
+	if (param_buf->num_rx_stats <
+	    fix_param->num_peer_ac_rx_stats * WLAN_MAX_AC) {
+		wma_err("Insufficient rx_stats buffer: available %d, required %d",
+			param_buf->num_rx_stats,
+			fix_param->num_peer_ac_rx_stats * WLAN_MAX_AC);
+		return QDF_STATUS_E_FAILURE;
+	}
 	for (i = 0; i < fix_param->num_peer_ac_rx_stats; i++) {
 		uint32_t peer_id = wmi_peer_rx[i].peer_id;
 		struct sir_wifi_rx *ac;
@@ -4988,3 +4997,22 @@ uint32_t wma_get_eht_ch_width(void)
 #endif
 }
 #endif
+
+QDF_STATUS wma_send_reduce_pwr_scan_mode(uint32_t pdev_id, uint32_t param_val)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct pdev_params pparam = {0};
+	QDF_STATUS status;
+
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	pparam.param_id = WMI_PDEV_PARAM_SCAN_MODE;
+	pparam.param_value = param_val;
+	status = wmi_unified_pdev_param_send(wma->wmi_handle,
+					     &pparam, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Unable to send reduce power scan mode");
+
+	return status;
+}

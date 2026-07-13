@@ -4429,7 +4429,7 @@ wlan_mlme_get_mgmt_6ghz_rate_support(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 wlan_mlme_get_status_ring_buffer(struct wlan_objmgr_psoc *psoc,
-				 bool *enable_ring_buffer)
+				 uint32_t *enable_ring_buffer)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -5757,5 +5757,22 @@ wlan_mlme_get_sta_keep_alive_period(struct wlan_objmgr_psoc *psoc,
 
 	*keep_alive_period = mlme_obj->cfg.sta.sta_keep_alive_period;
 
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_reduce_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
+				   bool *scan_mode)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*scan_mode =
+			cfg_default(CFG_REDUCE_PWR_SCAN_MODE);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*scan_mode = mlme_obj->cfg.reduce_pwr_scan_mode;
 	return QDF_STATUS_SUCCESS;
 }
