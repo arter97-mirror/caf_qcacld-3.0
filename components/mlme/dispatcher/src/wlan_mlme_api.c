@@ -7569,6 +7569,7 @@ QDF_STATUS mlme_update_tgt_uhr_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	bool uhr_capab;
+	bool elr_capable;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (!mlme_obj || !mac_ctx || !wma_cfg)
@@ -7584,6 +7585,21 @@ QDF_STATUS mlme_update_tgt_uhr_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 		     sizeof(struct wlan_mlme_uhr_caps));
 	qdf_mem_copy(&mlme_obj->cfg.mlme_uhr_caps_5g, &wma_cfg->uhr_cap_5g,
 		     sizeof(struct wlan_mlme_uhr_caps));
+
+	/*
+	 * ELR requires HE dynamic fragmentation Level 2. The
+	 * he_dynamic_frag_support INI stays at its generic 11ax default
+	 * for non-ELR targets; only raise the already-computed HE
+	 * fragmentation cap here, for targets that report ELR support.
+	 */
+	elr_capable = wma_cfg->uhr_cap_2g.elr_rx_support ||
+		      wma_cfg->uhr_cap_2g.elr_tx_support ||
+		      wma_cfg->uhr_cap_5g.elr_rx_support ||
+		      wma_cfg->uhr_cap_5g.elr_tx_support;
+	if (elr_capable && cfg_in_range(CFG_HE_FRAGMENTATION, 2))
+		mlme_obj->cfg.he_caps.dot11_he_cap.fragmentation =
+		QDF_MAX(mlme_obj->cfg.he_caps.dot11_he_cap.fragmentation,
+			2);
 
 	return QDF_STATUS_SUCCESS;
 }
