@@ -1190,6 +1190,50 @@ static void dp_resolve_rx_ol_mode(struct wlan_dp_psoc_context *dp_ctx)
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
+#ifdef QCA_WIFI_3_0_ADRASTEA
+/**
+ * wlan_dp_gro_rx_ctx_id_remap() - Remap a CE-pipe based Rx context id to a
+ *  bounded value
+ * @rx_ctx_id: Rx context id as set by hif_get_rx_ctx_id() in the CE Rx
+ *  completion path (QDF_NBUF_CB_RX_CTX_ID())
+ *
+ * On Helium (CE based) targets such as Adrastea, the Rx context id is
+ * derived from the CE pipe's NAPI id (NAPI_PIPE2ID(ce_id) = ce_id + 1),
+ * which can be as large as the CE pipe count. The GRO control arrays
+ * gro_flushed[]/gro_force_flush[] are instead sized by DP_MAX_RX_THREADS
+ * (WLAN_CFG_NUM_REO_DEST_RING), a converged/wifi3.0 REO-ring concept
+ * unrelated to CE pipe count and much smaller. Only CE1, CE9 and CE10
+ * carry RX data on these targets; remap their NAPI-derived ids
+ * (2, 10, 11) to a small, dense index so callers indexing those arrays
+ * don't go out of bounds. This remap is local to this file: the value
+ * stashed in QDF_NBUF_CB_RX_CTX_ID(nbuf) itself is left untouched, since
+ * other consumers (e.g. hif_get_napi()) expect the original NAPI id.
+ *
+ * Return: Rx context id in [0, 2]
+ */
+static uint8_t wlan_dp_gro_rx_ctx_id_remap(uint8_t rx_ctx_id)
+{
+	switch (rx_ctx_id) {
+	case 2:  /* CE1: target->host HTT */
+		return 0;
+	case 10: /* CE9: target->host HTT */
+		return 1;
+	case 11: /* CE10: target->host HTT */
+		return 2;
+	default:
+		dp_err_rl("Invalid rx_ctx_id %u, remapping to 0", rx_ctx_id);
+		return 0;
+	}
+}
+#else
+static inline uint8_t wlan_dp_gro_rx_ctx_id_remap(uint8_t rx_ctx_id)
+{
+	return rx_ctx_id;
+}
+#endif /* QCA_WIFI_3_0_ADRASTEA */
+#endif /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
+
+#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 /**
  * dp_gro_rx_bh_disable() - GRO RX/flush function.
  * @dp_intf: DP interface pointer
@@ -1211,7 +1255,8 @@ static QDF_STATUS dp_gro_rx_bh_disable(struct wlan_dp_intf *dp_intf,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	uint32_t rx_aggregation;
-	uint8_t rx_ctx_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
+	uint8_t rx_ctx_id =
+		wlan_dp_gro_rx_ctx_id_remap(QDF_NBUF_CB_RX_CTX_ID(nbuf));
 	uint8_t low_tput_force_flush = 0;
 	int32_t gro_disallowed;
 
@@ -1739,7 +1784,8 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 	int status = QDF_STATUS_E_FAILURE;
 	bool nbuf_receive_offload_ok = false;
 	enum dp_nbuf_push_type push_type;
-	uint8_t rx_ctx_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
+	uint8_t rx_ctx_id =
+		wlan_dp_gro_rx_ctx_id_remap(QDF_NBUF_CB_RX_CTX_ID(nbuf));
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	int32_t gro_disallowed;
 
