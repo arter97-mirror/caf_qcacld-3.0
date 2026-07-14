@@ -18294,6 +18294,14 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					       cfg_val);
 		if (ret_val)
 			goto send_err;
+
+		ret_val = wma_cli_set_command(link_info->vdev_id,
+					      wmi_vdev_param_reject_addba,
+					      cfg_val ? 0 : 1, VDEV_CMD);
+		if (ret_val) {
+			hdd_err("Failed to set param for ADDBA reject");
+			goto send_err;
+		}
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_HE_MCS]) {
