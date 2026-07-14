@@ -8287,7 +8287,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 uint8_t addba_extn_present,
 					 uint8_t amsdu_support, uint8_t is_wep,
 					 uint16_t calc_buff_size,
-					 tSirMacAddr bssid)
+					 tSirMacAddr bssid,
+					 uint8_t req_dialog_token)
 {
 
 	tDot11faddba_rsp frm;
@@ -8298,9 +8299,9 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status;
 	uint8_t tx_flag = 0;
 	uint8_t vdev_id = 0;
-	uint16_t buff_size, status_code, batimeout;
+	uint16_t buff_size = 0, status_code = 0, batimeout = 0;
 	uint16_t frm_buff_size = 0;
-	uint8_t dialog_token;
+	uint8_t dialog_token = 0;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t he_frag = 0;
 	tpDphHashNode sta_ds = NULL;
@@ -8313,20 +8314,38 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 
 	vdev_id = session->vdev_id;
 
-	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
-				&dialog_token, &status_code, &buff_size,
-				&batimeout);
+	sta_ds = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
+				       &session->dph.dphHashTable);
 
 	qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 	frm.Category.category = ACTION_CATEGORY_BACK;
 	frm.Action.action = ADDBA_RESPONSE;
 
+	if (!sta_ds && LIM_IS_PASSTHRU_ROLE(session)) {
+		/*
+		 * No local host/FW peer exists for this PASSTHRU vdev peer
+		 * (e.g. beyond the max supported passthru peer count).
+		 * cdp_addba_responsesetup()/cdp_tid_update_ba_win_size()
+		 * cannot be used since there is no DP peer either, so decline
+		 * outright instead of leaving the ADDBA req unanswered, which
+		 * makes the peer keep retrying and repeatedly stall Rx.
+		 */
+		frm.DialogToken.token = req_dialog_token;
+		frm.Status.status = STATUS_REQUEST_DECLINED;
+		frm.addba_param_set.tid = tid;
+		pe_err("vdev:%d refused addba req from " QDF_MAC_ADDR_FMT
+		       ": no passthru peer entry",
+		       vdev_id, QDF_MAC_ADDR_REF(peer_mac));
+		goto send_addba_rsp;
+	}
+
+	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
+				&dialog_token, &status_code, &buff_size,
+				&batimeout);
+
 	frm.DialogToken.token = dialog_token;
 	frm.Status.status = status_code;
-
-	sta_ds = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
-				       &session->dph.dphHashTable);
 
 	if (sta_ds && lim_is_session_he_capable(session))
 		he_cap = lim_is_sta_he_capable(sta_ds);
@@ -8411,6 +8430,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		frm.addba_param_set.amsdu_supp = 0;
 	}
 
+send_addba_rsp:
 	frm.addba_param_set.policy = SIR_MAC_BA_POLICY_IMMEDIATE;
 	frm.ba_timeout.timeout = batimeout;
 	if (addba_extn_present) {

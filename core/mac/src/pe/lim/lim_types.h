@@ -1619,6 +1619,9 @@ typedef enum sHalBitVal         /* For Bit operations */
  * @is_wep: protected bit in fc
  * @calc_buff_size: Calculated buf size from peer and self capabilities
  * @bssid: peer BSSID
+ * @req_dialog_token: dialog token from the received ADDBA request, echoed
+ *  back when no local peer entry exists to source it from (e.g. PASSTHRU
+ *  vdev peer beyond the max supported peer count)
  *
  * This function is called when ADDBA request is successful. ADDBA response is
  * setup by calling addba_response_setup API and frame is then sent out OTA.
@@ -1631,7 +1634,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 uint8_t addba_extn_present,
 					 uint8_t amsdu_support, uint8_t is_wep,
 					 uint16_t calc_buff_size,
-					 tSirMacAddr bssid);
+					 tSirMacAddr bssid,
+					 uint8_t req_dialog_token);
 
 /**
  * lim_send_delba_action_frame() - Send delba to peer

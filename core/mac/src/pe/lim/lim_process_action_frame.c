@@ -1839,6 +1839,30 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 		 addba_req->addba_param_set.buff_size, buff_size,
 		 addba_req->ba_start_seq_ctrl.ssn, extd_buff_size);
 
+	if (!sta_ds && LIM_IS_PASSTHRU_ROLE(session)) {
+		/*
+		 * No local peer entry for this PASSTHRU vdev peer (e.g. peer
+		 * count beyond the max supported passthru peers). There is no
+		 * DP peer to run cdp_addba_requestprocess() against either, so
+		 * decline directly instead of silently dropping the request,
+		 * which would make the peer keep retrying ADDBA and repeatedly
+		 * stall Rx.
+		 */
+		qdf_status =
+		lim_send_addba_response_frame(mac_ctx,
+					      mac_hdr->sa,
+					      addba_req->addba_param_set.tid,
+					      session,
+					      addba_req->addba_extn_element.present,
+					      addba_req->addba_param_set.amsdu_supp,
+					      mac_hdr->fc.wep, buff_size,
+					      mac_hdr->bssId,
+					      addba_req->DialogToken.token);
+		if (qdf_status != QDF_STATUS_SUCCESS)
+			pe_err("Failed to send addba decline response frame");
+		goto error;
+	}
+
 	qdf_status = cdp_addba_requestprocess(
 					soc, mac_hdr->sa,
 					session->vdev_id,
@@ -1855,7 +1879,8 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			session,
 			addba_req->addba_extn_element.present,
 			addba_req->addba_param_set.amsdu_supp,
-			mac_hdr->fc.wep, buff_size, mac_hdr->bssId);
+			mac_hdr->fc.wep, buff_size, mac_hdr->bssId,
+			addba_req->DialogToken.token);
 		if (qdf_status != QDF_STATUS_SUCCESS) {
 			pe_err("Failed to send addba response frame");
 			cdp_addba_resp_tx_completion(
