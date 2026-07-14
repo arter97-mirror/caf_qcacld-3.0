@@ -1930,7 +1930,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 		vdev_mlme->ext_vdev_ptr->mlme_roam =
 			qdf_mem_common_alloc(sizeof(struct wlan_mlme_roam));
 		if (!vdev_mlme->ext_vdev_ptr->mlme_roam) {
-			qdf_mem_free(vdev_mlme->ext_vdev_ptr);
+			qdf_mem_common_free(vdev_mlme->ext_vdev_ptr);
 			vdev_mlme->ext_vdev_ptr = NULL;
 			return QDF_STATUS_E_NOMEM;
 		}
