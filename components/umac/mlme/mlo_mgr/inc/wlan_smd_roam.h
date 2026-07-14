@@ -43,6 +43,28 @@ typedef enum smd_prep_status {
 	SMD_PREP_STATUS_PREP_RESP_RX_TIMEOUT = 4,
 } smd_prep_status;
 /**
+ * smd_update_ctx_on_roam_sync() - Update SMD context on ROAM_SYNC
+ * @vdev: VDEV object (assoc link vdev)
+ * @sync_ind: Roam offload sync indication from firmware
+ *
+ * Called from mlo_fw_roam_sync_req() after the beacon/probe response has been
+ * written to the scan DB by wmi_fill_roam_sync_buffer().  Looks up the target
+ * AP's scan entry to decide the roaming scenario and updates smd_ctx and the
+ * per-vdev SMD-enabled flag accordingly:
+ *
+ *  Non-SMD -> SMD : allocate smd_ctx (if needed), copy smd_identifier +
+ *                   capabilities.
+ *  SMD -> SMD     : update smd_identifier (SMD(A) -> SMD(B)),
+ *
+ *  SMD -> Non-SMD : clear smd_ctx fields, free smd_ctx,
+ *
+ * Return: QDF_STATUS_SUCCESS; errors are logged but not fatal for the caller.
+ */
+QDF_STATUS
+smd_update_ctx_on_roam_sync(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *sync_ind);
+
+/**
  * smd_fw_roam_start - Handler for SMD roam start event handler
  *
  * @vdev: vdev pointer
@@ -683,6 +705,13 @@ void
 smd_link_recfg_ctx_cleanup(struct mlo_link_recfg_context *recfg_ctx);
 
 #else
+static inline QDF_STATUS
+smd_update_ctx_on_roam_sync(struct wlan_objmgr_vdev *vdev,
+			    struct roam_offload_synch_ind *sync_ind)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline void
 smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
 {

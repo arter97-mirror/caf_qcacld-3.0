@@ -4307,9 +4307,9 @@ static QDF_STATUS find_smd_ie(uint8_t *buf, qdf_size_t buf_len,
  */
 #define WLAN_SMD_IE_TOTAL_LEN 11
 #define WLAN_SMD_IE_MIN_LEN 9
-static QDF_STATUS lim_unpack_ieee80211_smd_payload(uint8_t *smd_ie,
-						   qdf_size_t ie_len,
-						   struct wlan_smd_ie *smd)
+QDF_STATUS lim_unpack_ieee80211_smd_payload(uint8_t *smd_ie,
+					     qdf_size_t ie_len,
+					     struct wlan_smd_ie *smd)
 {
 	uint8_t cap_byte;
 

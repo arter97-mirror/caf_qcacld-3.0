@@ -2405,11 +2405,30 @@ QDF_STATUS
 lim_unpack_ieee80211_uhr_link_reconfig_req_payload(
 	uint8_t *frame, uint32_t frame_len,
 	struct wlan_uhr_link_reconfig_req *req);
+
+/**
+ * lim_unpack_ieee80211_smd_payload() - Unpack SMD IE payload
+ * @smd_ie: Pointer to SMD IE
+ * @ie_len: IE length
+ * @smd: Output structure for parsed SMD IE
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS
+lim_unpack_ieee80211_smd_payload(uint8_t *smd_ie, qdf_size_t ie_len,
+				 struct wlan_smd_ie *smd);
 #else
 static inline QDF_STATUS
 lim_unpack_ieee80211_uhr_link_reconfig_req_payload(
 	uint8_t *frame, uint32_t frame_len,
 	void *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+lim_unpack_ieee80211_smd_payload(uint8_t *smd_ie, qdf_size_t ie_len,
+				 void *smd)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

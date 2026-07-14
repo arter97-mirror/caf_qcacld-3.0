@@ -30,6 +30,146 @@
 #include "wlan_cm_roam_offload.h"
 
 #ifdef WLAN_FEATURE_11BN_SMD
+QDF_STATUS
+smd_update_ctx_on_roam_sync(struct wlan_objmgr_vdev *vdev,
+				struct roam_offload_synch_ind *sync_ind)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+	struct scan_cache_entry *scan_entry = NULL;
+	bool was_smd = false;
+	bool is_smd_ap;
+	const uint8_t *smd_ie;
+	struct wlan_smd_ie parsed_smd_ie;
+	struct qdf_mac_addr link_addr;
+	QDF_STATUS status;
+
+	if (!vdev || !sync_ind) {
+		mlo_err("SMD roam_sync: invalid params");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return QDF_STATUS_SUCCESS;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_SUCCESS;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_SUCCESS;
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	if (smd_ctx && !qdf_is_macaddr_zero(&smd_ctx->smd_identifier))
+		was_smd = true;
+
+	/* sync_ind->bssid carries the target AP's MLD address for MLO/SMD
+	 * roam sync events, not the per-link BSSID. The scan cache is keyed
+	 * by link BSSID, so resolve the assoc link's BSSID from ml_link[]
+	 * via the assoc vdev id before doing the scan lookup.
+	 */
+	status = mlo_get_sta_link_mac_addr(wlan_vdev_get_id(vdev), sync_ind,
+					   &link_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("SMD roam_sync: link mac addr not found for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return QDF_STATUS_SUCCESS;
+	}
+
+	scan_entry = wlan_scan_get_entry_by_bssid(pdev, &link_addr);
+	if (!scan_entry) {
+		mlo_err("SMD roam_sync: scan entry not found for " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(link_addr.bytes));
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Check if target AP is SMD by looking for SMD IE in scan entry */
+	smd_ie = scan_entry->ie_list.smd_info;
+	is_smd_ap = (smd_ie != NULL);
+
+	if (is_smd_ap) {
+		/* Non-SMD -> SMD  or  SMD(A) -> SMD(B) */
+		if (!mlo_dev_ctx->smd_ctx) {
+			mlo_dev_ctx->smd_ctx =
+				qdf_mem_common_alloc(sizeof(struct smd_context));
+			if (!mlo_dev_ctx->smd_ctx) {
+				mlo_err("SMD: failed to alloc smd_ctx on roam");
+				goto out;
+			}
+			qdf_mutex_create(&mlo_dev_ctx->smd_ctx->smd_ctx_lock);
+		}
+
+		smd_ctx = mlo_dev_ctx->smd_ctx;
+		qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+
+		if (was_smd) {
+			/* SMD(A) -> SMD(B): Clear current context first */
+			mlo_info("SMD roam_sync: SMD(A)->SMD(B), clearing old ctx "
+				 QDF_MAC_ADDR_FMT,
+				 smd_ctx->smd_identifier.bytes);
+			qdf_mem_zero(smd_ctx, sizeof(struct smd_context));
+		}
+
+		/* Parse and update SMD IE information from scan entry */
+		status = lim_unpack_ieee80211_smd_payload((uint8_t *)smd_ie,
+							   smd_ie[1] + MIN_IE_LEN,
+							   &parsed_smd_ie);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("SMD: failed to parse SMD IE");
+			qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+			goto out;
+		}
+
+		/* Copy SMD identifier and capabilities */
+		qdf_mem_copy(smd_ctx->smd_identifier.bytes,
+			     parsed_smd_ie.smd_identifier,
+			     QDF_MAC_ADDR_SIZE);
+		smd_ctx->smd_capabilities.smd_type =
+			parsed_smd_ie.smd_cap.smd_type;
+		smd_ctx->smd_capabilities.ptk_mode =
+			parsed_smd_ie.smd_cap.ptk_mode;
+		smd_ctx->smd_capabilities.dl_data_forwarding =
+			parsed_smd_ie.smd_cap.dl_data_forwarding;
+		smd_ctx->smd_capabilities.max_prepared_targets =
+			parsed_smd_ie.smd_cap.max_num_prepared_target_ap_mlds;
+		smd_ctx->smd_capabilities.neighbor_ap_probe_support =
+			parsed_smd_ie.smd_cap.neigh_ap_probe;
+		smd_ctx->timeout_tu = parsed_smd_ie.smd_timeout;
+
+		smd_ctx->smd_roaming_in_progress = false;
+		smd_ctx->same_smd_roaming = false;
+
+		qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+
+		mlo_info("SMD roam_sync: roamed to SMD " QDF_MAC_ADDR_FMT
+			 "was_smd=%d",
+			 smd_ctx->smd_identifier.bytes, was_smd);
+	} else if (was_smd) {
+		/* SMD -> Non-SMD: Clear SMD context */
+		mlo_info("SMD roam_sync: roamed away from SMD "
+			 QDF_MAC_ADDR_FMT ", clearing ctx",
+			 smd_ctx->smd_identifier.bytes);
+		qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+		smd_ctx->smd_roaming_in_progress = false;
+		smd_ctx->same_smd_roaming = false;
+		qdf_mem_zero(smd_ctx->smd_identifier.bytes, QDF_MAC_ADDR_SIZE);
+		qdf_mem_zero(&smd_ctx->smd_capabilities,
+			     sizeof(smd_ctx->smd_capabilities));
+		smd_ctx->timeout_tu = 0;
+		qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+	}
+
+out:
+	if (scan_entry)
+		util_scan_free_cache_entry(scan_entry);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS
 smd_update_channel_freq(struct wlan_objmgr_psoc *psoc,
 			struct wlan_mlo_link_recfg_req *recfg_req)

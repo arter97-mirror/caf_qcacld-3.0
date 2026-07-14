@@ -440,6 +440,9 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	ml_nlink_conn_change_notify(
 		psoc, vdev_id, ml_nlink_roam_sync_start_evt, NULL);
 
+	if (!smd_is_roaming_in_progress(vdev))
+		smd_update_ctx_on_roam_sync(vdev, sync_ind);
+
 	wlan_cm_set_cross_vdev_roam(vdev);
 	cm_update_scan_mlme_for_mlo_roam(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
