@@ -1523,6 +1523,189 @@ smd_roam_cleanup_ies(struct mlo_link_recfg_context *recfg_ctx)
 	smd_link_recfg_ctx_cleanup(recfg_ctx);
 }
 
+/**
+ * smd_get_active_link_count() - Count valid entries in sta_ctx->links_info[].
+ * @mlo_dev_ctx: MLO device context
+ * @vdev_id: Output - vdev_id of the last valid link found. Only meaningful
+ *           when the returned count is exactly 1; untouched otherwise.vdev_id
+ *
+ * Return: number of populated (valid) link slots in sta_ctx->links_info[]
+ */
+static uint8_t
+smd_get_active_link_count(struct wlan_mlo_dev_context *mlo_dev_ctx,
+			  uint8_t *vdev_id)
+{
+	struct mlo_link_info *link_info;
+	uint8_t i;
+	uint8_t active_links = 0;
+
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
+		return 0;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+
+		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
+
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		if (link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		active_links++;
+		if (vdev_id)
+			*vdev_id = link_info->vdev_id;
+	}
+	mlo_debug("active links count %d", active_links);
+	return active_links;
+}
+
+/**
+ * smd_roam_update_mlo_flags() - Fix up MLO vdev flags after link update.
+ * @vdev: New assoc vdev whose sta_ctx->links_info[] was just refreshed
+ *
+ * Counts the currently valid entries in sta_ctx->links_info[]. If the roam
+ * collapsed down to exactly one active link, marks that link's vdev as a
+ * plain MLO vdev and clears its MLO-link-vdev flag (mirrors the flag state
+ * wlan_cm_set_cross_vdev_roam() sets for cross-vdev roaming). No-op for
+ * zero or multiple active links.
+ */
+static void smd_roam_update_mlo_flags(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *link_vdev;
+	uint8_t active_links = 0;
+	uint8_t active_vdev_id = WLAN_INVALID_VDEV_ID;
+
+	if (!vdev)
+		return;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
+		mlo_err("SMD: mlo_dev_ctx or sta_ctx NULL for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlo_err("SMD: PSOC NULL for vdev %d", wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	active_links = smd_get_active_link_count(mlo_dev_ctx, &active_vdev_id);
+	mlo_debug("SMD: post-roam active link count=%u for vdev %d",
+		  active_links, wlan_vdev_get_id(vdev));
+
+	if (active_links != 1)
+		return;
+
+	link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, active_vdev_id,
+							 WLAN_MLO_MGR_ID);
+	if (!link_vdev) {
+		mlo_err("SMD: link vdev %d not found for MLO flag update",
+			active_vdev_id);
+		return;
+	}
+
+	wlan_vdev_mlme_set_mlo_vdev(link_vdev);
+	wlan_vdev_mlme_clear_mlo_link_vdev(link_vdev);
+
+	mlo_debug("SMD: updated MLO flags for single-link vdev %d",
+		  active_vdev_id);
+
+	wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
+}
+
+/**
+ * smd_find_new_assoc_vdev() - Find the vdev to receive EV_SMD_EXEC_COMPLETE.
+ * @mlo_dev_ctx: MLO device context
+ * @recfg_ctx: link reconfig context
+ * @psoc: psoc pointer
+ *
+ * CASE 1 (ML→ML / SL→ML / ML→SL):
+ *   curr_recfg_req.vdev_id reconnected as assoc vdev and entered
+ *   CONNECTED/SMD_ROAM_SYNC via T4. Return it directly.
+ *
+ * CASE 2 (SL→SL):
+ *   curr_recfg_req.vdev_id is in INIT (disconnected, cleaned up).
+ *   The new assoc vdev is the OTHER vdev — it entered CONNECTED/SMD_ROAM_SYNC
+ *   at T4 during Phase 3 (idle-vdev direct connect with set_mlo_vdev only).
+ *   Search all MLD vdevs for one in CONNECTED/SMD_ROAM_SYNC.
+ *
+ * CASE 3 (roam collapsed to a single link):
+ *   Neither CASE 1 nor CASE 2 found a vdev in SMD_ROAM_SYNC — this happens
+ *   when the roam settled down to exactly one active link and that link's
+ *   vdev already transitioned out of SMD_ROAM_SYNC into CONNECTED. Use
+ *   smd_get_active_link_count() to identify that single link's vdev and
+ *   return it if it is CONNECTED.
+ *
+ * Return: vdev pointer (caller must release ref), NULL if not found.
+ */
+static struct wlan_objmgr_vdev *
+smd_find_new_assoc_vdev(struct wlan_mlo_dev_context *mlo_dev_ctx,
+			struct mlo_link_recfg_context *recfg_ctx,
+			struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *exec_vdev, *vdev;
+	uint8_t exec_vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
+	struct mlo_link_info *link_info;
+	uint8_t i;
+	uint8_t active_links = 0;
+	uint8_t active_vdev_id;
+
+	exec_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, exec_vdev_id,
+							 WLAN_MLO_MGR_ID);
+
+	/* CASE 1: exec vdev is already in CONNECTED/SMD_ROAM_SYNC (ML→ML) */
+	if (exec_vdev && cm_is_vdev_smd_roam_sync_in_progress(exec_vdev))
+		return exec_vdev;
+
+	if (exec_vdev)
+		wlan_objmgr_vdev_release_ref(exec_vdev, WLAN_MLO_MGR_ID);
+
+	/* CASE 2: SL→SL — search for the other vdev in SMD_ROAM_SYNC */
+	if (!mlo_dev_ctx->sta_ctx)
+		return NULL;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+
+		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID ||
+		    link_info->vdev_id == exec_vdev_id)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    link_info->vdev_id,
+							    WLAN_MLO_MGR_ID);
+		if (!vdev)
+			continue;
+
+		if (cm_is_vdev_smd_roam_sync_in_progress(vdev))
+			return vdev;
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+	}
+	/* CASE 3: roam collapsed to a single link — return it if connected */
+	active_links = smd_get_active_link_count(mlo_dev_ctx, &active_vdev_id);
+	if (active_links == 1) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    active_vdev_id,
+							    WLAN_MLO_MGR_ID);
+		if (vdev) {
+			if (cm_is_vdev_connected(vdev))
+				return vdev;
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+		}
+	}
+
+	mlo_debug("SMD: could not find assoc vdev in SMD_ROAM_SYNC");
+	return NULL;
+}
+
 QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc;
@@ -2849,71 +3032,6 @@ bool smd_handle_cm_roam_sync_pending(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
- * smd_find_new_assoc_vdev() - Find the vdev to receive EV_SMD_EXEC_COMPLETE.
- * @mlo_dev_ctx: MLO device context
- * @recfg_ctx: link reconfig context
- * @psoc: psoc pointer
- *
- * CASE 1 (ML→ML / SL→ML / ML→SL):
- *   curr_recfg_req.vdev_id reconnected as assoc vdev and entered
- *   CONNECTED/SMD_ROAM_SYNC via T4. Return it directly.
- *
- * CASE 2 (SL→SL):
- *   curr_recfg_req.vdev_id is in INIT (disconnected, cleaned up).
- *   The new assoc vdev is the OTHER vdev — it entered CONNECTED/SMD_ROAM_SYNC
- *   at T4 during Phase 3 (idle-vdev direct connect with set_mlo_vdev only).
- *   Search all MLD vdevs for one in CONNECTED/SMD_ROAM_SYNC.
- *
- * Return: vdev pointer (caller must release ref), NULL if not found.
- */
-static struct wlan_objmgr_vdev *
-smd_find_new_assoc_vdev(struct wlan_mlo_dev_context *mlo_dev_ctx,
-			struct mlo_link_recfg_context *recfg_ctx,
-			struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_objmgr_vdev *exec_vdev, *vdev;
-	uint8_t exec_vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
-	struct mlo_link_info *link_info;
-	uint8_t i;
-
-	exec_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, exec_vdev_id,
-							 WLAN_MLO_MGR_ID);
-
-	/* CASE 1: exec vdev is already in CONNECTED/SMD_ROAM_SYNC (ML→ML) */
-	if (exec_vdev && cm_is_vdev_smd_roam_sync_in_progress(exec_vdev))
-		return exec_vdev;
-
-	if (exec_vdev)
-		wlan_objmgr_vdev_release_ref(exec_vdev, WLAN_MLO_MGR_ID);
-
-	/* CASE 2: SL→SL — search for the other vdev in SMD_ROAM_SYNC */
-	if (!mlo_dev_ctx->sta_ctx)
-		return NULL;
-
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
-
-		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID ||
-		    link_info->vdev_id == exec_vdev_id)
-			continue;
-
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-							    link_info->vdev_id,
-							    WLAN_MLO_MGR_ID);
-		if (!vdev)
-			continue;
-
-		if (cm_is_vdev_smd_roam_sync_in_progress(vdev))
-			return vdev;
-
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-	}
-
-	mlo_debug("SMD: could not find assoc vdev in SMD_ROAM_SYNC");
-	return NULL;
-}
-
-/**
  * smd_remove_roam_cmd() - Remove the original roam command from serialization.
  * @cm_ctx: Connection manager context
  *
@@ -2945,11 +3063,18 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_objmgr_vdev *target_vdev;
+	struct wlan_objmgr_vdev *roamed_vdev;
 	struct roam_offload_synch_ind *sync_ind;
 	uint32_t sync_ind_len;
 	QDF_STATUS status;
 	struct wlan_roam_synch_complete_params sync_params = {};
 	uint8_t i;
+	struct cnx_mgr *cm_ctx;
+	struct cnx_mgr *cm_ctx_t;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_mlo_link_recfg_req *recfg_req;
+	uint8_t active_links = 0;
+	uint8_t active_vdev_id = WLAN_INVALID_VDEV_ID;
 
 	if (!recfg_ctx) {
 		mlo_err("SMD: recfg_ctx is NULL");
@@ -2962,13 +3087,25 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	recfg_req = &recfg_ctx->curr_recfg_req;
 	sync_ind = recfg_ctx->cached_sync_ind;
 	sync_ind_len = sync_ind ? sizeof(*sync_ind) : 0;
 
 	recfg_ctx->smd_roam_in_progress = false;
 	recfg_ctx->st_exec_in_progress = false;
 
-	sync_params.vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
+	roamed_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							   sync_ind->roamed_vdev_id,
+							   WLAN_MLO_MGR_ID);
+	if (!roamed_vdev) {
+		mlo_err("Roamed vdev %d null", sync_ind->roamed_vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cm_ctx_t = cm_get_cm_ctx(roamed_vdev);
+
+	sync_params.vdev_id = sync_ind->roamed_vdev_id;
+
 	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req &&
 			i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		sync_params.vdev_repurpose_resp[i].vdev_id =
@@ -2978,17 +3115,26 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 		sync_params.num_vdev_repurpose_resp++;
 	}
 
-	target_vdev = smd_find_new_assoc_vdev(mlo_dev_ctx, recfg_ctx, psoc);
-	if (!target_vdev) {
-		mlo_err("SMD: no assoc vdev in SMD_ROAM_SYNC for exec complete");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	/* Update all sta_ctx links (active + standby) from target_bss_ctx
 	 * while it is still valid, then free it before sending the roam
 	 * sync complete event to FW.
 	 */
-	smd_roam_update_sta_ctx_links(target_vdev);
+	smd_roam_update_sta_ctx_links(roamed_vdev);
+
+	target_vdev = smd_find_new_assoc_vdev(mlo_dev_ctx, recfg_ctx, psoc);
+	if (!target_vdev) {
+		mlo_err("SMD: no assoc vdev in SMD_ROAM_SYNC for exec complete");
+		wlan_objmgr_vdev_release_ref(roamed_vdev, WLAN_MLO_MGR_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	smd_roam_update_mlo_flags(target_vdev);
+	active_links = smd_get_active_link_count(mlo_dev_ctx, &active_vdev_id);
+
+	if (active_links == 1) {
+		cm_ctx = cm_get_cm_ctx(target_vdev);
+		cm_sm_transition_to(cm_ctx, WLAN_CM_SS_SMD_ROAM_SYNC);
+	}
 
 	/*
 	 * Deliver EV_SMD_EXEC_COMPLETE — the CM handler sends
@@ -3007,8 +3153,30 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_err("CM SMD Exec complete evt delivery failed");
 
+	pdev = wlan_vdev_get_pdev(target_vdev);
+	if (!pdev) {
+		mlo_err("Failed to find pdev for vdev id %d",
+			wlan_vdev_get_id(target_vdev));
+	}
+
+	/* reset state tran index and move to init state  */
+	recfg_ctx->sm.curr_state_idx = -1;
+	recfg_req->recfg_type = link_recfg_undefined;
+	recfg_req->join_pending_vdev_id = WLAN_INVALID_VDEV_ID;
+	recfg_ctx->internal_reason_code = link_recfg_success;
+
+	mlo_link_recfg_sm_transition_to(recfg_ctx, WLAN_LINK_RECFG_S_INIT);
 	smd_roam_cleanup_ies(recfg_ctx);
+
+	/* RSO state change to Enabled */
+	status = wlan_cm_roam_state_change(pdev, wlan_vdev_get_id(target_vdev),
+					   WLAN_ROAM_RSO_ENABLED,
+					   REASON_ROAM_ABORT);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("Failed to update roam state");
+
 	wlan_objmgr_vdev_release_ref(target_vdev, WLAN_MLO_MGR_ID);
+	wlan_objmgr_vdev_release_ref(roamed_vdev, WLAN_MLO_MGR_ID);
 	return status;
 }
 
@@ -3116,9 +3284,6 @@ void smd_roam_update_deflink(struct wlan_objmgr_vdev *vdev)
 	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	if (!vdev)
-		return;
-
-	if (!wlan_cm_is_cross_vdev_roaming(vdev))
 		return;
 
 	if (!g_mlo_ctx || !g_mlo_ctx->osif_ops ||
