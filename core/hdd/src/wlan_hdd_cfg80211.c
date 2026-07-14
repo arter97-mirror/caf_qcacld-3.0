@@ -27654,6 +27654,41 @@ static int wlan_hdd_cfg80211_qsh_get_stats(struct wiphy *wiphy,
 
 #ifdef WLAN_FEATURE_POWER_STATISTICS
 /**
+ * pack_rate_index() - Encode raw FW rate index into
+ *                      [preamble:16][rate/MCS:16] userspace format
+ * @fw_rate_idx: raw WMI_PDEV_RATE_IDX value from firmware
+ *
+ * Return: packed rate_index per the wifi_rate_info ABI encoding
+ */
+static uint32_t pack_rate_index(uint32_t fw_rate_idx)
+{
+	static const uint16_t cck_rate_x2[] = {
+		2, 4, 11, 22, /* CCK: 1, 2, 5.5, 11 Mbps */
+	};
+	static const uint16_t ofdm_rate[] = {
+		6, 9, 12, 18, 24, 36, 48, 54, /* OFDM: 6..54 Mbps */
+	};
+	uint16_t preamble;
+	uint16_t rate_field;
+
+	if (fw_rate_idx < 4) {
+		preamble = 1; /* CCK */
+		rate_field = cck_rate_x2[fw_rate_idx];
+	} else if (fw_rate_idx < 12) {
+		preamble = 2; /* OFDM */
+		rate_field = ofdm_rate[fw_rate_idx - 4];
+	} else if (fw_rate_idx < WMI_PDEV_RATE_RATE_IDX_MAX) {
+		preamble = 3; /* MCS: HT/VHT/HE/EHT */
+		rate_field = fw_rate_idx - 12;
+	} else {
+		preamble = 0; /* unknown/back-compat */
+		rate_field = (uint16_t)fw_rate_idx;
+	}
+
+	return ((uint32_t)preamble << 16) | rate_field;
+}
+
+/**
  * pack_rx_rate_stats_struct() - Pack RX rate stats with Flexible Array Member
  * @skb: sk_buff to pack data into
  * @cp_stats: CP stats data from firmware
@@ -27671,6 +27706,7 @@ static int pack_rx_rate_stats_struct(
 {
 	uint8_t *buf, *ptr;
 	wifi_rx_rate_stats *rx_stats;
+	struct cp_stats_rx_rate_info *rx_rate;
 	size_t total_size, core_size;
 	uint8_t current_core;
 	int i, rate_idx, total_rates;
@@ -27729,16 +27765,17 @@ static int pack_rx_rate_stats_struct(
 				    current_core)
 					continue;
 
+				rx_rate = &cp_stats->rx_rate_stats[i];
 				rx_stats->rates[rate_idx].rate_index =
-					cp_stats->rx_rate_stats[i].rate_index;
+					pack_rate_index(rx_rate->rate_index);
 				rx_stats->rates[rate_idx].band =
-					cp_stats->rx_rate_stats[i].band;
+					rx_rate->band;
 				rx_stats->rates[rate_idx].bw =
-					cp_stats->rx_rate_stats[i].bw;
+					rx_rate->bw;
 				rx_stats->rates[rate_idx].nss =
-					cp_stats->rx_rate_stats[i].nss;
+					rx_rate->nss;
 				rx_stats->rates[rate_idx].count =
-					cp_stats->rx_rate_stats[i].count;
+					rx_rate->count;
 				rate_idx++;
 			}
 		}
@@ -27780,6 +27817,7 @@ static int pack_tx_rate_stats_struct(
 {
 	uint8_t *buf, *ptr;
 	wifi_tx_rate_stats *tx_stats;
+	struct cp_stats_tx_rate_info *tx_rate;
 	size_t total_size, core_size;
 	uint8_t current_core;
 	int i, rate_idx, total_rates;
@@ -27839,16 +27877,17 @@ static int pack_tx_rate_stats_struct(
 				    current_core)
 					continue;
 
+				tx_rate = &cp_stats->tx_rate_stats[i];
 				tx_stats->rates[rate_idx].rate_index =
-					cp_stats->tx_rate_stats[i].rate_index;
+					pack_rate_index(tx_rate->rate_index);
 				tx_stats->rates[rate_idx].band =
-					cp_stats->tx_rate_stats[i].band;
+					tx_rate->band;
 				tx_stats->rates[rate_idx].bw =
-					cp_stats->tx_rate_stats[i].bw;
+					tx_rate->bw;
 				tx_stats->rates[rate_idx].nss =
-					cp_stats->tx_rate_stats[i].nss;
+					tx_rate->nss;
 				tx_stats->rates[rate_idx].count =
-					cp_stats->tx_rate_stats[i].count;
+					tx_rate->count;
 				rate_idx++;
 			}
 		}
