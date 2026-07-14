@@ -3200,6 +3200,9 @@ int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data)
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_set_vendor_wonder_priv_data(priv_data);
 		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_set_vendor_wonder_priv_data(priv_data);
+		break;
 	default:
 		return -EOPNOTSUPP;
 	}

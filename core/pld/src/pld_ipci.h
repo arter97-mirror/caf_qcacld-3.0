@@ -303,6 +303,12 @@ pld_ipci_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {
 	return -EINVAL;
 }
+
+static inline
+int pld_ipci_set_vendor_wonder_priv_data(const void *priv_data)
+{
+	return -EINVAL;
+}
 #else
 /**
  * pld_ipci_register_driver() - Register platform device callback functions
@@ -703,6 +709,12 @@ static inline int
 pld_ipci_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {
 	return icnss_get_iova_info(dev, addr, size);
+}
+
+static inline
+int pld_ipci_set_vendor_wonder_priv_data(const void *priv_data)
+{
+	return icnss_set_vendor_wonder_priv_data(priv_data);
 }
 #endif
 #endif
