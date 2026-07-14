@@ -1255,18 +1255,43 @@ static enum capture_type convert_vendor_cfr_capture_type(
 }
 
 static int
-wlan_cfg80211_cfr_set_config(struct wlan_objmgr_vdev *vdev,
-			     struct nlattr *tb[])
+wlan_cfg80211_cfr_set_group_table(struct wlan_objmgr_vdev *vdev,
+				  struct nlattr *tb[])
 {
 	struct nlattr *group[QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1];
 	struct nlattr *group_list;
+	int maxtype = QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX;
+	int attr = QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE;
+	int rem = 0;
+
+	nla_for_each_nested(group_list, tb[attr], rem) {
+		if (wlan_cfg80211_nla_parse(group, maxtype,
+					    nla_data(group_list),
+					    nla_len(group_list),
+					    cfr_config_policy)) {
+			hdd_err("nla_parse failed for cfr config group");
+			return -EINVAL;
+		}
+
+		if (QDF_IS_STATUS_ERROR(
+			wlan_cfg80211_cfr_set_group_config(vdev, group))) {
+			hdd_err("set group config failed");
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int
+wlan_cfg80211_cfr_set_config(struct wlan_objmgr_vdev *vdev,
+			     struct nlattr *tb[])
+{
 	struct cfr_wlanconfig_param params = { 0 };
 	enum capture_type type;
 	enum qca_wlan_vendor_cfr_capture_type vendor_capture_type;
-	int rem = 0;
-	int maxtype;
-	int attr;
 	uint64_t ul_mu_user_mask = 0;
+	int ret;
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DURATION]) {
 		params.cap_dur = nla_get_u32(tb[
@@ -1324,18 +1349,9 @@ wlan_cfg80211_cfr_set_config(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE]) {
-		maxtype = QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX;
-		attr = QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE;
-		nla_for_each_nested(group_list, tb[attr], rem) {
-			if (wlan_cfg80211_nla_parse(group, maxtype,
-						    nla_data(group_list),
-						    nla_len(group_list),
-						    cfr_config_policy)) {
-				hdd_err("nla_parse failed for cfr config group");
-				return -EINVAL;
-			}
-			wlan_cfg80211_cfr_set_group_config(vdev, group);
-		}
+		ret = wlan_cfg80211_cfr_set_group_table(vdev, tb);
+		if (ret)
+			return ret;
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE]) {
