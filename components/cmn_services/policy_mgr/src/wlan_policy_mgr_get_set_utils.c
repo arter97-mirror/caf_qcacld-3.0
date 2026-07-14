@@ -54,6 +54,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_cm_api.h"
 #include <wlan_vdev_mgr_utils_api.h>
+#include "wlan_smd_roam.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -8026,6 +8027,10 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 	if (notify_reason > MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
 		return QDF_STATUS_SUCCESS;
 
+	if (smd_is_roaming_in_progress(vdev)) {
+		mlo_debug("SMD roaming in progress allow it");
+		return QDF_STATUS_SUCCESS;
+	}
 	/*
 	 * CSA on the SAP/GO would have been allowed based on the
 	 * current concurrency combination. Starting a link switch

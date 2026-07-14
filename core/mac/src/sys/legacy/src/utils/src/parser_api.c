@@ -14979,7 +14979,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->ext_mld_capab_and_op_present = 0;
 
 	if (set_rsvd_fields) {
-		mlo_ie->reserved_1 = 0xF;
+		mlo_ie->reserved_1 = 0x07;
 		presence_bitmap |= ML_CTRL_BV_PBM_RESERVED_BITS_VAL;
 	}
 
@@ -15851,7 +15851,7 @@ populate_smd_bss_transition_params(
 	uint8_t *start_ptr = ptr;
 
 	/* Element ID Extension */
-	*ptr++ = WLAN_ELEMIDEXT_SMD_BSS_TRANSITION_PARAMS;
+	*ptr++ = WLAN_EXTN_ELEMID_SMD_BSS_TRANS_PARAMS;
 
 	/* ST control field (1 octet)
 	 * Bits:

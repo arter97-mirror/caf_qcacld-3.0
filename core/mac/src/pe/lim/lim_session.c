@@ -46,6 +46,7 @@
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_smd_roam.h"
 
 #ifdef WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY
 static struct sDphHashNode *g_dph_node_array;
@@ -1337,7 +1338,8 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 		cap_tx_nss = NSS_1x1_MODE;
 		cap_rx_nss = NSS_1x1_MODE;
 		session->nss_forced_1x1 = true;
-	} else if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
+	} else if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev) &&
+		   !smd_is_roaming_in_progress(session->vdev)) {
 		struct qdf_mac_addr *bssid =
 				(struct qdf_mac_addr *)bss_desc->bssId;
 

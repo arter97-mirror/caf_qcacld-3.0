@@ -27481,9 +27481,9 @@ exit:
 	return ret;
 }
 
-int wlan_hdd_cfg80211_external_auth_cmd(struct wiphy *wiphy,
-					struct wireless_dev *wdev,
-					const void *data, int data_len)
+static int wlan_hdd_cfg80211_external_auth_cmd(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data, int data_len)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;

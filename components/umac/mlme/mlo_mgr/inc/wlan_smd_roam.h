@@ -621,6 +621,18 @@ void
 smd_link_recfg_free_perptk_ies(struct wlan_mlo_link_recfg_rsp *link_recfg_rsp);
 
 /**
+ * smd_link_recfg_free_bss_trans_params_ie() - Free cached SMD BSS Transition
+ * Params element in ST prep rsp
+ * @link_recfg_rsp: Response structure whose smd_bss_trans_params field
+ * needs to be freed
+ *
+ * Return: void
+ */
+void
+smd_link_recfg_free_bss_trans_params_ie(
+			struct wlan_mlo_link_recfg_rsp *link_recfg_rsp);
+
+/**
  * smd_link_recfg_cleanup_rsp() - Free allocated fields in UHR ST prep rsp
  * @ctx: Link reconfiguration context
  * @link_recfg_rsp: Response structure whose fields need to be freed
@@ -930,6 +942,12 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 
 static inline void
 smd_link_recfg_free_perptk_ies(struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
+{
+}
+
+static inline void
+smd_link_recfg_free_bss_trans_params_ie(
+			struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
 {
 }
 

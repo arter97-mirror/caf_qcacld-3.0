@@ -99,6 +99,7 @@
 
 #include <wlan_dnw_api.h>
 #include "wma_uhr.h"
+#include "wlan_smd_roam.h"
 
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
@@ -1667,6 +1668,10 @@ static void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		req->is_assoc_vdev = true;
+	if (smd_is_roaming_in_progress(vdev)) {
+		req->is_assoc_vdev = true;
+		wma_err("is assoc vdev %d", req->is_assoc_vdev);
+	}
 }
 #else
 static inline void wma_set_mlo_capability(tp_wma_handle wma,

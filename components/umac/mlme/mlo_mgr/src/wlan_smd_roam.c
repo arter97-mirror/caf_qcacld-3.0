@@ -15,6 +15,7 @@
 #include "wlan_mlo_mgr_public_structs.h"
 #include "wlan_mlo_mgr_sta.h"
 #include <../../core/src/wlan_cm_roam_i.h>
+#include <../../core/src/wlan_cm_roam.h>
 #include "wlan_cm_roam_api.h"
 #include "wlan_cm_tgt_if_tx_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
@@ -654,6 +655,7 @@ smd_link_recfg_has_idle_vdev_for_add_link(
 	link_sw_req->reason = MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK;
 	link_sw_req->smd_lnk_sw_trigger = true;
 	link_sw_req->tgt_ap_link_addr = link_add->ap_link_addr;
+	link_sw_req->peer_mld_addr = req->add_link_info.mld_addr;
 
 	mlo_info("Idle vdev link switch: vdev %d, new link_id %d, freq %d, reason %d",
 			link_sw_req->vdev_id,
@@ -2945,7 +2947,7 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *target_vdev;
 	struct roam_offload_synch_ind *sync_ind;
 	uint32_t sync_ind_len;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS status;
 	struct wlan_roam_synch_complete_params sync_params = {};
 	uint8_t i;
 
@@ -2968,7 +2970,7 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 
 	sync_params.vdev_id = recfg_ctx->curr_recfg_req.vdev_id;
 	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req &&
-	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		sync_params.vdev_repurpose_resp[i].vdev_id =
 			recfg_ctx->vdev_repurpose_req[i].vdev_id;
 		sync_params.vdev_repurpose_resp[i].status =
@@ -2999,7 +3001,8 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 
 	status = cm_sm_deliver_event(target_vdev,
 				     WLAN_CM_SM_EV_SMD_EXEC_COMPLETE,
-				     sizeof(sync_params), &sync_params);
+				     sizeof(sync_params),
+				     &sync_params);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_err("CM SMD Exec complete evt delivery failed");
@@ -3424,29 +3427,61 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
+	if (req->reason == MLO_LINK_SWITCH_REASON_SMD_ROAM_ADD_LINK) {
+		if (qdf_is_macaddr_zero(&req->tgt_ap_link_addr)) {
+			mlo_err("Target AP MLD address not provided for idle vdev");
+			return QDF_STATUS_E_INVAL;
+		}
+		mlo_debug("Idle vdev: Using target MLD addr " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(req->peer_mld_addr.bytes));
 
-	status = wlan_vdev_get_bss_peer_mld_mac(vdev, &req->peer_mld_addr);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
+		status = mlo_mgr_link_switch_notify(vdev, req);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 
-	status = mlo_mgr_link_switch_notify(vdev, req);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
+		wlan_vdev_mlme_set_mlo_link_switch_in_progress(vdev);
+		status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 
-	wlan_vdev_mlme_set_mlo_link_switch_in_progress(vdev);
-	status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
+		wlan_vdev_mlme_set_mlo_vdev(vdev);
+		wlan_vdev_mlme_set_mlo_link_vdev(vdev);
+		status = mlo_mgr_link_switch_start_connect(vdev);
+		mlo_err("LINK_SWITCH_DEBUG: mlo_mgr_link_switch_start_connect returned status=%d",
+			status);
 
-	status = wlan_cm_disconnect(vdev, CM_MLO_LINK_SWITCH_DISCONNECT,
-				    REASON_FW_TRIGGERED_LINK_SWITCH, &bssid);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("VDEV %d: Connect failed for idle vdev",
+				vdev_id);
+			return status;
+		}
+	} else {
+		status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 
-	if (QDF_IS_STATUS_ERROR(status))
-		mlo_err("VDEV %d disconnect request not handled", req->vdev_id);
+		status = wlan_vdev_get_bss_peer_mld_mac(vdev,
+							&req->peer_mld_addr);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 
+		status = mlo_mgr_link_switch_notify(vdev, req);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+
+		wlan_vdev_mlme_set_mlo_link_switch_in_progress(vdev);
+		status = mlo_mgr_link_switch_trans_next_state(mlo_dev_ctx);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+
+		status = wlan_cm_disconnect(vdev, CM_MLO_LINK_SWITCH_DISCONNECT,
+					    REASON_FW_TRIGGERED_LINK_SWITCH,
+					    &bssid);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			mlo_err("VDEV %d disconnect request not handled",
+				req->vdev_id);
+	}
 	return status;
 }
 
@@ -3584,6 +3619,20 @@ smd_link_recfg_free_perptk_ies(struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
 		link_recfg_rsp->mic.ptr = NULL;
 		link_recfg_rsp->mic.len = 0;
 	}
+}
+
+void
+smd_link_recfg_free_bss_trans_params_ie(
+			struct wlan_mlo_link_recfg_rsp *link_recfg_rsp)
+{
+	if (!link_recfg_rsp->smd_bss_trans_params.ptr)
+		return;
+
+	qdf_mem_zero(link_recfg_rsp->smd_bss_trans_params.ptr,
+		     link_recfg_rsp->smd_bss_trans_params.len);
+	qdf_mem_free(link_recfg_rsp->smd_bss_trans_params.ptr);
+	link_recfg_rsp->smd_bss_trans_params.len = 0;
+	link_recfg_rsp->smd_bss_trans_params.ptr = NULL;
 }
 
 void

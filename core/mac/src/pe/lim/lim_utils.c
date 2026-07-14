@@ -92,6 +92,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_dnw_api.h"
+#include "wlan_smd_roam.h"
 
 #ifdef WLAN_FEATURE_11AX
 enum phy_ch_width
@@ -10706,6 +10707,104 @@ void lim_extract_per_link_id(struct pe_session *session,
 	pe_debug("vdev: %d, link id: %d", vdev_id, add_bss->staContext.link_id);
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_extract_ml_info_smd_skip_self_add() - Check whether the current link
+ * should be self-added to the partner info array while adding an ML link
+ * @session: PE session
+ *
+ * For SMD link switch the current link is the switched-to link, not an
+ * additional link on top of an existing association. partner_info must
+ * contain only the *other* target-AP links. Do NOT self-add the current
+ * link in that case; let the caller populate all partners from
+ * target_bss_ctx via mlo_link_recfg_get_add_partner_links.
+ *
+ * Return: true if the current link should be self-added, false otherwise
+ */
+static bool lim_extract_ml_info_smd_skip_self_add(struct pe_session *session)
+{
+	return mlo_mgr_is_link_add_link_switch(session->vdev) ||
+	       smd_is_roaming_in_progress(session->vdev);
+}
+
+/**
+ * lim_extract_ml_info_smd_partner_link() - Populate one ML partner info
+ * entry from SMD prepared target link info during SMD roaming
+ * @session: PE session
+ * @ml_partner_info: partner info list parsed from assoc rsp
+ * @ml_link: peer ML info being populated
+ * @partner_idx: current partner index, incremented on success
+ * @i: index into ml_partner_info->partner_link_info[]
+ * @link_id: link id for @i, only used for logging
+ *
+ * Return: true if handled (SMD roam in progress), false otherwise
+ */
+static bool
+lim_extract_ml_info_smd_partner_link(struct pe_session *session,
+				     struct mlo_partner_info *ml_partner_info,
+				     struct peer_ml_info *ml_link,
+				     uint8_t *partner_idx,
+				     uint8_t i, uint8_t link_id)
+{
+	struct mlo_link_info *pi;
+	struct mlo_link_info *tgt_link_info;
+	struct ml_partner_link_info *partner;
+
+	if (!smd_is_roaming_in_progress(session->vdev))
+		return false;
+
+	pi = &ml_partner_info->partner_link_info[i];
+	tgt_link_info = smd_get_prepared_ap_link_info(session->vdev,
+						      &pi->link_addr);
+	if (!tgt_link_info) {
+		pe_err("SMD: no target link info for link id %d", link_id);
+		return true;
+	}
+
+	partner = &ml_link->partner_info[*partner_idx];
+	partner->vdev_id = tgt_link_info->vdev_id;
+	partner->link_id = tgt_link_info->link_id;
+	if (tgt_link_info->link_chan_info)
+		qdf_mem_copy(&partner->channel_info,
+			     tgt_link_info->link_chan_info,
+			     sizeof(partner->channel_info));
+	qdf_mem_copy(&partner->link_addr,
+		     &tgt_link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&partner->self_mac_addr,
+		     &tgt_link_info->link_addr, QDF_MAC_ADDR_SIZE);
+
+	pe_debug("SMD vdev:%d partner[%d] link_id:%d vdev_id:%d",
+		 session->vdev_id, *partner_idx,
+		 tgt_link_info->link_id, tgt_link_info->vdev_id);
+	pe_debug("SMD freq:%d phymode:%d",
+		 tgt_link_info->link_chan_info ?
+			tgt_link_info->link_chan_info->ch_freq : 0,
+		 tgt_link_info->link_chan_info ?
+			tgt_link_info->link_chan_info->ch_phymode : 0);
+	pe_debug("SMD AP:" QDF_MAC_ADDR_FMT " STA:" QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(tgt_link_info->ap_link_addr.bytes),
+		 QDF_MAC_ADDR_REF(tgt_link_info->link_addr.bytes));
+	(*partner_idx)++;
+
+	return true;
+}
+#else
+static bool lim_extract_ml_info_smd_skip_self_add(struct pe_session *session)
+{
+	return false;
+}
+
+static bool
+lim_extract_ml_info_smd_partner_link(struct pe_session *session,
+				     struct mlo_partner_info *ml_partner_info,
+				     struct peer_ml_info *ml_link,
+				     uint8_t *partner_idx,
+				     uint8_t i, uint8_t link_id)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 void lim_extract_ml_info(struct pe_session *session,
 			 struct bss_params *add_bss,
 			 tpSirAssocRsp assoc_rsp)
@@ -10714,6 +10813,7 @@ void lim_extract_ml_info(struct pe_session *session,
 	struct mlo_partner_info *ml_partner_info;
 	struct mlo_link_info *link_info;
 	struct peer_ml_info *ml_link;
+	struct ml_partner_link_info *partner;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(session->vdev))
 		return;
@@ -10727,8 +10827,16 @@ void lim_extract_ml_info(struct pe_session *session,
 	ml_link->rec_max_simultaneous_links =
 		session->vdev->mlo_dev_ctx->mlo_max_recom_simult_links;
 
-	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev->mlo_dev_ctx,
-						   ml_link->link_id);
+	if (smd_is_roaming_in_progress(session->vdev)) {
+		link_info = smd_get_prepared_ap_link_info(
+					session->vdev,
+					(struct qdf_mac_addr *)session->bssId);
+	} else {
+		link_info = mlo_mgr_get_ap_link_by_link_id(
+					session->vdev->mlo_dev_ctx,
+					ml_link->link_id);
+	}
+
 	if (!link_info)
 		return;
 
@@ -10743,21 +10851,24 @@ void lim_extract_ml_info(struct pe_session *session,
 		if (!wlan_cm_is_link_add_connecting(session->vdev) &&
 		    !mlo_mgr_is_link_add_link_switch(session->vdev))
 			return;
-		/* Add current added link to peer assoc partner link array.
-		 */
-		ml_link->partner_info[partner_idx].vdev_id =
-					link_info->vdev_id;
-		ml_link->partner_info[partner_idx].link_id =
-					link_info->link_id;
-		qdf_mem_copy(&ml_link->partner_info[partner_idx].channel_info,
-			     link_info->link_chan_info,
-			     sizeof(ml_link->partner_info[partner_idx].
-			     channel_info));
-		qdf_mem_copy(&ml_link->partner_info[partner_idx].link_addr,
-			     &link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
-		qdf_mem_copy(&ml_link->partner_info[partner_idx].self_mac_addr,
-			     &link_info->link_addr, QDF_MAC_ADDR_SIZE);
-		partner_idx++;
+		if (!lim_extract_ml_info_smd_skip_self_add(session)) {
+			/* Add current added link to peer assoc
+			 * partner link array.
+			 */
+			partner = &ml_link->partner_info[partner_idx];
+			partner->vdev_id = link_info->vdev_id;
+			partner->link_id = link_info->link_id;
+			qdf_mem_copy(&partner->channel_info,
+				     link_info->link_chan_info,
+				     sizeof(partner->channel_info));
+			qdf_mem_copy(&partner->link_addr,
+				     &link_info->ap_link_addr,
+				     QDF_MAC_ADDR_SIZE);
+			qdf_mem_copy(&partner->self_mac_addr,
+				     &link_info->link_addr,
+				     QDF_MAC_ADDR_SIZE);
+			partner_idx++;
+		}
 
 		ml_partner_info->num_partner_links = 0;
 		mlo_link_recfg_get_add_partner_links(session->vdev,
@@ -10772,10 +10883,6 @@ void lim_extract_ml_info(struct pe_session *session,
 		link_info = mlo_mgr_get_ap_link_by_link_id(
 					session->vdev->mlo_dev_ctx,
 					link_id);
-		if (!link_info) {
-			pe_debug("no find link info for id %d", link_id);
-			continue;
-		}
 
 		if (ml_partner_info->partner_link_info[i].link_status_code) {
 			pe_debug("link id %d link_status_code %d", link_id,
@@ -10783,21 +10890,33 @@ void lim_extract_ml_info(struct pe_session *session,
 				 link_status_code);
 			continue;
 		}
+		if (!smd_is_roaming_in_progress(session->vdev)) {
+			if (!link_info) {
+				pe_debug("no find link info for id %d",
+					 link_id);
+				continue;
+			}
 
-		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
-		ml_link->partner_info[partner_idx].link_id = link_info->link_id;
+			partner = &ml_link->partner_info[partner_idx];
+			partner->vdev_id = link_info->vdev_id;
+			partner->link_id = link_info->link_id;
 
-		qdf_mem_copy(&ml_link->partner_info[partner_idx].channel_info,
-			     link_info->link_chan_info,
-			     sizeof(ml_link->partner_info[partner_idx].channel_info));
-		qdf_mem_copy(&ml_link->partner_info[partner_idx].link_addr,
-			     &link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
-		qdf_mem_copy(&ml_link->partner_info[partner_idx].self_mac_addr,
-			     &link_info->link_addr, QDF_MAC_ADDR_SIZE);
+			qdf_mem_copy(&partner->channel_info,
+				     link_info->link_chan_info,
+				     sizeof(partner->channel_info));
+			qdf_mem_copy(&partner->link_addr,
+				     &link_info->ap_link_addr,
+				     QDF_MAC_ADDR_SIZE);
+			qdf_mem_copy(&partner->self_mac_addr,
+				     &link_info->link_addr,
+				     QDF_MAC_ADDR_SIZE);
 
-		partner_idx++;
+			partner_idx++;
+		}
+		lim_extract_ml_info_smd_partner_link(session, ml_partner_info,
+						     ml_link, &partner_idx,
+						     i, link_id);
 	}
-
 	ml_link->num_links = partner_idx;
 	pe_debug("vdev:%d Num of partner links: %d", session->vdev_id,
 		 ml_link->num_links);

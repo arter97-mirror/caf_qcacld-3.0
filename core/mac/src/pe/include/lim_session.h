@@ -226,9 +226,11 @@ struct ext_mld_capab_and_op {
  * @ext_mld_capab_and_op_present: Extended MLD Capabilities And
  *                                Operations Present
  * @mld_mac_address_present: MLD MAC address Present
+ * @target_ap_mld_mac_address_present: Target AP MLD MAC address Present
  * @reserved_1: reserved
  * @common_info_length: common info length
  * @mld_mac_addr: MLD mac address
+ * @target_ap_mld_mac_addr: Target AP MLD mac address
  * @link_id: link id
  * @bss_param_change_count: bss param change count
  * @medium_sync_delay_info: structure of medium_sync_delay
@@ -253,9 +255,11 @@ struct wlan_mlo_ie {
 	uint16_t mld_id_present: 1;
 	uint16_t ext_mld_capab_and_op_present: 1;
 	uint16_t mld_mac_address_present: 1;
-	uint16_t reserved_1:4;
+	uint16_t target_ap_mld_mac_address_present:1;
+	uint16_t reserved_1:3;
 	uint8_t common_info_length;
 	uint8_t mld_mac_addr[6];
+	uint8_t target_ap_mld_mac_addr[6];
 	uint8_t link_id;
 	uint8_t bss_param_change_count;
 	struct medium_sync_delay medium_sync_delay_info;
