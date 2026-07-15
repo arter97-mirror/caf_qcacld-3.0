@@ -123,7 +123,7 @@ QDF_STATUS hdd_send_twt_requestor_enable_cmd(struct hdd_context *hdd_ctx,
 	uint8_t mac_id = policy_mgr_mode_get_macid_by_vdev_id(hdd_ctx->psoc,
 							      vdev_id);
 
-	osif_twt_send_requestor_enable_cmd(hdd_ctx->psoc, mac_id);
+	osif_twt_send_requestor_enable_cmd(hdd_ctx->psoc, mac_id, vdev_id);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -181,7 +181,8 @@ QDF_STATUS hdd_send_twt_responder_disable_cmd(struct hdd_context *hdd_ctx,
 
 void wlan_hdd_twt_init(struct hdd_context *hdd_ctx)
 {
-	osif_twt_send_requestor_enable_cmd(hdd_ctx->psoc, INVALID_PDEV_ID);
+	osif_twt_send_requestor_enable_cmd(hdd_ctx->psoc, INVALID_PDEV_ID,
+					   WLAN_INVALID_VDEV_ID);
 	qdf_create_work(0, &hdd_ctx->twt_en_dis_work,
 			hdd_twt_update_work_handler, hdd_ctx);
 }

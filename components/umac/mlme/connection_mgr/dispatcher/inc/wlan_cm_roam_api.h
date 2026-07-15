@@ -1549,6 +1549,7 @@ wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 			     enum wlan_diag_btm_block_reason reason);
 
 void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
 				    struct element_info *assoc_ie);
 
 void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
@@ -1850,6 +1851,7 @@ wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 
 static inline
 void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
 				    struct element_info *assoc_ie)
 {}
 
