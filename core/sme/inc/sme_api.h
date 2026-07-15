@@ -3718,6 +3718,24 @@ void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
  */
 void sme_update_uhr_cap_mcs(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t mcs);
+
+/**
+ * sme_set_uhr_testbed_def() - set uhr testbed default
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ *
+ * Return: None
+ */
+void sme_set_uhr_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
+
+/**
+ * sme_reset_uhr_caps() - reset uhr capabilities
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ *
+ * Return: None
+ */
+void sme_reset_uhr_caps(mac_handle_t mac_handle, uint8_t vdev_id);
 #else
 static inline void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
 					  struct wma_tgt_cfg *cfg)
@@ -3726,6 +3744,14 @@ static inline void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
 static inline void sme_update_uhr_cap_mcs(mac_handle_t mac_handle,
 					  uint8_t session_id,
 					  uint8_t mcs)
+{}
+
+static inline void sme_set_uhr_testbed_def(mac_handle_t mac_handle,
+					   uint8_t vdev_id)
+{}
+
+static inline void sme_reset_uhr_caps(mac_handle_t mac_handle,
+				      uint8_t vdev_id)
 {}
 #endif
 

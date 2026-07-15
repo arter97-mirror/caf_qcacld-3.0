@@ -11844,6 +11844,128 @@ void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
 		     &mac_ctx->uhr_cap_5g,
 		     sizeof(struct wlan_uhr_cap_info));
 }
+
+void sme_set_uhr_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	struct wlan_mlme_uhr_caps *mlme_uhr_cap;
+	struct wlan_objmgr_vdev *vdev;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+
+	mlme_uhr_cap = &mac_ctx->mlme_cfg->mlme_uhr_caps;
+	sme_debug("set UHR caps testbed defaults");
+	mlme_uhr_cap->dps_present = 0;
+	mlme_uhr_cap->dps_assist_support = 0;
+	mlme_uhr_cap->ap_static_hcm_support = 0;
+	mlme_uhr_cap->reserved_mac_b3 = 0;
+	mlme_uhr_cap->npca_support = 0;
+	mlme_uhr_cap->bsr_support = 0;
+	mlme_uhr_cap->addn_mapped_tid_support = 0;
+	mlme_uhr_cap->eotsp_support = 0;
+	mlme_uhr_cap->dso_support = 0;
+	mlme_uhr_cap->p_edca_support = 0;
+	mlme_uhr_cap->dbe_support = 0;
+	mlme_uhr_cap->ul_lli_support = 0;
+	mlme_uhr_cap->p2p_lli_support = 0;
+	mlme_uhr_cap->puo_support = 0;
+	mlme_uhr_cap->ap_puo_support = 0;
+	mlme_uhr_cap->duo_support = 0;
+	mlme_uhr_cap->ul_mu_data_disable_rx_support = 0;
+	mlme_uhr_cap->aom_support = 0;
+	mlme_uhr_cap->ifcs_support = 0;
+	mlme_uhr_cap->uhr_trs_support = 0;
+	mlme_uhr_cap->txspg_support = 0;
+	mlme_uhr_cap->txop_return_support_intxspg = 0;
+	mlme_uhr_cap->uhr_op_mode_param_update_timeout = 0;
+	mlme_uhr_cap->param_update_adv_notify = 0;
+	mlme_uhr_cap->update_ind_in_tim = 0;
+	mlme_uhr_cap->bounded_ess = 0;
+	mlme_uhr_cap->btm_assurance = 0;
+	mlme_uhr_cap->cobf_support = 0;
+	mlme_uhr_cap->max_nss_rx_ndp_sounding_80mhz = 0;
+	mlme_uhr_cap->max_nss_rx_dl_mumimo_80mhz = 0;
+	mlme_uhr_cap->max_nss_rx_ndp_sounding_160mhz = 0;
+	mlme_uhr_cap->max_nss_total_rx_dl_mumimo_160mhz = 0;
+	mlme_uhr_cap->max_nss_rx_ndp_sounding_320mhz = 0;
+	mlme_uhr_cap->max_nss_total_rx_dl_mumimo_320mhz = 0;
+	mlme_uhr_cap->elr_rx_support = 0;
+	mlme_uhr_cap->elr_tx_support = 0;
+	mlme_uhr_cap->partial_bw_dl_mumimo_support = 0;
+	mlme_uhr_cap->partial_bw_ul_mumimo_support = 0;
+	mlme_uhr_cap->mcs15_support = 0;
+	mlme_uhr_cap->two_x_ldpc_tx_support = 0;
+	mlme_uhr_cap->two_x_ldpc_rx_support = 0;
+	mlme_uhr_cap->ueqm_tx_support_max_nss_tx = 0;
+	mlme_uhr_cap->ueqm_rx_support_max_nss_rx = 0;
+	mlme_uhr_cap->cobf_joint_sounding_support = 0;
+	mlme_uhr_cap->im_tx_support = 0;
+	mlme_uhr_cap->im_rx_support = 0;
+	mlme_uhr_cap->co_sr_mode1_support = 0;
+	mlme_uhr_cap->co_sr_mode2_support = 0;
+	mlme_uhr_cap->dru_dbw20_pbw20_support = 0;
+	mlme_uhr_cap->dru_dbw40_pbw40_support = 0;
+	mlme_uhr_cap->dru_dbw80_pbw80_support = 0;
+	mlme_uhr_cap->dru_dbw80_pbw160_support = 0;
+	mlme_uhr_cap->dru_dbw80_pbw320_support = 0;
+	mlme_uhr_cap->dru_dbw20_pbw_ge80_support = 0;
+	mlme_uhr_cap->dru_dbw40_pbw_ge80_support = 0;
+	mlme_uhr_cap->dru_dbw60_pbw_ge80_support = 0;
+	mlme_uhr_cap->dru_rru_hybrid_support = 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						     WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+	csr_update_session_uhr_cap(mac_ctx, session, vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	qdf_mem_copy(&mac_ctx->uhr_cap_2g, mlme_uhr_cap,
+		     sizeof(struct wlan_uhr_cap_info));
+	qdf_mem_copy(&mac_ctx->uhr_cap_5g, mlme_uhr_cap,
+		     sizeof(struct wlan_uhr_cap_info));
+}
+
+void sme_reset_uhr_caps(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	struct wlan_objmgr_vdev *vdev;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+
+	sme_debug("reset UHR caps");
+	qdf_mem_copy(&mac_ctx->uhr_cap_2g,
+		     &mac_ctx->uhr_cap_2g_orig,
+		     sizeof(struct wlan_uhr_cap_info));
+	qdf_mem_copy(&mac_ctx->uhr_cap_5g,
+		     &mac_ctx->uhr_cap_5g_orig,
+		     sizeof(struct wlan_uhr_cap_info));
+
+	qdf_mem_copy(&mac_ctx->mlme_cfg->mlme_uhr_caps,
+		     &mac_ctx->uhr_cap_5g_orig,
+		     sizeof(struct wlan_mlme_uhr_caps));
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						     WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+	csr_update_session_uhr_cap(mac_ctx, session, vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+}
 #endif
 
 void sme_notify_hw_mode_change(void)
