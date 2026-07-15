@@ -5601,7 +5601,7 @@ sir_convert_reassoc_req_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	}
 
 	status = util_find_mlie(pframe + WLAN_REASSOC_REQ_IES_OFFSET,
-				nframe - WLAN_ASSOC_REQ_IES_OFFSET,
+				nframe - WLAN_REASSOC_REQ_IES_OFFSET,
 				&ml_ie, &ml_ie_total_len);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		util_get_bvmlie_persta_partner_info(ml_ie,
