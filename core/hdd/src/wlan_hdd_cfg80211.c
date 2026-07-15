@@ -10407,6 +10407,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_UHR_MCS] = {
+			.type = NLA_U8},
 
 };
 
@@ -19669,6 +19671,17 @@ BTM_REQ_RESP_DONE:
 			if (ret_val)
 				hdd_err("Failed to set STA 20 MHz only support");
 		}
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_UHR_MCS;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Configure UHR MCS: %d", cfg_val);
+		sme_update_uhr_cap_mcs(hdd_ctx->mac_handle, link_info->vdev_id,
+				       cfg_val);
+		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+					  link_info->vdev_id,
+					  adapter->device_mode);
 	}
 
 	if (update_sme_cfg)
