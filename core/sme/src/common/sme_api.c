@@ -17081,6 +17081,21 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
 		     sizeof(tDot11fIEeht_cap));
 }
 
+#ifdef WLAN_FEATURE_11BN
+void sme_update_uhr_cap_mcs(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t mcs)
+{
+	sme_debug("UHR MCS update via EHT caps path, mcs %d", mcs);
+	/*
+	 * UHR does not add new MCS rates in probe/assoc management frames.
+	 * update_peer_flags_tlv_uhrinfo() copies peer_eht_rx/tx_mcs_set[]
+	 * directly into the UHR WMI TLV at association time, so updating the
+	 * EHT MCS fields is the correct mechanism for controlling UHR MCS.
+	 */
+	sme_update_eht_cap_mcs(mac_handle, session_id, mcs);
+}
+#endif
+
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
 			    struct qdf_mac_addr *active_link_addr,

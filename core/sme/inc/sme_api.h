@@ -3702,9 +3702,30 @@ int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
  */
 void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
 			    struct wma_tgt_cfg *cfg);
+
+/**
+ * sme_update_uhr_cap_mcs() - update UHR MCS capability based on user request
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @mcs: MCS value (enum eht_mcs_config: 0=MCS0-7, 1=MCS0-9, 2=MCS0-11,
+ * 3=MCS0-13)
+ *
+ * UHR does not define new MCS rates in management frames; the MCS capability
+ * is inherited from EHT. This function updates the EHT MCS fields which are
+ * then copied to the UHR WMI TLV at peer association time.
+ *
+ * Return: None
+ */
+void sme_update_uhr_cap_mcs(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t mcs);
 #else
 static inline void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
 					  struct wma_tgt_cfg *cfg)
+{}
+
+static inline void sme_update_uhr_cap_mcs(mac_handle_t mac_handle,
+					  uint8_t session_id,
+					  uint8_t mcs)
 {}
 #endif
 
