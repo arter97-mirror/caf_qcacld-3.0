@@ -10409,7 +10409,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_UHR_MCS] = {
 			.type = NLA_U8},
-
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_SET_UHR_TESTBED_DEFAULTS] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -19679,6 +19680,22 @@ BTM_REQ_RESP_DONE:
 		hdd_debug("Configure UHR MCS: %d", cfg_val);
 		sme_update_uhr_cap_mcs(hdd_ctx->mac_handle, link_info->vdev_id,
 				       cfg_val);
+		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+					  link_info->vdev_id,
+					  adapter->device_mode);
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_SET_UHR_TESTBED_DEFAULTS;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Configure UHR testbed defaults %d", cfg_val);
+		if (!cfg_val)
+			sme_reset_uhr_caps(hdd_ctx->mac_handle,
+					   link_info->vdev_id);
+		else
+			sme_set_uhr_testbed_def(hdd_ctx->mac_handle,
+						link_info->vdev_id);
+
 		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
 					  link_info->vdev_id,
 					  adapter->device_mode);
