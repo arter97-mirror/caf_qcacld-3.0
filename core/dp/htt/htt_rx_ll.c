@@ -969,6 +969,16 @@ htt_rx_offload_msdu_pop_ll(htt_pdev_handle pdev,
 	*fw_desc = HTT_RX_OFFLOAD_DELIVER_IND_MSDU_DESC_GET(*msdu_hdr);
 
 	qdf_nbuf_pull_head(buf, HTT_RX_OFFLOAD_DELIVER_IND_MSDU_HDR_BYTES);
+
+	if (qdf_unlikely(msdu_len > qdf_nbuf_len(buf))) {
+		__QDF_TRACE_RL(QDF_TRACE_LEVEL_ERROR, QDF_MODULE_ID_HTT,
+			       "%s: drop frame with invalid msdu len %u %zu",
+			       __func__, msdu_len, qdf_nbuf_len(buf));
+		htt_rx_desc_frame_free(pdev, buf);
+		*head_buf = *tail_buf = NULL;
+		return 1;
+	}
+
 	qdf_nbuf_set_pktlen(buf, msdu_len);
 	return 0;
 }
@@ -1021,6 +1031,16 @@ htt_rx_offload_paddr_msdu_pop_ll(htt_pdev_handle pdev,
 	*fw_desc = HTT_RX_OFFLOAD_DELIVER_IND_MSDU_DESC_GET(*msdu_hdr);
 
 	qdf_nbuf_pull_head(buf, HTT_RX_OFFLOAD_DELIVER_IND_MSDU_HDR_BYTES);
+
+	if (qdf_unlikely(msdu_len > qdf_nbuf_len(buf))) {
+		__QDF_TRACE_RL(QDF_TRACE_LEVEL_ERROR, QDF_MODULE_ID_HTT,
+			       "%s: drop frame with invalid msdu len %u %zu",
+			       __func__, msdu_len, qdf_nbuf_len(buf));
+		htt_rx_desc_frame_free(pdev, buf);
+		*head_buf = *tail_buf = NULL;
+		return 1;
+	}
+
 	qdf_nbuf_set_pktlen(buf, msdu_len);
 	return 0;
 }
