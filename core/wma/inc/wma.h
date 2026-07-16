@@ -1133,6 +1133,9 @@ typedef struct {
 	wma_chan_hop_status_cb chan_hop_status_cb;
 	void *chan_hop_status_cb_ctx;
 #endif
+	A_INT32 wow_wakeup_reason;
+	uint8_t wow_wakeup_vdev_id;
+	bool wow_wakeup_reason_valid;
 } t_wma_handle, *tp_wma_handle;
 
 /**
