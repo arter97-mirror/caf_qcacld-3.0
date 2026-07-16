@@ -2726,6 +2726,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 						ap_ctx->dfs_cac_block_tx);
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 			}
+		} else if (hdd_ctx->dev_dfs_cac_status == DFS_CAC_IN_PROGRESS &&
+			   !wlan_util_is_vdev_in_cac_wait(hdd_ctx->pdev,
+							  WLAN_HDD_ID_OBJ_MGR)) {
+			hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 		}
 		hdd_nofl_info("Ap stopped vid %d reason=%d status %d",
 			      link_info->vdev_id,
