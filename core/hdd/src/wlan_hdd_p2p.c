@@ -252,6 +252,28 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	return qdf_status_to_os_return(status);
 }
 
+#ifdef CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					struct ieee80211_channel *chan,
+					unsigned int duration, u64 *cookie,
+					const u8 *rx_addr)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_remain_on_channel(wiphy, wdev, chan,
+						      duration, cookie);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
 int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					struct ieee80211_channel *chan,
@@ -271,6 +293,7 @@ int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 
 	return errno;
 }
+#endif
 
 static int
 __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,

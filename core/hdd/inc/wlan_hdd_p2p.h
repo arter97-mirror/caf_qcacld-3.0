@@ -44,10 +44,18 @@ struct p2p_app_set_ps {
 	uint8_t ps_selection;
 };
 
+#ifdef CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					struct ieee80211_channel *chan,
+					unsigned int duration, u64 *cookie,
+					const u8 *rx_addr);
+#else
 int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					struct ieee80211_channel *chan,
 					unsigned int duration, u64 *cookie);
+#endif
 
 int wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 					       struct wireless_dev *wdev,
