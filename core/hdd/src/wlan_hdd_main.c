@@ -4344,8 +4344,38 @@ hdd_use_sta_vdev_for_p2p_device_operations(struct hdd_context *hdd_ctx,
 	return false;
 }
 
+/**
+ * hdd_log_iftype_num() - function to log valid interface counters in array
+ * before passing to cfg80211_check_combinations
+ * @new_type: new interface type to add
+ * @iftype_num: array of interface counters
+ *
+ * Return: None
+ */
+static void hdd_log_iftype_num(enum nl80211_iftype new_type,
+			       u32 iftype_num[])
+{
+	char buf[64] = "";
+	int i, pos = 0;
+
+	for (i = 0; i < NUM_NL80211_IFTYPES; i++)
+		if (iftype_num[i])
+			pos += qdf_scnprintf(buf + pos, sizeof(buf) - pos,
+					     " [%d]=%u", i, iftype_num[i]);
+	hdd_debug("iface combination check new_type %d:%s", new_type, buf);
+}
+
+/**
+ * hdd_cfg80211_validate_add_iface() - function to validate combination
+ * @hdd_ctx: pointer to hdd context
+ * @new_type: new interface type adds to validate
+ * @new_adapter: pointer to new adapter to add or change
+ *
+ * Return: 0 for success; non-zero for failure
+ */
 static int hdd_cfg80211_validate_add_iface(struct hdd_context *hdd_ctx,
-					   enum nl80211_iftype new_type)
+					   enum nl80211_iftype new_type,
+					   struct hdd_adapter *new_adapter)
 {
 	struct hdd_adapter *adapter = NULL;
 	struct hdd_adapter *next_adapter = NULL;
@@ -4367,6 +4397,20 @@ static int hdd_cfg80211_validate_add_iface(struct hdd_context *hdd_ctx,
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_ALLOW_NEW_INTF) {
 		if (hdd_is_interface_up(adapter)) {
+			/*
+			 * Skip the adapter whose interface type is being
+			 * changed. Its device_mode is already updated to the
+			 * new mode but wdev->iftype has not been written yet
+			 * (that happens only after hdd_start_adapter succeeds).
+			 * Counting it here with the stale wdev->iftype would
+			 * incorrectly add the old type to the combination check
+			 * while new_type below already represents its new type.
+			 */
+			if (adapter == new_adapter) {
+				hdd_adapter_dev_put_debug(adapter,
+							  NET_DEV_HOLD_ALLOW_NEW_INTF);
+				continue;
+			}
 			wdev = &adapter->wdev;
 			if (wdev->iftype < NUM_NL80211_IFTYPES &&
 			    adapter->device_mode != QDF_P2P_DEVICE_MODE &&
@@ -4378,6 +4422,7 @@ static int hdd_cfg80211_validate_add_iface(struct hdd_context *hdd_ctx,
 	}
 
 	params.iftype_num[new_type]++;
+	hdd_log_iftype_num(new_type, params.iftype_num);
 	return cfg80211_check_combinations(hdd_ctx->wiphy, &params);
 }
 
@@ -4406,7 +4451,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
-	if (hdd_cfg80211_validate_add_iface(hdd_ctx, type)) {
+	if (hdd_cfg80211_validate_add_iface(hdd_ctx, type, adapter)) {
 		hdd_err("iface validation failed for %d", type);
 		return -EINVAL;
 	}

@@ -2870,6 +2870,11 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	/* ap_ctx is never null, only check sap_ctx */
+	if (!sap_ctx) {
+		hdd_err("sap_ctx is NULL for vdev %d", link_info->vdev_id);
+		return -EINVAL;
+	}
 	sap_config = &ap_ctx->sap_config;
 
 	if (hdd_ctx->acs_policy.acs_chan_freq)
