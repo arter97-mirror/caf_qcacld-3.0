@@ -3621,6 +3621,103 @@ static inline uint8_t lim_build_nonce_ie(struct pe_session *pe_session,
 }
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
+#ifdef WLAN_FEATURE_11AX
+/**
+ * lim_save_and_advertise_max_he_bw() - Advertise self max HE/EHT BW
+ * @mac_ctx: Global MAC context
+ * @session: Pointer to PE session
+ * @saved: Out param, pre-call values of the fields this overwrites
+ *
+ * chan_width_2/3 and rx/tx_he_mcs_map_160/80_80 must change together:
+ * lim_update_he_bw_cap_mcs() clears both when it clears chan_width,
+ * so restoring only chan_width would pair a 160MHz-capable flag with
+ * an all-disabled 160MHz MCS-NSS map.
+ *
+ * Return: None
+ */
+static void
+lim_save_and_advertise_max_he_bw(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 tDot11fIEhe_cap *saved)
+{
+	bool is_band_2g;
+
+	saved->chan_width_0 = session->he_config.chan_width_0;
+	saved->chan_width_1 = session->he_config.chan_width_1;
+	saved->chan_width_2 = session->he_config.chan_width_2;
+	saved->chan_width_3 = session->he_config.chan_width_3;
+	*(uint16_t *)saved->rx_he_mcs_map_160 =
+		*(uint16_t *)session->he_config.rx_he_mcs_map_160;
+	*(uint16_t *)saved->tx_he_mcs_map_160 =
+		*(uint16_t *)session->he_config.tx_he_mcs_map_160;
+	*(uint16_t *)saved->rx_he_mcs_map_80_80 =
+		*(uint16_t *)session->he_config.rx_he_mcs_map_80_80;
+	*(uint16_t *)saved->tx_he_mcs_map_80_80 =
+		*(uint16_t *)session->he_config.tx_he_mcs_map_80_80;
+
+	if (!session->he_capable)
+		return;
+
+	is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq);
+	if (is_band_2g) {
+		session->he_config.chan_width_0 =
+			mac_ctx->he_cap_2g.chan_width_0;
+	} else {
+		session->he_config.chan_width_1 =
+			mac_ctx->he_cap_5g.chan_width_1;
+		session->he_config.chan_width_2 =
+			mac_ctx->he_cap_5g.chan_width_2;
+		session->he_config.chan_width_3 =
+			mac_ctx->he_cap_5g.chan_width_3;
+
+		*(uint16_t *)session->he_config.rx_he_mcs_map_160 =
+			*(uint16_t *)mac_ctx->he_cap_5g.rx_he_mcs_map_160;
+		*(uint16_t *)session->he_config.tx_he_mcs_map_160 =
+			*(uint16_t *)mac_ctx->he_cap_5g.tx_he_mcs_map_160;
+		*(uint16_t *)session->he_config.rx_he_mcs_map_80_80 =
+			*(uint16_t *)mac_ctx->he_cap_5g.rx_he_mcs_map_80_80;
+		*(uint16_t *)session->he_config.tx_he_mcs_map_80_80 =
+			*(uint16_t *)mac_ctx->he_cap_5g.tx_he_mcs_map_80_80;
+	}
+}
+
+/**
+ * lim_restore_he_bw() - Undo lim_save_and_advertise_max_he_bw()
+ * @session: Pointer to PE session
+ * @saved: Snapshot from lim_save_and_advertise_max_he_bw()
+ *
+ * Return: None
+ */
+static void
+lim_restore_he_bw(struct pe_session *session, const tDot11fIEhe_cap *saved)
+{
+	session->he_config.chan_width_0 = saved->chan_width_0;
+	session->he_config.chan_width_1 = saved->chan_width_1;
+	session->he_config.chan_width_2 = saved->chan_width_2;
+	session->he_config.chan_width_3 = saved->chan_width_3;
+	*(uint16_t *)session->he_config.rx_he_mcs_map_160 =
+		*(uint16_t *)saved->rx_he_mcs_map_160;
+	*(uint16_t *)session->he_config.tx_he_mcs_map_160 =
+		*(uint16_t *)saved->tx_he_mcs_map_160;
+	*(uint16_t *)session->he_config.rx_he_mcs_map_80_80 =
+		*(uint16_t *)saved->rx_he_mcs_map_80_80;
+	*(uint16_t *)session->he_config.tx_he_mcs_map_80_80 =
+		*(uint16_t *)saved->tx_he_mcs_map_80_80;
+}
+#else
+static inline void
+lim_save_and_advertise_max_he_bw(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 tDot11fIEhe_cap *saved)
+{
+}
+
+static inline void
+lim_restore_he_bw(struct pe_session *session, const tDot11fIEhe_cap *saved)
+{
+}
+#endif /* WLAN_FEATURE_11AX */
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3869,6 +3966,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	enum phy_ch_width saved_ch_width = pe_session->ch_width;
 	uint8_t saved_ht_supported_ch_width =
 		pe_session->htSupportedChannelWidthSet;
+	tDot11fIEhe_cap saved_he_bw;
 
 	/* Temporarily set to STA's maximum capability for advertisement */
 	pe_session->ch_width = pe_session->sta_max_ch_width;
@@ -3951,6 +4049,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (IS_DOT11_MODE_HE(pe_session->dot11mode))
 		lim_update_session_he_capable(mac_ctx, pe_session);
 
+	/*
+	 * Advertise the STA's true maximum HE/EHT bandwidth capability (see
+	 * lim_save_and_advertise_max_he_bw() kernel-doc) instead of the
+	 * value that was clamped to the current operating bandwidth at join
+	 * time.
+	 */
+	lim_save_and_advertise_max_he_bw(mac_ctx, pe_session, &saved_he_bw);
+
 	if (lim_is_session_he_capable(pe_session)) {
 		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
 					pe_session->curr_op_freq,
@@ -3984,6 +4090,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 */
 	pe_session->ch_width = saved_ch_width;
 	pe_session->htSupportedChannelWidthSet = saved_ht_supported_ch_width;
+	lim_restore_he_bw(pe_session, &saved_he_bw);
 
 	pe_debug("Restored operating bandwidth: ch_width=%d ht_width=%d",
 		 saved_ch_width, saved_ht_supported_ch_width);
