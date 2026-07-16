@@ -310,6 +310,65 @@ void wlan_coex_n79_vdev_init(struct coex_vdev_obj *vdev_obj)
 	qdf_mem_zero(vdev_obj, sizeof(*vdev_obj));
 }
 
+/*
+ * wlan_coex_n79_clamp_nss() - Clamp NSS to AP capability for N79 pre-check.
+ * @vdev: vdev object
+ * @dyn_cfg: dynamic NSS chain config for this vdev
+ * @eff_rx_nss: out - effective Rx NSS to compare against N79 limit
+ * @eff_tx_nss: out - effective Tx NSS to compare against N79 limit
+ *
+ * For STA/P2P_CLIENT, clamps the host-configured NSS to the AP's
+ * association-time capability so the pre-check correctly skips WMI when
+ * the user has already forced a lower NSS or the AP cap is at the N79
+ * limit.  For other modes (SAP/P2P_GO/NAN) the host config is used
+ * directly since there is no upstream AP constraint.
+ *
+ * Return: QDF_STATUS_SUCCESS, or error if vdev MLME object is NULL.
+ */
+static QDF_STATUS
+wlan_coex_n79_clamp_nss(struct wlan_objmgr_vdev *vdev,
+			struct wlan_mlme_nss_chains *dyn_cfg,
+			uint8_t *eff_rx_nss, uint8_t *eff_tx_nss)
+{
+	uint8_t cap_rx_nss = 0, cap_tx_nss = 0;
+	uint8_t op_rx_nss = 0, op_tx_nss = 0;
+	enum QDF_OPMODE opmode;
+	QDF_STATUS status;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode == QDF_STA_MODE || opmode == QDF_P2P_CLIENT_MODE) {
+		status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+							   &cap_tx_nss,
+							   &cap_rx_nss,
+							   &op_tx_nss,
+							   &op_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			coex_err("vdev%u: failed to get bss nss params",
+				 wlan_vdev_get_id(vdev));
+			return status;
+		}
+		if (cap_rx_nss && cap_tx_nss) {
+			*eff_rx_nss = QDF_MIN(
+				cap_rx_nss,
+				(uint8_t)dyn_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ]);
+			*eff_tx_nss = QDF_MIN(
+				cap_tx_nss,
+				(uint8_t)dyn_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ]);
+		} else {
+			*eff_rx_nss =
+				(uint8_t)dyn_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
+			*eff_tx_nss =
+				(uint8_t)dyn_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
+		}
+	} else {
+		*eff_rx_nss =
+			(uint8_t)dyn_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
+		*eff_tx_nss =
+			(uint8_t)dyn_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
 void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_objmgr_vdev *vdev,
 				     void *arg)
@@ -318,7 +377,7 @@ void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 	struct coex_psoc_obj *psoc_obj;
 	struct wlan_mlme_nss_chains params;
 	struct wlan_mlme_nss_chains *dyn_cfg;
-	uint8_t cap_rx_nss = 0, cap_tx_nss = 0, op_rx_nss = 0, op_tx_nss = 0;
+	uint8_t eff_rx_nss, eff_tx_nss;
 	qdf_freq_t freq;
 	QDF_STATUS status;
 
@@ -332,9 +391,6 @@ void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 			 wlan_vdev_get_id(vdev));
 		return;
 	}
-
-	wlan_vdev_mlme_get_bss_nss_params(vdev, &cap_tx_nss, &cap_rx_nss,
-					  &op_tx_nss, &op_rx_nss);
 
 	dyn_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dyn_cfg) {
@@ -352,11 +408,15 @@ void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (cap_rx_nss <= psoc_obj->n79_limit_rx_nss &&
+	status = wlan_coex_n79_clamp_nss(vdev, dyn_cfg,
+					 &eff_rx_nss, &eff_tx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	if (eff_rx_nss <= psoc_obj->n79_limit_rx_nss &&
+	    eff_tx_nss <= psoc_obj->n79_limit_tx_nss &&
 	    dyn_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ] <=
 	    psoc_obj->n79_limit_rx_chain &&
-	    dyn_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ] <=
-	    psoc_obj->n79_limit_tx_nss &&
 	    dyn_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ] <=
 	    psoc_obj->n79_limit_tx_chain) {
 		coex_debug("vdev%u: skip N79 apply, at limit rx/tx nss=%u/%u chains=%u/%u",
@@ -431,6 +491,8 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_nss_chains params;
 	struct wlan_mlme_nss_chains *dyn_cfg;
 	bool chains_only = arg && *(bool *)arg;
+	uint8_t cap_rx_nss = 0, cap_tx_nss = 0, op_rx_nss = 0, op_tx_nss = 0;
+	enum QDF_OPMODE opmode;
 	QDF_STATUS status;
 
 	vdev_obj = wlan_vdev_get_coex_obj(vdev);
@@ -450,7 +512,8 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if ((opmode == QDF_STA_MODE || opmode == QDF_P2P_CLIENT_MODE) &&
 	    wlan_is_tdls_session_present(vdev) == QDF_STATUS_SUCCESS) {
 		vdev_obj->n79_restore_pending = true;
 		coex_debug("vdev%u: TDLS active, N79 restore deferred",
@@ -475,9 +538,45 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 		params.tx_nss[NSS_CHAINS_BAND_5GHZ] =
 			psoc_obj->n79_limit_tx_nss;
 	} else {
-		/* SS restore: restore full NSS */
-		params.rx_nss[NSS_CHAINS_BAND_5GHZ] = vdev_obj->saved_rx_nss;
-		params.tx_nss[NSS_CHAINS_BAND_5GHZ] = vdev_obj->saved_tx_nss;
+		/*
+		 * SS restore: for STA/P2P_CLIENT, clamp saved NSS to the AP's
+		 * association-time capability.  saved_rx/tx_nss come from
+		 * dyn_cfg (INI, e.g. 4) but the AP may support fewer streams
+		 * (e.g. 3x3).  FW rejects rx req_nss > assoc_peer_nss; tx_nss
+		 * is clamped for symmetry to keep dyn_cfg consistent with the
+		 * actual link capability and avoid asymmetric WMI values.
+		 * cap_rx/tx_nss are set at association and are not reduced by
+		 * DMS/OMN (only op_rx/tx_nss change after OMN exchanges).
+		 *
+		 * For SAP/P2P_GO/NAN AP roles there is no upstream AP
+		 * association, so no assoc_peer_nss constraint exists in FW and
+		 * the saved NSS can be restored directly.
+		 */
+		if (opmode == QDF_STA_MODE || opmode == QDF_P2P_CLIENT_MODE) {
+			status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+								   &cap_tx_nss,
+								   &cap_rx_nss,
+								   &op_tx_nss,
+								   &op_rx_nss);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				coex_err("vdev%u: failed to get bss nss params",
+					 wlan_vdev_get_id(vdev));
+				return;
+			}
+			params.rx_nss[NSS_CHAINS_BAND_5GHZ] =
+				cap_rx_nss ?
+				QDF_MIN(vdev_obj->saved_rx_nss, cap_rx_nss) :
+				vdev_obj->saved_rx_nss;
+			params.tx_nss[NSS_CHAINS_BAND_5GHZ] =
+				cap_tx_nss ?
+				QDF_MIN(vdev_obj->saved_tx_nss, cap_tx_nss) :
+				vdev_obj->saved_tx_nss;
+		} else {
+			params.rx_nss[NSS_CHAINS_BAND_5GHZ] =
+				vdev_obj->saved_rx_nss;
+			params.tx_nss[NSS_CHAINS_BAND_5GHZ] =
+				vdev_obj->saved_tx_nss;
+		}
 	}
 	params.num_rx_chains[NSS_CHAINS_BAND_5GHZ] = vdev_obj->saved_rx_chains;
 	params.num_tx_chains[NSS_CHAINS_BAND_5GHZ] = vdev_obj->saved_tx_chains;
@@ -517,15 +616,14 @@ void wlan_coex_n79_activate_vdev(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
 	struct wlan_mlme_nss_chains *dyn_cfg;
 	struct coex_psoc_obj *psoc_obj;
-	uint8_t cap_rx_nss = 0, cap_tx_nss = 0, op_rx_nss = 0, op_tx_nss = 0;
+	uint8_t eff_rx_nss, eff_tx_nss;
+	enum QDF_OPMODE opmode;
+	QDF_STATUS status;
 	qdf_freq_t freq;
 
 	freq = wlan_get_operation_chan_freq(vdev);
 	if (!wlan_reg_is_5ghz_ch_freq(freq))
 		return;
-
-	wlan_vdev_mlme_get_bss_nss_params(vdev, &cap_tx_nss, &cap_rx_nss,
-					  &op_tx_nss, &op_rx_nss);
 
 	dyn_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dyn_cfg)
@@ -534,11 +632,18 @@ void wlan_coex_n79_activate_vdev(struct wlan_objmgr_psoc *psoc,
 	psoc_obj = wlan_psoc_get_coex_obj(psoc);
 	if (!psoc_obj)
 		return;
-	if (cap_rx_nss <= psoc_obj->n79_limit_rx_nss &&
+
+	status = wlan_coex_n79_clamp_nss(vdev, dyn_cfg,
+					 &eff_rx_nss, &eff_tx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (eff_rx_nss <= psoc_obj->n79_limit_rx_nss &&
+	    eff_tx_nss <= psoc_obj->n79_limit_tx_nss &&
 	    dyn_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ] <=
 	    psoc_obj->n79_limit_rx_chain &&
-	    dyn_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ] <=
-	    psoc_obj->n79_limit_tx_nss &&
 	    dyn_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ] <=
 	    psoc_obj->n79_limit_tx_chain) {
 		coex_debug("vdev%u: skip N79 apply, at limit rx/tx nss=%u/%u chains=%u/%u",
@@ -550,7 +655,7 @@ void wlan_coex_n79_activate_vdev(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	if ((opmode == QDF_STA_MODE || opmode == QDF_P2P_CLIENT_MODE) &&
 	    wlan_is_tdls_session_present(vdev) == QDF_STATUS_SUCCESS)
 		wlan_tdls_check_and_teardown_links_sync(psoc, vdev);
 
