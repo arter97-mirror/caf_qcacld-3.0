@@ -26,6 +26,7 @@
 #include "wlan_mlo_mgr_public_structs.h"
 #include "wlan_mlo_mgr_sta.h"
 #include <../../core/src/wlan_cm_roam_i.h>
+#include "connection_mgr/core/src/wlan_cm_main_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include <include/wlan_mlme_cmn.h>
@@ -1355,7 +1356,11 @@ mlo_roam_is_internal_disconnect(struct wlan_objmgr_vdev *link_vdev)
 
 		if (!wlan_cm_get_active_disconnect_req(link_vdev,
 						       disconn_req)) {
-			mlme_err("vdev: %d: Active disconnect not found",
+			if (cm_get_ho_disconnect_pending(link_vdev)) {
+				qdf_mem_free(disconn_req);
+				return true;
+			}
+			mlme_err("vdev: %d: active or pending disconnect not found",
 				 wlan_vdev_get_id(link_vdev));
 			qdf_mem_free(disconn_req);
 			return false;
@@ -1417,6 +1422,7 @@ mlo_roam_validate_req(struct wlan_objmgr_vdev *vdev,
 			}
 			copied_conn_req_lock_release(sta_ctx);
 		}
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
