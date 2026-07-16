@@ -8887,11 +8887,22 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	struct stats_event *stats;
 	struct hdd_fw_txrx_stats txrx_stats = {0};
 	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	bool get_peer_info_enable = false;
+	QDF_STATUS qdf_status;
 	uint8_t *peer_addr;
 
 	if (hdd_stats->class_a_stat.is_tx_rate_version_checked &&
 	    !hdd_stats->class_a_stat.tx_rate_version)
 		return;
+
+	qdf_status = ucfg_mlme_get_sap_get_peer_info(hdd_ctx->psoc,
+						     &get_peer_info_enable);
+	if (QDF_IS_STATUS_ERROR(qdf_status) || !get_peer_info_enable) {
+		hdd_debug_rl("WMI_SERVICE_PEER_STATS_INFO not supported");
+		return;
+	}
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_debug("Roaming in progress");
