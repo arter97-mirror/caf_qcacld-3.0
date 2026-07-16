@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -402,6 +402,7 @@ ol_rx_reorder_flush_frag(htt_pdev_handle htt_pdev,
 	struct ol_rx_reorder_array_elem_t *rx_reorder_array_elem;
 	int seq;
 
+	qdf_spin_lock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 	seq = seq_num & peer->tids_rx_reorder[tid].win_sz_mask;
 	rx_reorder_array_elem = &peer->tids_rx_reorder[tid].array[seq];
 	if (rx_reorder_array_elem->head) {
@@ -409,6 +410,7 @@ ol_rx_reorder_flush_frag(htt_pdev_handle htt_pdev,
 		rx_reorder_array_elem->head = NULL;
 		rx_reorder_array_elem->tail = NULL;
 	}
+	qdf_spin_unlock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 }
 
 /*
@@ -461,6 +463,8 @@ ol_rx_reorder_store_frag(ol_txrx_pdev_handle pdev,
 		return;
 	}
 
+	qdf_spin_lock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
+
 	if ((!more_frag) && (!fragno) && (!rx_reorder_array_elem->head)) {
 		rx_reorder_array_elem->head = frag;
 		rx_reorder_array_elem->tail = frag;
@@ -468,6 +472,7 @@ ol_rx_reorder_store_frag(ol_txrx_pdev_handle pdev,
 		ol_rx_defrag(pdev, peer, tid, rx_reorder_array_elem->head);
 		rx_reorder_array_elem->head = NULL;
 		rx_reorder_array_elem->tail = NULL;
+		qdf_spin_unlock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 		return;
 	}
 	if (rx_reorder_array_elem->head) {
@@ -512,6 +517,8 @@ ol_rx_reorder_store_frag(ol_txrx_pdev_handle pdev,
 			now_ms + pdev->rx.defrag.timeout_ms;
 		ol_rx_defrag_waitlist_add(peer, tid);
 	}
+
+	qdf_spin_unlock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 }
 
 /*

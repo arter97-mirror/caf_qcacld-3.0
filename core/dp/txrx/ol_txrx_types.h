@@ -1386,6 +1386,11 @@ struct ol_rx_reorder_t {
 	struct ol_rx_reorder_array_elem_t *array;
 	/* base - single rx reorder element used for non-aggr cases */
 	struct ol_rx_reorder_array_elem_t base;
+	/* serializes defrag array head/tail access against concurrent
+	 * RX-thread fragment insertion and control-path frag flush
+	 * (e.g. peer_flush_frags on key install)
+	 */
+	qdf_spinlock_t defrag_tid_lock;
 #if defined(QCA_SUPPORT_OL_RX_REORDER_TIMEOUT)
 	struct ol_rx_reorder_timeout_list_elem_t timeout;
 #endif
