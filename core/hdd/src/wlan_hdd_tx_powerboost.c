@@ -316,23 +316,41 @@ __tx_power_boost_mmap(struct hdd_context *hdd_ctx,
 		      struct vm_area_struct *vma)
 {
 	int ret = 0;
-	struct page *page = NULL;
 	unsigned long size = (unsigned long)(vma->vm_end - vma->vm_start);
+	unsigned long offset = (unsigned long)vma->vm_pgoff << PAGE_SHIFT;
 
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
 
-	if (size > hdd_ctx->tx_pb.dma.size) {
-		hdd_err_rl("TPB: mmap size check failed (%lu %u)",
-			size, hdd_ctx->tx_pb.dma.size);
+	if (!hdd_ctx->tx_pb.dma.vaddr || !hdd_ctx->tx_pb.dma.size) {
+		hdd_err_rl("TPB: mmap on uninitialized buffer");
 		return -EINVAL;
 	}
 
-	page = virt_to_page((unsigned long)hdd_ctx->tx_pb.dma.vaddr +
-				(vma->vm_pgoff << PAGE_SHIFT));
-	ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(page),
+	/*
+	 * vm_pgoff is user-controlled; guard against an attacker supplying a
+	 * crafted offset that would let remap_pfn_range() install an arbitrary
+	 * physical page into userspace.  The two-step check is overflow-safe.
+	 */
+	if (offset > hdd_ctx->tx_pb.dma.size ||
+	    size > hdd_ctx->tx_pb.dma.size - offset) {
+		hdd_err_rl("TPB: mmap range check failed (off %lu size %lu buf %u)",
+			   offset, size, hdd_ctx->tx_pb.dma.size);
+		return -EINVAL;
+	}
+
+	/*
+	 * Derive the PFN from the buffer's DMA physical address rather than
+	 * virt_to_page(), which is invalid for coherent-DMA (non-lowmem)
+	 * Virtual Address Space.
+	 */
+	ret = remap_pfn_range(vma, vma->vm_start,
+			      PFN_DOWN(hdd_ctx->tx_pb.dma.paddr) + vma->vm_pgoff,
 			      size, vma->vm_page_prot);
-	hdd_debug("TPB: mmap for %zu bytes success", size);
+	if (ret)
+		hdd_err_rl("TPB: remap_pfn_range failed: %d", ret);
+	else
+		hdd_debug("TPB: mmap for %zu bytes success", size);
 
 	return ret;
 }
