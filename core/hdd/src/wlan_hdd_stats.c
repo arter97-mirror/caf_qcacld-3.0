@@ -9053,6 +9053,151 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
+static int hdd_put_eht_rate_info_to_skb(struct sk_buff *skb,
+					struct rate_info *rate)
+{
+	if (!(rate->flags & RATE_INFO_FLAGS_EHT_MCS))
+		return 0;
+
+	if (nla_put_u8(skb, NL80211_RATE_INFO_EHT_MCS, rate->mcs))
+		return -EINVAL;
+
+	if (rate->nss &&
+	    nla_put_u8(skb, NL80211_RATE_INFO_EHT_NSS, rate->nss))
+		return -EINVAL;
+
+	if (rate->bw == RATE_INFO_BW_320)
+		if (nla_put_flag(skb, NL80211_RATE_INFO_320_MHZ_WIDTH))
+			return -EINVAL;
+
+	return 0;
+}
+#else
+static inline int hdd_put_eht_rate_info_to_skb(struct sk_buff *skb,
+					       struct rate_info *rate)
+{
+	return 0;
+}
+#endif
+
+/**
+ * hdd_put_rate_info_to_skb() - Serialize rate_info into an NL skb nested attr
+ * @skb: sk_buff to write into
+ * @rate: rate_info struct (already populated by hdd_fill_sinfo_rate_info)
+ * @attr_idx: NL80211_STA_INFO_TX_BITRATE or NL80211_STA_INFO_RX_BITRATE
+ *
+ * Covers every field hdd_fill_sinfo_rate_info() may set: legacy, MCS, NSS,
+ * BW (HT/VHT/HE/EHT), SGI, and HE GI.
+ *
+ * Return: 0 on success, -EINVAL on failure
+ */
+static int hdd_put_rate_info_to_skb(struct sk_buff *skb,
+				    struct rate_info *rate,
+				    int attr_idx)
+{
+	struct nlattr *nla_rate;
+	uint32_t bitrate;
+	uint16_t bitrate_compat;
+
+	nla_rate = nla_nest_start(skb, attr_idx);
+	if (!nla_rate)
+		return -EINVAL;
+
+	bitrate = cfg80211_calculate_bitrate(rate);
+	bitrate_compat = bitrate < (1UL << 16) ? bitrate : 0;
+
+	if (bitrate &&
+	    nla_put_u32(skb, NL80211_RATE_INFO_BITRATE32, bitrate))
+		goto fail;
+
+	if (bitrate_compat &&
+	    nla_put_u16(skb, NL80211_RATE_INFO_BITRATE, bitrate_compat))
+		goto fail;
+
+	if (rate->flags & RATE_INFO_FLAGS_MCS) {
+		if (nla_put_u8(skb, NL80211_RATE_INFO_MCS, rate->mcs))
+			goto fail;
+	} else if (rate->flags & RATE_INFO_FLAGS_VHT_MCS) {
+		if (nla_put_u8(skb, NL80211_RATE_INFO_VHT_MCS, rate->mcs))
+			goto fail;
+		if (rate->nss &&
+		    nla_put_u8(skb, NL80211_RATE_INFO_VHT_NSS, rate->nss))
+			goto fail;
+	} else if (rate->flags & RATE_INFO_FLAGS_HE_MCS) {
+		if (nla_put_u8(skb, NL80211_RATE_INFO_HE_MCS, rate->mcs))
+			goto fail;
+		if (rate->nss &&
+		    nla_put_u8(skb, NL80211_RATE_INFO_HE_NSS, rate->nss))
+			goto fail;
+		if (nla_put_u8(skb, NL80211_RATE_INFO_HE_GI, rate->he_gi))
+			goto fail;
+		if (nla_put_u8(skb, NL80211_RATE_INFO_HE_DCM, rate->he_dcm))
+			goto fail;
+	} else if (hdd_put_eht_rate_info_to_skb(skb, rate)) {
+		goto fail;
+	}
+
+	if (rate->flags & RATE_INFO_FLAGS_SHORT_GI) {
+		if (nla_put_flag(skb, NL80211_RATE_INFO_SHORT_GI))
+			goto fail;
+	}
+
+	if (rate->bw == RATE_INFO_BW_40) {
+		if (nla_put_flag(skb, NL80211_RATE_INFO_40_MHZ_WIDTH))
+			goto fail;
+	} else if (rate->bw == RATE_INFO_BW_80) {
+		if (nla_put_flag(skb, NL80211_RATE_INFO_80_MHZ_WIDTH))
+			goto fail;
+	} else if (rate->bw == RATE_INFO_BW_160) {
+		if (nla_put_flag(skb, NL80211_RATE_INFO_160_MHZ_WIDTH))
+			goto fail;
+	}
+
+	nla_nest_end(skb, nla_rate);
+	hdd_nofl_debug("rate flags %d mcs %d nss %d he_gi %d dcm %d bw %d",
+		       rate->flags, rate->mcs, rate->nss, rate->he_gi,
+		       rate->he_dcm, rate->bw);
+	return 0;
+fail:
+	nla_nest_cancel(skb, nla_rate);
+	return -EINVAL;
+}
+
+/**
+ * hdd_put_chain_signal_avg_to_skb() - Serialize per-chain avg signal
+ * @skb: sk_buff to write into
+ * @sinfo: station_info struct pointer (chains bitmask + chain_signal_avg[])
+ *
+ * NL80211_STA_INFO_CHAIN_SIGNAL_AVG is a nested attribute where each active
+ * chain (per sinfo->chains bitmask) is packed as an s8, with the nla_type
+ * set to the chain index — matching NL80211_STA_INFO_CHAIN_SIGNAL format.
+ *
+ * Return: 0 on success, -EINVAL on failure
+ */
+static int hdd_put_chain_signal_avg_to_skb(struct sk_buff *skb,
+					   struct station_info *sinfo)
+{
+	struct nlattr *nla_chains;
+	uint8_t i;
+
+	nla_chains = nla_nest_start(skb, NL80211_STA_INFO_CHAIN_SIGNAL_AVG);
+	if (!nla_chains)
+		return -EINVAL;
+
+	for (i = 0; i < IEEE80211_MAX_CHAINS; i++) {
+		if (!(sinfo->chains & BIT(i)))
+			continue;
+		if (nla_put_u8(skb, i, sinfo->chain_signal_avg[i])) {
+			nla_nest_cancel(skb, nla_chains);
+			return -EINVAL;
+		}
+	}
+
+	nla_nest_end(skb, nla_chains);
+	return 0;
+}
+
 static int
 wlan_hdd_calculate_get_sta_len(struct station_info *sinfo)
 {
@@ -9099,6 +9244,37 @@ wlan_hdd_calculate_get_sta_len(struct station_info *sinfo)
 	/* NL80211_STA_INFO_INACTIVE_TIME */
 	if (sinfo->filled & HDD_INFO_INACTIVE_TIME)
 		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_TX_BITRATE */
+	if (sinfo->filled & HDD_INFO_TX_BITRATE)
+		nl_buf_len += nla_total_size(0) +
+			      /* BITRATE32 */
+			      nla_total_size(sizeof(uint32_t)) +
+			      /* BITRATE */
+			      nla_total_size(sizeof(uint16_t)) +
+			      /* MCS, VHT_MCS, VHT_NSS, HE_MCS,HE_NSS, HE_GI,
+			       * HE_DCM, EHT_MCS, EHT_NSS
+			       */
+			      nla_total_size(sizeof(uint8_t)) * 9 +
+			      /* SGI, 40/80/160/320 MHz flags */
+			      nla_total_size(0) * 5;
+	/* NL80211_STA_INFO_RX_BITRATE */
+	if (sinfo->filled & HDD_INFO_RX_BITRATE)
+		nl_buf_len += nla_total_size(0) +
+			      /* BITRATE32 */
+			      nla_total_size(sizeof(uint32_t)) +
+			      /* BITRATE */
+			      nla_total_size(sizeof(uint16_t)) +
+			      /* MCS, VHT_MCS, VHT_NSS, HE_MCS, HE_NSS, HE_GI,
+			       * HE_DCM, EHT_MCS, EHT_NSS
+			       */
+			      nla_total_size(sizeof(uint8_t)) * 9 +
+			      /* SGI, 40/80/160/320 MHz flags */
+			      nla_total_size(0) * 5;
+	/* NL80211_STA_INFO_CHAIN_SIGNAL_AVG */
+	if (sinfo->filled & HDD_INFO_CHAIN_SIGNAL_AVG)
+		nl_buf_len += nla_total_size(0) +
+			      nla_total_size(sizeof(uint8_t)) *
+			      IEEE80211_MAX_CHAINS;
 
 	return nl_buf_len;
 }
@@ -9262,6 +9438,31 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 			}
 		}
 
+		if (sinfo->filled & HDD_INFO_TX_BITRATE) {
+			if (hdd_put_rate_info_to_skb(
+						skb, &sinfo->txrate,
+						NL80211_STA_INFO_TX_BITRATE)) {
+				hdd_err("put tx_bitrate failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_RX_BITRATE) {
+			if (hdd_put_rate_info_to_skb(
+						skb, &sinfo->rxrate,
+						NL80211_STA_INFO_RX_BITRATE)) {
+				hdd_err("put rx_bitrate failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_CHAIN_SIGNAL_AVG) {
+			if (hdd_put_chain_signal_avg_to_skb(skb, sinfo)) {
+				hdd_err("put chain_signal_avg failed");
+				goto fail;
+			}
+		}
+
 		nla_nest_end(skb, nla_attr_1);
 		nla_nest_end(skb, nla_attr);
 		hdd_debug("PortId: %u", client_info->port_id);
@@ -9271,13 +9472,13 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 	if (!is_nl_app_registered)
 		return QDF_STATUS_SUCCESS;
 
-	hdd_nofl_debug("RSSI %d tx_bytes %llu rx_bytes %llu tx_packets %u rx_packets %u tx_retries %u tx_failed %u rx_mpdu %u fcs_count %u signal_avg %u expected throughput %u connected time %u inactive time %u",
-		       sinfo->signal, sinfo->tx_bytes, sinfo->rx_bytes,
-		       sinfo->tx_packets, sinfo->rx_packets, sinfo->tx_retries,
-		       sinfo->tx_failed, sinfo->rx_mpdu_count,
-		       sinfo->fcs_err_count, sinfo->signal_avg,
-		       sinfo->expected_throughput, sinfo->connected_time,
-		       sinfo->inactive_time);
+	hdd_nofl_debug("filled 0x%llx RSSI %d tx_bytes %llu rx_bytes %llu tx_packets %u rx_packets %u tx_retries %u tx_failed %u rx_mpdu %u fcs_cnt %u signal_avg %u expect tput %u conn. time %u inactive time %u",
+		       sinfo->filled, sinfo->signal, sinfo->tx_bytes,
+		       sinfo->rx_bytes, sinfo->tx_packets, sinfo->rx_packets,
+		       sinfo->tx_retries, sinfo->tx_failed,
+		       sinfo->rx_mpdu_count, sinfo->fcs_err_count,
+		       sinfo->signal_avg, sinfo->expected_throughput,
+		       sinfo->connected_time, sinfo->inactive_time);
 
 	return QDF_STATUS_SUCCESS;
 fail:
