@@ -4702,6 +4702,12 @@ extract_roam_ml_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			continue;
 		}
 
+		if (dst->num_links >= WLAN_MAX_ML_BSS_LINKS) {
+			wmi_err("num_links %d exceeded max %d, dropping link",
+				dst->num_links, WLAN_MAX_ML_BSS_LINKS);
+			break;
+		}
+
 		dst->present = true;
 
 		/* Self Link ID */

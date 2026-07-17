@@ -8309,7 +8309,8 @@ cm_roam_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.version = DIAG_MLO_SETUP_VERSION_V3;
 
-	for (i = 0; i < link_info->num_links; i++) {
+	for (i = 0; i < link_info->num_links &&
+	     i < MAX_NUM_LINKS_PER_EVENT; i++) {
 		wlan_diag_event.mlo_cmn_info[i].link_id =
 				link_info->ml_info[i].link_id;
 		wlan_diag_event.mlo_cmn_info[i].vdev_id =
