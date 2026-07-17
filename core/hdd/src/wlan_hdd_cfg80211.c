@@ -10225,6 +10225,9 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_AUX_LISTEN] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_TX] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_RX] = {.type = NLA_U8},
+
 };
 
 
@@ -10999,6 +11002,38 @@ static int hdd_config_rx_stbc(struct wlan_hdd_link_info *link_info,
 	ret = hdd_set_rx_stbc(link_info, rx_stbc);
 
 	return ret;
+}
+
+static int hdd_config_2x_ldpc_tx(struct wlan_hdd_link_info *link_info,
+				 const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t cfg_val;
+
+	cfg_val = nla_get_u8(attr);
+	hdd_debug("Configure UHR 2xLDPC Tx: %d", cfg_val);
+
+	sme_update_uhr_2x_ldpc_tx(hdd_ctx->mac_handle, link_info->vdev_id,
+				  cfg_val);
+	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, link_info->vdev_id,
+				  link_info->adapter->device_mode);
+	return 0;
+}
+
+static int hdd_config_2x_ldpc_rx(struct wlan_hdd_link_info *link_info,
+				 const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t cfg_val;
+
+	cfg_val = nla_get_u8(attr);
+	hdd_debug("Configure UHR 2xLDPC Rx: %d", cfg_val);
+
+	sme_update_uhr_2x_ldpc_rx(hdd_ctx->mac_handle, link_info->vdev_id,
+				  cfg_val);
+	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, link_info->vdev_id,
+				  link_info->adapter->device_mode);
+	return 0;
 }
 
 static int hdd_config_access_policy(struct wlan_hdd_link_info *link_info,
@@ -15493,6 +15528,10 @@ static const struct independent_setters independent_setters[] = {
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_QSH_SCAN_CTRL,
 	 hdd_set_cfg_qsh_scan_ctrl},
 #endif
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_TX,
+	 hdd_config_2x_ldpc_tx},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_RX,
+	 hdd_config_2x_ldpc_rx},
 };
 
 #ifdef WLAN_FEATURE_ELNA
