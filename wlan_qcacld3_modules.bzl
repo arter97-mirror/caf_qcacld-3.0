@@ -2814,6 +2814,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     combined_conditional_srcs = dict(_conditional_srcs)
+
+    # For adrastea (QCA_LL_TX_FLOW_CONTROL_V2 on an LL target), both
+    # CONFIG_WLAN_TX_FLOW_CONTROL and CONFIG_WLAN_TX_FLOW_CONTROL_V2 must
+    # use ol_txrx_flow_control.c instead of the cmn DP path.
+    if chipset == "adrastea":
+        adrastea_fc_srcs = ["core/dp/txrx/ol_txrx_flow_control.c"]
+        for key in ["CONFIG_WLAN_TX_FLOW_CONTROL", "CONFIG_WLAN_TX_FLOW_CONTROL_V2"]:
+            inner = dict(combined_conditional_srcs.get(key, {}))
+            inner[True] = adrastea_fc_srcs
+            combined_conditional_srcs[key] = inner
     wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
     existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
     existing_true_list = existing_inner.get(True, [])
