@@ -6193,6 +6193,10 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_smd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_11bi_pmkid_privacy_feature(hdd_ctx->psoc, feature_flags);
 
+	if (ucfg_dp_get_haps_config(hdd_ctx->psoc))
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_LATENCY_BASED_OPM);
+
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
 						       NLMSG_HDRLEN);
