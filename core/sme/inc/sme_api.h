@@ -3736,6 +3736,44 @@ void sme_set_uhr_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
  * Return: None
  */
 void sme_reset_uhr_caps(mac_handle_t mac_handle, uint8_t vdev_id);
+
+/**
+ * sme_update_uhr_2x_ldpc() - configure 2xLDPC Tx/Rx capability in UHR caps
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @tx_enable: true to enable 2xLDPC Tx, false to disable
+ * @rx_enable: true to enable 2xLDPC Rx, false to disable
+ *
+ * Updates two_x_ldpc_tx_support and two_x_ldpc_rx_support in both the
+ * 2G and 5G UHR capability stores and propagates to the vdev mlme state
+ * so the bits are reflected in subsequent association request frames.
+ *
+ * Return: None
+ */
+void sme_update_uhr_2x_ldpc(mac_handle_t mac_handle, uint8_t vdev_id,
+			    bool tx_enable, bool rx_enable);
+
+/**
+ * sme_update_uhr_2x_ldpc_tx() - set 2xLDPC Tx support in UHR caps
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @enable: 1 to enable, 0 to disable
+ *
+ * Return: None
+ */
+void sme_update_uhr_2x_ldpc_tx(mac_handle_t mac_handle, uint8_t vdev_id,
+			       uint8_t enable);
+
+/**
+ * sme_update_uhr_2x_ldpc_rx() - set 2xLDPC Rx support in UHR caps
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @enable: 1 to enable, 0 to disable
+ *
+ * Return: None
+ */
+void sme_update_uhr_2x_ldpc_rx(mac_handle_t mac_handle, uint8_t vdev_id,
+			       uint8_t enable);
 #else
 static inline void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
 					  struct wma_tgt_cfg *cfg)
@@ -3752,6 +3790,19 @@ static inline void sme_set_uhr_testbed_def(mac_handle_t mac_handle,
 
 static inline void sme_reset_uhr_caps(mac_handle_t mac_handle,
 				      uint8_t vdev_id)
+{}
+
+static inline void sme_update_uhr_2x_ldpc(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  bool tx_enable, bool rx_enable)
+{}
+
+static inline void sme_update_uhr_2x_ldpc_tx(mac_handle_t mac_handle,
+					     uint8_t vdev_id, uint8_t enable)
+{}
+
+static inline void sme_update_uhr_2x_ldpc_rx(mac_handle_t mac_handle,
+					     uint8_t vdev_id, uint8_t enable)
 {}
 #endif
 

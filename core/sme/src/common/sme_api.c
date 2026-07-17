@@ -11966,6 +11966,60 @@ void sme_reset_uhr_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	csr_update_session_uhr_cap(mac_ctx, session, vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 }
+
+void sme_update_uhr_2x_ldpc(mac_handle_t mac_handle, uint8_t vdev_id,
+			    bool tx_enable, bool rx_enable)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	struct wlan_objmgr_vdev *vdev;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+
+	sme_debug("UHR 2xLDPC tx %d rx %d", tx_enable, rx_enable);
+	mac_ctx->uhr_cap_2g.two_x_ldpc_tx_support = tx_enable ? 1 : 0;
+	mac_ctx->uhr_cap_2g.two_x_ldpc_rx_support = rx_enable ? 1 : 0;
+	mac_ctx->uhr_cap_5g.two_x_ldpc_tx_support = tx_enable ? 1 : 0;
+	mac_ctx->uhr_cap_5g.two_x_ldpc_rx_support = rx_enable ? 1 : 0;
+
+	mac_ctx->mlme_cfg->mlme_uhr_caps.two_x_ldpc_tx_support =
+						tx_enable ? 1 : 0;
+	mac_ctx->mlme_cfg->mlme_uhr_caps.two_x_ldpc_rx_support =
+						rx_enable ? 1 : 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+	csr_update_session_uhr_cap(mac_ctx, session, vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+}
+
+void sme_update_uhr_2x_ldpc_tx(mac_handle_t mac_handle, uint8_t vdev_id,
+			       uint8_t enable)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	bool rx_cur;
+
+	rx_cur = mac_ctx->uhr_cap_5g.two_x_ldpc_rx_support;
+	sme_update_uhr_2x_ldpc(mac_handle, vdev_id, enable, rx_cur);
+}
+
+void sme_update_uhr_2x_ldpc_rx(mac_handle_t mac_handle, uint8_t vdev_id,
+			       uint8_t enable)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	bool tx_cur;
+
+	tx_cur = mac_ctx->uhr_cap_5g.two_x_ldpc_tx_support;
+	sme_update_uhr_2x_ldpc(mac_handle, vdev_id, tx_cur, enable);
+}
 #endif
 
 void sme_notify_hw_mode_change(void)
