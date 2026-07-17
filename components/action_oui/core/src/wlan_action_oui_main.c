@@ -64,6 +64,7 @@ action_oui_allocate(struct action_oui_psoc_priv *psoc_priv)
 		psoc_priv->oui_priv[i] = oui_priv;
 	}
 
+	psoc_priv->state = ACTION_OUI_INIT;
 	return QDF_STATUS_SUCCESS;
 
 free_mem:
@@ -77,6 +78,7 @@ free_mem:
 		psoc_priv->oui_priv[j] = NULL;
 	}
 
+	psoc_priv->state = ACTION_OUI_DEINIT;
 	return QDF_STATUS_E_NOMEM;
 }
 
@@ -135,6 +137,8 @@ action_oui_destroy(struct action_oui_psoc_priv *psoc_priv)
 		qdf_mem_free(oui_priv);
 		oui_priv = NULL;
 	}
+
+	psoc_priv->state = ACTION_OUI_DEINIT;
 }
 
 /**
@@ -405,6 +409,7 @@ action_oui_psoc_create_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 	target_if_action_oui_register_tx_ops(&psoc_priv->tx_ops);
 	psoc_priv->psoc = psoc;
 	psoc_priv->action_oui_enable = cfg_get(psoc, CFG_ENABLE_ACTION_OUI);
+	psoc_priv->state = ACTION_OUI_DEINIT;
 	action_oui_debug("psoc priv attached");
 	goto exit;
 free_psoc_priv:
@@ -456,7 +461,12 @@ void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	if (load_default_config) {
+	if (!psoc_priv->action_oui_enable) {
+		action_oui_debug("action_oui is not enable");
+		goto exit;
+	}
+
+	if (load_default_config || psoc_priv->state == ACTION_OUI_DEINIT) {
 		action_oui_load_config(psoc_priv);
 
 		status = action_oui_allocate(psoc_priv);
