@@ -4120,13 +4120,11 @@ static inline void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
  */
 static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 {
-	/* DO NOT REMOVE these checks; for false positives, read above first */
-
-	wlan_objmgr_psoc_check_for_leaks(hdd_ctx->psoc);
-
 	/* many adapter resources are not freed by design during SSR */
 	if (is_ssr)
 		return;
+
+	wlan_objmgr_psoc_check_for_leaks(hdd_ctx->psoc);
 
 	qdf_wake_lock_check_for_leaks();
 	qdf_delayed_work_check_for_leaks();
@@ -4167,27 +4165,33 @@ static int hdd_debug_domain_set(enum qdf_debug_domain domain)
 
 #define hdd_debug_domain_get() qdf_debug_domain_get()
 #else
+#ifdef WLAN_OBJMGR_REF_ID_DEBUG
 static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t vdev_id;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_peer *peer, *next;
 
 	/* get module id which cause the leak and release ref */
 	wlan_objmgr_for_each_psoc_vdev(psoc, vdev_id, vdev) {
 		wlan_vdev_obj_lock(vdev);
-		wlan_objmgr_for_each_vdev_peer(vdev, peer) {
+		wlan_objmgr_for_each_vdev_peer(vdev, peer, next) {
 			qdf_atomic_t *ref_id_dbg;
 			int ref_id;
 			int32_t refs;
 
-			ref_id_dbg = vdev->vdev_objmgr.ref_id_dbg;
+			ref_id_dbg = peer->peer_objmgr.ref_id_dbg;
 			wlan_objmgr_for_each_refs(ref_id_dbg, ref_id, refs)
 				wlan_objmgr_peer_release_ref(peer, ref_id);
 		}
 		wlan_vdev_obj_unlock(vdev);
 	}
 }
+#else
+static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
 
 static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 {
@@ -4230,6 +4234,10 @@ static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 
 static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 {
+	/* many adapter resources are not freed by design during SSR */
+	if (is_ssr)
+		return;
+
 	hdd_check_for_objmgr_leaks(hdd_ctx);
 }
 
