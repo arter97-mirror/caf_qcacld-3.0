@@ -2260,3 +2260,21 @@ ucfg_mlme_get_mrsno_support(struct wlan_objmgr_psoc *psoc, bool *val)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+ucfg_mlme_get_enable_social_channels_on_2g_disable(
+		struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE);
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.enable_social_channels_on_2g_disable;
+
+	return QDF_STATUS_SUCCESS;
+}
