@@ -8056,9 +8056,10 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT;
 	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_3;
 	wlan_diag_event.token = neigh_rpt->resp_token;
-	wlan_diag_event.num_freq = neigh_rpt->num_freq;
+	wlan_diag_event.num_freq = QDF_MIN(neigh_rpt->num_freq,
+					   (uint8_t)MAX_ROAM_SCAN_CHAN);
 
-	for (i = 0; i < neigh_rpt->num_freq; i++)
+	for (i = 0; i < wlan_diag_event.num_freq; i++)
 		wlan_diag_event.freq[i] = neigh_rpt->freq[i];
 
 	wlan_diag_event.num_rpt = neigh_rpt->num_rpt;
