@@ -31,6 +31,7 @@
 #include "wlan_hdd_sysfs.h"
 #include "osif_sync.h"
 #include "wlan_cp_stats_ucfg_api.h"
+#include "wlan_hdd_apf.h"
 
 /**
  * __hdd_sysfs_dump_in_progress_store() - Handle sysfs write for
@@ -81,6 +82,7 @@ __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 	hdd_ctx->dump_in_progress = value;
 
 	if (hdd_ctx->dump_in_progress && hdd_ctx->enhance_chipset_logging) {
+		hdd_apf_dump_history(hdd_ctx);
 		ucfg_cp_stats_flush_host_buffer_if_pending(hdd_ctx->psoc);
 
 		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
