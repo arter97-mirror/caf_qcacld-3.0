@@ -1534,6 +1534,52 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 	}
 }
 
+#ifdef FEATURE_DP_RX_IRQ_AFFINITY
+/**
+ * dp_set_rx_irq_affinity() - Set CPU affinity for RX ring IRQ groups
+ * @dp_ctx: DP context handle
+ * @tput_level: current throughput level
+ * @prev_tput_level: previous throughput level
+ *
+ * Pins RX ring interrupt groups to performance CPU cores when throughput
+ * crosses TPUT_LEVEL_VERY_HIGH. Releases affinity when throughput drops.
+ */
+static inline void
+dp_set_rx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
+		       enum tput_level tput_level,
+		       enum tput_level prev_tput_level)
+{
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	void *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
+	struct device *dev = dp_ctx->qdf_dev->dev;
+	uint32_t cpumask = 0;
+
+	if (tput_level >= TPUT_LEVEL_VERY_HIGH &&
+	    prev_tput_level < TPUT_LEVEL_VERY_HIGH) {
+		if (qdf_unlikely(dp_ctx->dp_cfg.dp_irq_affinity_mask))
+			cpumask = dp_ctx->dp_cfg.dp_irq_affinity_mask;
+		else
+			pld_get_cpumask_for_wlan_tx_comp_interrupts(dev,
+								    &cpumask);
+		hif_set_grp_intr_affinity(hif_ctx,
+					  cdp_get_rx_rings_grp_bitmap(soc),
+					  cpumask, true);
+	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
+		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
+		hif_set_grp_intr_affinity(hif_ctx,
+					  cdp_get_rx_rings_grp_bitmap(soc),
+					  cpumask, false);
+	}
+}
+#else
+static inline void
+dp_set_rx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
+		       enum tput_level tput_level,
+		       enum tput_level prev_tput_level)
+{
+}
+#endif /* FEATURE_DP_RX_IRQ_AFFINITY */
+
 /**
  * dp_pld_request_bus_bandwidth() - Function to control bus bandwidth
  * @dp_ctx: handle to DP context
@@ -1639,6 +1685,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	if (dp_ctx->cur_vote_level != next_vote_level) {
 		/* Set affinity for tx completion grp interrupts */
 		dp_set_tx_irq_affinity(dp_ctx, tput_level, prev_tput_level);
+		dp_set_rx_irq_affinity(dp_ctx, tput_level, prev_tput_level);
 		dp_set_rx_thread_affinity(dp_ctx, tput_level, prev_tput_level);
 		prev_tput_level = tput_level;
 		dp_ctx->cur_vote_level = next_vote_level;

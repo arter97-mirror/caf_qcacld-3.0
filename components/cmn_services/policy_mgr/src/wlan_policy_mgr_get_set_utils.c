@@ -6539,6 +6539,13 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 			if (ch_freq == pcl.pcl_list[i])
 				return true;
 
+		if (mode == PM_SAP_MODE &&
+		    policy_mgr_allow_4th_new_freq(psoc, ch_freq, mode, 0)) {
+			policy_mgr_debug("4th port SAP ch %d allowed via hw mode check",
+					 ch_freq);
+			return true;
+		}
+
 		policy_mgr_err("4th port failed on ch freq %d with mode %d",
 			       ch_freq, mode);
 
@@ -10930,7 +10937,6 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		go_force_scc = policy_mgr_go_scc_enforced(psoc);
 		if ((mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) &&
 		    (!sta_sap_scc_on_dfs_chan ||
-		     !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false) ||
 		     (!go_force_scc && mode == PM_P2P_GO_MODE))) {
 			if (is_dfs_ch)
 				match = policy_mgr_disallow_mcc(psoc,

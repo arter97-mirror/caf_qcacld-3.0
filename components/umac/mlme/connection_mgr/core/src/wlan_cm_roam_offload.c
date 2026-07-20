@@ -2966,15 +2966,31 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
 {
 	uint32_t curr_length = rso_mode_cfg->assoc_ie_length;
 
-	if ((MAC_MAX_ADD_IE_LENGTH - curr_length) < ie_len) {
+	if ((curr_length >= MAX_ASSOC_IE_LENGTH) ||
+	    ((MAX_ASSOC_IE_LENGTH - curr_length) < (ie_len + 2))) {
 		mlme_err("Appending IE id: %d failed", ie_id);
 		return;
 	}
 
-	rso_mode_cfg->assoc_ie[curr_length] = ie_id;
-	rso_mode_cfg->assoc_ie[curr_length + 1] = ie_len;
-	qdf_mem_copy(&rso_mode_cfg->assoc_ie[curr_length + 2], ie_data, ie_len);
-	rso_mode_cfg->assoc_ie_length += (ie_len + 2);
+	if ((MAX_ASSOC_IE_LENGTH - 2) < curr_length) {
+		mlme_err("idx will be out of rang for id and ie_len");
+		return;
+	}
+
+	rso_mode_cfg->assoc_ie[curr_length++] = ie_id;
+	rso_mode_cfg->assoc_ie[curr_length++] = ie_len;
+
+	if (ie_len == 0) {
+		rso_mode_cfg->assoc_ie_length += 2;
+		return;
+	}
+
+	if (curr_length < (MAX_ASSOC_IE_LENGTH - 1) &&
+	    (MAX_ASSOC_IE_LENGTH - curr_length - 1) >= ie_len) {
+		qdf_mem_copy(&rso_mode_cfg->assoc_ie[curr_length],
+			     ie_data, ie_len);
+		rso_mode_cfg->assoc_ie_length += (ie_len + 2);
+	}
 }
 
 void wlan_add_supported_5ghz_channels(struct wlan_objmgr_psoc *psoc,

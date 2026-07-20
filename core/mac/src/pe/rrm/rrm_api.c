@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1440,6 +1440,12 @@ rrm_check_ml_ie(uint8_t *ies, uint16_t len, uint8_t *mlie_copy_len)
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &ml_common_info_length);
 
+	if (ml_common_info_length > ml_ie_total_len) {
+		mlo_err("Common info length greater than mlie length %du %zu",
+			ml_common_info_length, ml_ie_total_len);
+		return NULL;
+	}
+
 	ml_bv_ie_len = sizeof(struct wlan_ie_multilink) + ml_common_info_length;
 	if (ml_bv_ie_len) {
 		mlie_copy = qdf_mem_malloc(ml_bv_ie_len);
@@ -1819,7 +1825,7 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 			 * If last beacon report indication is not supported,
 			 * truncate and move on to the next beacon.
 			 */
-			if (rem_len &&
+			if (rem_len && bss_desc &&
 			    curr_req->request.Beacon.
 			    last_beacon_report_indication) {
 				offset = GET_IE_LEN_IN_BSS(
@@ -1896,8 +1902,7 @@ end:
 		rrm_cleanup(mac_ctx, beacon_xmit_ind->measurement_idx);
 	}
 
-	if (report)
-		qdf_mem_free(report);
+	qdf_mem_free(report);
 
 	return status;
 }

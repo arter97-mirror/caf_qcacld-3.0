@@ -231,6 +231,7 @@
 #include "wlan_psoc_mlme.h"
 #include "wlan_dnw_ucfg_api.h"
 #include "wlan_hdd_tx_powerboost.h"
+#include "wlan_hdd_eht.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -12307,7 +12308,7 @@ QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
 						 uint32_t port_id,
 						 uint16_t latency_level)
 {
-	uint32_t client_id, client_id_bitmap;
+	uint32_t client_id = 0, client_id_bitmap;
 	QDF_STATUS status;
 
 	status = wlan_hdd_get_set_client_info_id(adapter, port_id,
@@ -13311,7 +13312,7 @@ wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
 					  uint32_t port_id, uint16_t wfc_state)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint32_t client_id, client_id_bitmap, latency_host_flags = 0;
+	uint32_t client_id = 0, client_id_bitmap, latency_host_flags = 0;
 	QDF_STATUS status;
 	uint16_t cached_latency_level = 0;
 
@@ -26861,6 +26862,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 
 	wlan_wifi_pos_cfg80211_set_wiphy_ext_feature(wiphy, hdd_ctx->psoc);
 	wlan_hdd_set_mlo_wiphy_ext_feature(wiphy, hdd_ctx);
+	hdd_update_wiphy_mlo_sap_cap(hdd_ctx);
 	wlan_hdd_set_ext_kek_kck_support(wiphy);
 	wlan_hdd_set_32bytes_kck_support(wiphy);
 	wlan_hdd_set_nan_secure_mode(wiphy);
