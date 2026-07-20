@@ -4057,7 +4057,7 @@ wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-bool
+static inline bool
 wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc)
 {
 	return false;

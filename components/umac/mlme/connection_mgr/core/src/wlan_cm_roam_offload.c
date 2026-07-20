@@ -6386,6 +6386,51 @@ send_evt:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+						   struct qdf_mac_addr *bssid)
+	{
+		struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
+		struct mlo_link_info *links_info;
+		struct qdf_mac_addr connected_bssid;
+		int i;
+		QDF_STATUS status;
+	
+		if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
+			!mlo_dev_ctx || !mlo_dev_ctx->link_ctx) {
+			status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
+			if (QDF_IS_STATUS_ERROR(status))
+				return false;
+	
+			return qdf_is_macaddr_equal(bssid, &connected_bssid);
+		}
+	
+		links_info = mlo_dev_ctx->link_ctx->links_info;
+		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			if (links_info[i].link_id == WLAN_INVALID_LINK_ID)
+				continue;
+			if (qdf_is_macaddr_equal(bssid,
+						 &links_info[i].ap_link_addr))
+				return true;
+		}
+	
+		return false;
+	}
+#else
+	bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+						   struct qdf_mac_addr *bssid)
+	{
+		struct qdf_mac_addr connected_bssid;
+		QDF_STATUS status;
+	
+		status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
+		if (QDF_IS_STATUS_ERROR(status))
+			return false;
+	
+		return qdf_is_macaddr_equal(bssid, &connected_bssid);
+	}
+#endif
+
 #if (defined(CONNECTIVITY_DIAG_EVENT) || \
 	defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)) && \
 	defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -7129,51 +7174,6 @@ cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_free(scan_data);
 
 	cm_roam_cancel_event(vdev_id, ROAM_FAIL_REASON_REASSOC_TO_SAME_AP, 0);
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BE_MLO
-bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
-					   struct qdf_mac_addr *bssid)
-{
-	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
-	struct mlo_link_info *links_info;
-	struct qdf_mac_addr connected_bssid;
-	int i;
-	QDF_STATUS status;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
-	    !mlo_dev_ctx || !mlo_dev_ctx->link_ctx) {
-		status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
-		if (QDF_IS_STATUS_ERROR(status))
-			return false;
-
-		return qdf_is_macaddr_equal(bssid, &connected_bssid);
-	}
-
-	links_info = mlo_dev_ctx->link_ctx->links_info;
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		if (links_info[i].link_id == WLAN_INVALID_LINK_ID)
-			continue;
-		if (qdf_is_macaddr_equal(bssid,
-					 &links_info[i].ap_link_addr))
-			return true;
-	}
-
-	return false;
-}
-#else
-bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
-					   struct qdf_mac_addr *bssid)
-{
-	struct qdf_mac_addr connected_bssid;
-	QDF_STATUS status;
-
-	status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
-	if (QDF_IS_STATUS_ERROR(status))
-		return false;
-
-	return qdf_is_macaddr_equal(bssid, &connected_bssid);
 }
 #endif
 
