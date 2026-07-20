@@ -132,7 +132,7 @@
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
 
-static uint32_t g_fw_wlan_feat_caps;
+static uint64_t g_fw_wlan_feat_caps;
 /**
  * wma_get_fw_wlan_feat_caps() - get fw feature capability
  * @feature: feature enum value
@@ -141,7 +141,7 @@ static uint32_t g_fw_wlan_feat_caps;
  */
 bool wma_get_fw_wlan_feat_caps(enum cap_bitmap feature)
 {
-	return (g_fw_wlan_feat_caps & (1 << feature)) ? true : false;
+	return (g_fw_wlan_feat_caps & (1ULL << feature)) ? true : false;
 }
 
 /**
@@ -152,7 +152,7 @@ bool wma_get_fw_wlan_feat_caps(enum cap_bitmap feature)
  */
 void wma_set_fw_wlan_feat_caps(enum cap_bitmap feature)
 {
-	g_fw_wlan_feat_caps |= (1 << feature);
+	g_fw_wlan_feat_caps |= (1ULL << feature);
 }
 
 /**
