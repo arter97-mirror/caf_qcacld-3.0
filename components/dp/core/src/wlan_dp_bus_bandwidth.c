@@ -1619,6 +1619,18 @@ void dp_set_rx_thread_affinity(struct wlan_dp_psoc_context *dp_ctx,
 	}
 }
 
+#ifdef WLAN_DP_NAPI_IPI_REDIRECT
+static inline bool dp_keep_perf_affinity(void)
+{
+	return true;
+}
+#else
+static inline bool dp_keep_perf_affinity(void)
+{
+	return false;
+}
+#endif
+
 static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 					  enum tput_level tput_level,
 					  enum tput_level prev_tput_level)
@@ -1638,11 +1650,22 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 		hif_set_grp_intr_affinity(hif_ctx,
 					  cdp_get_tx_rings_grp_bitmap(soc),
 					  cpumask, true);
+		if (pld_get_napi_ipi_redirect_enabled(dev))
+			hif_set_napi_redirect_cpu(
+					hif_ctx,
+					cdp_get_tx_rings_grp_bitmap(soc),
+					0, true);
 	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
 		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
-		hif_set_grp_intr_affinity(hif_ctx,
+		if (!dp_keep_perf_affinity())
+			hif_set_grp_intr_affinity(
+					hif_ctx,
+					cdp_get_tx_rings_grp_bitmap(soc),
+					cpumask, false);
+
+		hif_set_napi_redirect_cpu(hif_ctx,
 					  cdp_get_tx_rings_grp_bitmap(soc),
-					  cpumask, false);
+					  0, false);
 	}
 }
 
@@ -1676,11 +1699,23 @@ dp_set_rx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 		hif_set_grp_intr_affinity(hif_ctx,
 					  cdp_get_rx_rings_grp_bitmap(soc),
 					  cpumask, true);
+		if (pld_get_napi_ipi_redirect_enabled(dev))
+			hif_set_napi_redirect_cpu(
+					hif_ctx, 0,
+					cdp_get_rx_rings_grp_bitmap(soc),
+					true);
+
 	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
 		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
-		hif_set_grp_intr_affinity(hif_ctx,
+		if (!dp_keep_perf_affinity())
+			hif_set_grp_intr_affinity(
+					hif_ctx,
+					cdp_get_rx_rings_grp_bitmap(soc),
+					cpumask, false);
+
+		hif_set_napi_redirect_cpu(hif_ctx, 0,
 					  cdp_get_rx_rings_grp_bitmap(soc),
-					  cpumask, false);
+					  false);
 	}
 }
 #else

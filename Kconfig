@@ -2337,6 +2337,10 @@ config WLAN_MAX_CPUS
 	  NR_CPUS can be up to 256. Default 8 covers most
 	  mobile/IoT platforms.
 
+config WLAN_DP_NAPI_IPI_REDIRECT
+	bool "IPI-based NAPI poll redirect for TX/RX completion groups"
+	default n
+
 config SOC_PERF_CLUSTER_FIRST
 	bool "Enable SOC_PERF_CLUSTER_FIRST"
 	default n

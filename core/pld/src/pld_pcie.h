@@ -1243,6 +1243,20 @@ pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 }
 #endif /* FEATURE_DT_CPU_MASK_DP_INTR */
 
+#ifdef WLAN_DP_NAPI_IPI_REDIRECT
+static inline bool
+pld_pcie_get_napi_ipi_redirect_enabled(struct device *dev)
+{
+	return cnss_get_napi_ipi_redirect_enabled(dev);
+}
+#else
+static inline bool
+pld_pcie_get_napi_ipi_redirect_enabled(struct device *dev)
+{
+	return false;
+}
+#endif /* WLAN_DP_NAPI_IPI_REDIRECT */
+
 static inline int
 pld_pcie_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {

@@ -3159,6 +3159,18 @@ void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 }
 #endif
 
+#ifdef WLAN_DP_NAPI_IPI_REDIRECT
+bool pld_get_napi_ipi_redirect_enabled(struct device *dev)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_get_napi_ipi_redirect_enabled(dev);
+	default:
+		return false;
+	}
+}
+#endif
+
 #if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
 int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {
