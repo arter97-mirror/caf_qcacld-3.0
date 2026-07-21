@@ -70,6 +70,28 @@ void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
  */
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_update_wiphy_mlo_sap_cap() - set MLO SAP EML/MLD caps in wiphy
+ * @hdd_ctx: HDD context
+ *
+ * Populate wiphy->iftype_ext_capab for NL80211_IFTYPE_AP with the correct
+ * mld_capa_and_ops so hostapd can advertise max simultaneous links in the
+ * Multi-Link Element.  If wifi_pos (RTT/11AZ) already registered an AP
+ * entry, the EML/MLD fields are patched into that entry instead of
+ * replacing the pointer, so both capability sets coexist.
+ *
+ * Must be called after wlan_wifi_pos_cfg80211_set_wiphy_ext_feature().
+ *
+ * Return: None
+ */
+void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 /**
  * wlan_hdd_get_mlo_link_id() - get link id and number of links
  * @beacon: beacon IE buffer
@@ -117,6 +139,10 @@ static inline void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
 
 static inline
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
 {
 }
 
