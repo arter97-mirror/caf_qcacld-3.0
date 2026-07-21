@@ -1987,6 +1987,15 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 	if (errno)
 		goto stop_op;
 
+	if (!(hdd_ctx->passthru_cap_bitmap &
+	      WLAN_HDD_PASSTHRU_AMPDU_RA_CAP_BIT)) {
+		hdd_debug("FW AMPDU/RA cap unsupported, reject station "
+			  QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(info->mac));
+		errno = -EOPNOTSUPP;
+		goto stop_op;
+	}
+
 	peer_tbl = g_wt_ctx->peer_tbl;
 	vdev_id  = wt_adapter->deflink->vdev_id;
 	qdf_mem_copy(peer_mac.bytes, info->mac, QDF_MAC_ADDR_SIZE);
