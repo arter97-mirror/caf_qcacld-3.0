@@ -6330,11 +6330,14 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 	power_stats_results->num_debug_register
 		= param_buf->num_debug_register;
 
-	power_stats_results->debug_registers
-		= (uint32_t *)(power_stats_results + 1);
-
-	qdf_mem_copy(power_stats_results->debug_registers,
-			debug_registers, stats_registers_len);
+	if (param_buf->num_debug_register) {
+		power_stats_results->debug_registers
+			= (uint32_t *)(power_stats_results + 1);
+		qdf_mem_copy(power_stats_results->debug_registers,
+			     debug_registers, stats_registers_len);
+	} else {
+		power_stats_results->debug_registers = NULL;
+	}
 	if (mac->sme.sme_power_debug_stats_callback)
 		mac->sme.sme_power_debug_stats_callback(mac,
 							power_stats_results);

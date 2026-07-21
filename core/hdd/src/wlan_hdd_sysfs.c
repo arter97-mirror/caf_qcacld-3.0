@@ -251,6 +251,7 @@ static void hdd_power_debugstats_cb(struct power_stats_response *response,
 
 	/* copy fixed-sized data */
 	priv->power_stats = *response;
+	priv->power_stats.debug_registers = NULL;
 
 	/* copy variable-size data */
 	if (response->num_debug_register) {
