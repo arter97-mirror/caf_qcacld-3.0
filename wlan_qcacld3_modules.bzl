@@ -23,6 +23,7 @@ _target_chipset_map = {
         "waipio":[
                 "qca6490",
                 "qca6750",
+		"kiwi",
         ],
         "lahaina":[
                 "qca6490",
@@ -34,7 +35,7 @@ _target_chipset_map = {
 	],
 	"malabar":[
 		"adrastea",
-	]
+	],
 }
 
 _chipset_hw_map = {
@@ -42,6 +43,7 @@ _chipset_hw_map = {
         "adrastea" : "ADRASTEA",
         "qca6750": "MOSELLE",
         "qca6490": "LITHIUM",
+        "kiwi": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -57,6 +59,10 @@ _chipset_header_map = {
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
+    "kiwi": [
+        "api/hw/kiwi/v1",
+        "cmn/hal/wifi3.0/kiwi",
+    ],
 }
 
 _hw_header_map = {
@@ -67,6 +73,9 @@ _hw_header_map = {
     ],
     "LITHIUM": [
         "cmn/hal/wifi3.0/li",
+    ],
+    "BERYLLIUM": [
+        "cmn/hal/wifi3.0/be",
     ],
 }
 
@@ -1077,6 +1086,12 @@ _conditional_srcs = {
         True: [
             "cmn/hal/wifi3.0/qca6490/hal_6490.c",
             "cmn/hif/src/qca6490def.c",
+        ],
+    },
+    "CONFIG_KIWI_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
+            "cmn/hif/src/kiwidef.c",
         ],
     },
     "CONFIG_OCB_UT_FRAMEWORK": {
