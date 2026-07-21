@@ -1563,6 +1563,119 @@ config QCA6750_HEADERS_DEF
 	bool "Enable QCA6750_HEADERS_DEF"
 	default n
 
+config CNSS_KIWI
+	bool "Enable CNSS_KIWI"
+	default n
+
+config KIWI_HEADERS_DEF
+	bool "Enable KIWI_HEADERS_DEF"
+	default n
+
+config QCA_WIFI_KIWI
+	bool "Enable QCA_WIFI_KIWI"
+	default n
+
+config BERYLLIUM
+	bool "Enable BERYLLIUM"
+	default n
+
+config WLAN_FEATURE_11BE
+	bool "Enable WLAN_FEATURE_11BE"
+	default n
+
+config WLAN_FEATURE_11BE_MLO
+	bool "Enable WLAN_FEATURE_11BE_MLO"
+	default n
+
+config WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG
+	bool "Enable WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG"
+	default n
+
+config WLAN_DP_DISABLE_TCL_STATUS_SRNG
+	bool "Enable WLAN_DP_DISABLE_TCL_STATUS_SRNG"
+	default n
+
+config CFG_MAX_STA_VDEVS
+	int "Enable CFG_MAX_STA_VDEVS"
+
+config CFG_BMISS_OFFLOAD_MAX_VDEV
+	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+
+config CHIP_VERSION
+	int "Enable CHIP_VERSION"
+
+config WLAN_TWT_SAP_STA_COUNT
+	bool "Enable WLAN_TWT_SAP_STA_COUNT"
+	default n
+
+config WLAN_TWT_SAP_PDEV_COUNT
+	bool "Enable WLAN_TWT_SAP_PDEV_COUNT"
+	default n
+
+config WLAN_SYSFS_DP_STATS
+	bool "Enable WLAN_SYSFS_DP_STATS"
+	default n
+
+config EMULATION_2_0
+	bool "Enable EMULATION_2_0"
+	default n
+
+config DP_BE_WAR
+	bool "Enable DP_BE_WAR"
+	default n
+
+config DP_FEATURE_HW_COOKIE_CONVERSION
+	bool "Enable DP_FEATURE_HW_COOKIE_CONVERSION"
+	default n
+
+config DP_HW_COOKIE_CONVERT_EXCEPTION
+	bool "Enable DP_HW_COOKIE_CONVERT_EXCEPTION"
+	default n
+
+config WLAN_FEATURE_NEAR_FULL_IRQ
+	bool "Enable WLAN_FEATURE_NEAR_FULL_IRQ"
+	default n
+
+config DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
+	bool "Enable DP_USE_REDUCED_PEER_ID_FIELD_WIDTH"
+	default n
+
+config DISABLE_STATUS_RING_TIMER_WAR
+	bool "Enable DISABLE_STATUS_RING_TIMER_WAR"
+	default n
+
+config CE_DISABLE_SRNG_TIMER_IRQ
+	bool "Enable CE_DISABLE_SRNG_TIMER_IRQ"
+	default n
+
+config TX_ADDR_INDEX_SEARCH
+	bool "Enable TX_ADDR_INDEX_SEARCH"
+	default n
+
+config DP_CON_MON_MSI_ENABLED
+	bool "Enable DP_CON_MON_MSI_ENABLED"
+	default n
+
+config WLAN_RX_MON_PARSE_CMN_USER_INFO
+	bool "Enable WLAN_RX_MON_PARSE_CMN_USER_INFO"
+	default n
+
+config NO_RX_PKT_HDR_TLV
+	bool "Enable NO_RX_PKT_HDR_TLV"
+	default n
+
+config DEVICE_FORCE_WAKE_ENABLE
+	bool "Enable DEVICE_FORCE_WAKE_ENABLE"
+	default n
+
+config HIF_REG_WINDOW_SUPPORT
+	bool "Enable HIF_REG_WINDOW_SUPPORT"
+	default n
+
+config WINDOW_REG_PLD_LOCK_ENABLE
+	bool "Enable WINDOW_REG_PLD_LOCK_ENABLE"
+	default n
+
 config QCA_MONITOR_PKT_SUPPORT
 	bool "Enable QCA_MONITOR_PKT_SUPPORT"
 	default n
@@ -1749,6 +1862,28 @@ config DP_RX_BUFFER_POOL_ALLOC_THRES
 
 config DP_RX_BUFFER_POOL_SIZE
     int "Enable DP_RX_BUFFER_POOL_SIZE"
+
+config NUM_SOC_PERF_CLUSTER
+    int "Enable NUM_SOC_PERF_CLUSTER"
+
+endif
+
+if QCA_WIFI_KIWI
+config MULTI_IF_NAME
+    string "Enable CONFIG_MULTI_IF_NAME"
+    default kiwi
+
+config DP_RX_BUFFER_POOL_ALLOC_THRES
+    int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+
+config DP_RX_BUFFER_POOL_SIZE
+    int "Enable DP_RX_BUFFER_POOL_SIZE"
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+    int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+
+config DP_RX_REFILL_THRD_THRESHOLD
+    int "Enable DP_RX_REFILL_THRD_THRESHOLD"
 
 config NUM_SOC_PERF_CLUSTER
     int "Enable NUM_SOC_PERF_CLUSTER"
