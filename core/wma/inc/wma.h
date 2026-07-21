@@ -1129,6 +1129,9 @@ typedef struct {
 #ifdef DRIVER_PASSTHRU_MODE
 	wma_get_tsf_timer_cb get_tsf_cb;
 	void *get_tsf_cb_ctx;
+	/* Channel hop status callback and context */
+	wma_chan_hop_status_cb chan_hop_status_cb;
+	void *chan_hop_status_cb_ctx;
 #endif
 } t_wma_handle, *tp_wma_handle;
 
@@ -2828,6 +2831,22 @@ QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params);
 QDF_STATUS
 wma_passthru_get_tsf_timer(struct ocb_get_tsf_timer_param *req,
 			   wma_get_tsf_timer_cb cb, void *ctx);
+
+/*
+ * wma_vdev_get_chan_hop_status() - Send channel hop status request to firmware
+ * @req: Channel hop status request parameters
+ * @cb: Callback function to be invoked on receiving response
+ * @ctx: Context to be passed to callback
+ *
+ * This function sends a channel hop status request command to firmware
+ * and stores the callback information for later invocation when the
+ * response event is received.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS
+wma_vdev_get_chan_hop_status(struct vdev_chan_hop_status_req *req,
+			     wma_chan_hop_status_cb cb, void *ctx);
 #else
 static inline
 QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
@@ -2835,5 +2854,16 @@ QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
-#endif
 
+/**
+ * wma_get_sap_perf_tuning_enabled() - Get sap perf tuning service capability.
+ * @wmi_handle: wmi handler
+ *
+ * The API will return if fw support sap perf tuning feature or not.
+ *
+ * Return: true if support sap perf tuning feature otherwise false.
+ */
+bool
+wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle);
+
+#endif

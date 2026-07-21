@@ -20,6 +20,26 @@
 
 #ifdef WLAN_DP_FEATURE_SW_LATENCY_MGR
 
+/* Timer-dominance coalescing monitor: 50ms sliding window */
+#define DP_SWLM_RATIO_WIN_US            50000    /* 50 ms window */
+
+/* Min consecutive timer flushes before a bytes-thresh flush is counted
+ * as timer-dominated.
+ */
+#define DP_SWLM_TIMER_DOM_CONSEC_MIN    2
+
+/* Require N consecutive windows above threshold before disabling */
+#define DP_SWLM_RATIO_DIS_CONSEC_WIN    3
+
+/* Minimum disable duration (us) before re-enable is evaluated */
+#define DP_SWLM_RATIO_DIS_COOLDOWN_US   5000000  /* 5 s */
+
+/*
+ * Shift used for division-free 50% threshold comparison:
+ *   timer_dom/total > 0.5  ==  timer_dom << DP_SWLM_RATIO_THRESH_SHIFT > total
+ */
+#define DP_SWLM_RATIO_THRESH_SHIFT      1
+
 #define DP_SWLM_TCL_TPUT_PASS_THRESH 3
 
 #define DP_SWLM_TCL_RX_TRAFFIC_THRESH	50
@@ -64,7 +84,7 @@ bool dp_tx_is_special_frame(qdf_nbuf_t nbuf, uint32_t frame_mask)
 }
 
 /**
- * dp_swlm_tcl_reset_session_data() -  Reset the TCL coalescing session data
+ * dp_swlm_tcl_reset_session_data() - Reset the TCL coalescing session data
  * @soc: DP soc handle
  * @ring_id: TCL ring id
  *
@@ -77,7 +97,17 @@ dp_swlm_tcl_reset_session_data(struct dp_soc *soc, uint8_t ring_id)
 
 	params->tcl[ring_id].coalesce_end_time = qdf_get_log_timestamp_usecs() +
 		params->time_flush_thresh;
-	params->tcl[ring_id].bytes_coalesced = 0;
+	/*
+	 * When the timer-dominance monitor has disabled coalescing, preserve
+	 * bytes_coalesced so that bytes_thresh can still fire and give the
+	 * monitor real data to evaluate each window. However, if bytes_thresh
+	 * just fired (bytes_coalesced already exceeds the threshold), reset to
+	 * 0 so the next session starts fresh and avoids firing on every packet.
+	 */
+	if (!params->tcl[ring_id].coalesce_disable ||
+	    params->tcl[ring_id].bytes_coalesced >
+	    params->tcl[ring_id].bytes_flush_thresh)
+		params->tcl[ring_id].bytes_coalesced = 0;
 	params->tcl[ring_id].bytes_flush_thresh =
 				params->tcl[ring_id].sampling_session_tx_bytes *
 				params->tx_thresh_multiplier;

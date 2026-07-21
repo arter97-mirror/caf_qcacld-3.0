@@ -233,6 +233,7 @@ QDF_STATUS dp_check_and_update_pending(struct dp_rx_tm_handle_cmn
 	uint32_t nbuf_dequeued_total = 0;
 	uint32_t rx_flushed_total = 0;
 	uint32_t pending = 0;
+	uint64_t dequeued_flushed;
 	int i;
 
 	txrx_handle_cmn =
@@ -267,9 +268,9 @@ QDF_STATUS dp_check_and_update_pending(struct dp_rx_tm_handle_cmn
 		}
 	}
 
-	if (nbuf_queued_total > (nbuf_dequeued_total + rx_flushed_total))
-		pending = nbuf_queued_total - (nbuf_dequeued_total +
-					       rx_flushed_total);
+	dequeued_flushed = (uint64_t)nbuf_dequeued_total + rx_flushed_total;
+	if (nbuf_queued_total > dequeued_flushed)
+		pending = (uint32_t)(nbuf_queued_total - dequeued_flushed);
 
 	if (unlikely(pending > rx_pending_hl_threshold))
 		qdf_atomic_set(&rx_tm_hdl->allow_dropping, 1);

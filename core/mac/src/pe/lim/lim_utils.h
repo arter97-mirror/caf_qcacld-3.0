@@ -1333,6 +1333,10 @@ void lim_update_caps_info_for_bss(struct mac_context *mac_ctx,
 			uint16_t *caps, uint16_t bss_caps);
 void lim_send_set_dtim_period(struct mac_context *mac_ctx, uint8_t dtim_period,
 			      struct pe_session *session);
+void lim_update_vdev_bss_param_dtim(struct pe_session *session,
+				    uint8_t dtim_period);
+void lim_update_vdev_bss_param_use_prot(struct pe_session *session,
+					bool use_prot);
 
 QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
@@ -3555,12 +3559,15 @@ lim_skip_tpc_update_for_sta(struct mac_context *mac,
  * @session: Pointer to PE session
  * @chan_freq: Channel frequency in MHz
  * @power_type_6g: Pointer to store the best 6 GHz power type
+ * @bw_update_allowed: Allow to update bandwidth of pe session
  *
  * This function determines the best 6 GHz power type (LPI/SP/VLP) based on
  * the session's channel width and center frequency. For 320 MHz bandwidth,
  * it uses the center frequency from ch_center_freq_seg1. The function calls
  * the regulatory module to get the best power type considering the AP's
  * defined power type and current bandwidth.
+ * Retry with progressively narrower bandwidths (160/80/40/20 MHz) when the
+ * full BW check fails and update pe session BW if bw_update_allowed is true.
  *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise
  */
@@ -3568,7 +3575,8 @@ QDF_STATUS lim_get_6g_power_type_with_bw(
 	struct mac_context *mac,
 	struct pe_session *session,
 	qdf_freq_t chan_freq,
-	enum reg_6g_ap_type *power_type_6g);
+	enum reg_6g_ap_type *power_type_6g,
+	bool bw_update_allowed);
 
 #ifdef FEATURE_WLAN_GC_SKIP_JOIN
 static inline bool

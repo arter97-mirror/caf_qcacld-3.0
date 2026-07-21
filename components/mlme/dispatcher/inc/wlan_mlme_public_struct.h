@@ -1540,6 +1540,11 @@ struct wlan_mlme_aux_dev_caps {
  * @bt_profile_con: Bluetooth connection profile
  * @relaxed_lpi_conn_policy: Relaxed LPI connection policy flag
  * @edca_txop_limit: EDCA TXOP limit in milliseconds.
+ * @sap_perf_tuning_enable: Enable/Disable SAP performance tuning.
+ * @sap_perf_data_threshold: data_threshold in Kbps corresponds to the total
+ * TX/RX bytes.
+ * @sap_traffic_monitoring_time_s: Duration of traffic monitoring
+ * in unit of sec
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1615,6 +1620,9 @@ struct wlan_mlme_generic {
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
 	uint32_t edca_txop_limit;
+	bool sap_perf_tuning_enable;
+	uint32_t sap_perf_data_threshold;
+	uint32_t sap_traffic_monitoring_time_s;
 };
 
 /**
@@ -1914,6 +1922,9 @@ enum station_prefer_bw {
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
+ * @enable_high_band_roaming:       Enable/disable high band roaming
+ * @high_band_roaming_threshold_time_ms: High band roaming threshold time in ms
+ * @high_band_roaming_data_threshold: High band roaming data threshold in KBps
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1957,6 +1968,9 @@ struct wlan_mlme_sta_cfg {
 	bool usr_disable_eht;
 	bool eht_disable_punct_in_us_lpi;
 #endif
+	bool enable_high_band_roaming;
+	uint32_t high_band_roaming_threshold_time_ms;
+	uint32_t high_band_roaming_data_threshold;
 };
 
 /**
@@ -1966,6 +1980,7 @@ struct wlan_mlme_sta_cfg {
  * @stats_link_speed_rssi_med: medium rssi link speed
  * @stats_link_speed_rssi_low: rssi link speed, low
  * @stats_report_max_link_speed_rssi: report speed limit
+ * @stats_chain_signal_in_signal_row: report per-chain RSSI on signal row
  */
 struct wlan_mlme_stats_cfg {
 	uint32_t stats_periodic_display_time;
@@ -1973,6 +1988,7 @@ struct wlan_mlme_stats_cfg {
 	int stats_link_speed_rssi_med;
 	int stats_link_speed_rssi_low;
 	uint32_t stats_report_max_link_speed_rssi;
+	bool stats_chain_signal_in_signal_row;
 };
 
 /**

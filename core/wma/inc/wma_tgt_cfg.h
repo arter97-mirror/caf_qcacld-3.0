@@ -252,7 +252,6 @@ struct board_info {
  * @all_twt_enabled: all twt enabled
  * @twt_stats_enabled: twt stats enabled
  * @tx_powerboost: tx powerboost enabled
- *
  */
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;

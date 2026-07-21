@@ -3749,7 +3749,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 						mac_ctx,
 						session,
 						bss_desc->chan_freq,
-						&power_type_6g);
+						&power_type_6g,
+						true);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			if (req_fail_status_code)
 				*req_fail_status_code =
@@ -6728,15 +6729,48 @@ parse_both_tpe_present:
 		if (local_eirp_set && reg_eirp_set) {
 			local_tpe = tpe_ies[local_eirp_idx];
 			reg_tpe = tpe_ies[reg_eirp_idx];
+			if (local_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+				pe_debug("Invalid local EIRP max count: %d",
+					 local_tpe.max_tx_pwr_count);
+				local_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ;
+			}
+			if (reg_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+				pe_debug("Invalid reg EIRP max count: %d",
+					 reg_tpe.max_tx_pwr_count);
+				reg_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ;
+			}
 		} else if (local_psd_set && reg_psd_set) {
 			local_tpe = tpe_ies[local_psd_idx];
 			reg_tpe = tpe_ies[reg_psd_idx];
+			if (local_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
+				pe_debug("Invalid local PSD max count: %d",
+					 local_tpe.max_tx_pwr_count);
+				local_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ_PSD;
+			}
+			if (reg_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
+				pe_debug("Invalid reg PSD max tx count: %d",
+					 reg_tpe.max_tx_pwr_count);
+				reg_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ_PSD;
+			}
 		} else {
 			return;
 		}
 
 		min_count = QDF_MIN(local_tpe.max_tx_pwr_count,
 				    reg_tpe.max_tx_pwr_count);
+		if (non_psd_set && min_count >= MAX_NUM_EIRP_PWR_LEVEL) {
+			pe_debug("Clamp min_count %d to %d for chan_eirp_power",
+				 min_count, MAX_NUM_EIRP_PWR_LEVEL - 1);
+			min_count = MAX_NUM_EIRP_PWR_LEVEL - 1;
+		}
 		for (i = 0; i < min_count + 1; i++) {
 			if (vdev_mlme->reg_tpc_obj.tpe[i] !=
 			    QDF_MIN(local_tpe.tx_power[i], reg_tpe.tx_power[i]))

@@ -10863,12 +10863,23 @@ QDF_STATUS lim_ieee80211_unpack_tpe(const uint8_t *tpe_ie,
 	} else {
 		if (!dot11f_tpe->max_tx_pwr_count) {
 			dot11f_tpe->num_tx_power = dot11f_tpe->max_tx_pwr_count;
+			if (!ie_len) {
+				pe_err("TPE IE: no payload for tx_power");
+				return QDF_STATUS_E_BADMSG;
+			}
 			qdf_mem_copy(dot11f_tpe->tx_power, buf, 1);
 			return QDF_STATUS_SUCCESS;
 		}
 		else
 			dot11f_tpe->num_tx_power =
 					1 << (dot11f_tpe->max_tx_pwr_count - 1);
+	}
+
+	if (dot11f_tpe->num_tx_power > sizeof(dot11f_tpe->tx_power) ||
+	    ie_len < dot11f_tpe->num_tx_power) {
+		pe_err("TPE IE: invalid num_tx_power %u ie_len %u",
+		       dot11f_tpe->num_tx_power, ie_len);
+		return QDF_STATUS_E_BADMSG;
 	}
 
 	qdf_mem_copy(dot11f_tpe->tx_power, buf, dot11f_tpe->num_tx_power);
@@ -14995,9 +15006,11 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	*p_ml_ie++ = mlo_ie->common_info_length;
 	len_remaining--;
 
-	qdf_mem_copy(p_ml_ie, mld_addr, QDF_MAC_ADDR_SIZE);
-	p_ml_ie += QDF_MAC_ADDR_SIZE;
-	len_remaining -= QDF_MAC_ADDR_SIZE;
+	if (mlo_ie->mld_mac_address_present) {
+		qdf_mem_copy(p_ml_ie, mld_addr, QDF_MAC_ADDR_SIZE);
+		p_ml_ie += QDF_MAC_ADDR_SIZE;
+		len_remaining -= QDF_MAC_ADDR_SIZE;
+	}
 
 	if (mlo_ie->eml_capab_present) {
 		QDF_SET_BITS(*(uint16_t *)p_ml_ie,

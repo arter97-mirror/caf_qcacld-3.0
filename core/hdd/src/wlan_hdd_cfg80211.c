@@ -5116,6 +5116,14 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	wlan_hdd_set_supported_features_extn(fset_extn,
 					     WIFI_FEATURE_CONFIG_NDO);
 
+	fset |= WIFI_FEATURE_MKEEP_ALIVE;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_MKEEP_ALIVE);
+
+	fset |= WIFI_FEATURE_P2P_RAND_MAC;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_P2P_RAND_MAC);
+
 	if (hdd_link_layer_stats_supported()) {
 		fset |= WIFI_FEATURE_LINK_LAYER_STATS;
 		wlan_hdd_set_supported_features_extn(fset_extn,
@@ -5162,6 +5170,9 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		wlan_hdd_set_supported_features_extn(
 					fset_extn,
 					WIFI_FEATURE_MULTIPLE_MLD_ON_SAP);
+
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_SET_VOIP_MODE);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						       NLMSG_HDRLEN);
@@ -9030,7 +9041,7 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			return -ENOMEM;
 
 		snprintf(firmware_version, SIR_VERSION_STRING_LEN,
-			 "FW:%d.%d.%d.%d.%d.%d HW:%s STT:%s",
+			 "FW:%d.%d.%d.%d.%d.%d HW:%s %s",
 			 hdd_ctx->fw_version_info.major_spid,
 			 hdd_ctx->fw_version_info.minor_spid,
 			 hdd_ctx->fw_version_info.siid,

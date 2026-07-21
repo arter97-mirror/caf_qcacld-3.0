@@ -660,6 +660,7 @@ struct hdd_peer_stats {
  * @signal: Signal strength of last received PPDU
  * @signal_avg: Average signal strength
  * @chains: valid chains bitmap
+ * @chain_signal: Per-chain signal strength of last PPDU
  * @chain_signal_avg: Per-chain signal strength average
  * @rxrate: Last unicast data frame rx rate
  * @txrate: Current unicasr tx rate
@@ -671,6 +672,8 @@ struct hdd_peer_stats {
  * @tx_failed: Number of failed transmissions (MPDUs)
  * @rx_mpdu_count: Number of MPDUs received from this station
  * @fcs_err_count: Number of MPDUs received from this station with an FCS error
+ * @rx_dropped_misc: RX packets dropped for unspecified reasons
+ * @bss_param: BSS parameters (dtim, beacon interval, flags)
  * @filled: bitflag of flags using the bits of &enum nl80211_sta_info to
  *  indicate the relevant values in this struct for them
  */
@@ -678,6 +681,7 @@ struct wlan_hdd_station_stats_info {
 	int8_t signal;
 	int8_t signal_avg;
 	uint8_t chains;
+	int8_t chain_signal[IEEE80211_MAX_CHAINS];
 	int8_t chain_signal_avg[IEEE80211_MAX_CHAINS];
 	struct rate_info txrate;
 	struct rate_info rxrate;
@@ -689,6 +693,8 @@ struct wlan_hdd_station_stats_info {
 	uint32_t tx_failed;
 	uint32_t rx_mpdu_count;
 	uint32_t fcs_err_count;
+	uint64_t rx_dropped_misc;
+	struct sta_bss_parameters bss_param;
 	uint64_t filled;
 };
 
@@ -5856,15 +5862,16 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 
 /**
  * hdd_roam_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
- * mac addr update due to roaming.
+ * mac addr during roaming.
  * @primary_vdev: VDEV undergoing roaming
  * @vdev_id: vdev ID for which the HDD MAC address needs to be updated
  * @old_self_mac: Current self link mac of VDEV
- * @new_self_mac: New self link mac of VDEV
+ * @new_self_mac: New self link mac of VDEV (may equal @old_self_mac)
  *
- * Check if both @old_self_mac and @new_self_mac are part of adapter
- * corresponding to @vdev_id. Then take necessary actions to support
- * MAC update and update DP to change link MAC address to new link's address.
+ * Always called for every link during roam sync, including links whose
+ * MAC address has not changed. Syncs vdev_mlme macaddr/linkaddr to the
+ * FW-assigned per-link MAC. When @old_self_mac != @new_self_mac, also
+ * updates DP with the new link MAC address.
  *
  * Return: QDF_STATUS
  */

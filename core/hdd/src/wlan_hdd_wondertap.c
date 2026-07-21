@@ -207,6 +207,7 @@ __wlan_hdd_wondertap_set_fixed_tx_rate(struct hdd_adapter *adapter,
 	}
 
 	g_wt_ctx->tx_rate_cfg.nss = params->nss;
+	g_wt_ctx->tx_rate_cfg.mcs = params->mcs;
 	g_wt_ctx->tx_rate_cfg.gi_val = gi;
 	g_wt_ctx->tx_rate_cfg.ch_width =
 		__wlan_hdd_convert_wt_bandwidth_to_phy_ch_width(params->bw);
@@ -275,6 +276,9 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 	uint8_t num_ml_sta = 0, num_disabled_ml = 0;
 	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct passthru_peer_tbl_entry *peer_tbl;
+	uint8_t vdev_id = adapter->deflink->vdev_id;
+	uint8_t i;
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -283,6 +287,19 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 	ASSERT_RTNL();
 
 	dev_close(adapter->dev);
+
+	peer_tbl = g_wt_ctx->peer_tbl;
+	for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		if (peer_tbl[i].peer_status == PASSTHRU_PEER_SETUP_NOT_DONE)
+			continue;
+		hdd_debug("Deleting wondertap peer " QDF_MAC_ADDR_FMT
+			  " status %d on deinit",
+			  QDF_MAC_ADDR_REF(peer_tbl[i].mac_addr.bytes),
+			  peer_tbl[i].peer_status);
+		wlan_hdd_wondertap_peer_del(hdd_ctx, vdev_id,
+					    peer_tbl[i].mac_addr.bytes);
+		qdf_mem_zero(&peer_tbl[i], sizeof(peer_tbl[i]));
+	}
 
 	status = qdf_event_reset(&g_wt_ctx->wondertap_vdev_event);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -661,18 +678,101 @@ stop_adapter:
 	return ret;
 }
 
-static void wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
-					  struct hdd_wondertap_peer_setup *peer)
+static QDF_STATUS
+__wlan_hdd_populate_caps_peer_setup_req(
+			struct sir_passthru_peer_setup_msg *req,
+			const qdf_wondertap_station_info_t *sta_info,
+			bool *caps_applied)
 {
-	int ret;
+	uint8_t nss = 0;
+	uint8_t i;
+
+	hdd_debug("sta info cap mask: 0x%x", sta_info->capability_mask);
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HT)) {
+		req->htcap_present = 1;
+		qdf_mem_copy(&req->peer_ht_cap, &sta_info->ht_capa,
+			     sizeof(req->peer_ht_cap));
+		/* NSS from HT MCS rx_mask: each non-zero byte
+		 * represents one spatial stream
+		 */
+		for (i = 0; i < IEEE80211_HT_MCS_MASK_LEN; i++) {
+			if (sta_info->ht_capa.mcs.rx_mask[i])
+				nss = i + 1;
+		}
+	}
+
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_VHT)) {
+		uint8_t max_mcs;
+		uint16_t rx_mcs_map =
+			le16_to_cpu(sta_info->vht_capa.supp_mcs.rx_mcs_map);
+
+		req->vhtcap_present = 1;
+		qdf_mem_copy(&req->peer_vht_cap, &sta_info->vht_capa,
+			     sizeof(req->peer_vht_cap));
+		/* NSS from VHT rx_mcs_map: 2-bit value 0x3
+		 * per stream indicates disabled
+		 */
+		nss = 0;
+		for (i = 1; i <= 8; i++) {
+			if (((rx_mcs_map >> ((i - 1) * 2)) & 0x3) != 0x3)
+				nss = i;
+		}
+		/* max_mcs from highest MCS set in stream 1 of VHT rx_mcs_map */
+		max_mcs = VHT_GET_MCS_FOR_NSS(rx_mcs_map, 1);
+		if (max_mcs == VHT_MCS_0_9)
+			req->max_mcs = 9;
+		else if (max_mcs == VHT_MCS_0_8)
+			req->max_mcs = 8;
+		else if (max_mcs == VHT_MCS_0_7)
+			req->max_mcs = 7;
+		hdd_debug("vht: rx_mcs_map 0x%x max_mcs %u",
+			  rx_mcs_map, req->max_mcs);
+	}
+
+	if (sta_info->capability_mask & BIT(WONDERTAP_STATION_CAP_HE)) {
+		req->hecap_present = 1;
+		qdf_mem_copy(&req->peer_he_cap, &sta_info->he_capa,
+			     sizeof(req->peer_he_cap));
+		/*
+		 * ieee80211_he_cap_elem only carries MAC+PHY capability
+		 * bytes -- HE MCS/NSS maps are not present in
+		 * wondertap_station_info. If HT/VHT NSS extraction above
+		 * yielded 0 (HE-only peer), fall back to tx_rate_cfg.nss
+		 * which WONDER sets via set_fixed_tx_rate/set_tx_rate_mask.
+		 */
+		if (!nss)
+			nss = g_wt_ctx->tx_rate_cfg.nss;
+		if (!req->max_mcs)
+			req->max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
+	}
+
+	req->nss = nss ? nss : 1;
+
+	if (sta_info->capability_mask &
+		(BIT(WONDERTAP_STATION_CAP_HT) |
+		 BIT(WONDERTAP_STATION_CAP_VHT) |
+		 BIT(WONDERTAP_STATION_CAP_HE))) {
+		if (caps_applied)
+			*caps_applied = true;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (caps_applied)
+		*caps_applied = false;
+	return QDF_STATUS_E_INVAL;
+}
+
+static void
+wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
+			      struct hdd_wondertap_peer_setup *peer,
+			      const qdf_wondertap_station_info_t *sta_info,
+			      bool *caps_applied)
+{
 	mac_handle_t mac_handle;
-	struct sir_passthru_peer_setup_msg req;
+	struct sir_passthru_peer_setup_msg req = {0};
+	QDF_STATUS status;
 
 	if (wlan_hdd_validate_vdev_id(peer->vdev_id))
-		return;
-
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret)
 		return;
 
 	hdd_debug("vdev %d peer setup for " QDF_MAC_ADDR_FMT,
@@ -681,12 +781,71 @@ static void wlan_hdd_wondertap_peer_setup(struct hdd_context *hdd_ctx,
 	mac_handle = hdd_ctx->mac_handle;
 	qdf_mem_copy(req.peer_mac_addr.bytes, peer->peer_addr,
 		     QDF_MAC_ADDR_SIZE);
-	req.vdev_id = peer->vdev_id;
-	req.ch_width = g_wt_ctx->tx_rate_cfg.ch_width;
+	req.vdev_id    = peer->vdev_id;
+	req.peer_aid   = peer->peer_aid;
+	req.ch_width   = g_wt_ctx->tx_rate_cfg.ch_width;
 	req.dot11mode = g_wt_ctx->tx_rate_cfg.dot11_mode;
 	req.gi_val = g_wt_ctx->tx_rate_cfg.gi_val;
 	req.nss = g_wt_ctx->tx_rate_cfg.nss;
+	req.max_mcs = g_wt_ctx->tx_rate_cfg.mcs;
+
+	status = __wlan_hdd_populate_caps_peer_setup_req(&req, sta_info,
+							 caps_applied);
+	if (QDF_IS_STATUS_ERROR(status))
+		req.create_only = 1;
+
 	sme_passthru_peer_setup(mac_handle, &req);
+}
+
+static void
+wlan_hdd_wondertap_peer_assoc(struct hdd_context *hdd_ctx, uint8_t vdev_id,
+			      const uint8_t *peer_addr,
+			      const qdf_wondertap_station_info_t *sta_info)
+{
+	struct sir_passthru_peer_setup_msg req = {0};
+	mac_handle_t mac_handle;
+	QDF_STATUS status;
+
+	if (wlan_hdd_validate_vdev_id(vdev_id))
+		return;
+
+	hdd_debug("vdev %d peer assoc " QDF_MAC_ADDR_FMT,
+		  vdev_id, QDF_MAC_ADDR_REF(peer_addr));
+	mac_handle = hdd_ctx->mac_handle;
+
+	qdf_mem_copy(req.peer_mac_addr.bytes, peer_addr, QDF_MAC_ADDR_SIZE);
+	req.vdev_id     = vdev_id;
+	req.gi_val      = g_wt_ctx->tx_rate_cfg.gi_val;
+	req.create_only = 0;
+
+	status = __wlan_hdd_populate_caps_peer_setup_req(&req, sta_info, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("no valid caps provided");
+		return;
+	}
+
+	hdd_debug("vdev %d peer assoc nss %d max_mcs %d",
+		  vdev_id, req.nss, req.max_mcs);
+
+	sme_passthru_peer_setup(mac_handle, &req);
+}
+
+void wlan_hdd_wondertap_peer_del(struct hdd_context *hdd_ctx,
+				 uint8_t vdev_id,
+				 const uint8_t *peer_addr)
+{
+	struct sir_passthru_peer_del_msg req = {0};
+	mac_handle_t mac_handle;
+
+	if (wlan_hdd_validate_vdev_id(vdev_id))
+		return;
+
+	hdd_debug("vdev %d peer del " QDF_MAC_ADDR_FMT,
+		  vdev_id, QDF_MAC_ADDR_REF(peer_addr));
+	mac_handle = hdd_ctx->mac_handle;
+	qdf_mem_copy(req.peer_mac_addr.bytes, peer_addr, QDF_MAC_ADDR_SIZE);
+	req.vdev_id = vdev_id;
+	sme_passthru_peer_del(mac_handle, &req);
 }
 
 static inline QDF_STATUS
@@ -755,6 +914,10 @@ int wlan_hdd_wondertap_init(void **handle,
 		 params->tx_rate.preamble, params->tx_rate.bw,
 		 params->tx_rate.gi, params->tx_rate.nss,
 		 params->tx_rate.mcs);
+	hdd_info("Rate mask preamble:%d bw:%d nss:%d max_mcs:%d rate_adaptation:%d",
+		 params->tx_rate_mask.max_preamble, params->tx_rate_mask.max_bw,
+		 params->tx_rate_mask.max_nss, params->tx_rate_mask.max_mcs,
+		 params->rate_adaptation_enable);
 
 	if (params->channel.bandwidth > WONDERTAP_RATE_BW_320 ||
 	    params->tx_rate.bw > WONDERTAP_RATE_BW_320 ||
@@ -823,8 +986,6 @@ int wlan_hdd_wondertap_init(void **handle,
 	g_wt_ctx = wt_ctx;
 	mutex_unlock(&g_wt_ctx_mutex);
 
-	qdf_spinlock_create(&wt_ctx->peer_tbl_lock);
-
 	status = qdf_runtime_lock_init(&wt_ctx->wondertap_rtpm_lock);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("passthrough mode rtpm lock creation failed");
@@ -891,7 +1052,6 @@ create_wake_lock_failed:
 	qdf_runtime_lock_deinit(&wt_ctx->wondertap_rtpm_lock);
 
 create_rtpm_lock_failed:
-	qdf_spinlock_destroy(&wt_ctx->peer_tbl_lock);
 	mutex_lock(&g_wt_ctx_mutex);
 	qdf_event_destroy(&wt_ctx->wondertap_vdev_event);
 	g_wt_ctx = NULL;
@@ -997,7 +1157,6 @@ void wlan_hdd_wondertap_deinit(void *handle,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
 	qdf_wake_lock_destroy(&wt_ctx->wondertap_wakelock);
 	qdf_runtime_lock_deinit(&wt_ctx->wondertap_rtpm_lock);
-	qdf_spinlock_destroy(&wt_ctx->peer_tbl_lock);
 
 	mutex_lock(&g_wt_ctx_mutex);
 	/*
@@ -1318,7 +1477,10 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	features->bits.sta_coexist = 1;
 	features->maximum_channel_switch_time_us = 50000;
 
-	hdd_debug("passthru cap bitmap 0x%llx", hdd_ctx->passthru_cap_bitmap);
+	features->bits.nss = QDF_MIN(hdd_ctx->num_rf_chains,
+				     (uint32_t)WLAN_PASSTHRU_MAX_NSS);
+	hdd_debug("passthru cap bitmap 0x%llx nss %d",
+		  hdd_ctx->passthru_cap_bitmap, features->bits.nss);
 	if (hdd_ctx->passthru_cap_bitmap & WLAN_HDD_PASSTHRU_CHAN_HOP_CAP_BIT)
 		features->bits.channel_hopping = 1;
 
@@ -1573,65 +1735,408 @@ void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
 	mutex_unlock(&g_wt_ctx_mutex);
 }
 
-bool hdd_passthru_is_peer_create_allowed(void)
+#define WLAN_CHAN_HOP_STATUS_WAIT_TIME_MS 1000
+
+/**
+ * struct hdd_chan_hop_status_priv - Channel hop status private context
+ * @response: Response structure from firmware
+ * @status: Operation status (0 on success, negative on error)
+ *
+ * Private data structure for osif_request to handle synchronous
+ * channel hop status request.
+ */
+struct hdd_chan_hop_status_priv {
+	struct vdev_chan_hop_status_response response;
+	int status;
+};
+
+/**
+ * hdd_chan_hop_status_resp_cb() - Channel hop status response callback
+ * @ctx: osif_request context
+ * @response_ptr: Response structure pointer
+ *
+ * Callback invoked by WMA layer when channel hop status event is received.
+ * Stores the response and completes the osif_request to wake waiting thread.
+ */
+static void hdd_chan_hop_status_resp_cb(void *ctx, void *response_ptr)
 {
-	bool is_peer_create_allowed = false;
+	struct osif_request *request;
+	struct hdd_chan_hop_status_priv *priv;
+	struct vdev_chan_hop_status_response *response = response_ptr;
 
-	if (!g_wt_ctx || !g_wt_ctx->is_peer_create_enabled)
-		return is_peer_create_allowed;
+	request = osif_request_get(ctx);
+	if (!request) {
+		hdd_err("Obsolete chan_hop_status request");
+		return;
+	}
 
-	qdf_spinlock_acquire(&g_wt_ctx->peer_tbl_lock);
-	is_peer_create_allowed = (g_wt_ctx->num_peers >=
-				  WLAN_PASSTHRU_MAX_PEER) ? false : true;
-	qdf_spinlock_release(&g_wt_ctx->peer_tbl_lock);
+	priv = osif_request_priv(request);
+	if (response) {
+		priv->response = *response;
+		priv->status = 0;
+	} else {
+		priv->status = -EINVAL;
+	}
 
-	return is_peer_create_allowed;
+	osif_request_complete(request);
+	osif_request_put(request);
 }
 
-void hdd_passthru_check_n_create_peer(struct qdf_mac_addr *peer_mac)
+/**
+ * wlan_hdd_wondertap_get_channel_status_report() - Get channel status report
+ * @handle: Wondertap handle
+ * @report: Report structure to fill (pre-allocated by Wonder driver)
+ *
+ * Retrieves channel hopping statistics from firmware and converts to
+ * wondertap format. This is a synchronous operation that blocks until
+ * firmware responds or timeout occurs.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_wondertap_get_channel_status_report(
+	void *handle,
+	qdf_wondertap_channel_status_report_t *report)
 {
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	struct osif_vdev_sync *vdev_sync;
+	struct vdev_chan_hop_status_req req = {0};
+	struct osif_request *request;
+	struct hdd_chan_hop_status_priv *priv;
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	void *cookie;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_CHAN_HOP_STATUS_WAIT_TIME_MS,
+	};
+	QDF_STATUS status;
+	int errno;
+	uint32_t i;
+
+	hdd_enter();
+
+	/* Validate wondertap context and handle */
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
+		hdd_err("Incorrect handle received - rejecting get_channel_status");
+		return -EINVAL;
+	}
+
+	if (!report) {
+		hdd_err("Invalid report pointer");
+		return -EINVAL;
+	}
+
+	hdd_ctx = g_wt_ctx->hdd_ctx;
+	wt_adapter = g_wt_ctx->wt_adapter;
+
+	/* Validate HDD context */
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	psoc = hdd_ctx->psoc;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle ||
+	    !wmi_service_enabled(wmi_handle,
+				 wmi_service_vdev_chan_hop_status_report)) {
+		hdd_err("wmi_service_vdev_chan_hop_status_report not supported");
+		return -ENOTSUPP;
+	}
+	/* Start vdev operation */
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	/* Allocate osif_request for synchronous operation */
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("osif request alloc failure");
+		errno = -ENOMEM;
+		goto stop_op;
+	}
+	cookie = osif_request_cookie(request);
+
+	/* Prepare request */
+	req.vdev_id = wt_adapter->deflink->vdev_id;
+
+	/* Send command to firmware */
+	status = wma_vdev_get_chan_hop_status(&req,
+					      hdd_chan_hop_status_resp_cb,
+					      cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send get chan hop status command: %d",
+			status);
+		errno = qdf_status_to_os_return(status);
+		goto osif_req_put;
+	}
+
+	/* Wait for response with timeout */
+	errno = osif_request_wait_for_response(request);
+	if (errno) {
+		hdd_err("get chan hop status timed out");
+		goto osif_req_put;
+	}
+
+	/* Get response from private data */
+	priv = osif_request_priv(request);
+	errno = priv->status;
+	if (errno) {
+		hdd_err("get chan hop status operation failed: %d", errno);
+		goto osif_req_put;
+	}
+
+	/* Convert response to wondertap format */
+	report->current_channel_hopping_request_tsf =
+		priv->response.hopping_request_tsf;
+	report->current_channel_index =
+		priv->response.current_channel_index;
+	report->channel_status_len = priv->response.num_slots;
+
+	hdd_debug("hopping_request_tsf=0x%x, current_channel_index=%d, num_slots=%d",
+		  priv->response.hopping_request_tsf,
+		  priv->response.current_channel_index,
+		  priv->response.num_slots);
+
+	hdd_debug("Converting %d channel status entries",
+		  report->channel_status_len);
+
+	/* Copy slot information with type conversions */
+	for (i = 0; i < priv->response.num_slots; i++) {
+		report->status[i].channel_switch_tsf =
+			priv->response.slot_info[i].channel_switch_tsf;
+		report->status[i].freq =
+			priv->response.slot_info[i].freq;
+		report->status[i].channel_start_tsf =
+			priv->response.slot_info[i].channel_start_tsf;
+		report->status[i].channel_end_tsf =
+			priv->response.slot_info[i].channel_end_tsf;
+		/* Convert u32 to u16 for traffic indices */
+		report->status[i].tx_traffic_index =
+			(uint16_t)priv->response.slot_info[i].tx_traffic_index;
+		report->status[i].rx_traffic_index =
+			(uint16_t)priv->response.slot_info[i].rx_traffic_index;
+
+		hdd_debug("Slot %d: freq=%d, channel_switch_tsf=0x%x, channel_start_tsf=0x%x, channel_end_tsf=0x%x, tx_idx=%d, rx_idx=%d",
+			  i, report->status[i].freq,
+			  report->status[i].channel_switch_tsf,
+			  report->status[i].channel_start_tsf,
+			  report->status[i].channel_end_tsf,
+			  report->status[i].tx_traffic_index,
+			  report->status[i].rx_traffic_index);
+	}
+
+	hdd_info("Successfully retrieved %d channel status entries",
+		 report->channel_status_len);
+
+osif_req_put:
+	osif_request_put(request);
+
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	hdd_exit();
+	return errno;
+}
+
+/**
+ * wlan_hdd_wondertap_set_station_info - Add, update, or remove station info
+ * @handle: opaque wondertap handle
+ * @action: station action (NEW / UPDATE / DEL / QUERY)
+ * @info: station information parameters
+ *
+ * Handles station management requests from the wonder framework.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_wondertap_set_station_info(void *handle,
+				    const qdf_wondertap_station_action_t action,
+				    qdf_wondertap_station_info_t *info)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	struct osif_vdev_sync *vdev_sync;
 	struct passthru_peer_tbl_entry *peer_tbl;
 	struct hdd_wondertap_peer_setup params = {0};
+	struct qdf_mac_addr peer_mac;
 	bool trigger_peer_create = false;
-	uint8_t i;
+	uint8_t i, vdev_id;
+	int errno;
 
-	if (!g_wt_ctx)
-		return;
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic || !info)
+		return -EINVAL;
 
-	qdf_spinlock_acquire(&g_wt_ctx->peer_tbl_lock);
+	hdd_ctx    = g_wt_ctx->hdd_ctx;
+	wt_adapter = g_wt_ctx->wt_adapter;
+
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		goto stop_op;
+
 	peer_tbl = g_wt_ctx->peer_tbl;
+	vdev_id  = wt_adapter->deflink->vdev_id;
+	qdf_mem_copy(peer_mac.bytes, info->mac, QDF_MAC_ADDR_SIZE);
 
-	for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
-		if (qdf_is_macaddr_zero(&peer_tbl[i].mac_addr)) {
-			trigger_peer_create = true;
+	switch (action) {
+	case WONDERTAP_STATION_STATE_NEW:
+		hdd_debug("set_station_info aid %d", info->aid);
+		if (g_wt_ctx->num_peers >= WLAN_PASSTHRU_MAX_PEER) {
+			hdd_err("max peers %d reached", WLAN_PASSTHRU_MAX_PEER);
+			errno = -ENOSPC;
 			break;
 		}
 
-		if (qdf_is_macaddr_equal(peer_mac,
-					 &peer_tbl[i].mac_addr) &&
-		    peer_tbl[i].peer_status != PASSTHRU_PEER_SETUP_NOT_DONE)
+		/*
+		 * First pass: check all slots for a duplicate MAC with an
+		 * active (non-NOT_DONE) status. This must run before the
+		 * free-slot search — a deleted slot (NOT_DONE) at an earlier
+		 * index could otherwise be found before an active entry for
+		 * the same MAC at a later index, incorrectly triggering a
+		 * new peer create.
+		 */
+		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+			if (!qdf_mem_cmp(info->mac, peer_tbl[i].mac_addr.bytes,
+					 QDF_MAC_ADDR_SIZE) &&
+			    peer_tbl[i].peer_status !=
+					PASSTHRU_PEER_SETUP_NOT_DONE) {
+				hdd_debug("set_station_info NEW: peer "
+					  QDF_MAC_ADDR_FMT
+					  " already exists, skipping",
+					  QDF_MAC_ADDR_REF(info->mac));
+				break;
+			}
+		}
+		if (i < WLAN_PASSTHRU_MAX_PEER)
 			break;
+
+		/* Second pass: find a free slot */
+		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+			if (peer_tbl[i].peer_status ==
+					PASSTHRU_PEER_SETUP_NOT_DONE) {
+				trigger_peer_create = true;
+				break;
+			}
+
+			if (!qdf_mem_cmp(info->mac, peer_tbl[i].mac_addr.bytes,
+					 QDF_MAC_ADDR_SIZE) &&
+			    (peer_tbl[i].peer_status !=
+			     PASSTHRU_PEER_SETUP_NOT_DONE))
+				break;
+		}
+
+		if (!trigger_peer_create) {
+			hdd_err("set_station_info NEW: no free slot for "
+				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(info->mac));
+			errno = -ENOSPC;
+			break;
+		}
+
+		g_wt_ctx->num_peers++;
+		qdf_mem_copy(peer_tbl[i].mac_addr.bytes, info->mac,
+			     QDF_MAC_ADDR_SIZE);
+		peer_tbl[i].sta_info.aid = info->aid;
+		peer_tbl[i].peer_status = PASSTHRU_PEER_SETUP_IN_PROGRESS;
+
+		hdd_debug("set_station_info NEW peer " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(info->mac));
+
+		qdf_mem_copy(params.peer_addr, info->mac, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&peer_tbl[i].sta_info, info,
+			     sizeof(peer_tbl[i].sta_info));
+
+		params.vdev_id  = vdev_id;
+		params.peer_aid = info->aid;
+		peer_tbl[i].caps_applied_in_new = false;
+		wlan_hdd_wondertap_peer_setup(hdd_ctx, &params, info,
+					      &peer_tbl[i].caps_applied_in_new);
+		break;
+
+	case WONDERTAP_STATION_STATE_UPDATE:
+		hdd_debug("set_station_info aid %d", info->aid);
+		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
+						 &peer_mac))
+				break;
+		}
+		if (i == WLAN_PASSTHRU_MAX_PEER) {
+			hdd_err("UPDATE: peer not found " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(info->mac));
+			errno = -ENOENT;
+			goto stop_op;
+		}
+		qdf_mem_copy(&peer_tbl[i].sta_info, info,
+			     sizeof(peer_tbl[i].sta_info));
+
+		if (peer_tbl[i].caps_applied_in_new) {
+			hdd_debug("UPDATE: caps already applied in NEW for "
+				  QDF_MAC_ADDR_FMT ", skipping",
+				  QDF_MAC_ADDR_REF(info->mac));
+			break;
+		}
+
+		hdd_debug("set_station_info UPDATE " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(info->mac));
+		wlan_hdd_wondertap_peer_assoc(hdd_ctx, vdev_id,
+					      info->mac, info);
+		break;
+
+	case WONDERTAP_STATION_STATE_DEL:
+		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
+						 &peer_mac))
+				break;
+		}
+		if (i == WLAN_PASSTHRU_MAX_PEER) {
+			hdd_err("DEL: peer not found " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(info->mac));
+			errno = -ENOENT;
+			goto stop_op;
+		}
+		qdf_mem_zero(&peer_tbl[i].sta_info,
+			     sizeof(peer_tbl[i].sta_info));
+		peer_tbl[i].peer_status = PASSTHRU_PEER_SETUP_NOT_DONE;
+		peer_tbl[i].caps_applied_in_new = false;
+		g_wt_ctx->num_peers--;
+
+		hdd_debug("set_station_info DEL " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(info->mac));
+		wlan_hdd_wondertap_peer_del(hdd_ctx, vdev_id, info->mac);
+		break;
+
+	case WONDERTAP_STATION_STATE_QUERY:
+		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
+						 &peer_mac))
+				break;
+		}
+		if (i == WLAN_PASSTHRU_MAX_PEER) {
+			hdd_err("QUERY: peer not found " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(info->mac));
+			errno = -ENOENT;
+			goto stop_op;
+		}
+		qdf_mem_copy(info, &peer_tbl[i].sta_info, sizeof(*info));
+
+		hdd_debug("set_station_info QUERY " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(info->mac));
+		break;
+
+	default:
+		errno = -EINVAL;
+		break;
 	}
 
-	if (!trigger_peer_create) {
-		qdf_spinlock_release(&g_wt_ctx->peer_tbl_lock);
-		return;
-	}
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
 
-	g_wt_ctx->num_peers++;
-	qdf_copy_macaddr(&peer_tbl[i].mac_addr, peer_mac);
-	peer_tbl[i].peer_status = PASSTHRU_PEER_SETUP_IN_PROGRESS;
-
-	hdd_debug("Trigger passthru peer create for " QDF_MAC_ADDR_FMT,
-		  QDF_MAC_ADDR_REF(peer_mac->bytes));
-
-	qdf_spinlock_release(&g_wt_ctx->peer_tbl_lock);
-
-	qdf_copy_macaddr((struct qdf_mac_addr *)&params.peer_addr,
-			 &peer_tbl[i].mac_addr);
-	params.vdev_id = g_wt_ctx->wt_adapter->deflink->vdev_id;
-
-	wlan_hdd_wondertap_peer_setup(g_wt_ctx->hdd_ctx, &params);
+	return errno;
 }
 
 /**
@@ -1651,6 +2156,9 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.get_capabilities = wlan_hdd_wondertap_get_capabilities,
 	.channel_schedule_request = wlan_hdd_wondertap_set_chan_sched,
 	.get_mac_tsf = wlan_hdd_wondertap_get_mac_tsf,
+	.get_channel_status_report =
+		wlan_hdd_wondertap_get_channel_status_report,
+	.set_station_info = wlan_hdd_wondertap_set_station_info,
 };
 
 /**
@@ -1660,7 +2168,7 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
  * version supported and the operations table.
  */
 static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
-	.ver = WONDER_VERSION_1_6_1,
+	.ver = WONDER_VERSION_1_6_5,
 	.wonder_ops = &wlan_drv_wondertap_ops,
 };
 

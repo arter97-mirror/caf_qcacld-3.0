@@ -29,6 +29,7 @@ struct hdd_wondertap_tx_rate_cfg {
 };
 
 #define WLAN_PASSTHRU_MAX_PEER 7
+#define WLAN_PASSTHRU_MAX_NSS  2
 
 /**
  * enum passthru_peer_status - passthru peer status
@@ -48,12 +49,19 @@ enum passthru_peer_status {
 
 /**
  * struct passthru_peer_tbl_entry - passthru peer table entry
- * @mac_addr: peer mac address
- * @peer_status: peer status
+ * @mac_addr: peer MAC address
+ * @peer_status: peer setup status
+ * @sta_info: station info stored on UPDATE, returned verbatim on QUERY
+ * @caps_applied_in_new: caps were already sent to FW as part of NEW; every
+ *  UPDATE for this peer is skipped while this is set, since FW does not
+ *  support a second peer_assoc for the same peer. Cleared only on DEL.
+ *  WONDER is expected to send caps in either NEW or UPDATE, never both.
  */
 struct passthru_peer_tbl_entry {
-	struct qdf_mac_addr mac_addr;
-	enum passthru_peer_status peer_status;
+	struct qdf_mac_addr          mac_addr;
+	enum passthru_peer_status    peer_status;
+	qdf_wondertap_station_info_t sta_info;
+	bool                          caps_applied_in_new;
 };
 
 /**
@@ -67,7 +75,6 @@ struct passthru_peer_tbl_entry {
  * @frame_filter: frame filter value
  * @magic: handle for external entity
  * @tx_rate_cfg: transmit rate configuration
- * @peer_tbl_lock: spinlock for access to peer table
  * @peer_tbl: passthru peer table
  * @num_peers: number of peers in the table
  * @is_peer_create_enabled: is peer created enabled
@@ -82,16 +89,30 @@ struct hdd_wondertap_context {
 	uint8_t frame_filter;
 	uint64_t magic;
 	struct hdd_wondertap_tx_rate_cfg tx_rate_cfg;
-	qdf_spinlock_t peer_tbl_lock;
 	struct passthru_peer_tbl_entry peer_tbl[WLAN_PASSTHRU_MAX_PEER];
 	uint8_t num_peers;
 	bool is_peer_create_enabled;
 };
 
 struct hdd_wondertap_peer_setup {
-	uint8_t vdev_id;
-	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t  vdev_id;
+	uint8_t  peer_addr[QDF_MAC_ADDR_SIZE];
+	uint16_t peer_aid;
 };
+
+/**
+ * wlan_hdd_wondertap_peer_del() - Delete a wondertap peer
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @peer_addr: peer MAC address
+ *
+ * Sends a passthru peer delete message to PE via SME.
+ *
+ * Return: None
+ */
+void wlan_hdd_wondertap_peer_del(struct hdd_context *hdd_ctx,
+				 uint8_t vdev_id,
+				 const uint8_t *peer_addr);
 
 /**
  * wlan_hdd_wondertap_register_ops() - Register wondertap operations
@@ -127,23 +148,6 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup);
  * Return: None
  */
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up);
-
-/**
- * hdd_passthru_is_peer_create_allowed() - Check whether passthru peer create is
- *  allowed or not.
- *
- * Return: true if allowed else false
- */
-bool hdd_passthru_is_peer_create_allowed(void);
-
-/**
- * hdd_passthru_check_n_create_peer() - Check for new peer and do the necessary
- *  control path peer setup.
- * @peer_mac: peer MAC address
- *
- * Return: None
- */
-void hdd_passthru_check_n_create_peer(struct qdf_mac_addr *peer_mac);
 #else
 static inline int wlan_hdd_wondertap_register_ops(struct device *dev)
 {
@@ -157,16 +161,6 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 static inline
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
-{
-}
-
-static inline bool hdd_passthru_is_peer_create_allowed(void)
-{
-	return false;
-}
-
-static inline
-void hdd_passthru_check_n_create_peer(struct qdf_mac_addr *peer_mac)
 {
 }
 #endif /*DRIVER_PASSTHRU_MODE */
