@@ -4361,7 +4361,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		mbo_ie_len + adaptive_11r_ie_len +
 		vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
-		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len + nonce_ie_len;
+		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len +
+		nonce_ie_len + smd_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -10251,7 +10252,7 @@ lim_send_uhr_link_recfg_st_prep_req_frame(
 
 	rv_mlie_len = lim_caculate_mlo_ie_length(&session->mlo_ie);
 	session->mlo_ie_total_len = rv_mlie_len;
-	pe_debug("SMD: Reconfig ML IE len %d", rv_mlie_len);	
+	pe_debug("SMD: Reconfig ML IE len %d", rv_mlie_len);
 	/* Add SMD BSS Transition Parameters element (mandatory for ST prep Type=0) */
 	qdf_status = populate_smd_bss_transition_params(session, req,
 			smd_bss_trans_ie,
