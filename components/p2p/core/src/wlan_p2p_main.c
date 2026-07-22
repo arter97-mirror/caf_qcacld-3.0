@@ -857,6 +857,7 @@ QDF_STATUS p2p_psoc_start(struct wlan_objmgr_psoc *soc,
 	start_param->event_cb_data = req->event_cb_data;
 	start_param->tx_cnf_cb = req->tx_cnf_cb;
 	start_param->tx_cnf_cb_data = req->tx_cnf_cb_data;
+	start_param->tx_expiry_cb = req->tx_expiry_cb;
 	p2p_init_lo_event(start_param, req);
 	p2p_soc_obj->start_param = start_param;
 
@@ -929,6 +930,7 @@ QDF_STATUS p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 	start_param->event_cb_data = NULL;
 	start_param->tx_cnf_cb = NULL;
 	start_param->tx_cnf_cb_data = NULL;
+	start_param->tx_expiry_cb = NULL;
 	qdf_mem_free(start_param);
 
 	p2p_debug("p2p psoc stop successful");

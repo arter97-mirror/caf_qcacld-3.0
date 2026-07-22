@@ -618,6 +618,43 @@ static QDF_STATUS p2p_process_ready_on_channel_evt(
 }
 
 /**
+ * p2p_notify_mgmt_tx_expiry() - Notify mgmt frame tx expiry
+ * @roc_ctx: remain on channel request
+ *
+ * This function notifies upper layer about mgmt frame tx expiry via
+ * tx_expiry_cb registered by HDD. Driver is not required to send this
+ * notification for an explicit user ROC, or if the tx was requested
+ * with wait_time of 0, since the caller did not ask to wait for tx
+ * completion.
+ *
+ * Return: None
+ */
+static void p2p_notify_mgmt_tx_expiry(struct p2p_roc_context *roc_ctx)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj = roc_ctx->p2p_soc_obj;
+	struct p2p_start_param *start_param;
+
+	if (roc_ctx->roc_type == USER_REQUESTED) {
+		p2p_debug("user requested roc, skip tx expiry notification");
+		return;
+	}
+
+	if (roc_ctx->zero_wait) {
+		p2p_debug("zero wait_time, skip tx expiry notification");
+		return;
+	}
+
+	start_param = p2p_soc_obj->start_param;
+	if (!(start_param->tx_expiry_cb)) {
+		p2p_err_rl("no tx expiry callback");
+		return;
+	}
+
+	start_param->tx_expiry_cb(p2p_soc_obj->soc, roc_ctx->vdev_id,
+				  roc_ctx->id, roc_ctx->chan_freq);
+}
+
+/**
  * p2p_process_scan_complete_evt() - Process scan complete event
  * @roc_ctx: remain on channel request
  *
@@ -638,6 +675,7 @@ static QDF_STATUS p2p_process_scan_complete_evt(
 	/* allow runtime suspend */
 	qdf_runtime_pm_allow_suspend(&p2p_soc_obj->roc_runtime_lock);
 
+	p2p_notify_mgmt_tx_expiry(roc_ctx);
 
 	status = qdf_mc_timer_stop_sync(&roc_ctx->roc_timer);
 	if (QDF_IS_STATUS_ERROR(status))

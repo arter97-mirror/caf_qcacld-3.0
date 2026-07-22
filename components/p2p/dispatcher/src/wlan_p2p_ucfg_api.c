@@ -363,6 +363,7 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
 	tx_action->vdev_id = mgmt_frm->vdev_id;
 	tx_action->chan_freq = mgmt_frm->chan_freq;
 	tx_action->duration = mgmt_frm->wait;
+	tx_action->zero_wait = !mgmt_frm->wait;
 	tx_action->buf_len = mgmt_frm->len;
 	tx_action->no_cck = mgmt_frm->no_cck;
 	tx_action->no_ack = mgmt_frm->dont_wait_for_ack;

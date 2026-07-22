@@ -1365,6 +1365,7 @@ static QDF_STATUS p2p_roc_req_for_tx_action(
 	roc_ctx->vdev_id = tx_ctx->vdev_id;
 	roc_ctx->chan_freq = tx_ctx->chan_freq;
 	roc_ctx->duration = tx_ctx->duration;
+	roc_ctx->zero_wait = tx_ctx->zero_wait;
 	roc_ctx->roc_state = ROC_STATE_IDLE;
 	roc_ctx->roc_type = OFF_CHANNEL_TX;
 	roc_ctx->tx_ctx = tx_ctx;
@@ -3394,6 +3395,7 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 				curr_roc_ctx->duration = tx_ctx->duration;
 			status = p2p_restart_roc_timer(curr_roc_ctx);
 			curr_roc_ctx->tx_ctx = tx_ctx;
+			curr_roc_ctx->zero_wait = tx_ctx->zero_wait;
 			if (status != QDF_STATUS_SUCCESS) {
 				p2p_err("restart roc timer fail");
 				goto fail;

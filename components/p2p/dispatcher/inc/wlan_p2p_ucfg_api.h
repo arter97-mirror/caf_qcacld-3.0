@@ -104,6 +104,25 @@ typedef QDF_STATUS (*mcc_quota_event_callback)(struct wlan_objmgr_psoc *psoc,
 					       struct mcc_quota_info *mcc_quota);
 
 /**
+ * typedef p2p_mgmt_tx_expiry_callback() - Callback for mgmt tx expiry
+ * @psoc: psoc object
+ * @vdev_id: vdev id on which the mgmt tx was requested
+ * @cookie: mgmt tx cookie (as returned to userspace by tx_mgmt) that
+ *          expired without a tx status
+ * @chan_freq: channel frequency on which the mgmt tx was requested
+ *
+ * This callback will be used to notify hdd that a mgmt frame tx
+ * request has expired without receiving a tx status, so that hdd can
+ * report it to cfg80211 via cfg80211_tx_mgmt_expired().
+ *
+ * Return: None
+ */
+typedef void (*p2p_mgmt_tx_expiry_callback)(struct wlan_objmgr_psoc *psoc,
+					    uint32_t vdev_id,
+					    uint64_t cookie,
+					    qdf_freq_t chan_freq);
+
+/**
  * struct p2p_start_param - p2p soc start parameters. Below callbacks
  *                          will be registered by the HDD
  * @rx_cb:            Function pointer to hdd rx callback. This
@@ -121,6 +140,9 @@ typedef QDF_STATUS (*mcc_quota_event_callback)(struct wlan_objmgr_psoc *psoc,
  *                    callback. This function will be used to give
  *                    listen offload stopped event to hdd
  * @lo_event_cb_data: Pointer to p2p listen offload callback user data
+ * @tx_expiry_cb:     Function pointer to hdd mgmt tx expiry callback.
+ *                    This function will be used to notify hdd when a
+ *                    mgmt tx request expires without a tx status
  */
 struct p2p_start_param {
 	p2p_rx_callback rx_cb;
@@ -133,6 +155,7 @@ struct p2p_start_param {
 	p2p_lo_event_callback lo_event_cb;
 	void *lo_event_cb_data;
 #endif
+	p2p_mgmt_tx_expiry_callback tx_expiry_cb;
 };
 
 /**

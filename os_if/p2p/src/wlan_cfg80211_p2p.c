@@ -322,6 +322,67 @@ fail:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 }
 
+/**
+ * wlan_p2p_tx_expiry_callback() - Callback for mgmt tx expiry
+ * @psoc: psoc object
+ * @vdev_id: vdev id on which the mgmt tx was requested
+ * @cookie: mgmt tx cookie that expired without a tx status
+ * @chan_freq: channel frequency on which the mgmt tx was requested
+ *
+ * This callback will be used to notify cfg80211 that a mgmt frame tx
+ * request has expired without receiving a tx status.
+ *
+ * Return: None
+ */
+static void wlan_p2p_tx_expiry_callback(struct wlan_objmgr_psoc *psoc,
+					uint32_t vdev_id, uint64_t cookie,
+					qdf_freq_t chan_freq)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct vdev_osif_priv *osif_priv;
+	struct wireless_dev *wdev;
+	struct ieee80211_channel *chan;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_P2P_ID);
+	if (!vdev) {
+		osif_err("vdev is null");
+		return;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		osif_err("osif_priv is null");
+		goto fail;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		osif_err("wireless dev is null");
+		goto fail;
+	}
+
+	if (!wdev->wiphy) {
+		osif_err("wiphy is null");
+		goto fail;
+	}
+
+	chan = ieee80211_get_channel(wdev->wiphy, chan_freq);
+	if (!chan) {
+		osif_err("channel conversion failed, freq:%d", chan_freq);
+		goto fail;
+	}
+
+	osif_debug("vdev_id:%d, cookie:%llx, freq:%d",
+		   vdev_id, cookie, chan_freq);
+
+	cfg80211_tx_mgmt_expired(wdev, cookie, chan, GFP_KERNEL);
+
+fail:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+}
+
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 /**
  * wlan_p2p_lo_event_callback() - Callback for listen offload event
@@ -513,6 +574,7 @@ QDF_STATUS p2p_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	start_param.event_cb_data = psoc;
 	start_param.tx_cnf_cb = wlan_p2p_action_tx_cnf_callback;
 	start_param.tx_cnf_cb_data = psoc;
+	start_param.tx_expiry_cb = wlan_p2p_tx_expiry_callback;
 	wlan_p2p_init_lo_event(&start_param, psoc);
 
 	return ucfg_p2p_psoc_start(psoc, &start_param);

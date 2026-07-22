@@ -172,6 +172,9 @@ struct p2p_frame_info {
  * @no_ack:         Required ack or not
  * @rand_mac_tx:    Use random MAC address
  * @duration:       Duration for the RoC
+ * @zero_wait:      True if userspace requested wait_time of 0. Driver is
+ *                  not required to send tx expiry notification in this
+ *                  case, since the caller did not ask to wait for tx.
  * @tx_timer:       RoC timer
  * @frame_info:     Frame type information
  * @nbuf:           Network buffer
@@ -192,6 +195,7 @@ struct tx_action_context {
 	bool no_ack;
 	bool rand_mac_tx;
 	uint32_t duration;
+	bool zero_wait;
 	qdf_mc_timer_t tx_timer;
 	struct p2p_frame_info frame_info;
 	qdf_nbuf_t nbuf;

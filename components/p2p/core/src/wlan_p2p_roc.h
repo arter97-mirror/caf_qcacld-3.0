@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -84,6 +84,8 @@ enum roc_state {
  * @chan_freq:   Chan frequency for which this RoC has been requested
  * @phy_mode:    PHY mode
  * @duration:    Duration for the RoC
+ * @zero_wait:   True if this RoC was created for an off channel tx MGMT
+ *               request with wait_time of 0
  * @roc_type:    RoC type  User requested or internal
  * @roc_timer:   RoC timer
  * @roc_state:   Roc state
@@ -103,6 +105,7 @@ struct p2p_roc_context {
 	qdf_freq_t chan_freq;
 	uint8_t phy_mode;
 	uint32_t duration;
+	bool zero_wait;
 	enum roc_type roc_type;
 	qdf_mc_timer_t roc_timer;
 	enum roc_state roc_state;
