@@ -265,6 +265,7 @@
 #include "qdf_wakelock_debug.h"
 #include "wlan_hdd_wondertap.h"
 #include "wlan_hdd_uhr.h"
+#include "wlan_smd_roam.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -19054,7 +19055,8 @@ static void hdd_v2_flow_pool_map(int vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+	    !smd_is_roaming_in_progress(vdev)) {
 		hdd_info_rl("Link switch is ongoing, do not invoke flow pool map");
 		goto release_ref;
 	}
@@ -19099,7 +19101,8 @@ static void hdd_v2_flow_pool_unmap(int vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+	    !smd_is_roaming_in_progress(vdev)) {
 		hdd_debug("vdev:%d Link switch is ongoing do not invoke flow pool unmap",
 			  vdev_id);
 		goto release_ref;
