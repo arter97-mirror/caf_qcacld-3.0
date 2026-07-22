@@ -22673,7 +22673,8 @@ QDF_STATUS hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_tdls_psoc_enable(psoc);
 	ucfg_fwol_psoc_enable(psoc);
 	ucfg_ll_sap_psoc_enable(psoc);
-	if (!cds_is_driver_recovering())
+
+	if (!cds_is_driver_recovering() || cds_is_driver_loading())
 		status = ucfg_action_oui_psoc_enable(psoc, true);
 	else
 		status = ucfg_action_oui_psoc_enable(psoc, false);
@@ -22692,7 +22693,8 @@ void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	nan_psoc_disable(psoc);
 	disa_psoc_disable(psoc);
 	ocb_psoc_disable(psoc);
-	if (!cds_is_driver_recovering())
+
+	if (!cds_is_driver_recovering() || cds_is_load_or_unload_in_progress())
 		ucfg_action_oui_psoc_disable(psoc);
 }
 
