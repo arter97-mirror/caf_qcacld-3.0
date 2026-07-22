@@ -2637,6 +2637,11 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 
 		for (i = 0; i < roam_sync_ind->num_setup_links; i++) {
 			link = &roam_sync_ind->ml_link[i];
+			if (setup_links->link_id >= MAX_MLO_LINK_ID) {
+				wmi_err("Invalid setup link ID %u",
+					setup_links->link_id);
+				return QDF_STATUS_E_INVAL;
+			}
 			link->link_id = setup_links->link_id;
 
 			/*
