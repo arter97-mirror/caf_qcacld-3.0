@@ -1025,6 +1025,8 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 				       flow_evict_success_code);
 	/* Clear the sw_ft_entry */
 	qdf_mem_zero(sw_ft_entry, sizeof(*sw_ft_entry));
+	/* Mark NAPI ID is invalid */
+	sw_ft_entry->napi_id = DP_INVALID_ID;
 	dp_rx_fisa_restore_pkt_hist(sw_ft_entry, &pkt_hist);
 
 	if (!elem) {
