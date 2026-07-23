@@ -95,7 +95,8 @@ wlan_hdd_add_nss_info(struct hdd_connection_info *conn_info,
 	if (!(conn_info->conn_flag.ht_present |
 	      conn_info->conn_flag.vht_present |
 	      conn_info->conn_flag.he_present |
-	      conn_info->conn_flag.eht_present))
+	      conn_info->conn_flag.eht_present |
+	      conn_info->conn_flag.uhr_present))
 		return length;
 
 	ret_val = scnprintf(buf, buf_avail_len,
@@ -467,6 +468,54 @@ wlan_hdd_add_eht_cap_info(struct hdd_connection_info *conn_info,
 #else
 static ssize_t
 wlan_hdd_add_eht_cap_info(struct hdd_connection_info *conn_info,
+			  uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
+/**
+ * wlan_hdd_add_uhr_cap_info() - Populate UHR MAC and PHY capabilities
+ * @conn_info: station connection information
+ * @buf: output buffer
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes populated by this function in buffer
+ */
+static ssize_t
+wlan_hdd_add_uhr_cap_info(struct hdd_connection_info *conn_info,
+			  uint8_t *buf, ssize_t buf_avail_len)
+{
+	struct ieee80211_sta_uhr_cap *uhr;
+	ssize_t length = 0;
+	int ret;
+
+	if (!conn_info->conn_flag.uhr_present)
+		return length;
+
+	uhr = &conn_info->uhr_cap;
+	if (!uhr->has_uhr)
+		return length;
+
+	ret = scnprintf(buf, buf_avail_len,
+			"uhr_mac_cap_info = 0x%02x%02x%02x%02x%02x\n"
+			"uhr_phy_cap_info = 0x%02x\n",
+			uhr->mac.mac_cap[4],
+			uhr->mac.mac_cap[3],
+			uhr->mac.mac_cap[2],
+			uhr->mac.mac_cap[1],
+			uhr->mac.mac_cap[0],
+			uhr->phy.cap);
+	if (ret <= 0)
+		return length;
+
+	length = ret;
+	return length;
+}
+#else
+static ssize_t
+wlan_hdd_add_uhr_cap_info(struct hdd_connection_info *conn_info,
 			  uint8_t *buf, ssize_t buf_avail_len)
 {
 	return 0;
@@ -865,6 +914,9 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		length += wlan_hdd_add_eht_cap_info(conn_info, buf + length,
 						    buf_avail_len - length);
 
+		length += wlan_hdd_add_uhr_cap_info(conn_info, buf + length,
+						    buf_avail_len - length);
+
 		if (is_legacy)
 			return length;
 	}
@@ -979,6 +1031,9 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 
 	length += wlan_hdd_add_eht_cap_info(conn_info, buf + length,
 					   buf_avail_len - length);
+
+	length += wlan_hdd_add_uhr_cap_info(conn_info, buf + length,
+					    buf_avail_len - length);
 
 	return length;
 }

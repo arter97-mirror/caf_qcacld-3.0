@@ -1707,6 +1707,29 @@ void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
+void hdd_copy_uhr_caps(struct hdd_station_ctx *hdd_sta_ctx,
+		       tDot11fAssocResponse *assoc_resp)
+{
+	struct ieee80211_sta_uhr_cap *uhr = &hdd_sta_ctx->conn_info.uhr_cap;
+	tDot11fIEuhr_cap *caps = &assoc_resp->uhr_cap;
+
+	qdf_mem_zero(uhr, sizeof(*uhr));
+
+	if (!caps->present || caps->num_data < 7)
+		return;
+
+	/*
+	 * dot11f strips EID, Len, and ExtEID before storing into data[].
+	 * Wire layout: data[0..5] = MAC caps (6 bytes), data[6] = PHY byte 0.
+	 * mac_cap[] is 5 bytes so data[5] (6th MAC byte) is not stored.
+	 */
+	uhr->has_uhr = true;
+	qdf_mem_copy(uhr->mac.mac_cap, caps->data, sizeof(uhr->mac.mac_cap));
+	uhr->phy.cap = caps->data[6];
+}
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)) && \
 	defined(WLAN_FEATURE_11BE)
 void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,

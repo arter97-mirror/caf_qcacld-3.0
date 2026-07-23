@@ -1338,6 +1338,11 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 	else
 		hdd_sta_ctx->conn_info.conn_flag.eht_op_present = false;
 
+	if (assoc_resp->uhr_cap.present)
+		hdd_sta_ctx->conn_info.conn_flag.uhr_present = true;
+	else
+		hdd_sta_ctx->conn_info.conn_flag.uhr_present = false;
+
 	/*
 	 * Cache connection info only in case of station
 	 */
@@ -1353,6 +1358,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 
 		hdd_copy_he_operation(hdd_sta_ctx, &assoc_resp->he_op);
 		hdd_copy_eht_caps(hdd_sta_ctx, assoc_resp);
+		hdd_copy_uhr_caps(hdd_sta_ctx, assoc_resp);
 		hdd_cm_update_prev_ap_ie(hdd_sta_ctx, rsp);
 	}
 

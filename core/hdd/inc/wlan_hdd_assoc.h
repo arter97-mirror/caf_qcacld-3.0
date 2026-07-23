@@ -71,6 +71,7 @@ enum peer_status {
  * @vht_op_present: vht operation present or not
  * @he_present: he operation present or not
  * @eht_op_present: eht operation present or not
+ * @uhr_present: uhr element present or not
  */
 struct hdd_conn_flag {
 	uint8_t ht_present:1;
@@ -81,6 +82,7 @@ struct hdd_conn_flag {
 	uint8_t vht_op_present:1;
 	uint8_t he_present:1;
 	uint8_t eht_op_present:1;
+	uint8_t uhr_present:1;
 };
 
 /*defines for tx_BF_cap_info */
@@ -168,6 +170,7 @@ struct hdd_conn_flag {
  * @eht_cap_len: length of @eht_cap
  * @eht_operation: EHT operation info
  * @eht_oper_len: length of @eht_operation
+ * @uhr_cap: UHR capabilities info (MAC + PHY)
  * @ap_nss: AP advertised nss
  */
 struct hdd_connection_info {
@@ -224,6 +227,9 @@ struct hdd_connection_info {
 	uint32_t eht_cap_len;
 	struct ieee80211_eht_operation eht_operation;
 	uint32_t eht_oper_len;
+#endif
+#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
+	struct ieee80211_sta_uhr_cap uhr_cap;
 #endif
 	uint8_t ap_nss;
 };
@@ -612,6 +618,23 @@ void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
 		       tDot11fAssocResponse * assoc_resp);
 #else
 static inline void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
+				     tDot11fAssocResponse *assoc_resp)
+{
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
+/**
+ * hdd_copy_uhr_caps() - copy UHR capabilities to hdd station context
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @assoc_resp: pointer to Assoc response
+ *
+ * Return: None
+ */
+void hdd_copy_uhr_caps(struct hdd_station_ctx *hdd_sta_ctx,
+		       tDot11fAssocResponse *assoc_resp);
+#else
+static inline void hdd_copy_uhr_caps(struct hdd_station_ctx *hdd_sta_ctx,
 				     tDot11fAssocResponse *assoc_resp)
 {
 }
