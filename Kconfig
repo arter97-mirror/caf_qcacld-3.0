@@ -1595,15 +1595,6 @@ config WLAN_DP_DISABLE_TCL_STATUS_SRNG
 	bool "Enable WLAN_DP_DISABLE_TCL_STATUS_SRNG"
 	default n
 
-config CFG_MAX_STA_VDEVS
-	int "Enable CFG_MAX_STA_VDEVS"
-
-config CFG_BMISS_OFFLOAD_MAX_VDEV
-	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
-
-config CHIP_VERSION
-	int "Enable CHIP_VERSION"
-
 config WLAN_TWT_SAP_STA_COUNT
 	bool "Enable WLAN_TWT_SAP_STA_COUNT"
 	default n
@@ -1887,6 +1878,18 @@ config DP_RX_REFILL_THRD_THRESHOLD
 
 config NUM_SOC_PERF_CLUSTER
     int "Enable NUM_SOC_PERF_CLUSTER"
+
+config CFG_MAX_STA_VDEVS
+    int "Enable CFG_MAX_STA_VDEVS"
+    default 4
+
+config CFG_BMISS_OFFLOAD_MAX_VDEV
+    int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+    default 4
+
+config CHIP_VERSION
+    int "Enable CHIP_VERSION"
+    default 1
 
 endif
 endif # QCA_CLD_WLAN
