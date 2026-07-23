@@ -30833,6 +30833,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	bool sta_sap_p2p_concurrency, sta_p2p_ndp_conc;
 	bool sap_sta_nan_concurrency, sap_sap_sta_concurrency;
 	bool sta_sta_sap_sap_concurrency, sta_sap_sap_p2p_concurrency;
+	uint32_t iface_combination_bitmap;
 	uint8_t num;
 	QDF_STATUS status;
 	bool is_nan_allowed;
@@ -30861,6 +30862,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 					      CFG_STA_STA_SAP_SAP_CONCURRENCY);
 	sta_sap_sap_p2p_concurrency = cfg_get(psoc,
 					      CFG_STA_SAP_SAP_P2P_CONCURRENCY);
+	iface_combination_bitmap = cfg_get(psoc, CFG_IFACE_COMBINATION_BITMAP);
 
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
 	is_nan_allowed = ucfg_nan_is_allowed(psoc);
@@ -30874,6 +30876,16 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		     wlan_hdd_is_iface_sta_sta(i) ||
 		     wlan_hdd_is_iface_sap_sap(i) ||
 		     wlan_hdd_is_iface_p2p_p2p(i)))
+			continue;
+
+		/* Disallow standalone STA+STA and SAP+SAP combinations */
+		if (!(iface_combination_bitmap &
+		    WLAN_HDD_IFACE_COMBINATION_STA_STA) &&
+		    wlan_hdd_is_iface_sta_sta(i))
+			continue;
+		if (!(iface_combination_bitmap &
+		    WLAN_HDD_IFACE_COMBINATION_SAP_SAP) &&
+		    wlan_hdd_is_iface_sap_sap(i))
 			continue;
 
 		/* Filter for 1x1 DBS targets */

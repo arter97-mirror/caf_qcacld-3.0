@@ -1606,6 +1606,47 @@ enum host_log_level {
 
 /*
  * <ini>
+ * g_iface_combination_bitmap - Bitmask to control standalone iface combinations
+ * @Min: 0x0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0x3
+ *
+ * Each bit enables/disables a specific standalone two-interface combination
+ * from being included in the advertised nl80211 iface combinations list.
+ *
+ * Bit 0: STA+STA combination
+ *   0 - disable STA+STA combination
+ *   1 - enable  STA+STA combination
+ *
+ * Bit 1: SAP+SAP combination
+ *   0 - disable SAP+SAP combination
+ *   1 - enable  SAP+SAP combination
+ *
+ * Bits 2-31: Reserved for future use.  Must be set to 0.
+ *
+ * Default 0x3 enables both STA+STA and SAP+SAP.
+ *
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define WLAN_HDD_IFACE_COMBINATION_STA_STA  BIT(0)
+#define WLAN_HDD_IFACE_COMBINATION_SAP_SAP  BIT(1)
+
+#define CFG_IFACE_COMBINATION_BITMAP CFG_INI_UINT( \
+		"g_iface_combination_bitmap", \
+		0x0, \
+		0xFFFFFFFF, \
+		0x3, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Bitmask to control standalone iface combinations")
+
+/*
+ * <ini>
  * g_sta_sap_sap_p2p_concurrency  - enable STA-SAP-SAP-P2P concurrency
  * @Min: 0
  * @Max: 1
@@ -1846,6 +1887,7 @@ enum host_log_level {
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
 	CFG(CFG_SAP_SAP_STA_CONCURRENCY) \
 	CFG(CFG_STA_STA_SAP_SAP_CONCURRENCY) \
+	CFG(CFG_IFACE_COMBINATION_BITMAP) \
 	CFG(CFG_STA_SAP_SAP_P2P_CONCURRENCY) \
 	CFG_UL_JITTER_LOG_ALL \
 	CFG_EPM_ENABLE_ALL \
