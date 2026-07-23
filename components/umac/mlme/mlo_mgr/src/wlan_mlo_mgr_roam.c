@@ -1850,6 +1850,11 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
+	if (!ml_partner_info.num_partner_links) {
+		mlme_debug("No partner links, skip gen probe rsp");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	gen_frame_len = MAX_MGMT_MPDU_LEN;
 
 	gen_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
@@ -1875,7 +1880,7 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 							    &reporting_link_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-		return status;
+		goto done;
 	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
