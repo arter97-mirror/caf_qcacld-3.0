@@ -96,6 +96,17 @@ static inline bool wma_is_peer_uhr_capable(tpAddStaParams params)
 bool wma_get_bss_uhr_capable(struct bss_params *add_bss);
 
 /**
+ * wma_set_bss_rate_flags_uhr() - set rate flags based on BSS UHR capability
+ * @rate_flags: pointer to rate flags to be updated
+ * @add_bss: add_bss params
+ *
+ * Return: QDF_STATUS_SUCCESS if the bss is UHR capable and rate_flags was
+ * updated, QDF_STATUS_E_NOSUPPORT otherwise
+ */
+QDF_STATUS wma_set_bss_rate_flags_uhr(enum tx_rate_info *rate_flags,
+				      struct bss_params *add_bss);
+
+/**
  * wma_match_uhr_rate() - get UHR rate matching with nss
  * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
@@ -149,6 +160,13 @@ static inline
 bool wma_get_bss_uhr_capable(struct bss_params *add_bss)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS wma_set_bss_rate_flags_uhr(enum tx_rate_info *rate_flags,
+				      struct bss_params *add_bss)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline

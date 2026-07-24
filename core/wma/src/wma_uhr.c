@@ -21,6 +21,7 @@
  */
 
 #include "wma_uhr.h"
+#include "wma_eht.h"
 #include "wmi_unified.h"
 #include "service_ready_param.h"
 #include "target_if.h"
@@ -590,6 +591,56 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 bool wma_get_bss_uhr_capable(struct bss_params *add_bss)
 {
 	return add_bss->uhr_capable;
+}
+
+/**
+ * wma_get_uhr_rate_flags() - Return the UHR rate flags corresponding to the BW
+ * @ch_width: BW whose rate flags is requested
+ *
+ * UHR MCS/NSS/BW rate sets are identical to EHT, so the BW-to-flags mapping
+ * reuses wma_get_eht_rate_flags() and only the resulting flags are remapped
+ * from TX_RATE_EHT* to the equivalent TX_RATE_UHR* bit.
+ *
+ * Return: UHR rate flags
+ */
+static enum tx_rate_info wma_get_uhr_rate_flags(enum phy_ch_width ch_width)
+{
+	enum tx_rate_info eht_flags = wma_get_eht_rate_flags(ch_width);
+	enum tx_rate_info rate_flags = 0;
+
+	if (eht_flags & TX_RATE_EHT320)
+		rate_flags |= TX_RATE_UHR320;
+	if (eht_flags & TX_RATE_EHT160)
+		rate_flags |= TX_RATE_UHR160;
+	if (eht_flags & TX_RATE_EHT80)
+		rate_flags |= TX_RATE_UHR80;
+	if (eht_flags & TX_RATE_EHT40)
+		rate_flags |= TX_RATE_UHR40;
+	if (eht_flags & TX_RATE_EHT20)
+		rate_flags |= TX_RATE_UHR20;
+
+	return rate_flags;
+}
+
+/**
+ * wma_set_bss_rate_flags_uhr() - set rate flags based on BSS UHR capability
+ * @rate_flags: pointer to rate flags to be updated
+ * @add_bss: add_bss params
+ *
+ * Return: QDF_STATUS_SUCCESS if the bss is UHR capable and rate_flags was
+ * updated, QDF_STATUS_E_NOSUPPORT otherwise
+ */
+QDF_STATUS wma_set_bss_rate_flags_uhr(enum tx_rate_info *rate_flags,
+				      struct bss_params *add_bss)
+{
+	if (!add_bss->uhr_capable)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	*rate_flags |= wma_get_uhr_rate_flags(add_bss->ch_width);
+
+	wma_debug("uhr_capable %d rate_flags 0x%x", add_bss->uhr_capable,
+		  *rate_flags);
+	return QDF_STATUS_SUCCESS;
 }
 
 /* MCS Based UHR rate table — identical values to EHT (same MCS/NSS/BW set) */

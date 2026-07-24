@@ -83,6 +83,7 @@
 #include <wlan_cm_api.h>
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "wma_eht.h"
+#include "wma_uhr.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_fw_offload_main.h"
 #include "target_if_fwol.h"
@@ -868,15 +869,19 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 	rate_flags = &vdev_mlme->mgmt.rate_info.rate_flags;
 	*rate_flags = 0;
 
-	qdf_status = wma_set_bss_rate_flags_eht(rate_flags, add_bss);
+	qdf_status = wma_set_bss_rate_flags_uhr(rate_flags, add_bss);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		if (QDF_STATUS_SUCCESS !=
-			wma_set_bss_rate_flags_he(rate_flags, add_bss)) {
-			if (add_bss->vhtCapable)
-				*rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
-			/* avoid to conflict with htCapable flag */
-			else if (add_bss->htCapable)
-				*rate_flags |= wma_get_ht_rate_flags(add_bss->ch_width);
+		qdf_status = wma_set_bss_rate_flags_eht(rate_flags, add_bss);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			if (QDF_STATUS_SUCCESS !=
+				wma_set_bss_rate_flags_he(rate_flags,
+							  add_bss)) {
+				if (add_bss->vhtCapable)
+					*rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
+				/* avoid to conflict with htCapable flag */
+				else if (add_bss->htCapable)
+					*rate_flags |= wma_get_ht_rate_flags(add_bss->ch_width);
+			}
 		}
 	}
 
@@ -886,7 +891,8 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 
 	if (!add_bss->htCapable && !add_bss->vhtCapable &&
 	    !wma_get_bss_he_capable(add_bss) &&
-	    !wma_get_bss_eht_capable(add_bss))
+	    !wma_get_bss_eht_capable(add_bss) &&
+	    !wma_get_bss_uhr_capable(add_bss))
 		*rate_flags = TX_RATE_LEGACY;
 
 	wma_debug("capable: vht %u, ht %u, rate_flags %x, ch_width %d",
