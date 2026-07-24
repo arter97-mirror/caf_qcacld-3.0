@@ -6310,8 +6310,9 @@ bool cm_lookup_pmkid_using_bssid(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id,
 				 struct wlan_crypto_pmksa *pmk_cache)
 {
-	struct wlan_crypto_pmksa *pmksa;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_crypto_pmksa pmksa;
+	QDF_STATUS status;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -6320,17 +6321,18 @@ bool cm_lookup_pmkid_using_bssid(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	pmksa = wlan_crypto_get_pmksa(vdev, &pmk_cache->bssid);
-	if (!pmksa) {
+	status = wlan_crypto_get_pmksa_copy(vdev,
+					    &pmk_cache->bssid, &pmksa);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 		return false;
 	}
-	qdf_mem_copy(pmk_cache->pmkid, pmksa->pmkid, sizeof(pmk_cache->pmkid));
-	qdf_mem_copy(pmk_cache->pmk, pmksa->pmk, pmksa->pmk_len);
-	pmk_cache->pmk_len = pmksa->pmk_len;
-	pmk_cache->pmk_lifetime = pmksa->pmk_lifetime;
-	pmk_cache->pmk_lifetime_threshold = pmksa->pmk_lifetime_threshold;
-	pmk_cache->pmk_entry_ts = pmksa->pmk_entry_ts;
+	qdf_mem_copy(pmk_cache->pmkid, pmksa.pmkid, sizeof(pmk_cache->pmkid));
+	qdf_mem_copy(pmk_cache->pmk, pmksa.pmk, pmksa.pmk_len);
+	pmk_cache->pmk_len = pmksa.pmk_len;
+	pmk_cache->pmk_lifetime = pmksa.pmk_lifetime;
+	pmk_cache->pmk_lifetime_threshold = pmksa.pmk_lifetime_threshold;
+	pmk_cache->pmk_entry_ts = pmksa.pmk_entry_ts;
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
@@ -6461,7 +6463,7 @@ cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_pmk_info *pmk_info;
-	struct wlan_crypto_pmksa *pmksa;
+	struct wlan_crypto_pmksa pmksa;
 	struct cm_roam_values_copy src_cfg;
 	struct qdf_mac_addr bssid;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
@@ -6486,12 +6488,12 @@ cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cm_get_psk_pmk(pdev, vdev_id, pmk_info->pmk, &pmk_info->pmk_len);
 
-	pmksa = wlan_crypto_get_pmksa(vdev, &bssid);
-	if (pmksa) {
+	if (QDF_IS_STATUS_SUCCESS(wlan_crypto_get_pmksa_copy(vdev, &bssid,
+							     &pmksa))) {
 		pmk_info->spmk_timeout_period =
-			(pmksa->pmk_lifetime *
-			 pmksa->pmk_lifetime_threshold / 100);
-		pmk_info->spmk_timestamp = pmksa->pmk_entry_ts;
+			(pmksa.pmk_lifetime *
+			 pmksa.pmk_lifetime_threshold / 100);
+		pmk_info->spmk_timestamp = pmksa.pmk_entry_ts;
 		mlme_debug("spmk_ts:%ld spmk_timeout_prd:%d secs",
 			   pmk_info->spmk_timestamp,
 			   pmk_info->spmk_timeout_period);

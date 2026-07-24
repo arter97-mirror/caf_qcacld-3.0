@@ -1852,7 +1852,7 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 {
 	uint32_t ret, i;
 	bool pmkid_found = false;
-	struct wlan_crypto_pmksa *pmksa = NULL;
+	struct wlan_crypto_pmksa pmksa;
 	tDot11fIERSN dot11f_ie_rsn = {0};
 	struct pe_fils_session *fils_info = NULL;
 	struct qdf_mac_addr *sta_addr = (struct qdf_mac_addr *)peer_mac_addr;
@@ -1880,18 +1880,20 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	if (QDF_IS_STATUS_ERROR(wlan_crypto_get_pmksa_copy(pe_session->vdev,
+							   sta_addr, &pmksa))) {
+		pe_debug("pmkid not found for sta ");
+		return false;
+	}
+
 	for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
-		pmksa = wlan_crypto_get_pmksa(pe_session->vdev,
-					      sta_addr);
-		if (pmksa) {
-			if (qdf_mem_cmp(pmksa->pmkid, dot11f_ie_rsn.pmkid[i],
-					PMKID_LEN))
-				continue;
-			pmkid_found = true;
-			pe_debug("pmkid match in rsn ie total_count %d",
-				 dot11f_ie_rsn.pmkid_count);
-			break;
-		}
+		if (qdf_mem_cmp(pmksa.pmkid, dot11f_ie_rsn.pmkid[i],
+				PMKID_LEN))
+			continue;
+		pmkid_found = true;
+		pe_debug("pmkid match in rsn ie total_count %d",
+			 dot11f_ie_rsn.pmkid_count);
+		break;
 	}
 	if (!pmkid_found) {
 		pe_debug("pmkid not found for sta ");
@@ -1904,7 +1906,7 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 	fils_info->akm = lim_get_akm_type(pe_session->vdev);
 	fils_info->auth = SIR_FILS_SK_WITHOUT_PFS;
 
-	fils_info->fils_pmk_len = pmksa->pmk_len;
+	fils_info->fils_pmk_len = pmksa.pmk_len;
 	if (fils_info->fils_pmk)
 		qdf_mem_free(fils_info->fils_pmk);
 
@@ -1916,16 +1918,16 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 
 	/* RSN_IE */
 	wlan_crypto_build_rsnie_with_pmksa(pe_session->vdev,
-					   fils_info->rsn_ie, pmksa);
+					   fils_info->rsn_ie, &pmksa);
 
 	fils_info->rsn_ie_len = fils_info->rsn_ie[1] + 2;
 
 	/* PMK ID */
-	qdf_mem_copy(fils_info->fils_pmkid, pmksa->pmkid,
+	qdf_mem_copy(fils_info->fils_pmkid, pmksa.pmkid,
 		     PMKID_LEN);
 
 	/* PMK */
-	qdf_mem_copy(fils_info->fils_pmk, pmksa->pmk,
+	qdf_mem_copy(fils_info->fils_pmk, pmksa.pmk,
 		     fils_info->fils_pmk_len);
 
 	/* Snonce */

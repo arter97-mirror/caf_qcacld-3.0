@@ -5426,7 +5426,9 @@ static QDF_STATUS csr_cm_update_fils_info(struct wlan_objmgr_vdev *vdev,
 {
 	uint8_t cache_id[CACHE_ID_LEN] = {0};
 	struct scan_cache_entry *entry;
-	struct wlan_crypto_pmksa *fils_ssid_pmksa, *bssid_lookup_pmksa;
+	struct wlan_crypto_pmksa fils_ssid_pmksa, bssid_lookup_pmksa;
+	bool fils_ssid_found, bssid_lookup_found;
+	QDF_STATUS status;
 
 	if (!req->fils_info || !req->fils_info->is_fils_connection) {
 		wlan_cm_update_mlme_fils_info(vdev, NULL);
@@ -5440,16 +5442,20 @@ static QDF_STATUS csr_cm_update_fils_info(struct wlan_objmgr_vdev *vdev,
 			  cache_id[0], cache_id[1]);
 	}
 	entry = req->bss->entry;
-	bssid_lookup_pmksa = wlan_crypto_get_pmksa(vdev, &entry->bssid);
-	fils_ssid_pmksa =
-			wlan_crypto_get_fils_pmksa(vdev, cache_id,
-						   entry->ssid.ssid,
-						   entry->ssid.length);
+	status = wlan_crypto_get_pmksa_copy(vdev, &entry->bssid,
+					    &bssid_lookup_pmksa);
+	bssid_lookup_found = QDF_IS_STATUS_SUCCESS(status);
+	status = wlan_crypto_get_fils_pmksa_copy(vdev,
+						 cache_id,
+						 entry->ssid.ssid,
+						 entry->ssid.length,
+						 &fils_ssid_pmksa);
+	fils_ssid_found = QDF_IS_STATUS_SUCCESS(status);
 
 	if ((!req->fils_info->rrk_len ||
 	     !req->fils_info->username_len) &&
 	     !bss_desc->fils_info_element.is_cache_id_present &&
-	     !bssid_lookup_pmksa && !fils_ssid_pmksa)
+	     !bssid_lookup_found && !fils_ssid_found)
 		return QDF_STATUS_E_FAILURE;
 
 	return wlan_cm_update_mlme_fils_info(vdev, req->fils_info);
