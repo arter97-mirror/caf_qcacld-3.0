@@ -9011,6 +9011,30 @@ int sme_set_auto_rate_he_sgi(mac_handle_t mac_handle, uint8_t session_id,
 	return 0;
 }
 
+int sme_reset_auto_rate_he_sgi_ltf(mac_handle_t mac_handle,
+				    uint8_t session_id)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	int status;
+
+	if (mac_ctx->he_sgi_ltf_cfg_bit_mask == DEF_HE_AUTO_SGI_LTF)
+		return 0;
+
+	mac_ctx->he_sgi_ltf_cfg_bit_mask = DEF_HE_AUTO_SGI_LTF;
+	status = wma_cli_set_command(session_id,
+				     wmi_vdev_param_autorate_misc_cfg,
+				     DEF_HE_AUTO_SGI_LTF, VDEV_CMD);
+	if (status) {
+		sme_err("failed to reset he_sgi_ltf");
+		return status;
+	}
+
+	sme_debug("auto rate HE SGI_LTF reset to default 0x%08X",
+			mac_ctx->he_sgi_ltf_cfg_bit_mask);
+
+	return 0;
+}
+
 int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 			   uint8_t ldpc_disable)
 {

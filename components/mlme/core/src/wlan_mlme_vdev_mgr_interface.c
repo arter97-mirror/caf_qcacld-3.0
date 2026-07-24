@@ -195,8 +195,17 @@ static QDF_STATUS sta_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
 					   uint16_t event_data_len,
 					   void *event_data)
 {
+	mac_handle_t mac_handle;
+
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+	if (mac_handle)
+		sme_reset_auto_rate_he_sgi_ltf(
+				mac_handle,
+				vdev_mlme->vdev->vdev_objmgr.vdev_id);
+
 	return lim_sta_mlme_vdev_start_send(vdev_mlme, event_data_len,
 					    event_data);
 }
