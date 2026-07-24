@@ -503,7 +503,8 @@ int wlan_hdd_cfg80211_connected_chan_stats_req(struct wiphy *wiphy,
 					       const void *data,
 					       int data_len);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
 	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 /**
  * wlan_hdd_cfg80211_get_station() - get station statistics
@@ -539,7 +540,8 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 #endif
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
 	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 /**
  * wlan_hdd_cfg80211_dump_station() - dump station statistics
