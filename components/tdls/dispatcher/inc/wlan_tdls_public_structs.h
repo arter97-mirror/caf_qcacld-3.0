@@ -950,6 +950,7 @@ struct tdls_update_peer_params {
 	uint8_t supported_oper_classes[WLAN_MAX_SUPP_OPER_CLASSES];
 	bool is_qos_wmm_sta;
 	bool is_pmf;
+	bool epp_peer;
 };
 
 struct tdls_update_peer_request {
