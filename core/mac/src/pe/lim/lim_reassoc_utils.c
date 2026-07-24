@@ -356,9 +356,23 @@ QDF_STATUS lim_add_ft_sta_self(struct mac_context *mac_ctx, uint16_t assoc_id,
 	if (session_entry->limRmfEnabled)
 		add_sta_params->rmfEnabled = true;
 
+	pe_debug("FT add self sta vdev %d: peer dph entry nss cap_tx_nss %d cap_rx_nss %d op_tx_nss %d op_rx_nss %d",
+		 session_entry->vdev_id, sta_ds->cap_tx_nss,
+		 sta_ds->cap_rx_nss, sta_ds->op_tx_nss, sta_ds->op_rx_nss);
+
 	qdf_mem_copy(add_sta_params->supportedRates.supportedMCSSet,
 		     sta_ds->supportedRates.supportedMCSSet,
 		     SIR_MAC_MAX_SUPPORTED_MCS_SET);
+
+	add_sta_params->self_cap_tx_nss = QDF_MAX(sta_ds->cap_tx_nss, NSS_1x1_MODE);
+	add_sta_params->self_cap_rx_nss = QDF_MAX(sta_ds->cap_rx_nss, NSS_1x1_MODE);
+	add_sta_params->self_op_tx_nss = QDF_MAX(sta_ds->op_tx_nss, NSS_1x1_MODE);
+	add_sta_params->self_op_rx_nss = QDF_MAX(sta_ds->op_rx_nss, NSS_1x1_MODE);
+
+	pe_debug("FT add self sta vdev %d: add_sta_params self_cap_tx_nss %d self_cap_rx_nss %d self_op_tx_nss %d self_op_rx_nss %d",
+		 session_entry->vdev_id, add_sta_params->self_cap_tx_nss,
+		 add_sta_params->self_cap_rx_nss, add_sta_params->self_op_tx_nss,
+		 add_sta_params->self_op_rx_nss);
 
 	if (lim_is_fils_connection(session_entry))
 		add_sta_params->no_ptk_4_way = true;

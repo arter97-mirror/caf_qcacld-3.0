@@ -5864,6 +5864,13 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			wma_debug("WMI_SERVICE_PEER_ASSOC_CONF not enabled");
 		}
 
+		wma_debug("wma add sta vdev %d: cached addBssStaContext nss before refresh tx_cap %d rx_cap %d tx_op %d rx_op %d",
+			  params->smesessionId,
+			  ((tAddStaParams *)iface->addBssStaContext)->self_cap_tx_nss,
+			  ((tAddStaParams *)iface->addBssStaContext)->self_cap_rx_nss,
+			  ((tAddStaParams *)iface->addBssStaContext)->self_op_tx_nss,
+			  ((tAddStaParams *)iface->addBssStaContext)->self_op_rx_nss);
+
 		((tAddStaParams *)iface->addBssStaContext)->no_ptk_4_way =
 						params->no_ptk_4_way;
 
@@ -5872,6 +5879,19 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			     params->supportedRates.supportedMCSSet,
 			     SIR_MAC_MAX_SUPPORTED_MCS_SET);
 
+		((tAddStaParams *)iface->addBssStaContext)->self_cap_tx_nss =
+						params->self_cap_tx_nss;
+		((tAddStaParams *)iface->addBssStaContext)->self_cap_rx_nss =
+						params->self_cap_rx_nss;
+		((tAddStaParams *)iface->addBssStaContext)->self_op_tx_nss =
+						params->self_op_tx_nss;
+		((tAddStaParams *)iface->addBssStaContext)->self_op_rx_nss =
+						params->self_op_rx_nss;
+
+		wma_debug("wma add sta vdev %d: refreshed addBssStaContext nss from add sta req tx_cap %d rx_cap %d tx_op %d rx_op %d",
+			  params->smesessionId,
+			  params->self_cap_tx_nss, params->self_cap_rx_nss,
+			  params->self_op_tx_nss, params->self_op_rx_nss);
 
 		ret = wma_send_peer_assoc(wma,
 				iface->nwType,

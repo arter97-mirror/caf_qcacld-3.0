@@ -1317,6 +1317,40 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	if (!session->lim_join_req) {
+		status = mlme_get_vdev_nss_by_freq_from_dyn(session->vdev,
+							    session->curr_op_freq,
+							    &cap_tx_nss,
+							    &cap_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to get VDEV nss for FT session");
+			return status;
+		}
+
+		op_tx_nss = cap_tx_nss;
+		op_rx_nss = cap_rx_nss;
+
+		session->cap_tx_nss = cap_tx_nss;
+		session->cap_rx_nss = cap_rx_nss;
+
+		pe_debug("FT preauth vdev %d freq %d: dynamic DUT nss cap_tx_nss %d cap_rx_nss %d op_tx_nss %d op_rx_nss %d",
+			 session->vdev_id, session->curr_op_freq,
+			 session->cap_tx_nss, session->cap_rx_nss,
+			 op_tx_nss, op_rx_nss);
+
+		status = wlan_vdev_mlme_set_bss_nss_params(session->vdev,
+							   session->cap_tx_nss,
+							   session->cap_rx_nss,
+							   op_tx_nss, op_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_debug("Failed to set curr bss nss %d", status);
+		else
+			pe_debug("FT preauth vdev %d: pushed dynamic nss into vdev mlme obj",
+				 session->vdev_id);
+
+		return status;
+	}
+
 	bss_desc = &session->lim_join_req->bssDescription;
 	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, &bss_desc->bcn_ies,
 				  session->dot11mode);
@@ -1410,6 +1444,11 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	uint8_t tx_nss, rx_nss;
 	uint8_t vdev_tx_nss, vdev_rx_nss;
+
+	pe_debug("bsstype = %d", session->bssType);
+
+	if (!session->lim_join_req) 
+		pe_err("Null lim join req");
 
 	if (session->bssType != eSIR_INFRASTRUCTURE_MODE) {
 

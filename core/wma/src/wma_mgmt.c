@@ -1931,6 +1931,13 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	cmd->peer_cap_ul_nss = params->self_cap_rx_nss;
 	cmd->peer_op_dl_nss = params->self_op_tx_nss;
 
+	wma_debug("peer assoc vdev %d: self nss tx_cap %d rx_cap %d tx_op %d rx_op %d bcn_tx_nss %d -> wmi peer_supp_tx_nss %d peer_cap_ul_nss %d peer_op_dl_nss %d",
+		  params->smesessionId, params->self_cap_tx_nss,
+		  params->self_cap_rx_nss, params->self_op_tx_nss,
+		  params->self_op_rx_nss, params->bcn_tx_nss,
+		  cmd->peer_supp_tx_nss, cmd->peer_cap_ul_nss,
+		  cmd->peer_op_dl_nss);
+
 	/*
 	 * VHT _Rates:
 	 * Because of DBS a vdev may come up in any of the two MACs with

@@ -3274,6 +3274,11 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 			pe_debug("Failed to fetch curr bss nss %d", status);
 			return;
 		}
+		pe_debug("assoc rsp vdev %d state %d: vdev mlme nss before negotiation cap_tx_nss %d cap_rx_nss %d op_tx_nss %d op_rx_nss %d, real AP advertised nss cap_tx_nss %d cap_rx_nss %d op_tx_nss %d op_rx_nss %d",
+			 session->vdev_id, session->limMlmState,
+			 cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss,
+			 nss_ies->cap_tx_nss, nss_ies->cap_rx_nss,
+			 nss_ies->op_tx_nss, nss_ies->op_rx_nss);
 		break;
 	default:
 		pe_debug("Unexpected call to update session in %d for %d",
@@ -3299,7 +3304,7 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 		return;
 	}
 
-	pe_debug("BSSID: " QDF_MAC_ADDR_FMT ", state %d, cap nss %dx%d op nss %dx%d",
+	pe_debug("assoc rsp BSSID: " QDF_MAC_ADDR_FMT ", state %d, negotiated cap nss %dx%d op nss %dx%d, pushed to vdev mlme obj",
 		 QDF_MAC_ADDR_REF(session->bssId), session->limMlmState,
 		 cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss);
 
@@ -3317,6 +3322,10 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 		sta_ds->cap_rx_nss = cap_rx_nss;
 		sta_ds->op_tx_nss = op_tx_nss;
 		sta_ds->op_rx_nss = op_rx_nss;
+		pe_debug("assoc rsp vdev %d: peer dph entry nss updated cap_tx_nss %d cap_rx_nss %d op_tx_nss %d op_rx_nss %d",
+			 session->vdev_id, sta_ds->cap_tx_nss,
+			 sta_ds->cap_rx_nss, sta_ds->op_tx_nss,
+			 sta_ds->op_rx_nss);
 	}
 }
 
