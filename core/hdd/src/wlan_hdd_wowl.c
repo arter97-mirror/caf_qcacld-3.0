@@ -28,6 +28,7 @@
 #include "qdf_str.h"
 #include <wlan_hdd_includes.h>
 #include <wlan_hdd_wowl.h>
+#include <linux/hex.h>
 #include <wlan_pmo_wow_public_struct.h>
 #include "wlan_hdd_object_manager.h"
 

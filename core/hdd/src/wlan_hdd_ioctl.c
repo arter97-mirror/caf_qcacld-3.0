@@ -22,6 +22,7 @@
 #include "osif_sync.h"
 #include <wlan_hdd_includes.h>
 #include <wlan_hdd_wowl.h>
+#include <linux/hex.h>
 #include <wlan_hdd_stats.h>
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_trace.h"

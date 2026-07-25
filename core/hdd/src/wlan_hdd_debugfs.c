@@ -28,6 +28,7 @@
 
 #include "osif_sync.h"
 #include <wlan_hdd_includes.h>
+#include <linux/hex.h>
 #include <wlan_hdd_debugfs.h>
 #include <wlan_osif_request_manager.h>
 #include <wlan_hdd_wowl.h>
