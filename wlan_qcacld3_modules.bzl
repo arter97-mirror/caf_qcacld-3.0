@@ -22,8 +22,6 @@ _target_chipset_map = {
     ],
     "pineapple": [
         "peach-v2",
-        "peach",
-        "kiwi-v2",
         "qca6750",
         "wcn6450",
     ],
@@ -2774,7 +2772,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra" and target != "hamoa_la" and target != "glymur":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra" and target != "hamoa_la" and target != "glymur" and target != "pineapple":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
