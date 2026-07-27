@@ -598,6 +598,24 @@ bool
 smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * smd_handle_connect_success() - Apply T4 SMD_ROAM_SYNC redirect after a
+ *  vdev's individual connect completes successfully.
+ * @vdev: vdev that just completed CM_SM_EV_CONNECT_SUCCESS
+ *
+ * If SMD roaming is in progress AND @vdev is the assoc STA vdev, transitions
+ * the vdev's CM SM from CONNECTED/IDLE to CONNECTED/SMD_ROAM_SYNC instead.
+ * No-op otherwise.
+ *
+ * Must be called from event-handler context (e.g. the connect-success
+ * notify path shared by SL->SL idle-vdev connect and ML->ML link switch
+ * completion), never from a CM SM entry/exit routine.
+ *
+ * Return: void
+ */
+void
+smd_handle_connect_success(struct wlan_objmgr_vdev *vdev);
+
+/**
  * smd_roam_link_recfg_abort() - Abort link reconfiguration SM during SMD roam.
  * @vdev: vdev pointer
  *
@@ -917,6 +935,11 @@ static inline bool
 smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
+}
+
+static inline void
+smd_handle_connect_success(struct wlan_objmgr_vdev *vdev)
+{
 }
 
 static inline

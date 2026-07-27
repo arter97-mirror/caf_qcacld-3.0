@@ -3052,6 +3052,33 @@ smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 }
 
 void
+smd_handle_connect_success(struct wlan_objmgr_vdev *vdev)
+{
+	struct cnx_mgr *cm_ctx;
+
+	/*
+	 * T4: If SMD roaming is active AND this vdev is the assoc vdev,
+	 * enter SMD_ROAM_SYNC instead of IDLE. The vdev is connected on the
+	 * new AP but old-link cleanup is still pending (EV_SMD_EXEC_COMPLETE
+	 * will drive it). Blocks RSO state changes, link reconfig, and new
+	 * roam triggers until cleanup completes.
+	 *
+	 * Called from event-handler context (post connect-success notify),
+	 * never from a CM SM entry/exit routine - wlan_sm_transition_to()
+	 * must not be invoked while already inside another transition.
+	 */
+	if (!wlan_vdev_mlme_is_assoc_sta_vdev(vdev) ||
+	    !smd_is_roaming_in_progress(vdev))
+		return;
+
+	cm_ctx = cm_get_cm_ctx(vdev);
+	if (!cm_ctx)
+		return;
+
+	cm_sm_transition_to(cm_ctx, WLAN_CM_SS_SMD_ROAM_SYNC);
+}
+
+void
 smd_roam_link_recfg_abort(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlo_link_recfg_context *recfg_ctx;
