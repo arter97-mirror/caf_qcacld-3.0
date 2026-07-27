@@ -7654,13 +7654,19 @@ cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
 		scan_data->ap[0].cu_load = 0;
 	util_scan_free_cache_entry(entry);
 
-	/* Fill the band info from operating channel */
-	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
-	if (bss_chan)
-		scan_data->band =
-			wlan_convert_freq_to_diag_band(bss_chan->ch_freq);
-	else
-		mlme_debug("vdev:%d bss_chan is null", vdev_id);
+	/*
+	 * Band info is only meaningful for MLO-capable roam decisions;
+	 * do not populate/print it for non-MLO vdevs.
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+		if (bss_chan)
+			scan_data->band =
+				wlan_convert_freq_to_diag_band(
+							bss_chan->ch_freq);
+		else
+			mlme_debug("vdev:%d bss_chan is null", vdev_id);
+	}
 
 	cm_roam_trigger_info_event(trigger_data, scan_data, vdev_id, false);
 
