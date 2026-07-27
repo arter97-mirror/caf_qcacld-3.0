@@ -1900,6 +1900,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
 
 	vdev_id = vdev_mlme->vdev->vdev_objmgr.vdev_id;
 	mlme_legacy_debug("Sending vdev delete to firmware for vdev id = %d ",
@@ -1908,9 +1909,13 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 	if (!vdev_mlme->ext_vdev_ptr)
 		return status;
 
+	psoc = wlan_vdev_get_psoc(vdev_mlme->vdev);
+	wlan_objmgr_psoc_vdev_id_set_defer_clear(psoc, vdev_id, true);
+
 	status = vdev_mgr_delete_send(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Failed to send vdev delete to firmware");
+		wlan_objmgr_psoc_vdev_id_set_defer_clear(psoc, vdev_id, false);
 		mlme_wma_vdev_detach_handler(vdev_id);
 	}
 
@@ -2199,6 +2204,8 @@ vdevmgr_vdev_delete_rsp_handle(struct wlan_objmgr_psoc *psoc,
 			       struct vdev_delete_response *rsp)
 {
 	mlme_legacy_debug("vdev id = %d ", rsp->vdev_id);
+	wlan_objmgr_psoc_vdev_id_clear_map(psoc, rsp->vdev_id);
+
 	return wma_vdev_detach_callback(rsp);
 }
 
