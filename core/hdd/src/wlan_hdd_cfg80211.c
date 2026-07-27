@@ -34318,42 +34318,7 @@ out:
 	return ret;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
-	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
-static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
-					     struct wireless_dev *wdev,
-					     u8 key_index,
-					     bool unicast, bool multicast)
-{
-	int errno = -EINVAL;
-	struct osif_vdev_sync *vdev_sync;
-	struct net_device *ndev;
-	struct hdd_adapter *adapter;
-	int link_id = -1;
-
-	ndev = hdd_wdev_get_netdev(wdev);
-	if (!ndev) {
-		hdd_err("netdev is null");
-		return -ENODEV;
-	}
-
-	adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
-	if (!adapter || wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
-		return errno;
-
-	errno = osif_vdev_sync_op_start(ndev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __wlan_hdd_cfg80211_set_default_key(wiphy, ndev,
-						    link_id, key_index,
-						    unicast, multicast);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-#elif defined(CFG80211_MLO_KEY_OPERATION_SUPPORT)
+#ifdef CFG80211_MLO_KEY_OPERATION_SUPPORT
 static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     struct net_device *ndev,
 					     int link_id, u8 key_index,
