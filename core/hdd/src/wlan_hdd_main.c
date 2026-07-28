@@ -2978,14 +2978,10 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, false);
 }
 
-static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
+#ifndef WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
+static void hdd_lpc_disable_imps_bmps(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *sta_adapter;
-
-	if (!ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))
-		return;
-
-	ucfg_fwol_set_ilp_config(hdd_ctx->psoc, hdd_ctx->pdev, 0);
 
 	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 0))
 		hdd_err("IMPS feature disable failed");
@@ -2999,6 +2995,21 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 	wlan_hdd_lpc_set_bmps(sta_adapter, false, 0);
 
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, true);
+}
+#else
+static void hdd_lpc_disable_imps_bmps(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
+static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
+{
+	if (!ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))
+		return;
+
+	ucfg_fwol_set_ilp_config(hdd_ctx->psoc, hdd_ctx->pdev, 0);
+
+	hdd_lpc_disable_imps_bmps(hdd_ctx);
 }
 
 QDF_STATUS wlan_hdd_lpc_acquire_wakelock(void)
