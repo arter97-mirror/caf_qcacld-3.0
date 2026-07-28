@@ -391,6 +391,8 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
  * @mac: mac addr to be added or append
  * @freq: frequency
  * @rnd_cookie: random mac mgmt tx cookie
+ * @skip_timeout_clear: Skip clearing the FW mac addr filter on
+ *  clear_timer expiry while this cookie is still present in the list
  *
  * This function will add or append the mac addr entry to vdev random mac list.
  * Once the mac addr filter is not needed, it can be removed by
@@ -402,7 +404,8 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
  */
 QDF_STATUS
 p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-		   uint8_t *mac, uint32_t freq, uint64_t rnd_cookie);
+		   uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
+		   bool skip_timeout_clear);
 
 /**
  * p2p_del_random_mac() - del mac filter from given vdev rand mac list

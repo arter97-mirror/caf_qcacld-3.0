@@ -266,6 +266,27 @@ wlan_p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 			uint8_t *mac, uint32_t freq, uint64_t rnd_cookie);
 
 /**
+ * wlan_p2p_add_protected_random_mac() - add or append random mac to given
+ *  vdev rand mac list, protected from clear_timer's FW filter clear
+ * @soc: soc object
+ * @vdev_id: vdev id
+ * @mac: mac addr to be added or append
+ * @freq: frequency
+ * @rnd_cookie: random mac mgmt tx cookie
+ *
+ * Same as wlan_p2p_add_random_mac(), except the added cookie is marked so
+ * that clear_timer expiry will never send the FW mac addr filter clear
+ * while this cookie is still present in the list. Once the mac addr filter
+ * is not needed, it can be removed by wlan_p2p_del_random_mac.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_p2p_add_protected_random_mac(struct wlan_objmgr_psoc *soc,
+				  uint32_t vdev_id, uint8_t *mac,
+				  uint32_t freq, uint64_t rnd_cookie);
+
+/**
  * wlan_p2p_del_random_mac() - del mac filter from given vdev rand mac list
  * @soc: soc object
  * @vdev_id: vdev id

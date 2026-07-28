@@ -226,7 +226,15 @@ QDF_STATUS
 wlan_p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 			uint8_t *mac, uint32_t freq, uint64_t rnd_cookie)
 {
-	return p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie);
+	return p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie, false);
+}
+
+QDF_STATUS
+wlan_p2p_add_protected_random_mac(struct wlan_objmgr_psoc *soc,
+				  uint32_t vdev_id, uint8_t *mac,
+				  uint32_t freq, uint64_t rnd_cookie)
+{
+	return p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie, true);
 }
 
 QDF_STATUS

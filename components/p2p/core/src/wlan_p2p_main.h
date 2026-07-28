@@ -297,10 +297,13 @@ struct p2p_soc_priv_obj {
  * struct action_frame_cookie - Action frame cookie item in cookie list
  * @cookie_node: qdf_list_node
  * @cookie: Cookie value
+ * @skip_timeout_clear: Skip clearing the FW mac addr filter on
+ *  clear_timer expiry while this cookie is still present in the list
  */
 struct action_frame_cookie {
 	qdf_list_node_t cookie_node;
 	uint64_t cookie;
+	bool skip_timeout_clear;
 };
 
 /**

@@ -1360,6 +1360,8 @@ enum hdd_wlm_latency_level {
  * struct hdd_pmsr_req - Internal state for an active PMSR request
  * @cookie: cfg80211 request cookie
  * @is_valid: Is the cached request valid
+ * @rand_mac_registered: Is a protected random mac cookie held for this
+ *  PMSR session's randomized address
  * @vdev_id: vdev id for the request
  * @req_id: WMI request id (lower 32 bits of cookie)
  * @nl_port_id: NL port id
@@ -1367,6 +1369,7 @@ enum hdd_wlm_latency_level {
 struct hdd_pmsr_req {
 	u64 cookie;
 	bool is_valid;
+	bool rand_mac_registered;
 	u8 vdev_id;
 	u32 req_id;
 	u32 nl_port_id;

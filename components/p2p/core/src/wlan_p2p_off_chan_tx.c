@@ -2260,12 +2260,15 @@ find_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
  * given list
  * @cookie_list: List of cookies
  * @rnd_cookie: Cookie to be added
+ * @skip_timeout_clear: Skip clearing the FW mac addr filter on
+ *  clear_timer expiry while this cookie is still present in the list
  *
  * Return: If allocation and addition is successful return pointer to
  * action_frame_cookie object in which cookie item is encapsulated.
  */
 static struct action_frame_cookie *
-allocate_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
+allocate_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie,
+			     bool skip_timeout_clear)
 {
 	struct action_frame_cookie *action_cookie;
 
@@ -2274,6 +2277,7 @@ allocate_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
 		return NULL;
 
 	action_cookie->cookie = rnd_cookie;
+	action_cookie->skip_timeout_clear = skip_timeout_clear;
 	qdf_list_insert_front(cookie_list, &action_cookie->cookie_node);
 
 	return action_cookie;
@@ -2298,31 +2302,11 @@ delete_action_frame_cookie(qdf_list_t *cookie_list,
 }
 
 /**
- * delete_all_action_frame_cookie() - Delete all the cookies to given list
- * @cookie_list: List of cookies
- *
- * This function deletes all the cookies from from given list.
- *
- * Return: None
- */
-static void
-delete_all_action_frame_cookie(qdf_list_t *cookie_list)
-{
-	qdf_list_node_t *node = NULL;
-
-	p2p_debug("Delete cookie list %pK, size %d", cookie_list,
-		  qdf_list_size(cookie_list));
-
-	while (!qdf_list_empty(cookie_list)) {
-		qdf_list_remove_front(cookie_list, &node);
-		qdf_mem_free(node);
-	}
-}
-
-/**
  * append_action_frame_cookie() - Append action cookie to given list
  * @cookie_list: List of cookies
  * @rnd_cookie: Cookie to be append
+ * @skip_timeout_clear: Skip clearing the FW mac addr filter on
+ *  clear_timer expiry while this cookie is still present in the list
  *
  * This is a wrapper function which invokes allocate_action_frame_cookie
  * if the cookie to be added is not duplicate
@@ -2331,7 +2315,8 @@ delete_all_action_frame_cookie(qdf_list_t *cookie_list)
  *             false - failed.
  */
 static bool
-append_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
+append_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie,
+			   bool skip_timeout_clear)
 {
 	struct action_frame_cookie *action_cookie;
 
@@ -2345,7 +2330,8 @@ append_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
 		return true;
 
 	/* insert new cookie in cookie list */
-	action_cookie = allocate_action_frame_cookie(cookie_list, rnd_cookie);
+	action_cookie = allocate_action_frame_cookie(cookie_list, rnd_cookie,
+						     skip_timeout_clear);
 	if (!action_cookie)
 		return false;
 
@@ -2359,6 +2345,10 @@ append_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
  * @mac: mac addr to be added or append
  * @freq: frequency
  * @rnd_cookie: random mac mgmt tx cookie
+ * @skip_timeout_clear: Skip clearing the FW mac addr filter on
+ *  clear_timer expiry while this cookie is still present in the list. When
+ *  appending to an existing entry, also stop the entry's running
+ *  clear_timer so an in-flight timeout does not race this add.
  *
  * This function will add or append the mac addr entry to vdev random mac list.
  * Once the mac addr filter is not needed, it can be removed by
@@ -2370,7 +2360,8 @@ append_action_frame_cookie(qdf_list_t *cookie_list, uint64_t rnd_cookie)
  */
 QDF_STATUS
 p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-		   uint8_t *mac, uint32_t freq, uint64_t rnd_cookie)
+		   uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
+		   bool skip_timeout_clear)
 {
 	uint32_t i;
 	uint32_t first_unused = MAX_RANDOM_MAC_ADDRS;
@@ -2417,9 +2408,20 @@ p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 	}
 
 	if (i != MAX_RANDOM_MAC_ADDRS) {
+		if (skip_timeout_clear &&
+		    qdf_mc_timer_get_current_state(
+				&p2p_vdev_obj->random_mac[i].clear_timer) ==
+		    QDF_TIMER_STATE_RUNNING) {
+			qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+			p2p_debug("random_mac:stop timer on vdev %d addr " QDF_MAC_ADDR_FMT,
+				  vdev_id, QDF_MAC_ADDR_REF(mac));
+			qdf_mc_timer_stop(&p2p_vdev_obj->random_mac[i].clear_timer);
+			qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+		}
+
 		append_ret = append_action_frame_cookie(
 				&p2p_vdev_obj->random_mac[i].cookie_list,
-				rnd_cookie);
+				rnd_cookie, skip_timeout_clear);
 		qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		p2p_debug("random_mac:append %d vdev %d freq %d "QDF_MAC_ADDR_FMT" rnd_cookie %llu",
@@ -2445,7 +2447,7 @@ p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 
 	action_cookie = allocate_action_frame_cookie(
 				&p2p_vdev_obj->random_mac[i].cookie_list,
-				rnd_cookie);
+				rnd_cookie, skip_timeout_clear);
 	if (!action_cookie) {
 		qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
@@ -3038,6 +3040,8 @@ p2p_set_rand_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 static void p2p_mac_clear_timeout(void *context)
 {
 	struct action_frame_random_mac *random_mac = context;
+	struct action_frame_cookie *action_cookie;
+	struct action_frame_cookie *action_cookie_next;
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 	uint32_t freq;
 	uint8_t addr[QDF_MAC_ADDR_SIZE];
@@ -3053,6 +3057,7 @@ static void p2p_mac_clear_timeout(void *context)
 	if (!p2p_vdev_obj || !p2p_vdev_obj->vdev)
 		return;
 
+	vdev_id = wlan_vdev_get_id(p2p_vdev_obj->vdev);
 	is_p2p_go_running = policy_mgr_mode_specific_connection_count(
 				wlan_vdev_get_psoc(p2p_vdev_obj->vdev),
 				PM_P2P_GO_MODE, NULL);
@@ -3073,13 +3078,33 @@ static void p2p_mac_clear_timeout(void *context)
 		return;
 	}
 
-	delete_all_action_frame_cookie(&random_mac->cookie_list);
+	/* Remove every cookie that isn't protected. A protected cookie
+	 * (e.g. an active PMSR session) means the FW mac addr filter must
+	 * stay in place, so skip the filter clear below but still drop
+	 * any other, unprotected cookie so it doesn't linger forever.
+	 */
+	qdf_list_for_each_del(&random_mac->cookie_list, action_cookie,
+			      action_cookie_next, cookie_node) {
+		if (action_cookie->skip_timeout_clear)
+			continue;
+		qdf_list_remove_node(&random_mac->cookie_list,
+				     &action_cookie->cookie_node);
+		qdf_mem_free(action_cookie);
+	}
+
+	if (!qdf_list_empty(&random_mac->cookie_list)) {
+		p2p_debug("random_mac:skip clear, protected cookie remains vdev %d "
+			  QDF_MAC_ADDR_FMT, vdev_id,
+			  QDF_MAC_ADDR_REF(random_mac->addr));
+		qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+		return;
+	}
+
 	random_mac->in_use = false;
 	freq = random_mac->freq;
 	qdf_mem_copy(addr, random_mac->addr, QDF_MAC_ADDR_SIZE);
 	qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
 
-	vdev_id = wlan_vdev_get_id(p2p_vdev_obj->vdev);
 	p2p_debug("random_mac:clear timeout vdev %d " QDF_MAC_ADDR_FMT " freq %d",
 		  vdev_id, QDF_MAC_ADDR_REF(addr), freq);
 
@@ -3097,7 +3122,7 @@ p2p_request_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 
-	status = p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie);
+	status = p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie, false);
 	if (status == QDF_STATUS_E_EXISTS)
 		return QDF_STATUS_SUCCESS;
 
