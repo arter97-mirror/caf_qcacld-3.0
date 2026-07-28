@@ -154,14 +154,70 @@ lim_set_link_force_mode_for_cac(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
+ * lim_sync_mlo_sta_cac_info_to_partners() - copy this session's
+ * mlo_sta_cac_info to every other link's own pe_session in the same
+ * MLO association
+ * @session: pe session whose mlo_sta_cac_info was just updated
+ *
+ * lim_process_mcst_ie_and_csa() only ever updates the mlo_sta_cac_info
+ * of the pe_session it was called with, but each MLO link has its own
+ * pe_session with its own independent copy of mlo_sta_cac_info. Call
+ * this right after a state-changing update so every partner link's
+ * pe_session observes the same CAC/CSA state.
+ *
+ * Return none
+ */
+static void
+lim_sync_mlo_sta_cac_info_to_partners(struct pe_session *session)
+{
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint16_t vdev_count = 0;
+	uint16_t i;
+	struct mac_context *mac_ctx;
+	struct pe_session *link_session;
+
+	if (!session->vdev || !session->vdev->mlo_dev_ctx)
+		return;
+
+	mac_ctx = session->mac_ctx;
+	if (!mac_ctx)
+		return;
+
+	mlo_get_partner_vdev_list(session->vdev, &vdev_count, wlan_vdev_list);
+	for (i = 0; i < vdev_count; i++) {
+		if (!wlan_vdev_list[i])
+			continue;
+		if (wlan_vdev_list[i] == session->vdev)
+			goto release_ref;
+
+		link_session = pe_find_session_by_vdev_id(mac_ctx,
+							  wlan_vdev_get_id(wlan_vdev_list[i]));
+		if (!link_session)
+			goto release_ref;
+
+		link_session->mlo_sta_cac_info = session->mlo_sta_cac_info;
+		pe_debug("vdev %d: synced mlo_sta_cac_info from vdev %d (in_cac=%d state=%d cac_link=%d)",
+			 wlan_vdev_get_id(wlan_vdev_list[i]), session->vdev_id,
+			 session->mlo_sta_cac_info.mlo_link_in_cac,
+			 session->mlo_sta_cac_info.link_state,
+			 session->mlo_sta_cac_info.cac_link_id);
+release_ref:
+		mlo_release_vdev_ref(wlan_vdev_list[i]);
+	}
+}
+
+/**
  * lim_process_mcst_ie_and_csa() - Process MCST IE and CSA in beacon
  * @pdev: pointer to pdev object
  * @session: pe session
  * @link_id: Link ID
- * @sta_pro: STA profile data
- * @sta_pro_len: STA profile length
+ * @mcst_found: whether the MCST IE was found by the caller
  * @csa_found: CSA found in ML IE or not
  * @channel: CSA new channel
+ * @is_self_link: true if link_id refers to session->vdev itself (the
+ *                beacon was received directly on this link), false if
+ *                link_id refers to a partner link found via a per-STA
+ *                profile in this session's ML IE
  *
  * This function processes MCST IE and CSA IE in beacon and determines
  * the appropriate action based on CAC state.
@@ -208,32 +264,20 @@ static void
 lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 			    struct pe_session *session,
 			    uint8_t link_id,
-			    uint8_t *sta_pro,
-			    uint32_t sta_pro_len,
+			    bool mcst_found,
 			    uint8_t csa_found,
-			    uint8_t channel)
+			    uint8_t channel,
+			    bool is_self_link)
 {
-	const uint8_t *mcst_ie;
-	bool mcst_found = false;
 	qdf_freq_t new_chan_freq = 0;
 	bool is_new_chan_dfs = false;
-	uint8_t mcst_ext_id = WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME;
 	struct wlan_objmgr_vdev *partner_vdev = NULL;
+	bool partner_ref_taken = false;
 
-	if (!session || !sta_pro) {
+	if (!session) {
 		pe_err("invalid input parameters");
 		return;
 	}
-
-	pe_debug("Per-STA Profile IE list (len %d):", sta_pro_len);
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   sta_pro, sta_pro_len);
-
-	/* Look for MCST IE */
-	mcst_ie = wlan_get_ext_ie_ptr_from_ext_id(&mcst_ext_id, 1,
-						  sta_pro,
-						  sta_pro_len);
-	mcst_found = mcst_ie;
 
 	if (csa_found && channel) {
 		struct mlo_link_info *linfo = NULL;
@@ -283,10 +327,19 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 	 * (the 5G DFS link) inside a 6G beacon; session->vdev is the 6G vdev.
 	 * All force-mode operations must target the 5G partner vdev.
 	 * Only needed when csa_found is true (Scenario 2 and 3-1).
+	 * For a self-link beacon (received directly on the 5G link), link_id
+	 * refers to session->vdev itself, so no lookup/ref is needed.
 	 */
-	if (csa_found)
-		partner_vdev = mlo_get_vdev_by_link_id(session->vdev, link_id,
-						       WLAN_MLO_MGR_ID);
+	if (csa_found) {
+		if (is_self_link) {
+			partner_vdev = session->vdev;
+		} else {
+			partner_vdev = mlo_get_vdev_by_link_id(session->vdev,
+							       link_id,
+							       WLAN_MLO_MGR_ID);
+			partner_ref_taken = true;
+		}
+	}
 
 	/* mlo_link_in_cac= true means during CAC,
 	 * mlo_link_in_cac= false means after CAC
@@ -300,7 +353,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 				 */
 				if (session->mlo_sta_cac_info.link_state ==
 				    MLO_LINK_FORCE_DO_CSA) {
-					if (partner_vdev)
+					if (partner_vdev && partner_ref_taken)
 						mlo_release_vdev_ref(partner_vdev);
 					return;
 				}
@@ -308,6 +361,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 					 session->vdev_id, link_id);
 				session->mlo_sta_cac_info.link_state =
 						MLO_LINK_FORCE_DO_CSA;
+				lim_sync_mlo_sta_cac_info_to_partners(session);
 			} else if (!csa_found) {
 				/* Scenario 1-2: radar detect to DFS,CSA done
 				 * Scenario 5-1: during CAC,no radar detect
@@ -320,13 +374,14 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 					 session->vdev_id, link_id, channel);
 				session->mlo_sta_cac_info.link_state =
 						MLO_LINK_FORCE_WAIT_CAC_DONE;
+				lim_sync_mlo_sta_cac_info_to_partners(session);
 			} else if (csa_found && !is_new_chan_dfs) {
 				/* Scenario 2: During CAC, radar to non-DFS
 				 * set no_force
 				 */
 				if (session->mlo_sta_cac_info.link_state ==
 				    MLO_LINK_FORCE_SW2_NON_DFS) {
-					if (partner_vdev)
+					if (partner_vdev && partner_ref_taken)
 						mlo_release_vdev_ref(partner_vdev);
 					return;
 				}
@@ -349,6 +404,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 						 session->vdev_id, link_id);
 				session->mlo_sta_cac_info.link_state =
 						MLO_LINK_FORCE_SW2_NON_DFS;
+				lim_sync_mlo_sta_cac_info_to_partners(session);
 
 			} else {
 				pe_debug("vdev %d link %d chn:%d. unsupported",
@@ -364,7 +420,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 				 */
 				if (session->mlo_sta_cac_info.link_state ==
 				    MLO_LINK_FORCE_DO_CSA) {
-					if (partner_vdev)
+					if (partner_vdev && partner_ref_taken)
 						mlo_release_vdev_ref(partner_vdev);
 					return;
 				}
@@ -389,6 +445,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 				session->mlo_sta_cac_info.cac_link_id = link_id;
 				session->mlo_sta_cac_info.link_state =
 						MLO_LINK_FORCE_DO_CSA;
+				lim_sync_mlo_sta_cac_info_to_partners(session);
 			} else if (!csa_found) {
 				/* Scenario 3-2: radar to DFS after CAC
 				 * wait CAC completed
@@ -401,13 +458,14 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 					 session->vdev_id, link_id);
 				session->mlo_sta_cac_info.link_state =
 						MLO_LINK_FORCE_WAIT_CAC_DONE;
+				lim_sync_mlo_sta_cac_info_to_partners(session);
 			} else if (csa_found && !is_new_chan_dfs) {
 				/*Scenario 4: After CAC, radar to non-DFS
 				 * set no_force
 				 */
 				if (session->mlo_sta_cac_info.link_state ==
 				    MLO_LINK_FORCE_SW2_NON_DFS) {
-					if (partner_vdev)
+					if (partner_vdev && partner_ref_taken)
 						mlo_release_vdev_ref(partner_vdev);
 					return;
 				}
@@ -417,6 +475,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 
 				session->mlo_sta_cac_info.link_state =
 						MLO_LINK_FORCE_SW2_NON_DFS;
+				lim_sync_mlo_sta_cac_info_to_partners(session);
 
 			} else {
 				pe_debug("vdev %d link %d. unsupported state",
@@ -425,7 +484,7 @@ lim_process_mcst_ie_and_csa(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 
-	if (partner_vdev)
+	if (partner_vdev && partner_ref_taken)
 		mlo_release_vdev_ref(partner_vdev);
 }
 
@@ -454,6 +513,9 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 	uint16_t opclass_width;
 	bool csa_found = false;
+	const uint8_t *mcst_ie;
+	bool mcst_found = false;
+	uint8_t mcst_ext_id = WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME;
 
 	if (!session || !bcn_ptr || !mac_ctx) {
 		pe_err("invalid input parameters");
@@ -545,6 +607,12 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			session->mlo_sta_cac_info.link_state =
 					MLO_LINK_FORCE_CAC_COMPLETE;
 		}
+		/*
+		 * Each MLO link has its own pe_session copy of
+		 * mlo_sta_cac_info; propagate this CAC-complete update to the
+		 * partner links so every session observes the same state.
+		 */
+		lim_sync_mlo_sta_cac_info_to_partners(session);
 	}
 
 	for (i = 0; i < bcn_ptr->mlo_ie.mlo_ie.num_sta_profile; i++) {
@@ -566,6 +634,9 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			    stacontrol,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
+		mcst_ie = wlan_get_ext_ie_ptr_from_ext_id(&mcst_ext_id, 1,
+							  sta_pro, sta_pro_len);
+		mcst_found = mcst_ie;
 
 		csa_ie = (struct ieee80211_channelswitch_ie *)
 				wlan_get_ie_ptr_from_eid(
@@ -579,7 +650,7 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		link_info = mlo_mgr_get_ap_link_by_link_id(mlo_ctx, link_id);
 		if (!link_info) {
 			mlo_err("link info null");
-			return;
+			continue;
 		}
 
 		if (xcsa_ie) {
@@ -659,9 +730,8 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		csa_found = csa_ie || xcsa_ie;
 		if (wlan_cm_is_vdev_connected(session->vdev))
 			lim_process_mcst_ie_and_csa(pdev, session, link_id,
-						    sta_pro, sta_pro_len,
-						    csa_found,
-						    csa_param.channel);
+						    mcst_found, csa_found,
+						    csa_param.channel, false);
 	}
 }
 
@@ -901,9 +971,132 @@ update_bw:
 	}
 }
 
+/**
+ * lim_process_beacon_mlo_self_link() - process CSA/eCSA and MCST IE
+ * carried directly in a 5G MLO STA link's own beacon (top-level IEs,
+ * not a per-STA profile)
+ * @mac_ctx: global mac context
+ * @session: pe session for the 5G link
+ * @bcn_ptr: pointer to tSchBeaconStruct
+ * @rx_pkt_info: pointer to RX packet info structure, used to scan the
+ *               beacon's raw top-level IE list for the MCST extension IE
+ *
+ * Return none
+ */
+static void
+lim_process_beacon_mlo_self_link(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 tSchBeaconStruct *bcn_ptr,
+				 uint8_t *rx_pkt_info)
+{
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_mlo_dev_context *mlo_ctx;
+	uint8_t link_id;
+	uint8_t is_sta_csa_synced;
+	struct csa_offload_params csa_param;
+	bool csa_found = false;
+	bool mcst_found = false;
+	uint8_t *frame;
+	uint16_t frame_len;
+	uint8_t mcst_ext_id = WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME;
+
+	qdf_mem_zero(&csa_param, sizeof(csa_param));
+
+	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	mlo_ctx = vdev->mlo_dev_ctx;
+	if (!pdev || !mlo_ctx) {
+		pe_err("null pdev/mlo_dev_ctx");
+		return;
+	}
+
+	link_id = wlan_vdev_get_link_id(vdev);
+
+	/* MCST ext IE at the beacon's own top level (not per-STA-profile) */
+	frame = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+	if (frame_len > SIR_MAC_B_PR_SSID_OFFSET)
+		mcst_found = wlan_get_ext_ie_ptr_from_ext_id(&mcst_ext_id, 1,
+							     frame + SIR_MAC_B_PR_SSID_OFFSET,
+							     frame_len - SIR_MAC_B_PR_SSID_OFFSET) != NULL;
+
+	csa_found = bcn_ptr->ext_chan_switch_present ||
+		    bcn_ptr->channelSwitchPresent;
+
+	/*
+	 * CAC complete: this link went inactive waiting for CAC (Scenario
+	 * 1-2/3-2 in lim_process_mcst_ie_and_csa) and its own beacon no
+	 * longer carries the CSA/eCSA IE nor the MCST IE - CAC finished
+	 * clean, so re-activate this link. Unlike the partner-link path in
+	 * lim_process_beacon_mlo(), which looks up the partner vdev via
+	 * cac_link_id, session->vdev here already IS the link to activate -
+	 * but link_state/cac_link_id may have been broadcast onto this
+	 * session by lim_sync_mlo_sta_cac_info_to_partners() from a
+	 * different link's CAC, so only act if cac_link_id names this
+	 * link, not some other link this session merely observed.
+	 */
+	if (session->mlo_sta_cac_info.link_state ==
+				MLO_LINK_FORCE_WAIT_CAC_DONE &&
+	    session->mlo_sta_cac_info.cac_link_id == link_id &&
+	    !csa_found && !mcst_found) {
+		pe_debug("vdev %d: CAC completed", session->vdev_id);
+
+		session->mlo_sta_cac_info.mlo_link_in_cac = false;
+		lim_set_link_force_mode_for_cac(vdev, false);
+		session->mlo_sta_cac_info.link_state =
+				MLO_LINK_FORCE_CAC_COMPLETE;
+		lim_sync_mlo_sta_cac_info_to_partners(session);
+		return;
+	}
+
+	/*
+	 * Top-level (not per-STA-profile) CSA/eCSA IE of this link's own
+	 * beacon, already parsed by the generic dot11f beacon parser.
+	 */
+	if (bcn_ptr->ext_chan_switch_present) {
+		csa_param.channel = bcn_ptr->ext_chan_switch.new_channel;
+		csa_param.switch_mode = bcn_ptr->ext_chan_switch.switch_mode;
+		csa_param.new_op_class = bcn_ptr->ext_chan_switch.new_reg_class;
+		if (wlan_reg_is_6ghz_op_class(pdev, csa_param.new_op_class))
+			csa_param.csa_chan_freq = wlan_reg_chan_band_to_freq(pdev,
+									     csa_param.channel,
+									     BIT(REG_BAND_6G));
+		else
+			csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(pdev,
+									       csa_param.channel);
+		csa_param.ies_present_flag |= MLME_XCSA_IE_PRESENT;
+	} else if (bcn_ptr->channelSwitchPresent) {
+		csa_param.channel = bcn_ptr->channelSwitchIE.newChannel;
+		csa_param.switch_mode = bcn_ptr->channelSwitchIE.switchMode;
+		csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(pdev,
+								       csa_param.channel);
+		csa_param.ies_present_flag |= MLME_CSA_IE_PRESENT;
+	}
+
+	if (csa_found) {
+		is_sta_csa_synced = mlo_is_sta_csa_synced(mlo_ctx, link_id);
+		mlo_sta_handle_csa_standby_link(mlo_ctx, link_id, &csa_param,
+						vdev);
+		if (!is_sta_csa_synced)
+			mlo_sta_csa_save_params(mlo_ctx, link_id, &csa_param);
+	}
+
+	if (wlan_cm_is_vdev_connected(vdev))
+		lim_process_mcst_ie_and_csa(pdev, session,
+					    link_id,
+					    mcst_found,
+					    csa_found,
+					    csa_param.channel,
+					    true);
+}
+
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tSchBeaconStruct *bcn_ptr)
+			    tSchBeaconStruct *bcn_ptr,
+			    uint8_t *rx_pkt_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_channel *des_chan;
@@ -921,8 +1114,14 @@ void lim_process_beacon_eht(struct mac_context *mac_ctx,
 	if (!des_chan || !IS_WLAN_PHYMODE_EHT(des_chan->ch_phymode))
 		return;
 
-	if (mlo_is_mld_sta(vdev))
-		/* handle beacon IE for 802.11be mlo case */
+	if (!mlo_is_mld_sta(vdev))
+		return;
+
+	/* handle beacon IE for 802.11be mlo case */
+	if (wlan_reg_is_5ghz_ch_freq(bcn_ptr->chan_freq))
+		lim_process_beacon_mlo_self_link(mac_ctx, session, bcn_ptr,
+						 rx_pkt_info);
+	else
 		lim_process_beacon_mlo(mac_ctx, session, bcn_ptr);
 }
 
@@ -1095,7 +1294,7 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		lim_process_beacon_eht_op(session, bcn_ptr);
 
 	if (cu_flag) {
-		lim_process_beacon_eht(mac_ctx, session, bcn_ptr);
+		lim_process_beacon_eht(mac_ctx, session, bcn_ptr, rx_pkt_info);
 		if (session->lim_join_req)
 			bss = &session->lim_join_req->bssDescription;
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);

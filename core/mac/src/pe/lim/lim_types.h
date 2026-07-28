@@ -459,12 +459,14 @@ void lim_cleanup_mlm(struct mac_context *);
  * @mac_ctx: global mac context
  * @session: pe session
  * @bcn_ptr: pointer to tSchBeaconStruct
+ * @rx_pkt_info: pointer to RX packet info structure
  *
  * Return none
  */
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tSchBeaconStruct *bcn_ptr);
+			    tSchBeaconStruct *bcn_ptr,
+			    uint8_t *rx_pkt_info);
 
 /**
  * lim_process_beacon_eht_op() - process beacon 11be eht op IE
@@ -479,7 +481,8 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 static inline
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tSchBeaconStruct *bcn_ptr)
+			    tSchBeaconStruct *bcn_ptr,
+			    uint8_t *rx_pkt_info)
 {
 }
 

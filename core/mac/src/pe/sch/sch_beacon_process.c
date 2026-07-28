@@ -287,9 +287,17 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 
 	/*
 	 * Ignore bcn as channel switch IE present and csa offload is enabled,
-	 * as in CSA offload enabled case FW will send Event to switch channel
+	 * as in CSA offload enabled case FW will send Event to switch channel.
+	 * Exception: for a 5G MLO STA link, still run the MCST IE / self-link
+	 * CSA state machine in lim_process_beacon_eht() before returning, so
+	 * that path isn't skipped along with the rest of this function; the
+	 * eCSA action frame path is unaffected by this.
 	 */
 	if (bcn->channelSwitchPresent && wma_is_csa_offload_enabled()) {
+		if (mlo_is_mld_sta(session->vdev) &&
+		    wlan_reg_is_5ghz_ch_freq(bcn->chan_freq))
+			lim_process_beacon_eht(mac_ctx, session, bcn,
+					       rx_pkt_info);
 		pe_err_rl("Ignore bcn as channel switch IE present and csa offload is enabled");
 		return false;
 	}
@@ -831,7 +839,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			lim_send_channel_usage_req_notif_cap_action_frame(session->vdev_id);
 	}
 
-	lim_process_beacon_eht(mac_ctx, session, bcn);
+	lim_process_beacon_eht(mac_ctx, session, bcn, rx_pkt_info);
 }
 
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
