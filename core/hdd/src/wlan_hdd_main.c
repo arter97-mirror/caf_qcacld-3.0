@@ -17364,6 +17364,7 @@ hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		if (qdf_atomic_test_bit(SOFTAP_ADD_INTF_LINK,
 					link_info->link_flags) &&
+		    link_info->vdev &&
 		    wlan_vdev_get_link_id(link_info->vdev) == link_id)
 			return link_info;
 	}
