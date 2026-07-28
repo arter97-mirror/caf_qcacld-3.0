@@ -2488,6 +2488,39 @@ smd_st_prep_response_received(struct mlo_link_recfg_context *recfg_ctx,
 	return status;
 }
 
+/**
+ * smd_link_recfg_reset_to_init() - Common state reset for LNK_RCFG SM
+ *  completion, regardless of success or failure.
+ * @recfg_ctx: link reconfiguration context
+ *
+ * Resets the transition-list index and pending request bookkeeping, then
+ * transitions the LNK_RCFG SM back to WLAN_LINK_RECFG_S_INIT so the vdev is
+ * ready for a subsequent link reconfiguration / SMD roam attempt. Called
+ * from both the success path (smd_exec_complete()) and the failure path
+ * (smd_link_recfg_complete()'s !success branch, e.g. SMD roam abort or
+ * northbound disconnect) - previously only the success path reached this,
+ * leaving the LNK_RCFG SM stuck in WLAN_LINK_RECFG_S_ABORT after a failed
+ * roam.
+ *
+ * Does NOT touch recfg_ctx->internal_reason_code - that already holds the
+ * specific failure reason recorded by the abort path (or must be set to
+ * link_recfg_success by the caller on the success path); this helper only
+ * resets the outcome-neutral SM bookkeeping.
+ *
+ * Return: void
+ */
+static void
+smd_link_recfg_reset_to_init(struct mlo_link_recfg_context *recfg_ctx)
+{
+	struct wlan_mlo_link_recfg_req *recfg_req = &recfg_ctx->curr_recfg_req;
+
+	recfg_ctx->sm.curr_state_idx = -1;
+	recfg_req->recfg_type = link_recfg_undefined;
+	recfg_req->join_pending_vdev_id = WLAN_INVALID_VDEV_ID;
+
+	mlo_link_recfg_sm_transition_to(recfg_ctx, WLAN_LINK_RECFG_S_INIT);
+}
+
 void
 smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
 			bool success)
@@ -2517,6 +2550,7 @@ smd_link_recfg_complete(struct mlo_link_recfg_context *recfg_ctx,
 							       SMD_PREP_STATUS_VDEV_REPURPOSE_FAIL);
 		}
 		smd_roam_cleanup_ies(recfg_ctx);
+		smd_link_recfg_reset_to_init(recfg_ctx);
 		return;
 	}
 
@@ -3239,7 +3273,6 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	struct cnx_mgr *cm_ctx;
 	struct cnx_mgr *cm_ctx_t;
 	struct wlan_objmgr_pdev *pdev;
-	struct wlan_mlo_link_recfg_req *recfg_req;
 	uint8_t active_links = 0;
 	uint8_t active_vdev_id = WLAN_INVALID_VDEV_ID;
 
@@ -3254,7 +3287,6 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	recfg_req = &recfg_ctx->curr_recfg_req;
 	sync_ind = recfg_ctx->cached_sync_ind;
 	sync_ind_len = sync_ind ? sizeof(*sync_ind) : 0;
 
@@ -3327,12 +3359,8 @@ smd_exec_complete(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/* reset state tran index and move to init state  */
-	recfg_ctx->sm.curr_state_idx = -1;
-	recfg_req->recfg_type = link_recfg_undefined;
-	recfg_req->join_pending_vdev_id = WLAN_INVALID_VDEV_ID;
 	recfg_ctx->internal_reason_code = link_recfg_success;
-
-	mlo_link_recfg_sm_transition_to(recfg_ctx, WLAN_LINK_RECFG_S_INIT);
+	smd_link_recfg_reset_to_init(recfg_ctx);
 	smd_roam_cleanup_ies(recfg_ctx);
 
 	/* RSO state change to Enabled */
