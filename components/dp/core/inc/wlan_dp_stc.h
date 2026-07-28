@@ -1183,7 +1183,20 @@ void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
  */
 static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
-	return dp_cfg->stc_enable;
+	return dp_cfg->stc_enable & DP_STC_ENABLE_BIT;
+}
+
+/**
+ * wlan_dp_cfg_is_stc_prealloc_enabled() - Check if STC prealloc is enabled
+ * @dp_cfg: SoC CFG config
+ *
+ * Return: true if STC prealloc should be done (bit7 NOT set), false otherwise.
+ */
+static inline bool
+wlan_dp_cfg_is_stc_prealloc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return wlan_dp_cfg_is_stc_enabled(dp_cfg) &&
+	       !(dp_cfg->stc_enable & DP_STC_NO_PREALLOC_BIT);
 }
 
 /**
@@ -1437,6 +1450,12 @@ static inline void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 }
 
 static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+static inline bool
+wlan_dp_cfg_is_stc_prealloc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return false;
 }

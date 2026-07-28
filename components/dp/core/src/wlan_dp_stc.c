@@ -3508,7 +3508,7 @@ void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 	/* Ensure FISA is enabled when STC is enabled
 	 * to prevent crash due to missing FISA context
 	 */
-	if (config->stc_enable)
+	if (config->stc_enable & DP_STC_ENABLE_BIT)
 		config->is_rx_fisa_enabled = true;
 
 	config->stc_rtpm_control = cfg_get(psoc, CFG_DP_STC_RTPM_CONTROL);

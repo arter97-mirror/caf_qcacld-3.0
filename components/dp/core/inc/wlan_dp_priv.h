@@ -197,7 +197,7 @@ struct dp_affn_override_params {
  * @is_load_balance_enabled: indicates whether load balance is enabled or not
  * @lb_cpumask_override: load balance CPU mask override bitmask
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
- * @stc_enable: indicates whether STC feature is enabled or not
+ * @stc_enable: STC enable bitmask (bit0=feature enable, bit7=skip prealloc)
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
  * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
  * @dp_rx_thread_affinity_mask: DP rx thread affinity mask (o for disable)
@@ -299,7 +299,7 @@ struct wlan_dp_psoc_cfg {
 	bool is_flow_balance_enabled;
 #endif
 #ifdef WLAN_DP_FEATURE_STC
-	bool stc_enable;
+	uint8_t stc_enable;
 	bool stc_rtpm_control;
 #endif
 	uint32_t dp_irq_affinity_mask;

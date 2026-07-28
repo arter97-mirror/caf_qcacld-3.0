@@ -1582,12 +1582,18 @@
 #ifdef WLAN_DP_FEATURE_STC
 /*
  * <ini>
- * dp_stc_enable - Control STC feature enablement
+ * dp_stc_enable - Control STC feature enablement and prealloc behaviour
  * @Min: 0
- * @Max: 1
+ * @Max: 0xFF
  * @Default: 0
  *
- * This ini is used to enable DP STC
+ * Bit 0 (0x01): STC feature enable.  0 = disabled, 1 = enabled.
+ * Bit 7 (0x80): Skip STC prealloc.   0 = prealloc (default), 1 = no prealloc.
+ *
+ * Supported values:
+ *   0x00 - STC disabled, no prealloc
+ *   0x01 - STC enabled,  prealloc ON
+ *   0x81 - STC enabled,  prealloc OFF
  *
  * Supported Feature: STA (pre 802.11BE)
  *
@@ -1595,8 +1601,12 @@
  *
  * </ini>
  */
+#define DP_STC_ENABLE_BIT        BIT(0)
+#define DP_STC_NO_PREALLOC_BIT   BIT(7)
+
 #define CFG_DP_STC_ENABLE \
-	CFG_INI_BOOL("dp_stc_enable", false, \
+	CFG_INI_UINT("dp_stc_enable", 0, 0xFF, 0, \
+		     CFG_VALUE_OR_DEFAULT, \
 		     "Enable/Disable DP Smart Traffic Classifier")
 
 /*

@@ -1373,11 +1373,25 @@ wlan_dp_sync_prealloc_with_profile_cfg(struct wlan_dp_prealloc_cfg *cfg) {}
 static inline bool
 wlan_cfg_is_stc_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 {
-	return !!cfg_get(ctrl_psoc, CFG_DP_STC_ENABLE);
+	return cfg_get(ctrl_psoc, CFG_DP_STC_ENABLE) & DP_STC_ENABLE_BIT;
+}
+
+static inline bool
+wlan_cfg_is_stc_prealloc_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+{
+	uint32_t val = cfg_get(ctrl_psoc, CFG_DP_STC_ENABLE);
+
+	return (val & DP_STC_ENABLE_BIT) && !(val & DP_STC_NO_PREALLOC_BIT);
 }
 #else
 static inline bool
 wlan_cfg_is_stc_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_cfg_is_stc_prealloc_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 {
 	return false;
 }
@@ -1393,8 +1407,7 @@ dp_is_prealloc_ctx_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	case DP_STC_RX_FLOW_TABLE_TYPE:
 	case DP_STC_TX_FLOW_TABLE_TYPE:
 	case DP_STC_CLASSIFIED_FLOW_TABLE_TYPE:
-		/* Change the int value to bool */
-		return wlan_cfg_is_stc_enabled(ctrl_psoc);
+		return wlan_cfg_is_stc_prealloc_enabled(ctrl_psoc);
 	default:
 		break;
 	}
