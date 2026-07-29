@@ -506,10 +506,12 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
  * hdd_is_sta_connect_or_link_switch_in_prog() - check if any sta is connecting
  * or in the middle of a link switch or or eapol is in progress
  * @hdd_ctx: hdd context
+ * @op_mode: adapter mode
  *
  * Return: true if any sta is connecting/in link switch
  */
-bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx);
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx,
+					       enum QDF_OPMODE op_mode);
 
 /**
  * wlan_hdd_configure_twt_responder() - configure twt responder in sap_config

@@ -7800,7 +7800,7 @@ static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 	     policy_mgr_mode_specific_connection_count(psoc,
 						       mode, NULL) == 1) ||
 	     (!policy_mgr_get_connection_count(psoc) &&
-	     !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx))) {
+	     !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx, op_mode))) {
 		policy_mgr_check_and_stop_opportunistic_timer(
 						psoc,
 						wlan_vdev_get_id(vdev));
