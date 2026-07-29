@@ -3845,6 +3845,7 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTING;
 	struct wlan_hdd_link_info *link_info;
 	bool is_connecting = false, is_switching_link = false;
+	bool key_exchng_in_prog = false;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -3865,12 +3866,17 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
 			    wlan_hdd_is_link_switch_in_progress(link_info))
 				is_switching_link = true;
 
-			if (!is_connecting && !is_switching_link)
+			key_exchng_in_prog =
+					sme_is_sta_key_exchange_in_progress(
+							hdd_ctx->mac_handle,
+							link_info->vdev_id);
+			if (!is_connecting && !is_switching_link &&
+			    !key_exchng_in_prog)
 				continue;
 
-			hdd_debug("vdev_id %d: connecting %d switching link %d",
+			hdd_debug("vdev_id %d: connecting %d switching link %d key_exchng_in_prog %d",
 				  link_info->vdev_id, is_connecting,
-				  is_switching_link);
+				  is_switching_link, key_exchng_in_prog);
 
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
@@ -3942,9 +3948,20 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * Eg: The concurrency could be safe when link switch vdev is torn down
 	 * during link switch. However, when the link comes up, the combination
 	 * could be undesired.
+	 *
+	 * When P2P GO + STA/P2P-CLI concurrency arises. Dont allow CSA on GO
+	 * iface while eapol is in progress for STA/P2P-CLI vdev's or noa is in
+	 * progress in p2p go iface. Because for STA/P2P-CLI connection+eapol,
+	 * firmware does NOA(max 2.5 secs) on GO iface and during this time it
+	 * cannot do CSA as it won't be able to send CSA frames during NOA
+	 * period
 	 */
-	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx)) {
-		hdd_err("Do not allow CSA, STA connect/link switch is in progress");
+	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx) ||
+	    (adapter->device_mode == QDF_P2P_GO_MODE &&
+	     ucfg_p2p_is_p2p_go_noa_in_progress(hdd_ctx->pdev,
+						link_info->vdev_id))) {
+		hdd_err("vdev %d Do not allow CSA, STA connect/link switch/eapol/noa is in progress",
+			link_info->vdev_id);
 		return -EBUSY;
 	}
 
