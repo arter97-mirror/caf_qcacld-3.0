@@ -15349,7 +15349,9 @@ hdd_set_cfg_sta_dfs_ch_peer_scc(struct wlan_hdd_link_info *link_info,
 static int hdd_set_cfg_aux_listen(struct wlan_hdd_link_info *link_info,
 				  const struct nlattr *attr)
 {
+	struct wlan_hdd_link_info *iter_info;
 	uint8_t val;
+	int errno = 0, ret;
 
 	val = nla_get_u8(attr);
 	hdd_debug("Received cfg_aux_listen value %d", val);
@@ -15358,9 +15360,15 @@ static int hdd_set_cfg_aux_listen(struct wlan_hdd_link_info *link_info,
 	/* Cache the value in the adapter to restore in case of an SSR */
 	link_info->adapter->aux_l_disable = val;
 
-	return wma_cli_set_command(link_info->vdev_id,
-				   wmi_vdev_param_aux_l_disable,
-				   val, VDEV_CMD);
+	hdd_adapter_for_each_active_link_info(link_info->adapter, iter_info) {
+		ret = wma_cli_set_command(iter_info->vdev_id,
+					  wmi_vdev_param_aux_l_disable,
+					  val, VDEV_CMD);
+		if (ret)
+			errno = ret;
+	}
+
+	return errno;
 }
 
 #ifdef WLAN_FEATURE_QSH_SCAN
