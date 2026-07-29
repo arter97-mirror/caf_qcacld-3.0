@@ -28,6 +28,7 @@
 #include "lim_types.h"
 #include <include/wlan_mlme_cmn.h>
 #include <../../core/src/vdev_mgr_ops.h>
+#include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_psoc_mlme_api.h"
 #include "target_if_cm_roam_offload.h"
 #include "wlan_crypto_global_api.h"
@@ -199,6 +200,8 @@ static QDF_STATUS sta_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
 
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+
+	wlan_util_vdev_mlme_reset_ratemask_params(vdev_mlme);
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	if (mac_handle)
