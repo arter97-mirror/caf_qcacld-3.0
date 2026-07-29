@@ -3591,9 +3591,14 @@ static bool lim_is_pmksa_privacy_set(const uint8_t *rsnxe)
 static uint8_t lim_build_nonce_ie(struct pe_session *pe_session,
 				  uint8_t *nonce_ie)
 {
-	const uint8_t *ap_rsnxe;
+	const uint8_t *ap_rsnxe = NULL;
 	uint8_t *bcn_ie;
 	int bcn_ie_len;
+	struct scan_cache_entry *scan_entry;
+	const uint8_t *sp_ie;
+	uint8_t sp_rsnxe_buf[SIR_MAC_IE_TYPE_LEN_SIZE +
+			     SIR_MAC_RSNX_CAP_MAX_LEN];
+	uint8_t sp_rsnxe_len = 0;
 	uint32_t bcn_ie_offset = DOT11F_FF_TIMESTAMP_LEN +
 				 DOT11F_FF_BEACONINTERVAL_LEN +
 				 DOT11F_FF_CAPABILITIES_LEN +
@@ -3601,6 +3606,25 @@ static uint8_t lim_build_nonce_ie(struct pe_session *pe_session,
 
 	if (!pe_session->beacon)
 		return 0;
+
+	scan_entry = wlan_cm_get_curr_candidate_entry(pe_session->vdev,
+						      pe_session->cm_id);
+	sp_ie = scan_entry ? util_scan_entry_security_profile(scan_entry) : NULL;
+	lim_override_ap_rsnxe_from_security_profile(pe_session,
+						    sp_ie,
+						    &ap_rsnxe,
+						    &sp_rsnxe_len,
+						    sp_rsnxe_buf,
+						    sizeof(sp_rsnxe_buf));
+	if (scan_entry)
+		util_scan_free_cache_entry(scan_entry);
+
+	if (sp_rsnxe_len) {
+		ap_rsnxe = sp_rsnxe_buf;
+		if (!lim_is_pmksa_privacy_set(ap_rsnxe))
+			return 0;
+		goto build_nonce;
+	}
 
 	if (pe_session->bcnLen <= bcn_ie_offset) {
 		pe_debug("AP beacon len:%d less than IE offset:%d",
@@ -3615,6 +3639,7 @@ static uint8_t lim_build_nonce_ie(struct pe_session *pe_session,
 	if (!lim_is_pmksa_privacy_set(ap_rsnxe))
 		return 0;
 
+build_nonce:
 	nonce_ie[0] = WLAN_MAC_EID_EXT;
 	nonce_ie[1] = 1 + SIR_FILS_NONCE_LENGTH;
 	nonce_ie[2] = SIR_FILS_NONCE_EXT_EID;
