@@ -27,6 +27,7 @@
 #define HDD_DISALLOW_LEGACY_HDDLOG 1
 #include "osif_sync.h"
 #include <wlan_hdd_tx_rx.h>
+#include <linux/version.h>
 #include <wlan_hdd_softap_tx_rx.h>
 #include <wlan_hdd_napi.h>
 #include <linux/netdevice.h>
@@ -1172,6 +1173,11 @@ static void wlan_hdd_update_queue_oper_stats(struct hdd_adapter *adapter,
 static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
 {
 	return false;
+}
+#elif (KERNEL_VERSION(7, 0, 0) <= LINUX_VERSION_CODE)
+static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
+{
+	return netif_tx_owned(txq, smp_processor_id());
 }
 #else
 static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
