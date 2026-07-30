@@ -3629,6 +3629,19 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_HAS_TX_POWER_LINK_ID
 endif
 
+# Feature check: does cfg80211_mgmt_tx_status carry an int link_id arg?
+# Same full-signature grep idiom as CFG80211_HAS_TX_POWER_LINK_ID.
+TXST_PAT1 := cfg80211_mgmt_tx_status\$(LPAREN)struct wireless_dev \*wdev,[[:space:]]+
+TXST_PAT2 := u64 cookie, const u8 \*buf,[[:space:]]+
+TXST_PAT3 := size_t len, bool ack, int link_id,[[:space:]]+
+TXST_PAT4 := gfp_t gfp\$(RPAREN)
+TXST_PAT  := $(TXST_PAT1)$(TXST_PAT2)$(TXST_PAT3)$(TXST_PAT4)
+found = $(shell tr '\n' ' ' < $(srctree)/include/net/cfg80211.h \
+    | grep -qE '$(TXST_PAT)' && echo yes || echo no)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_HAS_MGMT_TX_STATUS_LINK_ID
+endif
+
 found = $(shell if grep -qF "NL80211_EXT_FEATURE_SECURE_NAN" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes"; else echo "no"; fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_EXT_FEATURE_SECURE_NAN

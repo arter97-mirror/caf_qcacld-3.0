@@ -41413,12 +41413,37 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 }
 #endif
 
-void wlan_hdd_cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
-				      const u8 *buf, size_t len, bool ack,
-				      gfp_t gfp)
+/**
+ * wlan_hdd_cfg80211_mgmt_tx_status() - wrapper for cfg80211_mgmt_tx_status
+ * @wdev: wireless dev
+ * @cookie: mgmt_tx cookie
+ * @buf: management frame buffer
+ * @len: frame length
+ * @ack: whether the frame was ACKed
+ * @gfp: GFP flags
+ *
+ * Absorbs the kernel-side signature difference for MLO: newer kernels
+ * insert an int link_id argument between @ack and @gfp
+ * (detected by Kbuild feature check as CFG80211_HAS_MGMT_TX_STATUS_LINK_ID).
+ * qcacld p2p callers do not populate link_id today, so pass 0.
+ */
+#ifdef CFG80211_HAS_MGMT_TX_STATUS_LINK_ID
+void
+wlan_hdd_cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
+				 const u8 *buf, size_t len, bool ack,
+				 gfp_t gfp)
+{
+	cfg80211_mgmt_tx_status(wdev, cookie, buf, len, ack, 0, gfp);
+}
+#else
+void
+wlan_hdd_cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
+				 const u8 *buf, size_t len, bool ack,
+				 gfp_t gfp)
 {
 	cfg80211_mgmt_tx_status(wdev, cookie, buf, len, ack, gfp);
 }
+#endif
 
 #if defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT) && \
 	defined(WLAN_FEATURE_MULTI_LINK_SAP)

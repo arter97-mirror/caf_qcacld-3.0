@@ -228,5 +228,4 @@ int osif_p2p_noa_cancel(struct hdd_adapter *adapter, const void *data,
 int osif_p2p_parse_noa_params(struct hdd_adapter *adapter,
 			      struct p2p_ps_config *noa, const void *data,
 			      int data_len);
-
 #endif /* _WLAN_CFG80211_P2P_H_ */

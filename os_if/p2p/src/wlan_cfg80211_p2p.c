@@ -313,7 +313,7 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 
 	osif_debug("send indication to %s interface", wdev->netdev->name);
 	is_success = tx_cnf->status ? false : true;
-	cfg80211_mgmt_tx_status(
+	wlan_hdd_cfg80211_mgmt_tx_status(
 		wdev,
 		tx_cnf->action_cookie,
 		tx_cnf->buf, tx_cnf->buf_len,
