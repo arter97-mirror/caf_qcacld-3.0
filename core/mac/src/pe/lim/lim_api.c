@@ -3246,10 +3246,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		goto roam_sync_fail;
 	}
 
-	if (roam_sync_ind_ptr->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
-		wlan_peer_set_key_install_flag(mac_ctx->psoc, bssid.bytes,
-					       true);
-
 	lim_mlo_roam_copy_partner_info_to_session(ft_session_ptr,
 						  roam_sync_ind_ptr);
 
