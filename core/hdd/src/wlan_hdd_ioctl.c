@@ -7813,8 +7813,8 @@ static int hdd_driver_command(struct wlan_hdd_link_info *link_info,
 	/* copy to local struct to avoid numerous changes to legacy code */
 	if (priv_data->total_len <= 0 ||
 	    priv_data->total_len > WLAN_PRIV_DATA_MAX_LEN) {
-		hdd_warn("Invalid priv_data.total_len: %d!!!",
-			  priv_data->total_len);
+		hdd_nofl_warn("Invalid priv_data.total_len: %d!!!",
+			      priv_data->total_len);
 		ret = -EINVAL;
 		goto exit;
 	}
