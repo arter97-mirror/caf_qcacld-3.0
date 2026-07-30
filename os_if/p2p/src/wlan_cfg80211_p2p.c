@@ -210,15 +210,15 @@ static void wlan_p2p_rx_callback(void *user_data,
 		   match[0], match[1], match[2], match[3], match[4], match[5]);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi,
 			       rx_frame->buf, rx_frame->frame_len,
 			       NL80211_RXMGMT_FLAG_ANSWERED);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
-	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi,
 			       rx_frame->buf, rx_frame->frame_len,
 			       NL80211_RXMGMT_FLAG_ANSWERED, GFP_ATOMIC);
 #else
-	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi,
 			       rx_frame->buf, rx_frame->frame_len, GFP_ATOMIC);
 #endif /* LINUX_VERSION_CODE */
 	osif_debug("indicated frame to userspace: %s",
