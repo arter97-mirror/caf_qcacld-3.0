@@ -9464,8 +9464,10 @@ exit:
 
 #if defined(WLAN_FEATURE_MULTI_LINK_SAP) || \
 	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
-int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
-			      unsigned int link_id) {
+static int _wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      unsigned int link_id)
+{
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 
@@ -9486,6 +9488,22 @@ int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 
 	return errno;
 }
+
+#ifdef CONFIG_ML_RECONFIG_SINGLE_WIPHY
+int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			      unsigned int link_id,
+			      struct cfg80211_ap_settings *settings)
+{
+	(void)settings;
+	return _wlan_hdd_cfg80211_stop_ap(wiphy, dev, link_id);
+}
+#else
+int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			      unsigned int link_id)
+{
+	return _wlan_hdd_cfg80211_stop_ap(wiphy, dev, link_id);
+}
+#endif /* CONFIG_ML_RECONFIG_SINGLE_WIPHY */
 #else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
 {

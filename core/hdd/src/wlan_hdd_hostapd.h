@@ -403,11 +403,20 @@ static inline QDF_STATUS hdd_get_sap_ht2040_mode(
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to netdev
  * @link_id: Link id for which this stop_ap is received.
+ * @settings: (CONFIG_ML_RECONFIG_SINGLE_WIPHY only) AP settings for the
+ *            reconfigure link removal path — unused by qcacld but present
+ *            to match cfg80211_ops.stop_ap slot signature.
  *
  * Return: zero for success non-zero for failure
  */
+#ifdef CONFIG_ML_RECONFIG_SINGLE_WIPHY
+int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			      unsigned int link_id,
+			      struct cfg80211_ap_settings *settings);
+#else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 			      unsigned int link_id);
+#endif
 #else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			      struct net_device *dev);
