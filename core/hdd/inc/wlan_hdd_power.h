@@ -422,7 +422,7 @@ int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 				  int radio_idx,
 				  unsigned int link_id,
 				  int *dbm);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+#elif defined(CFG80211_HAS_TX_POWER_LINK_ID)
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  unsigned int link_id,
@@ -449,6 +449,12 @@ int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 				  int radio_idx,
 				  enum nl80211_tx_power_setting type,
 				  int dbm);
+#elif defined(CFG80211_HAS_TX_POWER_LINK_ID)
+int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  enum nl80211_tx_power_setting type,
+				  int mbm,
+				  int link_id);
 #else
 int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,

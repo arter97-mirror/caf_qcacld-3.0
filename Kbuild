@@ -3608,6 +3608,23 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DWLAN_FEATURE_11BE_MLO_TTLM
 endif
 
+# Feature check: does cfg80211_ops.set_tx_power carry an int link_id arg?
+# Uses full-signature grep on the flattened header text — rigorous
+# (no leak from body of adjacent functions).
+# ( and ) in the regex are escaped as $(LPAREN)/$(RPAREN) so make does
+# not mistake them for its own $(shell ...) closing paren.
+LPAREN := (
+RPAREN := )
+TXPOW_PAT1 := set_tx_power\$(RPAREN)\$(LPAREN)struct wiphy \*wiphy,[[:space:]]+
+TXPOW_PAT2 := struct wireless_dev \*wdev,[[:space:]]+
+TXPOW_PAT3 := enum nl80211_tx_power_setting type, int mbm, int link_id\$(RPAREN)
+TXPOW_PAT  := $(TXPOW_PAT1)$(TXPOW_PAT2)$(TXPOW_PAT3)
+found = $(shell tr '\n' ' ' < $(srctree)/include/net/cfg80211.h \
+    | grep -qE '$(TXPOW_PAT)' && echo yes || echo no)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_HAS_TX_POWER_LINK_ID
+endif
+
 found = $(shell if grep -qF "NL80211_EXT_FEATURE_SECURE_NAN" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes"; else echo "no"; fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_EXT_FEATURE_SECURE_NAN
