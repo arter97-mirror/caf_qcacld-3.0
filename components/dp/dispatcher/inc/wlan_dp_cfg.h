@@ -1339,9 +1339,32 @@
 	CFG_INI_BOOL("dp_rx_fisa_lru_del_enable", true, \
 		     "Enable/Disable DP Rx FISA LRU deletion")
 
+/*
+ * <ini>
+ * dp_rx_fisa_aggr_enable - Control FISA UDP/TCP aggregation (coalescing)
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Enable or disable FISA packet aggregation (super-frame coalescing).
+ * Flow steering (FST) remains active regardless of this setting when
+ * dp_rx_fisa_enable=1.  Set to 0 for SFE L2L forwarding where super-frames
+ * cause forced fragmentation in sfe_ipv4_recv_udp().
+ *
+ * Related: dp_rx_fisa_enable
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_RX_FISA_AGGR_ENABLE \
+	CFG_INI_BOOL("dp_rx_fisa_aggr_enable", true, \
+		     "Enable/Disable DP Rx FISA aggregation (coalescing)")
+
 #define CFG_DP_FISA \
 	CFG(CFG_DP_RX_FISA_ENABLE) \
-	CFG(CFG_DP_RX_FISA_LRU_DEL_ENABLE)
+	CFG(CFG_DP_RX_FISA_LRU_DEL_ENABLE) \
+	CFG(CFG_DP_RX_FISA_AGGR_ENABLE)
 #else
 #define CFG_DP_FISA
 #endif

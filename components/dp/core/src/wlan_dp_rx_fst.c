@@ -846,7 +846,8 @@ void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
 	config->is_rx_fisa_enabled = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
 	config->is_rx_fisa_lru_del_enabled =
 				cfg_get(psoc, CFG_DP_RX_FISA_LRU_DEL_ENABLE);
-	config->is_fisa_aggr_enabled = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
+	config->is_fisa_aggr_enabled =
+			cfg_get(psoc, CFG_DP_RX_FISA_AGGR_ENABLE);
 }
 #else /* WLAN_SUPPORT_RX_FISA */
 
