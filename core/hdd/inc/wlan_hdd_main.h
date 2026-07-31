@@ -288,11 +288,8 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 /** Hdd Default MTU */
 #define HDD_DEFAULT_MTU         (1500)
 
-#ifdef QCA_CONFIG_SMP
-#define NUM_CPUS NR_CPUS
-#else
-#define NUM_CPUS 1
-#endif
+/* Use QDF_MAX_AVAILABLE_CPU which caps NR_CPUS to WLAN_MAX_CPUS */
+#define NUM_CPUS QDF_MAX_AVAILABLE_CPU
 
 #define ACS_COMPLETE_TIMEOUT 3000
 
@@ -2498,7 +2495,7 @@ struct hdd_context {
 	qdf_time_t runtime_resume_start_time_stamp;
 	qdf_time_t runtime_suspend_done_time_stamp;
 #if defined(CLD_PM_QOS) && defined(CLD_DEV_PM_QOS)
-	struct dev_pm_qos_request pm_qos_req[NR_CPUS];
+	struct dev_pm_qos_request pm_qos_req[QDF_MAX_AVAILABLE_CPU];
 	struct cpumask qos_cpu_mask;
 #elif defined(CLD_PM_QOS)
 	struct pm_qos_request pm_qos_req;
