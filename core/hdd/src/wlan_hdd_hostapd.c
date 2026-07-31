@@ -8902,6 +8902,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	}
 
 	config->ch_params.ch_width = config->ch_width_orig;
+
 	if (sap_phymode_is_eht(config->SapHw_mode) ||
 	    sap_phymode_is_uhr(config->SapHw_mode))
 		wlan_reg_set_create_punc_bitmap(&config->ch_params, true);
@@ -10072,9 +10073,11 @@ wlan_hdd_go_5ghz_mcc_160_bw_override(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct ch_params ch_params = {0};
+	struct ch_params probe_params = {0};
 	uint32_t freq;
 	enum nl80211_channel_type channel_type;
 	struct ieee80211_channel *ieee_chan;
+	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	if (!hdd_ctx || !chandef || !new_chandef || !chandef->chan) {
 		hdd_err("hdd context or chandef is NULL");
@@ -10086,7 +10089,6 @@ wlan_hdd_go_5ghz_mcc_160_bw_override(struct wlan_hdd_link_info *link_info,
 	 * No need to downgrade BW if:
 	 * - Its not 5 GHz freq
 	 * - BW is not 160 ie less than 160.
-	 * - center freq itself is DFS.
 	 * - Go force scc is enabled.
 	 * - MCC interface not present.
 	 */
@@ -10095,14 +10097,42 @@ wlan_hdd_go_5ghz_mcc_160_bw_override(struct wlan_hdd_link_info *link_info,
 	     chandef->width != NL80211_CHAN_WIDTH_160))
 		return false;
 
-	if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq))
-		return false;
+	policy_mgr_get_cfg_sta_dfs_ch_peer_scc(hdd_ctx->psoc,
+					       &cfg_sta_dfs_ch_peer_scc);
 
-	if (policy_mgr_go_scc_enforced(hdd_ctx->psoc))
-		return false;
+	/*
+	 * If cfg_sta_dfs_ch_peer_scc is enabled, downgrade a standalone DFS
+	 * GO to 80 MHz. Use the bonded-channel check for 160 MHz since the
+	 * scalar wlan_reg_is_dfs_for_freq() only checks the primary
+	 * frequency and misses composite-BW DFS overlap (e.g.
+	 * ch36/5180MHz + BW160 -> seg1=5250).
+	 */
+	if (cfg_sta_dfs_ch_peer_scc) {
+		bool is_ch_dfs = false;
 
-	if (!policy_mgr_will_freq_lead_to_mcc(hdd_ctx->psoc, freq))
-		return false;
+		if (chandef->width == NL80211_CHAN_WIDTH_160) {
+			probe_params.ch_width = CH_WIDTH_160MHZ;
+			wlan_reg_set_create_punc_bitmap(&probe_params, true);
+			if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+				    hdd_ctx->pdev, freq, &probe_params,
+				    REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS)
+				is_ch_dfs = true;
+		} else if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq)) {
+			is_ch_dfs = true;
+		}
+
+		if (!is_ch_dfs)
+			return false;
+	} else {
+		if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq))
+			return false;
+
+		if (policy_mgr_go_scc_enforced(hdd_ctx->psoc))
+			return false;
+
+		if (!policy_mgr_will_freq_lead_to_mcc(hdd_ctx->psoc, freq))
+			return false;
+	}
 
 	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy, freq);
 	if (!ieee_chan) {
