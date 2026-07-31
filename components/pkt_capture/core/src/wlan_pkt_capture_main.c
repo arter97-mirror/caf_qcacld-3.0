@@ -1122,8 +1122,15 @@ pkt_capture_vdev_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) ||
 	    (!pkt_capture_get_mode(wlan_vdev_get_psoc(vdev)) &&
-	     !pkt_capture_get_full_rx_mgmt_frames(wlan_vdev_get_psoc(vdev))) ||
-	     vdev->vdev_objmgr.vdev_id != 0)
+	     !pkt_capture_get_full_rx_mgmt_frames(wlan_vdev_get_psoc(vdev))))
+		return QDF_STATUS_SUCCESS;
+	/*
+	 * For MLO, both link vdevs are created with QDF_STA_MODE.
+	 * But pkt_capture is designed to track a single vdev via
+	 * gp_pkt_capture_vdev,so only attach priv to the first
+	 * STA link vdevcreated. Subsequent STA link vdevs are skipped.
+	 */
+	if (gp_pkt_capture_vdev)
 		return QDF_STATUS_SUCCESS;
 
 	vdev_priv = qdf_mem_malloc(sizeof(*vdev_priv));
@@ -1199,8 +1206,15 @@ pkt_capture_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) ||
 	    (!pkt_capture_get_mode(wlan_vdev_get_psoc(vdev)) &&
-	     !pkt_capture_get_full_rx_mgmt_frames(wlan_vdev_get_psoc(vdev))) ||
-	     vdev->vdev_objmgr.vdev_id != 0)
+	     !pkt_capture_get_full_rx_mgmt_frames(wlan_vdev_get_psoc(vdev))))
+		return QDF_STATUS_SUCCESS;
+
+	/*
+	 * For MLO, priv is attached only to the first STA link vdev
+	 * (see pkt_capture_vdev_create_notification). So skip any other
+	 * STA vdev
+	 */
+	if (vdev != gp_pkt_capture_vdev)
 		return QDF_STATUS_SUCCESS;
 
 	vdev_priv = pkt_capture_vdev_get_priv(vdev);
