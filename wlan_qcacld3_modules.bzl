@@ -42,10 +42,6 @@ _target_chipset_map = {
         "wcn7760",
         "fig",
     ],
-    "volcano": [
-        "qca6750",
-        "peach-v2",
-    ],
     "x1e80100": [
         "kiwi-v2",
     ],
