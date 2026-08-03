@@ -2403,7 +2403,8 @@ wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 	    event->status != HOST_TWT_DEL_STATUS_ROAMING &&
 	    event->status != HOST_TWT_DEL_STATUS_PEER_INIT_TEARDOWN &&
 	    event->status != HOST_TWT_DEL_STATUS_CONCURRENCY &&
-	    event->status != HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE) {
+	    event->status != HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE &&
+	    event->status != HOST_DEL_TWT_STATUS_SCAN_STARTED) {
 		twt_err("Drop TWT Del dialog event for dialog_id:%d status:%d active_cmd:%d",
 			event->dialog_id, event->status, active_cmd);
 
