@@ -186,6 +186,9 @@ static void hdd_enable_gtk_offload(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
 
+	if (wlan_vdev_is_open_mode(vdev))
+		return;
+
 	status = ucfg_pmo_enable_gtk_offload_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to enable gtk offload");
@@ -313,6 +316,9 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
 {
 	struct pmo_gtk_rsp_req gtk_rsp_request;
 	QDF_STATUS status;
+
+	if (wlan_vdev_is_open_mode(vdev))
+		return;
 
 	/* ensure to get gtk rsp first before disable it*/
 	gtk_rsp_request.callback = wlan_hdd_cfg80211_update_replay_counter_cb;
@@ -541,6 +547,13 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 		goto free_req;
 	}
 
+	ucfg_pmo_set_ns_offload_enable_dynamic(vdev, trigger, true);
+
+	if (!ucfg_pmo_get_ns_offload_enable_dynamic(vdev)) {
+		hdd_debug("NS offload is dynamically disabled");
+		goto free_req;
+	}
+
 	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
 		hdd_debug("Dynamic arp ns offload disabled");
 		ucfg_pmo_flush_ns_offload_req(vdev);
@@ -612,6 +625,12 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 		goto out;
 	}
 
+	if (!ucfg_pmo_get_ns_offload_enable_dynamic(vdev)) {
+		hdd_debug("NS offload is already dynamically disabled");
+		goto out;
+	}
+
+	ucfg_pmo_set_ns_offload_enable_dynamic(vdev, trigger, false);
 	status = ucfg_pmo_disable_ns_offload_in_fwr(vdev, trigger);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Failed to disable NS Offload");
@@ -3127,10 +3146,18 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  int radio_idx,
+				  enum nl80211_tx_power_setting type,
+				  int mbm)
+#else
 int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  enum nl80211_tx_power_setting type,
 				  int mbm)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -3386,7 +3413,13 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	return wlan_hdd_get_tx_power(adapter, dbm);
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  int radio_idx,
+				  unsigned int link_id,
+				  int *dbm)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  unsigned int link_id,

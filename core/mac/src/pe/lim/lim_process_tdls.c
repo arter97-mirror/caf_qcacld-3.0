@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4219,6 +4219,8 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 	uint8_t session_id;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	tSirMacAddr peer;
+	struct tdls_peer *curr_peer;
+	struct tdls_vdev_priv_obj *vdev_obj;
 
 	pe_debug("TDLS Delete STA Request Received");
 	pe_session =
@@ -4230,6 +4232,12 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 		lim_send_sme_tdls_del_sta_rsp(mac, del_sta_req->session_id,
 					      del_sta_req->peermac, NULL,
 					      QDF_STATUS_E_FAILURE);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_obj = wlan_vdev_get_tdls_vdev_obj(pe_session->vdev);
+	if (!vdev_obj) {
+		pe_err("vdev_obj: %pK is null", vdev_obj);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -4261,9 +4269,20 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 		goto lim_tdls_del_sta_error;
 	}
 
-	qdf_mem_copy(peer, del_sta_req->peermac.bytes, sizeof(tSirMacAddr));
-	lim_send_deauth_mgmt_frame(mac, REASON_DEAUTH_NETWORK_LEAVING,
-				   peer, pe_session, false);
+	curr_peer = wlan_tdls_find_peer(vdev_obj, del_sta_req->peermac.bytes);
+	if (!curr_peer) {
+		pe_err("tdls peer is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (curr_peer->link_status ==  TDLS_LINK_CONNECTED &&
+	    curr_peer->valid_entry) {
+		qdf_mem_copy(peer, del_sta_req->peermac.bytes,
+			     sizeof(tSirMacAddr));
+		lim_send_deauth_mgmt_frame(mac, REASON_DEAUTH_NETWORK_LEAVING,
+					   peer, pe_session, false);
+	}
+
 	status = lim_tdls_del_sta(mac, del_sta_req->peermac,
 				  pe_session, true);
 	if (status == QDF_STATUS_SUCCESS)

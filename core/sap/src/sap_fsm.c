@@ -2481,6 +2481,9 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 					 csr_roaminfo->owe_pending_assoc_ind,
 					 csr_roaminfo->fReassocReq)) {
 				sap_err("Failed to fill OWE IE");
+				if (csr_roaminfo->owe_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(
+						csr_roaminfo->owe_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(csr_roaminfo->
 					     owe_pending_assoc_ind);
 				csr_roaminfo->owe_pending_assoc_ind = NULL;
@@ -2490,6 +2493,9 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 			if (!sap_save_owe_pending_assoc_ind(sap_ctx,
 					 csr_roaminfo->owe_pending_assoc_ind)) {
 				sap_err("Failed to save assoc ind");
+				if (csr_roaminfo->owe_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(
+						csr_roaminfo->owe_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(csr_roaminfo->
 					     owe_pending_assoc_ind);
 				csr_roaminfo->owe_pending_assoc_ind = NULL;
@@ -2503,6 +2509,9 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 			if (!sap_save_ft_pending_assoc_ind(sap_ctx,
 			    csr_roaminfo->ft_pending_assoc_ind)) {
 				sap_err("Failed to save ft assoc ind");
+				if (csr_roaminfo->ft_pending_assoc_ind->assocReqPtr)
+					qdf_mem_free(
+						csr_roaminfo->ft_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(csr_roaminfo->ft_pending_assoc_ind);
 				csr_roaminfo->ft_pending_assoc_ind = NULL;
 				qdf_mem_free(sap_ap_event);

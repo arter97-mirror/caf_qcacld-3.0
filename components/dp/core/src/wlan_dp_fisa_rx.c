@@ -1023,6 +1023,35 @@ dp_fisa_rx_is_fst_work_queued(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx)
 	return false;
 }
 
+/* time in ns */
+#define FST_UPDATE_MON_TIME 1000000000
+#define MAX_ALLOWED_FST_UPDATE_PER_SEC 64
+#define MAX_ALLOWED_FST_UPDATE_PENDING 64
+
+static inline bool
+dp_fisa_rx_skip_fst_update(struct dp_rx_fst *fisa_hdl)
+{
+	uint64_t curr_time_ns = qdf_sched_clock();
+
+	if ((curr_time_ns - fisa_hdl->last_update_time_ns) >
+	    FST_UPDATE_MON_TIME) {
+		fisa_hdl->last_update_time_ns = curr_time_ns;
+		fisa_hdl->update_count = 0;
+	}
+
+	if (fisa_hdl->update_count >= MAX_ALLOWED_FST_UPDATE_PER_SEC ||
+	    (qdf_list_size(&fisa_hdl->fst_update_list) >=
+	     MAX_ALLOWED_FST_UPDATE_PENDING)) {
+		dp_debug_rl("Skip fst update update_cnt:%d list_size:%d",
+			    fisa_hdl->update_count,
+			    qdf_list_size(&fisa_hdl->fst_update_list));
+		return true;
+	}
+
+	fisa_hdl->update_count++;
+	return false;
+}
+
 /**
  * dp_fisa_rx_queue_fst_update_work() - Queue FST update work
  * @fisa_hdl: Handle to FISA context
@@ -1059,6 +1088,11 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	hal_rx_msdu_get_reo_destination_indication(hal_soc_hdl, rx_tlv_hdr,
 						   &reo_dest_indication);
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+	if (dp_fisa_rx_skip_fst_update(fisa_hdl)) {
+		qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+		return NULL;
+	}
+
 	found = dp_fisa_rx_is_fst_work_queued(fisa_hdl, flow_idx);
 	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
 	if (found)

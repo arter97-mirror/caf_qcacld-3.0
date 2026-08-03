@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -315,6 +315,9 @@ static QDF_STATUS dp_rx_fst_cmem_init(struct dp_rx_fst *fst)
 		dp_err("failed to allocate fst update wq");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	fst->last_update_time_ns = 0;
+	fst->update_count = 0;
 
 	qdf_create_work(0, &fst->fst_update_work,
 			dp_fisa_rx_fst_update_work, fst);

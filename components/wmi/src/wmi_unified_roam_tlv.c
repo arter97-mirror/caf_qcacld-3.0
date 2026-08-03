@@ -3661,6 +3661,12 @@ extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (num_entries > MAX_VENDOR_CONTROL_PARAMS) {
+		wmi_err("Too many vendor control params: %u (max allowed: %u)",
+			num_entries, MAX_VENDOR_CONTROL_PARAMS);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	dst_list = qdf_mem_malloc(sizeof(struct roam_vendor_handoff_params));
 	if (!dst_list)
 		return QDF_STATUS_E_FAILURE;
@@ -4157,6 +4163,7 @@ free_entries:
 	qdf_mem_zero(*entries,
 		     WLAN_MAX_ML_BSS_LINKS * sizeof(**entries));
 	qdf_mem_free(*entries);
+	*entries = NULL;
 
 free_keys:
 	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
