@@ -1339,6 +1339,18 @@ hdd_sysfs_destroy_monitor_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_txrx_stats_destroy(adapter);
 }
 
+static void
+hdd_sysfs_create_passthru_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_txrx_stats_create(adapter);
+}
+
+static void
+hdd_sysfs_destroy_passthru_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_txrx_stats_destroy(adapter);
+}
+
 void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 {
 	struct kobject *kobj = NULL;
@@ -1488,6 +1500,9 @@ void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 	case QDF_NDI_MODE:
 		hdd_sysfs_create_ndi_adapter_root_obj(adapter);
 		break;
+	case QDF_PASSTHRU_MODE:
+		hdd_sysfs_create_passthru_adapter_root_obj(adapter);
+		break;
 	default:
 		break;
 	}
@@ -1525,6 +1540,9 @@ void hdd_destroy_adapter_sysfs_files(struct hdd_adapter *adapter)
 		break;
 	case QDF_NDI_MODE:
 		hdd_sysfs_destroy_ndi_adapter_root_obj(adapter);
+		break;
+	case QDF_PASSTHRU_MODE:
+		hdd_sysfs_destroy_passthru_adapter_root_obj(adapter);
 		break;
 	default:
 		break;
