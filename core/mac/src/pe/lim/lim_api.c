@@ -5757,6 +5757,19 @@ lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
 		lim_passthru_apply_vht_mcs_cap(mac, sta, pe_session,
 					       &vht_caps, msg);
 	} else if (msg->create_only && IS_DOT11_MODE_VHT(msg->dot11mode)) {
+		if (!pe_session->cap_tx_nss || !pe_session->cap_rx_nss) {
+			/* try refill again because hw mode may refreshed */
+			lim_fill_session_nss_params_on_create(mac, pe_session);
+			if (!pe_session->cap_tx_nss ||
+			    !pe_session->cap_rx_nss) {
+				pe_debug("vdev:%d zero nss:%dX%d, fallback to 1x1",
+					 pe_session->vdev_id,
+					 pe_session->cap_tx_nss,
+					 pe_session->cap_rx_nss);
+				pe_session->cap_tx_nss = NSS_1x1_MODE;
+				pe_session->cap_rx_nss = NSS_1x1_MODE;
+			}
+		}
 		/* NEW: self session caps, ch_width from tx_rate_cfg */
 		pe_debug("vdev:%d Populate VHT caps from session",
 			 pe_session->vdev_id);
