@@ -2704,8 +2704,8 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 			return FISA_AGGR_NOT_ELIGIBLE;
 		}
 
-		dp_err("REO id mismatch flow: %pK napi_id: %u nbuf: %pK reo_id: %u",
-		       fisa_flow, fisa_flow->napi_id, nbuf, napi_id);
+		dp_err_rl("REO id mismatch flow:%pK napi:%u nbuf:%pK reo:%u",
+			  fisa_flow, fisa_flow->napi_id, nbuf, napi_id);
 		DP_STATS_INC(fisa_hdl, reo_mismatch.allow_non_aggr, 1);
 		QDF_BUG(0);
 		return FISA_AGGR_NOT_ELIGIBLE;
@@ -2795,7 +2795,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 	 * FISA_FLOW_MAX_AGGR_COUNT - 1.
 	 */
 	if (fisa_flow->cur_aggr > (FISA_FLOW_MAX_AGGR_COUNT - 1))
-		dp_err("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
+		dp_err_rl("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
 
 	dp_fisa_debug("hal cum_len 0x%x - napI_cumu_len 0x%x = flow_cum_len 0x%x cur_aggr %d",
 		      hal_cumulative_ip_len,
@@ -2805,12 +2805,12 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 
 	if (fisa_flow->adjusted_cumulative_ip_length >
 	    FISA_FLOW_MAX_CUMULATIVE_IP_LEN) {
-		dp_err("fisa_flow %pK nbuf %pK", fisa_flow, nbuf);
-		dp_err("fisa_flow->adjusted_cumulative_ip_length %d",
-		       fisa_flow->adjusted_cumulative_ip_length);
-		dp_err("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
-		dp_err("napi_flush_cumulative_ip_length %d",
-		       fisa_flow->napi_flush_cumulative_ip_length);
+		dp_err_rl("fisa_flow %pK nbuf %pK", fisa_flow, nbuf);
+		dp_err_rl("fisa_flow->adjusted_cumulative_ip_length %d",
+			  fisa_flow->adjusted_cumulative_ip_length);
+		dp_err_rl("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
+		dp_err_rl("napi_flush_cumulative_ip_length %d",
+			  fisa_flow->napi_flush_cumulative_ip_length);
 		qdf_assert(0);
 	}
 
