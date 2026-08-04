@@ -2453,7 +2453,7 @@ struct hdd_tx_powerboost {
  * @tas_send_to_fw: Indicate if TAS has sent to FW
  * @passthru_cap_bitmap: passthru capability bitmap
  * @dar_data: DAR(Dynamic Analytics Report) data
- * @nan_caps: Cached NAN PHY capabilities (HT/VHT) for advertising
+ * @nan_caps: Cached NAN PHY capabilities (HT/VHT/HE) for advertising
  *            to kernel/userspace
  */
 struct hdd_context {
@@ -2777,12 +2777,15 @@ struct hdd_context {
 #endif
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 	/*
-	 * nan_caps: Cached NAN PHY capabilities (HT/VHT) for advertising
+	 * nan_caps: Cached NAN PHY capabilities (HT/VHT/HE) for advertising
 	 * to kernel/userspace.
 	 */
 	struct {
 		struct ieee80211_sta_ht_cap ht;
 		struct ieee80211_sta_vht_cap vht;
+#ifdef WLAN_FEATURE_11AX
+		struct ieee80211_sta_he_cap he;
+#endif
 	} nan_caps;
 #endif
 };

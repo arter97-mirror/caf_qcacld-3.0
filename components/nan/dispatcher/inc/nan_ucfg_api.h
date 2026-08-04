@@ -886,7 +886,7 @@ struct wma_tgt_cfg;
 bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_nan_set_phy_target_cfg() - ucfg API to compute and cache NAN HT/VHT
+ * ucfg_nan_set_phy_target_cfg() - ucfg API to compute and cache NAN HT/VHT/HE
  * PHY capability intersection
  * @psoc: pointer to PSOC object
  * @cfg: effective target config (FW intersected with host)
@@ -903,7 +903,7 @@ void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
 				 bool enable_5g, bool enable_6g);
 
 /**
- * ucfg_nan_get_phy_caps() - ucfg API to retrieve cached NAN HT/VHT PHY
+ * ucfg_nan_get_phy_caps() - ucfg API to retrieve cached NAN HT/VHT/HE PHY
  * capability intersection result
  * @psoc: pointer to PSOC object
  * @caps: output NAN PHY capability struct

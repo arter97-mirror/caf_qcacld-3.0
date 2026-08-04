@@ -35,6 +35,10 @@
 #include "cfg_ucfg_api.h"
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 #include "wma_tgt_cfg.h"
+#ifdef WLAN_FEATURE_11AX
+#include "dot11f.h"
+#include "cds_api.h"
+#endif
 #endif
 
 static QDF_STATUS nan_psoc_obj_created_notification(
@@ -743,6 +747,264 @@ static uint16_t nan_intersect_vht_mcs_map(uint16_t fw_map, uint16_t drv_map)
 	return out;
 }
 
+#ifdef WLAN_FEATURE_11AX
+/**
+ * nan_pack_he_cap_ie() - Pack a dot11f HE capability into its on-wire IE
+ * bytes and extract the MAC/PHY capability fields
+ * @he_cap_cfg: dot11f HE capability
+ * @mac_cap_info: output 6-byte MAC capability info
+ * @phy_cap_info: output 11-byte PHY capability info
+ *
+ * Return: None
+ */
+static void nan_pack_he_cap_ie(const tDot11fIEhe_cap *he_cap_cfg,
+			       uint8_t mac_cap_info[6],
+			       uint8_t phy_cap_info[11])
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	uint8_t buf[128];
+	uint32_t consumed = 0;
+	uint32_t status;
+	const uint8_t *payload;
+	/*
+	 * dot11f_pack_ie_he_cap() does not modify its input in practice, but
+	 * its generated signature does not take a const pointer. Make a local
+	 * copy to avoid casting away const from the caller's data.
+	 */
+	tDot11fIEhe_cap he_cap_local;
+
+	qdf_mem_zero(mac_cap_info, 6);
+	qdf_mem_zero(phy_cap_info, 11);
+	if (!mac_ctx || !he_cap_cfg || !he_cap_cfg->present)
+		return;
+
+	he_cap_local = *he_cap_cfg;
+	status = dot11f_pack_ie_he_cap(mac_ctx, &he_cap_local,
+				       buf, sizeof(buf), &consumed);
+	if (!DOT11F_SUCCEEDED(status) || consumed < 3 + 6 + 11)
+		return;
+
+	/*
+	 * Packed layout: Element ID (255, Extension Element),
+	 * Length, Extension ID (35, HE Capabilities), then
+	 * 6 bytes MAC cap info + 11 bytes PHY cap info.
+	 */
+	if (buf[0] != DOT11F_EID_HE_CAP || buf[2] != 35)
+		return;
+
+	payload = &buf[3];
+	qdf_mem_copy(mac_cap_info, payload, 6);
+	qdf_mem_copy(phy_cap_info, payload + 6, 11);
+}
+
+static uint16_t nan_u16_from_u8_pair(const uint8_t *u8_pair)
+{
+	uint16_t v;
+
+	qdf_mem_copy(&v, u8_pair, sizeof(v));
+	return v;
+}
+
+/**
+ * nan_intersect_he_mcs_map() - Merge HE MCS maps (strict intersection)
+ * @a: per-band MCS map for 2.4 GHz
+ * @a_valid: whether 2.4 GHz band is enabled
+ * @b: per-band MCS map for 5 GHz
+ * @b_valid: whether 5 GHz band is enabled
+ * @c: per-band MCS map for 6 GHz
+ * @c_valid: whether 6 GHz band is enabled
+ *
+ * HE MCS map encoding: 2 bits per NSS (0=0-7, 1=0-9, 2=0-11, 3=not
+ * supported). Disabled bands contribute the neutral element (0x2, the
+ * maximum) so they don't restrict the intersection.
+ *
+ * Return: merged MCS map
+ */
+static uint16_t nan_intersect_he_mcs_map(uint16_t a, bool a_valid,
+					 uint16_t b, bool b_valid,
+					 uint16_t c, bool c_valid)
+{
+	uint16_t out = 0;
+	int s;
+
+	for (s = 0; s < 8; s++) {
+		uint8_t ca = a_valid ? ((a >> (2 * s)) & 0x3) : 0x2;
+		uint8_t cb = b_valid ? ((b >> (2 * s)) & 0x3) : 0x2;
+		uint8_t cc = c_valid ? ((c >> (2 * s)) & 0x3) : 0x2;
+		uint8_t merged;
+
+		if (ca == 0x3 || cb == 0x3 || cc == 0x3)
+			merged = 0x3;
+		else
+			merged = QDF_MIN(ca, QDF_MIN(cb, cc));
+
+		out |= ((uint16_t)merged) << (2 * s);
+	}
+
+	return out;
+}
+
+/**
+ * struct nan_he_band_caps - per-band OS-agnostic HE capability
+ * @present: whether HE is present for this band
+ * @mac_cap_info: packed MAC capability info bytes
+ * @phy_cap_info: packed PHY capability info bytes
+ * @rx_mcs_map_lt_80: RX MCS map for <80 MHz
+ * @tx_mcs_map_lt_80: TX MCS map for <80 MHz
+ * @rx_mcs_map_160: RX MCS map for 160 MHz
+ * @tx_mcs_map_160: TX MCS map for 160 MHz
+ * @rx_mcs_map_80p80: RX MCS map for 80+80 MHz
+ * @tx_mcs_map_80p80: TX MCS map for 80+80 MHz
+ */
+struct nan_he_band_caps {
+	bool present;
+	uint8_t mac_cap_info[6];
+	uint8_t phy_cap_info[11];
+	uint16_t rx_mcs_map_lt_80;
+	uint16_t tx_mcs_map_lt_80;
+	uint16_t rx_mcs_map_160;
+	uint16_t tx_mcs_map_160;
+	uint16_t rx_mcs_map_80p80;
+	uint16_t tx_mcs_map_80p80;
+};
+
+/**
+ * nan_build_he_cap_per_band() - Build per-band OS-agnostic HE cap
+ * @he_cap_cfg: effective (FW ∩ host) HE cap for this band
+ * @out: output per-band HE cap
+ *
+ * Return: None
+ */
+static void nan_build_he_cap_per_band(const tDot11fIEhe_cap *he_cap_cfg,
+				      struct nan_he_band_caps *out)
+{
+	qdf_mem_zero(out, sizeof(*out));
+	if (!he_cap_cfg || !he_cap_cfg->present)
+		return;
+
+	out->present = true;
+	nan_pack_he_cap_ie(he_cap_cfg, out->mac_cap_info, out->phy_cap_info);
+
+	out->rx_mcs_map_lt_80 = he_cap_cfg->rx_he_mcs_map_lt_80;
+	out->tx_mcs_map_lt_80 = he_cap_cfg->tx_he_mcs_map_lt_80;
+	out->rx_mcs_map_160 =
+		nan_u16_from_u8_pair(he_cap_cfg->rx_he_mcs_map_160[0]);
+	out->tx_mcs_map_160 =
+		nan_u16_from_u8_pair(he_cap_cfg->tx_he_mcs_map_160[0]);
+	out->rx_mcs_map_80p80 =
+		nan_u16_from_u8_pair(he_cap_cfg->rx_he_mcs_map_80_80[0]);
+	out->tx_mcs_map_80p80 =
+		nan_u16_from_u8_pair(he_cap_cfg->tx_he_mcs_map_80_80[0]);
+}
+
+/**
+ * nan_populate_he_phy_caps() - Compute the NAN HE PHY capability
+ * intersection and store it into @caps
+ * @cfg: effective target config (FW intersected with host)
+ * @enable_2g: whether NAN is enabled on 2.4 GHz band
+ * @enable_5g: whether NAN is enabled on 5 GHz band
+ * @enable_6g: whether NAN is enabled on 6 GHz band
+ * @caps: output NAN PHY capability struct
+ *
+ * Strict intersection: a capability is advertised only if supported on all
+ * bands on which NAN is enabled. There is no dedicated 6 GHz HE cap field
+ * in struct wma_tgt_cfg today, so the 5 GHz HE cap is used as a
+ * conservative fallback for 6 GHz.
+ *
+ * Return: None
+ */
+static void nan_populate_he_phy_caps(struct wma_tgt_cfg *cfg, bool enable_2g,
+				     bool enable_5g, bool enable_6g,
+				     struct nan_phy_caps *caps)
+{
+	struct nan_he_band_caps he2 = {0}, he5 = {0}, he6 = {0};
+	bool v2, v5, v6;
+	bool base_is_2g = false, base_is_5g = false, base_is_6g = false;
+	int i;
+
+	if (enable_2g && cfg->he_cap_2g.present)
+		nan_build_he_cap_per_band(&cfg->he_cap_2g, &he2);
+	if (enable_5g && cfg->he_cap_5g.present)
+		nan_build_he_cap_per_band(&cfg->he_cap_5g, &he5);
+	if (enable_6g && cfg->he_cap_5g.present)
+		nan_build_he_cap_per_band(&cfg->he_cap_5g, &he6);
+
+	v2 = enable_2g && he2.present;
+	v5 = enable_5g && he5.present;
+	v6 = enable_6g && he6.present;
+
+	caps->he_supported = (v2 || !enable_2g) && (v5 || !enable_5g) &&
+			      (v6 || !enable_6g) && (v2 || v5 || v6);
+	if (!caps->he_supported)
+		return;
+
+	if (v2) {
+		qdf_mem_copy(caps->he_mac_cap_info, he2.mac_cap_info, 6);
+		qdf_mem_copy(caps->he_phy_cap_info, he2.phy_cap_info, 11);
+		base_is_2g = true;
+	} else if (v5) {
+		qdf_mem_copy(caps->he_mac_cap_info, he5.mac_cap_info, 6);
+		qdf_mem_copy(caps->he_phy_cap_info, he5.phy_cap_info, 11);
+		base_is_5g = true;
+	} else if (v6) {
+		qdf_mem_copy(caps->he_mac_cap_info, he6.mac_cap_info, 6);
+		qdf_mem_copy(caps->he_phy_cap_info, he6.phy_cap_info, 11);
+		base_is_6g = true;
+	}
+
+	if (!base_is_2g && v2) {
+		for (i = 0; i < 6; i++)
+			caps->he_mac_cap_info[i] &= he2.mac_cap_info[i];
+		for (i = 0; i < 11; i++)
+			caps->he_phy_cap_info[i] &= he2.phy_cap_info[i];
+	}
+	if (!base_is_5g && v5) {
+		for (i = 0; i < 6; i++)
+			caps->he_mac_cap_info[i] &= he5.mac_cap_info[i];
+		for (i = 0; i < 11; i++)
+			caps->he_phy_cap_info[i] &= he5.phy_cap_info[i];
+	}
+	if (!base_is_6g && v6) {
+		for (i = 0; i < 6; i++)
+			caps->he_mac_cap_info[i] &= he6.mac_cap_info[i];
+		for (i = 0; i < 11; i++)
+			caps->he_phy_cap_info[i] &= he6.phy_cap_info[i];
+	}
+
+	caps->he_rx_mcs_map_lt_80 = nan_intersect_he_mcs_map(
+		v2 ? he2.rx_mcs_map_lt_80 : 0, v2,
+		v5 ? he5.rx_mcs_map_lt_80 : 0, v5,
+		v6 ? he6.rx_mcs_map_lt_80 : 0, v6);
+	caps->he_tx_mcs_map_lt_80 = nan_intersect_he_mcs_map(
+		v2 ? he2.tx_mcs_map_lt_80 : 0, v2,
+		v5 ? he5.tx_mcs_map_lt_80 : 0, v5,
+		v6 ? he6.tx_mcs_map_lt_80 : 0, v6);
+	caps->he_rx_mcs_map_160 = nan_intersect_he_mcs_map(
+		v2 ? he2.rx_mcs_map_160 : 0, v2,
+		v5 ? he5.rx_mcs_map_160 : 0, v5,
+		v6 ? he6.rx_mcs_map_160 : 0, v6);
+	caps->he_tx_mcs_map_160 = nan_intersect_he_mcs_map(
+		v2 ? he2.tx_mcs_map_160 : 0, v2,
+		v5 ? he5.tx_mcs_map_160 : 0, v5,
+		v6 ? he6.tx_mcs_map_160 : 0, v6);
+	caps->he_rx_mcs_map_80p80 = nan_intersect_he_mcs_map(
+		v2 ? he2.rx_mcs_map_80p80 : 0, v2,
+		v5 ? he5.rx_mcs_map_80p80 : 0, v5,
+		v6 ? he6.rx_mcs_map_80p80 : 0, v6);
+	caps->he_tx_mcs_map_80p80 = nan_intersect_he_mcs_map(
+		v2 ? he2.tx_mcs_map_80p80 : 0, v2,
+		v5 ? he5.tx_mcs_map_80p80 : 0, v5,
+		v6 ? he6.tx_mcs_map_80p80 : 0, v6);
+}
+#else
+static inline void nan_populate_he_phy_caps(struct wma_tgt_cfg *cfg,
+					    bool enable_2g, bool enable_5g,
+					    bool enable_6g,
+					    struct nan_phy_caps *caps)
+{
+}
+#endif /* WLAN_FEATURE_11AX */
+
 void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
 			   struct wma_tgt_cfg *cfg, uint8_t num_rf_chains,
 			   bool enable_2g, bool enable_5g, bool enable_6g)
@@ -815,6 +1077,8 @@ void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
 			       caps->vht_rx_stbc || caps->vht_su_bformer ||
 			       caps->vht_su_bformee ||
 			       caps->vht_rx_mcs_map != 0xFFFF;
+
+	nan_populate_he_phy_caps(cfg, enable_2g, enable_5g, enable_6g, caps);
 }
 
 void nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,

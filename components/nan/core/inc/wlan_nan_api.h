@@ -513,7 +513,7 @@ QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
 			       struct nan_capabilities *caps);
 
 /**
- * nan_populate_phy_caps() - Compute and cache NAN HT/VHT PHY capability
+ * nan_populate_phy_caps() - Compute and cache NAN HT/VHT/HE PHY capability
  * intersection
  * @psoc: pointer to PSOC object
  * @cfg: effective target config (FW intersected with host)
@@ -532,7 +532,7 @@ void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
 			   bool enable_2g, bool enable_5g, bool enable_6g);
 
 /**
- * nan_get_phy_caps() - Retrieve cached NAN HT/VHT PHY capability
+ * nan_get_phy_caps() - Retrieve cached NAN HT/VHT/HE PHY capability
  * intersection result
  * @psoc: pointer to PSOC object
  * @caps: output NAN PHY capability struct

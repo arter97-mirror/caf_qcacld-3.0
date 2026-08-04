@@ -1215,7 +1215,7 @@ struct nan_capabilities {
 } qdf_packed;
 
 /**
- * struct nan_phy_caps - NAN PHY capability intersection result (HT/VHT)
+ * struct nan_phy_caps - NAN PHY capability intersection result (HT/VHT/HE)
  * @ht_supported: whether HT is supported for NAN
  * @ht_ldpc: HT RX LDPC supported
  * @ht_sgi_20: HT short GI for 20 MHz supported
@@ -1233,11 +1233,22 @@ struct nan_capabilities {
  * @vht_su_bformee: VHT SU beamformee supported
  * @vht_rx_mcs_map: VHT RX MCS map, 2 bits per NSS as per VHT Capabilities IE
  * @vht_tx_mcs_map: VHT TX MCS map, 2 bits per NSS as per VHT Capabilities IE
+ * @he_supported: whether HE is supported for NAN
+ * @he_mac_cap_info: packed HE MAC capability bytes, as in the HE
+ *     Capabilities element (mirrors ieee80211_he_cap_elem.mac_cap_info)
+ * @he_phy_cap_info: packed HE PHY capability bytes, as in the HE
+ *     Capabilities element (mirrors ieee80211_he_cap_elem.phy_cap_info)
+ * @he_rx_mcs_map_lt_80: HE RX MCS map for <80 MHz, 2 bits per NSS
+ * @he_tx_mcs_map_lt_80: HE TX MCS map for <80 MHz, 2 bits per NSS
+ * @he_rx_mcs_map_160: HE RX MCS map for 160 MHz, 2 bits per NSS
+ * @he_tx_mcs_map_160: HE TX MCS map for 160 MHz, 2 bits per NSS
+ * @he_rx_mcs_map_80p80: HE RX MCS map for 80+80 MHz, 2 bits per NSS
+ * @he_tx_mcs_map_80p80: HE TX MCS map for 80+80 MHz, 2 bits per NSS
  *
- * OS-agnostic representation of the HT/VHT capability bits relevant to NAN,
- * after intersecting FW-effective target capability with NAN band
+ * OS-agnostic representation of the HT/VHT/HE capability bits relevant to
+ * NAN, after intersecting FW-effective target capability with NAN band
  * enablement. HDD renders this into kernel-facing
- * ieee80211_sta_ht_cap/vht_cap structures.
+ * ieee80211_sta_ht_cap/vht_cap/he_cap structures.
  */
 struct nan_phy_caps {
 	bool ht_supported;
@@ -1258,6 +1269,18 @@ struct nan_phy_caps {
 	bool vht_su_bformee;
 	uint16_t vht_rx_mcs_map;
 	uint16_t vht_tx_mcs_map;
+
+#ifdef WLAN_FEATURE_11AX
+	bool he_supported;
+	uint8_t he_mac_cap_info[6];
+	uint8_t he_phy_cap_info[11];
+	uint16_t he_rx_mcs_map_lt_80;
+	uint16_t he_tx_mcs_map_lt_80;
+	uint16_t he_rx_mcs_map_160;
+	uint16_t he_tx_mcs_map_160;
+	uint16_t he_rx_mcs_map_80p80;
+	uint16_t he_tx_mcs_map_80p80;
+#endif
 };
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _NAN_PUBLIC_STRUCTS_H_ */

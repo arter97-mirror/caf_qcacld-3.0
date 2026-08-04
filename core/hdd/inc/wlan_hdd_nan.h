@@ -51,7 +51,7 @@ void hdd_nan_fill_wiphy_caps(struct hdd_context *hdd_ctx,
 			     struct wiphy_nan_capa *nan_capa);
 
 /**
- * hdd_populate_nan_phy_caps() - Populate/calculate NAN PHY caps (HT/VHT)
+ * hdd_populate_nan_phy_caps() - Populate/calculate NAN PHY caps (HT/VHT/HE)
  * from effective target configuration (FW ∩ host) and cache them for use
  * when advertising via cfg80211/mac80211.
  * @hdd_ctx: HDD context
