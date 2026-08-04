@@ -1432,6 +1432,8 @@ struct hdd_pmsr_req {
  * @mc_addr_list: multicast address list
  * @mc_list_lock: spin lock for multicast list
  * @addr_filter_pattern:
+ * @mgmt_frame_mcast_stypes: bitmap of mgmt frame subtypes for which
+ *	multicast-addressed frames should be delivered on this interface
  * @scan_info:
  * @psb_changed: Flag to ensure PSB is configured through framework
  * @configured_psb: UAPSD psb value configured through framework
@@ -1625,6 +1627,7 @@ struct hdd_adapter {
 	struct hdd_multicast_addr_list mc_addr_list;
 	qdf_spinlock_t mc_list_lock;
 	uint8_t addr_filter_pattern;
+	uint32_t mgmt_frame_mcast_stypes;
 
 	struct hdd_scan_info scan_info;
 

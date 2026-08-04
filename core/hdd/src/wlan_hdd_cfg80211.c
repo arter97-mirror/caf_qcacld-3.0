@@ -30549,6 +30549,10 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_BEACON_RATE_HT);
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_BEACON_RATE_VHT);
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0))
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_MULTICAST_REGISTRATIONS);
+#endif
 	wlan_hdd_set_ap_pmksa_caching_feature_flag(wiphy);
 
 	hdd_add_channel_switch_support(&wiphy->flags);
@@ -42188,8 +42192,11 @@ static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 		return;
 	}
 
-	hdd_debug("Mode: %d, set mgmt regis update value 0x%x",
-		  adapter->device_mode, upd->interface_stypes);
+	adapter->mgmt_frame_mcast_stypes = upd->interface_mcast_stypes;
+
+	hdd_debug("Mode: %d, set mgmt regis update value 0x%x mcast_stypes 0x%x",
+		  adapter->device_mode, upd->interface_stypes,
+		  upd->interface_mcast_stypes);
 }
 
 /**
