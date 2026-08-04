@@ -3749,7 +3749,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 						mac_ctx,
 						session,
 						bss_desc->chan_freq,
-						&power_type_6g);
+						&power_type_6g,
+						true);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			if (req_fail_status_code)
 				*req_fail_status_code =

@@ -2458,6 +2458,7 @@ int pld_qmi_indication(struct device *dev, void *cb_ctx,
 	case PLD_BUS_TYPE_PCIE:
 		return pld_pcie_register_qmi_ind(dev, cb_ctx, cb);
 	case PLD_BUS_TYPE_SNOC:
+		return pld_snoc_register_qmi_ind(dev, cb_ctx, cb);
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
 		return -EINVAL;

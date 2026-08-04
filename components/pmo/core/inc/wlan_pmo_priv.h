@@ -34,6 +34,7 @@
 #include "wlan_pmo_gtk_public_struct.h"
 #include "wlan_pmo_wow_public_struct.h"
 #include "wlan_pmo_mc_addr_filtering_public_struct.h"
+#include "wlan_pmo_obj_mgmt_public_struct.h"
 
 #define PMO_PS_DATA_INACTIVITY_TIMEOUT (200)
 #define PMO_PS_DATA_OPM_LEVEL (1)
@@ -57,6 +58,7 @@
  * @get_dtim_period: register callback to get dtim period from mlme
  * @get_beacon_interval: register callback to get beacon interval from mlme
  * @lock: spin lock for pmo psoc
+ * @wow_deferred_wakeup_cb: callback to log deferred WOW wakeup reason
  */
 struct pmo_psoc_priv_obj {
 	struct pmo_psoc_cfg psoc_cfg;
@@ -73,6 +75,7 @@ struct pmo_psoc_priv_obj {
 	pmo_is_device_in_low_pwr_mode is_device_in_low_pwr_mode;
 	pmo_get_dtim_period get_dtim_period;
 	pmo_get_beacon_interval get_beacon_interval;
+	pmo_wow_deferred_wakeup_cb wow_deferred_wakeup_cb;
 	qdf_spinlock_t lock;
 };
 

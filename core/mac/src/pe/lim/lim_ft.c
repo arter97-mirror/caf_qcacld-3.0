@@ -559,7 +559,8 @@ static QDF_STATUS lim_fill_session_power_info(
 						mac,
 						ft_session,
 						pbssDescription->chan_freq,
-						&power_type_6g);
+						&power_type_6g,
+						false);
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
 

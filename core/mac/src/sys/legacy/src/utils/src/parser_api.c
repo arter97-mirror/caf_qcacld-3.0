@@ -816,9 +816,44 @@ populate_dot11f_avoid_channel_ie(struct mac_context *mac_ctx,
 }
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
+/**
+ * adjacent_same_band() - To check if band is same or not
+ * @prev: prev channel
+ * @cur: curr channel
+ * @chan_spacing_for_2ghz: 2 GHz chan spacing
+ * @chan_spacing_for_5ghz_6ghz: 5/6 GHz chan spacing
+ *
+ * Return: true/false
+ */
+static inline bool adjacent_same_band(const struct regulatory_channel *prev,
+				      const struct regulatory_channel *cur,
+				      uint16_t chan_spacing_for_2ghz,
+				      uint16_t chan_spacing_for_5ghz_6ghz)
+{
+	enum reg_wifi_band b_prev = wlan_reg_freq_to_band(prev->center_freq);
+	enum reg_wifi_band b_cur  = wlan_reg_freq_to_band(cur->center_freq);
+
+	if (b_prev == REG_BAND_UNKNOWN || b_cur == REG_BAND_UNKNOWN)
+		return false; /* Be conservative */
+
+	if (b_prev != b_cur)
+		return false; /* Different band*/
+
+	/*
+	 * Within the same band, apply proper spacing rule using
+	 * channel numbers.
+	 */
+	if (b_prev == REG_BAND_2G)
+		return (prev->chan_num + chan_spacing_for_2ghz) ==
+								cur->chan_num;
+
+	/* For 5/6 GHz, use the shared spacing constant. */
+	return (prev->chan_num + chan_spacing_for_5ghz_6ghz) == cur->chan_num;
+}
+
 QDF_STATUS
-populate_dot11f_country(struct mac_context *mac,
-			tDot11fIECountry *ctry_ie, struct pe_session *pe_session)
+populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
+			struct pe_session *pe_session)
 {
 	uint8_t code[REG_ALPHA2_LEN + 1];
 	uint8_t cur_triplet_num_chans = 0;
@@ -848,7 +883,6 @@ populate_dot11f_country(struct mac_context *mac,
 			goto out;
 		}
 	}
-
 	if (!pe_session ||
 	    (mlme_priv && mlme_priv->country_ie_for_all_band)) {
 		status = wlan_mlme_get_band_capability(mac->psoc,
@@ -883,6 +917,9 @@ populate_dot11f_country(struct mac_context *mac,
 	/* advertise global operating class */
 	ctry_ie->country[REG_ALPHA2_LEN] = 0x04;
 
+	/* Pass 1: 2.4/5 GHz subband triplets — grouped by adjacency and
+	 * tx_power
+	 */
 	start = NULL;
 	prev = NULL;
 	for (chan_enum = 0; chan_enum < chan_num; chan_enum++) {
@@ -891,27 +928,31 @@ populate_dot11f_country(struct mac_context *mac,
 		if (cur_chan->chan_flags & REGULATORY_CHAN_DISABLED)
 			continue;
 
-		if (wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq) &&
-		    !six_gig_started) {
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_131;
-			num_triplets++;
-			six_gig_started = true;
-		}
+		if (wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq))
+			continue;
 
-		if (start && prev &&
-		    ((prev->chan_num + chan_spacing_for_2ghz ==
-		      cur_chan->chan_num) ||
-		     (prev->chan_num + chan_spacing_for_5ghz_6ghz ==
-		      cur_chan->chan_num)) &&
-		    start->tx_power == cur_chan->tx_power) {
-			/* Can use same entry */
+		/* Continue if channels are adjacent, in the same
+		 * band, and have the same tx_power.
+		 */
+		if ((start && prev &&
+		     adjacent_same_band(prev, cur_chan, chan_spacing_for_2ghz,
+					chan_spacing_for_5ghz_6ghz)) &&
+		    (start->tx_power == cur_chan->tx_power)) {
+			/* Can use same entry within the same band */
 			prev = cur_chan;
 			cur_triplet_num_chans++;
 			continue;
+		} else {
+			/* Different band or not adjacent or tx power changed */
+			pe_debug("new triplet (band change or non-adjacent or tx power mismatch)");
 		}
 
 		if (start && prev) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
 			/* Save as entry */
 			buffer_triplets[num_triplets][0] = start->chan_num;
 			buffer_triplets[num_triplets][1] =
@@ -919,39 +960,133 @@ populate_dot11f_country(struct mac_context *mac,
 			buffer_triplets[num_triplets][2] = start->tx_power;
 			start = NULL;
 			cur_triplet_num_chans = 0;
-
-			num_triplets++;
-			if (num_triplets > 80) {
-				pe_err("Triplets number exceed max size");
-				status = QDF_STATUS_E_FAILURE;
-				goto out;
-			}
-		}
-
-		if ((chan_enum == NUM_CHANNELS - 1) && (six_gig_started)) {
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_132;
-			num_triplets++;
-
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_133;
-			num_triplets++;
-
-			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
-			buffer_triplets[num_triplets][1] = OP_CLASS_134;
 			num_triplets++;
 		}
 
-		/* Start new group */
 		start = cur_chan;
 		prev = cur_chan;
 	}
 
 	if (start) {
+		if (num_triplets > 80) {
+			pe_err("Triplets number exceed max size");
+			status = QDF_STATUS_E_FAILURE;
+			goto out;
+		}
 		buffer_triplets[num_triplets][0] = start->chan_num;
 		buffer_triplets[num_triplets][1] = cur_triplet_num_chans + 1;
 		buffer_triplets[num_triplets][2] = start->tx_power;
 		num_triplets++;
+	}
+
+	/*
+	 * Pass 2: 6 GHz Operating/Subband Sequences per IEEE 802.11ax 9.4.2.8.
+	 *
+	 * {201, 131, 0} is followed by subband triplets for 20 MHz channels
+	 * grouped by adjacency only. Power field is reserved (0) per spec
+	 * NOTE 4 — actual power is conveyed via the TPE IE. Operating
+	 * triplets for >=40 MHz classes have zero subband triplets following
+	 * them.
+	 */
+	start = NULL;
+	prev = NULL;
+	cur_triplet_num_chans = 0;
+	six_gig_started = false;
+
+	for (chan_enum = 0; chan_enum < chan_num; chan_enum++) {
+		cur_chan = &sec_cur_chan_list[chan_enum];
+
+		if (!wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq))
+			continue;
+
+		if (cur_chan->chan_flags & REGULATORY_CHAN_DISABLED)
+			continue;
+
+		if (!six_gig_started) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
+			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+			buffer_triplets[num_triplets][1] = OP_CLASS_131;
+			buffer_triplets[num_triplets][2] = 0;
+			num_triplets++;
+			six_gig_started = true;
+		}
+
+		if (start && prev &&
+		    adjacent_same_band(prev, cur_chan, chan_spacing_for_2ghz,
+				       chan_spacing_for_5ghz_6ghz)) {
+			prev = cur_chan;
+			cur_triplet_num_chans++;
+			continue;
+		}
+
+		if (start && prev) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
+			buffer_triplets[num_triplets][0] = start->chan_num;
+			buffer_triplets[num_triplets][1] =
+					cur_triplet_num_chans + 1;
+			buffer_triplets[num_triplets][2] = 0;
+			start = NULL;
+			cur_triplet_num_chans = 0;
+			num_triplets++;
+		}
+
+		start = cur_chan;
+		prev = cur_chan;
+	}
+
+	if (start) {
+		if (num_triplets > 80) {
+			pe_err("Triplets number exceed max size");
+			status = QDF_STATUS_E_FAILURE;
+			goto out;
+		}
+		buffer_triplets[num_triplets][0] = start->chan_num;
+		buffer_triplets[num_triplets][1] = cur_triplet_num_chans + 1;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+	}
+
+	if (six_gig_started) {
+		/* >=40 MHz classes require zero subband triplets per spec */
+		if (num_triplets > 78) {
+			pe_err("Triplets number exceed max size");
+			status = QDF_STATUS_E_FAILURE;
+			goto out;
+		}
+		buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+		buffer_triplets[num_triplets][1] = OP_CLASS_132;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+
+		buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+		buffer_triplets[num_triplets][1] = OP_CLASS_133;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+
+		buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
+		buffer_triplets[num_triplets][1] = OP_CLASS_134;
+		buffer_triplets[num_triplets][2] = 0;
+		num_triplets++;
+
+		if (pe_session && (pe_session->ch_width == CH_WIDTH_320MHZ)) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
+			buffer_triplets[num_triplets][0] = OP_CLASS_ID_202;
+			buffer_triplets[num_triplets][1] = OP_CLASS_137;
+			buffer_triplets[num_triplets][2] = 0;
+			num_triplets++;
+		}
 	}
 
 	if (!num_triplets) {
@@ -960,6 +1095,7 @@ populate_dot11f_country(struct mac_context *mac,
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
+
 
 	ctry_ie->num_more_triplets = num_triplets - 1;
 	ctry_ie->first_triplet[0] = buffer_triplets[0][0];
@@ -10863,12 +10999,23 @@ QDF_STATUS lim_ieee80211_unpack_tpe(const uint8_t *tpe_ie,
 	} else {
 		if (!dot11f_tpe->max_tx_pwr_count) {
 			dot11f_tpe->num_tx_power = dot11f_tpe->max_tx_pwr_count;
+			if (!ie_len) {
+				pe_err("TPE IE: no payload for tx_power");
+				return QDF_STATUS_E_BADMSG;
+			}
 			qdf_mem_copy(dot11f_tpe->tx_power, buf, 1);
 			return QDF_STATUS_SUCCESS;
 		}
 		else
 			dot11f_tpe->num_tx_power =
 					1 << (dot11f_tpe->max_tx_pwr_count - 1);
+	}
+
+	if (dot11f_tpe->num_tx_power > sizeof(dot11f_tpe->tx_power) ||
+	    ie_len < dot11f_tpe->num_tx_power) {
+		pe_err("TPE IE: invalid num_tx_power %u ie_len %u",
+		       dot11f_tpe->num_tx_power, ie_len);
+		return QDF_STATUS_E_BADMSG;
 	}
 
 	qdf_mem_copy(dot11f_tpe->tx_power, buf, dot11f_tpe->num_tx_power);
@@ -12978,6 +13125,12 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &mlo_ie_ptr->mlo_ie.common_info_length);
 
+	if (mlo_ie_ptr->mlo_ie.common_info_length > ml_ie_total_len) {
+		pe_err("common info length greater than mlie length %u %u",
+		       mlo_ie_ptr->mlo_ie.common_info_length, ml_ie_total_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
 		   mlo_ie_ptr->mlo_ie.common_info_length;
 	lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
@@ -14995,9 +15148,11 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	*p_ml_ie++ = mlo_ie->common_info_length;
 	len_remaining--;
 
-	qdf_mem_copy(p_ml_ie, mld_addr, QDF_MAC_ADDR_SIZE);
-	p_ml_ie += QDF_MAC_ADDR_SIZE;
-	len_remaining -= QDF_MAC_ADDR_SIZE;
+	if (mlo_ie->mld_mac_address_present) {
+		qdf_mem_copy(p_ml_ie, mld_addr, QDF_MAC_ADDR_SIZE);
+		p_ml_ie += QDF_MAC_ADDR_SIZE;
+		len_remaining -= QDF_MAC_ADDR_SIZE;
+	}
 
 	if (mlo_ie->eml_capab_present) {
 		QDF_SET_BITS(*(uint16_t *)p_ml_ie,

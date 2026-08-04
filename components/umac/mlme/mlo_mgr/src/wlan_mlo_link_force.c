@@ -2870,11 +2870,12 @@ ml_nlink_handle_mcc_links(struct wlan_objmgr_psoc *psoc,
 	if (ml_num_link < 2)
 		return;
 
-	policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
-					  ml_vdev_lst,
-					  ml_linkid_lst,
-					  ml_num_link,
-					  &affected_link_bitmap);
+	if (!policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
+					       ml_vdev_lst,
+					       ml_linkid_lst,
+					       ml_num_link,
+					       &affected_link_bitmap))
+		return;
 	if (affected_link_bitmap) {
 		force_cmd->force_inactive_num =
 			convert_link_bitmap_to_link_ids(

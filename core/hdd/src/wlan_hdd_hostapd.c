@@ -9377,6 +9377,100 @@ static void hdd_update_param_chandef(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * wlan_hdd_go_5ghz_mcc_160_bw_override() - Override 5 GHz BW for GO,
+ * to avoid 160 Mhz DFS GO in MCC.
+ * @link_info: Link info pointer in HDD adapter
+ * @chandef: GO starting channel
+ * @new_chandef: new override GO channel
+ *
+ * The function will override the GO BW to 80 MHz from 160 MHz, if any other
+ * MCC interface is present and scc is not enabled.
+ *
+ * Return: true if bandwidth override
+ */
+static bool
+wlan_hdd_go_5ghz_mcc_160_bw_override(struct wlan_hdd_link_info *link_info,
+				     struct cfg80211_chan_def *chandef,
+				     struct cfg80211_chan_def *new_chandef)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct ch_params ch_params = {0};
+	uint32_t freq;
+	enum nl80211_channel_type channel_type;
+	struct ieee80211_channel *ieee_chan;
+
+	if (!hdd_ctx || !chandef || !new_chandef || !chandef->chan) {
+		hdd_err("hdd context or chandef is NULL");
+		return false;
+	}
+
+	freq = chandef->chan->center_freq;
+	/*
+	 * No need to downgrade BW if:
+	 * - Its not 5 GHz freq
+	 * - BW is not 160 ie less than 160.
+	 * - center freq itself is DFS.
+	 * - Go force scc is enabled.
+	 * - MCC interface not present.
+	 */
+	if (!WLAN_REG_IS_5GHZ_CH_FREQ(freq) ||
+	    (chandef->width != NL80211_CHAN_WIDTH_80P80 &&
+	     chandef->width != NL80211_CHAN_WIDTH_160))
+		return false;
+
+	if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq))
+		return false;
+
+	if (policy_mgr_go_scc_enforced(hdd_ctx->psoc))
+		return false;
+
+	if (!policy_mgr_will_freq_lead_to_mcc(hdd_ctx->psoc, freq))
+		return false;
+
+	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy, freq);
+	if (!ieee_chan) {
+		hdd_err("Vdev %d, freq %d get channel failed",
+			link_info->vdev_id, freq);
+		return false;
+	}
+	qdf_mem_copy(new_chandef, chandef, sizeof(*new_chandef));
+	ch_params.ch_width = CH_WIDTH_80MHZ;
+	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev, freq, 0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
+
+	switch (ch_params.sec_ch_offset) {
+	case PHY_SINGLE_CHANNEL_CENTERED:
+		channel_type = NL80211_CHAN_HT20;
+		break;
+	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+		channel_type = NL80211_CHAN_HT40MINUS;
+		break;
+	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+		channel_type = NL80211_CHAN_HT40PLUS;
+		break;
+	default:
+		channel_type = NL80211_CHAN_NO_HT;
+		break;
+	}
+
+	cfg80211_chandef_create(new_chandef, ieee_chan, channel_type);
+
+	if (ch_params.ch_width == CH_WIDTH_80MHZ) {
+		new_chandef->width = NL80211_CHAN_WIDTH_80;
+		new_chandef->center_freq1 = ch_params.mhz_freq_seg0;
+		new_chandef->center_freq2 = 0;
+	}
+
+	hdd_debug("Vdev %d, override SAP/GO freq %d's BW %d (f1 %d, f2 %d) to BW %d (f1 %d, f2 %d)",
+		  link_info->vdev_id, new_chandef->chan->center_freq,
+		  chandef->width, chandef->center_freq1, chandef->center_freq2,
+		  new_chandef->width, new_chandef->center_freq1,
+		  new_chandef->center_freq2);
+	return true;
+}
+
+/**
  * __wlan_hdd_cfg80211_start_ap() - start soft ap mode
  * @wiphy: Pointer to wiphy structure
  * @dev: Pointer to net_device structure
@@ -9445,12 +9539,14 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 
-	hdd_nofl_info("%s(vdevid-%d): START AP: mode %s(%d) %d bw %d (5MHz %d 10MHz %d)",
+	hdd_nofl_info("%s(vdevid-%d): START AP: mode %s(%d) %d bw %d(f1 %d, f2 %d) (5MHz %d 10MHz %d)",
 		      dev->name, link_info->vdev_id,
 		      qdf_opmode_str(adapter->device_mode),
 		      adapter->device_mode,
 		      params->chandef.chan->center_freq,
 		      params->chandef.width,
+		      params->chandef.center_freq1,
+		      params->chandef.center_freq2,
 		      cds_is_5_mhz_enabled(),
 		      cds_is_10_mhz_enabled());
 
@@ -9492,6 +9588,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		freq = (qdf_freq_t)chandef->chan->center_freq;
 		channel_width = wlan_hdd_get_channel_bw(chandef->width);
 	}
+
+	if (adapter->device_mode == QDF_P2P_GO_MODE &&
+	    wlan_hdd_go_5ghz_mcc_160_bw_override(link_info,
+						 chandef, &new_chandef)) {
+		chandef = &new_chandef;
+		freq = (qdf_freq_t)chandef->chan->center_freq;
+		channel_width = wlan_hdd_get_channel_bw(chandef->width);
+	}
+
 	intf_pm_mode =
 		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
 						     adapter->device_mode,

@@ -509,6 +509,15 @@ typedef int (*wma_tgt_cfg_cb)(hdd_handle_t handle, struct wma_tgt_cfg *cfg);
 typedef void (*wma_get_tsf_timer_cb)(void *ctx, void *response_ptr);
 
 /**
+ * typedef wma_chan_hop_status_cb - Channel hop status callback
+ * @ctx: Callback context
+ * @response: Response structure pointer
+ *
+ * Callback function type for channel hop status response.
+ */
+typedef void (*wma_chan_hop_status_cb)(void *ctx, void *response);
+
+/**
  * struct wma_cli_set_cmd_t - set command parameters
  * @param_id: parameter id
  * @param_value: parameter value

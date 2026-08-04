@@ -13,6 +13,7 @@ targets = [
     "sun",
     "vienna",
     "hamoa_la",
+    "glymur",
 ]
 
 la_variants = [
@@ -57,6 +58,7 @@ vm_target_bases = [
     "hamoa",
     "chora",
     "hamoa_la",
+    "glymur",
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]

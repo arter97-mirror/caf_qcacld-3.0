@@ -1195,17 +1195,30 @@ void lim_passthrough_init_session(struct mac_context *mac_ptr,
 void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 				    struct sir_delete_session *msg);
 /**
- * lim_passthrough_peer_setup() - Peer setup for passthrough mode
- * @mac: Pointer to global MAC context
- * @msg: Pointer to peer setup message
+ * lim_passthrough_peer_setup() - peer setup/update for passthrough mode
+ * @mac: pointer to global MAC context
+ * @msg: pointer to peer setup message (create_only=1 for NEW, 0 for UPDATE)
  *
- * This function creates the peer and setup the peer capabilities to
- * add sta in passthrough mode operation.
+ * Handles both NEW (create DPH entry, WMI_PEER_CREATE) and UPDATE (update
+ * caps in DPH entry, WMI_PEER_ASSOC) actions from set_station_info.
  *
  * Return: None
  */
 void lim_passthrough_peer_setup(struct mac_context *mac,
 				struct sir_passthru_peer_setup_msg *msg);
+
+/**
+ * lim_passthru_peer_del() - delete a passthru peer by MAC address
+ * @mac: pointer to global MAC context
+ * @msg: pointer to peer deletion message
+ *
+ * Looks up the DPH entry by MAC address and calls lim_del_sta() to post
+ * WMA_DELETE_STA_REQ, then removes the DPH entry and releases the AID.
+ *
+ * Return: None
+ */
+void lim_passthru_peer_del(struct mac_context *mac,
+			   struct sir_passthru_peer_del_msg *msg);
 #else
 static inline
 void lim_passthrough_init_session(struct mac_context *mac_ptr,
@@ -1220,6 +1233,12 @@ void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 static inline
 void lim_passthrough_peer_setup(struct mac_context *mac,
 				struct sir_passthru_peer_setup_msg *msg)
+{
+}
+
+static inline
+void lim_passthru_peer_del(struct mac_context *mac,
+			   struct sir_passthru_peer_del_msg *msg)
 {
 }
 #endif

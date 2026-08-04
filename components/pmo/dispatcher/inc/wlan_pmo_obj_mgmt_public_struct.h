@@ -114,6 +114,16 @@ typedef int (*pmo_pld_auto_suspend_cb)(void);
 typedef int (*pmo_pld_auto_resume_cb)(void);
 
 /**
+ * typedef pmo_wow_deferred_wakeup_cb() - callback to log deferred WOW wakeup
+ * @psoc: objmgr psoc handle
+ *
+ * Called from PMO after the host wakeup indication is sent to FW and the
+ * target has resumed, so that the WMA layer can emit the cached wakeup
+ * reason that was recorded during the WOW wakeup host event.
+ */
+typedef void (*pmo_wow_deferred_wakeup_cb)(struct wlan_objmgr_psoc *psoc);
+
+/**
  * struct wlan_pmo_tx_ops - structure of tx function
  *					pointers for pmo component
  * @send_arp_offload_req: fp to send arp offload request

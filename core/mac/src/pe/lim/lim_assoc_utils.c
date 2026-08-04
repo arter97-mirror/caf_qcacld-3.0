@@ -1728,9 +1728,13 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				   pRates->llbRates[bRateIndex - 1])) {
 				pe_debug("Duplicate 11b rate: %d",
 					 tempRateSet.rate[min]);
-			} else if (!pe_session->is_oui_auth_assoc_6mbps_2ghz_enable) {
+			} else if (!pe_session->is_oui_auth_assoc_6mbps_2ghz_enable ||
+				   pe_session->dot11mode == MLME_DOT11_MODE_11B) {
 				pRates->llbRates[bRateIndex++] =
 						tempRateSet.rate[min];
+			} else {
+				pe_debug("Drop 11b rate %d",
+					 tempRateSet.rate[min]);
 			}
 		} else {
 			pe_debug("%d is neither 11a nor 11b rate",

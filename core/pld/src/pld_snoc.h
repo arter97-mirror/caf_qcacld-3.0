@@ -205,6 +205,13 @@ pld_snoc_get_audio_wlan_timestamp(struct device *dev,
 }
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
 
+static inline int
+pld_snoc_register_qmi_ind(struct device *dev, void *cb_ctx,
+			  int (*cb)(void *ctx, uint16_t type,
+				    void *event, int event_len))
+{
+	return -EINVAL;
+}
 #else
 /**
  * pld_snoc_register_driver() - Register platform device callback functions
@@ -461,5 +468,23 @@ static inline unsigned long pld_snoc_get_device_config(void)
 {
 	return icnss_get_device_config();
 }
+
+#ifdef WLAN_CHIPSET_STATS
+static inline int
+pld_snoc_register_qmi_ind(struct device *dev, void *cb_ctx,
+			  int (*cb)(void *ctx, uint16_t type,
+				    void *event, int event_len))
+{
+	return icnss_register_driver_async_data_cb(dev, cb_ctx, cb);
+}
+#else
+static inline int
+pld_snoc_register_qmi_ind(struct device *dev, void *cb_ctx,
+			  int (*cb)(void *ctx, uint16_t type,
+				    void *event, int event_len))
+{
+	return 0;
+}
+#endif
 #endif
 #endif

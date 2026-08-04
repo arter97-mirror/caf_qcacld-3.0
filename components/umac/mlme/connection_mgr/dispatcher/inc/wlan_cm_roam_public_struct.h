@@ -2559,6 +2559,7 @@ struct set_pcl_req {
  * @frame_buf: buffer containing probe response or beacon
  * @is_same_bssid: flag to indicate if roaming is requested for same bssid
  * @forced_roaming: Roam to any bssid in any ch (here bssid & ch is not given)
+ * @skip_full_scan: skip full scan fallback when cache scan finds no candidate
  */
 struct roam_invoke_req {
 	uint8_t vdev_id;
@@ -2568,6 +2569,7 @@ struct roam_invoke_req {
 	uint8_t *frame_buf;
 	uint8_t is_same_bssid;
 	bool forced_roaming;
+	bool skip_full_scan;
 };
 
 /**

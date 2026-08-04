@@ -750,6 +750,8 @@ struct punc_chan_info {
  * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
  * @qcn_ie_present_in_beacon: QCN Ie Present in beacon
+ * @passthru_pending_create_only: one-shot flag set before
+ *   lim_add_sta() for passthru NEW action, cleared after
  */
 struct pe_session {
 	uint8_t available;
@@ -1087,6 +1089,10 @@ struct pe_session {
 	uint8_t wnm_action_dialog_token;
 	struct dfs_p2p_group_info dfs_p2p_info;
 	uint8_t qcn_ie_present_in_beacon;
+#ifdef DRIVER_PASSTHRU_MODE
+	/* one-shot flag set before lim_add_sta(NEW), cleared after */
+	uint8_t passthru_pending_create_only;
+#endif
 };
 
 /*-------------------------------------------------------------------------

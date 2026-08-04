@@ -1,1 +1,5 @@
 include $(WLAN_ROOT)/configs/default_defconfig
+
+CONFIG_WLAN_DUMP_IN_PROGRESS := y
+CONFIG_WLAN_CHIPSET_STATS := y
+CONFIG_WLAN_CHIPSET_LOG_MAX_SIZE := y

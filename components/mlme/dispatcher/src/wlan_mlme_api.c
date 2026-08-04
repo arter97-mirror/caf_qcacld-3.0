@@ -8846,6 +8846,23 @@ wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_stats_get_chain_signal_in_signal_row(struct wlan_objmgr_psoc *psoc,
+					       bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_STATS_CHAIN_SIGNAL_IN_SIGNAL_ROW);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.stats.stats_chain_signal_in_signal_row;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool
 wlan_mlme_is_bcn_prot_disabled_for_sap(struct wlan_objmgr_psoc *psoc)
 {
@@ -9719,6 +9736,65 @@ uint32_t wlan_get_fw_cck_cap(struct wlan_objmgr_psoc *psoc)
 	return target_if_fw_cck_support(psoc);
 }
 
+uint32_t
+wlan_mlme_get_high_band_roaming_threshold_time_ms(
+				struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_HIGH_BAND_ROAMING_THRESHOLD_TIME_MS);
+	}
+
+	if (mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay <
+	    mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms) {
+	      mlme_debug("Capping high band threshold time %u to roam_scan_hi_rssi_delay %u",
+			 mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms,
+			 mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay);
+		return mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay;
+	}
+
+	mlme_debug("high_band_roaming_threshold_time_ms %u",
+		   mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms);
+	return mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms;
+}
+
+uint32_t
+wlan_mlme_get_high_band_roaming_data_threshold(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_HIGH_BAND_ROAMING_DATA_THRESHOLD);
+	}
+
+	mlme_debug("high_band_roaming_data_threshold %u",
+		   mlme_obj->cfg.sta.high_band_roaming_data_threshold);
+
+	return mlme_obj->cfg.sta.high_band_roaming_data_threshold;
+}
+
+bool
+wlan_mlme_get_enable_high_band_roaming(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_ENABLE_HIGH_BAND_ROAMING);
+	}
+
+	mlme_debug("enable_high_band_roaming %u",
+		   mlme_obj->cfg.sta.enable_high_band_roaming);
+
+	return mlme_obj->cfg.sta.enable_high_band_roaming;
+}
+
 bool wlan_mlme_get_p2p_go_cancel_one_shot_noa(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -9769,4 +9845,78 @@ QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *p
 	mlme_debug("Set P2P GC keep-awake during NoA: %d", value);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+bool
+wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_SAP_PERF_TUNING_ENABLE);
+	}
+
+	mlme_debug("sap_perf_tuning_enable %d",
+		   mlme_obj->cfg.gen.sap_perf_tuning_enable);
+
+	return mlme_obj->cfg.gen.sap_perf_tuning_enable;
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc,
+				      bool sap_perf_tuning_enable)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return QDF_STATUS_E_INVAL;
+	}
+	mlme_obj->cfg.gen.sap_perf_tuning_enable = sap_perf_tuning_enable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t
+wlan_mlme_get_sap_perf_data_threshold(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_SAP_PERF_DATA_THRESHOLD);
+	}
+
+	mlme_debug("sap_perf_data_threshold %u",
+		   mlme_obj->cfg.gen.sap_perf_data_threshold);
+
+	return mlme_obj->cfg.gen.sap_perf_data_threshold;
+}
+
+uint32_t
+wlan_mlme_get_sap_traffic_monitoring_time_s(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_SAP_TRAFFIC_MONITORING_TIME_S);
+	}
+
+	mlme_debug("sap_traffic_monitoring_time_s %u",
+		   mlme_obj->cfg.gen.sap_traffic_monitoring_time_s);
+
+	return mlme_obj->cfg.gen.sap_traffic_monitoring_time_s;
+}
+
+bool
+wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc)
+{
+	return wma_get_sap_perf_tuning_enabled(
+		get_wmi_unified_hdl_from_psoc(psoc));
 }

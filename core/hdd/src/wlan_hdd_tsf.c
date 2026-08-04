@@ -590,7 +590,7 @@ void hdd_restart_tsf_sync_post_wlan_resume(struct hdd_adapter *adapter)
 	qdf_mc_timer_t *sync_timer;
 
 	if (!hdd_get_th_sync_status(adapter)) {
-		hdd_err("Host TSF sync is not initialized!!");
+		hdd_debug("Host TSF sync is not initialized!!");
 		return;
 	}
 

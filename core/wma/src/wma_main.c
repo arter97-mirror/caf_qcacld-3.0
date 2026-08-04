@@ -734,6 +734,9 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->twt_ap_sta_count = CFG_TGT_DEFAULT_TWT_AP_STA_COUNT;
 	tgt_cfg->enable_pci_gen = cfg_get(wma_handle->psoc, CFG_ENABLE_PCI_GEN);
 
+	tgt_cfg->iot_temporal_mode_enabled =
+		cfg_get(wma_handle->psoc, CFG_IOT_TEMPORAL_MODE_ENABLED);
+
 	tgt_cfg->mgmt_comp_evt_bundle_support = true;
 	tgt_cfg->tx_msdu_new_partition_id_support = true;
 	tgt_cfg->is_sap_connected_d3wow_enabled =
@@ -3641,6 +3644,42 @@ int wma_passthru_get_tsf_timer_resp_handler(ol_scn_t scn, uint8_t *event_buf,
 }
 
 static
+int wma_vdev_chan_hop_status_resp_handler(ol_scn_t scn, uint8_t *event_buf,
+					  uint32_t len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)scn;
+	struct vdev_chan_hop_status_response response = {0};
+	QDF_STATUS status;
+
+	if (!scn || !event_buf) {
+		wma_err("scn: 0x%pK, data: 0x%pK", scn, event_buf);
+		return -EINVAL;
+	}
+
+	/* Use the WMI extract function to parse the event */
+	status = wmi_extract_vdev_chan_hop_status(wma_handle->wmi_handle,
+						  event_buf, &response);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to extract channel hop status");
+		return -EINVAL;
+	}
+
+	wma_debug("Channel hop status: vdev_id=%d, num_slots=%d, hopping_request_tsf=%u, current_channel_index=%u",
+		  response.vdev_id, response.num_slots,
+		  response.hopping_request_tsf, response.current_channel_index);
+
+	if (wma_handle->chan_hop_status_cb)
+		wma_handle->chan_hop_status_cb
+			(wma_handle->chan_hop_status_cb_ctx,
+			 &response);
+
+	wma_handle->chan_hop_status_cb = NULL;
+	wma_handle->chan_hop_status_cb_ctx = NULL;
+
+	return 0;
+}
+
+static
 void wma_register_passthru_events(tp_wma_handle wma_handle)
 {
 	QDF_STATUS status;
@@ -3650,6 +3689,14 @@ void wma_register_passthru_events(tp_wma_handle wma_handle)
 					    wma_passthru_get_tsf_timer_resp_handler);
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("Failed to register Passthru TSF resp event cb");
+
+	status =
+	wmi_unified_register_event(wma_handle->wmi_handle,
+				   wmi_vdev_chan_hop_status_report_event_id,
+				   wma_vdev_chan_hop_status_resp_handler);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to register chan hop status event cb");
 }
 #else
 static inline
@@ -4151,6 +4198,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					      wma_vdev_get_dtim_period);
 	pmo_register_get_beacon_interval_callback(wma_handle->psoc,
 						  wma_vdev_get_beacon_interval);
+	pmo_register_wow_deferred_wakeup_cb(wma_handle->psoc,
+					    wma_wow_log_deferred_wakeup);
 	wma_register_nan_callbacks(wma_handle);
 	wma_register_pkt_capture_callbacks(wma_handle);
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -5238,6 +5287,7 @@ QDF_STATUS wma_close(void)
 	pmo_unregister_is_device_in_low_pwr_mode(wma_handle->psoc);
 	pmo_unregister_get_pause_bitmap(wma_handle->psoc);
 	pmo_unregister_pause_bitmap_notifier(wma_handle->psoc);
+	pmo_unregister_wow_deferred_wakeup_cb(wma_handle->psoc);
 
 	tgt_psoc_info = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	init_deinit_free_num_units(wma_handle->psoc, tgt_psoc_info);
@@ -8036,6 +8086,21 @@ int wma_rx_ready_event(void *handle, uint8_t *cmd_param_info,
 }
 
 /**
+ * wma_is_wmi_init_cmd_sent() - check if WMI init command has been sent
+ *
+ * Return: true if WMI init command was sent to firmware, false otherwise
+ */
+bool wma_is_wmi_init_cmd_sent(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma || !wma->wmi_handle)
+		return false;
+
+	return wmi_is_init_cmd_sent(wma->wmi_handle);
+}
+
+/**
  * wma_wait_for_ready_event() - wait for wma ready event
  * @handle: wma handle
  *
@@ -10640,3 +10705,13 @@ wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
 				   wmi_service_mlo_sap_emlsr_support);
 }
 #endif
+
+bool
+wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
+{
+	if (!wmi_handle)
+		return false;
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_vdev_traffic_monitoring);
+}

@@ -1497,6 +1497,8 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 		hif_set_ep_vote_access(hif_ctx,
 				       HIF_EP_VOTE_DP_ACCESS,
 				       HIF_EP_VOTE_ACCESS_ENABLE);
+		if (psoc_ctx->wow_deferred_wakeup_cb)
+			psoc_ctx->wow_deferred_wakeup_cb(psoc);
 	}
 out:
 	return status;

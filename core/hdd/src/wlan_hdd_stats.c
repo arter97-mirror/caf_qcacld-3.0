@@ -41,7 +41,6 @@
 #include <wlan_cfg80211_mc_cp_stats.h>
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "wlan_mlme_ucfg_api.h"
-#include "wlan_mlme_ucfg_api.h"
 #include "wlan_hdd_sta_info.h"
 #include "cdp_txrx_misc.h"
 #include "cdp_txrx_host_stats.h"
@@ -62,6 +61,7 @@
 #include "wlan_nan_api.h"
 #include "wlan_pmo_tgt_api.h"
 #include "wlan_pmo_ucfg_api.h"
+#include <wlan_vdev_mgr_ucfg_api.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -73,6 +73,7 @@
 #define HDD_INFO_RX_BITRATE             STATION_INFO_RX_BITRATE
 #define HDD_INFO_TX_BYTES               STATION_INFO_TX_BYTES
 #define HDD_INFO_CHAIN_SIGNAL_AVG       STATION_INFO_CHAIN_SIGNAL_AVG
+#define HDD_INFO_CHAIN_SIGNAL           0
 #define HDD_INFO_EXPECTED_THROUGHPUT    0
 #define HDD_INFO_RX_BYTES               STATION_INFO_RX_BYTES
 #define HDD_INFO_RX_PACKETS             STATION_INFO_RX_PACKETS
@@ -83,6 +84,8 @@
 #define HDD_INFO_STA_FLAGS              0
 #define HDD_INFO_RX_MPDUS               0
 #define HDD_INFO_FCS_ERROR_COUNT        0
+#define HDD_INFO_RX_DROP_MISC           0
+#define HDD_INFO_BSS_PARAM              0
 #else
 #define HDD_INFO_SIGNAL                 BIT(NL80211_STA_INFO_SIGNAL)
 #define HDD_INFO_SIGNAL_AVG             BIT(NL80211_STA_INFO_SIGNAL_AVG)
@@ -93,6 +96,7 @@
 #define HDD_INFO_RX_BITRATE             BIT(NL80211_STA_INFO_RX_BITRATE)
 #define HDD_INFO_TX_BYTES               BIT(NL80211_STA_INFO_TX_BYTES)
 #define HDD_INFO_CHAIN_SIGNAL_AVG       BIT(NL80211_STA_INFO_CHAIN_SIGNAL_AVG)
+#define HDD_INFO_CHAIN_SIGNAL           BIT(NL80211_STA_INFO_CHAIN_SIGNAL)
 #define HDD_INFO_EXPECTED_THROUGHPUT  BIT(NL80211_STA_INFO_EXPECTED_THROUGHPUT)
 #define HDD_INFO_RX_BYTES               BIT(NL80211_STA_INFO_RX_BYTES)
 #define HDD_INFO_RX_PACKETS             BIT(NL80211_STA_INFO_RX_PACKETS)
@@ -103,6 +107,8 @@
 #define HDD_INFO_STA_FLAGS              BIT(NL80211_STA_INFO_STA_FLAGS)
 #define HDD_INFO_RX_MPDUS             BIT_ULL(NL80211_STA_INFO_RX_MPDUS)
 #define HDD_INFO_FCS_ERROR_COUNT      BIT_ULL(NL80211_STA_INFO_FCS_ERROR_COUNT)
+#define HDD_INFO_RX_DROP_MISC         BIT_ULL(NL80211_STA_INFO_RX_DROP_MISC)
+#define HDD_INFO_BSS_PARAM            BIT(NL80211_STA_INFO_BSS_PARAM)
 #endif /* kernel version less than 4.0.0 && no_backport */
 
 #define HDD_LINK_STATS_MAX		5
@@ -668,6 +674,49 @@ hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx, const uint8_t *bssid)
 }
 
 #define WLAN_INVALID_RSSI_VALUE -128
+
+/**
+ * hdd_fill_bss_params() - populate sinfo->bss_param for the connected BSS
+ * @link_info: link info pointer of STA adapter
+ * @sinfo: kernel station_info struct to populate
+ *
+ * Fills beacon_interval, dtim_period, and bss_param flags so that
+ * nl80211_send_station() includes NL80211_STA_INFO_BSS_PARAM in its netlink
+ * response, making those fields visible in "iw link" output.
+ */
+static void hdd_fill_bss_params(struct wlan_hdd_link_info *link_info,
+				struct station_info *sinfo)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_bss_params bp;
+
+	if (HDD_INFO_BSS_PARAM == 0)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		return;
+
+	if (QDF_IS_STATUS_ERROR(wlan_vdev_mlme_get_bss_params(vdev, &bp))) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+		return;
+	}
+
+	sinfo->bss_param.beacon_interval = bp.beacon_interval;
+	sinfo->bss_param.dtim_period     = bp.dtim_period;
+	sinfo->bss_param.flags           = 0;
+
+	if (bp.flags & VDEV_MLME_BSS_PARAM_CTS_PROT)
+		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_CTS_PROT;
+	if (bp.flags & VDEV_MLME_BSS_PARAM_SHORT_PREAMBLE)
+		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_SHORT_PREAMBLE;
+	if (bp.flags & VDEV_MLME_BSS_PARAM_SHORT_SLOT_TIME)
+		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_SHORT_SLOT_TIME;
+
+	sinfo->filled |= HDD_INFO_BSS_PARAM;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+}
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * wlan_hdd_is_per_link_stats_supported - Check if FW supports per link stats
@@ -738,8 +787,10 @@ wlan_hdd_copy_sinfo_to_link_info(struct wlan_hdd_link_info *link_info,
 
 	hdd_sinfo->signal = sinfo->signal;
 	hdd_sinfo->signal_avg = sinfo->signal_avg;
-	for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
+	for (i = 0; i < IEEE80211_MAX_CHAINS; i++) {
+		hdd_sinfo->chain_signal[i] = sinfo->chain_signal[i];
 		hdd_sinfo->chain_signal_avg[i] = sinfo->chain_signal_avg[i];
+	}
 	hdd_sinfo->chains = sinfo->chains;
 
 	qdf_mem_copy(&hdd_sinfo->txrate,
@@ -755,6 +806,12 @@ wlan_hdd_copy_sinfo_to_link_info(struct wlan_hdd_link_info *link_info,
 	hdd_sinfo->tx_failed = sinfo->tx_failed;
 	hdd_sinfo->rx_mpdu_count = sinfo->rx_mpdu_count;
 	hdd_sinfo->fcs_err_count = sinfo->fcs_err_count;
+	hdd_sinfo->rx_dropped_misc = sinfo->rx_dropped_misc;
+
+	if (sinfo->filled & HDD_INFO_BSS_PARAM) {
+		hdd_sinfo->bss_param = sinfo->bss_param;
+		hdd_sinfo->filled |= HDD_INFO_BSS_PARAM;
+	}
 
 	link_mac = sta_ctx->conn_info.bssid.bytes;
 	hdd_nofl_debug("copied sinfo for " QDF_MAC_ADDR_FMT " into link_info",
@@ -776,15 +833,19 @@ wlan_hdd_copy_hdd_stats_to_sinfo(struct station_info *sinfo,
 
 	sinfo->signal = hdd_sinfo->signal;
 	sinfo->signal_avg = hdd_sinfo->signal_avg;
-	for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
+	for (i = 0; i < IEEE80211_MAX_CHAINS; i++) {
+		sinfo->chain_signal[i] = hdd_sinfo->chain_signal[i];
 		sinfo->chain_signal_avg[i] = hdd_sinfo->chain_signal_avg[i];
+	}
 	sinfo->chains = hdd_sinfo->chains;
 
 	if (!hdd_sinfo->signal) {
 		sinfo->signal = WLAN_INVALID_RSSI_VALUE;
 		sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
-		for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
+		for (i = 0; i < IEEE80211_MAX_CHAINS; i++) {
+			sinfo->chain_signal[i] = WLAN_INVALID_RSSI_VALUE;
 			sinfo->chain_signal_avg[i] = WLAN_INVALID_RSSI_VALUE;
+		}
 	}
 
 	qdf_mem_copy(&sinfo->txrate,
@@ -800,6 +861,8 @@ wlan_hdd_copy_hdd_stats_to_sinfo(struct station_info *sinfo,
 	sinfo->tx_failed = hdd_sinfo->tx_failed;
 	sinfo->rx_mpdu_count = hdd_sinfo->rx_mpdu_count;
 	sinfo->fcs_err_count = hdd_sinfo->fcs_err_count;
+	sinfo->rx_dropped_misc = hdd_sinfo->rx_dropped_misc;
+	sinfo->bss_param = hdd_sinfo->bss_param;
 	sinfo->filled = hdd_sinfo->filled;
 }
 
@@ -835,7 +898,7 @@ static void wlan_hdd_update_sinfo(struct station_info *sinfo,
 			HDD_INFO_TX_BITRATE | HDD_INFO_RX_BITRATE |
 			HDD_INFO_TX_BYTES | HDD_INFO_RX_BYTES |
 			HDD_INFO_RX_PACKETS | HDD_INFO_FCS_ERROR_COUNT |
-			HDD_INFO_RX_MPDUS;
+			HDD_INFO_RX_MPDUS | HDD_INFO_RX_DROP_MISC;
 }
 
 static void
@@ -863,6 +926,48 @@ wlan_hdd_get_mlo_links_count(struct hdd_adapter *adapter, uint32_t *count)
 	}
 
 	*count = num_links;
+}
+
+/**
+ * wlan_hdd_fill_standby_bss_params() - fill bss_param cache for standby link
+ * @link_info: standby link info (vdev_id == WLAN_UMAC_VDEV_ID_MAX)
+ *
+ * On first connect the standby link's hdd_sinfo cache is cold because
+ * wlan_hdd_get_sta_stats never ran its full path for a standby link.
+ * Iterate sibling link_infos, pick the first that is associated (has a live
+ * vdev), and copy its MLME bss_params into the standby link's hdd_sinfo so
+ * that subsequent wlan_hdd_update_sinfo calls return valid dtim/bi values.
+ */
+static void
+wlan_hdd_fill_standby_bss_params(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct wlan_hdd_link_info *iter_link;
+	struct station_info tmp_sinfo = {0};
+
+	if (link_info->hdd_sinfo.filled & HDD_INFO_BSS_PARAM)
+		return;
+
+	hdd_adapter_for_each_link_info(adapter, iter_link) {
+		if (iter_link == link_info)
+			continue;
+		if (!hdd_cm_is_vdev_associated(iter_link))
+			continue;
+		hdd_fill_bss_params(iter_link, &tmp_sinfo);
+		if ((tmp_sinfo.filled & HDD_INFO_BSS_PARAM) &&
+		    tmp_sinfo.bss_param.dtim_period) {
+			link_info->hdd_sinfo.bss_param = tmp_sinfo.bss_param;
+			link_info->hdd_sinfo.filled |= HDD_INFO_BSS_PARAM;
+			hdd_nofl_debug("standby bss_param from assoc vdev_id=%d bi=%u dtim=%u",
+				       iter_link->vdev_id,
+				       tmp_sinfo.bss_param.beacon_interval,
+				       tmp_sinfo.bss_param.dtim_period);
+			break;
+		}
+		hdd_nofl_debug("standby bss_param: assoc vdev_id=%d dtim=%u not ready",
+			       iter_link->vdev_id,
+			       tmp_sinfo.bss_param.dtim_period);
+	}
 }
 
 #else
@@ -893,6 +998,11 @@ wlan_hdd_update_sinfo(struct station_info *sinfo,
 
 static inline void
 wlan_hdd_get_mlo_links_count(struct hdd_adapter *adapter, uint32_t *count)
+{
+}
+
+static inline void
+wlan_hdd_fill_standby_bss_params(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -7369,6 +7479,7 @@ wlan_hdd_update_mld_peer_sinfo(struct hdd_adapter *adapter,
 	hdd_sinfo->tx_failed += sinfo->tx_failed;
 	hdd_sinfo->rx_mpdu_count += sinfo->rx_mpdu_count;
 	hdd_sinfo->fcs_err_count += sinfo->fcs_err_count;
+	hdd_sinfo->rx_dropped_misc += sinfo->rx_dropped_misc;
 }
 
 /*
@@ -7922,7 +8033,8 @@ static void hdd_report_actual_rate(enum tx_rate_info rate_flags,
 }
 
 /**
- * hdd_wlan_fill_per_chain_rssi_stats() - Fill per chain rssi stats
+ * hdd_wlan_fill_chain_signal_avg_stats() - Fill per-chain RSSI into
+ * chain_signal_avg[] (legacy behaviour — brackets on "signal avg:" row)
  *
  * @sinfo: The station_info structure to be filled.
  * @link_info: pointer to link_info struct in adapter
@@ -7931,8 +8043,9 @@ static void hdd_report_actual_rate(enum tx_rate_info rate_flags,
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 static void
-hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
-				   struct wlan_hdd_link_info *link_info)
+hdd_wlan_fill_chain_signal_avg_stats(
+		struct station_info *sinfo,
+		struct wlan_hdd_link_info *link_info)
 {
 	bool rssi_stats_valid = false;
 	uint8_t i;
@@ -7941,7 +8054,7 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 	for (i = 0; i < NUM_CHAINS_MAX; i++) {
 		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
 			sinfo->chain_signal_avg[i] =
-			link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
+				link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
 			sinfo->chains |= 1 << i;
 			if (sinfo->chain_signal_avg[i] > sinfo->signal_avg)
 				sinfo->signal_avg = sinfo->chain_signal_avg[i];
@@ -7960,6 +8073,75 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 		sinfo->filled |= HDD_INFO_SIGNAL_AVG;
 	}
 }
+
+/**
+ * hdd_wlan_fill_chain_signal_stats() - Fill per-chain RSSI into
+ * chain_signal[] (AL WiFi format — brackets on "signal:" row)
+ *
+ * @sinfo: The station_info structure to be filled.
+ * @link_info: pointer to link_info struct in adapter
+ *
+ * Return: None
+ */
+static void
+hdd_wlan_fill_chain_signal_stats(struct station_info *sinfo,
+				 struct wlan_hdd_link_info *link_info)
+{
+	bool rssi_stats_valid = false;
+	uint8_t i;
+
+	sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
+	for (i = 0; i < WLAN_MAX_VDEV_CHAINS; i++) {
+		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
+			sinfo->chain_signal[i] =
+				link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
+			sinfo->chains |= 1 << i;
+			if (sinfo->chain_signal[i] > sinfo->signal_avg)
+				sinfo->signal_avg = sinfo->chain_signal[i];
+
+			hdd_debug("RSSI for chain %d, vdev_id %d is %d",
+				  i, link_info->vdev_id,
+				  sinfo->chain_signal[i]);
+		}
+
+		if (!rssi_stats_valid && sinfo->chain_signal[i])
+			rssi_stats_valid = true;
+	}
+
+	if (rssi_stats_valid) {
+		sinfo->filled |= HDD_INFO_CHAIN_SIGNAL;
+		sinfo->filled |= HDD_INFO_SIGNAL_AVG;
+	}
+}
+
+/**
+ * hdd_wlan_fill_per_chain_rssi_stats() - Fill per chain rssi stats
+ *
+ * @sinfo: The station_info structure to be filled.
+ * @link_info: pointer to link_info struct in adapter
+ *
+ * Dispatches to hdd_wlan_fill_chain_signal_stats() when the INI
+ * gchain_signal_in_signal_row is enabled, otherwise falls back to
+ * hdd_wlan_fill_chain_signal_avg_stats().
+ *
+ * Return: None
+ */
+static void
+hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
+				   struct wlan_hdd_link_info *link_info)
+{
+	bool chain_signal_in_signal_row = false;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	wlan_mlme_stats_get_chain_signal_in_signal_row(
+			hdd_ctx->psoc,
+			&chain_signal_in_signal_row);
+
+	if (chain_signal_in_signal_row)
+		hdd_wlan_fill_chain_signal_stats(sinfo, link_info);
+	else
+		hdd_wlan_fill_chain_signal_avg_stats(sinfo, link_info);
+}
 #else
 static inline void
 hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
@@ -7975,9 +8157,13 @@ static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
 {
 	sinfo->rx_mpdu_count = link_info->hdd_stats.peer_stats.rx_count;
 	sinfo->fcs_err_count = link_info->hdd_stats.peer_stats.fcs_count;
-	hdd_debug("RX mpdu count %d fcs_err_count %d",
-		  sinfo->rx_mpdu_count, sinfo->fcs_err_count);
-	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT | HDD_INFO_RX_MPDUS;
+	sinfo->rx_dropped_misc =
+		link_info->hdd_stats.summary_stat.rx_discard_cnt;
+	hdd_debug("RX mpdu count %d fcs_err_count %d rx_dropped_misc %llu",
+		  sinfo->rx_mpdu_count, sinfo->fcs_err_count,
+		  (unsigned long long)sinfo->rx_dropped_misc);
+	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT | HDD_INFO_RX_MPDUS |
+			 HDD_INFO_RX_DROP_MISC;
 }
 #else
 static void hdd_fill_fcs_and_mpdu_count(struct wlan_hdd_link_info *link_info,
@@ -8701,11 +8887,22 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	struct stats_event *stats;
 	struct hdd_fw_txrx_stats txrx_stats = {0};
 	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	bool get_peer_info_enable = false;
+	QDF_STATUS qdf_status;
 	uint8_t *peer_addr;
 
 	if (hdd_stats->class_a_stat.is_tx_rate_version_checked &&
 	    !hdd_stats->class_a_stat.tx_rate_version)
 		return;
+
+	qdf_status = ucfg_mlme_get_sap_get_peer_info(hdd_ctx->psoc,
+						     &get_peer_info_enable);
+	if (QDF_IS_STATUS_ERROR(qdf_status) || !get_peer_info_enable) {
+		hdd_debug_rl("WMI_SERVICE_PEER_STATS_INFO not supported");
+		return;
+	}
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_debug("Roaming in progress");
@@ -8717,6 +8914,8 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 							     peer_addr);
 	if (!stats) {
 		hdd_err_rl("Failed to get peer_stats");
+		hdd_stats->class_a_stat.is_tx_rate_version_checked = true;
+		hdd_stats->class_a_stat.tx_rate_version = 0;
 		return;
 	}
 
@@ -8777,6 +8976,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 		   link_info->vdev_id, 0);
 
 	if (link_info->vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
+		wlan_hdd_fill_standby_bss_params(link_info);
 		wlan_hdd_update_sinfo(sinfo, link_info);
 		wlan_hdd_fill_send_get_sta_ucast_stats(link_info, mac, sinfo);
 		hdd_debug_rl("Sending Cached stats for standby link");
@@ -8822,6 +9022,8 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	 */
 	hdd_lpass_notify_connect(link_info);
 
+	hdd_fill_bss_params(link_info, sinfo);
+
 	if (wlan_hdd_update_rate_info(link_info, sinfo))
 		/* Keep GUI happy */
 		return 0;
@@ -8859,8 +9061,10 @@ wlan_hdd_update_mlo_rate_info(struct wlan_hdd_station_stats_info *hdd_sinfo,
 
 	hdd_sinfo->signal = sinfo->signal;
 	hdd_sinfo->signal_avg = sinfo->signal_avg;
-	for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
+	for (i = 0; i < IEEE80211_MAX_CHAINS; i++) {
+		hdd_sinfo->chain_signal[i] = sinfo->chain_signal[i];
 		hdd_sinfo->chain_signal_avg[i] = sinfo->chain_signal_avg[i];
+	}
 	hdd_sinfo->chains = sinfo->chains;
 
 	qdf_mem_copy(&hdd_sinfo->txrate,
@@ -8909,6 +9113,13 @@ wlan_hdd_update_mlo_sinfo(struct wlan_hdd_link_info *link_info,
 	hdd_sinfo->tx_failed += sinfo->tx_failed;
 	hdd_sinfo->rx_mpdu_count += sinfo->rx_mpdu_count;
 	hdd_sinfo->fcs_err_count += sinfo->fcs_err_count;
+	hdd_sinfo->rx_dropped_misc += sinfo->rx_dropped_misc;
+
+	if (!(hdd_sinfo->filled & HDD_INFO_BSS_PARAM) &&
+	    (sinfo->filled & HDD_INFO_BSS_PARAM)) {
+		hdd_sinfo->bss_param = sinfo->bss_param;
+		hdd_sinfo->filled |= HDD_INFO_BSS_PARAM;
+	}
 }
 
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV

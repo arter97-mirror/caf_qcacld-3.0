@@ -5331,6 +5331,18 @@ wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *periodic_display_time);
 
 /**
+ * wlan_mlme_stats_get_chain_signal_in_signal_row() - get INI toggle for
+ * reporting per-chain RSSI on the signal row in iw station dump
+ * @psoc: pointer to psoc object
+ * @val: buffer to hold value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_stats_get_chain_signal_in_signal_row(struct wlan_objmgr_psoc *psoc,
+					       bool *val);
+
+/**
  * wlan_mlme_is_bcn_prot_disabled_for_sap() - Is beacon protection config
  * disabled for SAP interface
  *
@@ -5893,4 +5905,87 @@ bool wlan_mlme_get_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
 						      bool value);
+
+/**
+ * wlan_mlme_get_sap_perf_tuning_enabled() - query current
+ * SAP perf tuning support.
+ * @psoc: pointer to psoc
+ *
+ * Return: true if perf tuning is enabled for SAP.
+ */
+bool
+wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_sap_perf_tuning_enabled() - Update SAP perf tuning support.
+ * @psoc: pointer to psoc
+ * @sap_perf_tuning_enable: Updated value of perf_tuning_enable
+ *
+ * Return: QDF_SUCCESS on success and any other status for failure.
+ */
+QDF_STATUS
+wlan_mlme_set_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc,
+				      bool sap_perf_tuning_enable);
+
+/**
+ * wlan_mlme_get_sap_perf_tuning_serv_cap() - Get SAP perf tuning support
+ * based on service capability bit.
+ * @psoc: pointer to psoc
+ *
+ * Return: service capability flag for SAP Performance tuning feature.
+ */
+bool
+wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_sap_perf_data_threshold() - query current SAP perf data
+ * threshold.
+ * @psoc: pointer to psoc
+ *
+ * Return: SAP performance data threshold.
+ */
+uint32_t
+wlan_mlme_get_sap_perf_data_threshold(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_sap_traffic_monitoring_time_s() - query current SAP traffic
+ * monitoring time in unit of sec.
+ * @psoc: pointer to psoc
+ *
+ * Return: SAP traffic monitoring time in second.
+ */
+uint32_t
+wlan_mlme_get_sap_traffic_monitoring_time_s(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_high_band_roaming_threshold_time_ms() - Get high band roaming
+ * threshold time in millisecond.
+ * @psoc: pointer to psoc
+ *
+ * Return: High band roaming threshold time in millisecond.
+ */
+uint32_t
+wlan_mlme_get_high_band_roaming_threshold_time_ms(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_high_band_roaming_data_threshold() - Get high band roaming
+ * data threshold in KBps.
+ * @psoc: pointer to psoc
+ *
+ * Return: High band roaming data threshold in KBps.
+ */
+uint32_t
+wlan_mlme_get_high_band_roaming_data_threshold(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_enable_high_band_roaming() - Get enable high band roaming
+ * support
+ * @psoc: pointer to psoc
+ *
+ * Return: true if high band roaming is enabled, false otherwise
+ */
+bool
+wlan_mlme_get_enable_high_band_roaming(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_MLME_API_H_ */

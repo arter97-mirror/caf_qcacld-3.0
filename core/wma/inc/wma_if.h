@@ -270,6 +270,8 @@ typedef struct {
 	/* The return status of SIR_HAL_ADD_STA_REQ is reported here */
 	QDF_STATUS status;
 	uint8_t updateSta;
+	/* 1 = passthru NEW: WMI_PEER_CREATE only; skip WMI_PEER_ASSOC_CMDID */
+	uint8_t create_only;
 	uint8_t rmfEnabled;
 	uint32_t encryptType;
 	uint8_t sessionId;

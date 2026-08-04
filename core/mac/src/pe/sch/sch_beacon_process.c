@@ -303,6 +303,7 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 		session->bcon_dtim_period = bcn->tim.dtimPeriod;
 		lim_send_set_dtim_period(mac_ctx, bcn->tim.dtimPeriod,
 				session);
+		lim_update_vdev_bss_param_dtim(session, bcn->tim.dtimPeriod);
 	}
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_RX_MGMT_TSF,
 	       session->peSessionId, bcn->timeStamp[0]));
@@ -348,6 +349,8 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 		else
 			lim_enable_short_preamble(mac_ctx, true,
 						  beaconParams, session);
+		lim_update_vdev_bss_param_use_prot(session,
+						   bcn->erpIEInfo.useProtection);
 	}
 	lim_update_short_slot(mac_ctx, bcn, beaconParams, session);
 
@@ -706,7 +709,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						mac_ctx,
 						session,
 						bcn->chan_freq,
-						&pwr_type_6g);
+						&pwr_type_6g,
+						false);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 
