@@ -8514,7 +8514,7 @@ __wlan_hdd_cfg80211_get_logger_supp_feature(struct wiphy *wiphy,
 	int status;
 	uint32_t features;
 	struct sk_buff *reply_skb = NULL;
-	bool enable_ring_buffer;
+	uint32_t enable_ring_buffer;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -10774,7 +10774,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL];
 	struct nlattr *ps_latency_tolerance_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE];
-	int ret;
+	int ret = 0;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -10832,8 +10832,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
 		ps_params.ps_opm_level = curr_ps_params.ps_opm_level;
 
-		if (!ps_params.ps_ito)
-			return -EINVAL;
+		if (!ps_params.ps_ito) {
+			ret = -EINVAL;
+			goto err;
+		}
 
 		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
 			  ps_params.ps_ito, ps_params.spec_wake,
@@ -10845,7 +10847,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 						  ps_params.spec_wake);
 
 		if (ret)
-			return ret;
+			goto err;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
 	}
 
 	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
@@ -10853,8 +10858,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ps_params.spec_wake = nla_get_u16(ps_latency_tolerance_attr);
 		ps_params.ps_ito = curr_ps_params.ps_ito;
 
-		if (!ps_params.ps_opm_level)
-			return -EINVAL;
+		if (!ps_params.ps_opm_level) {
+			ret = -EINVAL;
+			goto err;
+		}
 
 		hdd_debug("ps_opm_level %d latency_tolerance %d opm_mode %d",
 			  ps_params.ps_opm_level, ps_params.spec_wake,
@@ -10866,17 +10873,23 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 						  ps_params.spec_wake);
 
 		if (ret)
-			return ret;
+			goto err;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
 	}
 
 	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
-	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED))
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED)) {
 		ucfg_pmo_set_ps_params(vdev, &ps_params);
-	else
+	} else {
 		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, true, 0);
+	}
 
+err:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-	return 0;
+	return ret;
 }
 
 static int hdd_config_stats_avg_factor(struct wlan_hdd_link_info *link_info,
@@ -16505,6 +16518,7 @@ static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_START_MAX + 1];
 	struct sir_wifi_start_log start_log = { 0 };
 	mac_handle_t mac_handle;
+	uint32_t enable_ring_buffer;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -16563,6 +16577,18 @@ static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 	start_log.is_pktlog_buff_clear = false;
 
 	cds_set_ring_log_level(start_log.ring_id, start_log.verbose_level);
+
+	/* Get enable_ring_buffer INI value */
+	wlan_mlme_get_status_ring_buffer(hdd_ctx->psoc, &enable_ring_buffer);
+
+	/* Check if ring buffer is supported based on INI and verbose level */
+	if (enable_ring_buffer == 2) {
+		if (start_log.verbose_level <= LOG_LEVEL_NORMAL_COLLECT) {
+			hdd_debug("Ring buffer not supported for ring_id: %d, verbose_level: %d",
+				  start_log.ring_id, start_log.verbose_level);
+			return -EOPNOTSUPP;
+		}
+	}
 
 	if (start_log.ring_id == RING_ID_WAKELOCK) {
 		/* Start/stop wakelock events */
@@ -16662,6 +16688,8 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb
 		[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX + 1];
+	uint32_t enable_ring_buffer;
+	uint32_t verbose_level;
 
 	hdd_enter();
 
@@ -16690,6 +16718,23 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 
 	ring_id = nla_get_u32(
 			tb[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_ID]);
+
+	/* Get enable_ring_buffer INI value */
+	wlan_mlme_get_status_ring_buffer(hdd_ctx->psoc, &enable_ring_buffer);
+
+	/* Check if ring buffer logging is enabled based on INI and
+	 * verbose level
+	 */
+	if (enable_ring_buffer == 2) {
+		/* Get the current verbose level for the ring */
+		verbose_level = cds_get_ring_log_level(ring_id);
+
+		if (verbose_level <= LOG_LEVEL_NORMAL_COLLECT) {
+			hdd_debug("Ring buffers are not enabled for ring_id: %d",
+				  ring_id);
+			return -EINVAL;
+		}
+	}
 
 	if (ring_id == RING_ID_PER_PACKET_STATS) {
 		wlan_logging_set_per_pkt_stats();
@@ -27546,6 +27591,27 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Posting of link connect request failed");
 			return -EINVAL;
+		}
+	}
+
+	if (pairwise && adapter->device_mode == QDF_STA_MODE) {
+		struct wlan_objmgr_peer *peer;
+		enum wlan_peer_type peer_type;
+		struct qdf_mac_addr mac_address = {0};
+
+		qdf_mem_copy(mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+		peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+						   mac_address.bytes,
+						   WLAN_OSIF_ID);
+		if (peer) {
+			peer_type = wlan_peer_get_peer_type(peer);
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+			if (peer_type == WLAN_PEER_TDLS &&
+			    !ucfg_tdls_is_key_install_allowed(vdev,
+							      &mac_address)) {
+				hdd_debug("TDLS peer's key install disallowed");
+				return 0;
+			}
 		}
 	}
 
