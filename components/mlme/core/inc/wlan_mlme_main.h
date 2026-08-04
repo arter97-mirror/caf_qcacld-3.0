@@ -468,7 +468,7 @@ struct mlme_legacy_priv {
 #ifdef WLAN_FEATURE_11BE
 	tDot11fIEeht_cap eht_config;
 #endif
-	qdf_time_t last_delba_sent_time;
+	uint64_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
 	bool notify_co_located_ap_upt_rnr;

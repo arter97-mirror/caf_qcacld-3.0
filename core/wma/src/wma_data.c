@@ -3115,7 +3115,7 @@ wma_drop_delba(tp_wma_handle wma, uint8_t vdev_id,
 	       enum cdp_delba_rcode cdp_reason_code)
 {
 	struct wlan_objmgr_vdev *vdev;
-	qdf_time_t last_ts, ts = qdf_mc_timer_get_system_time();
+	uint64_t last_ts, ts = qdf_mc_timer_get_system_time();
 	bool drop = false;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,

@@ -305,7 +305,7 @@ struct csr_roam_session {
 #endif
 #ifdef FEATURE_WLAN_ESE
 	bool isPrevApInfoValid;
-	uint32_t roamTS1;
+	uint64_t roamTS1;
 #endif
 	bool ch_switch_in_progress;
 	uint8_t nss;

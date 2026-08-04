@@ -2225,7 +2225,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		     sizeof(tSirMacSeqCtl));
 
 	bss_desc_ptr->received_time =
-		      (uint64_t)qdf_mc_timer_get_system_time();
+		      qdf_mc_timer_get_system_time();
 	if (parsed_frm_ptr->mdiePresent) {
 		bss_desc_ptr->mdiePresent = parsed_frm_ptr->mdiePresent;
 		qdf_mem_copy((uint8_t *)bss_desc_ptr->mdie,
