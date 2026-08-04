@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
- * Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,12 +27,44 @@
  */
 
 struct hdd_context;
+struct wma_tgt_cfg;
 
 #ifdef WLAN_FEATURE_NAN
 struct wiphy;
 struct wireless_dev;
 
 bool wlan_hdd_nan_is_supported(struct hdd_context *hdd_ctx);
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+struct wiphy_nan_capa;
+
+/**
+ * hdd_nan_fill_wiphy_caps() - Fill wiphy NAN capabilities
+ * @hdd_ctx: Pointer to HDD context
+ * @nan_capa: pointer to wiphy NAN capabilities structure
+ *
+ * Copies cached NAN PHY capabilities to the wiphy structure.
+ *
+ * Return: None
+ */
+void hdd_nan_fill_wiphy_caps(struct hdd_context *hdd_ctx,
+			     struct wiphy_nan_capa *nan_capa);
+
+/**
+ * hdd_populate_nan_phy_caps() - Populate/calculate NAN PHY caps (HT/VHT)
+ * from effective target configuration (FW ∩ host) and cache them for use
+ * when advertising via cfg80211/mac80211.
+ * @hdd_ctx: HDD context
+ * @cfg: pointer to effective target config (struct wma_tgt_cfg)
+ */
+void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
+			       struct wma_tgt_cfg *cfg);
+#else
+static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
+					     struct wma_tgt_cfg *cfg)
+{
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**
  * wlan_hdd_cfg80211_nan_ext_request() - handle NAN Extended request
@@ -103,6 +134,11 @@ void hdd_ndp_update_peer_bw(uint8_t vdev_id, struct qdf_mac_addr *peer_mac,
 static inline bool wlan_hdd_nan_is_supported(struct hdd_context *hdd_ctx)
 {
 	return false;
+}
+
+static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
+					     struct wma_tgt_cfg *cfg)
+{
 }
 #endif /* WLAN_FEATURE_NAN */
 

@@ -29,6 +29,7 @@
 #include <net/cfg80211.h>
 #include <ani_global.h>
 #include "sme_api.h"
+#include "wma.h"
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_nan.h"
 #include "osif_sync.h"
@@ -37,8 +38,38 @@
 #include "os_if_nan.h"
 #include "spatial_reuse_api.h"
 #include "wlan_nan_api.h"
+#include "nan_ucfg_api.h"
 #include "spatial_reuse_ucfg_api.h"
 #include <cdp_txrx_ctrl.h>
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * hdd_nan_fill_wiphy_caps() - Fill NAN PHY capabilities into wiphy
+ * @hdd_ctx: Pointer to hdd context
+ * @nan_capa: Pointer to wiphy NAN capability structure to fill
+ *
+ * Copies the cached NAN PHY capabilities (HT/VHT) from the HDD
+ * context into the provided wiphy NAN capability structure.
+ *
+ * Return: None
+ */
+void hdd_nan_fill_wiphy_caps(struct hdd_context *hdd_ctx,
+			     struct wiphy_nan_capa *nan_capa)
+{
+	if (!hdd_ctx || !nan_capa)
+		return;
+
+	/*
+	 * Warn if caps have not been populated yet (e.g. if called before
+	 * hdd_populate_nan_phy_caps() during early init or after SSR).
+	 */
+	if (!hdd_ctx->nan_caps.ht.ht_supported &&
+	    !hdd_ctx->nan_caps.vht.vht_supported)
+		hdd_warn("NAN PHY caps not yet populated; wiphy will advertise no NAN PHY caps");
+	nan_capa->phy.ht = hdd_ctx->nan_caps.ht;
+	nan_capa->phy.vht = hdd_ctx->nan_caps.vht;
+}
+#endif
 
 /**
  * wlan_hdd_nan_is_supported() - HDD NAN support query function
@@ -321,6 +352,172 @@ void hdd_ndp_update_peer_bw(uint8_t vdev_id, struct qdf_mac_addr *peer_mac,
 			break;
 		}
 	}
+}
+#endif
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+#if defined(CONFIG_BAND_6GHZ) && \
+	(defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)))
+static bool hdd_nan_is_6g_enabled(struct hdd_context *hdd_ctx)
+{
+	return !!(hdd_ctx->iftype_data_6g);
+}
+#else
+static bool hdd_nan_is_6g_enabled(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
+
+static u8 hdd_nan_map_mpdu_density_to_code(u32 dens_us)
+{
+	u32 q;
+
+	/* ieee80211_sta_ht_cap.ampdu_density encoding:
+	 * 0: 0us, 1: 0.25us, 2: 0.5us, 3: 1us, 4: 2us, 5: 4us, 6: 8us, 7: 16us
+	 */
+	if (dens_us == 0)
+		return IEEE80211_HT_MPDU_DENSITY_NONE;
+	/* work in quarter-microsecond units */
+	q = dens_us * 4;
+	if (q <= 1)
+		return IEEE80211_HT_MPDU_DENSITY_0_25;
+	if (q <= 2)
+		return IEEE80211_HT_MPDU_DENSITY_0_5;
+	if (q <= 4)
+		return IEEE80211_HT_MPDU_DENSITY_1;
+	if (q <= 8)
+		return IEEE80211_HT_MPDU_DENSITY_2;
+	if (q <= 16)
+		return IEEE80211_HT_MPDU_DENSITY_4;
+	if (q <= 32)
+		return IEEE80211_HT_MPDU_DENSITY_8;
+	return IEEE80211_HT_MPDU_DENSITY_16;
+}
+
+/**
+ * hdd_populate_nan_phy_caps() - Populate NAN PHY capabilities (HT/VHT)
+ * @hdd_ctx: HDD context
+ * @cfg: effective target config (FW intersected with host)
+ *
+ * Asks the NAN component to compute the FW∩host∩band-enablement HT/VHT
+ * capability intersection, then renders that OS-agnostic result into the
+ * kernel-facing ieee80211_sta_ht_cap/vht_cap structures cached in
+ * hdd_ctx->nan_caps for use when advertising via cfg80211/mac80211.
+ *
+ * Return: None
+ */
+void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
+			       struct wma_tgt_cfg *cfg)
+{
+	struct ieee80211_sta_ht_cap *ht;
+	struct ieee80211_sta_vht_cap *vht;
+	struct nan_phy_caps caps;
+	bool enable_2g, enable_5g, enable_6g;
+	uint32_t band_capability = 0;
+	QDF_STATUS status;
+	int i;
+
+	if (!hdd_ctx || !cfg)
+		return;
+
+	/*
+	 * Determine enabled NAN bands from the configured band capability
+	 * bitmap. hdd_is_2g_supported()/hdd_is_5g_supported() cannot be
+	 * reused here: they encode "not restricted to the other single
+	 * band" (curr_band), so for every possible curr_band value at
+	 * least one of them is true, making enable_2g || enable_5g always
+	 * true regardless of actual per-band enablement.
+	 */
+	status = ucfg_mlme_get_band_capability(hdd_ctx->psoc, &band_capability);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to get MLME band capability");
+
+	enable_2g = !!(band_capability & BIT(REG_BAND_2G));
+	enable_5g = !!(band_capability & BIT(REG_BAND_5G));
+	enable_6g = hdd_nan_is_6g_enabled(hdd_ctx);
+
+	ucfg_nan_set_phy_target_cfg(hdd_ctx->psoc, cfg, hdd_ctx->num_rf_chains,
+				    enable_2g, enable_5g, enable_6g);
+	ucfg_nan_get_phy_caps(hdd_ctx->psoc, &caps);
+
+	/* Zero the cache first, then take pointers into it (Issue #7:
+	 * avoids confusing pattern where pointers appear stale after zero).
+	 */
+	qdf_mem_zero(&hdd_ctx->nan_caps, sizeof(hdd_ctx->nan_caps));
+
+	ht = &hdd_ctx->nan_caps.ht;
+	vht = &hdd_ctx->nan_caps.vht;
+
+	ht->ht_supported = caps.ht_supported;
+	if (ht->ht_supported) {
+		/* ht->cap is u16 (native endian), not __le16 */
+		if (caps.ht_ldpc)
+			ht->cap |= IEEE80211_HT_CAP_LDPC_CODING;
+		if (caps.ht_sgi_20)
+			ht->cap |= IEEE80211_HT_CAP_SGI_20;
+		if (caps.ht_sgi_40)
+			ht->cap |= IEEE80211_HT_CAP_SGI_40;
+		if (caps.ht_rx_stbc)
+			ht->cap |= IEEE80211_HT_CAP_RX_STBC;
+		if (caps.ht_tx_stbc)
+			ht->cap |= IEEE80211_HT_CAP_TX_STBC;
+
+		/* A-MPDU factor: use a conservative default
+		 * if host policy doesn't provide
+		 */
+		ht->ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
+		/* A-MPDU density: derive from effective
+		 * mpdu_density (microseconds)
+		 */
+		ht->ampdu_density =
+			hdd_nan_map_mpdu_density_to_code(caps.ht_mpdu_density);
+
+		/* HT MCS: set one byte per RF chain */
+		qdf_mem_zero(&ht->mcs, sizeof(ht->mcs));
+		for (i = 0; i < hdd_ctx->num_rf_chains &&
+		     i < IEEE80211_HT_MCS_MASK_LEN; i++)
+			ht->mcs.rx_mask[i] = 0xFF;
+
+		ht->mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
+		ht->mcs.rx_highest = cpu_to_le16(150 * hdd_ctx->num_rf_chains);
+	} else {
+		qdf_mem_zero(ht, sizeof(*ht));
+	}
+
+	vht->vht_supported = caps.vht_supported;
+	if (vht->vht_supported) {
+		/* vht->cap is u32 (native endian), not __le32 */
+		vht->cap = 0;
+		if (caps.vht_short_gi_80)
+			vht->cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
+		if (caps.vht_short_gi_160)
+			vht->cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
+		if (caps.vht_rx_ldpc)
+			vht->cap |= IEEE80211_VHT_CAP_RXLDPC;
+		if (caps.vht_tx_stbc)
+			vht->cap |= IEEE80211_VHT_CAP_TXSTBC;
+		if (caps.vht_rx_stbc)
+			vht->cap |= IEEE80211_VHT_CAP_RXSTBC_4 &
+				    IEEE80211_VHT_CAP_RXSTBC_MASK;
+		if (caps.vht_su_bformer)
+			vht->cap |= IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE;
+		if (caps.vht_su_bformee)
+			vht->cap |= IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE;
+
+		qdf_mem_zero(&vht->vht_mcs, sizeof(vht->vht_mcs));
+		/* rx_mcs_map / tx_mcs_map are __le16 */
+		vht->vht_mcs.rx_mcs_map = cpu_to_le16(caps.vht_rx_mcs_map);
+		vht->vht_mcs.tx_mcs_map = cpu_to_le16(caps.vht_tx_mcs_map);
+		/* rx_highest/tx_highest left 0; not bounded here */
+	} else {
+		qdf_mem_zero(vht, sizeof(*vht));
+	}
+
+	hdd_debug("NAN PHY caps: HT=%d cap=0x%x, VHT=%d cap=0x%x",
+		  ht->ht_supported, ht->cap,
+		  vht->vht_supported, vht->cap);
 }
 #endif
 #endif

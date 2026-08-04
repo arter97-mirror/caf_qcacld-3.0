@@ -158,6 +158,7 @@ struct nan_cfg_params {
  * @fw_nan_addr: NAN MAC address which is randomized by target
  * @ndp_peer_mac_addr: array of NDP peer MAC address
  * @num_ndp_peers: Num of existing NDP peers
+ * @phy_caps: Cached NAN HT/VHT PHY capability intersection result
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -179,6 +180,9 @@ struct nan_psoc_priv_obj {
 	struct qdf_mac_addr fw_nan_addr;
 	struct qdf_mac_addr ndp_peer_mac_addr[MAX_NDP_PEERS];
 	uint8_t num_ndp_peers;
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+	struct nan_phy_caps phy_caps;
+#endif
 };
 
 /**

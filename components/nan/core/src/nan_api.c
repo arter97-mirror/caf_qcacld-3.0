@@ -33,6 +33,9 @@
 #include "nan_ucfg_api.h"
 #include <wlan_mlme_api.h>
 #include "cfg_ucfg_api.h"
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+#include "wma_tgt_cfg.h"
+#endif
 
 static QDF_STATUS nan_psoc_obj_created_notification(
 		struct wlan_objmgr_psoc *psoc, void *arg_list)
@@ -708,4 +711,121 @@ QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
 {
 	return target_if_nan_set_device_caps(psoc, caps);
 }
+
+/**
+ * nan_intersect_vht_mcs_map() - intersect two VHT MCS-NSS maps
+ * @fw_map: FW-effective VHT MCS-NSS map
+ * @drv_map: host-policy VHT MCS-NSS map
+ *
+ * Each NSS is encoded in 2 bits: 0=MCS0-7, 1=MCS0-8, 2=MCS0-9, 3=unsupported.
+ * The intersection per NSS is the more restrictive (numerically smaller,
+ * unless either side reports unsupported) of the two encodings.
+ *
+ * Return: intersected VHT MCS-NSS map
+ */
+static uint16_t nan_intersect_vht_mcs_map(uint16_t fw_map, uint16_t drv_map)
+{
+	uint16_t out = 0;
+	int nss;
+
+	for (nss = 0; nss < 8; nss++) {
+		uint16_t shift = nss * 2;
+		uint16_t a = (fw_map >> shift) & 0x3;
+		uint16_t b = (drv_map >> shift) & 0x3;
+		uint16_t c;
+
+		if (a == 3 || b == 3)
+			c = 3;
+		else
+			c = (a < b) ? a : b;
+		out |= (c & 0x3) << shift;
+	}
+	return out;
+}
+
+void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
+			   struct wma_tgt_cfg *cfg, uint8_t num_rf_chains,
+			   bool enable_2g, bool enable_5g, bool enable_6g)
+{
+	struct nan_psoc_priv_obj *psoc_priv = nan_get_psoc_priv_obj(psoc);
+	struct nan_phy_caps *caps;
+	bool nan_band_enabled;
+	int nss;
+	uint16_t drv_mcs_map, fw_rx_mcs, fw_tx_mcs;
+
+	if (!psoc_priv || !cfg)
+		return;
+
+	caps = &psoc_priv->phy_caps;
+	qdf_mem_zero(caps, sizeof(*caps));
+
+	nan_band_enabled = enable_2g || enable_5g || enable_6g;
+
+	/*
+	 * cfg->ht_cap/vht_cap are already the effective FW∩host capability
+	 * (not per-band), so the intersection across bands reduces to a
+	 * single check: is NAN enabled on at least one band?
+	 */
+	if (nan_band_enabled) {
+		caps->ht_ldpc = cfg->ht_cap.ht_rx_ldpc;
+		caps->ht_sgi_20 = cfg->ht_cap.ht_sgi_20;
+		caps->ht_sgi_40 = cfg->ht_cap.ht_sgi_40;
+		caps->ht_rx_stbc = cfg->ht_cap.ht_rx_stbc;
+		caps->ht_tx_stbc = cfg->ht_cap.ht_tx_stbc;
+		caps->ht_mpdu_density = cfg->ht_cap.mpdu_density;
+	}
+	caps->ht_supported = caps->ht_ldpc || caps->ht_sgi_20 ||
+			      caps->ht_sgi_40 || caps->ht_rx_stbc ||
+			      caps->ht_tx_stbc;
+
+	/*
+	 * Build driver MCS map from num_rf_chains: supported NSS get
+	 * MCS 0-9 (encoding 0x1), all others are unsupported (0x3).
+	 */
+	drv_mcs_map = 0xFFFF; /* all NSS unsupported by default */
+	for (nss = 0; nss < num_rf_chains && nss < 8; nss++) {
+		drv_mcs_map &= ~(0x3U << (nss * 2));
+		drv_mcs_map |= (0x1U << (nss * 2)); /* MCS 0-9 */
+	}
+
+	/*
+	 * vht_supp_mcs lower 16 bits = RX MCS map, upper 16 bits = TX MCS
+	 * map (0 if not separately encoded).
+	 */
+	fw_rx_mcs = (uint16_t)(cfg->vht_cap.vht_supp_mcs & 0xFFFF);
+	fw_tx_mcs = (uint16_t)((cfg->vht_cap.vht_supp_mcs >> 16) & 0xFFFF);
+	if (!fw_tx_mcs)
+		fw_tx_mcs = fw_rx_mcs;
+
+	caps->vht_rx_mcs_map = nan_intersect_vht_mcs_map(fw_rx_mcs,
+							 drv_mcs_map);
+	caps->vht_tx_mcs_map = nan_intersect_vht_mcs_map(fw_tx_mcs,
+							 drv_mcs_map);
+
+	caps->vht_short_gi_80 = cfg->vht_cap.vht_short_gi_80;
+	caps->vht_short_gi_160 = cfg->vht_cap.vht_short_gi_160;
+	caps->vht_rx_ldpc = cfg->vht_cap.vht_rx_ldpc;
+	caps->vht_tx_stbc = cfg->vht_cap.vht_tx_stbc;
+	caps->vht_rx_stbc = cfg->vht_cap.vht_rx_stbc;
+	caps->vht_su_bformer = cfg->vht_cap.vht_su_bformer;
+	caps->vht_su_bformee = cfg->vht_cap.vht_su_bformee;
+
+	caps->vht_supported = caps->vht_short_gi_80 || caps->vht_short_gi_160 ||
+			       caps->vht_rx_ldpc || caps->vht_tx_stbc ||
+			       caps->vht_rx_stbc || caps->vht_su_bformer ||
+			       caps->vht_su_bformee ||
+			       caps->vht_rx_mcs_map != 0xFFFF;
+}
+
+void nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
+		      struct nan_phy_caps *caps)
+{
+	struct nan_psoc_priv_obj *psoc_priv = nan_get_psoc_priv_obj(psoc);
+
+	if (!psoc_priv || !caps)
+		return;
+
+	*caps = psoc_priv->phy_caps;
+}
 #endif
+

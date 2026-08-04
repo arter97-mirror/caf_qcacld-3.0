@@ -31555,6 +31555,8 @@ static void wlan_hdd_set_nan_cap(struct hdd_context *hdd_ctx)
 	nan_caps->n_antennas = caps.n_antennas;
 	nan_caps->max_channel_switch_time = caps.max_channel_switch_time;
 	nan_caps->dev_capabilities = caps.dev_capabilities;
+
+	hdd_nan_fill_wiphy_caps(hdd_ctx, nan_caps);
 }
 #else
 static inline void wlan_hdd_set_nan_cap(struct hdd_context *hdd_ctx)

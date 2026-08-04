@@ -500,6 +500,8 @@ nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
 #endif /* WLAN_FEATURE_NAN && WLAN_CHIPSET_STATS */
 
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+struct wma_tgt_cfg;
+
 /**
  * nan_get_device_caps() - This API get NAN capabilities from firmware
  * @psoc: pointer to PSOC object
@@ -509,6 +511,36 @@ nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
  */
 QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
 			       struct nan_capabilities *caps);
+
+/**
+ * nan_populate_phy_caps() - Compute and cache NAN HT/VHT PHY capability
+ * intersection
+ * @psoc: pointer to PSOC object
+ * @cfg: effective target config (FW intersected with host)
+ * @num_rf_chains: number of RF chains supported by the host
+ * @enable_2g: whether NAN is enabled on 2.4 GHz band
+ * @enable_5g: whether NAN is enabled on 5 GHz band
+ * @enable_6g: whether NAN is enabled on 6 GHz band
+ *
+ * Intersects @cfg with NAN band enablement policy and caches the OS-agnostic
+ * result for retrieval via nan_get_phy_caps().
+ *
+ * Return: None
+ */
+void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
+			   struct wma_tgt_cfg *cfg, uint8_t num_rf_chains,
+			   bool enable_2g, bool enable_5g, bool enable_6g);
+
+/**
+ * nan_get_phy_caps() - Retrieve cached NAN HT/VHT PHY capability
+ * intersection result
+ * @psoc: pointer to PSOC object
+ * @caps: output NAN PHY capability struct
+ *
+ * Return: None
+ */
+void nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
+		      struct nan_phy_caps *caps);
 /**
  * wlan_get_nan_init_dw_time() - get nan init dw time
  *

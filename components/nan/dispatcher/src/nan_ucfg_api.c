@@ -1957,4 +1957,19 @@ bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return nan_is_fw_support_standard_mode(psoc);
 }
+
+void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
+				 struct wma_tgt_cfg *cfg,
+				 uint8_t num_rf_chains, bool enable_2g,
+				 bool enable_5g, bool enable_6g)
+{
+	nan_populate_phy_caps(psoc, cfg, num_rf_chains, enable_2g, enable_5g,
+			      enable_6g);
+}
+
+void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
+			   void *caps)
+{
+	nan_get_phy_caps(psoc, (struct nan_phy_caps *)caps);
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

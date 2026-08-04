@@ -873,6 +873,8 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 }
 #endif /* WLAN_FEATURE_NAN */
 
+struct wma_tgt_cfg;
+
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
 /**
  * ucfg_nan_is_fw_support_standard_mode() - wrapper API for function
@@ -882,11 +884,53 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
  * Return: true if NAN standard mode supported by FW otherwise false
  */
 bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_nan_set_phy_target_cfg() - ucfg API to compute and cache NAN HT/VHT
+ * PHY capability intersection
+ * @psoc: pointer to PSOC object
+ * @cfg: effective target config (FW intersected with host)
+ * @num_rf_chains: number of RF chains supported by the host
+ * @enable_2g: whether NAN is enabled on 2.4 GHz band
+ * @enable_5g: whether NAN is enabled on 5 GHz band
+ * @enable_6g: whether NAN is enabled on 6 GHz band
+ *
+ * Return: None
+ */
+void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
+				 struct wma_tgt_cfg *cfg,
+				 uint8_t num_rf_chains, bool enable_2g,
+				 bool enable_5g, bool enable_6g);
+
+/**
+ * ucfg_nan_get_phy_caps() - ucfg API to retrieve cached NAN HT/VHT PHY
+ * capability intersection result
+ * @psoc: pointer to PSOC object
+ * @caps: output NAN PHY capability struct
+ *
+ * Return: None
+ */
+void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
+			   void *caps);
 #else
 static inline
 bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline
+void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
+				 struct wma_tgt_cfg *cfg,
+				 uint8_t num_rf_chains, bool enable_2g,
+				 bool enable_5g, bool enable_6g)
+{
+}
+
+static inline
+void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
+			   void *caps)
+{
 }
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

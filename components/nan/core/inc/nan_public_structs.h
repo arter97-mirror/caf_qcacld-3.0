@@ -1213,5 +1213,51 @@ struct nan_capabilities {
 	u16 max_channel_switch_time;
 	u8 dev_capabilities;
 } qdf_packed;
+
+/**
+ * struct nan_phy_caps - NAN PHY capability intersection result (HT/VHT)
+ * @ht_supported: whether HT is supported for NAN
+ * @ht_ldpc: HT RX LDPC supported
+ * @ht_sgi_20: HT short GI for 20 MHz supported
+ * @ht_sgi_40: HT short GI for 40 MHz supported
+ * @ht_rx_stbc: HT RX STBC supported
+ * @ht_tx_stbc: HT TX STBC supported
+ * @ht_mpdu_density: effective HT MPDU density in microseconds
+ * @vht_supported: whether VHT is supported for NAN
+ * @vht_short_gi_80: VHT short GI for 80 MHz supported
+ * @vht_short_gi_160: VHT short GI for 160 MHz supported
+ * @vht_rx_ldpc: VHT RX LDPC supported
+ * @vht_tx_stbc: VHT TX STBC supported
+ * @vht_rx_stbc: VHT RX STBC supported
+ * @vht_su_bformer: VHT SU beamformer supported
+ * @vht_su_bformee: VHT SU beamformee supported
+ * @vht_rx_mcs_map: VHT RX MCS map, 2 bits per NSS as per VHT Capabilities IE
+ * @vht_tx_mcs_map: VHT TX MCS map, 2 bits per NSS as per VHT Capabilities IE
+ *
+ * OS-agnostic representation of the HT/VHT capability bits relevant to NAN,
+ * after intersecting FW-effective target capability with NAN band
+ * enablement. HDD renders this into kernel-facing
+ * ieee80211_sta_ht_cap/vht_cap structures.
+ */
+struct nan_phy_caps {
+	bool ht_supported;
+	bool ht_ldpc;
+	bool ht_sgi_20;
+	bool ht_sgi_40;
+	bool ht_rx_stbc;
+	bool ht_tx_stbc;
+	uint32_t ht_mpdu_density;
+
+	bool vht_supported;
+	bool vht_short_gi_80;
+	bool vht_short_gi_160;
+	bool vht_rx_ldpc;
+	bool vht_tx_stbc;
+	bool vht_rx_stbc;
+	bool vht_su_bformer;
+	bool vht_su_bformee;
+	uint16_t vht_rx_mcs_map;
+	uint16_t vht_tx_mcs_map;
+};
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _NAN_PUBLIC_STRUCTS_H_ */
