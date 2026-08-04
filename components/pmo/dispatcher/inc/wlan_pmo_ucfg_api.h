@@ -1109,6 +1109,18 @@ QDF_STATUS ucfg_pmo_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS ucfg_pmo_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 					    pmo_pld_auto_resume_cb pld_cb);
+
+/**
+ * ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(): arm RTPM TBTT-nack delay
+ * @psoc: objmgr psoc
+ *
+ * Call only after ucfg_pmo_psoc_bus_runtime_suspend() has returned, so
+ * the shortened delay it may arm is not immediately reset by that same
+ * suspend attempt's own WMI traffic.
+ *
+ * Return: none
+ */
+void ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc);
 #endif
 
 /**
@@ -2016,6 +2028,11 @@ ucfg_pmo_psoc_bus_runtime_resume(
 		pmo_pld_auto_suspend_cb pld_cb)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
+{
 }
 #endif
 

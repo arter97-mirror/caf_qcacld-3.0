@@ -507,6 +507,11 @@ QDF_STATUS ucfg_pmo_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 {
 	return pmo_core_psoc_bus_runtime_resume(psoc, pld_cb);
 }
+
+void ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
+{
+	pmo_core_psoc_apply_tbtt_nack_rtpm_delay(psoc);
+}
 #endif
 
 QDF_STATUS

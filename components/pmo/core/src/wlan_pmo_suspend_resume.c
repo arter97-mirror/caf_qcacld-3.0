@@ -770,12 +770,14 @@ out:
 }
 
 /**
- * pmo_core_set_tbtt_nack_rtpm_delay() - Set RTPM autosuspend delay on TBTT nack
+ * pmo_core_set_tbtt_nack_rtpm_delay() - Set TBTT nack flag on WoW nack
  * @psoc: objmgr psoc handle
  *
  * When FW nacks WoW suspend due to proximity to a TBTT event, iterate
- * through all up STA vdevs and set a short RTPM autosuspend delay so
- * the suspend is retried after the TBTT window has passed.
+ * through all up STA vdevs and, if a qualifying vdev is found, set a
+ * flag so the RTPM autosuspend delay can be shortened by the caller
+ * once this suspend attempt (and any WMI traffic it generates) has
+ * fully unwound.
  *
  * Return: none
  */
@@ -784,6 +786,7 @@ pmo_core_set_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
 {
 	uint8_t vdev_id;
 	struct wlan_objmgr_vdev *vdev;
+	struct pmo_psoc_priv_obj *psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	for (vdev_id = 0; vdev_id < WLAN_UMAC_PSOC_MAX_VDEVS; vdev_id++) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
@@ -798,8 +801,7 @@ pmo_core_set_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
 
 		if (PMO_VDEV_IN_STA_MODE(pmo_core_get_vdev_op_mode(vdev)) &&
 		    pmo_core_get_vdev_beacon_interval(vdev) >= 100) {
-			hif_rtpm_set_autosuspend_delay(
-					WOW_TBTT_NACK_RETRY_RTPM_DELAY);
+			pmo_core_set_tbtt_nack(psoc_ctx, true);
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 			break;
 		}
@@ -833,6 +835,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
 	qdf_event_reset(&psoc_ctx->wow.target_suspend);
 	pmo_core_set_wow_nack(psoc_ctx, false, 0);
+	pmo_core_set_tbtt_nack(psoc_ctx, false);
 	host_credits = pmo_tgt_psoc_get_host_credits(psoc);
 	wmi_pending_cmds = pmo_tgt_psoc_get_pending_cmnds(psoc);
 	pmo_debug("Credits:%d; Pending_Cmds: %d",
@@ -985,8 +988,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 
 	hif_latency_detect_timer_stop(pmo_core_psoc_get_hif_handle(psoc));
 
-	if (hif_rtpm_get_autosuspend_delay() == WOW_LARGE_RX_RTPM_DELAY ||
-	    hif_rtpm_get_autosuspend_delay() == WOW_TBTT_NACK_RETRY_RTPM_DELAY)
+	if (hif_rtpm_get_autosuspend_delay() == WOW_LARGE_RX_RTPM_DELAY)
 		hif_rtpm_restore_autosuspend_delay();
 
 	pmo_core_update_wow_enable_cmd_sent(psoc_ctx, true);
@@ -1365,6 +1367,25 @@ out:
 	pmo_exit();
 
 	return status;
+}
+
+void pmo_core_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
+{
+	struct pmo_psoc_priv_obj *psoc_ctx;
+
+	if (!psoc) {
+		pmo_err("psoc is NULL");
+		return;
+	}
+
+	psoc_ctx = pmo_psoc_get_priv(psoc);
+	if (!psoc_ctx) {
+		pmo_err("psoc_ctx is NULL");
+		return;
+	}
+
+	if (pmo_core_get_tbtt_nack(psoc_ctx))
+		hif_rtpm_set_wow_tbtt_nack_delay(WOW_TBTT_NACK_RETRY_RTPM_DELAY);
 }
 
 QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,

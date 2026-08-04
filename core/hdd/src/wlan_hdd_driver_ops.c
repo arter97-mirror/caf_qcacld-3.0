@@ -1850,6 +1850,13 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 	if (status == QDF_STATUS_SUCCESS)
 		ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
 
+	/*
+	 * Arm the TBTT-nack retry delay only after this suspend attempt
+	 * (and any WMI traffic it generated) has fully returned, so the
+	 * shortened delay is not immediately reset by that same attempt.
+	 */
+	ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(hdd_ctx->psoc);
+
 	hdd_debug("Runtime suspend done result: %d", err);
 
 	return err;
