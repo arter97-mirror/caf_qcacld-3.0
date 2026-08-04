@@ -439,6 +439,27 @@ bool nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
 void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
 				bool is_increment);
 
+/**
+ * nan_get_pasn_peer_count() - Return the pasn peer count
+ * @vdev: Pointer to vdev object
+ * @val: pointer to pasn peer count
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS nan_get_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
+				   uint32_t *val);
+
+/**
+ * nan_get_max_pairing_sessions() - Get maximum NAN pairing sessions supported
+ * @psoc: psoc pointer
+ * @val: pointer to max pairing session value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_get_max_pairing_sessions(struct wlan_objmgr_psoc *psoc,
+					uint32_t *val);
+
 /*
  * nan_pasn_flush_callback: callback to flush the NAN PASN scheduler msg
  * @msg: pointer to msg

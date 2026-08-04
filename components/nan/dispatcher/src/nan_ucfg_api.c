@@ -1693,6 +1693,9 @@ QDF_STATUS ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 	struct scheduler_msg msg = {0};
 	uint32_t len;
 	struct nan_pasn_peer_req params;
+	uint32_t pasn_peer_count;
+	uint32_t max_nan_pairing_session;
+
 	static const struct osif_request_params req_params = {
 		.priv_size = 0,
 		.timeout_ms = NAN_PASN_PEER_CREATE_TIMEOUT_MS,
@@ -1728,6 +1731,24 @@ QDF_STATUS ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 		status = wlan_mlme_clear_peer_private_object_data(peer);
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 		return status;
+	}
+
+	status = nan_get_pasn_peer_count(vdev, &pasn_peer_count);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to get pasn peer");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = nan_get_max_pairing_sessions(psoc, &max_nan_pairing_session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to get max pairing session");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (pasn_peer_count >= max_nan_pairing_session) {
+		nan_err("Max NAN pairing sessions reached (%u)",
+			max_nan_pairing_session);
+		return QDF_STATUS_E_RESOURCES;
 	}
 
 	len = sizeof(params);

@@ -31,6 +31,7 @@
 #include "lim_send_messages.h"
 #include "wma_nan_datapath.h"
 #include "os_if_nan.h"
+#include "cfg_nan_api.h"
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
 #include "wlan_nan_api_i.h"
@@ -50,6 +51,8 @@ static QDF_STATUS lim_add_ndi_peer(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds;
 	uint16_t assoc_id, peer_idx;
 	QDF_STATUS status;
+	uint32_t max_ndp_sessions;
+	uint32_t ndi_peer_count;
 	uint8_t zero_mac_addr[QDF_MAC_ADDR_SIZE] = { 0, 0, 0, 0, 0, 0 };
 
 	if (!wlan_is_vdev_id_up(mac_ctx->pdev, vdev_id)) {
@@ -78,6 +81,26 @@ static QDF_STATUS lim_add_ndi_peer(struct mac_context *mac_ctx,
 		pe_err("NDI Peer already exists!!");
 		return QDF_STATUS_SUCCESS;
 	}
+
+	status = cfg_nan_get_ndp_max_sessions(mac_ctx->psoc,
+					      &max_ndp_sessions);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_warn("Failed to get max NDP sessions, using cfg/default value");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = cfg_nan_get_ndp_peer_count(mac_ctx->psoc,
+					    &ndi_peer_count);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to get NDP peer count");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (ndi_peer_count >= max_ndp_sessions) {
+		pe_err("Max NDP sessions reached (%u)", max_ndp_sessions);
+		return QDF_STATUS_E_RESOURCES;
+	}
+
 	pe_info("Need to create NDI Peer :" QDF_MAC_ADDR_FMT,
 		QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
 

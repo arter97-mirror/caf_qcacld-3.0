@@ -122,6 +122,41 @@ void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
 	nan_debug("Pasn peer count:%d", nan_vdev_obj->num_pasn_peers);
 }
 
+QDF_STATUS nan_get_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
+				   uint32_t *val)
+{
+	struct nan_vdev_priv_obj *nan_vdev_obj;
+
+	nan_vdev_obj = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_obj) {
+		nan_err("NAN vdev priv obj is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = nan_vdev_obj->num_pasn_peers;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS nan_get_max_pairing_sessions(struct wlan_objmgr_psoc *psoc,
+					uint32_t *val)
+{
+	struct target_psoc_info *tgt_hdl;
+
+	if (!psoc) {
+		nan_err("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		nan_err("tgt_hdl is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = tgt_hdl->info.service_ext2_param.max_nan_pairing_sessions;
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * nan_add_peer_in_migrated_addr_list() - add peer address in the migrated list
  * @psoc: pointer to psoc object
@@ -504,6 +539,8 @@ QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 	struct nan_pasn_peer_ops *peer_ops;
 	struct wlan_objmgr_vdev *nan_vdev;
 	uint8_t nan_vdev_id;
+	uint32_t pasn_peer_count;
+	uint32_t max_nan_pairing_session;
 
 	if (!nan_is_pairing_allowed(psoc)) {
 		nan_debug("NAN pairing is not allowed");
@@ -540,16 +577,30 @@ QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
-	status = peer_ops->nan_pasn_peer_create_cb(psoc, peer_mac_addr,
-						   nan_vdev_id,
-						   NAN_PASN_PEER_CREATE);
-
+	status = nan_get_pasn_peer_count(nan_vdev, &pasn_peer_count);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("NAN PASN peer create request fails");
+		nan_err("Failed to get pasn peer");
 		goto ref_rel;
 	}
 
-	nan_update_pasn_peer_count(nan_vdev, true);
+	status = nan_get_max_pairing_sessions(psoc, &max_nan_pairing_session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to max pairing session");
+		goto ref_rel;
+	}
+
+	if (pasn_peer_count < max_nan_pairing_session) {
+		status = peer_ops->nan_pasn_peer_create_cb(
+						psoc,
+						peer_mac_addr,
+						nan_vdev_id,
+						NAN_PASN_PEER_CREATE);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			nan_err("NAN PASN peer create request fails");
+			goto ref_rel;
+		}
+		nan_update_pasn_peer_count(nan_vdev, true);
+	}
 
 	status = nan_remove_peer_in_migrated_addr_list(psoc, nan_vdev_id,
 						       peer_mac_addr);

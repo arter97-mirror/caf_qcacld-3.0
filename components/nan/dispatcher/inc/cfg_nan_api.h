@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,6 +83,16 @@ QDF_STATUS cfg_nan_get_ndp_keepalive_period(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS cfg_nan_get_ndp_max_sessions(struct wlan_objmgr_psoc *psoc,
 					uint32_t *val);
+
+/**
+ * cfg_nan_get_ndp_peer_count() - Return the ndp peer count
+ * @psoc: Pointer to psoc object
+ * @val: pointer to ndp peer count
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cfg_nan_get_ndp_peer_count(struct wlan_objmgr_psoc *psoc,
+				      uint32_t *val);
 
 /**
  * cfg_nan_get_max_ndi() - get max number of ndi host supports

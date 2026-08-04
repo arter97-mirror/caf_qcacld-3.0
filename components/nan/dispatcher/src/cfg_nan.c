@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -111,6 +111,21 @@ QDF_STATUS cfg_nan_get_ndp_max_sessions(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = nan_obj->cfg_param.max_ndp_sessions;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS cfg_nan_get_ndp_peer_count(struct wlan_objmgr_psoc *psoc,
+				      uint32_t *val)
+{
+	struct nan_psoc_priv_obj *nan_psoc_priv;
+
+	nan_psoc_priv = cfg_nan_get_priv_obj(psoc);
+	if (!nan_psoc_priv) {
+		nan_err("NAN psoc priv obj is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = nan_psoc_priv->num_ndp_peers;
 	return QDF_STATUS_SUCCESS;
 }
 
