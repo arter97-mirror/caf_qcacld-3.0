@@ -3603,7 +3603,7 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_EXTERNAL_AUTH_MLO_SUPPORT
 endif
 
-found = $(shell if grep -qF "NL80211_CMD_SET_TID_TO_LINK_MAPPING" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+found = $(shell if grep -qF "struct cfg80211_ttlm_params" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DWLAN_FEATURE_11BE_MLO_TTLM
 endif
