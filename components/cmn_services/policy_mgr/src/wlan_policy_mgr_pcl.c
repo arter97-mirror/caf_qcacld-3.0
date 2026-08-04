@@ -710,6 +710,8 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 	bool allow_go_scc_on_dfs_chn = false;
 	bool dfs_master_capable = false;
 	uint8_t sta_sap_scc_on_dfs_chnl = 0;
+	bool cfg_sta_dfs_ch_peer_scc = false;
+	bool is_dfs = false;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
@@ -732,17 +734,31 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 		return status;
 	}
 
+	status = policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
+						&cfg_sta_dfs_ch_peer_scc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_debug("cfg_sta_dfs_ch_peer_scc unavailable, defaulting to false");
+		cfg_sta_dfs_ch_peer_scc = false;
+		status = QDF_STATUS_SUCCESS;
+	}
+
 	if (dfs_master_capable && sta_sap_scc_on_dfs_chnl &&
 	    pm_ctx->cfg.go_force_scc == GO_FORCE_SCC_STRICT) {
 		allow_go_scc_on_dfs_chn = true;
 	}
 
 	for (i = 0; i < *pcl_len_org; i++) {
+		is_dfs = (allow_go_scc_on_dfs_chn || cfg_sta_dfs_ch_peer_scc) &&
+			 wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
+						  pcl_list_org[i]);
+
 		if ((!wlan_reg_is_passive_or_disable_for_pwrmode(
 			pm_ctx->pdev, pcl_list_org[i],
 			REG_CURRENT_PWR_MODE)) ||
-		    (allow_go_scc_on_dfs_chn &&
-		     wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_list_org[i]))) {
+		    (allow_go_scc_on_dfs_chn && is_dfs) ||
+		    (is_dfs && cfg_sta_dfs_ch_peer_scc &&
+		     policy_mgr_is_sta_sap_scc(psoc, pcl_list_org[i],
+					      false))) {
 			pcl_list_org[pcl_len] = pcl_list_org[i];
 			weight_list_org[pcl_len++] = weight_list_org[i];
 		}
