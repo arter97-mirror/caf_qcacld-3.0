@@ -4649,7 +4649,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 					      frm->HTCaps.present,
 					      frm->VHTCaps.present,
 					      frm->he_cap.present,
-					      frm->eht_cap.present, false);
+					      eht_cap_ie_len > 0, false);
 
 	min_rid = lim_get_min_session_txrate(pe_session, NULL);
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_START_EVENT,
