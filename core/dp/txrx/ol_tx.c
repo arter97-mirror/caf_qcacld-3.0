@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -77,6 +77,8 @@ qdf_nbuf_t ol_tx_data(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		&& (qdf_nbuf_get_protocol(skb) == htons(ETH_P_IP))
 		&& (qdf_nbuf_get_ip_summed(skb) == CHECKSUM_PARTIAL))
 		qdf_nbuf_set_ip_summed(skb, CHECKSUM_COMPLETE);
+
+	QDF_NBUF_CB_TX_VDEV_CTX(skb) = vdev_id;
 
 	/* Terminate the (single-element) list of tx frames */
 	qdf_nbuf_set_next(skb, NULL);
