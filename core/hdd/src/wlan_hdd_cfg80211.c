@@ -35618,9 +35618,8 @@ void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
 	struct hdd_context *hdd_ctx = (struct hdd_context *)context;
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
-	struct cfg80211_probe_status_info probe_info = {0};
 	bool acked;
-	uint8_t link_idx = 0;
+	int link_id;
 
 	if (!hdd_ctx) {
 		hdd_err("Invalid HDD context");
@@ -35646,26 +35645,18 @@ void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
 		return;
 	}
 
-	if (ieee_link_id_valid && ieee_link_id < IEEE80211_MLD_MAX_NUM_LINKS) {
-		probe_info.valid_links = BIT(ieee_link_id);
-		link_idx = ieee_link_id;
-	} else {
-		probe_info.valid_links = 0;
-		link_idx = 0;
-	}
+	if (ieee_link_id_valid && ieee_link_id < IEEE80211_MLD_MAX_NUM_LINKS)
+		link_id = ieee_link_id;
+	else
+		link_id = -1;
 
 	acked = (status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
 
-	probe_info.cookie = adapter->probe_peer_cookie;
-	probe_info.peer_addr = NULL;
-	probe_info.links[link_idx].acked = acked;
-	probe_info.links[link_idx].ack_signal = ack_rssi;
-	probe_info.links[link_idx].is_valid_ack_signal = acked;
+	cfg80211_probe_status(adapter->dev, NULL, adapter->probe_peer_cookie,
+			      link_id, acked, ack_rssi, acked, GFP_KERNEL);
 
-	cfg80211_probe_status(adapter->dev, &probe_info, GFP_KERNEL);
-
-	hdd_debug("Reported ack rssi for vdev_id=%d link_idx=%u", vdev_id,
-		  link_idx);
+	hdd_debug("Reported ack rssi for vdev_id=%d link_id=%d", vdev_id,
+		  link_id);
 
 	adapter->probe_peer_cookie = 0;
 }
