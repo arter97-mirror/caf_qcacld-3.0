@@ -1077,6 +1077,11 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	if (!dp_ctx->gl_flow_recs || dp_intf->device_mode != QDF_STA_MODE)
 		return QDF_STATUS_E_NOSUPPORT;
 
+	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
+		dp_info("SPM: STC disabled, skipping SPM intf init");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
 	if (dp_intf->spm_intf_ctx) {
 		dp_info("Module already initialized!");
 		return QDF_STATUS_E_ALREADY;
