@@ -29,7 +29,7 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_debugfs_config.h"
 
-#define DEBUGFS_CONFIG_BUF_SIZE (4096 * 8)
+#define DEBUGFS_CONFIG_BUF_SIZE (4096 * 16)
 
 /**
  * struct ini_config_buf - the buffer struct to save ini configs
