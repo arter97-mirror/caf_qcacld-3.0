@@ -34639,6 +34639,67 @@ wlan_hdd_is_key_associated_with_peer(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
+ * wlan_hdd_ndi_del_key() - Delete encryption key for NDI interface
+ * @ndev: pointer to net device
+ * @key_index: Key index used in 802.11 frames
+ * @pairwise: true if it is pairwise key
+ * @mac_addr: Peer address
+ *
+ * Cleans up driver-side crypto state for an NDI key and requests key
+ * removal from firmware, waiting for the key response before returning.
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+static int wlan_hdd_ndi_del_key(struct net_device *ndev,
+				u8 key_index, bool pairwise,
+				const u8 *mac_addr)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+	QDF_STATUS status;
+	int ret;
+
+	if (!WLAN_HDD_IS_NDI(adapter)) {
+		hdd_debug("Not an NDI adapter, skip NDI del key");
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("NDI vdev is NULL");
+		return -EINVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	hdd_debug("NDI del key: vdev %d idx %d pairwise %d peer "
+		  QDF_MAC_ADDR_FMT, vdev_id, key_index, pairwise,
+		  QDF_MAC_ADDR_REF(mac_addr));
+
+	/* Notify firmware to remove the key, waiting for its response. */
+	ret = wlan_cfg80211_crypto_del_ndi_key(vdev, key_index, pairwise,
+					       mac_addr);
+	if (ret) {
+		hdd_err("NDI del key: fw notification failed idx %d ret %d",
+			key_index, ret);
+		goto put_vdev;
+	}
+
+	/* Clean up driver-side crypto state after firmware is notified. */
+	status = wlan_crypto_delkey(vdev, (uint8_t *)mac_addr, key_index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("NDI del key: driver cleanup failed idx %d status %d",
+			  key_index, status);
+		ret = qdf_status_to_os_return(status);
+	}
+
+put_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return ret;
+}
+
+/**
  * __wlan_hdd_cfg80211_del_key() - Delete the encryption key for station
  * @wiphy: wiphy interface context
  * @ndev: pointer to net device
@@ -34650,7 +34711,7 @@ wlan_hdd_is_key_associated_with_peer(struct wlan_objmgr_vdev *vdev,
  * It is used to delete the key information
  * Underlying hardware implementation does not have API to delete the
  * encryption key for normal peers. Currently delete keys are supported
- * only for PASN peers.
+ * only for PASN peers and NDI interfaces.
  * For other peers, it is automatically deleted when the peer is
  * removed. Hence this function currently does nothing.
  * Future implementation may interpret delete key operation to
@@ -34666,6 +34727,7 @@ static int __wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 				       bool pairwise, const u8 *mac_addr)
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	struct wlan_objmgr_peer *peer;
 	struct qdf_mac_addr peer_mac;
 	enum wlan_peer_type peer_type;
@@ -34693,6 +34755,13 @@ static int __wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 		hdd_err("Invalid mac address");
 		ret = -EINVAL;
 		goto err;
+	}
+
+	/* NDI interface requires explicit key cleanup in driver and fw. */
+	if (WLAN_HDD_IS_NDI(adapter)) {
+		ret = wlan_hdd_ndi_del_key(ndev, key_index, pairwise, mac_addr);
+		hdd_exit();
+		return ret;
 	}
 
 	peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc, peer_mac.bytes,
