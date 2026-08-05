@@ -2353,6 +2353,7 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	wmi_roam_frame_info *src_data = NULL;
 	struct roam_frame_info *dst_buf;
 	uint8_t i, subtype, idx;
+	bool db2dbm_enable;
 
 	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
 
@@ -2371,6 +2372,10 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 	dst->num_frame = num_frames;
 	dst_buf = dst->frame_info;
+
+	db2dbm_enable = wmi_service_enabled(wmi_handle,
+					    wmi_service_hw_db2dbm_support);
+
 	for (i = 0; i < num_frames; i++) {
 		dst_buf->timestamp = src_data->timestamp;
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_data->bssid,
@@ -2441,7 +2446,12 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		}
 
 		dst_buf->retry_count = src_data->retry_count;
-		dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
+		if (!db2dbm_enable)
+			dst_buf->rssi = src_data->rssi_dbm_abs +
+					WMI_NOISE_FLOOR_DBM_DEFAULT;
+		else
+			dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
+
 		dst_buf->assoc_id =
 			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
