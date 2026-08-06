@@ -1675,6 +1675,100 @@ wlan_cfg80211_rx_mgmt_ext(struct wireless_dev *wdev,
 #endif
 
 /**
+ * hdd_deliver_mgmt_frame_to_adapter() - indicate a received mgmt frame to
+ *	cfg80211 for a single, already-resolved adapter
+ * @hdd_ctx: pointer to hdd context
+ * @adapter: adapter to deliver the frame on
+ * @link_info: link on @adapter that received the frame, or NULL if the
+ *	caller has no specific link context (falls back to
+ *	adapter->deflink)
+ * @frm_len: frame length
+ * @pb_frames: pointer to frame body
+ * @frame_type: frame type
+ * @rx_freq: rx freq
+ * @rx_rssi: rx rssi
+ * @rx_flags: rx mgmt flags
+ *
+ * Performs the same cfg80211 RX-mgmt indication done in
+ * __hdd_indicate_mgmt_frame_to_user()'s check_adapter loop, but for a
+ * single adapter that has already been resolved by the caller. Used by
+ * fan-out delivery paths that must not re-enter adapter resolution (and
+ * so cannot call hdd_indicate_mgmt_frame_to_user() directly, since that
+ * would recurse back into hdd_find_adapter_for_nan_oui_frames()).
+ *
+ * Return: None
+ */
+static void
+hdd_deliver_mgmt_frame_to_adapter(struct hdd_context *hdd_ctx,
+				  struct hdd_adapter *adapter,
+				  struct wlan_hdd_link_info *link_info,
+				  uint32_t frm_len, uint8_t *pb_frames,
+				  uint8_t frame_type, uint32_t rx_freq,
+				  int8_t rx_rssi, enum rxmgmt_flags rx_flags)
+{
+	struct hdd_adapter *assoc_adapter;
+	enum nl80211_rxmgmt_flags nl80211_flag = 0;
+	bool eht_capab;
+
+	if (!adapter->dev) {
+		hdd_err("adapter->dev is NULL");
+		return;
+	}
+
+	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
+		hdd_err("adapter has invalid magic");
+		return;
+	}
+
+	if (!link_info)
+		link_info = adapter->deflink;
+
+	if (hdd_is_qos_action_frame(pb_frames, frm_len)) {
+		if (QDF_IS_STATUS_SUCCESS(
+			sme_update_dsc_pto_up_mapping(
+					hdd_ctx->mac_handle,
+					adapter->dscp_to_up_map,
+					adapter->deflink->vdev_id)))
+			hdd_send_dscp_up_map_to_fw(adapter);
+	}
+
+	assoc_adapter = adapter;
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (hdd_adapter_is_link_adapter(adapter) && eht_capab) {
+		assoc_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
+		if (!assoc_adapter) {
+			hdd_err("Assoc adapter is NULL");
+			return;
+		}
+	}
+
+	hdd_debug_rl("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d rx_rssi %d over NL80211",
+		     link_info->vdev_id, assoc_adapter->dev->ifindex,
+		     frame_type, frm_len, rx_freq, rx_rssi);
+
+	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+	defined(WLAN_FEATURE_MULTI_LINK_SAP)
+	wlan_cfg80211_rx_mgmt_ext(assoc_adapter->dev->ieee80211_ptr,
+				  link_info, rx_freq, rx_rssi,
+				  pb_frames, frm_len, nl80211_flag);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
+			 rx_freq, rx_rssi * 100, pb_frames, frm_len,
+			 NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
+	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
+			 rx_freq, rx_rssi * 100, pb_frames,
+			 frm_len, NL80211_RXMGMT_FLAG_ANSWERED,
+			 GFP_ATOMIC);
+#else
+	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr, rx_freq,
+			 rx_rssi * 100,
+			 pb_frames, frm_len, GFP_ATOMIC);
+#endif /* LINUX_VERSION_CODE */
+}
+
+/**
  * hdd_compare_nan_address() - compare the cached NAN MAC address with
  * destination address from the frame
  * @hdd_ctx: pointer to hdd context
@@ -1720,23 +1814,78 @@ hdd_get_usd_adapter(struct hdd_context *hdd_ctx)
 #endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 /**
+ * hdd_deliver_nan_oui_frame_to_mcast_registrants() - deliver a NAN-OUI
+ *	multicast action frame to every up adapter whose iftype has
+ *	registered multicast delivery for this subtype
+ * @hdd_ctx: pointer to hdd context
+ * @frm_len: frame length
+ * @pb_frames: pointer to frame body
+ * @sub_type: frame sub type
+ * @rx_freq: rx freq
+ * @rx_rssi: rx rssi
+ * @rx_flags: rx mgmt flags
+ *
+ * Return: true if delivered to at least one adapter
+ */
+static bool
+hdd_deliver_nan_oui_frame_to_mcast_registrants(struct hdd_context *hdd_ctx,
+					       uint32_t frm_len,
+					       uint8_t *pb_frames,
+					       uint8_t sub_type,
+					       uint32_t rx_freq,
+					       int8_t rx_rssi,
+					       enum rxmgmt_flags rx_flags)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE;
+	bool delivered = false;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (!adapter->dev || !(adapter->dev->flags & IFF_UP))
+			goto next_adapt;
+
+		if (!(adapter->mgmt_frame_mcast_stypes & BIT(sub_type)))
+			goto next_adapt;
+
+		hdd_debug("Delivering NAN OUI mcast frame to iftype %d adapter",
+			  adapter->wdev.iftype);
+		hdd_deliver_mgmt_frame_to_adapter(hdd_ctx, adapter, NULL,
+						  frm_len, pb_frames, sub_type,
+						  rx_freq, rx_rssi, rx_flags);
+		delivered = true;
+next_adapt:
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return delivered;
+}
+
+/**
  * hdd_find_adapter_for_nan_oui_frames() - find adapter for NAN OUI frames
  * @hdd_ctx: pointer to hdd context
  * @frm_len: frame length
  * @pb_frames: pointer to frame body
  * @sub_type: frame sub type
+ * @rx_freq: rx freq
+ * @rx_rssi: rx rssi
+ * @rx_flags: rx mgmt flags
  *
  * This function find the adapter for NAN OUI action frames. It compares
  * destination with P2P multicast address or NAN discovery address. if
  * destination matches either of P2P or NAN MAC address, it returns
- * corresponding adapter to it.
+ * corresponding adapter to it. If the destination is the P2P/USD
+ * multicast address and no USD adapter is cached, the frame is instead
+ * delivered directly to every up adapter whose iftype has registered
+ * multicast delivery for this subtype.
  *
  * return: NAN OUI adapter
  */
 static struct hdd_adapter *
 hdd_find_adapter_for_nan_oui_frames(struct hdd_context *hdd_ctx,
 				    uint32_t frm_len, uint8_t *pb_frames,
-				    uint8_t sub_type)
+				    uint8_t sub_type, uint32_t rx_freq,
+				    int8_t rx_rssi, enum rxmgmt_flags rx_flags)
 {
 	struct action_frm_hdr *action_hdr;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
@@ -1759,8 +1908,12 @@ hdd_find_adapter_for_nan_oui_frames(struct hdd_context *hdd_ctx,
 	if (!qdf_mem_cmp(dest_addr, P2P_MC_ADDR, P2P_MC_ADDR_SIZE) ||
 	    !qdf_mem_cmp(dest_addr, USD_ADDR, USD_ADDR_SIZE)) {
 		adapter = hdd_get_usd_adapter(hdd_ctx);
-		if (!adapter)
+		if (!adapter) {
+			hdd_deliver_nan_oui_frame_to_mcast_registrants(
+				hdd_ctx, frm_len, pb_frames, sub_type,
+				rx_freq, rx_rssi, rx_flags);
 			return NULL;
+		}
 
 		hdd_debug("USD adapter found for dest_addr:" QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(dest_addr));
@@ -1790,11 +1943,8 @@ __hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 	struct hdd_context *hdd_ctx;
 	uint8_t *dest_addr = NULL;
 	uint16_t auth_algo;
-	enum nl80211_rxmgmt_flags nl80211_flag = 0;
 	bool is_pasn_auth_frame = false;
-	struct hdd_adapter *assoc_adapter;
 	struct hdd_adapter *adapter = link_info->adapter;
-	bool eht_capab;
 	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_adapter *curr_adapter = NULL;
 	struct hdd_adapter *next_adapter = NULL;
@@ -1852,7 +2002,9 @@ __hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 
 		adapter = hdd_find_adapter_for_nan_oui_frames(hdd_ctx, frm_len,
 							      pb_frames,
-							      sub_type);
+							      sub_type, rx_freq,
+							      rx_rssi,
+							      rx_flags);
 		if (adapter)
 			goto check_adapter;
 
@@ -1900,63 +2052,10 @@ check_adapter:
 		if (curr_adapter != adapter)
 			goto next_adapt;
 
-		if (!adapter->dev) {
-			hdd_err("adapter->dev is NULL");
-			goto next_adapt;
-		}
-
-		if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
-			hdd_err("adapter has invalid magic");
-			goto next_adapt;
-		}
-
-		/* Channel indicated may be wrong. TODO */
-		/* Indicate an action frame. */
-		if (hdd_is_qos_action_frame(pb_frames, frm_len)) {
-			if (QDF_IS_STATUS_SUCCESS(
-				sme_update_dsc_pto_up_mapping(
-						hdd_ctx->mac_handle,
-						adapter->dscp_to_up_map,
-						adapter->deflink->vdev_id)))
-				hdd_send_dscp_up_map_to_fw(adapter);
-		}
-
-		assoc_adapter = adapter;
-		ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-		if (hdd_adapter_is_link_adapter(adapter) && eht_capab) {
-			assoc_adapter =
-				hdd_adapter_get_mlo_adapter_from_link(adapter);
-			if (!assoc_adapter) {
-				hdd_err("Assoc adapter is NULL");
-				goto next_adapt;
-			}
-		}
-
-		/* Indicate Frame Over Normal Interface */
-		hdd_debug_rl("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d rx_rssi %d over NL80211",
-			     link_info->vdev_id, assoc_adapter->dev->ifindex,
-			     frame_type, frm_len, rx_freq, rx_rssi);
-
-		wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
-	defined(WLAN_FEATURE_MULTI_LINK_SAP)
-		wlan_cfg80211_rx_mgmt_ext(assoc_adapter->dev->ieee80211_ptr,
-					  link_info, rx_freq, rx_rssi,
-					  pb_frames, frm_len, nl80211_flag);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-		cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
-				 rx_freq, rx_rssi * 100, pb_frames, frm_len,
-				 NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
-		cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
-				 rx_freq, rx_rssi * 100, pb_frames,
-				 frm_len, NL80211_RXMGMT_FLAG_ANSWERED,
-				 GFP_ATOMIC);
-#else
-		cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr, rx_freq,
-				 rx_rssi * 100,
-				 pb_frames, frm_len, GFP_ATOMIC);
-#endif /* LINUX_VERSION_CODE */
+		hdd_deliver_mgmt_frame_to_adapter(hdd_ctx, curr_adapter,
+						  link_info, frm_len,
+						  pb_frames, frame_type,
+						  rx_freq, rx_rssi, rx_flags);
 next_adapt:
 		hdd_adapter_dev_put_debug(curr_adapter, dbgid);
 	}
