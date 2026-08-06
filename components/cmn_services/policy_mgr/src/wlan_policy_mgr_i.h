@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -295,6 +295,7 @@ extern enum policy_mgr_conc_next_action
  *                       BW when do restart
  * @move_sap_go_1st_on_dfs_sta_csa: Enable/Disable SAP / GO's movement
  *				    to non-DFS channel before STA
+ * @force_sap_20mhz_cc_id: Force SAP on 20Mhz for country ID
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -325,6 +326,7 @@ struct policy_mgr_cfg {
 #endif
 	bool use_sap_original_bw;
 	bool move_sap_go_1st_on_dfs_sta_csa;
+	bool force_sap_20mhz_cc_id;
 };
 
 /**
