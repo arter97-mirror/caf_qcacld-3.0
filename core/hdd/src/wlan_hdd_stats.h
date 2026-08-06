@@ -1141,4 +1141,14 @@ hdd_cstats_log_ndi_create_req_evt(struct wlan_objmgr_vdev *vdev,
  */
 void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 			     struct peer_stats_info_ext_event *peer_info);
+
+/**
+ * hdd_is_sta_key_exchange_in_progress() - Check if STA/P2P CLI 4-way handshake
+ *   is in progress on the given link
+ * @link_info: HDD link info pointer
+ *
+ * Return: true if key exchange is in progress, false otherwise
+ */
+bool hdd_is_sta_key_exchange_in_progress(struct wlan_hdd_link_info *link_info);
+
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

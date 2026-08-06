@@ -3721,6 +3721,13 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		goto deliver_son;
 	}
 
+	if (hdd_is_sta_key_exchange_in_progress(adapter->deflink)) {
+		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
+		hdd_debug("Key exchange in progress, cached tx power = %d",
+			  *dbm);
+		goto deliver_son;
+	}
+
 	status = wlan_hdd_tx_power_request_needed(adapter);
 	if (status == QDF_STATUS_E_ALREADY) {
 		/* TX_POWER is sent by STATION_STATS by firmware and

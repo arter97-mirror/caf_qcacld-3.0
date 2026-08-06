@@ -9582,6 +9582,19 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 }
 
+bool hdd_is_sta_key_exchange_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
+		return false;
+
+	return sme_is_sta_key_exchange_in_progress(hdd_ctx->mac_handle,
+						   link_info->vdev_id);
+}
+
 /**
  * wlan_hdd_get_sta_stats() - get aggregate STA stats
  * @link_info: Link info pointer of STA adapter to get stats for
@@ -9621,8 +9634,9 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 		return 0;
 	}
 
-	if (hdd_is_roam_sync_in_progress(hdd_ctx, link_info->vdev_id)) {
-		hdd_debug("Roam sync is in progress, cannot continue with this request");
+	if (hdd_is_roam_sync_in_progress(hdd_ctx, link_info->vdev_id) ||
+	    hdd_is_sta_key_exchange_in_progress(link_info)) {
+		hdd_debug("Roam sync or Key exchange in progress, return cached rssi");
 		/*
 		 * supplicant reports very low rssi to upper layer
 		 * and handover happens to cellular.
