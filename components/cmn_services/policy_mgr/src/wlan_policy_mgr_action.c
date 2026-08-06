@@ -2188,6 +2188,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	uint32_t sta_count = 0;
 	enum policy_mgr_con_mode con_mode;
 	qdf_freq_t conc_ml_sap_user_freq = 0, conc_ml_sap_freq = 0;
+	bool is_6ghz_cap = false;
+	uint32_t pcl_24g_len = 0;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -2379,6 +2381,8 @@ user_freq_check:
 	pdev = wlan_vdev_get_pdev(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
+	is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(psoc, cur_sap_vdev_id,
+						     NULL);
 	for (i = 0; i < pcl_len; i++) {
 		if (pcl_channels[i] == curr_sap_freq)
 			continue;
@@ -2394,6 +2398,10 @@ user_freq_check:
 					      REG_CURRENT_PWR_MODE) ||
 		    !policy_mgr_is_safe_channel(psoc, pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_channels[i]))
+			continue;
+
+		if (!is_6ghz_cap &&
+		    WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_channels[i]))
 			continue;
 
 		/* SAP moved to 2.4 GHz, due to STA on DFS or Indoor where
@@ -2414,6 +2422,42 @@ user_freq_check:
 
 		new_sap_freq = pcl_channels[i];
 		break;
+	}
+
+	/*
+	 * No 5/6 GHz candidate survived (all DFS, unsafe, or 6 GHz-incapable
+	 * for this vdev). Fall back to a 2.4 GHz channel so the SAP/GO is
+	 * not left stranded on the DFS channel it was supposed to vacate.
+	 * Do not consider 2.4 GHz for an LL SAP vdev. PM_SCC_ON_24_CH_24G
+	 * orders an existing SCC 2.4 GHz channel first, so the first
+	 * surviving candidate is already SCC-preferred.
+	 */
+	if (!new_sap_freq &&
+	    !policy_mgr_is_vdev_ll_lt_sap(psoc, cur_sap_vdev_id)) {
+		status = policy_mgr_get_channel_list(
+					psoc, PM_SCC_ON_24_CH_24G,
+					mode, pcl_channels, pcl_weight,
+					QDF_ARRAY_SIZE(pcl_weight),
+					&pcl_24g_len);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			for (i = 0; i < pcl_24g_len; i++) {
+				if (pcl_channels[i] == curr_sap_freq)
+					continue;
+
+				if (!wlan_reg_is_freq_enabled(
+							pdev, pcl_channels[i],
+							REG_CURRENT_PWR_MODE) ||
+				    !policy_mgr_is_safe_channel(
+							psoc, pcl_channels[i]))
+					continue;
+
+				new_sap_freq = pcl_channels[i];
+				break;
+			}
+		}
+		if (new_sap_freq)
+			policy_mgr_debug("No 5/6 GHz candidate for vdev %d, falling back to 2.4 GHz freq %u",
+					 cur_sap_vdev_id, new_sap_freq);
 	}
 out:
 	/* Restore the connection entry */
