@@ -2332,6 +2332,7 @@ void wlan_cm_fill_crypto_filter_from_vdev(struct wlan_objmgr_vdev *vdev,
 	filter->mcastcipherset = rso_cfg->orig_sec_info.mcastcipherset;
 	filter->ucastcipherset = rso_cfg->orig_sec_info.ucastcipherset;
 	filter->key_mgmt = rso_cfg->orig_sec_info.key_mgmt;
+	filter->enable_adaptive_11r = rso_cfg->is_adaptive_11r_connection;
 }
 
 static void cm_dump_occupied_chan_list(struct wlan_chan_list *occupied_ch)

@@ -615,6 +615,7 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 	uint8_t cb_mode;
 	QDF_STATUS status;
 	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
+	struct cm_roam_values_copy config = {};
 
 	/* Retrieve the session that was already created and update the entry */
 	ft_session->limWmeEnabled = pe_session->limWmeEnabled;
@@ -805,6 +806,14 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 		mac->mlme_cfg->ht_caps.enable_smps,
 		mac->mlme_cfg->ht_caps.smps,
 		ft_session->supported_nss_1x1);
+
+	if (bss_desc->adaptive_11r_ap)
+		ft_session->is_adaptive_11r_connection =
+			wlan_get_adaptive_11r_enabled(&mac->mlme_cfg->lfr);
+
+	config.bool_value = ft_session->is_adaptive_11r_connection;
+	wlan_cm_roam_cfg_set_value(mac->psoc, ft_session->vdev_id,
+				   ADAPTIVE_11R_CONNECTION, &config);
 
 	return QDF_STATUS_SUCCESS;
 }
