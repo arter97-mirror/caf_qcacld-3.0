@@ -10166,7 +10166,9 @@ void lim_fill_session_security_profile(struct pe_session *session,
 {
 	session->sec_profile_num = -1;
 	if (!wlan_vdev_get_security_profile_enabled(session->vdev) ||
-	    !util_scan_entry_security_profile(entry))
+	    !util_scan_entry_security_profile(entry) ||
+	    !entry->neg_sec_info.sec_profile_valid ||
+	    entry->neg_sec_info.sec_profile_num < 0)
 		return;
 
 	session->sec_profile_num =
