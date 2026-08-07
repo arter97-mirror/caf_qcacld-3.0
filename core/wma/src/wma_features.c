@@ -4010,8 +4010,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	wma_print_wow_stats(wma, wake_info);
 	wma_acquire_wow_wakelock(wma, wake_info->wake_reason);
 
-	/* Reset the Suspend Type here */
-	pmo_set_wow_suspend_type(wma->psoc, QDF_WOW_UNSUPPORTED_TYPE);
 	return errno;
 }
 
@@ -4051,6 +4049,8 @@ void wma_wow_log_deferred_wakeup(struct wlan_objmgr_psoc *psoc)
 			       wma_suspend_type_str(wma));
 	}
 
+	/* Reset only after the suspend type is consumed above. */
+	pmo_set_wow_suspend_type(psoc, QDF_WOW_UNSUPPORTED_TYPE);
 	wma->wow_wakeup_reason_valid = false;
 }
 
