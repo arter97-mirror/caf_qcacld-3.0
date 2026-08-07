@@ -940,6 +940,12 @@ QDF_STATUS ucfg_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	struct tdls_get_all_peers *tdls_peers;
 	QDF_STATUS status;
 
+	if (!vdev || !buf || buflen <= 0) {
+		tdls_err("Invalid parameters: vdev=%pK, buf=%pK, buflen=%d",
+			 vdev, buf, buflen);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	tdls_peers = qdf_mem_malloc(sizeof(*tdls_peers));
 	if (!tdls_peers)
 		return QDF_STATUS_E_NOMEM;
@@ -958,7 +964,7 @@ QDF_STATUS ucfg_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	if (status != QDF_STATUS_SUCCESS)
 		qdf_mem_free(tdls_peers);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 static QDF_STATUS tdls_send_mgmt_frame_flush_callback(struct scheduler_msg *msg)

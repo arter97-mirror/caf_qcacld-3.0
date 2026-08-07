@@ -561,10 +561,14 @@ static void tdls_get_all_peers_from_list(
 	struct tdls_soc_priv_obj *tdls_soc_obj;
 	struct tdls_osif_indication indication;
 
-	if (!get_tdls_peers->vdev) {
+	if (!get_tdls_peers)
+		return;
+
+	if (!get_tdls_peers->vdev || !get_tdls_peers->buf) {
 		qdf_mem_free(get_tdls_peers);
 		return;
 	}
+
 	len = __tdls_get_all_peers_from_list(get_tdls_peers);
 
 	indication.status = len;
