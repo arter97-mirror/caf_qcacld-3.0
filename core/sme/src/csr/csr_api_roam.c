@@ -8377,6 +8377,19 @@ QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac,
 	case WLAN_SER_CMD_PENDING:
 	case WLAN_SER_CMD_ACTIVE:
 		break;
+	case WLAN_SER_CMD_ALREADY_EXISTS:
+		/*
+		 * A STOP_BSS command for this vdev is already queued (e.g. from
+		 * a concurrent NDI teardown path). Treat this as success so the
+		 * caller waits on disconnect_comp_var for the already-queued
+		 * command to complete, rather than bailing out and leaving the
+		 * vdev stuck in a partially-torn-down state.
+		 */
+		sme_debug("STOP_BSS already queued for vdev %d, skipping duplicate",
+			  vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		qdf_mem_free(stop_bss_req);
+		return QDF_STATUS_SUCCESS;
 	default:
 		sme_err("ser cmd status %d", status);
 		goto error;
