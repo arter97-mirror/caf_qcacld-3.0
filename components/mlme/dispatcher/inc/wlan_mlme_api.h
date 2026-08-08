@@ -3970,9 +3970,26 @@ wlan_mlme_get_sae_roam_auth_retry_count(struct wlan_objmgr_psoc *psoc,
  */
 bool
 wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_support_non_dbs_dual_sta_roaming  - API to get if dual station
+ * roaming is enabled on non_dbs hardware
+ * @psoc: Pointer to global psoc object
+ *
+ * Return: True if dual sta roaming is enabled on non_dbs card else return
+ * false
+ */
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

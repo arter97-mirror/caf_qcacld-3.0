@@ -541,7 +541,8 @@ wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 
-	if (!connected_sta_freq_list || !sta_count)
+	if (!connected_sta_freq_list || !sta_count ||
+	    wlan_mlme_support_non_dbs_dual_sta_roaming(psoc))
 		return true;
 
 	for (i = 0; i < sta_count; i++) {
@@ -659,7 +660,6 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 
 	if (!wlan_mlme_get_dual_sta_roaming_enabled(psoc))
 		return;
-
 	/*
 	 * Check if primary iface is configured. If yes,
 	 * then allow further STA connection to all

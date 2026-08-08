@@ -6264,6 +6264,25 @@ wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 
 	return dual_sta_roaming_enabled;
 }
+
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc)
+{
+	bool support = false;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("mlme_obj is not ready");
+		return false;
+	}
+
+	if (mlme_obj->cfg.lfr.lfr3_support_single_mac_dual_sta_roaming &&
+	    !policy_mgr_is_hw_dbs_capable(psoc))
+		support = true;
+
+	return support;
+}
 #endif
 
 QDF_STATUS
