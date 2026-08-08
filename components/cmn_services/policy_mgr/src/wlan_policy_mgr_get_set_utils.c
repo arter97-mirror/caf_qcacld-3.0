@@ -6232,6 +6232,9 @@ bool policy_mgr_concurrent_sta_on_different_mac(struct wlan_objmgr_psoc *psoc)
 	bool is_different_mac = false;
 	int i;
 
+	if (wlan_mlme_support_non_dbs_dual_sta_roaming(psoc))
+		return true;
+
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		return false;
 
