@@ -4458,6 +4458,11 @@ struct ppet_hdr {
 	((HE_MCS_MSK_4_NSS(nss) & (mcs_set)) != HE_MCS_MSK_4_NSS(nss))
 
 #define HE_MCS_ALL_DISABLED                   0xFFFF
+#define HE_DISABLE_MCS_OVER_NSS(_nss) \
+	(HE_MCS_ALL_DISABLED ^ (BIT((_nss) << 1) - 1))
+#ifndef WLAN_MAX_VDEV_NSS
+#define WLAN_MAX_VDEV_NSS 2
+#endif
 
 #define HE_MCS_0_7     0x0
 #define HE_MCS_0_9     0x1
