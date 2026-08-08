@@ -2016,6 +2016,8 @@ struct fw_scan_channels {
  * @lfr3_roaming_offload: Enable/disable roam offload feature
  * @lfr3_dual_sta_roaming_enabled: Enable/Disable dual sta roaming offload
  *                                 feature
+ * @lfr3_support_single_mac_dual_sta_roaming: Support single mac dual sta
+ *                                            roaming feature
  * @enable_self_bss_roam: enable roaming to connected BSSID
  * @enable_disconnect_roam_offload: enable disassoc/deauth roam scan.
  * @enable_idle_roam: flag to enable/disable idle roam in fw
@@ -2164,6 +2166,7 @@ struct wlan_mlme_lfr_cfg {
 	struct wlan_cm_roam_rt_stats roam_rt_stats;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
+	bool lfr3_support_single_mac_dual_sta_roaming;
 	bool enable_self_bss_roam;
 	bool enable_disconnect_roam_offload;
 	bool enable_idle_roam;
