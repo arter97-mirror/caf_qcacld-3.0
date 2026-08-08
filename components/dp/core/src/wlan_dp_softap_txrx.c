@@ -498,6 +498,29 @@ dp_softap_is_mlo_dev(struct wlan_dp_link *dp_link)
 						WLAN_VDEV_FEXT2_MLO);
 }
 
+#ifdef CONFIG_BORON
+static inline
+void dp_softap_get_bss_peer_tx_flow_idx(void *soc, qdf_nbuf_t nbuf,
+					uint8_t *link_id)
+{
+	struct cdp_peer_output_param peer_info = {0};
+	struct qdf_mac_addr *src_mac_addr;
+
+	src_mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
+					       QDF_NBUF_SRC_MAC_OFFSET);
+	cdp_peer_get_info_by_peer_addr(soc, src_mac_addr->bytes, *link_id,
+				       &peer_info);
+	dp_set_peer_txpt_idx(nbuf, &peer_info);
+}
+
+#else
+static inline
+void dp_softap_get_bss_peer_tx_flow_idx(void *soc, qdf_nbuf_t nbuf,
+					uint8_t *link_id)
+{
+}
+#endif
+
 static QDF_STATUS
 dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 			      qdf_nbuf_t nbuf,
@@ -515,17 +538,22 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 	dest_mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						QDF_NBUF_DEST_MAC_OFFSET);
 
-	if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) || QDF_NBUF_CB_GET_IS_MCAST(nbuf))
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_BUG(soc);
+
+	if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) || QDF_NBUF_CB_GET_IS_MCAST(nbuf)) {
+		dp_softap_get_bss_peer_tx_flow_idx(soc, nbuf, link_id);
 		return QDF_STATUS_SUCCESS;
+	}
 
 	/* for a unicast frame */
 	qdf_copy_macaddr(&mac_addr, dest_mac_addr);
-	soc = cds_get_context(QDF_MODULE_ID_SOC);
-	QDF_BUG(soc);
 	dp_wds_replace_peer_mac(soc, dp_link, mac_addr.bytes);
 
 	cdp_peer_get_info_by_peer_addr(soc, mac_addr.bytes, *link_id,
 				       &peer_info);
+	dp_set_peer_txpt_idx(nbuf, &peer_info);
+
 	*link_id = peer_info.vdev_id;
 	peer_state = peer_info.state;
 
