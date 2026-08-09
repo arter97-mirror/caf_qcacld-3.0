@@ -4852,31 +4852,34 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			return QDF_STATUS_E_FAILURE;
 		}
 
+		ie_len = elem_len + size_of_len_field + 1;
 		if (eid != elem_id ||
 				(oui && qdf_mem_cmp(oui,
 						&ptr[size_of_len_field + 1],
 						oui_length))) {
-			qdf_mem_copy(tmp_buf + tmp_len, &ptr[0],
-				     elem_len + size_of_len_field + 1);
-			tmp_len += (elem_len + size_of_len_field + 1);
+			qdf_mem_copy(tmp_buf + tmp_len, &ptr[0], ie_len);
+			tmp_len += ie_len;
 		} else {
 			/*
 			 * eid matched and if provided OUI also matched
 			 * take oui IE and store in provided buffer.
 			 */
 			if (extracted_ie) {
-				ie_len = elem_len + size_of_len_field + 1;
 				if (ie_len <= (eid_max_len + size_of_len_field +
 					       1 - extracted_ie_len)) {
 					qdf_mem_copy(
 					extracted_ie + extracted_ie_len,
 					&ptr[0], ie_len);
 					extracted_ie_len += ie_len;
+				} else {
+					qdf_mem_copy(tmp_buf + tmp_len, &ptr[0],
+						     ie_len);
+					tmp_len += ie_len;
 				}
 			}
 		}
 		left -= elem_len;
-		ptr += (elem_len + size_of_len_field + 1);
+		ptr += ie_len;
 	}
 	qdf_mem_copy(addn_ie, tmp_buf, tmp_len);
 
