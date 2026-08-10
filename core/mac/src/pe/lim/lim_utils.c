@@ -13260,6 +13260,110 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
 	return true;
 }
 
+static inline
+bool lim_is_freq_overlap(qdf_freq_t s1, qdf_freq_t e1, qdf_freq_t s2,
+			 qdf_freq_t e2)
+{
+	return QDF_MAX(s1, s2) <= QDF_MIN(e1, e2);
+}
+
+static
+bool lim_is_avoid_freq_overlap(struct pe_session *session,
+			       struct gvp_ctrl_params *gvp_data)
+{
+	const struct bonded_channel_freq *range;
+	qdf_freq_t curr_op_freq = 0, op_start_freq, op_end_freq, cfi_freq = 0;
+	uint16_t curr_bw, center_320 = 0;
+	qdf_freq_t avoid_start_freq = 0, avoid_end_freq = 0;
+
+	curr_op_freq = session->curr_op_freq;
+	curr_bw = wlan_reg_get_bw_value(session->ch_width);
+	cfi_freq = wlan_reg_compute_6g_center_freq_from_cfi(
+					session->ch_center_freq_seg1);
+	center_320 = (curr_bw == CH_WIDTH_320MHZ) ? cfi_freq : 0;
+	range = wlan_reg_get_bonded_chan_entry(curr_op_freq, curr_bw,
+					       center_320);
+	if (range) {
+		op_start_freq = range->start_freq;
+		op_end_freq = range->end_freq;
+	} else {
+		op_start_freq = curr_op_freq;
+		op_end_freq = op_start_freq;
+	}
+	avoid_start_freq = gvp_data->avoid_start_freq;
+	avoid_end_freq = gvp_data->avoid_end_freq;
+
+	return lim_is_freq_overlap(op_start_freq, op_end_freq, avoid_start_freq,
+				   avoid_end_freq);
+}
+
+int
+lim_set_gvp_oper_params(struct mac_context *mac_ctx, uint8_t vdev_id,
+			struct gvp_ctrl_params *gvp_data,
+			uint8_t gvp_oper_control)
+{
+	struct pe_session *session = NULL;
+	qdf_freq_t curr_op_freq;
+	struct bss_description *bss_desc = NULL;
+	enum QDF_OPMODE opmode;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session does not exist for vdev id: %d", vdev_id);
+		return -EINVAL;
+	}
+
+	curr_op_freq = session->curr_op_freq;
+	if (!wlan_reg_is_6ghz_chan_freq(curr_op_freq)) {
+		pe_debug("Op freq %d is not in 6GHz band, skip GVP operation",
+			 curr_op_freq);
+		return 0;
+	}
+
+	if (!gvp_data) {
+		pe_err("GVP data is NULL");
+		return -EIO;
+	}
+
+	if (session->lim_join_req)
+		bss_desc = &session->lim_join_req->bssDescription;
+
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
+
+	/* if EZ exit, set tx power = GVP */
+	if (gvp_data->ez_enter == 0) {
+		if (!gvp_data->gvp_tx_power)
+			gvp_data->gvp_tx_power = WLAN_DEF_GVP_EIRP_TX_POWER;
+		lim_set_tpc_power(mac_ctx, session, bss_desc, false,
+				  gvp_data->gvp_tx_power);
+		return 0;
+	}
+
+	/*
+	 * If EZ enter, set tx power to VLP if INI is set to 2 or if STA mode.
+	 * Else, check for no overlap and set tx power to GVP.
+	 */
+	if (gvp_data->ez_enter == 1) {
+		if (gvp_oper_control == 2 || opmode == QDF_STA_MODE) {
+			pe_debug("fallback to vlp");
+			lim_set_tpc_power(mac_ctx, session, bss_desc, true, 0);
+			return 0;
+		}
+
+		if (!lim_is_avoid_freq_overlap(session, gvp_data)) {
+			if (!gvp_data->gvp_tx_power)
+				gvp_data->gvp_tx_power =
+						WLAN_DEF_GVP_EIRP_TX_POWER;
+			pe_debug("No channel overlap, use EZ power: %d",
+				 gvp_data->gvp_tx_power);
+			lim_set_tpc_power(mac_ctx, session, bss_desc, false,
+					  gvp_data->gvp_tx_power);
+		}
+	}
+
+	return 0;
+}
+
 /*
  * lim_get_tx_power() - Function to get the Tx power of the center frequency
  * of the sap interface.

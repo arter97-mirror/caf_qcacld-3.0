@@ -5292,4 +5292,19 @@ enum wfa_capa_qos_mgmt_features {
 	WFA_CAPA_CONTROL_PLANE_STATS = 0x40,
 	WFA_CAPA_UNSOLICITED_STATS = 0x80,
 };
+
+/**
+ * struct gvp_ctrl_params - structure to hold GVP control parameters
+ * @ez_enter: EZ enter or exit indication
+ * @avoid_start_freq: channel start frequency to avoid in EZ (Exclusion Zone)
+ * @avoid_end_freq: channel end frequency to avoid in EZ (Exclusion Zone)
+ * @gvp_tx_power: GVP tx power level in EZ
+ */
+struct gvp_ctrl_params {
+	uint8_t ez_enter;
+	uint32_t avoid_start_freq;
+	uint32_t avoid_end_freq;
+	uint8_t gvp_tx_power;
+};
+
 #endif /* __SIR_API_H */

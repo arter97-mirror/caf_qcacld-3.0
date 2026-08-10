@@ -3846,6 +3846,25 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
 		  uint8_t gvp_tx_power);
 
 /**
+ * lim_set_gvp_oper_params() - Process GVP operation parameters from
+ * userspace and set new tx power and update set_tpc command to FW
+ * @mac_ctx: Pointer to Global MAC structure
+ * @vdev_id: vdev id
+ * @gvp_data: GVP control data
+ * @gvp_oper_control: GVP operation control
+ *
+ * Looks up the pe_session for @vdev_id and applies the GVP tx power
+ * decision. pe_session must only be accessed from LIM, so this is the
+ * entry point SME uses instead of reaching into pe_session directly.
+ *
+ * Return: 0 on success else err code
+ */
+int
+lim_set_gvp_oper_params(struct mac_context *mac_ctx, uint8_t vdev_id,
+			struct gvp_ctrl_params *gvp_data,
+			uint8_t gvp_oper_control);
+
+/**
  * lim_update_tx_power() - Function to update the TX power for
  * the STA interface based on the SAP concurrency
  *

@@ -477,12 +477,12 @@ update_ext_max_tpe_power(struct mac_context *mac,
 	switch (tpe->max_tx_pwr_interpret) {
 	case LOCAL_EIRP:
 		tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320 = eirp_power;
-		pe_debug("non-psd ext max tx power %d",
-			 tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320);
+		pe_debug_rl("non-psd ext max tx power %d",
+			    tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320);
 		break;
 	case LOCAL_EIRP_PSD:
 		tpe->ext_max_tx_power.ext_max_tx_power_local_psd.ext_count = ext_count;
-		pe_debug("Ext count : %d ", ext_count);
+		pe_debug_rl("Ext count : %d ", ext_count);
 		for (i = 0; i < ext_count; i++) {
 			wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
 					      tpe->max_tx_pwr_category,
@@ -492,18 +492,18 @@ update_ext_max_tpe_power(struct mac_context *mac,
 					      &psd_power, get_vlp_pwr);
 			tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[i] = psd_power * 2;
 			curr_freq += 20;
-			pe_debug("psd ext max tx power %d",
-				 tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[i]);
+			pe_debug_rl("psd ext max tx power %d",
+				    tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[i]);
 		}
 		break;
 	case REGULATORY_CLIENT_EIRP:
 		tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320 = eirp_power * 2;
-		pe_debug("non-psd ext max tx power %d",
-			 tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320);
+		pe_debug_rl("non-psd ext max tx power %d",
+			    tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320);
 		break;
 	case REGULATORY_CLIENT_EIRP_PSD:
 		tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count = ext_count;
-		pe_debug("Ext count : %d ", ext_count);
+		pe_debug_rl("Ext count : %d ", ext_count);
 		for (i = 0; i < ext_count; i++) {
 			wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
 					      tpe->max_tx_pwr_category,
@@ -513,8 +513,8 @@ update_ext_max_tpe_power(struct mac_context *mac,
 					      &psd_power, get_vlp_pwr);
 			tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power[i] = psd_power * 2;
 			curr_freq += 20;
-			pe_debug("psd ext max tx power %d",
-				 tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power[i]);
+			pe_debug_rl("psd ext max tx power %d",
+				    tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power[i]);
 		}
 		break;
 	default:
@@ -649,9 +649,9 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 				tpe_ptr->tx_power[count] =
 					QDF_MAX(tpe_ptr->tx_power[count],
 						gvp_eirp_tx_pwr);
-			pe_debug("non-psd default TPE %d %d, GVP tx pwr: %d",
-				 count, tpe_ptr->tx_power[count],
-				 gvp_eirp_tx_pwr);
+			pe_debug_rl("non-psd default TPE %d %d, GVP tx pwr: %d",
+				    count, tpe_ptr->tx_power[count],
+				    gvp_eirp_tx_pwr);
 		}
 		if (num_extn_tx_pwr)
 			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq, 0);
@@ -689,9 +689,9 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 					tpe_ptr->tx_power[count] =
 					QDF_MAX(tpe_ptr->tx_power[count],
 						gvp_eirp_tx_pwr);
-				pe_debug("non-psd subord TPE %d %d, GVP tx pwr: %d",
-					 count, tpe_ptr->tx_power[count],
-					 gvp_eirp_tx_pwr);
+				pe_debug_rl("non-psd subord TPE %d %d, GVP tx pwr: %d",
+					    count, tpe_ptr->tx_power[count],
+					    gvp_eirp_tx_pwr);
 			}
 			if (num_extn_tx_pwr)
 				update_ext_max_tpe_power(mac, tpe_ptr,
@@ -793,8 +793,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 					QDF_MAX(tpe_ptr->tx_power[count],
 						gvp_psd_tx_pwr);
 		curr_freq += 20;
-		pe_debug("psd default TPE %d %d, GVP tx pwr: %d",
-			 count, tpe_ptr->tx_power[count], gvp_psd_tx_pwr);
+		pe_debug_rl("psd default TPE %d %d, GVP tx pwr: %d",
+			    count, tpe_ptr->tx_power[count], gvp_psd_tx_pwr);
 	}
 
 	if (num_extn_tx_pwr)
@@ -833,9 +833,9 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 					QDF_MAX(tpe_ptr->tx_power[count],
 						gvp_psd_tx_pwr);
 			curr_freq += 20;
-			pe_debug("psd subord TPE %d %d, GVP tx pwr: %d",
-				 count, tpe_ptr->tx_power[count],
-				 gvp_psd_tx_pwr);
+			pe_debug_rl("psd subord TPE %d %d, GVP tx pwr: %d",
+				    count, tpe_ptr->tx_power[count],
+				    gvp_psd_tx_pwr);
 		}
 		if (num_extn_tx_pwr)
 			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq,
