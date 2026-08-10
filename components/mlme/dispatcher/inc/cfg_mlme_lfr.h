@@ -1628,7 +1628,7 @@ enum roam_bg_scan {
 
 /*
  * <ini>
- * gNeighborLookupThreshold/RoamRSSI_Trigger - Set neighbor lookup rssi
+ * gNeighborLookupThreshold/RoamRSSI_Trigger/RoamRSSI_2G_Trigger - Set neighbor lookup rssi
  * threshold
  * @Min: -100
  * @Max: -50
@@ -1645,7 +1645,7 @@ enum roam_bg_scan {
  * </ini>
  */
 #define CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD CFG_INI_INT( \
-	"gNeighborLookupThreshold RoamRSSI_Trigger", \
+	"gNeighborLookupThreshold RoamRSSI_Trigger RoamRSSI_2G_Trigger", \
 	RoamRSSI_Trigger_min, \
 	RoamRSSI_Trigger_max, \
 	RoamRSSI_Trigger_default, \
@@ -1655,7 +1655,7 @@ enum roam_bg_scan {
 
 /*
  * <ini>
- * gNeighborLookupThreshold5ghz - Set neighbor lookup rssi threshold for 5GHz
+ * gNeighborLookupThreshold5ghz/RoamRSSI_5G_Trigger - Set neighbor lookup rssi threshold for 5GHz
  * @Min: -100
  * @Max: -50
  * @Default: -76
@@ -1671,7 +1671,7 @@ enum roam_bg_scan {
  * </ini>
  */
 #define CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_5GHZ CFG_INI_INT( \
-	"gNeighborLookupThreshold5ghz", \
+	"gNeighborLookupThreshold5ghz RoamRSSI_5G_Trigger", \
 	RoamRSSI_Trigger_min, \
 	RoamRSSI_Trigger_max, \
 	RoamRSSI_Trigger_default, \
@@ -1680,7 +1680,7 @@ enum roam_bg_scan {
 
 /*
  * <ini>
- * gNeighborLookupThreshold6ghz - Set neighbor lookup rssi threshold for 6GHz
+ * gNeighborLookupThreshold6ghz/RoamRSSI_6G_Trigger - Set neighbor lookup rssi threshold for 6GHz
  * @Min: -100
  * @Max: -50
  * @Default: -76
@@ -1696,7 +1696,7 @@ enum roam_bg_scan {
  * </ini>
  */
 #define CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_6GHZ CFG_INI_INT( \
-	"gNeighborLookupThreshold6ghz", \
+	"gNeighborLookupThreshold6ghz RoamRSSI_6G_Trigger", \
 	RoamRSSI_Trigger_min, \
 	RoamRSSI_Trigger_max, \
 	RoamRSSI_Trigger_default, \
