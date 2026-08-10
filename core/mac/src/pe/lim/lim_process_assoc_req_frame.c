@@ -2475,6 +2475,66 @@ lim_pmkid_cache_search_partner_link(struct mac_context *mac_ctx,
 }
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+/**
+ * lim_lookup_pmkid_only() - Fallback PMKID-only PMKSA lookup
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id for the session
+ * @pmkid: pointer to the PMKID(s) from the association request
+ * @pmkid_count: number of PMKIDs in the request
+ * @pmkid_cache: output PMKSA cache entry to populate on success
+ *
+ * Performs a PMKID-only lookup when the BSSID-based lookup fails. This
+ * handles NAN IDP scenarios where the PMKSA is cached against the NMI but
+ * the association request arrives on a different interface MAC, causing the
+ * BSSID lookup to miss. On success, copies the PMKID, PMK and PMK length
+ * into pmkid_cache.
+ *
+ * Return: true if a matching PMKSA was found, false otherwise
+ */
+static bool lim_lookup_pmkid_only(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, uint8_t *pmkid,
+				   uint16_t pmkid_count,
+				   struct wlan_crypto_pmksa *pmkid_cache)
+{
+	struct wlan_crypto_pmksa *pmksa_by_pmkid = NULL;
+	struct wlan_objmgr_vdev *vdev;
+	bool found = false;
+
+	if (!pmkid_count)
+		return false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						     WLAN_MLME_CM_ID);
+	if (!vdev)
+		return false;
+
+	pmksa_by_pmkid = wlan_crypto_get_pmksa_by_pmkid(vdev, pmkid);
+	if (pmksa_by_pmkid) {
+		pe_debug("PMKID-only lookup succeeded");
+		qdf_mem_copy(pmkid_cache->pmkid, pmksa_by_pmkid->pmkid,
+			     sizeof(pmkid_cache->pmkid));
+		qdf_mem_copy(pmkid_cache->pmk, pmksa_by_pmkid->pmk,
+			     pmksa_by_pmkid->pmk_len);
+		pmkid_cache->pmk_len = pmksa_by_pmkid->pmk_len;
+		found = true;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+	return found;
+}
+#else
+static inline bool lim_lookup_pmkid_only(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id, uint8_t *pmkid,
+					  uint16_t pmkid_count,
+					  struct wlan_crypto_pmksa *pmkid_cache)
+{
+	return false;
+}
+#endif
+
 static bool lim_is_pmkid_found_for_peer(struct mac_context *mac_ctx,
 					tSirMacAddr peer_mac_addr,
 					struct pe_session *session,
@@ -2506,8 +2566,17 @@ static bool lim_is_pmkid_found_for_peer(struct mac_context *mac_ctx,
 	if (!found &&
 	    !cm_lookup_pmkid_using_bssid(mac_ctx->psoc, session->vdev_id,
 					 pmkid_cache)) {
-		qdf_mem_free(pmkid_cache);
-		return false;
+		/*
+		 * BSSID lookup failed. Try PMKID-only lookup as fallback for
+		 * NAN IDP where PMKSA is cached with NMI but connection arrives
+		 * on a different interface MAC.
+		 */
+		found = lim_lookup_pmkid_only(mac_ctx->psoc, session->vdev_id,
+					      pmkid, pmkid_count, pmkid_cache);
+		if (!found) {
+			qdf_mem_free(pmkid_cache);
+			return false;
+		}
 	}
 
 	session_pmkid = pmkid_cache->pmkid;
