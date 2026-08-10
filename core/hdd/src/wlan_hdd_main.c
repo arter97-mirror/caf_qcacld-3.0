@@ -6807,7 +6807,7 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	/* Host should hold a wake lock until the FW event response is received
 	 * the WMI event would not be a wake up event.
 	 */
-	qdf_runtime_pm_prevent_suspend(
+	qdf_runtime_pm_prevent_suspend_sync(
 			&hdd_ctx->runtime_context.dyn_mac_addr_update);
 	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 
@@ -6866,7 +6866,8 @@ status_ret:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		ret = qdf_status_to_os_return(status);
 		goto allow_suspend;
-	} else if (!ret) {
+	}
+	if (!ret) {
 		/* need to update mac address for dp vdev in the mlo sap case */
 		status = ucfg_dp_update_link_mac_addr(vdev, &mac_addr,
 						      skip_reattach);
@@ -6885,6 +6886,8 @@ status_ret:
 	hdd_tx_latency_restore_config(link_info);
 
 allow_suspend:
+	if (ret && !skip_reattach)
+		ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 	qdf_runtime_pm_allow_suspend(
 			&hdd_ctx->runtime_context.dyn_mac_addr_update);
@@ -7365,8 +7368,15 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 
 	if (net_if_running && adapter->deflink->vdev) {
 		ret = hdd_update_vdev_mac_address(adapter, mac_addr);
-		if (ret)
+		if (ret) {
+			hdd_err("Failed to update vdev MAC, reverting to old address "
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
+			if (hdd_update_vdev_mac_address(adapter,
+							adapter->mac_addr))
+				hdd_err("Failed to revert vdev MAC address");
 			return ret;
+		}
 	}
 
 	hdd_set_mld_address(adapter, &mac_addr);
