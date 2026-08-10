@@ -3972,7 +3972,7 @@ QDF_STATUS wlan_dp_stc_pdev_create_handler(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
 		dp_info("STC: Feature not enabled in config");
-		return QDF_STATUS_SUCCESS;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	dp_info("STC: state %d stc_allowed=0x%x",
