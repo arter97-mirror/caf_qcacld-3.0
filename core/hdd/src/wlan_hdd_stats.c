@@ -5908,7 +5908,14 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 
 	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
-	rtpm_get_status = hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_OSIF);
+
+	rtpm_get_status = hif_rtpm_get(HIF_RTPM_GET_SYNC, HIF_RTPM_ID_OSIF);
+	if (QDF_IS_STATUS_ERROR(rtpm_get_status)) {
+		hdd_err("rtpm get sync failed status:%u",
+			rtpm_get_status);
+		return -EBUSY;
+	}
+
 	/**
 	 * HTT_DBG_EXT_STATS_PDEV_RX
 	 */
@@ -5939,8 +5946,8 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 		hdd_err_rl("Failed to get fw stats: %u", status);
 		ret_val = -EINVAL;
 	}
-	if (QDF_IS_STATUS_SUCCESS(rtpm_get_status))
-		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_OSIF);
+
+	hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_OSIF);
 
 	return ret_val;
 }
