@@ -673,7 +673,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 
 	qdf_net_stats_add_tx_bytes(&dp_intf->stats, qdf_nbuf_len(nbuf));
 
-	if (qdf_nbuf_is_tso(nbuf)) {
+	if (qdf_nbuf_is_tso(nbuf) || qdf_nbuf_is_uso(nbuf)) {
 		qdf_net_stats_add_tx_pkts(&dp_intf->stats,
 					  qdf_nbuf_get_tso_num_seg(nbuf));
 	} else {

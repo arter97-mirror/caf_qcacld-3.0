@@ -2726,6 +2726,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 						ap_ctx->dfs_cac_block_tx);
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 			}
+		} else if (hdd_ctx->dev_dfs_cac_status == DFS_CAC_IN_PROGRESS &&
+			   !wlan_util_is_vdev_in_cac_wait(hdd_ctx->pdev,
+							  WLAN_HDD_ID_OBJ_MGR)) {
+			hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 		}
 		hdd_nofl_info("Ap stopped vid %d reason=%d status %d",
 			      link_info->vdev_id,
@@ -8856,10 +8860,16 @@ wlan_hdd_is_ap_ap_force_scc_override(struct wlan_hdd_link_info *link_info,
 
 	if ((ch_params.ch_width == CH_WIDTH_80MHZ) ||
 	    (ch_params.ch_width == CH_WIDTH_80P80MHZ) ||
-	    (ch_params.ch_width == CH_WIDTH_160MHZ) ||
-	    wlan_hdd_is_chwidth_320mhz(ch_params.ch_width)) {
+	    (ch_params.ch_width == CH_WIDTH_160MHZ)) {
 		if (ch_params.mhz_freq_seg0)
 			new_chandef->center_freq1 = ch_params.mhz_freq_seg0;
+	} else if (wlan_hdd_is_chwidth_320mhz(ch_params.ch_width)) {
+		/* For 320MHz, nl80211 center_freq1 is the center of the full
+		 * 320MHz span (mhz_freq_seg1/ch_cfreq2), not the primary 160MHz
+		 * subchannel center (mhz_freq_seg0/ch_cfreq1).
+		 */
+		if (ch_params.mhz_freq_seg1)
+			new_chandef->center_freq1 = ch_params.mhz_freq_seg1;
 	}
 
 	hdd_debug("override AP freq %d to first AP(vdev_id %d) center_freq:%d width:%d freq1:%d freq2:%d ",
