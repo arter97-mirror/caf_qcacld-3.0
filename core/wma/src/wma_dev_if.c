@@ -5897,8 +5897,19 @@ static void wma_add_tdls_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 		is_tgt_peer_conf_supported =
 			wlan_psoc_nif_fw_ext_cap_get(wma->psoc,
 						     WLAN_SOC_F_PEER_CREATE_RESP);
+		/*
+		 * On the add path peer_assoc must never be sent here: it is
+		 * driven later by the CHANGE_STA (updateSta=1) request once the
+		 * peer caps are known. When the target supports peer create
+		 * confirm, the create-confirm handler sends ADD_STA_RSP; else
+		 * send it now. Falling through would emit a premature (empty
+		 * caps) peer_assoc and result in two peer_assoc cmds for one
+		 * TDLS peer.
+		 */
 		if (is_tgt_peer_conf_supported)
 			return;
+
+		goto send_rsp;
 	}
 
 	/* Peer Assoc */
