@@ -134,6 +134,9 @@ wlan_psoc_get_coex_obj_fl(struct wlan_objmgr_psoc *psoc,
  * @saved_tx_nss: tx_nss saved before N79 active WMI; restored on N79 inactive
  * @saved_rx_chains: num_rx_chains saved before N79 active; restored on inactive
  * @saved_tx_chains: num_tx_chains saved before N79 active; restored on inactive
+ * @saved_tx_chains_11a: num_tx_chains_11a saved before N79 active
+ * @saved_tx_chains_11b: num_tx_chains_11b saved before N79 active
+ * @saved_tx_chains_11g: num_tx_chains_11g saved before N79 active
  * @saved_force: true if the pre-N79 config was USER_FORCE; used to restore
  *   the correct force_mode in the WMI restore command
  * @wmi_sent: true if N79 active WMI was sent for this vdev (guards restore)
@@ -145,6 +148,9 @@ struct coex_vdev_obj {
 	uint8_t saved_tx_nss;
 	uint8_t saved_rx_chains;
 	uint8_t saved_tx_chains;
+	uint8_t saved_tx_chains_11a;
+	uint8_t saved_tx_chains_11b;
+	uint8_t saved_tx_chains_11g;
 	bool saved_force;
 	bool wmi_sent;
 	bool n79_restore_pending;
@@ -162,6 +168,30 @@ wlan_vdev_get_coex_obj(struct wlan_objmgr_vdev *vdev)
 	return (struct coex_vdev_obj *)
 		wlan_objmgr_vdev_get_comp_private_obj(
 			vdev, WLAN_UMAC_COMP_COEX);
+}
+
+/**
+ * wlan_coex_n79_is_supported_opmode() - check if vdev opmode supports N79
+ *   chain-limit WMI commands
+ * @vdev: vdev object
+ *
+ * N79 chainmask overrides apply only to STA, P2P-client (GC), P2P-GO, and
+ * SAP vdevs.  NAN and all other modes must not receive these commands.
+ *
+ * Return: true if the opmode is supported, false otherwise
+ */
+static inline bool
+wlan_coex_n79_is_supported_opmode(struct wlan_objmgr_vdev *vdev)
+{
+	switch (wlan_vdev_mlme_get_opmode(vdev)) {
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+	case QDF_P2P_GO_MODE:
+	case QDF_SAP_MODE:
+		return true;
+	default:
+		return false;
+	}
 }
 #endif /* FEATURE_N79_COEX */
 

@@ -108,4 +108,49 @@ wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef FEATURE_N79_COEX
+struct wlan_mlme_nss_chains;
+
+/**
+ * wlan_coex_n79_is_active() - query current N79 active state
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if N79 coexistence is currently active
+ */
+bool wlan_coex_n79_is_active(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_coex_n79_update_nss_chains() - apply N79 chain/NSS limits to config
+ * @psoc: pointer to psoc object
+ * @vdev: pointer to vdev object (used for bookkeeping: wmi_sent, saved values)
+ * @nss_cfg: NSS/chains config to update in place (caller pre-fills with ini)
+ * @ch_freq: vdev operating channel frequency
+ *
+ * Returns true and overwrites the 5 GHz Rx/Tx chain and NSS fields with the
+ * N79 limits when all conditions hold: N79 is active and at least one of the
+ * four fields exceeds the stored N79 limit.  Also marks
+ * the 5 GHz band state BAND_REQ_FORCE so WMI sends USER_FORCE to FW.
+ * Returns false without modifying @nss_cfg otherwise.
+ */
+bool wlan_coex_n79_update_nss_chains(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlme_nss_chains *nss_cfg,
+				     uint32_t ch_freq);
+#else
+static inline bool
+wlan_coex_n79_is_active(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_coex_n79_update_nss_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct wlan_mlme_nss_chains *nss_cfg,
+				uint32_t ch_freq)
+{
+	return false;
+}
+#endif /* FEATURE_N79_COEX */
 #endif

@@ -29,7 +29,7 @@
  * n79_ss_hysteresis_timer - Hysteresis delay (seconds) before restoring
  * spatial streams after N79 becomes inactive.
  *
- * @Min: 10
+ * @Min: 1
  * @Max: 3600
  * @Default: 1800
  *
@@ -43,7 +43,7 @@
  */
 #define CFG_N79_SS_HYSTERESIS_TIMER \
 	CFG_INI_UINT("n79_ss_hysteresis_timer", \
-		10, 3600, 1800, \
+		1, 3600, 1800, \
 		CFG_VALUE_OR_DEFAULT, \
 		"N79 spatial-stream restore hysteresis (s)")
 

@@ -206,13 +206,7 @@ QDF_STATUS ucfg_coex_n79_wlan_evt(struct wlan_objmgr_psoc *psoc,
 
 bool ucfg_coex_n79_is_active(struct wlan_objmgr_psoc *psoc)
 {
-	struct coex_psoc_obj *psoc_obj;
-
-	if (!psoc)
-		return false;
-
-	psoc_obj = wlan_psoc_get_coex_obj(psoc);
-	return psoc_obj ? !!qdf_atomic_read(&psoc_obj->n79_coex_active) : false;
+	return wlan_coex_n79_is_active(psoc);
 }
 
 bool ucfg_coex_n79_nss_chain_vdev_up_req(

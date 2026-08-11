@@ -26,6 +26,10 @@
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_coex_utils_api.h>
 #include "cfg_ucfg_api.h"
+#ifdef FEATURE_N79_COEX
+#include "wlan_mlme_public_struct.h"
+#include "wlan_mlme_main.h"
+#endif
 
 QDF_STATUS wlan_coex_init(void)
 {
@@ -162,3 +166,108 @@ wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 {
 	return coex_psoc_get_btc_chain_mode(psoc, val);
 }
+
+#ifdef FEATURE_N79_COEX
+bool wlan_coex_n79_is_active(struct wlan_objmgr_psoc *psoc)
+{
+	struct coex_psoc_obj *psoc_obj;
+
+	if (!psoc)
+		return false;
+
+	psoc_obj = wlan_psoc_get_coex_obj(psoc);
+
+	return psoc_obj ?
+		!!qdf_atomic_read(&psoc_obj->n79_coex_active) : false;
+}
+
+bool wlan_coex_n79_update_nss_chains(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlme_nss_chains *nss_cfg,
+				     uint32_t ch_freq)
+{
+	struct coex_psoc_obj *psoc_obj;
+	struct coex_vdev_obj *vdev_obj;
+	struct wlan_mlme_nss_chains *dyn_cfg;
+
+	if (!psoc || !vdev || !nss_cfg)
+		return false;
+
+	psoc_obj = wlan_psoc_get_coex_obj(psoc);
+	if (!psoc_obj || !qdf_atomic_read(&psoc_obj->n79_coex_active))
+		return false;
+
+	coex_debug("N79 update nss chains: policy=%d",
+		   psoc_obj->n79_coex_policy);
+	if (psoc_obj->n79_coex_policy != N79_COEX_POLICY_2X2)
+		return false;
+
+	/* Only apply to STA/GC/GO/SAP; NAN and other modes do not use
+	 * this chainmask command.
+	 */
+	if (!wlan_coex_n79_is_supported_opmode(vdev)) {
+		coex_debug("vdev%u: opmode %d not supported, skip N79 nss update",
+			   wlan_vdev_get_id(vdev),
+			   wlan_vdev_mlme_get_opmode(vdev));
+		return false;
+	}
+
+	/* Skip if all fields are already at or below the N79 limits */
+	if (nss_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ] <=
+			psoc_obj->n79_limit_rx_chain &&
+	    nss_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ] <=
+			psoc_obj->n79_limit_tx_chain &&
+	    nss_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ] <=
+			psoc_obj->n79_limit_rx_nss &&
+	    nss_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ] <=
+			psoc_obj->n79_limit_tx_nss)
+		return false;
+
+	vdev_obj = wlan_vdev_get_coex_obj(vdev);
+	dyn_cfg  = mlme_get_dynamic_vdev_config(vdev);
+	if (vdev_obj && dyn_cfg && !vdev_obj->wmi_sent) {
+		vdev_obj->saved_rx_nss =
+			(uint8_t)nss_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
+		vdev_obj->saved_tx_nss =
+			(uint8_t)nss_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
+		vdev_obj->saved_rx_chains =
+			(uint8_t)nss_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ];
+		vdev_obj->saved_tx_chains =
+			(uint8_t)nss_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ];
+		vdev_obj->saved_tx_chains_11a =
+			(uint8_t)nss_cfg->num_tx_chains_11a;
+		vdev_obj->saved_tx_chains_11b =
+			(uint8_t)nss_cfg->num_tx_chains_11b;
+		vdev_obj->saved_tx_chains_11g =
+			(uint8_t)nss_cfg->num_tx_chains_11g;
+		vdev_obj->saved_force =
+			(dyn_cfg->nss_band_state[NSS_CHAINS_BAND_5GHZ] ==
+			 BAND_REQ_FORCE ||
+			 dyn_cfg->chains_band_state[NSS_CHAINS_BAND_5GHZ] ==
+			 BAND_REQ_FORCE);
+	}
+
+	nss_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ] =
+					psoc_obj->n79_limit_rx_chain;
+	nss_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ] =
+					psoc_obj->n79_limit_tx_chain;
+	nss_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ] = psoc_obj->n79_limit_rx_nss;
+	nss_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ] = psoc_obj->n79_limit_tx_nss;
+	nss_cfg->num_tx_chains_11a = psoc_obj->n79_limit_tx_chain;
+	nss_cfg->num_tx_chains_11b = psoc_obj->n79_limit_tx_chain;
+	nss_cfg->num_tx_chains_11g = psoc_obj->n79_limit_tx_chain;
+	nss_cfg->nss_band_state[NSS_CHAINS_BAND_5GHZ]    = BAND_REQ_FORCE;
+	nss_cfg->chains_band_state[NSS_CHAINS_BAND_5GHZ] = BAND_REQ_FORCE;
+
+	if (vdev_obj)
+		vdev_obj->wmi_sent = true;
+
+	coex_debug("Set nss=%u/%u chains=%u/%u",
+		   nss_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ],
+		   nss_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ],
+		   nss_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ],
+		   nss_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ]);
+
+	return true;
+}
+#endif /* FEATURE_N79_COEX */

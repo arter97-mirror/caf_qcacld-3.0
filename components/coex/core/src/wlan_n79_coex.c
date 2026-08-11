@@ -385,6 +385,13 @@ void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 	if (!wlan_reg_is_5ghz_ch_freq(freq))
 		return;
 
+	if (!wlan_coex_n79_is_supported_opmode(vdev)) {
+		coex_debug("vdev%u: opmode %d not supported, skip N79 apply",
+			   wlan_vdev_get_id(vdev),
+			   wlan_vdev_mlme_get_opmode(vdev));
+		return;
+	}
+
 	vdev_obj = wlan_vdev_get_coex_obj(vdev);
 	if (!vdev_obj) {
 		coex_err("vdev%u: coex vdev obj is NULL",
@@ -443,6 +450,12 @@ void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 			(uint8_t)dyn_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ];
 		vdev_obj->saved_tx_chains =
 			(uint8_t)dyn_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ];
+		vdev_obj->saved_tx_chains_11a =
+			(uint8_t)dyn_cfg->num_tx_chains_11a;
+		vdev_obj->saved_tx_chains_11b =
+			(uint8_t)dyn_cfg->num_tx_chains_11b;
+		vdev_obj->saved_tx_chains_11g =
+			(uint8_t)dyn_cfg->num_tx_chains_11g;
 		vdev_obj->saved_force =
 			(dyn_cfg->nss_band_state[NSS_CHAINS_BAND_5GHZ] ==
 			 BAND_REQ_FORCE ||
@@ -466,6 +479,9 @@ void wlan_coex_n79_apply_active_vdev(struct wlan_objmgr_psoc *psoc,
 	params.tx_nss[NSS_CHAINS_BAND_5GHZ] = psoc_obj->n79_limit_tx_nss;
 	params.num_tx_chains[NSS_CHAINS_BAND_5GHZ] =
 		psoc_obj->n79_limit_tx_chain;
+	params.num_tx_chains_11a = psoc_obj->n79_limit_tx_chain;
+	params.num_tx_chains_11b = psoc_obj->n79_limit_tx_chain;
+	params.num_tx_chains_11g = psoc_obj->n79_limit_tx_chain;
 	params.disable_rx_mrc[NSS_CHAINS_BAND_5GHZ]   = true;
 	params.nss_band_state[NSS_CHAINS_BAND_5GHZ]   = BAND_REQ_FORCE;
 	params.chains_band_state[NSS_CHAINS_BAND_5GHZ] = BAND_REQ_FORCE;
@@ -498,19 +514,6 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 	vdev_obj = wlan_vdev_get_coex_obj(vdev);
 	if (!vdev_obj || !vdev_obj->wmi_sent)
 		return;
-
-	/*
-	 * Guard against SAP/STA CSA that switched to 2.4 GHz via a
-	 * channel-change-only path (no BSS restart, so SAP_STOP was never
-	 * fired).  The vdev is no longer on 5 GHz; clear N79 state without
-	 * sending a restore WMI.
-	 */
-	if (!wlan_reg_is_5ghz_ch_freq(wlan_get_operation_chan_freq(vdev))) {
-		vdev_obj->wmi_sent = false;
-		coex_debug("vdev%u: no longer on 5GHz, clear N79 state",
-			   wlan_vdev_get_id(vdev));
-		return;
-	}
 
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	if ((opmode == QDF_STA_MODE || opmode == QDF_P2P_CLIENT_MODE) &&
@@ -580,6 +583,9 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 	}
 	params.num_rx_chains[NSS_CHAINS_BAND_5GHZ] = vdev_obj->saved_rx_chains;
 	params.num_tx_chains[NSS_CHAINS_BAND_5GHZ] = vdev_obj->saved_tx_chains;
+	params.num_tx_chains_11a = vdev_obj->saved_tx_chains_11a;
+	params.num_tx_chains_11b = vdev_obj->saved_tx_chains_11b;
+	params.num_tx_chains_11g = vdev_obj->saved_tx_chains_11g;
 	params.disable_rx_mrc[NSS_CHAINS_BAND_5GHZ]   = false;
 	if (vdev_obj->saved_force) {
 		params.nss_band_state[NSS_CHAINS_BAND_5GHZ] = BAND_REQ_FORCE;
@@ -591,6 +597,19 @@ void wlan_coex_n79_restore_vdev(struct wlan_objmgr_psoc *psoc,
 							BAND_REQ_NO_FORCE;
 	}
 
+	coex_debug("vdev%u: N79 restore params: rx_nss=%u tx_nss=%u rx_chains=%u tx_chains=%u chains_11a=%u chains_11b=%u chains_11g=%u rx_nss_2g=%u tx_nss_2g=%u rx_chains_2g=%u tx_chains_2g=%u",
+		   wlan_vdev_get_id(vdev),
+		   params.rx_nss[NSS_CHAINS_BAND_5GHZ],
+		   params.tx_nss[NSS_CHAINS_BAND_5GHZ],
+		   params.num_rx_chains[NSS_CHAINS_BAND_5GHZ],
+		   params.num_tx_chains[NSS_CHAINS_BAND_5GHZ],
+		   params.num_tx_chains_11a,
+		   params.num_tx_chains_11b,
+		   params.num_tx_chains_11g,
+		   params.rx_nss[NSS_CHAINS_BAND_2GHZ],
+		   params.tx_nss[NSS_CHAINS_BAND_2GHZ],
+		   params.num_rx_chains[NSS_CHAINS_BAND_2GHZ],
+		   params.num_tx_chains[NSS_CHAINS_BAND_2GHZ]);
 	status = tgt_send_n79_coex_nss_chains(vdev, &params);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		if (!chains_only)
@@ -625,6 +644,13 @@ void wlan_coex_n79_activate_vdev(struct wlan_objmgr_psoc *psoc,
 	if (!wlan_reg_is_5ghz_ch_freq(freq))
 		return;
 
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (!wlan_coex_n79_is_supported_opmode(vdev)) {
+		coex_debug("vdev%u: opmode %d not supported, skip N79 activate",
+			   wlan_vdev_get_id(vdev), opmode);
+		return;
+	}
+
 	dyn_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dyn_cfg)
 		return;
@@ -637,8 +663,6 @@ void wlan_coex_n79_activate_vdev(struct wlan_objmgr_psoc *psoc,
 					 &eff_rx_nss, &eff_tx_nss);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
-
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (eff_rx_nss <= psoc_obj->n79_limit_rx_nss &&
 	    eff_tx_nss <= psoc_obj->n79_limit_tx_nss &&
@@ -766,11 +790,14 @@ QDF_STATUS wlan_coex_n79_event(struct wlan_objmgr_psoc *psoc,
 	case WLAN_COEX_N79_STA_CONNECT:
 	case WLAN_COEX_N79_SAP_START:
 	case WLAN_COEX_N79_NAN_START:
-		if (qdf_atomic_read(&psoc_obj->n79_coex_active))
-			wlan_coex_n79_apply_active_vdev(psoc, vdev, NULL);
-		else
+		if (!qdf_atomic_read(&psoc_obj->n79_coex_active)) {
 			coex_debug("vdev%u: N79 inactive, skip apply on connect",
 				   wlan_vdev_get_id(vdev));
+			break;
+		}
+		if (psoc_obj->n79_coex_policy == N79_COEX_POLICY_2X2)
+			break;
+		wlan_coex_n79_apply_active_vdev(psoc, vdev, NULL);
 		break;
 	case WLAN_COEX_N79_STA_DISCONNECT:
 	case WLAN_COEX_N79_SAP_STOP:

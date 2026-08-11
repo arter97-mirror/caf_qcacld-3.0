@@ -93,6 +93,7 @@
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_utility.h"
 #include "wlan_coex_ucfg_api.h"
+#include "wlan_coex_utils_api.h"
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include "wmi_unified_vdev_api.h"
 #include <wlan_cm_api.h>
@@ -4322,6 +4323,7 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	enum coex_btc_chain_mode btc_chain_mode;
 	struct wlan_mlme_qos *qos_aggr;
 	uint8_t amsdu_val;
+	struct wlan_mlme_nss_chains n79_cfg;
 
 	if (!wma || !mac_ctx)
 		return QDF_STATUS_E_FAILURE;
@@ -4411,8 +4413,20 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	}
 
 	/* Send the dynamic nss chain params before vdev start to fw */
-	if (wma->dynamic_nss_chains_support && !restart)
+	if (wma->dynamic_nss_chains_support && !restart) {
 		wma_vdev_nss_chain_params_send(vdev_id, ini_cfg);
+
+		/*
+		 * If N79 is active on a 5 GHz 4x4 vdev, override chainmask
+		 * to N79 limits before auth/assoc/EAPOL.  All conditions
+		 * (N79 active, 5 GHz, any field above limit) are evaluated
+		 * inside wlan_coex_n79_update_nss_chains().
+		 */
+		qdf_mem_copy(&n79_cfg, ini_cfg, sizeof(n79_cfg));
+		if (wlan_coex_n79_update_nss_chains(wma->psoc, vdev, &n79_cfg,
+						    des_chan->ch_freq))
+			wma_vdev_nss_chain_params_send(vdev_id, &n79_cfg);
+	}
 
 	status = ucfg_coex_psoc_get_btc_chain_mode(wma->psoc, &btc_chain_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
