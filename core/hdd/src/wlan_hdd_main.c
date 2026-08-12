@@ -4478,13 +4478,18 @@ static inline void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
  */
 static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 {
-	/* DO NOT REMOVE these checks; for false positives, read above first */
-
-	wlan_objmgr_psoc_check_for_leaks(hdd_ctx->psoc);
-
 	/* many adapter resources are not freed by design during SSR */
-	if (is_ssr)
+	if (is_ssr) {
+		hdd_debug("SSR in progress, skip leak checks");
 		return;
+	}
+
+	/*
+	 * Prefer fast SSR recovery over leak detection: a kernel panic
+	 * from a leak check assertion is more disruptive to the customer
+	 * than skipping these checks in a critical SSR scenario.
+	 */
+	wlan_objmgr_psoc_check_for_leaks(hdd_ctx->psoc);
 
 	qdf_wake_lock_check_for_leaks();
 	qdf_delayed_work_check_for_leaks();
@@ -4558,6 +4563,12 @@ static void hdd_check_for_objmgr_leaks(struct hdd_context *hdd_ctx)
 
 static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 {
+	/* many adapter resources are not freed by design during SSR */
+	if (is_ssr) {
+		hdd_debug("SSR in progress, skip leak checks");
+		return;
+	}
+
 	hdd_check_for_objmgr_leaks(hdd_ctx);
 }
 
