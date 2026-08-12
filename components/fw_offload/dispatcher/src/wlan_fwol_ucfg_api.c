@@ -537,6 +537,21 @@ QDF_STATUS ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS ucfg_set_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
+					    bool dynamic_bw_switch)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	fwol_obj->cfg.dynamic_bw_switch = dynamic_bw_switch;
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS ucfg_get_dynamic_mode_switch_value(struct wlan_objmgr_psoc *psoc,
 					      bool *dynamic_mode_switch)
 {

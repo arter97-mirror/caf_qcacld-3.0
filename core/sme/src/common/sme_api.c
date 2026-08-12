@@ -16853,6 +16853,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		sme_err("Failed to set scan mode for 6 GHz, %d", status);
 	/* QCN vendor IE should be excluded for cert cases */
 	wlan_mlme_set_exclude_qcn_ie_support(mac_ctx->psoc, true);
+	ucfg_set_dynamic_bw_switch_value(mac_ctx->psoc, false);
 }
 
 #define BA_BUFF_SIZE_512                 5

@@ -324,6 +324,16 @@ QDF_STATUS ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
 					    bool *dynamic_bw_switch);
 
 /**
+ * ucfg_set_dynamic_bw_switch_value() - Sets dynamic_bw_switch value
+ * @psoc: pointer to the psoc object
+ * @dynamic_bw_switch: dynamic_bw_switch value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_set_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
+					    bool dynamic_bw_switch);
+
+/**
  * ucfg_get_dynamic_mode_switch_value() - Assigns dynamic_mode_switch value
  * @psoc: pointer to the psoc object
  * @dynamic_mode_switch: pointer to return dynamic_mode_switch value
