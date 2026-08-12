@@ -4301,8 +4301,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 
 	case SIR_MAC_AUTH_FRAME_2:
 		if ((auth_frame->authAlgoNumber == eSIR_OPEN_SYSTEM) ||
-		    ((auth_frame->authAlgoNumber == eSIR_SHARED_KEY) &&
-			(auth_frame->authStatusCode != STATUS_SUCCESS))) {
+		    (auth_frame->authStatusCode != STATUS_SUCCESS)) {
 			/*
 			 * Allocate buffer for Authenticaton frame of size
 			 * equal to management frame header length plus
