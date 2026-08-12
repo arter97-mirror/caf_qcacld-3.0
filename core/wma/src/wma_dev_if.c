@@ -692,7 +692,8 @@ wma_vdev_self_peer_delete(tp_wma_handle wma_handle,
 				vdev_id);
 			wma_handle_vdev_detach(wma_handle, pdel_vdev_req_param);
 			mlme_vdev_self_peer_delete_resp(pdel_vdev_req_param);
-			cds_trigger_recovery(QDF_SELF_PEER_DEL_FAILED);
+			if (status != QDF_STATUS_E_EMPTY)
+				cds_trigger_recovery(QDF_SELF_PEER_DEL_FAILED);
 			return status;
 		}
 	} else if (iface->type == WMI_VDEV_TYPE_STA ||
@@ -2313,7 +2314,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 			QDF_MAC_ADDR_REF(peer_addr), vdev_id,
 			iface->peer_count);
 		QDF_ASSERT(0);
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_EMPTY;
 	}
 
 	if (!soc) {
