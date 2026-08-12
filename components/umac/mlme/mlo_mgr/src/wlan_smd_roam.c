@@ -4005,10 +4005,8 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
 
-		status = wlan_vdev_get_bss_peer_mld_mac(vdev,
-							&req->peer_mld_addr);
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+		qdf_copy_macaddr(&req->peer_mld_addr,
+				 &mlo_dev_ctx->smd_ctx->smd_identifier);
 
 		status = mlo_mgr_link_switch_notify(vdev, req);
 		if (QDF_IS_STATUS_ERROR(status))
