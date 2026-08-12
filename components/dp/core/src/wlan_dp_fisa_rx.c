@@ -1013,6 +1013,8 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 				fisa_hdl->base)[hashed_flow_idx]);
 	reo_id = sw_ft_entry->napi_id;
+	if (reo_id >= MAX_REO_DEST_RINGS)
+		return;
 
 	dp_rx_fisa_acquire_ft_lock(fisa_hdl, reo_id);
 
