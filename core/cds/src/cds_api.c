@@ -1190,6 +1190,12 @@ close:
  *
  * Return: true if target can suspend, otherwise false
  */
+#ifdef AUTO_PLATFORM
+static bool cds_should_suspend_target(void)
+{
+	return false;
+}
+#else
 static bool cds_should_suspend_target(void)
 {
 	struct hif_opaque_softc *hif_ctx;
@@ -1229,6 +1235,7 @@ static bool cds_should_suspend_target(void)
 	/* target should support suspend in FTM mode */
 	return true;
 }
+#endif
 
 #ifdef HIF_USB
 static inline void cds_suspend_target(tp_wma_handle wma_handle)
