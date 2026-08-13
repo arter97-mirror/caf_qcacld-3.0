@@ -764,6 +764,18 @@ static void tdls_start_all_discovery_timers(
 		if (!vdev_list[i])
 			continue;
 
+		/*
+		 * On non-DBS (single MAC) hardware only one ML STA link is
+		 * active at a time, so skip starting the discovery timer on
+		 * links that are not currently active.
+		 */
+		if (!ucfg_mlo_is_mlo_vdev_active(vdev_list[i])) {
+			tdls_debug("Skip discovery timer on inactive vdev %d",
+				   wlan_vdev_get_id(vdev_list[i]));
+			mlo_release_vdev_ref(vdev_list[i]);
+			continue;
+		}
+
 		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev_list[i]);
 		if (!tdls_vdev) {
 			mlo_release_vdev_ref(vdev_list[i]);
