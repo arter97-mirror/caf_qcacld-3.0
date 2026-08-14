@@ -1279,7 +1279,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	}
 	if (ret) {
 		osif_err("TWT setup command not allowed");
-		return -EOPNOTSUPP;
+		return ret;
 	}
 
 	return osif_twt_setup_send(vdev, psoc, &params);
