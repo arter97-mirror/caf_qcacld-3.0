@@ -1717,8 +1717,8 @@ lim_drop_unprotected_action_frame(struct mac_context *mac, struct pe_session *pe
 		rmfConnection = true;
 
 	if (rmfConnection && (pHdr->fc.wep == 0)) {
-		pe_err("Dropping unprotected Action category: %d frame since RMF is enabled",
-			category);
+		pe_err_rl("vdev %d: Dropping unprotected Action category: %d frame since RMF is enabled",
+			  pe_session->vdev_id, category);
 		return true;
 	}
 
