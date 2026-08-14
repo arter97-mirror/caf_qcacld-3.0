@@ -50,6 +50,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_mlo_mgr_peer.h"
+#include "wlan_mlo_mgr_sta.h"
 #include <wlan_cp_stats_chipset_stats.h>
 #include <wlan_cp_stats_ucfg_api.h>
 #ifdef CNSS_GENL
@@ -4338,6 +4339,12 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 
 	if (wlan_hdd_is_link_switch_in_progress(link_info)) {
 		hdd_debug("Link Switch in progress, can't process the request");
+		return -EBUSY;
+	}
+
+	if (mlo_is_ml_connection_in_progress(hdd_ctx->psoc,
+					     link_info->vdev_id)) {
+		hdd_debug("MLO connection in progress, can't process the request");
 		return -EBUSY;
 	}
 
