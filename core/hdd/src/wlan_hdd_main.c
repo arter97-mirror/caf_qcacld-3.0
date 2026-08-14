@@ -5605,12 +5605,13 @@ static void hdd_features_deinit(struct hdd_context *hdd_ctx)
 /**
  * hdd_deconfigure_cds() -De-Configure cds
  * @hdd_ctx:	HDD context
+ * @is_recovery: Is recovery in progress
  *
  * Deconfigure Cds modules before WLAN firmware is down.
  *
  * Return: 0 on success and errno on failure.
  */
-static int hdd_deconfigure_cds(struct hdd_context *hdd_ctx)
+static int hdd_deconfigure_cds(struct hdd_context *hdd_ctx, bool is_recovery)
 {
 	QDF_STATUS qdf_status;
 	int ret = 0;
@@ -5625,7 +5626,7 @@ static int hdd_deconfigure_cds(struct hdd_context *hdd_ctx)
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 		hdd_debug("Failed to deregister mode change cb with Policy Manager");
 
-	qdf_status = cds_disable(hdd_ctx->psoc);
+	qdf_status = cds_disable(hdd_ctx->psoc, is_recovery);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("Failed to Disable the CDS Modules! :%d",
 			qdf_status);
@@ -6073,7 +6074,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			break;
 		}
 
-		ret = hdd_configure_cds(hdd_ctx);
+		ret = hdd_configure_cds(hdd_ctx, reinit);
 		if (ret) {
 			hdd_err("Failed to Enable cds modules; errno: %d", ret);
 			goto sched_disable;
@@ -6147,7 +6148,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 	return 0;
 
 deconfigure_cds:
-	hdd_deconfigure_cds(hdd_ctx);
+	hdd_deconfigure_cds(hdd_ctx, reinit);
 sched_disable:
 	/*
 	 * Disable scheduler 1st so that scheduler thread doesn't send messages
@@ -19346,12 +19347,12 @@ static void hdd_hastings_bt_war_initialize(struct hdd_context *hdd_ctx)
 /**
  * hdd_configure_cds() - Configure cds modules
  * @hdd_ctx:	HDD context
- *
+ * @is_recovery: Is recovery in progress
  * Enable Cds modules after WLAN firmware is up.
  *
  * Return: 0 on success and errno on failure.
  */
-int hdd_configure_cds(struct hdd_context *hdd_ctx)
+int hdd_configure_cds(struct hdd_context *hdd_ctx, bool is_recovery)
 {
 	int ret;
 	QDF_STATUS status;
@@ -19646,7 +19647,7 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	return 0;
 
 cds_disable:
-	cds_disable(hdd_ctx->psoc);
+	cds_disable(hdd_ctx->psoc, is_recovery);
 	ucfg_ipa_uc_ol_deinit(hdd_ctx->pdev);
 out:
 	return -EINVAL;
@@ -19764,7 +19765,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 			ucfg_dp_direct_link_deinit(hdd_ctx->psoc,
 						   is_recovery_stop);
 
-		if (hdd_deconfigure_cds(hdd_ctx)) {
+		if (hdd_deconfigure_cds(hdd_ctx, is_recovery_stop)) {
 			hdd_err("Failed to de-configure CDS");
 			QDF_ASSERT(0);
 			ret = -EINVAL;
@@ -22794,7 +22795,8 @@ QDF_STATUS hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	return status;
 }
 
-void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
+void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc,
+				bool is_recovery)
 {
 	ucfg_ll_sap_psoc_disable(psoc);
 	ucfg_fwol_psoc_disable(psoc);
@@ -22808,7 +22810,7 @@ void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	disa_psoc_disable(psoc);
 	ocb_psoc_disable(psoc);
 
-	if (!cds_is_driver_recovering() || cds_is_load_or_unload_in_progress())
+	if (!is_recovery)
 		ucfg_action_oui_psoc_disable(psoc);
 }
 

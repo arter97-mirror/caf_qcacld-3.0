@@ -379,7 +379,7 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, bool is_recovery);
 
 QDF_STATUS cds_post_disable(void);
 

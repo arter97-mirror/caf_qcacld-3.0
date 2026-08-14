@@ -1447,10 +1447,11 @@ err_wma_stop:
 /**
  * cds_disable() - stop/disable cds module
  * @psoc: Psoc pointer
+ * @is_recovery: Is recovery in progress
  *
  * Return: QDF status
  */
-QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, bool is_recovery)
 {
 	QDF_STATUS qdf_status;
 	void *handle;
@@ -1463,7 +1464,7 @@ QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc)
 
 	/* Trigger psoc disable for CLD components */
 	if (psoc) {
-		hdd_component_psoc_disable(psoc);
+		hdd_component_psoc_disable(psoc, is_recovery);
 		dispatcher_psoc_disable(psoc);
 	}
 

@@ -4894,7 +4894,7 @@ QDF_STATUS hdd_start_ap_link(struct wlan_hdd_link_info *link_info);
  * Return: 0 on success errno on failure.
  */
 int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held);
-int hdd_configure_cds(struct hdd_context *hdd_ctx);
+int hdd_configure_cds(struct hdd_context *hdd_ctx, bool is_recovery);
 int hdd_set_fw_params(struct hdd_adapter *adapter);
 
 /**
@@ -5416,10 +5416,12 @@ QDF_STATUS hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc);
 /**
  * hdd_component_psoc_disable() - Trigger psoc disable for CLD Components
  * @psoc: Pointer to psoc object
+ * @is_recovery: Is recovery in progress
  *
  * Return: None
  */
-void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc);
+void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc,
+				bool is_recovery);
 
 /**
  * hdd_component_pdev_open() - Trigger pdev open for CLD Components
