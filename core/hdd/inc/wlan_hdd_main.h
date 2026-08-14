@@ -1541,6 +1541,7 @@ struct hdd_pmsr_req {
  * @is_probe_peer_pending: Enable if a probe peer command is pending
  * @probe_peer_cookie: Cookie for correlating probe peer request with completion
  * @user_nss_ctx: Pointer to user configured NSS
+ * @smd_roam_manual_mode: Last successfully applied SMD roam manual mode
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1754,6 +1755,9 @@ struct hdd_adapter {
 	struct wlan_hdd_tx_power tx_power;
 #ifdef WLAN_FEATURE_TX_LATENCY_STATS
 	struct cdp_tx_latency_config tx_latency_cfg;
+#endif
+#ifdef WLAN_FEATURE_11BN_SMD
+	uint32_t smd_roam_manual_mode;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	qdf_time_t link_state_cached_timestamp;

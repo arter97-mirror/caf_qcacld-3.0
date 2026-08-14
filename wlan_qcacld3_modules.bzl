@@ -2013,6 +2013,7 @@ _conditional_srcs = {
     },
     "CONFIG_WLAN_FEATURE_11BN_SMD": {
         True: [
+            "core/hdd/src/wlan_hdd_sysfs_smd_roam_config.c",
             "components/umac/mlme/mlo_mgr/src/wlan_smd_roam.c",
         ],
     },

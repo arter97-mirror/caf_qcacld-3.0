@@ -49,6 +49,20 @@ QDF_STATUS wlan_cm_tgt_send_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wlan_cm_tgt_send_roam_smd_config()  - Send SMD roam config to firmware
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @req: SMD roam config parameter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_tgt_send_roam_smd_config(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    struct wlan_roam_smd_config *req);
+#endif
+
 /**
  * wlan_cm_roam_send_set_vdev_pcl()  - Send vdev set pcl command to firmware
  * @psoc:     PSOC pointer

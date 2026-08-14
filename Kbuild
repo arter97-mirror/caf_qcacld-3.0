@@ -322,6 +322,9 @@ endif
 
 ifeq ($(CONFIG_WLAN_SYSFS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs.o
+ifeq ($(CONFIG_WLAN_FEATURE_11BN_SMD), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_smd_roam_config.o
+endif
 ifeq ($(CONFIG_WLAN_SYSFS_CHANNEL), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_channel.o
 endif

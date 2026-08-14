@@ -3028,6 +3028,7 @@ struct wlan_roam_synch_complete_params {
  * @send_roam_disconnect_params: Send roam disconnect params to FW
  * @allow_pm_after_roam: Allow runtime PM suspernd after roam synch
  * is complete or after roam abort/ho-failure
+ * @send_roam_smd_config: Send SMD roam config to FW
  * @send_smd_roam_start_status_cmd: Send SMD roam start status to FW
  */
 struct wlan_cm_roam_tx_ops {
@@ -3100,6 +3101,8 @@ struct wlan_cm_roam_tx_ops {
 						  struct wlan_roam_disconnect_params *req);
 	void (*allow_pm_after_roam)(struct wlan_objmgr_psoc *psoc);
 #ifdef WLAN_FEATURE_11BN_SMD
+	QDF_STATUS (*send_roam_smd_config)(struct wlan_objmgr_vdev *vdev,
+					   struct wlan_roam_smd_config *req);
 	QDF_STATUS (*send_smd_roam_start_status_cmd)(struct wlan_objmgr_psoc *psoc,
 					struct wlan_roam_smd_start_status_params *params);
 #endif

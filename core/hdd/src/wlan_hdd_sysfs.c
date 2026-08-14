@@ -98,6 +98,7 @@
 #include <wlan_hdd_sysfs_bitrates.h>
 #include <wlan_hdd_sysfs_rf_test_mode.h>
 #include <wlan_hdd_sysfs_power_datapath_stats.h>
+#include <wlan_hdd_sysfs_smd_roam_config.h>
 #include "wlan_module_ids.h"
 #include <wlan_coex_ucfg_api.h>
 #include <wlan_hdd_sysfs_apfmode.h>
@@ -1232,11 +1233,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_sta_bitrates_create(adapter);
 	hdd_sysfs_power_datapath_stats_create(adapter);
 	hdd_sysfs_ipa_create(adapter);
+	hdd_sysfs_smd_roam_config_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_smd_roam_config_destroy(adapter);
 	hdd_sysfs_ipa_destroy(adapter);
 	hdd_sysfs_power_datapath_stats_destroy(adapter);
 	hdd_sysfs_sta_bitrates_destroy(adapter);

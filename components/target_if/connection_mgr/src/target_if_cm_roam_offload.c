@@ -33,6 +33,7 @@
 #include "target_if_cm_roam_event.h"
 #include <target_if_psoc_wake_lock.h>
 #include "wlan_psoc_mlme_api.h"
+#include "wmi_unified_roam_api.h"
 
 static struct wmi_unified
 *target_if_cm_roam_get_wmi_handle_from_vdev(struct wlan_objmgr_vdev *vdev)
@@ -2394,6 +2395,36 @@ end:
 
 #ifdef WLAN_FEATURE_11BN_SMD
 /**
+ * target_if_cm_roam_send_smd_config() - Send SMD roam config to firmware
+ * @vdev: vdev object
+ * @req: SMD roam config parameters
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_cm_roam_send_smd_config(struct wlan_objmgr_vdev *vdev,
+				  struct wlan_roam_smd_config *req)
+{
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle;
+
+	if (!req) {
+		target_if_err("Invalid SMD roam config");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	status = wmi_unified_send_roam_smd_config(wmi_handle, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("Failed to send WMI_ROAM_SMD_CONFIG_CMDID");
+
+	return status;
+}
+
+/**
  * target_if_cm_send_smd_roam_start_status_cmd() - Send SMD roam start status
  * command to firmware
  * @psoc: psoc object
@@ -2469,6 +2500,7 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_disconnect_params =
 					target_if_cm_roam_disconnect_params;
 #ifdef WLAN_FEATURE_11BN_SMD
+	tx_ops->send_roam_smd_config = target_if_cm_roam_send_smd_config;
 	tx_ops->send_smd_roam_start_status_cmd =
 					target_if_cm_send_smd_roam_start_status_cmd;
 #endif
