@@ -11235,6 +11235,7 @@ static void
 hdd_monitor_mode_release_wakelock(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct bbm_params param = {0};
 
 	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
 	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
@@ -11247,6 +11248,9 @@ hdd_monitor_mode_release_wakelock(struct hdd_adapter *adapter)
 		hdd_lpc_enable_powersave(hdd_ctx);
 		qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
 				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+		param.policy = BBM_DRIVER_MODE_POLICY;
+		param.policy_info.driver_mode = hdd_get_conparam();
+		ucfg_dp_bbm_apply_independent_policy(hdd_ctx->psoc, &param);
 	}
 }
 
