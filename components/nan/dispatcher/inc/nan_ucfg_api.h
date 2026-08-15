@@ -648,6 +648,38 @@ bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS
 ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value);
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * ucfg_nan_set_local_schedule() - Set NAN local schedule
+ * @params: pointer to local schedule parameters
+ *
+ * This function sends NAN local schedule configuration to firmware
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_nan_set_local_schedule(struct nan_local_sched_params *params);
+
+/**
+ * ucfg_nan_set_local_sched_rsp_status() - Cache NAN local schedule rsp status
+ * @vdev: pointer to vdev object
+ * @val: value to set
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_nan_set_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
+					       uint32_t val);
+
+/**
+ * ucfg_nan_get_local_sched_rsp_status() - Get cached NAN local schedule rsp
+ * status from vdev obj
+ * @vdev: pointer to vdev object
+ *
+ * Return: cached NAN local schedule rsp status
+ */
+uint32_t ucfg_nan_get_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev);
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 #ifdef NDP_TX_BW_FLOW_CTRL
 /**
  * ucfg_nan_get_peer_ndi_addr_by_id() - Get peer ndi mac address using ndp

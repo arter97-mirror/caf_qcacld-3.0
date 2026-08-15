@@ -237,6 +237,8 @@ enum nan_pasn_msg_type {
  * @NDP_END_ALL: end all NDPs request
  * @NDP_HOST_UPDATE: update host about ndp status
  * @NDP_UPDATE_CONFIG: ndp update config
+ * @NAN_LOCAL_SCHEDULE_REQ: NAN local schedule request to configure time slots
+ *                          and channels for NAN data path
  */
 enum nan_datapath_msg_type {
 	NAN_DATAPATH_INF_CREATE_REQ  = 0,
@@ -258,6 +260,7 @@ enum nan_datapath_msg_type {
 	NDP_END_ALL                  = 16,
 	NDP_HOST_UPDATE              = 17,
 	NDP_UPDATE_CONFIG            = 18,
+	NAN_LOCAL_SCHEDULE_REQ       = 19,
 };
 
 /**
@@ -519,6 +522,21 @@ struct nan_cluster_event {
 
 #define NAN_CH_INFO_MAX_LEN \
 	(NAN_CH_INFO_MAX_CHANNELS * sizeof(struct nan_datapath_channel_info))
+
+/* NAN Local Schedule Constants */
+#define NAN_MAX_SCHEDULE_SLOTS      512
+#define NAN_MAX_CHANNELS            8
+#define NAN_CHANNEL_ENTRY_MAX_LEN   255
+
+/*
+ * Wire size of a single NAN Channel Entry (Wi-Fi Aware Table 100). The
+ * kernel enforces this exact length on NL80211_ATTR_NAN_CHANNEL_ENTRY via
+ * NLA_POLICY_EXACT_LEN(6) before cfg80211_nan_channel.channel_entry is ever
+ * populated, and target firmware's wmi_nan_channel.chan_entry_fields is a
+ * fixed 6-byte field. Not a truncation length -- both ends of the pipe are
+ * fixed-size by spec.
+ */
+#define NAN_CHANNEL_ENTRY_LEN       6
 
 /**
  * struct nan_datapath_inf_create_req - ndi create request params
@@ -902,6 +920,45 @@ struct nan_dump_msg {
 	uint8_t *msg;
 	uint32_t data_len;
 };
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * struct nan_local_sched_channel - NAN schedule channel info
+ * @freq: Channel frequency
+ * @ch_width: Channel width
+ * @center_freq1: Center frequency 1
+ * @center_freq2: Center frequency 2
+ * @channel_entry: Channel entry blob
+ * @channel_entry_len: Length of channel entry
+ * @rx_nss: RX spatial streams
+ */
+struct nan_local_sched_channel {
+	uint32_t freq;
+	uint32_t ch_width;
+	uint32_t center_freq1;
+	uint32_t center_freq2;
+	uint8_t channel_entry[NAN_CHANNEL_ENTRY_MAX_LEN];
+	uint32_t channel_entry_len;
+	uint8_t rx_nss;
+};
+
+/**
+ * struct nan_local_sched_params - NAN local schedule parameters
+ * @vdev_id: VDEV ID
+ * @psoc: PSOC object
+ * @schedule: Schedule bitmap (timeslot -> channel index)
+ * @num_channels: Number of channels
+ * @ch: Array of channel definitions
+ */
+struct nan_local_sched_params {
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t schedule[NAN_MAX_SCHEDULE_SLOTS];
+	uint8_t num_channels;
+	struct nan_local_sched_channel ch[NAN_MAX_CHANNELS];
+};
+
+#endif
 
 /**
  * struct nan_pasn_peer_req - A NAN PASN peer request for the Target

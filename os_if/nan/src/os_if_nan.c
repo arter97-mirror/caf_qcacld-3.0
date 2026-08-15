@@ -3559,7 +3559,157 @@ int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_free(nan_req);
 	return qdf_status_to_os_return(status);
 }
-#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+#define NAN_LOCAL_SCHEDULE_TIMEOUT_MS 4000
+int os_if_nan_process_local_schedule(uint8_t vdev_id,
+				     struct wlan_objmgr_psoc *psoc,
+				     struct cfg80211_nan_local_sched *sched)
+{
+	struct nan_local_sched_params ucfg_params;
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request = NULL;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	int ret;
+	uint8_t i;
+	uint16_t slot_idx;
+	const struct cfg80211_nan_channel *cfg_chan;
+	static const struct osif_request_params req_params = {
+		.priv_size = 0,
+		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
+	};
+
+	/* Validate input parameters */
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return -EINVAL;
+	}
+
+	if (!sched) {
+		osif_err("Invalid schedule parameter");
+		return -EINVAL;
+	}
+
+	/* Validate channel count early */
+	if (sched->n_channels > NAN_MAX_CHANNELS) {
+		osif_err("Invalid channel count: %u (max: %u)",
+			 sched->n_channels, NAN_MAX_CHANNELS);
+		return -EINVAL;
+	}
+
+	/* Initialize UCFG parameters directly */
+	qdf_mem_zero(&ucfg_params, sizeof(ucfg_params));
+	ucfg_params.vdev_id = vdev_id;
+	ucfg_params.psoc = psoc;
+	ucfg_params.num_channels = sched->n_channels;
+
+	/* Convert schedule slots directly */
+	for (slot_idx = 0; slot_idx < NAN_MAX_SCHEDULE_SLOTS; slot_idx++)
+		ucfg_params.schedule[slot_idx] = sched->schedule[slot_idx];
+
+	/* Convert channels directly to UCFG format */
+	cfg_chan = sched->nan_channels;
+	for (i = 0; i < sched->n_channels; i++) {
+		ucfg_params.ch[i].freq = cfg_chan[i].chandef.chan->center_freq;
+
+		/* Convert and validate bandwidth */
+		switch (cfg_chan[i].chandef.width) {
+		case NL80211_CHAN_WIDTH_20:
+			ucfg_params.ch[i].ch_width = CH_WIDTH_20MHZ;
+			break;
+		case NL80211_CHAN_WIDTH_40:
+			ucfg_params.ch[i].ch_width = CH_WIDTH_40MHZ;
+			break;
+		case NL80211_CHAN_WIDTH_80:
+			ucfg_params.ch[i].ch_width = CH_WIDTH_80MHZ;
+			break;
+		case NL80211_CHAN_WIDTH_160:
+			ucfg_params.ch[i].ch_width = CH_WIDTH_160MHZ;
+			break;
+		default:
+			osif_err("Unsupported bandwidth: %d for channel %u",
+				 cfg_chan[i].chandef.width, i);
+			return -EINVAL;
+		}
+
+		ucfg_params.ch[i].rx_nss = cfg_chan[i].rx_nss;
+		qdf_mem_copy(ucfg_params.ch[i].channel_entry,
+			     cfg_chan[i].channel_entry,
+			     NAN_CHANNEL_ENTRY_LEN);
+		ucfg_params.ch[i].channel_entry_len = NAN_CHANNEL_ENTRY_LEN;
+		ucfg_params.ch[i].center_freq1 =
+			cfg_chan[i].chandef.center_freq1;
+		ucfg_params.ch[i].center_freq2 =
+			cfg_chan[i].chandef.center_freq2;
+
+		osif_debug("i%d freq%d bw%d rx_nss%d cf1%d cf2%d chan entry",
+			   i, cfg_chan[i].chandef.chan->center_freq,
+			   cfg_chan[i].chandef.width, cfg_chan[i].rx_nss,
+			   cfg_chan[i].chandef.center_freq1,
+			   cfg_chan[i].chandef.center_freq2);
+
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   cfg_chan[i].channel_entry,
+				   NAN_CHANNEL_ENTRY_LEN);
+	}
+
+	/* Allocate request for waiting on response */
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		osif_err("Request allocation failure");
+		return -ENOMEM;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		osif_err("psoc_nan_obj is null");
+		osif_request_put(request);
+		return -EINVAL;
+	}
+
+	psoc_priv->nan_local_sched_ctx = osif_request_cookie(request);
+
+	/* Send to lower layers */
+	status = ucfg_nan_set_local_schedule(&ucfg_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to set local schedule: %d", status);
+		ret = -EIO;
+		goto end;
+	}
+
+	/* Wait for response */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("NAN local schedule request timed out: %d", ret);
+		ret = -ETIMEDOUT;
+		goto end;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null for vdev_id: %d", vdev_id);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	if (ucfg_nan_get_local_sched_rsp_status(vdev) !=
+					NAN_DATAPATH_RSP_STATUS_SUCCESS) {
+		osif_err("NAN local schedule configuration failed");
+		ret = -EINVAL;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+end:
+	osif_request_put(request);
+	psoc_priv->nan_local_sched_ctx = NULL;
+
+	return ret;
+}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)) */
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			  const void *data, int data_len)

@@ -559,5 +559,17 @@ wlan_get_nan_init_dw_time(struct wlan_objmgr_psoc *psoc)
 
 	return nan_obj->cfg_param.nan_dw_time;
 }
+
+/**
+ * nan_set_local_schedule() - Set NAN local schedule
+ * @params: Pointer to NAN local schedule parameters
+ *
+ * This function is the core implementation for setting NAN local schedule.
+ * It posts a message to the scheduler which will be processed by the NAN
+ * component.
+ *
+ * Return: QDF_STATUS - Success or appropriate error code
+ */
+QDF_STATUS nan_set_local_schedule(struct nan_local_sched_params *params);
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_API_H_ */

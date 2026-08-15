@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,6 +59,19 @@ void hdd_nan_fill_wiphy_caps(struct hdd_context *hdd_ctx,
  */
 void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
 			       struct wma_tgt_cfg *cfg);
+
+/**
+ * wlan_hdd_cfg80211_nan_set_local_sched() - Set NAN local schedule
+ * @wiphy: Wireless hardware description
+ * @wdev: Wireless device
+ * @sched: NAN local schedule configuration
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_nan_set_local_sched(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct cfg80211_nan_local_sched
+					  *sched);
 #else
 static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
 					     struct wma_tgt_cfg *cfg)

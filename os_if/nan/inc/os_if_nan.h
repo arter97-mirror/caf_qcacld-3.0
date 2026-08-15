@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -199,7 +199,24 @@ int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
 			  struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			  struct cfg80211_nan_conf *conf,
 			  u32 changes);
-#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+/**
+ * os_if_nan_process_local_schedule() - Process NAN local schedule request
+ * @vdev_id: vdev ID
+ * @psoc: pointer to psoc object
+ * @sched: pointer to cfg80211 NAN local schedule structure
+ *
+ * This function processes the NAN local schedule configuration from cfg80211,
+ * converts it to internal format, validates it, and sends it to firmware.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_nan_process_local_schedule(uint8_t vdev_id,
+				     struct wlan_objmgr_psoc *psoc,
+				     struct cfg80211_nan_local_sched *sched);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)) */
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**
  * os_if_process_nan_req: os_if api to handle NAN requests attached to the

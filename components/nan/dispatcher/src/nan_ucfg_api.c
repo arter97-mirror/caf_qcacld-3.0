@@ -370,45 +370,6 @@ inline QDF_STATUS ucfg_nan_get_callbacks(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS ucfg_nan_sch_msg_flush_cb(struct scheduler_msg *msg)
-{
-	struct wlan_objmgr_vdev *vdev = NULL;
-
-	if (!msg || !msg->bodyptr)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	switch (msg->type) {
-	case NDP_INITIATOR_REQ:
-		vdev = ((struct nan_datapath_initiator_req *)
-			msg->bodyptr)->vdev;
-		break;
-	case NDP_RESPONDER_REQ:
-		vdev = ((struct nan_datapath_responder_req *)
-			msg->bodyptr)->vdev;
-		break;
-	case NDP_END_REQ:
-		vdev = ((struct nan_datapath_end_req *)msg->bodyptr)->vdev;
-		break;
-	case NDP_END_ALL:
-		vdev = ((struct nan_datapath_end_all_ndps *)msg->bodyptr)->vdev;
-		break;
-	case NDP_UPDATE_CONFIG:
-		vdev = ((struct nan_datapath_update_config *)msg->bodyptr)
-			->vdev;
-		break;
-	default:
-		nan_err("Invalid NAN msg type during sch flush");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (vdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-		qdf_mem_free(msg->bodyptr);
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 				  void *in_req, uint32_t req_type)
 {
@@ -469,7 +430,7 @@ QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_copy(msg.bodyptr, in_req, len);
 	msg.type = req_type;
 	msg.callback = nan_scheduled_msg_handler;
-	msg.flush_callback = ucfg_nan_sch_msg_flush_cb;
+	msg.flush_callback = nan_sch_msg_flush_cb;
 	status = scheduler_post_message(QDF_MODULE_ID_HDD,
 					QDF_MODULE_ID_NAN,
 					QDF_MODULE_ID_OS_IF, &msg);
@@ -1958,6 +1919,45 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 }
 
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+QDF_STATUS ucfg_nan_set_local_schedule(struct nan_local_sched_params *params)
+{
+	return nan_set_local_schedule(params);
+}
+
+QDF_STATUS ucfg_nan_set_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
+					       uint32_t val)
+{
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	priv_obj->local_sched_rsp_status = val;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t ucfg_nan_get_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t val;
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return 0;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	val = priv_obj->local_sched_rsp_status;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return val;
+}
+
 bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return nan_is_fw_support_standard_mode(psoc);

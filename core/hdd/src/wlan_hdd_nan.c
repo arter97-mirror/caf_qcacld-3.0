@@ -672,5 +672,73 @@ void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
 		  vht->vht_supported, vht->cap,
 		  hdd_nan_has_he_caps(hdd_ctx), hdd_nan_has_eht_caps(hdd_ctx));
 }
-#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+int
+wlan_hdd_cfg80211_nan_set_local_sched(struct wiphy *wiphy,
+				      struct wireless_dev *wdev,
+				      struct cfg80211_nan_local_sched *sched)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
+	struct net_device *dev;
+	int ret;
+
+	hdd_enter();
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return -EINVAL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err(" hdd ctx is null");
+		return -EINVAL;
+	}
+
+	/* Validate context */
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	/* Validate input parameter */
+	if (!sched) {
+		hdd_err("Invalid schedule parameter");
+		return -EINVAL;
+	}
+
+	/* Validate NAN standard mode support */
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		hdd_err("NAN standard mode not supported");
+		return -EOPNOTSUPP;
+	}
+
+	/* Validate NAN discovery is active */
+	if (!ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
+		hdd_err("NAN discovery not active");
+		return -EINVAL;
+	}
+
+	/* Validate vdev type */
+	if (adapter->device_mode != QDF_NAN_DISC_MODE) {
+		hdd_err("Invalid vdev mode: %d", adapter->device_mode);
+		return -EINVAL;
+	}
+
+	/* Process local schedule through osif layer */
+	ret = os_if_nan_process_local_schedule(adapter->deflink->vdev_id,
+					       hdd_ctx->psoc, sched);
+
+	hdd_exit();
+	return ret;
+}
+#endif /* LINUX_VERSION_CODE  >= KERNEL_VERSION(6, 18, 0) */
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif

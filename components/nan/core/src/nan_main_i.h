@@ -159,6 +159,7 @@ struct nan_cfg_params {
  * @ndp_peer_mac_addr: array of NDP peer MAC address
  * @num_ndp_peers: Num of existing NDP peers
  * @phy_caps: Cached NAN HT/VHT PHY capability intersection result
+ * @nan_local_sched_ctx: NAN local schedule request context
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -182,6 +183,7 @@ struct nan_psoc_priv_obj {
 	uint8_t num_ndp_peers;
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 	struct nan_phy_caps phy_caps;
+	void *nan_local_sched_ctx;
 #endif
 };
 
@@ -206,6 +208,7 @@ struct nan_psoc_priv_obj {
  * @peer_migrated_addr_list: list containing migrated peer mac address
  * @nan_disable_req_info: NAN disable request info
  * @migration_complete_event: NAN migration complete event
+ * @local_sched_rsp_status: status of the most recent NAN local schedule rsp
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -225,6 +228,7 @@ struct nan_vdev_priv_obj {
 	struct qdf_mac_addr peer_migrated_addr_list[MAX_NDP_SESSIONS];
 	uint8_t nan_disable_req_info;
 	qdf_event_t migration_complete_event;
+	uint32_t local_sched_rsp_status;
 };
 
 /**
@@ -260,6 +264,14 @@ void nan_release_cmd(void *in_req, uint32_t req_type);
  * Return: status of operation
  */
 QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg);
+
+/**
+ * nan_sch_msg_flush_cb: callback to flush the NAN scheduler msg
+ * @msg: pointer to msg
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_sch_msg_flush_cb(struct scheduler_msg *msg);
 
 /**
  * nan_discovery_flush_callback: callback to flush the NAN scheduler msg

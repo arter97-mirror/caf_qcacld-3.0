@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1044,6 +1044,35 @@ static int target_if_ndp_host_event_handler(ol_scn_t scn, uint8_t *data,
 	return 0;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+static QDF_STATUS target_if_nan_local_schedule_req(void *req)
+{
+	struct nan_local_sched_params *sched_req = req;
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+
+	if (!sched_req || !sched_req->psoc) {
+		target_if_err("Invalid req or psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = sched_req->psoc;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return wmi_unified_nan_local_schedule_cmd_send(wmi_handle, sched_req);
+}
+#else
+static inline QDF_STATUS target_if_nan_local_schedule_req(void *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 static QDF_STATUS target_if_nan_datapath_req(void *req, uint32_t req_type)
 {
 	/* send cmd to fw */
@@ -1062,6 +1091,9 @@ static QDF_STATUS target_if_nan_datapath_req(void *req, uint32_t req_type)
 		break;
 	case NDP_UPDATE_CONFIG:
 		target_if_nan_ndp_update_config(req);
+		break;
+	case NAN_LOCAL_SCHEDULE_REQ:
+		target_if_nan_local_schedule_req(req);
 		break;
 	default:
 		target_if_err("invalid req type");

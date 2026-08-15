@@ -42503,6 +42503,10 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.add_nan_func = wlan_hdd_cfg80211_add_nan_func,
 	.del_nan_func = wlan_hdd_cfg80211_del_nan_func,
 	.nan_change_conf = wlan_hdd_cfg80211_nan_change_conf,
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && \
+		LINUX_VERSION_CODE >=  KERNEL_VERSION(6, 18, 0)
+	.nan_set_local_sched = wlan_hdd_cfg80211_nan_set_local_sched,
+#endif
 #endif
 #if defined(CFG80211_PD_SUPPORT) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 	.start_pd = wlan_hdd_cfg80211_start_pd,
