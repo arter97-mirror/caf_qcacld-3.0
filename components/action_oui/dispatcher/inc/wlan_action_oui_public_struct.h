@@ -215,7 +215,7 @@ struct action_oui_request {
 	enum action_oui_id action_id;
 	uint32_t no_oui_extensions;
 	uint32_t total_no_oui_extensions;
-	struct action_oui_extension extension[0];
+	struct action_oui_extension extension[];
 };
 
 /**
