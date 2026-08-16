@@ -1133,7 +1133,7 @@ static inline int pld_pcie_get_direct_link_sid(struct device *dev,
 }
 #endif
 
-#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+#ifdef FEATURE_DT_CPU_MASK_DP_INTR
 static inline void
 pld_pcie_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
 					    unsigned int *cpumask)
@@ -1159,6 +1159,6 @@ pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 						 unsigned int *cpumask)
 {
 }
-#endif /* CONFIG_DT_CPU_MASK_DP_INTR */
+#endif /* FEATURE_DT_CPU_MASK_DP_INTR */
 #endif
 #endif
