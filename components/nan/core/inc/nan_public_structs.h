@@ -34,6 +34,7 @@
 #endif
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
+struct nan_local_sched_rsp;
 
 #ifdef NDP_TX_BW_FLOW_CTRL
 enum phy_ch_width;
@@ -239,6 +240,8 @@ enum nan_pasn_msg_type {
  * @NDP_UPDATE_CONFIG: ndp update config
  * @NAN_LOCAL_SCHEDULE_REQ: NAN local schedule request to configure time slots
  *                          and channels for NAN data path
+ * @NAN_LOCAL_SCHEDULE_RSP: NAN local schedule response from firmware with
+ *                          status of the schedule configuration
  */
 enum nan_datapath_msg_type {
 	NAN_DATAPATH_INF_CREATE_REQ  = 0,
@@ -261,6 +264,7 @@ enum nan_datapath_msg_type {
 	NDP_HOST_UPDATE              = 17,
 	NDP_UPDATE_CONFIG            = 18,
 	NAN_LOCAL_SCHEDULE_REQ       = 19,
+	NAN_LOCAL_SCHEDULE_RSP       = 20,
 };
 
 /**
@@ -958,6 +962,19 @@ struct nan_local_sched_params {
 	struct nan_local_sched_channel ch[NAN_MAX_CHANNELS];
 };
 
+/**
+ * struct nan_local_sched_rsp - NAN local schedule response
+ * @psoc: PSOC object pointer
+ * @vdev_id: VDEV ID
+ * @status: Response status
+ * @reason: Failure reason (if status != success)
+ */
+struct nan_local_sched_rsp {
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t vdev_id;
+	uint32_t status;
+	uint32_t reason;
+};
 #endif
 
 /**

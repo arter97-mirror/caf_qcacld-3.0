@@ -934,11 +934,66 @@ nan_process_local_schedule_msg(struct scheduler_msg *msg)
 {
 	return nan_handle_local_schedule_req(msg->bodyptr);
 }
+
+/**
+ * nan_handle_local_schedule_rsp() - Handle NAN local schedule response
+ * @rsp: Pointer to NAN local schedule response structure
+ *
+ * This function processes the NAN local schedule response by retrieving
+ * the vdev from psoc using vdev_id, and then notifying the OS IF layer.
+ *
+ * Return: QDF_STATUS - Success or appropriate error code
+ */
+static QDF_STATUS nan_handle_local_schedule_rsp(struct nan_local_sched_rsp *rsp)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!rsp || !rsp->psoc) {
+		nan_err("Invalid parameters: rsp=%pK", rsp);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = rsp->psoc;
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/* Get vdev from psoc using vdev_id */
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp->vdev_id,
+						    WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null for vdev_id: %d", rsp->vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_debug("Processing local schedule response for vdev_id: %d, status: %d, reason: %d",
+		  rsp->vdev_id, rsp->status, rsp->reason);
+
+	/* Notify OS IF layer about response */
+	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, vdev,
+						     NAN_LOCAL_SCHEDULE_RSP,
+						     rsp);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
+}
 #else
 static inline QDF_STATUS
 nan_process_local_schedule_msg(struct scheduler_msg *msg)
 {
 	nan_err("NAN local schedule not supported");
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+nan_handle_local_schedule_rsp(struct nan_local_sched_rsp *rsp)
+{
+	nan_err_rl("NAN local schedule not supported");
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
@@ -2082,6 +2137,9 @@ QDF_STATUS nan_datapath_event_handler(struct scheduler_msg *pe_msg)
 		nan_handle_host_update(pe_msg->bodyptr, &cmd.vdev);
 		cmd.cmd_type = WLAN_SER_CMD_NDP_END_ALL_REQ;
 		wlan_serialization_remove_cmd(&cmd);
+		break;
+	case NAN_LOCAL_SCHEDULE_RSP:
+		status = nan_handle_local_schedule_rsp(pe_msg->bodyptr);
 		break;
 	default:
 		nan_alert("Unhandled NDP event: %d", pe_msg->type);

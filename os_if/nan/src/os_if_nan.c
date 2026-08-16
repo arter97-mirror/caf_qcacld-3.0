@@ -2593,6 +2593,81 @@ ndp_sch_ind_nla_failed:
 	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * os_if_nan_local_schedule_rsp_handler() - NAN local schedule response handler
+ * @vdev: pointer to vdev object
+ * @rsp: response parameters
+ *
+ * This function handles the response from firmware for NAN local schedule
+ * configuration request and signals completion to the waiting thread.
+ *
+ * Return: none
+ */
+static void
+os_if_nan_local_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
+				     struct nan_local_sched_rsp *rsp)
+{
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!rsp) {
+		osif_err("Invalid NAN local schedule response");
+		return;
+	}
+
+	osif_debug("NAN local schedule response: status=%u, reason=%u",
+		   rsp->status, rsp->reason);
+
+	if (rsp->status == NAN_DATAPATH_RSP_STATUS_SUCCESS)
+		osif_debug("NAN local schedule configured successfully");
+	else
+		osif_err("NAN local schedule configuration failed, reason: %u",
+			 rsp->reason);
+
+	ucfg_nan_set_local_sched_rsp_status(vdev, rsp->status);
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		osif_err("psoc_priv is NULL");
+		return;
+	}
+
+	request = osif_request_get(psoc_priv->nan_local_sched_ctx);
+	if (!request) {
+		osif_debug("Obsolete request");
+		return;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+#else
+/**
+ * os_if_nan_local_schedule_rsp_handler() - Dummy NAN local schedule
+ * response handler
+ * @vdev: pointer to vdev object
+ * @rsp: response parameters
+ *
+ * This is a dummy inline function when FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+ * is not defined.
+ *
+ * Return: none
+ */
+static inline void os_if_nan_local_schedule_rsp_handler(
+				struct wlan_objmgr_vdev *vdev,
+				struct nan_local_sched_rsp *rsp)
+{
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_vdev *vdev,
 					     uint32_t type, void *msg)
@@ -2630,6 +2705,9 @@ static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 		break;
 	case NDP_SCHEDULE_UPDATE:
 		os_if_ndp_sch_update_ind_handler(vdev, msg);
+		break;
+	case NAN_LOCAL_SCHEDULE_RSP:
+		os_if_nan_local_schedule_rsp_handler(vdev, msg);
 		break;
 	default:
 		break;
