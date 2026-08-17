@@ -5338,6 +5338,75 @@ end:
 }
 
 /**
+ * ml_nlink_handle_passthru_intf() - Check force inactive needed
+ * with PASSTHRU (wondertap) interface
+ * @psoc: PSOC object information
+ * @vdev: ml sta vdev object
+ * @force_cmd: force command to be updated
+ *
+ * PASSTHRU is not part of policy_mgr_get_legacy_conn_info()'s mode list,
+ * so it never contributes to the force-inactive decisions computed by
+ * ml_nlink_handle_legacy_intf_emlsr()/ml_nlink_handle_legacy_intf(). This
+ * means an ML STA connect/reconnect/roam-sync while PASSTHRU is already
+ * active never re-applies PASSTHRU's mac-sharing constraint, and a later
+ * FW-initiated link switch can land 2 STA links + PASSTHRU on one mac.
+ * If PASSTHRU is active and shares a mac with one of the ML STA's current
+ * links, force that link inactive.
+ *
+ * Return: void
+ */
+static void
+ml_nlink_handle_passthru_intf(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_objmgr_vdev *vdev,
+			      struct ml_link_force_state *force_cmd)
+{
+	uint32_t passthru_freq = 0;
+	uint8_t passthru_vdev_id = 0;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0, force_inactive_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t i;
+
+	if (!policy_mgr_get_mode_specific_conn_info(psoc, &passthru_freq,
+						    &passthru_vdev_id,
+						    PM_PASSTHRU_MODE))
+		return;
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return;
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (ml_freq_lst[i] == passthru_freq)
+			continue;
+		if (policy_mgr_2_freq_always_on_same_mac(psoc, ml_freq_lst[i],
+							 passthru_freq))
+			force_inactive_link_bitmap |= 1 << ml_linkid_lst[i];
+	}
+
+	if (!force_inactive_link_bitmap)
+		return;
+
+	/* Don't force inactive if no active link would be left */
+	if (!(ml_link_bitmap & ~force_inactive_link_bitmap)) {
+		mlo_debug("unexpected ML conc with PASSTHRU freq %d",
+			  passthru_freq);
+		return;
+	}
+
+	force_cmd->force_inactive_bitmap |= force_inactive_link_bitmap;
+	mlo_debug("PASSTHRU vdev %d freq %d force inactive link bitmap 0x%x",
+		  passthru_vdev_id, passthru_freq, force_inactive_link_bitmap);
+}
+
+/**
  * ml_nlink_state_change_emlsr() - Handle ML STA link force
  * with concurrency internal function (HW EMLSR conc supported)
  * @psoc: PSOC object information
@@ -5384,6 +5453,8 @@ ml_nlink_state_change_emlsr(struct wlan_objmgr_psoc *psoc,
 
 	ml_nlink_handle_legacy_intf_emlsr(psoc, vdev,
 					  &legacy_intf_force_state);
+	ml_nlink_handle_passthru_intf(psoc, vdev,
+				      &legacy_intf_force_state);
 
 	force_state.force_inactive_bitmap |=
 		legacy_intf_force_state.force_inactive_bitmap;
@@ -5553,6 +5624,8 @@ ml_nlink_state_change_mlmr(struct wlan_objmgr_psoc *psoc,
 	ml_nlink_handle_mcc_links(psoc, vdev, &force_state);
 
 	ml_nlink_handle_legacy_intf(psoc, vdev, &legacy_intf_force_state);
+	ml_nlink_handle_passthru_intf(psoc, vdev,
+				      &legacy_intf_force_state);
 
 	force_state.force_inactive_bitmap |=
 		legacy_intf_force_state.force_inactive_bitmap;
