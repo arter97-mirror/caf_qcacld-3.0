@@ -12425,7 +12425,7 @@ uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
 
 	for (idx = 0; idx < num_tpe; idx++) {
 		if (!tpe_ie[idx].present)
-			return total_ie_len;
+			continue;
 
 		/* +2 for including element id and length */
 		total_ie_len += 2;
@@ -12480,7 +12480,7 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 
 	for (idx = 0; idx < num_tpe; idx++) {
 		if (!tpe_ptr[idx].present)
-			return QDF_STATUS_E_INVAL;
+			continue;
 
 		consumed = 0;
 		*target = WLAN_ELEMID_VHT_TX_PWR_ENVLP;
