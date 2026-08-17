@@ -3401,82 +3401,36 @@ lim_override_extcap_struct(struct mac_context *mac_ctx,
 }
 
 #ifdef WLAN_FEATURE_11BN_SMD
-/**
- * lim_fill_assoc_req_smd_ie() - Add SMD IE to association request
- * @mac_ctx: MAC context
- * @pe_session: PE session
- * @frm: Association request frame structure
- *
- * This function adds SMD Information Element to the association request
- * frame. The SMD context must already be populated by connection manager
- * when candidate was selected.
- *
- * Return: Length of SMD IE added
- */
-static uint32_t
-lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
-			  struct pe_session *pe_session,
-			  tDot11fAssocRequest *frm)
+#define LIM_RSNXE_SMD_CAP_OCTETS 5
+#define LIM_RSNXE_SMD_CAP_OCTET 4
+#define LIM_RSNXE_SMD_CAP_BIT BIT(5)
+
+/* checkpatch-suppress CamelCase */
+static void lim_set_smd_rsnxe_cap(struct pe_session *pe_session,
+				  tDot11fIERSNXEOpaque *rsnxe,
+				  const char *frame_type)
 {
-	struct wlan_mlo_dev_context *mlo_dev;
-	struct smd_context *smd_ctx;
-	tDot11fIEsmd_ie smd_ie;
-	uint32_t ie_len = sizeof(smd_ie);
+	if (!pe_session || !pe_session->vdev ||
+	    !wlan_vdev_is_smd_enabled(pe_session->vdev) ||
+	    !lim_security_profile_has_smd_cap(pe_session) || !rsnxe)
+		return;
 
-	if (!pe_session->vdev)
-		return 0;
+	rsnxe->present = 1;
+	if (rsnxe->num_data < LIM_RSNXE_SMD_CAP_OCTETS) {
+		qdf_mem_zero(&rsnxe->data[rsnxe->num_data],
+			     LIM_RSNXE_SMD_CAP_OCTETS - rsnxe->num_data);
+		rsnxe->num_data = LIM_RSNXE_SMD_CAP_OCTETS;
+	}
 
-	mlo_dev = pe_session->vdev->mlo_dev_ctx;
-	if (!mlo_dev || !mlo_dev->smd_ctx)
-		return 0;
-
-	smd_ctx = mlo_dev->smd_ctx;
-	if (qdf_is_macaddr_zero(&smd_ctx->smd_identifier))
-		return 0;
-
-	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
-
-	smd_ie.element_id = WLAN_ELEMID_EXTN_ELEM;
-	smd_ie.length = WLAN_SMD_INFO_IE_MIN_LEN;
-	smd_ie.element_id_extension = WLAN_EXTN_ELEMID_SMD_INFO;
-
-	qdf_mem_copy(smd_ie.smd_identifier,
-		     smd_ctx->smd_identifier.bytes,
-		     QDF_MAC_ADDR_SIZE);
-
-	smd_ie.smd_capabilities = (uint8_t)(
-			(((smd_ctx->smd_capabilities.smd_type <<
-			   SMD_CAP_TYPE_SHIFT) &
-			   SMD_CAP_TYPE_MASK)) |
-			(((smd_ctx->smd_capabilities.ptk_mode <<
-			   SMD_CAP_PTK_MODE_SHIFT) &
-			   SMD_CAP_PTK_MODE_MASK)) |
-			(((smd_ctx->smd_capabilities.dl_data_forwarding <<
-			   SMD_CAP_DL_DATA_FWD_SHIFT) &
-			   SMD_CAP_DL_DATA_FWD_MASK)) |
-			(((smd_ctx->smd_capabilities.max_prepared_targets <<
-			   SMD_CAP_MAX_TARGET_SHIFT) &
-			   SMD_CAP_MAX_TARGET_MASK)) |
-			(((smd_ctx->smd_capabilities.neighbor_ap_probe_support <<
-			   SMD_CAP_NEIGH_AP_PROBE_SHIFT) &
-			   SMD_CAP_NEIGH_AP_PROBE_MASK)));
-
-	smd_ie.timeout_value = smd_ctx->timeout_tu;
-
-	qdf_mem_copy(&frm->smd_ie, &smd_ie, ie_len);
-
-	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
-	pe_debug("Added SMD IE to assoc request, len=%u", ie_len);
-
-	return ie_len;
+	rsnxe->data[0] = (rsnxe->data[0] & 0xF0) | (rsnxe->num_data - 1);
+	rsnxe->data[LIM_RSNXE_SMD_CAP_OCTET] |= LIM_RSNXE_SMD_CAP_BIT;
+	pe_debug("%s: set SMD RSNXE bit 37", frame_type);
 }
 #else
-static inline
-uint32_t lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
-				   struct pe_session *pe_session,
-				   tDot11fAssocRequest *frm)
+static inline void lim_set_smd_rsnxe_cap(struct pe_session *pe_session,
+					 tDot11fIERSNXEOpaque *rsnxe,
+					 const char *frame_type)
 {
-	return 0;
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 
@@ -3974,7 +3928,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
 	bool eht_capable = false;
 	uint8_t uhr_cap_ie_len = 0;
-	uint16_t smd_ie_len = 0;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -4596,9 +4549,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (is_ml_ap)
 		mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session,
 						       frm);
-	if (wlan_vdev_is_smd_enabled(pe_session->vdev))
-		smd_ie_len = lim_fill_assoc_req_smd_ie(mac_ctx, pe_session,
-						       frm);
 #ifdef WLAN_FEATURE_11BN
 	if (lim_get_uhr_dps_support(pe_session)) {
 		lim_disable_ht_dynamic_smps(pe_session);
@@ -4628,6 +4578,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	lim_populate_security_profile_ie(pe_session, frm, rsnx_ie);
+	/* checkpatch-suppress CamelCase */
+	lim_set_smd_rsnxe_cap(pe_session, &frm->RSNXEOpaque, "Assoc Request");
 
 	/* Strip EHT capabilities IE */
 	if (lim_is_session_eht_capable(pe_session)) {
@@ -4677,7 +4629,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		mbo_ie_len + adaptive_11r_ie_len +
 		vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
 		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len +
-		nonce_ie_len + mme_ie_len + smd_ie_len;
+		nonce_ie_len + mme_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -4735,13 +4687,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			mlo_ie_len = 0;
 		}
 		payload = payload + mlo_ie_len;
-	}
-
-	if (smd_ie_len > 0) {
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
-			     &frm->smd_ie, smd_ie_len);
-		payload += smd_ie_len;
-		pe_debug("Manually appended SMD IE, len=%u", smd_ie_len);
 	}
 
 	if (eht_cap_ie_len) {

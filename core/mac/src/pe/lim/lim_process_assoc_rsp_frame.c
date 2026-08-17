@@ -1202,6 +1202,18 @@ lim_get_dlm_reject_reason(uint16_t status_code)
 }
 #endif
 #ifdef WLAN_FEATURE_11BN_SMD
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool lim_is_assoc_rsp_protected(struct pe_session *session_entry)
+{
+	return session_entry->assoc_rsp_protected;
+}
+#else
+static inline bool lim_is_assoc_rsp_protected(struct pe_session *session_entry)
+{
+	return false;
+}
+#endif
+
 /**
  * lim_process_assoc_rsp_smd() - Process SMD IE from association response
  * @mac_ctx: MAC context
@@ -1212,27 +1224,31 @@ lim_get_dlm_reject_reason(uint16_t status_code)
  * it against the SMD context that was populated from scan entry. It also
  * updates any dynamic SMD parameters that may have changed.
  *
- * Return: None
+ * Return: true if SMD response processing succeeds or is not applicable,
+ * false if the protected association response conflicts with SMD context.
  */
-static void
+static bool
 lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
 			  struct pe_session *session_entry,
 			  tpSirAssocRsp assoc_rsp)
 {
 	struct wlan_mlo_dev_context *mlo_dev;
 	struct smd_context *smd_ctx;
+	bool rsp_protected = false;
 
 	if (!session_entry->vdev)
-		return;
-
-	if (!assoc_rsp->smd_ie.present)
-		return;
+		return true;
 
 	mlo_dev = session_entry->vdev->mlo_dev_ctx;
 	if (!mlo_dev || !mlo_dev->smd_ctx)
-		return;
+		return true;
 
 	smd_ctx = mlo_dev->smd_ctx;
+	rsp_protected = lim_is_assoc_rsp_protected(session_entry);
+
+	if (!assoc_rsp->smd_ie.present)
+		return !rsp_protected ||
+		       !lim_security_profile_has_smd_cap(session_entry);
 
 	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
 
@@ -1241,7 +1257,7 @@ lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
 			QDF_MAC_ADDR_SIZE) != 0) {
 		pe_err("SMD Identifier mismatch between beacon and assoc response");
 		qdf_mutex_release(&smd_ctx->smd_ctx_lock);
-		return;
+		return false;
 	}
 
 	if (assoc_rsp->smd_ie.smd_timeout != smd_ctx->timeout_tu) {
@@ -1255,13 +1271,16 @@ lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
 	pe_info("SMD association complete: ID=" QDF_MAC_ADDR_FMT " timeout=%u",
 		QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes),
 		smd_ctx->timeout_tu);
+
+	return true;
 }
 #else
 static inline
-void lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
+bool lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
 			       struct pe_session *session_entry,
 			       tpSirAssocRsp assoc_rsp)
 {
+	return true;
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 /**
@@ -1839,7 +1858,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		goto assocReject;
 	}
 
-	if (!lim_validate_assoc_rsp_security_profile(mac_ctx, session_entry,
+	if (!lim_validate_assoc_rsp_security_profile(session_entry,
 						     assoc_rsp)) {
 		pe_err("Security Profile IE mismatch in assoc response");
 		assoc_cnf.resultCode = eSIR_SME_INVALID_ASSOC_RSP_RXED;
@@ -1912,9 +1931,16 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 
 	wlan_mlme_set_ap_nss(session_entry->vdev, nss_ies.cap_rx_nss);
-	lim_process_assoc_rsp_smd(mac_ctx,
-				  session_entry,
-				  assoc_rsp);
+	if (!lim_process_assoc_rsp_smd(mac_ctx, session_entry, assoc_rsp)) {
+		/* checkpatch-suppress CamelCase */
+		assoc_cnf.resultCode = eSIR_SME_INVALID_ASSOC_RSP_RXED;
+		/* checkpatch-suppress CamelCase */
+		assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
+		lim_send_disassoc_mgmt_frame(mac_ctx, REASON_UNSPEC_FAILURE,
+					     hdr->sa, session_entry, false);
+		/* checkpatch-suppress CamelCase */
+		goto assocReject;
+	}
 	pe_debug("AP supported NSS = %dx%d, OP %dx%d",
 		 nss_ies.cap_tx_nss, nss_ies.cap_rx_nss,
 		 nss_ies.op_tx_nss, nss_ies.op_rx_nss);

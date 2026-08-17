@@ -4295,6 +4295,37 @@ static inline void lim_update_pmksa_to_profile(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+#define LIM_RSNXE_SMD_CAP BIT_ULL(37)
+
+static uint64_t lim_get_known_rsnxe_caps(void)
+{
+	return 0xFULL | WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
+	       WLAN_CRYPTO_RSNX_CAP_SAE_PK |
+	       WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
+	       WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
+	       WLAN_CRYPTO_RSNX_CAP_URNM_MFPR |
+	       WLAN_CRYPTO_RSNX_CAP_ASSOC_FRM_ENCRYPTION |
+	       WLAN_CRYPTO_RSNX_CAP_DOT1X_OVER_AUTH_FRM |
+	       WLAN_CRYPTO_RSNX_CAP_PMKSA_PRIVACY |
+	       WLAN_CRYPTO_RSNX_CAP_DS_MAC_ADDR |
+	       LIM_RSNXE_SMD_CAP;
+}
+#else
+static uint64_t lim_get_known_rsnxe_caps(void)
+{
+	return 0xFULL | WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
+	       WLAN_CRYPTO_RSNX_CAP_SAE_PK |
+	       WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
+	       WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
+	       WLAN_CRYPTO_RSNX_CAP_URNM_MFPR |
+	       WLAN_CRYPTO_RSNX_CAP_ASSOC_FRM_ENCRYPTION |
+	       WLAN_CRYPTO_RSNX_CAP_DOT1X_OVER_AUTH_FRM |
+	       WLAN_CRYPTO_RSNX_CAP_PMKSA_PRIVACY |
+	       WLAN_CRYPTO_RSNX_CAP_DS_MAC_ADDR;
+}
+#endif
+
 /*
  * lim_is_non_default_rsnxe_cap_set() - Check if non-default userspace RSNXE
  * CAP is set
@@ -4310,7 +4341,7 @@ lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
 {
 	const uint8_t *rsnxe, *rsnxe_cap;
 	uint8_t cap_len = 0, cap_index;
-	uint32_t cap_mask[2];
+	uint64_t known_caps;
 
 	rsnxe = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE,
 					 req->assoc_ie.ptr,
@@ -4325,28 +4356,7 @@ lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
 		return true;
 	}
 
-	/*
-	 * Below is the definition of RSNXE capabilities defined
-	 * in (IEEE Std 802.11-2020, 9.4.2.241, Table 9-780).
-	 * The Extended RSN Capabilities field, except its first 4 bits, is a
-	 * bit field indicating the extended RSN capabilities being advertised
-	 * by the STA transmitting the element. The length of the Extended
-	 * RSN Capabilities field is a variable n, in octets, as indicated by
-	 * the first 4 bits in the field.
-	 * Let's consider a uint32_t cap_mask array which can accommodate
-	 * 60(64-4) bits to check if those bits are set or not.
-	 * This is to keep it simple as current supported bits are only 11.
-	 */
-	cap_mask[0] = ~((uint32_t)(0xF | WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
-			WLAN_CRYPTO_RSNX_CAP_SAE_PK |
-			WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
-			WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
-			WLAN_CRYPTO_RSNX_CAP_URNM_MFPR |
-			WLAN_CRYPTO_RSNX_CAP_ASSOC_FRM_ENCRYPTION |
-			WLAN_CRYPTO_RSNX_CAP_DOT1X_OVER_AUTH_FRM |
-			WLAN_CRYPTO_RSNX_CAP_PMKSA_PRIVACY |
-			WLAN_CRYPTO_RSNX_CAP_DS_MAC_ADDR));
-	cap_mask[1] = 0xFFFFFFFF;
+	known_caps = lim_get_known_rsnxe_caps();
 
 	/* Check if any other bits are set than cap_mask */
 	for (cap_index = 0; cap_index <= cap_len; cap_index++) {
@@ -4356,11 +4366,7 @@ lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
 			/* No mask for these bytes, check all bits */
 			mask_val = 0xFF;
 		} else {
-			/* Extract relevant byte from the 32-bit mask word */
-			uint32_t mask_word = cap_mask[cap_index / 4];
-			uint8_t shift = (cap_index % 4) * 8;
-
-			mask_val = (uint8_t)(mask_word >> shift);
+			mask_val = (uint8_t)~(known_caps >> (cap_index * 8));
 		}
 
 		if (rsnxe_cap[cap_index] & mask_val)
@@ -5633,7 +5639,6 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	uint32_t bss_len;
 	struct join_req *reassoc_req = NULL;
 	uint16_t caps;
-	const uint8_t *sp_ie;
 	uint32_t val;
 	tLimMlmReassocReq *mlm_reassoc_req;
 	tSirResultCodes ret_code = eSIR_SME_SUCCESS;
@@ -5729,11 +5734,12 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 
 	lim_strip_rsnx_ie(mac_ctx, session_entry, req);
 
-	sp_ie = util_scan_entry_security_profile(req->entry);
 	if (lim_is_rsn_profile(session_entry) &&
 	    !util_scan_entry_rsnxe_by_gen(req->entry,
 				req->entry->neg_sec_info.rsn_gen_selected) &&
-	    !lim_security_profile_has_ext_rsn_caps(session_entry, sp_ie)) {
+	    !lim_security_profile_has_ext_rsn_caps(
+				session_entry,
+				util_scan_entry_security_profile(req->entry))) {
 		pe_debug("Bss bcn has no RSNXE, strip if has");
 		status = lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
 				      (uint16_t *)&req->assoc_ie.len,
