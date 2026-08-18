@@ -110,7 +110,7 @@ smd_update_ctx_on_roam_sync(struct wlan_objmgr_vdev *vdev,
 			/* SMD(A) -> SMD(B): Clear current context first */
 			mlo_info("SMD roam_sync: SMD(A)->SMD(B), clearing old ctx "
 				 QDF_MAC_ADDR_FMT,
-				 smd_ctx->smd_identifier.bytes);
+				 QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes));
 			qdf_mem_zero(smd_ctx, sizeof(struct smd_context));
 		}
 
@@ -147,12 +147,13 @@ smd_update_ctx_on_roam_sync(struct wlan_objmgr_vdev *vdev,
 
 		mlo_info("SMD roam_sync: roamed to SMD " QDF_MAC_ADDR_FMT
 			 "was_smd=%d",
-			 smd_ctx->smd_identifier.bytes, was_smd);
+			 QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes),
+			 was_smd);
 	} else if (was_smd) {
 		/* SMD -> Non-SMD: Clear SMD context */
 		mlo_info("SMD roam_sync: roamed away from SMD "
 			 QDF_MAC_ADDR_FMT ", clearing ctx",
-			 smd_ctx->smd_identifier.bytes);
+			 QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes));
 		qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
 		smd_ctx->smd_roaming_in_progress = false;
 		smd_ctx->same_smd_roaming = false;
