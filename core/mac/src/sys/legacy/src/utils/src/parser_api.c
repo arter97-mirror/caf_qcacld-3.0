@@ -8268,7 +8268,11 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		he_cap->chan_width_0 = 0;
 		he_cap->chan_width_4 = 0;
 		he_cap->chan_width_6 = 0;
-		if (ch_width <= CH_WIDTH_80MHZ) {
+		if (session->ch_width < CH_WIDTH_40MHZ) {
+			he_cap->chan_width_1 = 0;
+			he_cap->chan_width_2 = 0;
+			he_cap->chan_width_3 = 0;
+		} else if (session->ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
 		} else if (ch_width == CH_WIDTH_160MHZ) {
