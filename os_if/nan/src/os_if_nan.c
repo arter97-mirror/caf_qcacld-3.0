@@ -2649,6 +2649,61 @@ os_if_nan_local_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	osif_request_complete(request);
 	osif_request_put(request);
 }
+
+/**
+ * os_if_nan_peer_schedule_rsp_handler() - NAN peer schedule response handler
+ * @vdev: pointer to vdev object
+ * @rsp: response parameters
+ *
+ * This function handles the response from firmware for NAN peer schedule
+ * configuration request and signals completion to the waiting thread.
+ *
+ * Return: none
+ */
+static void os_if_nan_peer_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
+						struct nan_peer_sched_rsp *rsp)
+{
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!rsp) {
+		osif_err("Invalid NAN peer schedule response");
+		return;
+	}
+
+	osif_debug("NAN peer schedule response: status=%u",
+		   rsp->status);
+
+	if (rsp->status == NAN_DATAPATH_RSP_STATUS_SUCCESS)
+		osif_debug("NAN peer schedule configured successfully");
+	else
+		osif_err("NAN peer schedule configuration failed, status: %u",
+			 rsp->status);
+
+	ucfg_nan_set_peer_sched_rsp_status(vdev, rsp->status);
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		osif_err("psoc_priv is NULL");
+		return;
+	}
+
+	request = osif_request_get(psoc_priv->nan_peer_sched_ctx);
+	if (!request) {
+		osif_debug("Obsolete request");
+		return;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
 #else
 /**
  * os_if_nan_local_schedule_rsp_handler() - Dummy NAN local schedule
@@ -2664,6 +2719,12 @@ os_if_nan_local_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
 static inline void os_if_nan_local_schedule_rsp_handler(
 				struct wlan_objmgr_vdev *vdev,
 				struct nan_local_sched_rsp *rsp)
+{
+}
+
+static inline void
+os_if_nan_peer_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
+				    struct nan_peer_sched_rsp *rsp)
 {
 }
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
@@ -2708,6 +2769,9 @@ static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 		break;
 	case NAN_LOCAL_SCHEDULE_RSP:
 		os_if_nan_local_schedule_rsp_handler(vdev, msg);
+		break;
+	case NAN_PEER_SCHEDULE_RSP:
+		os_if_nan_peer_schedule_rsp_handler(vdev, msg);
 		break;
 	default:
 		break;

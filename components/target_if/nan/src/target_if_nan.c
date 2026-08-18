@@ -104,6 +104,9 @@ static QDF_STATUS target_if_ndp_event_flush_cb(struct scheduler_msg *msg)
 	case NAN_LOCAL_SCHEDULE_RSP:
 		/* vdev_id in response; retrieved in dispatcher */
 		break;
+	case NAN_PEER_SCHEDULE_RSP:
+		/* vdev_id in response, retrieved in dispatcher */
+		break;
 	default:
 		break;
 	}
@@ -145,8 +148,45 @@ free_res:
 	msg->bodyptr = NULL;
 	return status;
 }
+
+static QDF_STATUS target_if_nan_peer_schedule_event_dispatcher(
+					struct scheduler_msg *msg)
+{
+	QDF_STATUS status;
+	struct wlan_nan_rx_ops *nan_rx_ops;
+	struct nan_peer_sched_rsp *rsp = msg->bodyptr;
+	struct wlan_objmgr_psoc *psoc = rsp->psoc;
+
+	if (!psoc) {
+		target_if_err("psoc is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto free_res;
+	}
+
+	nan_rx_ops = nan_psoc_get_rx_ops(psoc);
+	if (!nan_rx_ops) {
+		target_if_err("nan_rx_ops is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto free_res;
+	}
+
+	status = nan_rx_ops->nan_datapath_event_rx(msg);
+
+free_res:
+	qdf_mem_free(msg->bodyptr);
+	msg->bodyptr = NULL;
+	return status;
+}
 #else
 static inline QDF_STATUS target_if_nan_local_schedule_event_dispatcher(
+					struct scheduler_msg *msg)
+{
+	qdf_mem_free(msg->bodyptr);
+	msg->bodyptr = NULL;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS target_if_nan_peer_schedule_event_dispatcher(
 					struct scheduler_msg *msg)
 {
 	qdf_mem_free(msg->bodyptr);
@@ -191,6 +231,9 @@ static QDF_STATUS target_if_ndp_event_dispatcher(struct scheduler_msg *msg)
 	case NAN_LOCAL_SCHEDULE_RSP:
 		/* Use dedicated dispatcher for local schedule response */
 		return target_if_nan_local_schedule_event_dispatcher(msg);
+	case NAN_PEER_SCHEDULE_RSP:
+		/* Use dedicated dispatcher for peer schedule response */
+		return target_if_nan_peer_schedule_event_dispatcher(msg);
 	default:
 		target_if_err("invalid msg type %d", msg->type);
 		status = QDF_STATUS_E_INVAL;
@@ -1143,6 +1186,59 @@ static int target_if_nan_local_schedule_cnf_handler(ol_scn_t scn,
 	return 0;
 }
 
+static int target_if_nan_peer_schedule_cnf_handler(ol_scn_t scn,
+						   uint8_t *data,
+						   uint32_t data_len)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	struct scheduler_msg msg = {0};
+	struct nan_peer_sched_rsp *rsp;
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		target_if_err("psoc is null");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return -EINVAL;
+	}
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return -ENOMEM;
+
+	status = wmi_extract_nan_peer_schedule_cnf(wmi_handle, data, rsp);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("parsing of event failed, %d", status);
+		qdf_mem_free(rsp);
+		return -EINVAL;
+	}
+
+	/* Populate psoc field */
+	rsp->psoc = psoc;
+
+	msg.bodyptr = rsp;
+	msg.type = NAN_PEER_SCHEDULE_RSP;
+	msg.callback = target_if_ndp_event_dispatcher;
+	msg.flush_callback = target_if_ndp_event_flush_cb;
+	target_if_debug("NAN_PEER_SCHEDULE_RSP sent: %d", msg.type);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("failed to post msg, status: %d", status);
+		target_if_ndp_event_flush_cb(&msg);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static QDF_STATUS target_if_nan_local_schedule_req(void *req)
 {
 	struct nan_local_sched_params *sched_req = req;
@@ -1754,6 +1850,14 @@ target_if_deregister_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
 		status = ret;
 	}
 
+	ret = wmi_unified_unregister_event_handler(
+					handle,
+					wmi_nan_peer_schedule_cnf_event_id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event deregistration failed, ret: %d", ret);
+		status = ret;
+	}
+
 	return status;
 }
 
@@ -1842,6 +1946,17 @@ target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
 				handle,
 				wmi_nan_local_schedule_cnf_event_id,
 				target_if_nan_local_schedule_cnf_handler,
+				WMI_RX_UMAC_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("wmi event registration failed, ret: %d", ret);
+		target_if_nan_deregister_events(psoc);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = wmi_unified_register_event_handler(
+				handle,
+				wmi_nan_peer_schedule_cnf_event_id,
+				target_if_nan_peer_schedule_cnf_handler,
 				WMI_RX_UMAC_CTX);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		target_if_err("wmi event registration failed, ret: %d", ret);
