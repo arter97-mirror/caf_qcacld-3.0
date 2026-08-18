@@ -4972,17 +4972,93 @@ void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 	}
 }
 
+/**
+ * lim_get_update_bw_allow() whether bw can be sent to target directly
+ * @session: pe session
+ * @new_bw: bandwdith to set
+ * @update_allow: return true if bw and puncture can be updated directly
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+lim_get_update_bw_allow(struct pe_session *session,
+			enum phy_ch_width new_bw,
+			bool *update_allow)
+{
+	enum phy_ch_width ch_width;
+	struct wlan_objmgr_psoc *psoc;
+	enum wlan_phymode phy_mode;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	*update_allow = false;
+
+	if (!session || !update_allow) {
+		pe_err("invalid input");
+		return status;
+	}
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc) {
+		pe_err("psoc object invalid");
+		return status;
+	}
+	status = mlme_get_peer_phymode(psoc, session->bssId, &phy_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("failed to get phy_mode %d mac: " QDF_MAC_ADDR_FMT,
+		       status, QDF_MAC_ADDR_REF(session->bssId));
+		return status;
+	}
+	ch_width = wlan_mlme_get_ch_width_from_phymode(phy_mode);
+	if (new_bw <= ch_width)
+		*update_allow = true;
+
+	return status;
+}
+
 bool lim_check_vht_op_mode_change(struct mac_context *mac,
 				  struct pe_session *pe_session,
 				  uint8_t chanWidth, uint8_t *peerMac)
 {
-	tUpdateVHTOpMode tempParam;
+	QDF_STATUS status;
+	bool update_allow = false;
+	struct ch_params ch_params;
+	struct csa_offload_params *csa_param;
 
-	tempParam.opMode = chanWidth;
-	tempParam.smesessionId = pe_session->smeSessionId;
-	qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
+	status = lim_get_update_bw_allow(pe_session, chanWidth, &update_allow);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
 
-	lim_send_mode_update(mac, &tempParam, pe_session);
+	if (update_allow) {
+		tUpdateVHTOpMode tempParam;
+
+		tempParam.opMode = chanWidth;
+		tempParam.smesessionId = pe_session->smeSessionId;
+		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
+
+		lim_send_mode_update(mac, &tempParam, pe_session);
+
+		return true;
+	}
+
+	qdf_mem_zero(&ch_params, sizeof(ch_params));
+	ch_params.ch_width = chanWidth;
+	wlan_reg_set_channel_params_for_freq(mac->pdev,
+						pe_session->curr_op_freq,
+						0, &ch_params);
+	csa_param = qdf_mem_malloc(sizeof(*csa_param));
+	if (!csa_param) {
+		pe_err("csa_param allocation fails");
+		return false;
+	}
+
+	csa_param->channel = wlan_reg_freq_to_chan(mac->pdev,
+						   pe_session->curr_op_freq);
+	csa_param->csa_chan_freq = pe_session->curr_op_freq;
+	csa_param->new_ch_width = ch_params.ch_width;
+	csa_param->new_ch_freq_seg1 = ch_params.center_freq_seg0;
+	csa_param->new_ch_freq_seg2 = ch_params.center_freq_seg1;
+	qdf_copy_macaddr(&csa_param->bssid,
+			 (struct qdf_mac_addr *)pe_session->bssId);
+	lim_handle_sta_csa_param(mac, csa_param);
 
 	return true;
 }
@@ -7563,13 +7639,17 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 }
 
 void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
-		     uint8_t *ie_start, uint32_t num_bytes)
+		     uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
 {
 	const uint8_t *ie = NULL;
 	tDot11fIEhe_cap dot11_cap;
 	struct he_capability_info *he_cap;
+	bool is_band_2g = false;
 
-	populate_dot11f_he_caps(mac, session, &dot11_cap);
+	if (band == CDS_BAND_2GHZ)
+		is_band_2g = true;
+
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap);
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
 			HE_CAP_OUI_SIZE, ie_start, num_bytes);
@@ -7765,7 +7845,8 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	he_caps[0] = DOT11F_EID_HE_CAP;
 	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	qdf_mem_copy(&he_caps[2], HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE);
-	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len);
+	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len,
+			CDS_BAND_5GHZ);
 	he_cap = (struct he_capability_info *) (&he_caps[2 + HE_CAP_OUI_SIZE]);
 
 	nan_beamforming_supported =
@@ -7807,6 +7888,10 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status_5g))
 		pe_err("Unable send HE Cap IE for 5GHZ band, status: %d",
 			status_5g);
+
+	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len,
+			CDS_BAND_2GHZ);
+	he_cap = (struct he_capability_info *)(&he_caps[2 + HE_CAP_OUI_SIZE]);
 
 	/*
 	 * For 5G band HE cap, set the beamformee STS <= 80Mhz to
@@ -8249,6 +8334,12 @@ static void
 lim_revise_req_eht_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 				struct pe_session *session)
 {
+	struct mac_context *mac = session->mac_ctx;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
+		mlme_priv->eht_config = mac->eht_cap_2g;
+		pe_debug("revise 2G eht cap");
+	}
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
@@ -8270,6 +8361,7 @@ void lim_copy_join_req_eht_cap(struct pe_session *session)
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
 	if (!mlme_priv)
 		return;
+	lim_revise_req_eht_cap_per_band(mlme_priv, session);
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 }
@@ -8459,15 +8551,21 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes)
+		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
 {
 	const uint8_t *ie = NULL;
+	uint8_t offset = 0;
+	uint8_t offset_1 = 0;
 	tDot11fIEeht_cap dot11_cap;
 	tDot11fIEhe_cap dot11_he_cap;
 	struct wlan_eht_cap_info *eht_cap;
+	bool is_band_2g = false;
 
-	populate_dot11f_eht_caps(mac, session, &dot11_cap);
-	populate_dot11f_he_caps(mac, session, &dot11_he_cap);
+	if (band == CDS_BAND_2GHZ)
+		is_band_2g = true;
+
+	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap);
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap);
 	lim_log_eht_cap(mac, &dot11_cap);
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(EHT_CAP_OUI_TYPE,
