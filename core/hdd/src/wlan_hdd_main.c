@@ -6451,8 +6451,11 @@ int hdd_stop_no_trans(struct net_device *dev)
 	 * layer. Skip BSS termination and adapter deletion for NAN Data
 	 * interface (NDI).
 	 */
-	if (WLAN_HDD_IS_NDI(adapter))
+	if (WLAN_HDD_IS_NDI(adapter) &&
+	    !ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		hdd_debug("Skip NDI down for HAL based arch");
 		goto reset_iface_opened;
+	}
 
 	/*
 	 * The interface is marked as down for outside world (aka kernel)
