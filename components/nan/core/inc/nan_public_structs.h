@@ -35,6 +35,7 @@
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 struct nan_local_sched_rsp;
+struct nan_peer_sched_params;
 
 #ifdef NDP_TX_BW_FLOW_CTRL
 enum phy_ch_width;
@@ -242,6 +243,8 @@ enum nan_pasn_msg_type {
  *                          and channels for NAN data path
  * @NAN_LOCAL_SCHEDULE_RSP: NAN local schedule response from firmware with
  *                          status of the schedule configuration
+ * @NAN_PEER_SCHEDULE_REQ: NAN peer schedule request to configure time slots
+ *                         and channels for NAN data path
  */
 enum nan_datapath_msg_type {
 	NAN_DATAPATH_INF_CREATE_REQ  = 0,
@@ -265,6 +268,7 @@ enum nan_datapath_msg_type {
 	NDP_UPDATE_CONFIG            = 18,
 	NAN_LOCAL_SCHEDULE_REQ       = 19,
 	NAN_LOCAL_SCHEDULE_RSP       = 20,
+	NAN_PEER_SCHEDULE_REQ        = 21,
 };
 
 /**
@@ -528,7 +532,7 @@ struct nan_cluster_event {
 	(NAN_CH_INFO_MAX_CHANNELS * sizeof(struct nan_datapath_channel_info))
 
 /* NAN Local Schedule Constants */
-#define NAN_MAX_SCHEDULE_SLOTS      512
+#define NAN_MAX_SCHEDULE_SLOTS      32
 #define NAN_MAX_CHANNELS            8
 #define NAN_CHANNEL_ENTRY_MAX_LEN   255
 
@@ -974,6 +978,49 @@ struct nan_local_sched_rsp {
 	uint8_t vdev_id;
 	uint32_t status;
 	uint32_t reason;
+};
+
+#define NAN_MAX_PEER_MAPS 2
+#define NAN_INVALID_MAP_ID 0xff
+
+/**
+ * struct nan_peer_sched_map - NAN peer schedule map
+ * @map_id: map ID of this schedule map
+ * @schedule: a mapping of time slots to chandef indexes in the schedule's
+ *	@nan_channels. Each slot lasts 16TUs. An unscheduled slot will be
+ *	set to %NL80211_NAN_SCHED_NOT_AVAIL_SLOT.
+ */
+struct nan_peer_sched_map {
+	uint8_t map_id;
+	uint8_t schedule[NAN_MAX_SCHEDULE_SLOTS];
+};
+
+/**
+ * struct nan_peer_sched_params - NAN peer schedule parameters
+ * @vdev_id: vdev ID
+ * @psoc: PSOC object
+ * @peer_addr: MAC address of the peer
+ * @seq_id: sequence ID of the peer schedule
+ * @committed_dw: committed DW as published by the peer
+ * @max_chan_switch: maximum channel switch time in microseconds
+ * @ulw_size: number of bytes in @init_ulw
+ * @num_channels: number of channel definitions in @nan_channels
+ * @nan_channels: array of NAN channel definitions
+ * @maps: array of peer schedule maps
+ * @init_ulw: initial ULWs as published by the peer
+ */
+struct nan_peer_sched_params {
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+	struct qdf_mac_addr peer_addr;
+	uint8_t seq_id;
+	uint16_t committed_dw;
+	uint16_t max_chan_switch;
+	uint16_t ulw_size;
+	uint8_t num_channels;
+	struct nan_local_sched_channel nan_channels[NAN_MAX_CHANNELS];
+	struct nan_peer_sched_map maps[NAN_MAX_PEER_MAPS];
+	uint8_t init_ulw[]; /* Variable length array */
 };
 #endif
 

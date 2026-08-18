@@ -160,6 +160,7 @@ struct nan_cfg_params {
  * @num_ndp_peers: Num of existing NDP peers
  * @phy_caps: Cached NAN HT/VHT PHY capability intersection result
  * @nan_local_sched_ctx: NAN local schedule request context
+ * @nan_peer_sched_ctx: NAN peer schedule request context
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -184,6 +185,7 @@ struct nan_psoc_priv_obj {
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 	struct nan_phy_caps phy_caps;
 	void *nan_local_sched_ctx;
+	void *nan_peer_sched_ctx;
 #endif
 };
 
@@ -209,6 +211,7 @@ struct nan_psoc_priv_obj {
  * @nan_disable_req_info: NAN disable request info
  * @migration_complete_event: NAN migration complete event
  * @local_sched_rsp_status: status of the most recent NAN local schedule rsp
+ * @peer_sched_rsp_status: status of the most recent NAN peer schedule rsp
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -229,6 +232,7 @@ struct nan_vdev_priv_obj {
 	uint8_t nan_disable_req_info;
 	qdf_event_t migration_complete_event;
 	uint32_t local_sched_rsp_status;
+	uint32_t peer_sched_rsp_status;
 };
 
 /**
@@ -620,6 +624,16 @@ QDF_STATUS nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
  * Return: true if NAN standard mode supported by FW otherwise false
  */
 bool nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * nan_set_peer_schedule() - Set NAN peer schedule
+ * @params: pointer to peer schedule parameters
+ *
+ * This function sends NAN peer schedule configuration to firmware
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_set_peer_schedule(struct nan_peer_sched_params *params);
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

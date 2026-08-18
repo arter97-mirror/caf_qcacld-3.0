@@ -3789,6 +3789,172 @@ end:
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)) */
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+int os_if_nan_process_peer_schedule(uint8_t vdev_id,
+				    struct wlan_objmgr_psoc *psoc,
+				    struct cfg80211_nan_peer_sched *sched)
+{
+	struct nan_peer_sched_params *ucfg_params;
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request = NULL;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	int ret;
+	uint8_t i, j;
+	size_t req_size;
+	static const struct osif_request_params req_params = {
+		.priv_size = 0,
+		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
+	};
+
+	/* Validate input parameters */
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return -EINVAL;
+	}
+
+	if (!sched) {
+		osif_err("Invalid schedule parameter");
+		return -EINVAL;
+	}
+
+	/* Validate channel count early */
+	if (sched->n_channels > NAN_MAX_CHANNELS) {
+		osif_err("Invalid channel count: %u (max: %u)",
+			 sched->n_channels, NAN_MAX_CHANNELS);
+		return -EINVAL;
+	}
+
+	req_size = sizeof(*ucfg_params) + sched->ulw_size;
+	ucfg_params = qdf_mem_malloc(req_size);
+	if (!ucfg_params)
+		return -ENOMEM;
+
+	ucfg_params->vdev_id = vdev_id;
+	ucfg_params->psoc = psoc;
+	qdf_mem_copy(ucfg_params->peer_addr.bytes, sched->peer_addr,
+		     QDF_MAC_ADDR_SIZE);
+	ucfg_params->seq_id = sched->seq_id;
+	ucfg_params->committed_dw = sched->committed_dw;
+	ucfg_params->max_chan_switch = sched->max_chan_switch;
+	ucfg_params->ulw_size = sched->ulw_size;
+	ucfg_params->num_channels = sched->n_channels;
+
+	qdf_mem_copy(ucfg_params->init_ulw, sched->init_ulw,
+		     ucfg_params->ulw_size);
+
+	for (i = 0; i < ucfg_params->num_channels; i++) {
+		struct cfg80211_nan_channel *cfg_chan = &sched->nan_channels[i];
+
+		ucfg_params->nan_channels[i].freq =
+					cfg_chan->chandef.chan->center_freq;
+		switch (cfg_chan->chandef.width) {
+		case NL80211_CHAN_WIDTH_20:
+			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_20MHZ;
+			break;
+		case NL80211_CHAN_WIDTH_40:
+			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_40MHZ;
+			break;
+		case NL80211_CHAN_WIDTH_80:
+			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_80MHZ;
+			break;
+		case NL80211_CHAN_WIDTH_160:
+			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_160MHZ;
+			break;
+		default:
+			osif_err("Unsupported bandwidth: %d for channel %u",
+				 cfg_chan->chandef.width, i);
+			qdf_mem_free(ucfg_params);
+			return -EINVAL;
+		}
+
+		ucfg_params->nan_channels[i].rx_nss = cfg_chan->rx_nss;
+		qdf_mem_copy(ucfg_params->nan_channels[i].channel_entry,
+			     cfg_chan->channel_entry, NAN_CHANNEL_ENTRY_LEN);
+		ucfg_params->nan_channels[i].channel_entry_len =
+							NAN_CHANNEL_ENTRY_LEN;
+		ucfg_params->nan_channels[i].center_freq1 =
+			cfg_chan->chandef.center_freq1;
+		ucfg_params->nan_channels[i].center_freq2 =
+			cfg_chan->chandef.center_freq2;
+
+		osif_debug("i%d freq%d bw%d rx_nss%d cf1%d cf2%d chan entry",
+			   i, cfg_chan->chandef.chan->center_freq,
+			   cfg_chan->chandef.width, cfg_chan->rx_nss,
+			   cfg_chan->chandef.center_freq1,
+			   cfg_chan->chandef.center_freq2);
+
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   cfg_chan->channel_entry,
+				   NAN_CHANNEL_ENTRY_LEN);
+	}
+
+	for (i = 0; i < CFG80211_NAN_MAX_PEER_MAPS; i++) {
+		ucfg_params->maps[i].map_id = sched->maps[i].map_id;
+		for (j = 0; j < NAN_MAX_SCHEDULE_SLOTS; j++)
+			ucfg_params->maps[i].schedule[j] =
+						sched->maps[i].schedule[j];
+	}
+
+	/* Allocate request for waiting on response */
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		osif_err("Request allocation failure");
+		qdf_mem_free(ucfg_params);
+		return -ENOMEM;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		osif_err("psoc_nan_obj is null");
+		osif_request_put(request);
+		qdf_mem_free(ucfg_params);
+		return -EINVAL;
+	}
+
+	psoc_priv->nan_peer_sched_ctx = osif_request_cookie(request);
+
+	/* Send to lower layers */
+	status = ucfg_nan_set_peer_schedule(ucfg_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to set peer schedule: %d", status);
+		ret = -EIO;
+		goto end;
+	}
+
+	/* Wait for response */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("NAN peer schedule request timed out: %d", ret);
+		ret = -ETIMEDOUT;
+		goto end;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null for vdev_id: %d", vdev_id);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	if (ucfg_nan_get_peer_sched_rsp_status(vdev) !=
+					NAN_DATAPATH_RSP_STATUS_SUCCESS) {
+		osif_err("NAN peer schedule configuration failed");
+		ret = -EINVAL;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+end:
+	osif_request_put(request);
+	psoc_priv->nan_peer_sched_ctx = NULL;
+	qdf_mem_free(ucfg_params);
+
+	return ret;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			  const void *data, int data_len)
 {

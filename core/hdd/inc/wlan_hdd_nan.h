@@ -72,6 +72,18 @@ int wlan_hdd_cfg80211_nan_set_local_sched(struct wiphy *wiphy,
 					  struct wireless_dev *wdev,
 					  struct cfg80211_nan_local_sched
 					  *sched);
+
+/**
+ * wlan_hdd_cfg80211_nan_set_peer_sched() - Set NAN peer schedule
+ * @wiphy: Wireless hardware description
+ * @wdev: Wireless device
+ * @sched: NAN peer schedule configuration
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_nan_set_peer_sched(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 struct cfg80211_nan_peer_sched *sched);
 #else
 static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
 					     struct wma_tgt_cfg *cfg)

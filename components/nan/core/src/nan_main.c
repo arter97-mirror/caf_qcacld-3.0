@@ -982,6 +982,114 @@ static QDF_STATUS nan_handle_local_schedule_rsp(struct nan_local_sched_rsp *rsp)
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 	return status;
 }
+
+/**
+ * nan_handle_peer_schedule_req() - Handle NAN peer schedule request
+ * @req: Pointer to NAN peer schedule parameters
+ *
+ * This function processes the NAN peer schedule request by validating
+ * parameters, retrieving necessary objects, and sending the request to
+ * firmware through tx_ops.
+ *
+ * Return: QDF_STATUS - Success or appropriate error code
+ */
+static QDF_STATUS nan_handle_peer_schedule_req(
+					struct nan_peer_sched_params *req)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_nan_tx_ops *tx_ops;
+	QDF_STATUS status;
+
+	if (!req) {
+		nan_err("Invalid parameters: req is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!req->psoc) {
+		nan_err("Invalid parameters: psoc is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(req->psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto cleanup;
+	}
+
+	tx_ops = &psoc_nan_obj->tx_ops;
+	if (!tx_ops->nan_datapath_req_tx) {
+		nan_err("nan_datapath_req_tx is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto cleanup;
+	}
+
+	nan_debug("Processing peer schedule request for vdev_id: %d",
+		  req->vdev_id);
+
+	status = tx_ops->nan_datapath_req_tx(req, NAN_PEER_SCHEDULE_REQ);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("Failed to send peer schedule req to FW, status: %d",
+			status);
+
+cleanup:
+	/*
+	 * For variable length array (init_ulw), we allocated one block.
+	 * So freeing req frees everything.
+	 */
+	qdf_mem_free(req);
+	return status;
+}
+
+QDF_STATUS nan_set_peer_schedule(struct nan_peer_sched_params *params)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+	struct nan_peer_sched_params *req;
+	uint32_t len;
+
+	if (!params) {
+		nan_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len = sizeof(*req) + params->ulw_size;
+	req = qdf_mem_malloc(len);
+	if (!req)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(req, params, len);
+
+	msg.bodyptr = req;
+	msg.type = NAN_PEER_SCHEDULE_REQ;
+	msg.callback = nan_scheduled_msg_handler;
+	msg.flush_callback = nan_sch_msg_flush_cb;
+
+	status = scheduler_post_message(QDF_MODULE_ID_HDD,
+					QDF_MODULE_ID_NAN,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to post message, status: %d", status);
+		qdf_mem_free(req);
+	}
+
+	return status;
+}
+
+/**
+ * nan_process_peer_schedule_msg() - Process NAN peer schedule message
+ * @msg: Pointer to scheduler message
+ *
+ * This is a wrapper function to handle NAN_PEER_SCHEDULE_REQ message type.
+ *
+ * Return: QDF_STATUS - Success or appropriate error code
+ */
+static inline QDF_STATUS
+nan_process_peer_schedule_msg(struct scheduler_msg *msg)
+{
+	return nan_handle_peer_schedule_req(msg->bodyptr);
+}
 #else
 static inline QDF_STATUS
 nan_process_local_schedule_msg(struct scheduler_msg *msg)
@@ -994,6 +1102,13 @@ static inline QDF_STATUS
 nan_handle_local_schedule_rsp(struct nan_local_sched_rsp *rsp)
 {
 	nan_err_rl("NAN local schedule not supported");
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+nan_process_peer_schedule_msg(struct scheduler_msg *msg)
+{
+	nan_err("NAN peer schedule not supported");
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
@@ -1026,6 +1141,7 @@ QDF_STATUS nan_sch_msg_flush_cb(struct scheduler_msg *msg)
 		break;
 	case NAN_LOCAL_SCHEDULE_REQ:
 		/* No vdev for this req; only vdev_id and psoc */
+	case NAN_PEER_SCHEDULE_REQ:
 		qdf_mem_free(msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
@@ -1089,6 +1205,8 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 	}
 	case NAN_LOCAL_SCHEDULE_REQ:
 		return nan_process_local_schedule_msg(msg);
+	case NAN_PEER_SCHEDULE_REQ:
+		return nan_process_peer_schedule_msg(msg);
 	default:
 		nan_err("wrong request type: %d", msg->type);
 		return QDF_STATUS_E_INVAL;

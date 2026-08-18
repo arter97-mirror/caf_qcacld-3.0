@@ -1164,8 +1164,36 @@ static QDF_STATUS target_if_nan_local_schedule_req(void *req)
 
 	return wmi_unified_nan_local_schedule_cmd_send(wmi_handle, sched_req);
 }
+
+static QDF_STATUS target_if_nan_peer_schedule_req(
+				struct nan_peer_sched_params *req)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+
+	if (!req || !req->psoc) {
+		target_if_err("Invalid req or psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = req->psoc;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return wmi_unified_nan_peer_schedule_cmd_send(wmi_handle, req);
+}
 #else
 static inline QDF_STATUS target_if_nan_local_schedule_req(void *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS target_if_nan_peer_schedule_req(
+				struct nan_peer_sched_params *req)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -1192,6 +1220,9 @@ static QDF_STATUS target_if_nan_datapath_req(void *req, uint32_t req_type)
 		break;
 	case NAN_LOCAL_SCHEDULE_REQ:
 		target_if_nan_local_schedule_req(req);
+		break;
+	case NAN_PEER_SCHEDULE_REQ:
+		target_if_nan_peer_schedule_req(req);
 		break;
 	default:
 		target_if_err("invalid req type");

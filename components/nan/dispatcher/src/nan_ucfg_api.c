@@ -1919,6 +1919,11 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 }
 
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return nan_is_fw_support_standard_mode(psoc);
+}
+
 QDF_STATUS ucfg_nan_set_local_schedule(struct nan_local_sched_params *params)
 {
 	return nan_set_local_schedule(params);
@@ -1958,9 +1963,43 @@ uint32_t ucfg_nan_get_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev)
 	return val;
 }
 
-bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS ucfg_nan_set_peer_schedule(struct nan_peer_sched_params *params)
 {
-	return nan_is_fw_support_standard_mode(psoc);
+	return nan_set_peer_schedule(params);
+}
+
+QDF_STATUS ucfg_nan_set_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
+					      uint32_t val)
+{
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	priv_obj->peer_sched_rsp_status = val;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t ucfg_nan_get_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t val;
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return 0;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	val = priv_obj->peer_sched_rsp_status;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return val;
 }
 
 void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,

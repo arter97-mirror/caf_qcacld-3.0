@@ -678,6 +678,35 @@ QDF_STATUS ucfg_nan_set_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
  * Return: cached NAN local schedule rsp status
  */
 uint32_t ucfg_nan_get_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_nan_set_peer_schedule() - Set NAN peer schedule
+ * @params: pointer to peer schedule parameters
+ *
+ * This function sends NAN peer schedule configuration to firmware
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_nan_set_peer_schedule(struct nan_peer_sched_params *params);
+
+/**
+ * ucfg_nan_set_peer_sched_rsp_status() - Cache NAN peer schedule rsp status
+ * @vdev: pointer to vdev object
+ * @val: value to set
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_nan_set_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
+					      uint32_t val);
+
+/**
+ * ucfg_nan_get_peer_sched_rsp_status() - Get cached NAN peer schedule rsp
+ * status from vdev obj
+ * @vdev: pointer to vdev object
+ *
+ * Return: cached NAN peer schedule rsp status
+ */
+uint32_t ucfg_nan_get_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev);
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 #ifdef NDP_TX_BW_FLOW_CTRL

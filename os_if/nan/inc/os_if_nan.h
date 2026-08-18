@@ -215,6 +215,21 @@ int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
 int os_if_nan_process_local_schedule(uint8_t vdev_id,
 				     struct wlan_objmgr_psoc *psoc,
 				     struct cfg80211_nan_local_sched *sched);
+
+/**
+ * os_if_nan_process_peer_schedule() - Process NAN peer schedule request
+ * @vdev_id: vdev ID
+ * @psoc: pointer to psoc object
+ * @sched: pointer to os_if NAN peer schedule structure
+ *
+ * This function processes the NAN peer schedule configuration from os_if,
+ * converts it to internal format, validates it, and sends it to firmware.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_nan_process_peer_schedule(uint8_t vdev_id,
+				    struct wlan_objmgr_psoc *psoc,
+				    struct cfg80211_nan_peer_sched *sched);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)) */
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
