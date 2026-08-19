@@ -2078,8 +2078,51 @@ wlan_dp_rx_tdls_packet(uint8_t vdev_id, struct sk_buff *skb,
 		qdf_mem_free(info);
 }
 
+/*
+ * dp_fast_rx_cbk() - fast-path RX callback for WLAN_FAST_L2L_RX
+ * @dp_intf: DP interface handle (pre-resolved by caller)
+ * @rx_buf: head of received nbuf chain
+ *
+ * Called when HW FSE has already validated the flow index in CMEM.
+ * Skips FISA aggregation, EAPOL divert, and other slow-path checks
+ * to reduce per-packet CPU cycles on the hot RX data path.
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+dp_fast_rx_cbk(struct wlan_dp_intf *dp_intf, qdf_nbuf_t rx_buf)
+{
+	struct dp_tx_rx_stats *stats;
+	unsigned int cpu_index;
+	qdf_nbuf_t nbuf;
+	qdf_nbuf_t next;
+
+	cpu_index = qdf_get_cpu();
+	stats = &dp_intf->dp_stats.tx_rx_stats;
+
+	next = rx_buf;
+
+	while (next) {
+		nbuf = next;
+		next = qdf_nbuf_next(nbuf);
+		qdf_nbuf_set_next(nbuf, NULL);
+		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
+		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);
+		++stats->per_cpu[cpu_index].rx_packets;
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
+		qdf_net_stats_add_rx_bytes(&dp_intf->stats, qdf_nbuf_len(nbuf));
+		qdf_net_buf_debug_release_skb(nbuf);
+		if (qdf_likely(netif_receive_skb(nbuf) == NET_RX_SUCCESS))
+			++stats->per_cpu[cpu_index].rx_delivered;
+		else
+			++stats->per_cpu[cpu_index].rx_refused;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
-			    qdf_nbuf_t rxBuf)
+			    qdf_nbuf_t rx_buf)
 {
 	struct wlan_dp_intf *dp_intf = NULL;
 	struct wlan_dp_link *dp_link = NULL;
@@ -2100,19 +2143,23 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 	uint8_t pkt_type;
 
 	/* Sanity check on inputs */
-	if (qdf_unlikely((!dp_link_context) || (!rxBuf))) {
+	if (qdf_unlikely(!dp_link_context || !rx_buf)) {
 		dp_err_rl("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	dp_link = (struct wlan_dp_link *)dp_link_context;
 	dp_intf = dp_link->dp_intf;
+
+	if (qdf_nbuf_get_rx_flow_idx_valid(rx_buf))
+		return dp_fast_rx_cbk(dp_intf, rx_buf);
+
 	dp_ctx = dp_intf->dp_ctx;
 
 	cpu_index = qdf_get_cpu();
 	stats = &dp_intf->dp_stats.tx_rx_stats;
 
-	next = rxBuf;
+	next = rx_buf;
 
 	while (next) {
 		nbuf = next;

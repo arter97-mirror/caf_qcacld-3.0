@@ -2972,6 +2972,12 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		next_nbuf = head_nbuf->next;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 
+		/* WLAN_FAST_L2L_RX: flow already matched by HW FSE in
+		 * CMEM, bypass FISA aggregation for this packet.
+		 */
+		if (qdf_nbuf_get_rx_flow_idx_valid(head_nbuf))
+			goto deliver_nbuf;
+
 		/* bypass FISA check */
 		if (dp_is_nbuf_bypass_fisa(head_nbuf, vdev,
 					   dp_fisa_rx_hdl->add_tcp_flow_to_fst))
