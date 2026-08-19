@@ -298,6 +298,25 @@ static inline
 void wlan_dp_svc_deinit(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
+
+static inline
+QDF_STATUS dp_svc_get_meta_data_by_id(uint8_t svc_id, qdf_nbuf_t nbuf,
+				      uint32_t *metadata)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS dp_svc_inc_policy_ref_cnt_by_id(uint8_t svc_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS dp_svc_dec_policy_ref_cnt_by_id(uint8_t svc_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif
 
 #endif

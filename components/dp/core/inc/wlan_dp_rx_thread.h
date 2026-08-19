@@ -784,7 +784,14 @@ QDF_STATUS dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc, qdf_cpu_mask *new_mask)
  *
  * Return: number of frames
  */
+#ifdef FEATURE_WLAN_DP_RX_THREADS
 int dp_rx_tm_get_pending(ol_txrx_soc_handle soc);
+#else
+static inline int dp_rx_tm_get_pending(ol_txrx_soc_handle soc)
+{
+	return 0;
+}
+#endif
 
 #ifdef FEATURE_DAL_DP_SUPPORT
 static inline uint8_t
