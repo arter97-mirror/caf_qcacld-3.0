@@ -2307,6 +2307,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		msg->bodyptr = NULL;
 		break;
 	case eWNI_SME_SEND_SAE_MSG:
+	case WNI_SME_EXTERNAL_AUTH_STATUS_MSG:
 		lim_process_sae_msg(mac_ctx, msg->bodyptr);
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;

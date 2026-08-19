@@ -1052,6 +1052,111 @@ lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/**
+ * lim_process_eppke_auth_frame()- Process EPPKE authentication frame
+ * @mac_ctx: MAC context
+ * @pe_session: PE session
+ * @rx_pkt_info: Rx packet
+ *
+ * Return: None
+ */
+static void lim_process_eppke_auth_frame(struct mac_context *mac_ctx,
+					 struct pe_session *pe_session,
+					 uint8_t *rx_pkt_info)
+{
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t frame_len;
+	uint8_t *body_ptr;
+	enum rxmgmt_flags rx_flags = RXMGMT_FLAG_NONE;
+	struct sae_auth_retry *sae_retry;
+	uint16_t auth_seq = 0, status_code = 0, auth_algo;
+	QDF_STATUS status;
+
+	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+
+	if (frame_len < sizeof(uint16_t)) {
+		pe_err("vdev:%d EPPKE auth frame too short: %u",
+		       pe_session->vdev_id, frame_len);
+		return;
+	}
+
+	auth_algo = *(uint16_t *)body_ptr;
+	if (frame_len >= (SAE_AUTH_STATUS_CODE_OFFSET + 2)) {
+		auth_seq = *(uint16_t *)(body_ptr + SAE_AUTH_SEQ_NUM_OFFSET);
+		status_code =
+			*(uint16_t *)(body_ptr + SAE_AUTH_STATUS_CODE_OFFSET);
+	}
+
+	pe_nofl_rl_info("vdev:%d EPPKE Auth RX type %d subtype %d trans_seq_num:%d from "
+			QDF_MAC_ADDR_FMT,
+			pe_session->vdev_id, mac_hdr->fc.type,
+			mac_hdr->fc.subType, auth_seq,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
+
+	if (LIM_IS_STA_ROLE(pe_session) &&
+	    pe_session->limMlmState != eLIM_MLM_WT_EXTERNAL_AUTH_STATE)
+		pe_warn("vdev:%d EPPKE auth response for STA in unexpected state %x",
+			pe_session->vdev_id, pe_session->limMlmState);
+
+	sae_retry = mlme_get_sae_auth_retry(pe_session->vdev);
+	if (LIM_IS_STA_ROLE(pe_session) && sae_retry &&
+	    sae_retry->sae_auth.ptr &&
+	    lim_is_external_auth_algo_match(sae_retry->sae_auth.ptr,
+					    sae_retry->sae_auth.len,
+					    rx_pkt_info))
+		lim_sae_auth_cleanup_retry(mac_ctx, pe_session->vdev_id);
+
+	if (LIM_IS_STA_ROLE(pe_session)) {
+		/*
+		 * Cache the connectivity event with link address.
+		 * So call the Connectivity logging API before address
+		 * translation while forwarding the frame to userspace.
+		 */
+		wlan_connectivity_mgmt_event(
+				mac_ctx->psoc,
+				(struct wlan_frame_hdr *)mac_hdr,
+				pe_session->vdev_id, status_code, 0,
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				auth_algo, auth_seq, auth_seq, 0,
+				WLAN_AUTH_RESP);
+
+		lim_cp_stats_cstats_log_auth_evt(pe_session, CSTATS_DIR_RX,
+						 auth_algo, auth_seq,
+						 status_code);
+
+		status = lim_update_link_to_mld_address(mac_ctx,
+							pe_session->vdev,
+							mac_hdr, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("vdev:%d STA SAE address conversion failed status:%d",
+				 pe_session->vdev_id, status);
+			return;
+		}
+	} else {
+		pe_debug("vdev:%d EPPKE auth on non-STA role, dropping",
+			 pe_session->vdev_id);
+		return;
+	}
+
+	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
+				    (uint8_t *)mac_hdr,
+				    frame_len + sizeof(tSirMacMgmtHdr),
+				    pe_session->vdev_id,
+				    WMA_GET_RX_FREQ(rx_pkt_info),
+				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				    rx_flags);
+}
+#else
+static inline
+void lim_process_eppke_auth_frame(struct mac_context *mac_ctx,
+				  struct pe_session *pe_session,
+				  uint8_t *rx_pkt_info)
+{}
+#endif
+
 static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		tpSirMacMgmtHdr mac_hdr,
 		tSirMacAuthFrameBody *rx_auth_frm_body,
@@ -2149,6 +2254,10 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		lim_process_pasn_auth_frame(mac_ctx, pe_session->vdev_id,
 					    rx_pkt_info);
 		goto free;
+	} else if (auth_alg == eSIR_AUTH_TYPE_EPPKE ||
+		   auth_alg == eSIR_AUTH_TYPE_8021X_IN_AUTH) {
+		lim_process_eppke_auth_frame(mac_ctx, pe_session, rx_pkt_info);
+		goto free;
 	} else if (auth_alg == eSIR_FT_AUTH && LIM_IS_AP_ROLE(pe_session)) {
 		pe_debug("Auth Frame auth_alg  eSIR_FT_AUTH");
 			lim_process_ft_auth_frame(mac_ctx,
@@ -2317,7 +2426,9 @@ lim_process_external_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	}
 
 	auth_alg = *(uint16_t *)frm_body;
-	if (auth_alg != eSIR_AUTH_TYPE_SAE)
+	if (auth_alg != eSIR_AUTH_TYPE_SAE &&
+	    auth_alg != eSIR_AUTH_TYPE_EPPKE &&
+	    auth_alg != eSIR_AUTH_TYPE_8021X_IN_AUTH)
 		return false;
 
 	if (frm_len >= (SAE_AUTH_STATUS_CODE_OFFSET + 2)) {
@@ -2327,10 +2438,12 @@ lim_process_external_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 			*(uint16_t *)(frm_body + SAE_AUTH_STATUS_CODE_OFFSET);
 	}
 
-	pe_debug("LFR3: SAE auth frame: seq_ctrl:0x%X auth_transaction_num:%d",
+	pe_debug("LFR3: Roam external auth frame: algo:%d seq_ctrl:0x%X auth_transaction_num:%d",
+		 auth_alg,
 		 ((dot11_hdr->seqControl.seqNumHi << 8) |
 		  (dot11_hdr->seqControl.seqNumLo << 4) |
-		  (dot11_hdr->seqControl.fragNum)), *(uint16_t *)(frm_body + 2));
+		  (dot11_hdr->seqControl.fragNum)),
+		 *(uint16_t *)(frm_body + 2));
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
 	vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(mac->psoc, pdev_id,
