@@ -1386,7 +1386,11 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 
 	roam_event->reason =
 			wmi_convert_fw_reason_to_cm_reason(wmi_event->reason);
-	roam_event->rssi = wmi_event->rssi;
+	if (!wmi_service_enabled(wmi_handle, wmi_service_hw_db2dbm_support))
+		roam_event->rssi = wmi_event->rssi +
+				   WMI_NOISE_FLOOR_DBM_DEFAULT;
+	else
+		roam_event->rssi = wmi_event->rssi;
 	roam_event->notif = wmi_convert_fw_notif_to_cm_notif(wmi_event->notif);
 	roam_event->notif_params = wmi_event->notif_params;
 	roam_event->notif_params1 = wmi_event->notif_params1;
