@@ -166,6 +166,7 @@
 #include "wlan_tdls_cfg_api.h"
 #include <wlan_tdls_stats_api.h>
 #include <wlan_hdd_rssi_monitor.h>
+#include <wlan_hdd_cqm.h>
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_mlme_twt_ucfg_api.h"
 #include "wlan_fwol_ucfg_api.h"
@@ -22438,6 +22439,9 @@ struct osif_vdev_mgr_ops osif_vdev_mgrlegacy_ops = {
 					hdd_send_scan_done_complete_cb,
 	.osif_vdev_mgr_get_p2p_wdev_cb = hdd_get_p2p_wdev,
 	.osif_vdev_mgr_sta_csa_received = hdd_sta_csa_received_handler,
+#ifdef FEATURE_CQM_RSSI
+	.osif_vdev_mgr_cqm_rssi_breach_cb = hdd_cqm_rssi_breach_cb,
+#endif
 };
 
 static QDF_STATUS hdd_vdev_mgr_register_cb(void)

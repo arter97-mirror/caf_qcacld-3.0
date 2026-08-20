@@ -1197,6 +1197,24 @@ enum chan_change_notify_type {
 	CHAN_SWITCH_COMPLETE_NOTIFY
 };
 
+#ifdef FEATURE_CQM_RSSI
+/**
+ * struct hdd_cqm_rssi_state - per-vdev adaptive-hysteresis RSSI CQM cache
+ * @request_id: request id of the last configuration sent to firmware,
+ *              incremented on every new configuration to detect/discard
+ *              stale breach events after a vdev-id reuse
+ * @rssi_threshold: last configured RSSI threshold in dBm
+ * @rssi_hysteresis: last configured hysteresis in dBm
+ * @enabled: whether RSSI CQM monitoring is currently enabled for this vdev
+ */
+struct hdd_cqm_rssi_state {
+	uint32_t request_id;
+	int32_t  rssi_threshold;
+	uint32_t rssi_hysteresis;
+	bool     enabled;
+};
+#endif /* FEATURE_CQM_RSSI */
+
 /**
  * struct freq_change_info - Frequency change notify
  * @freq: Frequency
@@ -1267,6 +1285,7 @@ struct hdd_monitor_ctx {
  * @link_flags: a bitmap of hdd_link_flags
  * @ch_chng_info: Channel change info
  * @sap_stop_bss_work: stop sap work
+ * @cqm_rssi_state: adaptive-hysteresis RSSI CQM configuration cache
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1310,6 +1329,9 @@ struct wlan_hdd_link_info {
 	qdf_bitmap(link_flags, WLAN_LINK_FLAG_BITS_MAX);
 	struct freq_change_info ch_chng_info;
 	struct work_struct  sap_stop_bss_work;
+#ifdef FEATURE_CQM_RSSI
+	struct hdd_cqm_rssi_state cqm_rssi_state;
+#endif
 };
 
 /**

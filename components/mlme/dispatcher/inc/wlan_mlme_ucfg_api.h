@@ -5967,6 +5967,24 @@ ucfg_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_set_sap_suspend_resume(psoc, param);
 }
 
+#ifdef FEATURE_CQM_RSSI
+/**
+ * ucfg_mlme_set_cqm_rssi_config() - set adaptive-hysteresis RSSI CQM config
+ * @psoc: pointer to psoc object
+ * @param: CQM RSSI configuration request structure
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_cqm_rssi_config(struct wlan_objmgr_psoc *psoc,
+			      struct cqm_rssi_config_param *param)
+{
+	return wlan_mlme_set_cqm_rssi_config(psoc, param);
+}
+#endif /* FEATURE_CQM_RSSI */
+
 /**
  * ucfg_mlme_is_sap_suspend_supported() - check vdev suspend support
  * @vdev: vdev object

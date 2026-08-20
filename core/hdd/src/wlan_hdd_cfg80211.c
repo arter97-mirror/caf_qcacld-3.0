@@ -121,6 +121,7 @@
 #include <wlan_hdd_concurrency_matrix.h>
 #include <wlan_hdd_p2p_listen_offload.h>
 #include <wlan_hdd_rssi_monitor.h>
+#include <wlan_hdd_cqm.h>
 #include <wlan_hdd_sap_cond_chan_switch.h>
 #include <wlan_hdd_station_info.h>
 #include <wlan_hdd_tx_power.h>
@@ -43164,6 +43165,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.resume = wlan_hdd_cfg80211_resume_wlan,
 	.suspend = wlan_hdd_cfg80211_suspend_wlan,
 	.set_mac_acl = wlan_hdd_cfg80211_set_mac_acl,
+#ifdef FEATURE_CQM_RSSI
+	.set_cqm_rssi_config = wlan_hdd_cfg80211_set_cqm_rssi_config,
+#endif
 #ifdef WLAN_NL80211_TESTMODE
 	.testmode_cmd = wlan_hdd_cfg80211_testmode,
 #endif
