@@ -19312,7 +19312,7 @@ static void hdd_v2_flow_pool_map(int vdev_id)
 	}
 
 	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
-	    !smd_is_roaming_in_progress(vdev)) {
+	    !smd_roam_requires_flow_pool_map(vdev)) {
 		hdd_info_rl("Link switch is ongoing, do not invoke flow pool map");
 		goto release_ref;
 	}
@@ -19358,7 +19358,7 @@ static void hdd_v2_flow_pool_unmap(int vdev_id)
 	}
 
 	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
-	    !smd_is_roaming_in_progress(vdev)) {
+	    !smd_roam_requires_flow_pool_unmap(vdev)) {
 		hdd_debug("vdev:%d Link switch is ongoing do not invoke flow pool unmap",
 			  vdev_id);
 		goto release_ref;

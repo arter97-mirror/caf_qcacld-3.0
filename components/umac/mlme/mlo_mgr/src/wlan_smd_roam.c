@@ -3264,6 +3264,59 @@ smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev)
 	return smd_roam_in_progress(mlo_dev_ctx->link_recfg_ctx);
 }
 
+static enum smd_roam_topology_type
+smd_get_roam_topology(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!vdev)
+		return SMD_ROAM_TOPO_UNKNOWN;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
+		return SMD_ROAM_TOPO_UNKNOWN;
+
+	return mlo_dev_ctx->link_recfg_ctx->roam_topology;
+}
+
+bool
+smd_roam_requires_flow_pool_map(struct wlan_objmgr_vdev *vdev)
+{
+	if (!smd_is_roaming_in_progress(vdev))
+		return false;
+
+	switch (smd_get_roam_topology(vdev)) {
+	case SMD_ROAM_TOPO_ML_TO_ML:
+	case SMD_ROAM_TOPO_ML_TO_SL:
+		/* both/surviving link vdev(s) are already mapped */
+		return false;
+	default:
+		/* SL_TO_SL, SL_TO_ML add a vdev that needs mapping;
+		 * UNKNOWN (pre-M2) falls back to the permissive default.
+		 */
+		return true;
+	}
+}
+
+bool
+smd_roam_requires_flow_pool_unmap(struct wlan_objmgr_vdev *vdev)
+{
+	if (!smd_is_roaming_in_progress(vdev))
+		return false;
+
+	switch (smd_get_roam_topology(vdev)) {
+	case SMD_ROAM_TOPO_ML_TO_ML:
+	case SMD_ROAM_TOPO_SL_TO_ML:
+		/* no link vdev is being dropped */
+		return false;
+	default:
+		/* SL_TO_SL, ML_TO_SL drop a vdev that needs unmapping;
+		 * UNKNOWN (pre-M2) falls back to the permissive default.
+		 */
+		return true;
+	}
+}
+
 void
 smd_handle_connect_success(struct wlan_objmgr_vdev *vdev)
 {
