@@ -4323,6 +4323,8 @@ wma_get_peer_pmf_status(tp_wma_handle wma, uint8_t *peer_mac)
 static bool wma_is_11bi_assoc_resp(struct wma_txrx_node *iface,
 				   uint8_t mgt_type, uint8_t mgt_subtype)
 {
+	int32_t auth_algo;
+
 	if (mgt_type != IEEE80211_FC0_TYPE_MGT ||
 	    mgt_subtype != MGMT_SUBTYPE_ASSOC_RESP)
 		return false;
@@ -4330,10 +4332,19 @@ static bool wma_is_11bi_assoc_resp(struct wma_txrx_node *iface,
 	if (!iface->vdev)
 		return false;
 
-	return wlan_crypto_vdev_has_auth_mode(iface->vdev,
-					      BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
-	       wlan_crypto_vdev_has_auth_mode(iface->vdev,
-					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+	auth_algo = wlan_crypto_get_param(iface->vdev,
+					  WLAN_CRYPTO_PARAM_AUTH_ALGO);
+	if (auth_algo < 0) {
+		wma_debug("vdev:%d AUTH_ALGO read failed (%d) for assoc resp",
+			  wlan_vdev_get_id(iface->vdev), auth_algo);
+		return false;
+	}
+	wma_debug("vdev:%d assoc resp auth_algo:%d is_11bi:%d",
+		  wlan_vdev_get_id(iface->vdev), auth_algo,
+		  (auth_algo == eSIR_AUTH_TYPE_EPPKE ||
+		   auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH));
+	return auth_algo == eSIR_AUTH_TYPE_EPPKE ||
+	       auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH;
 }
 
 static bool wma_is_11bi_rx_subtype(uint8_t mgt_subtype)

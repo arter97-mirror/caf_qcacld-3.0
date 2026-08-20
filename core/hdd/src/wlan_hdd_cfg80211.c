@@ -2017,9 +2017,24 @@ int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
 	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
 	.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,     \
 },
+
+#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND                         \
+{                                                                       \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,         \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
+		 WIPHY_VENDOR_CMD_NEED_NETDEV |                         \
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,                         \
+	.doit = wlan_hdd_cfg80211_external_auth_cmd,                    \
+	vendor_command_policy(wlan_external_auth_policy,                \
+			      QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX)   \
+},
+
 #define WLAN_EXTERNAL_AUTH_INDEX QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX
 #else
 #define FEATURE_EXTERNAL_AUTHENTICATION_EVENT
+#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND
+#define WLAN_EXTERNAL_AUTH_INDEX 0
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
 static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = {
@@ -2434,41 +2449,13 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_IDLE_SHUTDOWN,
 	},
 	FEATURE_TX_POWER_BOOST_EVENTS
-#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
-		defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
-		defined(WLAN_FEATURE_11BN_SMD)
-#define WLAN_EXTERNAL_AUTH_INDEX QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX
-#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT                  \
-[QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX] = {            \
-	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
-	.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,     \
-},
-#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND                         \
-{                                                                       \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,         \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
-		WIPHY_VENDOR_CMD_NEED_NETDEV |                          \
-		WIPHY_VENDOR_CMD_NEED_RUNNING,                          \
-	.doit = wlan_hdd_cfg80211_external_auth_cmd,                    \
-	vendor_command_policy(wlan_external_auth_policy,                \
-			      QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX)   \
-},
-#else
-#define WLAN_EXTERNAL_AUTH_INDEX 0
-#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT
-#define FEATURE_EXTERNAL_AUTHENTICATION_COMMAND
-#endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	[QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE,
 	},
 #endif
-#if defined(WLAN_FEATURE_11BI_SECURITY) || \
-		defined(WLAN_FEATURE_11BN_SMD)
 	FEATURE_EXTERNAL_AUTHENTICATION_EVENT
-#endif
 	FEATURE_TDLS_VENDOR_EVENTS
 	[QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -18204,6 +18191,22 @@ hdd_handle_security_profile_connect_ext_feature(uint8_t ext_features,
 }
 #endif /* WLAN_FEATURE_SECURITY_PROFILE */
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static void
+hdd_handle_eppke_connect_ext_feature(uint8_t ext_features,
+				     bool *eppke_allowed)
+{
+	if (ext_features & BIT(QCA_CONNECT_EXT_FEATURE_EXT_AUTH_EPPKE))
+		*eppke_allowed = true;
+}
+#else
+static inline void
+hdd_handle_eppke_connect_ext_feature(uint8_t ext_features,
+				     bool *eppke_allowed)
+{
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static int
 __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 					     struct wireless_dev *wdev,
@@ -18217,6 +18220,7 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	uint8_t ext_features = 0, rsno_gen = 0;
 	bool smd_enabled = false;
 	bool sec_profile = false;
+	bool eppke_allowed = false;
 	int8_t ret = 0;
 	struct nlattr *curr_attr;
 	struct qdf_mac_addr allowed_bss_link_addr[WLAN_MAX_NUM_ALLOWED_BSSIDS];
@@ -18259,6 +18263,8 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	hdd_handle_security_profile_connect_ext_feature(ext_features,
 							&sec_profile);
 
+	hdd_handle_eppke_connect_ext_feature(ext_features, &eppke_allowed);
+
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		if (!link_info->vdev)
 			continue;
@@ -18269,6 +18275,10 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 
 		wlan_vdev_set_security_profile_enabled(link_info->vdev,
 						       sec_profile);
+		wlan_vdev_set_eppke_allowed(link_info->vdev, eppke_allowed);
+		hdd_debug("vdev:%d eppke_allowed:%d ext_features:0x%x",
+			  link_info->vdev_id, eppke_allowed, ext_features);
+
 		wma_cli_set_command(link_info->vdev_id,
 				    wmi_vdev_param_connect_ext_features,
 				    ext_features, VDEV_CMD);

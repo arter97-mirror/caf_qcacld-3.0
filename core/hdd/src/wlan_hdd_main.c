@@ -9021,6 +9021,7 @@ static void
 hdd_set_default_mrsno_gen_support(struct wlan_objmgr_vdev *vdev)
 {
 	wlan_vdev_set_rsno_gen_supported(vdev, 0);
+	wlan_vdev_set_eppke_allowed(vdev, 0);
 }
 
 static void
