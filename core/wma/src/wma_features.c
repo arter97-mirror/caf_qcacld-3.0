@@ -2804,10 +2804,11 @@ static void wma_log_pkt_ipv6(uint8_t *data, uint32_t length)
 		 ip_addr[15]);
 	src_port = *(uint16_t *)(data + IPV6_SRC_PORT_OFFSET);
 	dst_port = *(uint16_t *)(data + IPV6_DST_PORT_OFFSET);
-	wma_info("Pkt_len: %u, src_port: %u, dst_port: %u",
-		 qdf_cpu_to_be16(pkt_len),
-		 qdf_cpu_to_be16(src_port),
-		 qdf_cpu_to_be16(dst_port));
+	wma_conditional_log(is_wakeup_event_console_logs_enabled,
+			    "Pkt_len: %u, src_port: %u, dst_port: %u",
+			    qdf_cpu_to_be16(pkt_len),
+			    qdf_cpu_to_be16(src_port),
+			    qdf_cpu_to_be16(dst_port));
 }
 
 static void wma_log_pkt_tcpv4(uint8_t *data, uint32_t length)
@@ -3215,7 +3216,8 @@ static int wma_wake_event_packet(
 	case WOW_REASON_PACKET_FILTER_MATCH:
 	case WOW_REASON_DELAYED_WAKEUP_HOST_CFG_TIMER_ELAPSED:
 	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
-		wma_info("Wake event packet:");
+		wma_conditional_log(is_wakeup_event_console_logs_enabled,
+				    "Wake event packet:");
 		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 				   packet, packet_len);
 
@@ -3230,8 +3232,9 @@ static int wma_wake_event_packet(
 		 * dump event buffer which contains more info regarding
 		 * current page fault.
 		 */
-		wma_info("PF occurs during suspend: packet_len %u",
-			 packet_len);
+		wma_conditional_log(is_wakeup_event_console_logs_enabled,
+				    "PF occurs during suspend: packet_len %u",
+				    packet_len);
 		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_INFO,
 				   packet, packet_len);
 		break;
@@ -3464,32 +3467,6 @@ static void wma_debug_assert_page_fault_wakeup(uint32_t reason)
 	/* During DRV if page fault wake up then assert */
 	if ((WOW_REASON_PAGE_FAULT == reason) && (qdf_is_drv_connected()))
 		QDF_DEBUG_PANIC("Unexpected page fault wake up detected during DRV wow");
-}
-
-static void wma_wake_event_log_reason(t_wma_handle *wma,
-				      WOW_EVENT_INFO_fixed_param *wake_info)
-{
-	struct wma_txrx_node *vdev;
-
-	/* "Unspecified" means APPS triggered wake, else firmware triggered */
-	if (wake_info->wake_reason != WOW_REASON_UNSPECIFIED) {
-		vdev = &wma->interfaces[wake_info->vdev_id];
-		wma_nofl_info("WLAN triggered wakeup: %s (%d), vdev: %d (%s) : (%s)",
-			      wma_wow_wake_reason_str(wake_info->wake_reason),
-			      wake_info->wake_reason,
-			      wake_info->vdev_id,
-			      wma_vdev_type_str(vdev->type),
-			      wma_suspend_type_str(wma));
-		wma_debug_assert_page_fault_wakeup(wake_info->wake_reason);
-	} else if (!wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
-		wma_nofl_debug("Non-WLAN triggered wakeup: %s (%d) (%s)",
-			       wma_wow_wake_reason_str(wake_info->wake_reason),
-			       wake_info->wake_reason,
-			       wma_suspend_type_str(wma));
-	}
-
-	qdf_wow_wakeup_host_event(wake_info->wake_reason);
-	qdf_wma_wow_wakeup_stats_event(wma);
 }
 
 static QDF_STATUS wma_wow_pagefault_action_cb(void *buf)
@@ -3945,7 +3922,14 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
-	wma_wake_event_log_reason(wma, wake_info);
+	/* Cache wakeup info for deferred logging after FW resume */
+	wma->wow_wakeup_reason = wake_info->wake_reason;
+	wma->wow_wakeup_vdev_id = wake_info->vdev_id;
+	wma->wow_wakeup_reason_valid = true;
+	/* Non-logging actions from wma_wake_event_log_reason */
+	wma_debug_assert_page_fault_wakeup(wake_info->wake_reason);
+	qdf_wow_wakeup_host_event(wake_info->wake_reason);
+	qdf_wma_wow_wakeup_stats_event(wma);
 	if (wake_info->wake_reason == WOW_REASON_PAGE_FAULT)
 		wma_wow_wakeup_pagefault_notify(wma, event, len);
 
@@ -3970,6 +3954,45 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	/* Reset the Suspend Type here */
 	pmo_set_wow_suspend_type(wma->psoc, QDF_WOW_UNSUPPORTED_TYPE);
 	return errno;
+}
+
+/**
+ * wma_wow_log_deferred_wakeup() - log cached WOW wakeup reason after resume
+ * @psoc: objmgr psoc handle
+ *
+ * This callback is invoked by PMO after the host wakeup indication has been
+ * sent to FW and the target has resumed.  It emits the WOW wakeup reason that
+ * was cached in the WMA handle during wma_wow_wakeup_host_event() and then
+ * invalidates the cached value so it is only logged once.
+ */
+void wma_wow_log_deferred_wakeup(struct wlan_objmgr_psoc *psoc)
+{
+	struct wma_txrx_node *vdev;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return;
+
+	if (!wma->wow_wakeup_reason_valid)
+		return;
+
+	if (wma->wow_wakeup_reason != WOW_REASON_UNSPECIFIED) {
+		vdev = &wma->interfaces[wma->wow_wakeup_vdev_id];
+		wma_nofl_info("WLAN triggered wakeup: %s (%d), vdev: %d (%s) : (%s)",
+			      wma_wow_wake_reason_str(wma->wow_wakeup_reason),
+			      wma->wow_wakeup_reason,
+			      wma->wow_wakeup_vdev_id,
+			      wma_vdev_type_str(vdev->type),
+			      wma_suspend_type_str(wma));
+	} else if (!wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
+		wma_nofl_debug("Non-WLAN triggered wakeup: %s (%d) (%s)",
+			       wma_wow_wake_reason_str(wma->wow_wakeup_reason),
+			       wma->wow_wakeup_reason,
+			       wma_suspend_type_str(wma));
+	}
+
+	wma->wow_wakeup_reason_valid = false;
 }
 
 #ifdef FEATURE_WLAN_D0WOW

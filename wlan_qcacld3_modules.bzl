@@ -71,6 +71,7 @@ _target_chipset_map = {
     ],
     "hamoa": [
         "kiwi-v2",
+        "wcn7760",
     ],
     "chora": [
         "wcn7750",
@@ -82,6 +83,10 @@ _target_chipset_map = {
     "hamoa_la": [
         "kiwi-v2",
     ],
+    "glymur": [
+        "kiwi-v2",
+        "wcn7760",
+    ]
 }
 
 _chipset_hw_map = {
@@ -2770,7 +2775,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra" and target != "hamoa_la":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra" and target != "hamoa_la" and target != "glymur":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2809,6 +2814,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     combined_conditional_srcs = dict(_conditional_srcs)
+
+    # For adrastea (QCA_LL_TX_FLOW_CONTROL_V2 on an LL target), both
+    # CONFIG_WLAN_TX_FLOW_CONTROL and CONFIG_WLAN_TX_FLOW_CONTROL_V2 must
+    # use ol_txrx_flow_control.c instead of the cmn DP path.
+    if chipset == "adrastea":
+        adrastea_fc_srcs = ["core/dp/txrx/ol_txrx_flow_control.c"]
+        for key in ["CONFIG_WLAN_TX_FLOW_CONTROL", "CONFIG_WLAN_TX_FLOW_CONTROL_V2"]:
+            inner = dict(combined_conditional_srcs.get(key, {}))
+            inner[True] = adrastea_fc_srcs
+            combined_conditional_srcs[key] = inner
     wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
     existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
     existing_true_list = existing_inner.get(True, [])
