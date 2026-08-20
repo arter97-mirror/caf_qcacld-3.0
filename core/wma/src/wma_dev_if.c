@@ -1807,6 +1807,18 @@ send_rsp:
 
 	return status;
 }
+
+static void wma_passthru_handle_peer_create_conf(tp_wma_handle wma,
+						 tpAddStaParams add_sta)
+{
+	if (QDF_IS_STATUS_ERROR(add_sta->status)) {
+		wma_err("Peer creation failed with status %d", add_sta->status);
+		wma_remove_peer(wma, add_sta->staMac, add_sta->smesessionId,
+				true /* no_fw_peer_delete */);
+	}
+
+	wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP, (void *)add_sta, 0);
+}
 #else
 static inline
 void wma_add_passthru_sta(tp_wma_handle wma, tpAddStaParams add_sta)
@@ -1818,6 +1830,12 @@ wma_delete_sta_passthru_mode(tp_wma_handle wma,
 			     tpDeleteStaParams del_sta)
 {
 	return QDF_STATUS_E_INVAL;
+}
+
+static inline
+void wma_passthru_handle_peer_create_conf(tp_wma_handle wma,
+					  tpAddStaParams add_sta)
+{
 }
 #endif
 
@@ -4000,8 +4018,7 @@ int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
 			QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
 		qdf_mem_free(req_msg);
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
-		wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP,
-					   (void *)add_sta, 0);
+		wma_passthru_handle_peer_create_conf(wma, add_sta);
 
 		return 0;
 	}
