@@ -1509,6 +1509,7 @@ void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
 		/* delete the sta_ds allocated during ADD STA */
 		lim_delete_dph_hash_entry(mac_ctx, add_sta_rsp->staMac,
 					  peer_idx, session);
+		lim_release_peer_idx(mac_ctx, peer_idx, session);
 		qdf_mem_free(add_sta_rsp);
 		return;
 	}
