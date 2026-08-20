@@ -19883,6 +19883,57 @@ static bool wlan_hdd_is_iface_nan(uint8_t idx)
 }
 
 /**
+ * wlan_hdd_is_iface_sta_sta() - This API checks whether STA + STA present
+ * in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if STA interface is present otherwise false
+ */
+static bool wlan_hdd_is_iface_sta_sta(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].limits[0].types ==
+	    BIT(NL80211_IFTYPE_STATION) &&
+	    wlan_hdd_iface_combination[idx].limits[0].max == 2)
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_hdd_is_iface_sap_sap() - This API checks whether SAP + SAP present
+ * in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if SAP interface is present otherwise false
+ */
+static bool wlan_hdd_is_iface_sap_sap(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].limits[0].types ==
+	    BIT(NL80211_IFTYPE_AP) &&
+	    wlan_hdd_iface_combination[idx].limits[0].max == 2)
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_hdd_is_iface_p2p_p2p() - This API checks whether P2P + P2P present
+ * in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if P2P interface is present otherwise false
+ */
+static bool wlan_hdd_is_iface_p2p_p2p(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].limits[0].max == 2 &&
+	    wlan_hdd_iface_combination[idx].limits[0].types ==
+	    (BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT)))
+		return true;
+
+	return false;
+}
+
+/**
  * wlan_hdd_update_iface_combination() - This API updates interface combination
  * @hdd_ctx: HDD context
  * @wiphy: WIPHY structure pointer
@@ -19930,7 +19981,10 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	for (i = 0; i < num; i++) {
 		/* Filter for non-DBS targets */
 		if (!ucfg_policy_mgr_is_fw_supports_dbs(psoc) &&
-		    wlan_hdd_iface_combination[i].max_interfaces > 2)
+		    (wlan_hdd_iface_combination[i].max_interfaces > 2 ||
+		     wlan_hdd_is_iface_sta_sta(i) ||
+		     wlan_hdd_is_iface_sap_sap(i) ||
+		     wlan_hdd_is_iface_p2p_p2p(i)))
 			continue;
 
 		/* Filter for 1x1 DBS targets */
