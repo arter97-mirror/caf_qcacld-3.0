@@ -2449,7 +2449,8 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
-		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
+		if (qdf_unlikely(vdev->delete.pending) ||
+		    !vdev->osif_rx || QDF_STATUS_SUCCESS !=
 		    vdev->osif_rx(vdev->osif_vdev, linear_skb)) {
 			DP_STATS_INC(rx_fst, udp_flush_linear_osif_rx_fail, 1);
 			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
@@ -2482,7 +2483,8 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 			goto out;
 		}
 
-		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
+		if (qdf_unlikely(vdev->delete.pending) ||
+		    !vdev->osif_rx || QDF_STATUS_SUCCESS !=
 		    vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb)) {
 			DP_STATS_INC(rx_fst, udp_flush_nonlinear_osif_rx_fail,
 				     1);
@@ -2546,7 +2548,10 @@ dp_rx_fisa_flush_tcp_flow(struct dp_vdev *vdev,
 	qdf_nbuf_set_next(fisa_flow->head_skb, NULL);
 	if (fisa_flow->last_skb)
 		qdf_nbuf_set_next(fisa_flow->last_skb, NULL);
-	vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
+	if (qdf_unlikely(vdev->delete.pending || !vdev->osif_rx))
+		qdf_nbuf_free(fisa_flow->head_skb);
+	else
+		vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
 
 	fisa_flow->head_skb = NULL;
 
@@ -3071,7 +3076,8 @@ deliver_nbuf: /* Deliver without FISA */
 							    (uint32_t)qdf_nbuf_len(head_nbuf),
 							    (uint32_t)qdf_nbuf_get_only_data_len(head_nbuf));
 
-		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
+		if (qdf_unlikely(vdev->delete.pending) ||
+		    !vdev->osif_rx || QDF_STATUS_SUCCESS !=
 		    vdev->osif_rx(vdev->osif_vdev, head_nbuf)) {
 			DP_STATS_INC(dp_fisa_rx_hdl, osif_rx_fail, 1);
 			if (qdf_unlikely(qdf_trace_dp_fisa_osif_rx_fail_enabled()))
