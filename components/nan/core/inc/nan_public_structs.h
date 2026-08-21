@@ -38,6 +38,7 @@ struct nan_local_sched_rsp;
 struct nan_peer_sched_params;
 struct nan_peer_sched_rsp;
 struct nan_peer_params_req;
+struct nan_peer_params_rsp;
 
 #ifdef NDP_TX_BW_FLOW_CTRL
 enum phy_ch_width;
@@ -1079,6 +1080,18 @@ struct nan_peer_params_req {
 	uint32_t peer_flags;
 	uint32_t peer_cap_len;
 	uint8_t peer_cap[]; /* Variable length array */
+};
+
+/**
+ * struct nan_peer_params_rsp - NAN peer parameters response
+ * @psoc: PSOC object pointer
+ * @vdev_id: VDEV ID
+ * @status: Response status
+ */
+struct nan_peer_params_rsp {
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t vdev_id;
+	uint32_t status;
 };
 #endif
 
