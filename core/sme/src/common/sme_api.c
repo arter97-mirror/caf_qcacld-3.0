@@ -17538,9 +17538,13 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 	QDF_STATUS status;
 	struct psoc_phy_config config = {0};
 	bool eht_cap;
+	bool uhr_cap;
 
 	ucfg_psoc_mlme_get_11be_capab(mac_ctx->psoc, &eht_cap);
 	config.eht_cap = eht_cap;
+
+	wlan_psoc_mlme_get_11bn_capab(mac_ctx->psoc, &uhr_cap);
+	config.uhr_cap = uhr_cap;
 
 	qdf_mem_zero(&vdev_ini_cfg, sizeof(struct wlan_mlme_nss_chains));
 	/* Populate the nss chain params from ini for this vdev type */

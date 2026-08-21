@@ -5694,6 +5694,44 @@ static int hdd_set_pcie_params(struct hdd_context *hdd_ctx,
 }
 
 #ifdef FEATURE_SET
+#ifdef WLAN_FEATURE_11BN
+/**
+ * hdd_is_cfg_dot11_mode_11bn() - Check if dot11 mode is 11bn
+ * @dot11_mode: Input dot11_mode which needs to be checked
+ *
+ * Return: True, if input dot11_mode is 11bn dot11 mode else return false
+ */
+static bool hdd_is_cfg_dot11_mode_11bn(enum hdd_dot11_mode dot11_mode)
+{
+	return (dot11_mode == eHDD_DOT11_MODE_11bn ||
+		dot11_mode == eHDD_DOT11_MODE_11bn_ONLY);
+}
+
+/**
+ * hdd_is_11bn_supported() - Check if 11bn is supported or not
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: True, if 11bn is supported else return false
+ */
+static bool hdd_is_11bn_supported(struct hdd_context *hdd_ctx)
+{
+	bool uhr_capab;
+
+	wlan_psoc_mlme_get_11bn_capab(hdd_ctx->psoc, &uhr_capab);
+	return uhr_capab;
+}
+#else
+static bool hdd_is_cfg_dot11_mode_11bn(enum hdd_dot11_mode dot11_mode)
+{
+	return false;
+}
+
+static bool hdd_is_11bn_supported(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_is_cfg_dot11_mode_11be() - Check if dot11 mode is 11 be
@@ -5743,12 +5781,16 @@ hdd_get_wifi_standard(struct hdd_context *hdd_ctx,
 	WMI_HOST_WIFI_STANDARD wifi_standard = WMI_HOST_WIFI_STANDARD_4;
 
 	if (dot11_mode == eHDD_DOT11_MODE_AUTO) {
-		if (hdd_is_11be_supported(hdd_ctx))
+		if (hdd_is_11bn_supported(hdd_ctx))
+			wifi_standard = WMI_HOST_WIFI_STANDARD_8;
+		else if (hdd_is_11be_supported(hdd_ctx))
 			wifi_standard = WMI_HOST_WIFI_STANDARD_7;
 		else if (band_capability & BIT(REG_BAND_6G))
 			wifi_standard = WMI_HOST_WIFI_STANDARD_6E;
 		else
 			wifi_standard = WMI_HOST_WIFI_STANDARD_6;
+	} else if (hdd_is_cfg_dot11_mode_11bn(dot11_mode)) {
+		wifi_standard = WMI_HOST_WIFI_STANDARD_8;
 	} else if (hdd_is_cfg_dot11_mode_11be(dot11_mode)) {
 		wifi_standard = WMI_HOST_WIFI_STANDARD_7;
 	} else if (dot11_mode == eHDD_DOT11_MODE_11ax ||
