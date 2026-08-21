@@ -490,6 +490,18 @@ static inline bool hdd_cm_is_wapi_sta(enum csr_akm_type auth_type)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static inline bool hdd_cm_is_smd_roam(struct wlan_cm_connect_resp *rsp)
+{
+	return rsp->roaming_info && rsp->roaming_info->smd_transition;
+}
+#else
+static inline bool hdd_cm_is_smd_roam(struct wlan_cm_connect_resp *rsp)
+{
+	return false;
+}
+#endif
+
 static void hdd_update_scan_ie_for_connect(struct hdd_adapter *adapter,
 					   struct osif_connect_params *params)
 {
@@ -2179,6 +2191,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
 	bool is_roam = rsp->is_reassoc;
+	bool is_smd_transition = hdd_cm_is_smd_roam(rsp);
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -2222,14 +2235,17 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	/* Set MLO power save configuration after connection complete */
 	if (wlan_hdd_is_mlo_connection(link_info) &&
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
-	    !mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc, vdev)) {
+	    !mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc, vdev) &&
+	    !is_smd_transition) {
 		hdd_debug("MLO assoc link connected, setting power save to %d",
 			  adapter->allow_power_save);
 		wlan_hdd_set_mlo_ps(adapter, adapter->allow_power_save,
 				    0, -1);
 	}
 
-	hdd_configure_wow_commands(vdev, hdd_ctx);
+	if (!is_smd_transition)
+		hdd_configure_wow_commands(vdev, hdd_ctx);
+
 	hdd_clear_disconnect_receive(adapter);
 	hdd_n79_coex_sta_connect(hdd_ctx, vdev);
 }
