@@ -653,6 +653,7 @@ err_deinit_hif_context:
 	hdd_deinit_cds_hif_context();
 
 err_hif_close:
+	hif_rtpm_deregister(HIF_RTPM_ID_OSIF);
 	hif_close(hif_ctx);
 	return ret;
 }
