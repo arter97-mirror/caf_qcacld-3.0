@@ -14159,7 +14159,15 @@ static int hdd_set_wfc_state(struct wlan_hdd_link_info *link_info,
 	if (errno)
 		hdd_debug_rl("pld_set_wfc_mode failed");
 
-	return wlan_hdd_process_wfc_state(link_info->adapter, cfg_val);
+	errno = wlan_hdd_process_wfc_state(link_info->adapter, cfg_val);
+
+	if (errno)
+		hdd_debug("Failed to process state");
+
+	/* Return success to userspace even if the feature is disabled
+	 * or the state set above failed.
+	 */
+	return 0;
 }
 
 /**
