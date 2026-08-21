@@ -879,6 +879,7 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 	int ret = 0;
 	QDF_STATUS status;
 	uint8_t i, j;
+	bool keys_owned = false;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -984,8 +985,19 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 		target_if_err("Add keys failed");
 		ret = 0;
 	}
+	/*
+	 * Ownership of the per-link key allocations (GTK/IGTK/BIGTK) is
+	 * transferred into the crypto module by roam_sync_key_event() above,
+	 * even if it partially failed for some links. Freeing keys[] below
+	 * must not touch those pointers again.
+	 */
+	keys_owned = true;
 done:
 	if (keys) {
+		if (!keys_owned)
+			for (i = 0; i < num_keys; i++)
+				wlan_crypto_free_key(&keys[i].keys);
+
 		qdf_mem_zero(keys, WLAN_MAX_ML_BSS_LINKS * sizeof(*keys));
 		qdf_mem_free(keys);
 	}
