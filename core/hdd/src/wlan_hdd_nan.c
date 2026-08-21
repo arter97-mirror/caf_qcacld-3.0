@@ -806,5 +806,77 @@ int wlan_hdd_cfg80211_nan_set_peer_sched(struct wiphy *wiphy,
 	return ret;
 }
 #endif /* LINUX_VERSION_CODE  >= KERNEL_VERSION(6, 18, 0) */
+
+int wlan_hdd_cfg80211_nan_peer_params(struct wiphy *wiphy,
+				      struct wireless_dev *wdev,
+				      struct station_parameters *params,
+				      struct qdf_mac_addr *mac_addr)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
+	int ret;
+	struct net_device *dev;
+
+	hdd_enter();
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("dev is null");
+		return -EINVAL;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return -EINVAL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd ctx is null");
+		return -EINVAL;
+	}
+
+	/* Validate context */
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	/* Validate input parameter */
+	if (!params) {
+		hdd_err("Invalid peer params parameter");
+		return -EINVAL;
+	}
+
+	if (!mac_addr) {
+		hdd_err("mac addr is null");
+		return -EINVAL;
+	}
+
+	/* Validate NAN standard mode support */
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		hdd_err("NAN standard mode not supported");
+		return -EOPNOTSUPP;
+	}
+
+	/* Validate NAN discovery is active */
+	if (!ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
+		hdd_err("NAN discovery not active");
+		return -EINVAL;
+	}
+
+	/* Validate vdev type */
+	if (adapter->device_mode != QDF_NAN_DISC_MODE) {
+		hdd_err("Invalid vdev mode: %d", adapter->device_mode);
+		return -EINVAL;
+	}
+
+	/* Process peer params through osif layer */
+	ret = os_if_nan_process_peer_params(adapter->deflink->vdev_id,
+					    hdd_ctx->psoc, params, mac_addr);
+
+	hdd_exit();
+	return ret;
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif

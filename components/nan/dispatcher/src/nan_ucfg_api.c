@@ -2023,6 +2023,45 @@ uint32_t ucfg_nan_get_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev)
 	return val;
 }
 
+QDF_STATUS ucfg_nan_req_peer_params(struct nan_peer_params_req *req)
+{
+	return nan_req_peer_params(req);
+}
+
+QDF_STATUS ucfg_nan_set_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev,
+					       uint32_t val)
+{
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	priv_obj->peer_params_rsp_status = val;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t ucfg_nan_get_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t val;
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return 0;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	val = priv_obj->peer_params_rsp_status;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return val;
+}
+
 void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
 				 struct wma_tgt_cfg *cfg,
 				 uint8_t num_rf_chains, bool enable_2g,

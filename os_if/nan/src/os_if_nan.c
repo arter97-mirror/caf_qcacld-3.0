@@ -39,6 +39,7 @@
 #include "wlan_osif_request_manager.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_tdls_ucfg_api.h"
+#include "wlan_cmn_ieee80211.h"
 
 #define NAN_CMD_MAX_SIZE 2048
 
@@ -4013,6 +4014,255 @@ int os_if_nan_process_peer_schedule(uint8_t vdev_id,
 end:
 	osif_request_put(request);
 	psoc_priv->nan_peer_sched_ctx = NULL;
+	qdf_mem_free(ucfg_params);
+
+	return ret;
+}
+
+/**
+ * os_if_nan_convert_sta_flags_to_peer_flags() - Convert NL80211 STA flags to
+ * NAN peer flags
+ * @sta_flags_set: Station flags set from kernel (NL80211_STA_FLAG_*)
+ *
+ * This function converts kernel NL80211_STA_FLAG_* flags to NAN peer flags.
+ * The mapping is:
+ * - NL80211_STA_FLAG_MFP -> NAN_PEER_FLAG_PMF
+ * - NL80211_STA_FLAG_AUTHENTICATED -> NAN_PEER_FLAG_AUTHENTICATED
+ * - NL80211_STA_FLAG_ASSOCIATED -> NAN_PEER_FLAG_ASSOCIATED
+ * - NL80211_STA_FLAG_AUTHORIZED -> NAN_PEER_FLAG_AUTHORIZED
+ *
+ * Return: Converted NAN peer flags
+ */
+static uint32_t
+os_if_nan_convert_sta_flags_to_peer_flags(uint32_t sta_flags_set)
+{
+	uint32_t peer_flags = 0;
+
+	if (sta_flags_set & BIT(NL80211_STA_FLAG_MFP))
+		peer_flags |= NAN_PEER_FLAG_PMF;
+
+	if (sta_flags_set & BIT(NL80211_STA_FLAG_AUTHENTICATED))
+		peer_flags |= NAN_PEER_FLAG_AUTHENTICATED;
+
+	if (sta_flags_set & BIT(NL80211_STA_FLAG_ASSOCIATED))
+		peer_flags |= NAN_PEER_FLAG_ASSOCIATED;
+
+	if (sta_flags_set & BIT(NL80211_STA_FLAG_AUTHORIZED))
+		peer_flags |= NAN_PEER_FLAG_AUTHORIZED;
+
+	return peer_flags;
+}
+
+#ifdef WLAN_LINK_STA_PARAMS_PRESENT
+/**
+ * os_if_nan_extract_peer_caps() - Extract peer capabilities from params
+ * @params: Station parameters
+ * @peer_cap: Buffer to store capabilities
+ * @max_len: Maximum length of buffer
+ *
+ * Return: Length of capabilities extracted
+ */
+static uint32_t os_if_nan_extract_peer_caps(struct station_parameters *params,
+					    uint8_t *peer_cap,
+					    uint32_t max_len)
+{
+	uint32_t len = 0;
+	uint8_t *buf = peer_cap;
+	const uint8_t *he_capa;
+	uint32_t he_capa_len;
+	const uint8_t *eht_capa;
+	uint32_t eht_capa_len;
+
+	if (!params || !peer_cap || !max_len)
+		return 0;
+
+	/* HT Capability */
+	if (params->link_sta_params.ht_capa) {
+		if (len + 2 + sizeof(struct htcap_cmn_ie) <= max_len) {
+			*buf++ = WLAN_EID_HT_CAPABILITY;
+			*buf++ = sizeof(struct htcap_cmn_ie);
+			qdf_mem_copy(buf, params->link_sta_params.ht_capa,
+				     sizeof(struct htcap_cmn_ie));
+			buf += sizeof(struct htcap_cmn_ie);
+			len += 2 + sizeof(struct htcap_cmn_ie);
+		}
+	}
+
+	/* VHT Capability */
+	if (params->link_sta_params.vht_capa) {
+		if (len + 2 + sizeof(struct vhtcap) <= max_len) {
+			*buf++ = WLAN_EID_VHT_CAPABILITY;
+			*buf++ = sizeof(struct vhtcap);
+			qdf_mem_copy(buf, params->link_sta_params.vht_capa,
+				     sizeof(struct vhtcap));
+			buf += sizeof(struct vhtcap);
+			len += 2 + sizeof(struct vhtcap);
+		}
+	}
+
+	he_capa = params->link_sta_params.he_capa;
+	he_capa_len = params->link_sta_params.he_capa_len;
+	eht_capa = params->link_sta_params.eht_capa;
+	eht_capa_len = params->link_sta_params.eht_capa_len;
+
+	/*
+	 * HE/EHT capabilities are passed by cfg80211 as full IEs
+	 * (EID + LEN + payload). For NAN peer params we forward the
+	 * same IE blob, preserving the element headers.
+	 */
+	if (he_capa && he_capa_len >= 2) {
+		if (len + he_capa_len <= max_len) {
+			qdf_mem_copy(buf, he_capa, he_capa_len);
+			buf += he_capa_len;
+			len += he_capa_len;
+		}
+	}
+
+	if (eht_capa && eht_capa_len >= 2) {
+		if (len + eht_capa_len <= max_len) {
+			qdf_mem_copy(buf, eht_capa, eht_capa_len);
+			buf += eht_capa_len;
+			len += eht_capa_len;
+		}
+	}
+
+	return len;
+}
+#else
+static uint32_t os_if_nan_extract_peer_caps(struct station_parameters *params,
+					    uint8_t *peer_cap,
+					    uint32_t max_len)
+{
+	return 0;
+}
+#endif /* WLAN_LINK_STA_PARAMS_PRESENT */
+
+#define NAN_PEER_PARAMS_MAX_CAP_LEN 512
+int os_if_nan_process_peer_params(uint8_t vdev_id,
+				  struct wlan_objmgr_psoc *psoc,
+				  struct station_parameters *params,
+				  struct qdf_mac_addr *mac_addr)
+{
+	struct nan_peer_params_req *ucfg_params;
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request = NULL;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	int ret;
+	size_t req_size;
+	uint8_t *peer_cap_buf = NULL;
+	uint32_t peer_cap_len = 0;
+	static const struct osif_request_params req_params = {
+		.priv_size = 0,
+		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
+	};
+
+	/* Validate input parameters */
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return -EINVAL;
+	}
+
+	if (!mac_addr) {
+		osif_err("mac addr is NULL");
+		return -EINVAL;
+	}
+
+	if (!params) {
+		osif_err("Invalid peer params");
+		return -EINVAL;
+	}
+
+	peer_cap_buf = qdf_mem_malloc(NAN_PEER_PARAMS_MAX_CAP_LEN);
+	if (!peer_cap_buf)
+		return -ENOMEM;
+
+	peer_cap_len = os_if_nan_extract_peer_caps(params, peer_cap_buf,
+						   NAN_PEER_PARAMS_MAX_CAP_LEN);
+
+	req_size = sizeof(*ucfg_params) + peer_cap_len;
+	ucfg_params = qdf_mem_malloc(req_size);
+	if (!ucfg_params) {
+		qdf_mem_free(peer_cap_buf);
+		return -ENOMEM;
+	}
+
+	if (params->nmi_mac) {
+		qdf_mem_copy(ucfg_params->peer_nmi_addr.bytes, params->nmi_mac,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(ucfg_params->peer_ndi_mac_addr.bytes,
+			     mac_addr->bytes, QDF_MAC_ADDR_SIZE);
+	} else {
+		qdf_mem_copy(ucfg_params->peer_nmi_addr.bytes,
+			     mac_addr->bytes, QDF_MAC_ADDR_SIZE);
+	}
+
+	ucfg_params->vdev_id = vdev_id;
+	ucfg_params->psoc = psoc;
+	ucfg_params->peer_flags =
+		os_if_nan_convert_sta_flags_to_peer_flags(
+							params->sta_flags_set);
+	ucfg_params->peer_cap_len = peer_cap_len;
+
+	if (peer_cap_len)
+		qdf_mem_copy(ucfg_params->peer_cap, peer_cap_buf,
+			     peer_cap_len);
+
+	qdf_mem_free(peer_cap_buf);
+
+	/* Allocate request for waiting on response */
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		osif_err("Request allocation failure");
+		qdf_mem_free(ucfg_params);
+		return -ENOMEM;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		osif_err("psoc_nan_obj is null");
+		osif_request_put(request);
+		qdf_mem_free(ucfg_params);
+		return -EINVAL;
+	}
+
+	psoc_priv->nan_peer_params_ctx = osif_request_cookie(request);
+
+	/* Send to lower layers */
+	status = ucfg_nan_req_peer_params(ucfg_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to req peer params: %d", status);
+		ret = -EIO;
+		goto end;
+	}
+
+	/* Wait for response */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("NAN peer params request timed out: %d", ret);
+		ret = -ETIMEDOUT;
+		goto end;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null for vdev_id: %d", vdev_id);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	if (ucfg_nan_get_peer_params_rsp_status(vdev) !=
+					NAN_DATAPATH_RSP_STATUS_SUCCESS) {
+		osif_err("NAN peer params configuration failed");
+		ret = -EINVAL;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+end:
+	osif_request_put(request);
+	psoc_priv->nan_peer_params_ctx = NULL;
 	qdf_mem_free(ucfg_params);
 
 	return ret;

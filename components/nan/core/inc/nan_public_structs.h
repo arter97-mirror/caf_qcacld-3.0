@@ -37,6 +37,7 @@ struct wlan_objmgr_vdev;
 struct nan_local_sched_rsp;
 struct nan_peer_sched_params;
 struct nan_peer_sched_rsp;
+struct nan_peer_params_req;
 
 #ifdef NDP_TX_BW_FLOW_CTRL
 enum phy_ch_width;
@@ -248,6 +249,10 @@ enum nan_pasn_msg_type {
  *                         and channels for NAN data path
  * @NAN_PEER_SCHEDULE_RSP: NAN peer schedule response from firmware with
  *                         status of the schedule configuration
+ * @NAN_PEER_PARAMS_REQ: NAN peer params request to configure per-peer
+ *                        capabilities and attributes for NAN data path
+ * @NAN_PEER_PARAMS_RSP: NAN peer params response from firmware with
+ *                        status of the peer params configuration
  */
 enum nan_datapath_msg_type {
 	NAN_DATAPATH_INF_CREATE_REQ  = 0,
@@ -273,6 +278,8 @@ enum nan_datapath_msg_type {
 	NAN_LOCAL_SCHEDULE_RSP       = 20,
 	NAN_PEER_SCHEDULE_REQ        = 21,
 	NAN_PEER_SCHEDULE_RSP        = 22,
+	NAN_PEER_PARAMS_REQ          = 23,
+	NAN_PEER_PARAMS_RSP          = 24,
 };
 
 /**
@@ -1038,6 +1045,40 @@ struct nan_peer_sched_rsp {
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id;
 	uint32_t status;
+};
+
+/**
+ * enum nan_peer_params_flags - NAN peer flags
+ * @NAN_PEER_FLAG_PMF: Protected Management Frame
+ * @NAN_PEER_FLAG_AUTHENTICATED: Authenticated
+ * @NAN_PEER_FLAG_ASSOCIATED: Associated
+ * @NAN_PEER_FLAG_AUTHORIZED: Authorized
+ */
+enum nan_peer_params_flags {
+	NAN_PEER_FLAG_PMF           = 0x01,
+	NAN_PEER_FLAG_AUTHENTICATED = 0x02,
+	NAN_PEER_FLAG_ASSOCIATED    = 0x04,
+	NAN_PEER_FLAG_AUTHORIZED    = 0x08,
+};
+
+/**
+ * struct nan_peer_params_req - NAN peer parameters request
+ * @vdev_id: vdev ID
+ * @psoc: PSOC object
+ * @peer_nmi_addr: NMI MAC address of the peer
+ * @peer_ndi_mac_addr: NDI MAC address of the peer
+ * @peer_flags: Flags to enable/disable features
+ * @peer_cap_len: Length of peer capability
+ * @peer_cap: Peer capability data
+ */
+struct nan_peer_params_req {
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+	struct qdf_mac_addr peer_nmi_addr;
+	struct qdf_mac_addr peer_ndi_mac_addr;
+	uint32_t peer_flags;
+	uint32_t peer_cap_len;
+	uint8_t peer_cap[]; /* Variable length array */
 };
 #endif
 

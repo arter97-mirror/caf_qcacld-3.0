@@ -161,6 +161,7 @@ struct nan_cfg_params {
  * @phy_caps: Cached NAN HT/VHT PHY capability intersection result
  * @nan_local_sched_ctx: NAN local schedule request context
  * @nan_peer_sched_ctx: NAN peer schedule request context
+ * @nan_peer_params_ctx: NAN peer params request context
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -186,6 +187,7 @@ struct nan_psoc_priv_obj {
 	struct nan_phy_caps phy_caps;
 	void *nan_local_sched_ctx;
 	void *nan_peer_sched_ctx;
+	void *nan_peer_params_ctx;
 #endif
 };
 
@@ -212,6 +214,7 @@ struct nan_psoc_priv_obj {
  * @migration_complete_event: NAN migration complete event
  * @local_sched_rsp_status: status of the most recent NAN local schedule rsp
  * @peer_sched_rsp_status: status of the most recent NAN peer schedule rsp
+ * @peer_params_rsp_status: status of the most recent NAN peer params rsp
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -233,6 +236,7 @@ struct nan_vdev_priv_obj {
 	qdf_event_t migration_complete_event;
 	uint32_t local_sched_rsp_status;
 	uint32_t peer_sched_rsp_status;
+	uint32_t peer_params_rsp_status;
 };
 
 /**
@@ -655,6 +659,16 @@ bool nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
  * Return: QDF_STATUS
  */
 QDF_STATUS nan_set_peer_schedule(struct nan_peer_sched_params *params);
+
+/**
+ * nan_req_peer_params() - Request NAN peer parameters
+ * @req: pointer to NAN peer parameters request
+ *
+ * This function sends NAN peer parameters configuration to firmware
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_req_peer_params(struct nan_peer_params_req *req);
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

@@ -231,6 +231,23 @@ int os_if_nan_process_peer_schedule(uint8_t vdev_id,
 				    struct wlan_objmgr_psoc *psoc,
 				    struct cfg80211_nan_peer_sched *sched);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)) */
+
+/**
+ * os_if_nan_process_peer_params() - Process NAN peer parameters
+ * @vdev_id: vdev ID
+ * @psoc: pointer to psoc object
+ * @params: pointer to peer parameters
+ * @mac_addr: peer MAC address
+ *
+ * This function processes NAN peer parameters configuration request
+ * from cfg80211 and sends it to firmware through lower layers.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_process_peer_params(uint8_t vdev_id,
+				  struct wlan_objmgr_psoc *psoc,
+				  struct station_parameters *params,
+				  struct qdf_mac_addr *mac_addr);
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**
