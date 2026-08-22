@@ -700,6 +700,9 @@ static const u32 hdd_sta_akm_suites[] = {
 	WAPI_CERT_AKM_SUITE,
 	WLAN_AKM_SUITE_SAE_EXT_KEY,
 	WLAN_AKM_SUITE_FT_SAE_EXT_KEY,
+#ifdef WLAN_FEATURE_11BI_SECURITY
+	WLAN_AKM_SUITE_EPPKE,
+#endif
 };
 
 /*  STA FILS AKM suites */
@@ -2008,6 +2011,17 @@ int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
 }
 
 /* vendor specific events */
+#ifdef WLAN_FEATURE_11BI_SECURITY
+#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT                  \
+[QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX] = {            \
+	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
+	.subcmd = QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH,     \
+},
+#define WLAN_EXTERNAL_AUTH_INDEX QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX
+#else
+#define FEATURE_EXTERNAL_AUTHENTICATION_EVENT
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = {
 	[QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX] = {
 		.vendor_id =
@@ -2451,8 +2465,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE,
 	},
 #endif
-#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
-		defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
+#if defined(WLAN_FEATURE_11BI_SECURITY) || \
 		defined(WLAN_FEATURE_11BN_SMD)
 	FEATURE_EXTERNAL_AUTHENTICATION_EVENT
 #endif
@@ -27363,9 +27376,6 @@ static int wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
 	return errno;
 }
 
-#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
-	defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
-	defined(WLAN_FEATURE_11BN_SMD)
 #ifdef WLAN_FEATURE_11BN_SMD
 static inline uint16_t
 wlan_external_auth_smd_buf_len(const struct wlan_external_auth_params *params)
@@ -27510,6 +27520,9 @@ wlan_validate_smd_auth_response(struct hdd_adapter *adapter,
 	return 0;
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
+
+#if defined(WLAN_FEATURE_11BI_SECURITY) || \
+	defined(WLAN_FEATURE_11BN_SMD)
 
 static int
 wlan_send_external_auth_start_event(struct wireless_dev *wdev,

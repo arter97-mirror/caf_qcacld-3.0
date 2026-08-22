@@ -5046,6 +5046,20 @@ error:
 
 #define SAE_AUTH_ALGO_LEN 2
 #define SAE_AUTH_ALGO_OFFSET 0
+
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool lim_is_ack_for_11bi_auth(uint16_t auth_algo)
+{
+	return auth_algo == eSIR_AUTH_TYPE_EPPKE ||
+	       auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH;
+}
+#else
+static inline bool lim_is_ack_for_11bi_auth(uint16_t auth_algo)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static bool lim_is_ack_for_external_auth(qdf_nbuf_t buf)
 {
 	tpSirMacMgmtHdr mac_hdr;
@@ -5068,9 +5082,7 @@ static bool lim_is_ack_for_external_auth(qdf_nbuf_t buf)
 		sae_auth = (uint16_t *)((uint8_t *)mac_hdr +
 					sizeof(tSirMacMgmtHdr));
 		if (sae_auth[SAE_AUTH_ALGO_OFFSET] == eSIR_AUTH_TYPE_SAE ||
-		    sae_auth[SAE_AUTH_ALGO_OFFSET] == eSIR_AUTH_TYPE_EPPKE ||
-		    sae_auth[SAE_AUTH_ALGO_OFFSET] ==
-		    eSIR_AUTH_TYPE_8021X_IN_AUTH)
+		    lim_is_ack_for_11bi_auth(sae_auth[SAE_AUTH_ALGO_OFFSET]))
 			return true;
 	}
 
@@ -5102,6 +5114,39 @@ static inline uint16_t lim_get_auth_algorithm(qdf_nbuf_t buf)
 	return algo;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static void
+lim_notify_11bi_auth_tx_status(struct mac_context *mac_ctx,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint8_t vdev_id, qdf_nbuf_t buf, bool ack)
+{
+	tpSirMacMgmtHdr mac_hdr;
+	struct sae_auth_retry *ext_auth_info;
+	uint64_t cookie = 0;
+	QDF_STATUS status;
+
+	mac_hdr = (tpSirMacMgmtHdr)qdf_nbuf_data(buf);
+	status = lim_update_link_to_mld_address(mac_ctx, vdev, mac_hdr, true);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("failed to update to MLD address");
+
+	ext_auth_info = mlme_get_sae_auth_retry(vdev);
+	if (ext_auth_info)
+		cookie = ext_auth_info->cookie;
+
+	pe_debug("vdev:%d cookie:%llu ack:%d", vdev_id, cookie, ack);
+	wlan_cm_mgmt_tx_status(vdev, cookie, qdf_nbuf_data(buf),
+			       qdf_nbuf_len(buf), ack);
+}
+#else
+static inline void
+lim_notify_11bi_auth_tx_status(struct mac_context *mac_ctx,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint8_t vdev_id, qdf_nbuf_t buf, bool ack)
+{
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /**
  * lim_auth_tx_complete_cnf()- Confirmation for auth sent over the air
  * @context: pointer to global mac
@@ -5124,8 +5169,6 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 	bool ack = false;
 	struct pe_session *session;
 	struct wlan_objmgr_vdev *vdev = NULL;
-	struct sae_auth_retry *ext_auth_info;
-	uint64_t cookie = 0;
 	uint16_t auth_algo;
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
@@ -5144,7 +5187,8 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 		ext_auth_acked = lim_is_ack_for_external_auth(buf);
 		/*
 		 * 'Change' timer for future activations only if ack
-		 * received is not for WPA SAE/EDPKE auth frames.
+		 * received is not for WPA SAE/EPPKE/8021X-in-auth external
+		 * auth frames.
 		 */
 		if (!ext_auth_acked)
 			lim_deactivate_and_change_timer(mac_ctx,
@@ -5162,7 +5206,7 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 	}
 
 	/*
-	 * For EDPKE/EPPKE Authentication frames, notify userspace via
+	 * For 802.1x/EPPKE Authentication frames, notify userspace via
 	 * cfg80211_mgmt_tx_status() through HDD wrapper.
 	 *
 	 * Layering: LIM -> CM (ucfg) -> OSIF/HDD -> cfg80211
@@ -5177,26 +5221,9 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 	}
 
 	auth_algo = lim_get_auth_algorithm(buf);
-	if (buf && vdev &&
-	    (auth_algo == eSIR_AUTH_TYPE_EPPKE ||
-	     auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)) {
-		tpSirMacMgmtHdr mac_hdr;
-		QDF_STATUS status;
-
-		mac_hdr = (tpSirMacMgmtHdr)qdf_nbuf_data(buf);
-		status = lim_update_link_to_mld_address(mac_ctx, vdev,
-							mac_hdr, true);
-		if (QDF_IS_STATUS_ERROR(status))
-			pe_err("failed to update to MLD address");
-
-		ext_auth_info = mlme_get_sae_auth_retry(vdev);
-		if (ext_auth_info)
-			cookie = ext_auth_info->cookie;
-
-		pe_debug("vdev:%d cookie:%llu ack:%d", vdev_id, cookie, ack);
-		wlan_cm_mgmt_tx_status(vdev, cookie, qdf_nbuf_data(buf),
-				       qdf_nbuf_len(buf), ack);
-	}
+	if (buf && vdev && lim_is_ack_for_11bi_auth(auth_algo))
+		lim_notify_11bi_auth_tx_status(mac_ctx, vdev,
+					       vdev_id, buf, ack);
 
 	if (buf)
 		qdf_nbuf_free(buf);

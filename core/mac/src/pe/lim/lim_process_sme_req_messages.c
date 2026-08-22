@@ -4072,6 +4072,20 @@ lim_get_wpa_akm(uint32_t akm)
 		return ANI_AKM_TYPE_UNKNOWN;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static enum ani_akm_type lim_get_eppke_akm(uint32_t akm)
+{
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_EPPKE))
+		return ANI_AKM_TYPE_EPPKE;
+	return ANI_AKM_TYPE_NONE;
+}
+#else
+static inline enum ani_akm_type lim_get_eppke_akm(uint32_t akm)
+{
+	return ANI_AKM_TYPE_NONE;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static enum ani_akm_type
 lim_get_rsn_akm(uint32_t akm)
 {
@@ -4089,6 +4103,8 @@ lim_get_rsn_akm(uint32_t akm)
 		return ANI_AKM_TYPE_FT_SAE;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
 		return ANI_AKM_TYPE_SAE;
+	else if (lim_get_eppke_akm(akm) != ANI_AKM_TYPE_NONE)
+		return ANI_AKM_TYPE_EPPKE;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_DPP))
 		return ANI_AKM_TYPE_DPP_RSN;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OSEN))

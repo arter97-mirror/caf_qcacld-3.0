@@ -3927,6 +3927,22 @@ static void csr_update_snr(struct mac_context *mac, void *pMsg)
 		sme_err("pGetSnrReq is NULL");
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static enum csr_akm_type
+csr_translate_eppke_akm_type(enum ani_akm_type akm_type)
+{
+	if (akm_type == ANI_AKM_TYPE_EPPKE)
+		return eCSR_AUTH_TYPE_EPPKE;
+	return eCSR_AUTH_TYPE_UNKNOWN;
+}
+#else
+static inline enum csr_akm_type
+csr_translate_eppke_akm_type(enum ani_akm_type akm_type)
+{
+	return eCSR_AUTH_TYPE_UNKNOWN;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /**
  * csr_translate_akm_type() - Convert ani_akm_type value to equivalent
  * enum csr_akm_type
@@ -4008,7 +4024,7 @@ static enum csr_akm_type csr_translate_akm_type(enum ani_akm_type akm_type)
 		csr_akm_type = eCSR_AUTH_TYPE_SAE_EXT_KEY;
 		break;
 	default:
-		csr_akm_type = eCSR_AUTH_TYPE_UNKNOWN;
+		csr_akm_type = csr_translate_eppke_akm_type(akm_type);
 	}
 
 	return csr_akm_type;

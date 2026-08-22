@@ -3889,6 +3889,9 @@ static const struct rsn_oui_akm_type_map rsn_oui_akm_type_mapping_table[] = {
 	{ANI_AKM_TYPE_WPA_PSK,              {0x00, 0x50, 0xF2, 0x02} },
 	{ANI_AKM_TYPE_SAE_EXT_KEY,          {0x00, 0x0F, 0xAC, 0x18} },
 	{ANI_AKM_TYPE_FT_SAE_EXT_KEY,       {0x00, 0x0F, 0xAC, 0x19} },
+#ifdef WLAN_FEATURE_11BI_SECURITY
+	{ANI_AKM_TYPE_EPPKE,                {0x00, 0x0F, 0xAC, 0x1D} },
+#endif /* WLAN_FEATURE_11BI_SECURITY */
 	/* Add akm type above here */
 	{ANI_AKM_TYPE_UNKNOWN, {0} },
 };

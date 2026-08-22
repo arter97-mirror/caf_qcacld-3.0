@@ -41,6 +41,7 @@
 #include "wlan_reg_services_api.h"
 #include "lim_process_fils.h"
 #include "wlan_mlme_public_struct.h"
+#include "wlan_scan_utils_api.h"
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_pmo_ucfg_api.h"
 #include "wlan_cp_stats_utils_api.h"
@@ -777,8 +778,7 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BI_SECURITY) && \
-	defined(CFG80211_80211BI_AUTH_SUPPORT)
+#ifdef WLAN_FEATURE_11BI_SECURITY
 static
 QDF_STATUS lim_initiate_external_auth_req(struct mac_context *mac_ctx,
 					  struct pe_session *session,
@@ -836,13 +836,25 @@ QDF_STATUS lim_initiate_external_auth_req(struct mac_context *mac_ctx,
 		}
 	}
 
-	pe_debug("vdev_id %d ssid " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " akm:0x%x algo:%d pairwise:0x%x grp:0x%x grp_mgmt:0x%x",
+	if (session->lim_join_req && session->lim_join_req->rsnIE.length) {
+		QDF_STATUS cap_status;
+
+		cap_status = util_scan_get_rsn_cap(
+				session->lim_join_req->rsnIE.rsnIEdata,
+				session->lim_join_req->rsnIE.length,
+				&ext_auth->rsn_capab);
+		if (QDF_IS_STATUS_ERROR(cap_status))
+			pe_debug("vdev_id %d Failed to extract RSN cap",
+				 session->vdev_id);
+	}
+
+	pe_debug("vdev_id %d ssid " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " akm:0x%x algo:%d pairwise:0x%x grp:0x%x grp_mgmt:0x%x rsn_capab:0x%x",
 		 ext_auth->vdev_id,
 		 QDF_SSID_REF(ext_auth->ssid.length, ext_auth->ssid.ssId),
 		 QDF_MAC_ADDR_REF(ext_auth->peer_mac_addr.bytes),
 		 ext_auth->akm, ext_auth->auth_algo,
 		 ext_auth->pairwise_cipher, ext_auth->group_cipher,
-		 ext_auth->group_mgmt_cipher);
+		 ext_auth->group_mgmt_cipher, ext_auth->rsn_capab);
 
 	msg.type = WNI_SME_TRIGGER_EXTERNAL_AUTH;
 	msg.bodyptr = ext_auth;
@@ -890,7 +902,7 @@ lim_process_mlm_external_auth_req(struct mac_context *mac_ctx,
 
 	/* Activate External auth timer */
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
-			 session->peSessionId, eLIM_AUTH_EXTERNAL_AUTH_TIMER));
+			 session->peSessionId, eLIM_EXTERNAL_AUTH_TIMER));
 	if (tx_timer_activate(&lim_timers->external_auth_timer) != TX_SUCCESS)
 		pe_err("could not start External Auth timer");
 
