@@ -558,6 +558,28 @@ static inline bool lim_is_11bi_auth_mode(int32_t auth_mode)
 }
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/**
+ * lim_set_vdev_auth_algo() - Set vdev auth algorithm from mlme config
+ * @vdev: vdev object
+ * @auth_type: auth type from wep_params configuration
+ *
+ * Sets the vdev crypto auth algorithm parameter to the configured auth
+ * type so that 11bi auth mode is visible to the crypto layer.
+ */
+static inline void lim_set_vdev_auth_algo(struct wlan_objmgr_vdev *vdev,
+					  uint8_t auth_type)
+{
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_AUTH_ALGO,
+				   auth_type);
+}
+#else
+static inline void lim_set_vdev_auth_algo(struct wlan_objmgr_vdev *vdev,
+					  uint8_t auth_type)
+{
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static void lim_set_privacy(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    int32_t ucast_cipher,
@@ -614,6 +636,10 @@ static void lim_set_privacy(struct mac_context *mac_ctx,
 	mac_ctx->mlme_cfg->feature_flags.enable_rsn = rsn_enabled;
 	mac_ctx->mlme_cfg->wep_params.is_privacy_enabled = privacy;
 	mac_ctx->mlme_cfg->wep_params.wep_default_key_id = 0;
+
+	if (session->vdev)
+		lim_set_vdev_auth_algo(session->vdev,
+				       mac_ctx->mlme_cfg->wep_params.auth_type);
 }
 
 /**

@@ -2720,6 +2720,70 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/**
+ * wmi_fill_kde_and_auth_algo() - Copy KDE data and set auth algorithm
+ * @roam_sync_ind: roam sync indication to populate
+ * @synch_event: WMI roam sync event fixed params (FW-supplied, untrusted)
+ * @param_buf: WMI TLV parameter buffer
+ * @vdev: vdev object
+ *
+ * Copies the KDE TLV from the roam sync event into @roam_sync_ind and
+ * updates the vdev auth algorithm from the event's auth_algo field.
+ * If KDE data is absent, malformed, or oversized the KDE is skipped
+ * and roam sync continues unaffected; auth_algo is always updated.
+ */
+static void
+wmi_fill_kde_and_auth_algo(struct roam_offload_synch_ind *roam_sync_ind,
+			   wmi_roam_synch_event_fixed_param *synch_event,
+			   WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
+			   struct wlan_objmgr_vdev *vdev)
+{
+	roam_sync_ind->kde_data_len = 0;
+
+	if (!synch_event->kde_length)
+		goto set_auth_algo;
+
+	if (!param_buf->kde_data || !param_buf->num_kde_data) {
+		wmi_err("KDE length %d but TLV absent (kde_data %pK num %u)",
+			synch_event->kde_length,
+			param_buf->kde_data, param_buf->num_kde_data);
+		goto set_auth_algo;
+	}
+
+	if (synch_event->kde_length > MAX_KDE_DATA_LEN) {
+		wmi_err("KDE length %d exceeds max %d, skipping KDE",
+			synch_event->kde_length, MAX_KDE_DATA_LEN);
+		goto set_auth_algo;
+	}
+
+	if (synch_event->kde_length > param_buf->num_kde_data) {
+		wmi_err("KDE length %d > TLV bytes %u, skipping KDE",
+			synch_event->kde_length, param_buf->num_kde_data);
+		goto set_auth_algo;
+	}
+
+	roam_sync_ind->kde_data_len = synch_event->kde_length;
+	qdf_mem_copy(roam_sync_ind->kde_data, param_buf->kde_data,
+		     synch_event->kde_length);
+	wmi_debug("KDE data parsed, length: %d", roam_sync_ind->kde_data_len);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   roam_sync_ind->kde_data,
+			   roam_sync_ind->kde_data_len);
+
+set_auth_algo:
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_AUTH_ALGO,
+				   synch_event->auth_algo);
+}
+#else
+static inline void
+wmi_fill_kde_and_auth_algo(struct roam_offload_synch_ind *roam_sync_ind,
+			   wmi_roam_synch_event_fixed_param *synch_event,
+			   WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
+			   struct wlan_objmgr_vdev *vdev)
+{}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 #ifdef WLAN_FEATURE_11BN_SMD
 static void
 wmi_fill_roam_sync_smd_kdk(struct roam_offload_synch_ind *roam_sync_ind,
@@ -2944,6 +3008,9 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		qdf_mem_copy(roam_sync_ind->pmkid,
 			     pmk_cache_info->pmkid, PMKID_LEN);
 	}
+
+	/* Parse KDE data TLV if present */
+	wmi_fill_kde_and_auth_algo(roam_sync_ind, synch_event, param_buf, vdev);
 
 	status = wmi_fill_roam_mlo_info(wmi_handle, param_buf, roam_sync_ind);
 	if (QDF_IS_STATUS_ERROR(status)) {

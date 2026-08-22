@@ -105,6 +105,7 @@
 #define WLAN_FILS_MAX_RRK_LENGTH WLAN_CM_FILS_MAX_RRK_LENGTH
 
 #define FILS_MAX_HLP_DATA_LEN 2048
+#define MAX_KDE_DATA_LEN 255
 
 #define WLAN_FILS_MAX_RIK_LENGTH WLAN_FILS_MAX_RRK_LENGTH
 #define WLAN_FILS_FT_MAX_LEN          48
@@ -3323,6 +3324,8 @@ struct roam_offload_synch_ind {
 	enum phy_ch_width chan_width;
 	uint32_t max_rate_flags;
 	uint32_t ric_data_len;
+	uint32_t kde_data_len;
+	uint8_t kde_data[MAX_KDE_DATA_LEN];
 #ifdef FEATURE_WLAN_ESE
 	uint32_t tspec_len;
 #endif
