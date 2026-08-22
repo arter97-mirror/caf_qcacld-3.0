@@ -2953,6 +2953,20 @@ wma_handle_peer_create_cmd(tp_wma_handle wma,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool wma_peer_is_11bi(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_crypto_vdev_has_auth_mode(vdev, BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+#else
+static inline bool wma_peer_is_11bi(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /**
  * wma_add_peer() - send peer create command to fw
  * @wma: wma handle
@@ -2980,6 +2994,7 @@ QDF_STATUS wma_add_peer(tp_wma_handle wma,
 	QDF_STATUS status;
 	bool is_tgt_peer_conf_supported;
 	struct qdf_mac_addr peer_mac;
+	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
 
 	if (!psoc) {
 		wma_err("psoc is NULL");
@@ -3043,6 +3058,13 @@ QDF_STATUS wma_add_peer(tp_wma_handle wma,
 			 wma->interfaces[vdev_id].peer_count + 1);
 		return QDF_STATUS_SUCCESS;
 	}
+
+	if (iface->vdev) {
+		param.is_11bi_peer = wma_peer_is_11bi(iface->vdev);
+		wma_debug("vdev_id:%d is_11bi_peer:%d", vdev_id,
+			  param.is_11bi_peer);
+	}
+
 	qdf_mem_copy(param.peer_addr.bytes, peer_addr, QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(peer_mac.bytes, peer_addr, QDF_MAC_ADDR_SIZE);
 
@@ -3085,9 +3107,9 @@ send_peer_create:
 	return status;
 
 remove_peer:
-	if (peer_type == WMI_PEER_TYPE_TDLS && is_tgt_peer_conf_supported) {
+	if (peer_type == WMI_PEER_TYPE_TDLS && is_tgt_peer_conf_supported)
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
-	}
+
 	if (cdp_cfg_get_peer_unmap_conf_support(dp_soc))
 		cdp_peer_delete_sync(
 			dp_soc, vdev_id, peer_addr,

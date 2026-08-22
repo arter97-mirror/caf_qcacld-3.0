@@ -638,6 +638,27 @@ static void cm_diag_fill_wapi_auth_type(uint8_t *auth_type, uint32_t akm)
 		*auth_type = AUTH_WAPI_PSK;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool cm_diag_fill_11bi_auth_type(uint8_t *auth_type,
+					uint32_t authmodeset)
+{
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_EPPKE)) {
+		*auth_type = AUTH_EPPKE;
+		return true;
+	}
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)) {
+		*auth_type = AUTH_1X_OVER_AUTH;
+		return true;
+	}
+	return false;
+}
+#else
+static inline bool cm_diag_fill_11bi_auth_type(uint8_t *auth_type,
+					       uint32_t authmodeset)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
 static void cm_diag_get_auth_type(uint8_t *auth_type,
 				  uint32_t authmodeset, uint32_t akm,
 				  uint32_t ucastcipherset)
@@ -668,6 +689,9 @@ static void cm_diag_get_auth_type(uint8_t *auth_type,
 		*auth_type = AUTH_SHARED;
 		return;
 	}
+
+	if (cm_diag_fill_11bi_auth_type(auth_type, authmodeset))
+		return;
 
 	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||

@@ -33108,6 +33108,21 @@ static int wlan_hdd_add_key_sap(struct wlan_hdd_link_info *link_info,
 	return errno;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool hdd_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+#else
+static inline bool hdd_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 				struct wlan_hdd_link_info *link_info,
 				bool pairwise, u8 key_index,
@@ -33118,6 +33133,14 @@ static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	/* For 11bi (EPPKE) skip the FT pre-auth key-defer path */
+	if (wlan_cm_is_vdev_active(vdev) && hdd_is_11bi_vdev(vdev))
+		goto add_key;
+
 	/* The supplicant may attempt to set the PTK once
 	 * pre-authentication is done. Save the key in the
 	 * UMAC and install it after association
@@ -33125,11 +33148,11 @@ static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 	status = ucfg_cm_check_ft_status(pdev, link_info->vdev_id);
 	if (status == QDF_STATUS_SUCCESS) {
 		*ft_mode = true;
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return 0;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return -EINVAL;
+
+add_key:
 	errno = wlan_cfg80211_crypto_add_key(vdev, peer_mac, (pairwise ?
 					     WLAN_CRYPTO_KEY_TYPE_UNICAST :
 					     WLAN_CRYPTO_KEY_TYPE_GROUP),
@@ -33356,9 +33379,9 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 static bool
 wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
-			    struct qdf_mac_addr *mac_address)
+			    struct qdf_mac_addr *mac_address,
+			    uint8_t link_id)
 {
-	uint8_t link_id;
 	bool is_link_vdev, is_link_roam_auth_connected;
 
 	if (!adapter)
@@ -33375,6 +33398,11 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 		mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
 						  wlan_vdev_get_id(vdev));
 
+	/* For EPPKE: install key on assoc vdev immediately before connection */
+	if (hdd_is_11bi_vdev(vdev) && !wlan_cm_is_vdev_connected(vdev) &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return false;
+
 	/*
 	 * Defer key install unless the vdev is already connected and this
 	 * isn't the MLO link vdev roam-auth-connected case.
@@ -33382,7 +33410,6 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 	if (wlan_cm_is_vdev_connected(vdev) && !is_link_roam_auth_connected)
 		return false;
 
-	link_id = wlan_vdev_get_link_id(vdev);
 	hdd_debug("MLO:Defer set keys for link_id %d", link_id);
 	mlo_defer_set_keys(vdev, link_id, true);
 
@@ -33401,7 +33428,8 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 static bool
 wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
-			    struct qdf_mac_addr *mac_address)
+			    struct qdf_mac_addr *mac_address,
+			    uint8_t link_id)
 {
 	return false;
 }
@@ -33575,7 +33603,7 @@ done:
 						mac_address.bytes, params);
 	}
 
-	if (wlan_hdd_mlo_defer_set_keys(adapter, vdev, &mac_address))
+	if (wlan_hdd_mlo_defer_set_keys(adapter, vdev, &mac_address, link_id))
 		return 0;
 
 	if (((wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) ||
@@ -33823,6 +33851,7 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 
 	mlo_sta_get_vdev_list(vdev, &vdev_count, wlan_vdev_list);
 	for (link = 0; link < vdev_count; link++) {
+		uint16_t sta_link_id = link_id;
 		link_vdev = wlan_vdev_list[link];
 		vdev_id = wlan_vdev_get_id(link_vdev);
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
@@ -33856,6 +33885,26 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 				     QDF_MAC_ADDR_SIZE);
 			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 
+		} else if (adapter->device_mode == QDF_STA_MODE &&
+			   !wlan_cm_is_vdev_connected(vdev)) {
+			struct wlan_mlo_dev_context *mlo_dev_ctx =
+				link_vdev->mlo_dev_ctx;
+			struct mlo_link_info *ap_link_info =
+				mlo_mgr_get_ap_link_by_vdev_id(mlo_dev_ctx,
+							       vdev_id);
+			if (!ap_link_info) {
+				hdd_err("vdev:%d failed to get ap link info from vdev_id:%d",
+					wlan_vdev_get_id(link_vdev), vdev_id);
+				mlo_release_vdev_ref(link_vdev);
+				continue;
+			}
+
+			peer_mac = ap_link_info->ap_link_addr;
+			sta_link_id = ap_link_info->link_id;
+			hdd_debug("Partner_vdev:%d link_id:%d peer_mac: " QDF_MAC_ADDR_FMT,
+				  wlan_vdev_get_id(link_vdev),
+				  sta_link_id,
+				  QDF_MAC_ADDR_REF(peer_mac.bytes));
 		} else if (wlan_vdev_mlme_is_mlo_link_vdev(link_vdev) &&
 			   adapter->device_mode == QDF_STA_MODE) {
 			status = wlan_hdd_mlo_copy_partner_addr_from_mlie(
@@ -33874,7 +33923,7 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 add_key:
 		errno = wlan_hdd_add_key_vdev(mac_handle, link_vdev, key_index,
 					      pairwise, peer_mac.bytes,
-					      params, link_id, link_info);
+					      params, sta_link_id, link_info);
 		mlo_release_vdev_ref(link_vdev);
 	}
 

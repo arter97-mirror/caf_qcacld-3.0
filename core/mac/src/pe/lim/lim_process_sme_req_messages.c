@@ -528,12 +528,43 @@ lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static tAniAuthType lim_get_11bi_auth_type(int32_t auth_mode,
+					   int32_t akm)
+{
+	if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH))
+		return eSIR_AUTH_TYPE_8021X_IN_AUTH;
+	if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_EPPKE))
+		return eSIR_AUTH_TYPE_EPPKE;
+	return eSIR_OPEN_SYSTEM;
+}
+
+static bool lim_is_11bi_auth_mode(int32_t auth_mode)
+{
+	return QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
+	       QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH);
+}
+#else
+static inline tAniAuthType lim_get_11bi_auth_type(int32_t auth_mode,
+						  int32_t akm)
+{
+	return eSIR_OPEN_SYSTEM;
+}
+
+static inline bool lim_is_11bi_auth_mode(int32_t auth_mode)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static void lim_set_privacy(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    int32_t ucast_cipher,
 			    int32_t auth_mode, int32_t akm, bool ap_privacy)
 {
 	bool rsn_enabled, privacy;
+	tAniAuthType auth_11bi = lim_get_11bi_auth_type(auth_mode, akm);
 
 	/* set default to open */
 	mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_OPEN_SYSTEM;
@@ -544,6 +575,8 @@ static void lim_set_privacy(struct mac_context *mac_ctx,
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_AUTO_SWITCH;
 	else if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_SHARED))
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_SHARED_KEY;
+	else if (auth_11bi != eSIR_OPEN_SYSTEM)
+		mac_ctx->mlme_cfg->wep_params.auth_type = auth_11bi;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY) ||
@@ -4004,7 +4037,8 @@ lim_is_rsn_profile(struct pe_session *session)
 	    QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_RSNA) ||
 	    QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_CCKM) ||
 	    QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_SAE) ||
-	    QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_FILS_SK))
+	    QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_FILS_SK) ||
+	    lim_is_11bi_auth_mode(auth_mode))
 		is_rsn = true;
 
 	if (!is_rsn)

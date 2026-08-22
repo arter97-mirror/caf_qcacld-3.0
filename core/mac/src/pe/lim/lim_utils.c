@@ -5528,6 +5528,33 @@ void lim_get_short_slot_from_phy_mode(struct mac_context *mac, struct pe_session
 	*pShortSlotEnabled = val;
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool lim_is_11bi_assoc_req(struct pe_session *pe_session,
+				  tpSirMacMgmtHdr pMacHdr)
+{
+	int32_t auth_mode;
+
+	if (pMacHdr->fc.type != WLAN_FC0_TYPE_MGMT ||
+	    pMacHdr->fc.subType != SIR_MAC_MGMT_ASSOC_REQ)
+		return false;
+
+	auth_mode = wlan_crypto_get_param(pe_session->vdev,
+					  WLAN_CRYPTO_PARAM_AUTH_MODE);
+	/* wlan_crypto_get_param returns negative on error; treat as non-11bi */
+	if (auth_mode < 0)
+		return false;
+
+	return QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
+	       QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH);
+}
+#else
+static inline bool lim_is_11bi_assoc_req(struct pe_session *pe_session,
+					 tpSirMacMgmtHdr pMacHdr)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 void
 lim_set_protected_bit(struct mac_context *mac,
 		      struct pe_session *pe_session,
@@ -5535,6 +5562,13 @@ lim_set_protected_bit(struct mac_context *mac,
 {
 	uint16_t aid;
 	tpDphHashNode sta;
+
+	/* Set WEP bit for EPPKE association request */
+	if (lim_is_11bi_assoc_req(pe_session, pMacHdr)) {
+		pMacHdr->fc.wep = 1;
+		pe_debug("set WEP bit for EPPKE Assoc req");
+		return;
+	}
 
 	sta = dph_lookup_hash_entry(mac, peer_mac, &aid,
 				    &pe_session->dph.dphHashTable);
