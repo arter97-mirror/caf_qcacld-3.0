@@ -30132,6 +30132,30 @@ wlan_hdd_set_pd_mode(struct wiphy *wiphy)
 {}
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * wlan_hdd_set_full_ap_client_state() - Indicate
+ * NL80211_FEATURE_FULL_AP_CLIENT_STATE support in wiphy if FW supports
+ * NAN standard mode
+ * @hdd_ctx: HDD context
+ * @wiphy: pointer to wiphy structure
+ *
+ * Return: None
+ */
+static void wlan_hdd_set_full_ap_client_state(struct hdd_context *hdd_ctx,
+					      struct wiphy *wiphy)
+{
+	if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
+		wiphy->features |= NL80211_FEATURE_FULL_AP_CLIENT_STATE;
+}
+#else
+static inline void
+wlan_hdd_set_full_ap_client_state(struct hdd_context *hdd_ctx,
+				  struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -30263,6 +30287,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	wiphy->features |= NL80211_FEATURE_INACTIVITY_TIMER;
 
 	wiphy->features |= NL80211_FEATURE_VIF_TXPOWER;
+	wlan_hdd_set_full_ap_client_state(hdd_ctx, wiphy);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)) || \
 	defined(CFG80211_BEACON_TX_RATE_CUSTOM_BACKPORT)
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_BEACON_RATE_LEGACY);
