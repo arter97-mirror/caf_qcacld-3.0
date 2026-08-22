@@ -1984,6 +1984,8 @@ cm_wmi_auth_type_to_crypto_key_mgmt(uint32_t akm)
 		return WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384;
 	case WMI_AUTH_PASN:
 		return WLAN_CRYPTO_KEY_MGMT_PASN;
+	case WMI_AUTH_EPPKE:
+		return WLAN_CRYPTO_KEY_MGMT_EPPKE;
 	}
 
 	return WLAN_CRYPTO_KEY_MGMT_NONE;
@@ -2032,6 +2034,8 @@ uint32_t cm_get_wmi_auth_type(uint32_t akm)
 		return WMI_AUTH_FT_RSNA_SUITE_B_8021X_SHA384;
 	case WLAN_CRYPTO_KEY_MGMT_PASN:
 		return WMI_AUTH_PASN;
+	case WLAN_CRYPTO_KEY_MGMT_EPPKE:
+		return WMI_AUTH_EPPKE;
 	}
 
 	return WMI_AUTH_NONE;
@@ -2139,6 +2143,12 @@ uint32_t cm_crypto_authmode_to_wmi_authmode(int32_t authmodeset,
 
 	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SHARED))
 		return WMI_AUTH_SHARED;
+
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_EPPKE))
+		return WMI_AUTH_EPPKE;
+
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X_IN_AUTH))
+		return WMI_AUTH_8021X;
 
 	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||

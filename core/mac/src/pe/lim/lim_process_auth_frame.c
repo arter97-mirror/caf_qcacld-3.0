@@ -1098,8 +1098,8 @@ static void lim_process_eppke_auth_frame(struct mac_context *mac_ctx,
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    pe_session->limMlmState != eLIM_MLM_WT_EXTERNAL_AUTH_STATE)
-		pe_warn("vdev:%d EPPKE auth response for STA in unexpected state %x",
-			pe_session->vdev_id, pe_session->limMlmState);
+		pe_err("vdev:%d EPPKE auth response for STA in unexpected state %x",
+		       pe_session->vdev_id, pe_session->limMlmState);
 
 	sae_retry = mlme_get_sae_auth_retry(pe_session->vdev);
 	if (LIM_IS_STA_ROLE(pe_session) && sae_retry &&
