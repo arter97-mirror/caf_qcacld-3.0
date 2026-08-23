@@ -2147,7 +2147,7 @@ smd_link_recfg_assign_self_link_addr(
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct mlo_link_info *link_info;
-	uint8_t i;
+	int8_t i;
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t idx;
 	uint32_t allocated_bitmap;
@@ -2264,7 +2264,7 @@ smd_link_recfg_assign_self_link_addr(
 			continue;
 		}
 
-		if (!cm_is_vdev_connected(vdev)) {
+		if (!cm_is_vdev_connected(vdev) && !cm_is_vdev_roaming(vdev)) {
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 			continue;
 		}
@@ -2297,7 +2297,7 @@ smd_link_recfg_assign_self_link_addr(
 
 			idx++;
 			allocated_bitmap |= 1 << i;
-			break;
+			i = -1;
 		}
 	}
 
