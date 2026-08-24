@@ -8239,6 +8239,13 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 	}
 
+	/*
+	 * session can be NULL from this point on (caller supplied
+	 * freq/ch_width directly instead of a session, e.g. passthru
+	 * peer setup) -- use the freq/ch_width params below, never
+	 * session->curr_op_freq or session->ch_width, or this will
+	 * NULL deref.
+	 */
 	if (he_cap->ppet_present) {
 		value = WNI_CFG_HE_PPET_LEN;
 		/* if session is present, populate PPET based on band */
@@ -8268,11 +8275,11 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		he_cap->chan_width_0 = 0;
 		he_cap->chan_width_4 = 0;
 		he_cap->chan_width_6 = 0;
-		if (session->ch_width < CH_WIDTH_40MHZ) {
+		if (ch_width < CH_WIDTH_40MHZ) {
 			he_cap->chan_width_1 = 0;
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
-		} else if (session->ch_width <= CH_WIDTH_80MHZ) {
+		} else if (ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
 		} else if (ch_width == CH_WIDTH_160MHZ) {
