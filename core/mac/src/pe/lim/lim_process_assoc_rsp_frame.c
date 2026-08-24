@@ -1222,6 +1222,7 @@ static void lim_update_vdev_bss_params(struct pe_session *session_entry,
 {
 	struct vdev_mlme_obj *mlme_obj;
 	struct vdev_mlme_bss_params *bp;
+	struct bss_description *bss_desc;
 
 	if (!session_entry->vdev)
 		return;
@@ -1230,6 +1231,7 @@ static void lim_update_vdev_bss_params(struct pe_session *session_entry,
 	if (!mlme_obj)
 		return;
 
+	bss_desc = &session_entry->lim_join_req->bssDescription;
 	bp = &mlme_obj->mgmt.sta.bss_params;
 	bp->flags = 0;
 	if (beacon->erpPresent &&
@@ -1240,7 +1242,7 @@ static void lim_update_vdev_bss_params(struct pe_session *session_entry,
 	if (assoc_rsp->capabilityInfo.shortSlotTime)
 		bp->flags |= VDEV_MLME_BSS_PARAM_SHORT_SLOT_TIME;
 	bp->dtim_period = beacon->tim.dtimPeriod;
-	bp->beacon_interval = session_entry->beaconParams.beaconInterval;
+	bp->beacon_interval = bss_desc->beaconInterval;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
