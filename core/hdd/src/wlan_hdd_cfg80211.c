@@ -33470,6 +33470,47 @@ add_key:
 	return errno;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * wlan_hdd_add_key_ndi() - install key for a NAN datapath (NDI) vdev
+ * @hdd_ctx: HDD context
+ * @link_info: Link info pointer
+ * @pairwise: denotes if it's pairwise or group key
+ * @key_index: key index
+ * @mode: vdev device mode, key is added only when this is QDF_NDI_MODE
+ * @peer_mac: peer mac address
+ * @ft_mode: out parameter, set to true if the key install is deferred
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int wlan_hdd_add_key_ndi(struct hdd_context *hdd_ctx,
+				struct wlan_hdd_link_info *link_info,
+				bool pairwise, u8 key_index,
+				enum QDF_OPMODE mode,
+				const uint8_t *peer_mac, bool *ft_mode)
+{
+	if (mode != QDF_NDI_MODE)
+		return 0;
+
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		hdd_debug("NDI standard mode not supported by FW, skip key add");
+		return 0;
+	}
+
+	return wlan_hdd_add_key_sta(hdd_ctx->pdev, link_info, pairwise,
+				    key_index, peer_mac, ft_mode);
+}
+#else
+static inline int wlan_hdd_add_key_ndi(struct hdd_context *hdd_ctx,
+				       struct wlan_hdd_link_info *link_info,
+				       bool pairwise, u8 key_index,
+				       enum QDF_OPMODE mode,
+				       const uint8_t *peer_mac, bool *ft_mode)
+{
+	return 0;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
 wlan_hdd_mlo_link_free_keys(struct wlan_objmgr_psoc *psoc,
@@ -33988,6 +34029,10 @@ done:
 			return 0;
 		break;
 	default:
+		errno = wlan_hdd_add_key_ndi(hdd_ctx, link_info, pairwise,
+					     key_index, adapter->device_mode,
+					     (const uint8_t *)mac_address.bytes,
+					     &ft_mode);
 		break;
 	}
 	if (!errno && (adapter->device_mode != QDF_SAP_MODE))
