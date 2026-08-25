@@ -3136,6 +3136,40 @@ QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id)
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * dp_fisa_rx_fst_purge_queued_elems_for_vdev() - Discard any pending FST
+ *  update work items in fst_update_list that reference the given vdev
+ * @fisa_hdl: handle to FISA context
+ * @vdev: dp_vdev being detached
+ *
+ * Return: None
+ */
+static void
+dp_fisa_rx_fst_purge_queued_elems_for_vdev(struct dp_rx_fst *fisa_hdl,
+					   struct dp_vdev *vdev)
+{
+	struct dp_fisa_rx_fst_update_elem *elem;
+	qdf_list_node_t *cur_node, *next_node;
+	QDF_STATUS status;
+
+	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+	status = qdf_list_peek_front(&fisa_hdl->fst_update_list, &cur_node);
+	while (status == QDF_STATUS_SUCCESS) {
+		elem = (struct dp_fisa_rx_fst_update_elem *)cur_node;
+		status = qdf_list_peek_next(&fisa_hdl->fst_update_list,
+					    cur_node, &next_node);
+		if (elem->vdev == vdev) {
+			dp_info("purging stale FST update elem for vdev %pK action %u",
+				vdev, elem->action_code);
+			qdf_list_remove_node(&fisa_hdl->fst_update_list,
+					     cur_node);
+			qdf_mem_free(elem);
+		}
+		cur_node = next_node;
+	}
+	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+}
+
 QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
@@ -3152,6 +3186,9 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 		dp_err("null vdev by vdev_id %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (vdev->delete.pending)
+		dp_fisa_rx_fst_purge_queued_elems_for_vdev(fisa_hdl, vdev);
 
 	for (i = 0; i < ft_size; i++) {
 		reo_id = sw_ft_entry[i].napi_id;
