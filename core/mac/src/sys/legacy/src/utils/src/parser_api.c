@@ -17545,27 +17545,26 @@ populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 		if (len_remaining < npca_len)
 			goto finalize;
 
-		/* Byte0: primary[3:0], min_duration_thr[7:4] */
-		npca[0] = (uint8_t)(
-			(np->npca_primary_channel & 0x0F) |
-			((np->npca_min_duration_threshold & 0x0F) << 4));
+		/* Byte0: primary_channel[7:0] (11bn D1.5: widened to 8 bits) */
+		npca[0] = (uint8_t)(np->npca_primary_channel & 0xFF);
 
-		/* Byte1: switch_delay[5:0], switch_back_delay(low2)[7:6] */
+		/* Byte1: min_duration_thr[3:0], switch_delay(low4)[7:4] */
 		npca[1] = (uint8_t)(
-				(np->npca_switch_delay & 0x3F) |
-				((np->npca_switch_back_delay & 0x03) << 6));
+			(np->npca_min_duration_threshold & 0x0F) |
+			((np->npca_switch_delay & 0x0F) << 4));
 
-		/* Byte2: switch_back_delay(high4)[3:0], initial_qsrc[5:4],
-		 *        moplen[6], bitmap_present[7]
-		 */
+		/* Byte2: switch_delay(high2)[1:0], switch_back_delay[7:2] */
 		npca[2] = (uint8_t)(
-			((np->npca_switch_back_delay >> 2) & 0x0F) |
-			((np->initial_npca_qsrc & 0x03) << 4) |
-			((np->moplen_npca & 0x01) << 6) |
-			((np->disabled_subchan_bmap_present & 0x01) << 7));
+			((np->npca_switch_delay >> 4) & 0x03) |
+			((np->npca_switch_back_delay & 0x3F) << 2));
 
-		/* Byte3: Reserved (B24..B31) */
-		npca[3] = 0x00;
+		/* Byte3: initial_qsrc[1:0], moplen[2], bitmap_present[3],
+		 *        Reserved[7:4]
+		 */
+		npca[3] = (uint8_t)(
+			(np->initial_npca_qsrc & 0x03) |
+			((np->moplen_npca & 0x01) << 2) |
+			((np->disabled_subchan_bmap_present & 0x01) << 3));
 
 		/* Byte4-5: disabled_subchannel_bitmap (16b) if present */
 		if (np->disabled_subchan_bmap_present && npca_len == 6) {
@@ -17865,12 +17864,16 @@ lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
 		uint64_t npca = 0;
 		qdf_size_t npca_len;
 
-		/* Peek at byte 2 (B23 = disabled_subchan_bmap_present) */
+		/*
+		 * Peek at byte 3 (B27 = disabled_subchan_bmap_present).
+		 * 11bn D1.5: NPCA Primary Channel widened to 8 bits,
+		 * shifting disabled_subchan_bmap_present from B23 to B27.
+		 */
 		if (uhr_op_payload_len < (parsed_len + 4)) {
 			pe_err_rl("UHR payload too short for NPCA base");
 			return QDF_STATUS_E_PROTO;
 		}
-		npca_len = (uhr_op_payload[parsed_len + 2] & BIT(7)) ? 6 : 4;
+		npca_len = (uhr_op_payload[parsed_len + 3] & BIT(3)) ? 6 : 4;
 
 		if (uhr_op_payload_len < (parsed_len + npca_len)) {
 			pe_err_rl("UHR payload too short for NPCA params");
