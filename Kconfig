@@ -1305,6 +1305,10 @@ config THERMAL_STATS_SUPPORT
 	bool "Enable THERMAL_STATS_SUPPORT"
 	default n
 
+config THERMAL_UTIL_THROTTLE_SUPPORT
+	bool "Enable THERMAL_UTIL_THROTTLE_SUPPORT"
+	default n
+
 config TRACE_RECORD_FEATURE
 	bool "Enable TRACE_RECORD_FEATURE"
 	default n

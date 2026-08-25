@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -108,6 +108,21 @@ hdd_thermal_fill_clientid_priority(struct hdd_context *hdd_ctx, uint8_t mon_id,
 }
 #endif
 
+#ifdef THERMAL_UTIL_THROTTLE_SUPPORT
+static inline void
+hdd_thermal_fill_algo_type(struct thermal_mitigation_params *params,
+			   struct wlan_fwol_thermal_temp *thermal_temp)
+{
+	params->algo_type = thermal_temp->thermal_algo_type;
+}
+#else
+static inline void
+hdd_thermal_fill_algo_type(struct thermal_mitigation_params *params,
+			   struct wlan_fwol_thermal_temp *thermal_temp)
+{
+}
+#endif
+
 QDF_STATUS
 hdd_send_thermal_mitigation_val(struct hdd_context *hdd_ctx, uint32_t level,
 				uint8_t mon_id)
@@ -158,6 +173,7 @@ hdd_send_thermal_mitigation_val(struct hdd_context *hdd_ctx, uint32_t level,
 	therm_cfg_params.levelconf[0].tmplwm = target_temp;
 	therm_cfg_params.num_thermal_conf = 1;
 	therm_cfg_params.pdev_id = 0;
+	hdd_thermal_fill_algo_type(&therm_cfg_params, &thermal_temp);
 
 	hdd_thermal_fill_clientid_priority(hdd_ctx, mon_id,
 					   thermal_temp.priority_apps,
@@ -761,6 +777,7 @@ QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx)
 	therm_cfg_params.client_id =
 		hdd_convert_monitor_id_to_wmi_monitor_id(THERMAL_MONITOR_APPS);
 	therm_cfg_params.priority = 0;
+	hdd_thermal_fill_algo_type(&therm_cfg_params, &thermal_temp);
 
 	hdd_debug("dc %d dc_off_per %d enable %d", dc, dc_off_percent, enable);
 

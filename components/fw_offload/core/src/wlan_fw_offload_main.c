@@ -132,6 +132,22 @@ fwol_init_thermal_stats_in_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef THERMAL_UTIL_THROTTLE_SUPPORT
+static void
+fwol_init_thermal_algo_in_cfg(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_fwol_thermal_temp *thermal_temp)
+{
+	thermal_temp->thermal_algo_type =
+				cfg_get(psoc, CFG_THERMAL_ALGO_TYPE);
+}
+#else
+static void
+fwol_init_thermal_algo_in_cfg(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_fwol_thermal_temp *thermal_temp)
+{
+}
+#endif
+
 static void
 fwol_init_thermal_temp_in_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_fwol_thermal_temp *thermal_temp)
@@ -185,6 +201,7 @@ fwol_init_thermal_temp_in_cfg(struct wlan_objmgr_psoc *psoc,
 	thermal_temp->thermal_action =
 				cfg_get(psoc, CFG_THERMAL_MGMT_ACTION);
 	fwol_init_thermal_stats_in_cfg(psoc, thermal_temp);
+	fwol_init_thermal_algo_in_cfg(psoc, thermal_temp);
 }
 
 /**
