@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -655,9 +655,8 @@ int pld_ipci_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	info->board_id = icnss_info.board_id;
 	info->soc_id = icnss_info.soc_id;
 	info->fw_version = icnss_info.fw_version;
-	strlcpy(info->fw_build_timestamp, icnss_info.fw_build_timestamp,
+	strscpy(info->fw_build_timestamp, icnss_info.fw_build_timestamp,
 		sizeof(info->fw_build_timestamp));
-
 	pld_ipci_populate_hw_cap_info(&icnss_info, info);
 
 	return 0;

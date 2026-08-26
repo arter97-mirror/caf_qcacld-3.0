@@ -3562,8 +3562,8 @@ QDF_STATUS wma_process_del_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 static void wma_stats_ext_req_vdev_id_bitmap(struct wlan_objmgr_psoc *psoc,
 					     uint32_t vdev_id, uint32_t *bitmap)
 {
-	struct wlan_objmgr_vdev *vdev, *link_vdev;
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *vdev = NULL, *link_vdev = NULL;
+	struct wlan_mlo_dev_context *mlo_dev_ctx = NULL;
 	uint32_t i, connected_links_bitmap = 0;
 	uint8_t connected_vdev_id;
 
