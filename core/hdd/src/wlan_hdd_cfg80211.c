@@ -2011,7 +2011,7 @@ int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
 }
 
 /* vendor specific events */
-#ifdef WLAN_FEATURE_11BI_SECURITY
+#if defined(WLAN_FEATURE_11BI_SECURITY) || defined(WLAN_FEATURE_11BN_SMD)
 #define FEATURE_EXTERNAL_AUTHENTICATION_EVENT                  \
 [QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH_INDEX] = {            \
 	.vendor_id = QCA_NL80211_VENDOR_ID,                    \
@@ -27746,8 +27746,10 @@ wlan_external_auth_policy[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_STATUS_CODE] = { .type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR] = {
 			.type = NLA_BINARY, .len = ETH_ALEN },
+#ifdef WLAN_FEATURE_11BN_SMD
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_SMD_ID] = {
 			.type = NLA_BINARY, .len = QDF_MAC_ADDR_SIZE },
+#endif
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PTK_KCK] = {
 			.type = NLA_BINARY, .len = MAX_KCK_LEN },
 };
