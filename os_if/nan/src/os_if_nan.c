@@ -2245,6 +2245,52 @@ static void os_if_ndp_end_all_handler(struct wlan_objmgr_vdev *vdev)
 	osif_request_put(request);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * os_if_nan_ndi_peer_delete_rsp_signal() - Signal completion of a pending
+ * NDI peer delete request
+ * @vdev: vdev object on which the NDP peer departed indication was received
+ *
+ * This function signals completion of the waiting thread in
+ * os_if_nan_process_del_sta() once firmware indicates the NDI peer has
+ * actually departed/been deleted.
+ *
+ * Return: none
+ */
+static void os_if_nan_ndi_peer_delete_rsp_signal(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct nan_psoc_priv_obj *psoc_priv;
+	struct osif_request *request;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return;
+	}
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		osif_err("psoc_priv is NULL");
+		return;
+	}
+
+	request = osif_request_get(psoc_priv->ndp_peer_delete_ctx);
+	if (!request) {
+		osif_debug("Obsolete request");
+		return;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+#else
+static inline void
+os_if_nan_ndi_peer_delete_rsp_signal(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 /**
  * os_if_peer_departed_ind_handler() - Handle NDP peer departed indication
  * @vdev: vdev object
@@ -2278,6 +2324,8 @@ static void os_if_peer_departed_ind_handler(struct wlan_objmgr_vdev *vdev,
 	cb_obj.peer_departed_ind(vdev_id, peer_ind->sta_id,
 				&peer_ind->peer_mac_addr,
 				(active_peers == 0 ? true : false));
+
+	os_if_nan_ndi_peer_delete_rsp_signal(vdev);
 
 	/* if no peer left, stop wait timer for NDP_END_ALL` */
 	if (!active_peers)
