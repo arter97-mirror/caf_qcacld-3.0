@@ -4328,53 +4328,47 @@ lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BI_SECURITY
 /*
- * lim_check_11bi_rsnxe_caps() - Validate mandatory 11bi caps in rebuilt RSNXE
+ * lim_mirror_11bi_rsnxe_caps() - Mirror 11bi caps from AP RSNXE into STA RSNXE
  *
- * @rsnxe_caps: pointer to the first cap byte of the rebuilt RSNXE (i.e.
- *              new_rsnxe + SIR_MAC_IE_TYPE_LEN_SIZE), must be at least 4 bytes
+ * @new_rsnxe: rebuilt STA RSNXE buffer (full IE, at least 4 cap bytes)
+ * @ap_rsnxe: AP's full RSNXE IE (with EID+len header), or NULL
+ * @ap_rsnxe_len: length of AP RSNXE IE including type+len header
  * @auth: bitmask of negotiated auth modes
  *
- * Called after memcpy from userspace. Checks that mandatory bits are set:
- *   EPPKE:         KEK_IN_PASN (byte 2) and ASSOC_FRM_ENCRYPTION (byte 3)
- *   8021X_IN_AUTH: DOT1X_OVER_AUTH_FRM (byte 3)
- *
- * Return: true if all required caps are present, false otherwise
+ * For EPPKE: mirrors ASSOC_FRM_ENCRYPTION and KEK_IN_PASN from AP RSNXE.
+ * For 8021X_IN_AUTH: mirrors only ASSOC_FRM_ENCRYPTION; KEK_IN_PASN is
+ * left as-is from supplicant.
  */
-static bool lim_check_11bi_rsnxe_caps(const uint8_t *rsnxe_caps, int32_t auth)
+static void lim_mirror_11bi_rsnxe_caps(uint8_t *new_rsnxe,
+				       const uint8_t *ap_rsnxe,
+				       uint8_t ap_rsnxe_len,
+				       int32_t auth)
 {
-	const uint8_t kek_mask =
-		(uint8_t)(WLAN_CRYPTO_RSNX_CAP_KEK_IN_PASN >> 16);
-	const uint8_t assoc_mask =
+	const uint8_t cap_byte3_mask =
 		(uint8_t)(WLAN_CRYPTO_RSNX_CAP_ASSOC_FRM_ENCRYPTION >> 24);
-	const uint8_t dot1x_mask =
-		(uint8_t)(WLAN_CRYPTO_RSNX_CAP_DOT1X_OVER_AUTH_FRM >> 24);
+	const uint8_t cap_byte2_mask =
+		(uint8_t)(WLAN_CRYPTO_RSNX_CAP_KEK_IN_PASN >> 16);
 
-	if (QDF_HAS_PARAM(auth, WLAN_CRYPTO_AUTH_EPPKE)) {
-		if (!(rsnxe_caps[2] & kek_mask)) {
-			pe_err("EPPKE: KEK_IN_PASN not set in STA RSNXE");
-			return false;
-		}
-		if (!(rsnxe_caps[3] & assoc_mask)) {
-			pe_err("EPPKE: ASSOC_FRM_ENCRYPTION not set in STA RSNXE");
-			return false;
-		}
-	}
+	if (!QDF_HAS_PARAM(auth, WLAN_CRYPTO_AUTH_EPPKE) &&
+	    !QDF_HAS_PARAM(auth, WLAN_CRYPTO_AUTH_8021X_IN_AUTH))
+		return;
 
-	if (QDF_HAS_PARAM(auth, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)) {
-		if (!(rsnxe_caps[3] & dot1x_mask)) {
-			pe_err("8021X_IN_AUTH: DOT1X_OVER_AUTH_FRM not set in STA RSNXE");
-			return false;
-		}
-	}
+	if (!ap_rsnxe || ap_rsnxe_len < 4)
+		return;
 
-	return true;
+	new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE + 3] |=
+		ap_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE + 3] & cap_byte3_mask;
+
+	if (QDF_HAS_PARAM(auth, WLAN_CRYPTO_AUTH_EPPKE))
+		new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE + 2] |=
+			ap_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE + 2] & cap_byte2_mask;
 }
 #else
-static inline bool lim_check_11bi_rsnxe_caps(const uint8_t *rsnxe_caps,
-					     int32_t auth)
-{
-	return true;
-}
+static inline void lim_mirror_11bi_rsnxe_caps(uint8_t *new_rsnxe,
+					      const uint8_t *ap_rsnxe,
+					      uint8_t ap_rsnxe_len,
+					      int32_t auth)
+{}
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
 /*
@@ -4382,15 +4376,20 @@ static inline bool lim_check_11bi_rsnxe_caps(const uint8_t *rsnxe_caps,
  *
  * @rsnx_ie: RSNX IE from userspace (full IE with EID+len header)
  * @length: length of extended RSN cap field to build
+ * @ap_rsnxe: AP's full RSNXE IE, used to mirror 11bi cap bits
+ * @ap_rsnxe_len: length of AP RSNXE IE including type+len header
  * @auth: bitmask of negotiated auth modes
  *
  * This API is used to truncate/rebuild the RSNXE based on the length
  * provided. This length marks the length of the extended RSN cap field.
- * For 11bi connections with length == 4, validates mandatory caps after copy.
+ * For 11bi connections with length == 4, mirrors mandatory cap bits from
+ * the AP's RSNXE into the rebuilt STA RSNXE.
  *
  * Return: Newly constructed RSNX IE, or NULL on failure
  */
 static inline uint8_t *lim_rebuild_rsnxe_cap(uint8_t *rsnx_ie, uint8_t length,
+					     const uint8_t *ap_rsnxe,
+					     uint8_t ap_rsnxe_len,
 					     int32_t auth)
 {
 	const uint8_t *rsnxe_cap;
@@ -4415,12 +4414,9 @@ static inline uint8_t *lim_rebuild_rsnxe_cap(uint8_t *rsnx_ie, uint8_t length,
 	new_rsnxe[SIR_MAC_IE_LEN_OFFSET] = length;
 	qdf_mem_copy(&new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE], rsnxe_cap, length);
 
-	if (length == 4 && lim_is_11bi_auth_mode(auth) &&
-	    !lim_check_11bi_rsnxe_caps(&new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE],
-				       auth)) {
-		qdf_mem_free(new_rsnxe);
-		return NULL;
-	}
+	if (length == 4)
+		lim_mirror_11bi_rsnxe_caps(new_rsnxe, ap_rsnxe, ap_rsnxe_len,
+					   auth);
 
 	/* Now update the new field length in octet 0 for the new length*/
 	new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] =
@@ -4615,7 +4611,8 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 
 rebuild_rsnxe:
 	/* Build the new RSNXE */
-	new_rsnxe = lim_rebuild_rsnxe_cap(rsnxe, len, auth_mode);
+	new_rsnxe = lim_rebuild_rsnxe_cap(rsnxe, len, ap_rsnxe,
+					  ap_rsnxe_len, auth_mode);
 	if (!new_rsnxe) {
 		status = QDF_STATUS_E_FAILURE;
 		goto end;
