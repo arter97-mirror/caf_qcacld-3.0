@@ -33190,6 +33190,56 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	return ret;
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+/**
+ * wlan_hdd_cfg80211_handle_nan_peer() - Dispatch NAN peer params handling
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to network device
+ * @params: Pointer to add station parameter
+ * @errno: Output errno from the NAN peer params handler
+ * @mac_addr: NDI/peer MAC address associated with the request
+ *
+ * Dispatches add_station()/change_station() to the NAN peer params handler
+ * when the target vdev is a NAN Discovery vdev.
+ *
+ * Return: true if the request was consumed by the NAN peer params handler
+ * (caller must return *errno without falling through to legacy/TDLS
+ * add_station/change_station handling), false otherwise
+ */
+static bool wlan_hdd_cfg80211_handle_nan_peer(struct wiphy *wiphy,
+					      struct net_device *dev,
+					      struct station_parameters *params,
+					      int *errno,
+					      struct qdf_mac_addr *mac_addr)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (adapter->device_mode != QDF_NAN_DISC_MODE &&
+	    adapter->device_mode != QDF_NDI_MODE)
+		return false;
+
+	if (adapter->device_mode == QDF_NDI_MODE)
+		os_if_nan_ndi_peer_create(adapter->deflink->vdev_id,
+					  hdd_ctx->psoc, mac_addr);
+
+	*errno = wlan_hdd_cfg80211_nan_peer_params(wiphy, &adapter->wdev,
+						   params, mac_addr);
+
+	return true;
+}
+#else
+static inline bool wlan_hdd_cfg80211_handle_nan_peer(
+					struct wiphy *wiphy,
+					struct net_device *dev,
+					struct station_parameters *params,
+					int *errno,
+					struct qdf_mac_addr *mac_addr)
+{
+	return false;
+}
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)) || \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
 	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
@@ -33225,6 +33275,11 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
 		errno = -EINVAL;
 		goto out;
 	}
+
+	if (wlan_hdd_cfg80211_handle_nan_peer(wiphy, dev, params, &errno,
+					      (struct qdf_mac_addr *)mac))
+		goto out;
+
 	errno = __wlan_hdd_change_station(wiphy, dev, mac, params);
 
 out:
@@ -36695,55 +36750,6 @@ static inline
 uint8_t wlan_hdd_get_link_id(struct station_parameters *params)
 {
 	return 255;
-}
-#endif
-#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
-/**
- * wlan_hdd_cfg80211_handle_nan_peer() - Dispatch NAN peer params handling
- * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
- * @params: Pointer to add station parameter
- * @errno: Output errno from the NAN peer params handler
- * @mac_addr: NDI/peer MAC address associated with the request
- *
- * Dispatches add_station() to the NAN peer params handler when the target
- * vdev is a NAN Discovery vdev.
- *
- * Return: true if the request was consumed by the NAN peer params handler
- * (caller must return *errno without falling through to legacy/TDLS
- * add_station handling), false otherwise
- */
-static bool wlan_hdd_cfg80211_handle_nan_peer(struct wiphy *wiphy,
-					      struct net_device *dev,
-					      struct station_parameters *params,
-					      int *errno,
-					      struct qdf_mac_addr *mac_addr)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	if (adapter->device_mode != QDF_NAN_DISC_MODE &&
-	    adapter->device_mode != QDF_NDI_MODE)
-		return false;
-
-	if (adapter->device_mode == QDF_NDI_MODE)
-		os_if_nan_ndi_peer_create(adapter->deflink->vdev_id,
-					  hdd_ctx->psoc, mac_addr);
-
-	*errno = wlan_hdd_cfg80211_nan_peer_params(wiphy, &adapter->wdev,
-						   params, mac_addr);
-
-	return true;
-}
-#else
-static inline bool wlan_hdd_cfg80211_handle_nan_peer(
-					struct wiphy *wiphy,
-					struct net_device *dev,
-					struct station_parameters *params,
-					int *errno,
-					struct qdf_mac_addr *mac_addr)
-{
-	return false;
 }
 #endif
 
