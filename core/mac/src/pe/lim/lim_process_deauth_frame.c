@@ -96,7 +96,17 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    !(lim_is_sb_disconnect_allowed(pe_session) ||
 	      (pe_session->limMlmState == eLIM_MLM_WT_EXTERNAL_AUTH_STATE &&
-	       pe_session->limSmeState == eLIM_SME_WT_AUTH_STATE))) {
+	       pe_session->limSmeState == eLIM_SME_WT_AUTH_STATE) ||
+	      /*
+	       * Deauth received while waiting for the (Re)Assoc Response must
+	       * be processed so that the join attempt is aborted and the STA
+	       * leaves the (Re)Assoc wait state. Otherwise a subsequent
+	       * (Re)Association Response would be accepted in an
+	       * unauthenticated state.
+	       */
+	      pe_session->limMlmState == eLIM_MLM_WT_ASSOC_RSP_STATE ||
+	      pe_session->limMlmState == eLIM_MLM_WT_REASSOC_RSP_STATE ||
+	      pe_session->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE)) {
 		/*Every 15th deauth frame will be logged in kmsg */
 		if (!(mac->lim.deauthMsgCnt & 0xF)) {
 			pe_debug("received Deauth frame in DEAUTH_WT_STATE"
