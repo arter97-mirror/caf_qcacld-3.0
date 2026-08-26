@@ -4519,6 +4519,85 @@ int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	}
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+
+#define NAN_PEER_DELETE_TIMEOUT_MS 4000
+int os_if_nan_process_del_sta(uint8_t vdev_id,
+			      struct wlan_objmgr_psoc *psoc,
+			      const uint8_t *peer_addr)
+{
+	struct nan_del_sta_params *params;
+	QDF_STATUS status;
+	static const struct osif_request_params req_params = {
+		.priv_size = 0,
+		.timeout_ms = NAN_PEER_DELETE_TIMEOUT_MS,
+	};
+	struct osif_request *request = NULL;
+	int ret;
+
+	if (!psoc || !peer_addr) {
+		osif_err("Invalid input parameters");
+		return -EINVAL;
+	}
+
+	/* Validate peer address is not all zeros */
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_addr)) {
+		osif_err("Invalid peer MAC address (all zeros)");
+		return -EINVAL;
+	}
+
+	/* Allocate request structure */
+	params = qdf_mem_malloc(sizeof(*params));
+	if (!params) {
+		osif_err("Failed to allocate memory for del_sta params");
+		return -ENOMEM;
+	}
+
+	/* Populate parameters */
+	params->vdev_id = vdev_id;
+	params->psoc = psoc;
+	qdf_mem_copy(&params->peer_addr, peer_addr, QDF_MAC_ADDR_SIZE);
+
+	osif_debug("Deleting NAN peer: " QDF_MAC_ADDR_FMT " on vdev %d",
+		   QDF_MAC_ADDR_REF(peer_addr), vdev_id);
+
+	/* Call UCFG layer */
+	status = ucfg_nan_del_sta(psoc, params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to delete NAN peer, status: %d", status);
+		ret = qdf_status_to_os_return(status);
+		goto end;
+	}
+
+	/* Allocate request for waiting on response */
+	request = osif_request_alloc(&req_params);
+	if (!request) {
+		osif_err("Request allocation failure");
+		ret = -ENOMEM;
+		goto end;
+	}
+
+	nan_set_ndp_peer_delete_ctx(psoc, osif_request_cookie(request));
+
+	/* Wait for response */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("NAN peer params request timed out: %d", ret);
+		goto req_cleanup;
+	}
+
+	osif_debug("NDI peer deleted successfully");
+
+req_cleanup:
+	osif_request_put(request);
+	nan_set_ndp_peer_delete_ctx(psoc, NULL);
+
+end:
+	qdf_mem_free(params);
+	return ret;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 #ifdef WLAN_CHIPSET_STATS
 void
 os_if_cstats_log_ndp_initiator_req_evt(struct nan_datapath_initiator_req *req)

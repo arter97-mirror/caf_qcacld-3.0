@@ -36484,6 +36484,46 @@ bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
 }
 #endif
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * wlan_hdd_cfg80211_handle_nan_del_sta() - Dispatch del_station to the NAN
+ * peer deletion handler
+ * @adapter: HDD adapter for the vdev the del_station request targets
+ * @vdev_id: vdev ID for the NAN interface
+ * @psoc: pointer to psoc object
+ * @mac: peer MAC address to delete
+ * @errno: Output errno from the NAN del_sta handler
+ *
+ * Dispatches del_station() to os_if_nan_process_del_sta() when the target
+ * vdev is an NDI vdev.
+ *
+ * Return: true if the request was consumed by the NAN del_sta handler
+ * (caller must return *errno without falling through to legacy
+ * del_station handling), false otherwise
+ */
+static bool wlan_hdd_cfg80211_handle_nan_del_sta(struct hdd_adapter *adapter,
+						 uint8_t vdev_id,
+						 struct wlan_objmgr_psoc *psoc,
+						 uint8_t *mac, int *errno)
+{
+	if (QDF_NDI_MODE != adapter->device_mode)
+		return false;
+
+	*errno = os_if_nan_process_del_sta(vdev_id, psoc, mac);
+
+	return true;
+}
+#else
+static inline bool
+wlan_hdd_cfg80211_handle_nan_del_sta(struct hdd_adapter *adapter,
+				     uint8_t vdev_id,
+				     struct wlan_objmgr_psoc *psoc,
+				     uint8_t *mac, int *errno)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 /**
  * __wlan_hdd_cfg80211_del_station() - delete station v2
  * @wiphy: Pointer to wiphy
@@ -36503,6 +36543,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 	struct hdd_station_info *sta_info;
 	struct wlan_hdd_link_info *link_info;
 	uint8_t vdev_id = adapter->deflink->vdev_id;
+	int ret = 0;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -36523,6 +36564,10 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 	}
 
 	mac = (uint8_t *) param->peerMacAddr.bytes;
+
+	if (wlan_hdd_cfg80211_handle_nan_del_sta(adapter, vdev_id,
+						 hdd_ctx->psoc, mac, &ret))
+		return ret;
 
 	if (QDF_SAP_MODE != adapter->device_mode &&
 	    QDF_P2P_GO_MODE != adapter->device_mode)

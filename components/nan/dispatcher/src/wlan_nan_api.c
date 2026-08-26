@@ -147,4 +147,10 @@ bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return target_if_nan_is_fw_support_standard_mode(psoc);
 }
+
+void wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
+				       const struct qdf_mac_addr *peer_mac)
+{
+	nan_handle_ndi_peer_departed(vdev, peer_mac);
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

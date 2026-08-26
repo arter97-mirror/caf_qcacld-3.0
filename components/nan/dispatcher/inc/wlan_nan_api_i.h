@@ -237,11 +237,32 @@ wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
  * Return: true if NAN standard mode supported by FW otherwise false
  */
 bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_nan_handle_ndi_peer_departed() - wrapper API for function
+ * "nan_handle_ndi_peer_departed"
+ * @vdev: NDI vdev from which the peer departed
+ * @peer_mac: MAC address of the departed peer
+ *
+ * Should be called from the Del STA path after confirming no active
+ * peers remain. Mirrors the cleanup performed by nan_handle_end_ind()
+ * for the FW-initiated NDP_END_IND path.
+ *
+ * Return: none
+ */
+void wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
+				       const struct qdf_mac_addr *peer_mac);
 #else
 static inline bool
 tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline void
+wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
+				  const struct qdf_mac_addr *peer_mac)
+{
 }
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */

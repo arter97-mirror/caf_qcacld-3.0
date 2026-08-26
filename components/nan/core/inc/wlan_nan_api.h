@@ -607,5 +607,41 @@ nan_get_ndp_peer_create_ctx(struct wlan_objmgr_psoc *psoc)
 
 	return nan_obj->ndp_peer_create_ctx;
 }
+
+/**
+ * nan_set_ndp_peer_delete_ctx() - cache the NDI peer delete request cookie
+ * @psoc: pointer to PSOC object
+ * @ctx: osif_request cookie to cache, or NULL to clear it
+ *
+ * Return: None
+ */
+static inline void
+nan_set_ndp_peer_delete_ctx(struct wlan_objmgr_psoc *psoc, void *ctx)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj)
+		return;
+
+	nan_obj->ndp_peer_delete_ctx = ctx;
+}
+
+/**
+ * nan_get_ndp_peer_delete_ctx() - retrieve the cached NDI peer delete
+ * request cookie
+ * @psoc: pointer to PSOC object
+ *
+ * Return: cached osif_request cookie, or NULL
+ */
+static inline void *
+nan_get_ndp_peer_delete_ctx(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj)
+		return NULL;
+
+	return nan_obj->ndp_peer_delete_ctx;
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_API_H_ */

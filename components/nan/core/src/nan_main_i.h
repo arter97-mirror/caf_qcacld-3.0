@@ -163,6 +163,7 @@ struct nan_cfg_params {
  * @nan_peer_sched_ctx: NAN peer schedule request context
  * @nan_peer_params_ctx: NAN peer params request context
  * @ndp_peer_create_ctx: NDI peer create request context
+ * @ndp_peer_delete_ctx: NDI peer delete request context
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -190,6 +191,7 @@ struct nan_psoc_priv_obj {
 	void *nan_peer_sched_ctx;
 	void *nan_peer_params_ctx;
 	void *ndp_peer_create_ctx;
+	void *ndp_peer_delete_ctx;
 #endif
 };
 
@@ -701,6 +703,31 @@ QDF_STATUS nan_req_peer_params(struct nan_peer_params_req *req);
 QDF_STATUS nan_ndi_peer_create_req(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id,
 				   struct qdf_mac_addr *peer_mac);
+
+/**
+ * nan_del_sta() - Delete NAN data path peer
+ * @params: Pointer to station deletion parameters
+ *
+ * This function handles the deletion of a NAN datapath peer by calling
+ * the existing lim_ndp_delete_peers_by_addr_converged callback.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS nan_del_sta(struct nan_del_sta_params *params);
+
+/**
+ * nan_handle_ndi_peer_departed() - policy_mgr and primary connection
+ * cleanup on NDI STA deletion
+ * @vdev: vdev on which the peer departed
+ * @peer_mac: MAC address of the departing peer
+ *
+ * Mirrors the cleanup done by nan_handle_end_ind() when a STA deletion
+ * event (NDP_PEER_DEPARTED) is received on the NDI interface.
+ *
+ * Return: none
+ */
+void nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
+				  const struct qdf_mac_addr *peer_mac);
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

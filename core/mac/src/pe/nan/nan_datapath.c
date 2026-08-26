@@ -356,6 +356,8 @@ void lim_process_ndi_del_sta_rsp(struct mac_context *mac_ctx,
 	ucfg_nan_datapath_event_handler(psoc, vdev, NDP_PEER_DEPARTED,
 					&peer_ind);
 
+	wlan_nan_handle_ndi_peer_departed(vdev, &peer_ind.peer_mac_addr);
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 	/*

@@ -3770,4 +3770,78 @@ bool nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return tgt_nan_is_fw_support_standard_mode(psoc);
 }
+
+QDF_STATUS nan_del_sta(struct nan_del_sta_params *params)
+{
+	struct nan_callbacks cb_obj;
+	QDF_STATUS status;
+
+	if (!params || !params->psoc) {
+		nan_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Validate peer MAC address */
+	if (qdf_is_macaddr_zero(&params->peer_addr) ||
+	    qdf_is_macaddr_broadcast(&params->peer_addr)) {
+		nan_err("Invalid peer MAC address");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Get callbacks */
+	status = ucfg_nan_get_callbacks(params->psoc, &cb_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to get callbacks, status: %d", status);
+		return status;
+	}
+
+	/* Verify delete_peers_by_addr callback is registered */
+	if (!cb_obj.delete_peers_by_addr) {
+		nan_err("delete_peers_by_addr callback not registered");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Call the existing LIM callback to delete the peer */
+	cb_obj.delete_peers_by_addr(params->vdev_id, params->peer_addr);
+
+	nan_debug("NDP peer deletion initiated successfully");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
+				  const struct qdf_mac_addr *peer_mac)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct nan_vdev_priv_obj *vdev_nan_obj;
+
+	if (!vdev || !peer_mac) {
+		nan_err("Invalid params: vdev or peer_mac is NULL");
+		return;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		nan_err("psoc is NULL");
+		return;
+	}
+
+	if (!nan_is_fw_support_standard_mode(psoc)) {
+		nan_debug("NAN standard mode is not supportedi by FW");
+		return;
+	}
+
+	vdev_nan_obj = nan_get_vdev_priv_obj(vdev);
+	if (!vdev_nan_obj) {
+		nan_err("vdev_nan_obj is NULL");
+		return;
+	}
+
+	/* ndp_init_done is false if nan_handle_end_ind() already cleaned up */
+	if (!vdev_nan_obj->ndp_init_done)
+		return;
+
+	if (qdf_is_macaddr_equal(&vdev_nan_obj->primary_peer_mac, peer_mac))
+		ndi_remove_and_update_primary_connection(psoc, vdev);
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */

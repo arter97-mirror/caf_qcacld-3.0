@@ -263,6 +263,21 @@ int os_if_nan_process_peer_params(uint8_t vdev_id,
 int os_if_nan_ndi_peer_create(uint8_t vdev_id,
 			      struct wlan_objmgr_psoc *psoc,
 			      struct qdf_mac_addr *peer_mac);
+
+/**
+ * os_if_nan_process_del_sta() - Process station deletion request
+ * @vdev_id: VDEV ID for the NAN interface
+ * @psoc: Pointer to psoc object
+ * @peer_addr: MAC address of peer to delete
+ *
+ * This function processes a station deletion request from cfg80211/netlink
+ * and forwards it to the NAN core layer.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_process_del_sta(uint8_t vdev_id,
+			      struct wlan_objmgr_psoc *psoc,
+			      const uint8_t *peer_addr);
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**

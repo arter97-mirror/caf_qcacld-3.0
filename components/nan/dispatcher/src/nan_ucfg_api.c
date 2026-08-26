@@ -2099,4 +2099,22 @@ bool ucfg_nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
 {
 	return nan_is_peer_exist_for_opmode(psoc, peer_mac_addr, opmode);
 }
+
+QDF_STATUS ucfg_nan_del_sta(struct wlan_objmgr_psoc *psoc,
+			    struct nan_del_sta_params *params)
+{
+	QDF_STATUS status;
+
+	if (!psoc || !params) {
+		nan_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Call nan_del_sta directly instead of posting to scheduler */
+	status = nan_del_sta(params);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("Failed to delete NDP peer, status: %d", status);
+
+	return status;
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

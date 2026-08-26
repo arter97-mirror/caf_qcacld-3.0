@@ -1093,6 +1093,18 @@ struct nan_peer_params_rsp {
 	uint8_t vdev_id;
 	uint32_t status;
 };
+
+/**
+ * struct nan_del_sta_params - NAN delete station parameters
+ * @vdev_id: VDEV ID
+ * @psoc: PSOC object
+ * @peer_addr: MAC address of the peer to delete
+ */
+struct nan_del_sta_params {
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+	struct qdf_mac_addr peer_addr;
+};
 #endif
 
 /**

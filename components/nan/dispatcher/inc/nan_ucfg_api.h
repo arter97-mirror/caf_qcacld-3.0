@@ -779,6 +779,18 @@ QDF_STATUS ucfg_nan_ndi_peer_create(struct wlan_objmgr_psoc *psoc,
 bool ucfg_nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
 				       struct qdf_mac_addr *peer_mac_addr,
 				       enum QDF_OPMODE opmode);
+
+/**
+ * ucfg_nan_del_sta() - Delete NAN data path peer
+ * @psoc: Pointer to PSOC object
+ * @params: Pointer to station deletion parameters
+ *
+ * This function forwards the station deletion request to the NAN core layer.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS ucfg_nan_del_sta(struct wlan_objmgr_psoc *psoc,
+			    struct nan_del_sta_params *params);
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 #ifdef NDP_TX_BW_FLOW_CTRL
