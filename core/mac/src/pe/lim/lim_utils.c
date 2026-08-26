@@ -6539,7 +6539,8 @@ uint8_t lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 	 * update_ind_in_tim B32-B35 (high 4 bits) at w2[3:0]
 	 * bounded_ess B36 at w2[4], btm_assurance B37 at w2[5]
 	 * cobf_support B38 at w2[6], co_sr_support B39 at w2[7]
-	 * mapc_enh_meas_support B40 at w2[8], B41-B47 reserved = 0
+	 * mapc_enh_meas_support B40 at w2[8], hg_rtwt_support B41 at w2[9]
+	 * extended_channel_usage_support B42 at w2[10], B43-B47 reserved = 0
 	 */
 	w2 |= (uint16_t)((dot11_cap.update_ind_in_tim >> 1) & 0x0F) << 0;
 	w2 |= (uint16_t)(dot11_cap.bounded_ess & 0x1) << 4;
@@ -6547,6 +6548,8 @@ uint8_t lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 	w2 |= (uint16_t)(dot11_cap.cobf_support & 0x1) << 6;
 	w2 |= (uint16_t)(dot11_cap.co_sr_support & 0x1) << 7;
 	w2 |= (uint16_t)(dot11_cap.mapc_enh_meas_support & 0x1) << 8;
+	w2 |= (uint16_t)(dot11_cap.hg_rtwt_support & 0x1) << 9;
+	w2 |= (uint16_t)(dot11_cap.extended_channel_usage_support & 0x1) << 10;
 	*p++ = w2 & 0xff;
 	*p++ = (w2 >> 8) & 0xff;
 
@@ -6586,13 +6589,13 @@ uint8_t lim_set_uhr_caps(struct mac_context *mac, uint8_t *ie_start,
 	qdf_mem_copy(p, &phy, WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN);
 	p += WLAN_UHR_CAP_PHY_FIXED_FIELD_LEN;
 
-	/* DBE Capability Parameters (variable: 1, 4, or 7 bytes) */
+	/* DBE Capability Parameters (variable: 0, 3, 7, or 11 bytes) */
 	if (dot11_cap.dbe_support) {
 		uint8_t dbe_ctrl = dot11_cap.dbe_param[0];
 		uint8_t mcs160_present = (dbe_ctrl >> 3) & 0x1;
 		uint8_t mcs320_present = (dbe_ctrl >> 4) & 0x1;
-		uint8_t dbe_len = 1 + (mcs160_present ? 3 : 0) +
-				  (mcs320_present ? 3 : 0);
+		uint8_t dbe_len = 3 + (mcs160_present ? 4 : 0) +
+				  (mcs320_present ? 4 : 0);
 
 		if ((ie_start + num_bytes) - p < dbe_len)
 			goto done;
