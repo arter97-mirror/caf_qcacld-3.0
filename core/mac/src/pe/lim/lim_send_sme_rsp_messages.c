@@ -2125,7 +2125,12 @@ static void lim_csa_update_channel_width_for_dot11mode(
 	enum phy_ch_width max_ch_width;
 
 	max_ch_width = lim_get_max_channel_width_from_dot11mode(
-						session_entry->dot11mode);
+			session_entry->dot11mode);
+
+	if (wlan_reg_is_24ghz_ch_freq(csa_params->csa_chan_freq))
+		max_ch_width = qdf_min(max_ch_width, CH_WIDTH_40MHZ);
+	else if (wlan_reg_is_5ghz_ch_freq(csa_params->csa_chan_freq))
+		max_ch_width = qdf_min(max_ch_width, CH_WIDTH_160MHZ);
 
 	/* If AP wants to set in 80 + 80 BW, do not change to 160 MHz */
 	if (csa_params->new_ch_width == CH_WIDTH_80P80MHZ &&
@@ -2195,7 +2200,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
 
-	lim_csa_update_channel_width_for_dot11mode(session_entry, csa_params);
+	lim_csa_update_channel_width_for_dot11mode(session_entry,
+						   csa_params);
 	ch_params.ch_width = csa_params->new_ch_width;
 
 	if (IS_DOT11_MODE_EHT(session_entry->dot11mode))
