@@ -2785,10 +2785,25 @@ lim_del_sta(struct mac_context *mac,
 		pDelStaParams->respReqd = 0;
 	else {
 		if (!(IS_TDLS_PEER(sta->staType))) {
+			/* Skip duplicate NDI peer delete triggered by racing
+			 * NAN events while a prior delete is still pending.
+			 */
+			if (sta->staType == STA_ENTRY_NDI_PEER) {
+				if (GET_LIM_STA_CONTEXT_MLM_STATE(sta) ==
+						eLIM_MLM_WT_DEL_STA_RSP_STATE) {
+					pe_debug("Delete STA pending for "
+						 QDF_MAC_ADDR_FMT,
+						 QDF_MAC_ADDR_REF
+							(sta->staAddr));
+					qdf_mem_free(pDelStaParams);
+					return QDF_STATUS_SUCCESS;
+				}
+				SET_LIM_STA_CONTEXT_MLM_STATE(sta,
+					 eLIM_MLM_WT_DEL_STA_RSP_STATE);
 			/* when lim_del_sta is called from processSmeAssocCnf
 			 * then mlmState is already set properly. */
-			if (eLIM_MLM_WT_ASSOC_DEL_STA_RSP_STATE !=
-				GET_LIM_STA_CONTEXT_MLM_STATE(sta)) {
+			} else if (eLIM_MLM_WT_ASSOC_DEL_STA_RSP_STATE !=
+				   GET_LIM_STA_CONTEXT_MLM_STATE(sta)) {
 				MTRACE(mac_trace
 					(mac, TRACE_CODE_MLM_STATE,
 					 pe_session->peSessionId,
