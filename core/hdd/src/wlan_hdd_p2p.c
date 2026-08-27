@@ -418,6 +418,55 @@ int wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	return errno;
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_get_ml_sap_link_info_by_frame_da() - resolve the SAP link_info owning
+ * the peer a mgmt frame is addressed to
+ * @adapter: SAP adapter
+ * @buf: outgoing 802.11 mgmt frame (starts with the frame header)
+ *
+ * When a Multi-Link SAP mgmt-tx request doesn't carry a resolvable MLO
+ * link_id, don't guess via deflink — look up which link vdev the
+ * destination peer actually belongs to.
+ *
+ * Return: matching link_info, or NULL if the peer/vdev can't be resolved
+ */
+static struct wlan_hdd_link_info *
+hdd_get_ml_sap_link_info_by_frame_da(struct hdd_adapter *adapter,
+				     const uint8_t *buf)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_frame_hdr *wh = (struct wlan_frame_hdr *)buf;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info = NULL;
+
+	peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc, wh->i_addr1,
+					   WLAN_OSIF_P2P_ID);
+	if (!peer)
+		return NULL;
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (vdev)
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+						      wlan_vdev_get_id(vdev));
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_P2P_ID);
+
+	if (link_info && link_info->adapter != adapter)
+		link_info = NULL;
+
+	return link_info;
+}
+#else
+static inline struct wlan_hdd_link_info *
+hdd_get_ml_sap_link_info_by_frame_da(struct hdd_adapter *adapter,
+				     const uint8_t *buf)
+{
+	return NULL;
+}
+#endif
+
 #define WLAN_AUTH_FRAME_MIN_LEN 2
 static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      struct ieee80211_channel *chan, bool offchan,
@@ -455,7 +504,16 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		return -EINVAL;
 	}
 
-	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	link_info = NULL;
+	if (adapter->device_mode == QDF_SAP_MODE && link_id == -1 &&
+	    buf && len >= sizeof(struct wlan_frame_hdr))
+		link_info = hdd_get_ml_sap_link_info_by_frame_da(adapter, buf);
+	if (!link_info)
+		link_info = hdd_get_link_info_by_link_id(adapter, link_id);
 	if (!link_info) {
 		hdd_err("invalid link_info");
 		return -EINVAL;
@@ -463,10 +521,6 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
-
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret)
-		return ret;
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(buf[0]);
