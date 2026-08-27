@@ -1832,15 +1832,21 @@ void lim_extract_ht_caps_txrx_nss(uint8_t *mcs_set, uint8_t *tx_nss,
 void lim_update_dot11f_vht_caps_for_nss(tDot11fIEVHTCaps *vht_cap,
 					uint8_t tx_nss, uint8_t rx_nss)
 {
-	enum phy_ch_width ch_width;
-
 	vht_cap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(tx_nss);
 	vht_cap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(rx_nss);
-	ch_width = (vht_cap->supportedChannelWidthSet >= VHT_CAP_160_SUPP) ?
-			CH_WIDTH_160MHZ : CH_WIDTH_80MHZ;
-	pe_debug("ch_width %d", ch_width);
-	vht_cap->txSupDataRate = VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width, tx_nss, true);
-	vht_cap->rxHighSupDataRate = VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width, rx_nss, true);
+	/*
+	 * Per 802.11 spec, a value of 0 for the Tx/Rx Highest Supported Long
+	 * GI Data Rate subfields means they do not specify the highest long
+	 * GI VHT PPDU data rate the STA is able to transmit/receive; support
+	 * is instead conveyed entirely via the Tx/Rx VHT-MCS Map (see
+	 * 10.6.13.1). Advertising a bandwidth-derived value here is not
+	 * required and, since this function can run while ch_width is
+	 * temporarily elevated for capability advertisement, can advertise a
+	 * rate the STA is not currently operating at. CR 4649799 (WFA
+	 * VHT-5.2.54).
+	 */
+	vht_cap->txSupDataRate = 0;
+	vht_cap->rxHighSupDataRate = 0;
 }
 
 void lim_sym_dot11f_vht_mcs_nss(tDot11fIEVHTCaps *vht_cap,
