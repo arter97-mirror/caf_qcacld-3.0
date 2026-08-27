@@ -10690,6 +10690,50 @@ QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+#define MAX_VDEV_BMISS_TIMEOUT_PARAMS 2
+/**
+ * wma_config_bmiss_timeout_params() - send bmiss timeout vdev params to
+ * firmware
+ * @vdev_id: virtual device for the command
+ * @timeout_sec: bmiss timeout value in seconds, applied to both WOW
+ * (sleep) and non-WOW (active) modes
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_config_bmiss_timeout_params(uint32_t vdev_id,
+					   uint32_t timeout_sec)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dev_set_param setparam[MAX_VDEV_BMISS_TIMEOUT_PARAMS] = {};
+	uint8_t index = 0;
+
+	if (!wma_handle)
+		return QDF_STATUS_E_INVAL;
+
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_final_bmiss_time_sec,
+					   timeout_sec, index++,
+					   MAX_VDEV_BMISS_TIMEOUT_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
+
+	status = mlme_check_index_setparam(
+			setparam,
+			wmi_vdev_param_final_bmiss_time_wow_sec,
+			timeout_sec, index++,
+			MAX_VDEV_BMISS_TIMEOUT_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
+
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     vdev_id, setparam, index);
+error:
+	return status;
+}
+#endif
+
 QDF_STATUS wma_get_rx_chainmask(uint8_t pdev_id, uint32_t *chainmask_2g,
 				uint32_t *chainmask_5g)
 {

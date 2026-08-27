@@ -2448,6 +2448,19 @@ QDF_STATUS wma_get_chain_rssi(tp_wma_handle wma_handle,
 QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
 		uint32_t final_cnt);
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+/**
+ * wma_config_bmiss_timeout_params() - set bmiss timeout parameters
+ * @vdev_id: virtual device for the command
+ * @timeout_sec: bmiss timeout value in seconds, applied to both WOW
+ * (sleep) and non-WOW (active) modes
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_config_bmiss_timeout_params(uint32_t vdev_id,
+					   uint32_t timeout_sec);
+#endif
+
 #ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
 /**
  * wma_check_and_set_wake_timer(): checks all interfaces and if any interface

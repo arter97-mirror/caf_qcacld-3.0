@@ -3210,6 +3210,24 @@ QDF_STATUS sme_process_msg_callback(struct mac_context *mac,
 QDF_STATUS sme_set_bmiss_bcnt(uint32_t vdev_id, uint32_t first_cnt,
 		uint32_t final_cnt);
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+/**
+ * sme_set_bmiss_timeout_sec() - dynamically set beacon-miss disconnect
+ * timeout, independent of the RSO/roam-update pipeline
+ * @vdev_id: virtual device for the command
+ * @value: beacon-miss timeout in seconds, applied to both WOW and non-WOW
+ *
+ * Always caches @value in the psoc-scoped mlme cfg.lfr fields under the SME
+ * global lock. If the vdev is up (connected, roaming, or suspended), also
+ * sends the value to firmware immediately via a direct WMI vdev-param send.
+ * If the vdev is not yet up, the cache-only write is picked up automatically
+ * by the existing cm_roam_start_req() path at next connect.
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_set_bmiss_timeout_sec(uint8_t vdev_id, uint8_t value);
+#endif
+
 /**
  * sme_send_limit_off_channel_params() - send limit off channel parameters
  * @mac_handle: Opaque handle to the global MAC context

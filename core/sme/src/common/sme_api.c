@@ -15810,6 +15810,50 @@ QDF_STATUS sme_set_bmiss_bcnt(uint32_t vdev_id, uint32_t first_cnt,
 	return wma_config_bmiss_bcnt_params(vdev_id, first_cnt, final_cnt);
 }
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+QDF_STATUS sme_set_bmiss_timeout_sec(uint8_t vdev_id, uint8_t value)
+{
+	QDF_STATUS status;
+	struct mac_context *mac_ctx = sme_get_mac_context();
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!mac_ctx) {
+		sme_err("mac_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = wlan_mlme_set_bmiss_timeout_in_secs_on_wakeup(mac_ctx->psoc,
+							       value);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto release_lock;
+
+	status = wlan_mlme_set_bmiss_timeout_in_secs_on_sleep(mac_ctx->psoc,
+							      value);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto release_lock;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		status = QDF_STATUS_E_INVAL;
+		goto release_lock;
+	}
+
+	if (QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev)))
+		status = wma_config_bmiss_timeout_params(vdev_id, value);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+release_lock:
+	sme_release_global_lock(&mac_ctx->sme);
+	return status;
+}
+#endif
+
 QDF_STATUS sme_send_limit_off_channel_params(mac_handle_t mac_handle,
 					     uint8_t vdev_id,
 					     bool is_tos_active,
