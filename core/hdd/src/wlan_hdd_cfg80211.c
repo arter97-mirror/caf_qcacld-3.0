@@ -28808,6 +28808,240 @@ static int wlan_hdd_cfg80211_get_power_stats(
 }
 #endif /* WLAN_FEATURE_POWER_STATISTICS */
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+static const struct nla_policy
+wlan_hdd_sta_beacon_config_policy[WIFI_STA_BEACON_CONFIG_ATTR_MAX + 1] = {
+	[WIFI_STA_BEACON_CONFIG_ATTR_MISS_TIMEOUT_SEC] = {.type = NLA_U32 },
+};
+
+/**
+ * __wlan_hdd_cfg80211_set_sta_beacon_config() - Set STA beacon-miss
+ * disconnect threshold
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data
+ * @data_len: vendor command data length
+ *
+ * Sets the beacon-miss disconnect threshold for the associated STA vdev via
+ * sme_set_bmiss_timeout_sec(), applied identically to WOW and non-WOW modes
+ * (FUNC_REQ_1). Only allowed on a STA-mode adapter (FUNC_REQ_4). Rejects
+ * values above the host INI-derived maximum without modifying the current
+ * threshold (FUNC_REQ_3 / ERR_REQ_2).
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+__wlan_hdd_cfg80211_set_sta_beacon_config(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev;
+	struct hdd_adapter *adapter;
+	struct nlattr *tb[WIFI_STA_BEACON_CONFIG_ATTR_MAX + 1];
+	uint32_t miss_timeout_sec;
+	int ret;
+
+	if (!wdev || !wdev->netdev) {
+		hdd_err("Invalid wdev or netdev");
+		return -EINVAL;
+	}
+	dev = wdev->netdev;
+
+	hdd_enter_dev(dev);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_err_rl("command not allowed in %d mode, vdev_id: %d",
+			   adapter->device_mode, adapter->deflink->vdev_id);
+		return -EINVAL;
+	}
+
+	ret = wlan_cfg80211_nla_parse(tb, WIFI_STA_BEACON_CONFIG_ATTR_MAX,
+				      data, data_len,
+				      wlan_hdd_sta_beacon_config_policy);
+	if (ret) {
+		hdd_err("Invalid ATTR");
+		return -EINVAL;
+	}
+
+	if (!tb[WIFI_STA_BEACON_CONFIG_ATTR_MISS_TIMEOUT_SEC]) {
+		hdd_err("attr miss_timeout_sec failed");
+		return -EINVAL;
+	}
+
+	miss_timeout_sec =
+		nla_get_u32(tb[WIFI_STA_BEACON_CONFIG_ATTR_MISS_TIMEOUT_SEC]);
+
+	if (miss_timeout_sec > cfg_max(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP)) {
+		hdd_err_rl("miss_timeout_sec %u exceeds max %u",
+			   miss_timeout_sec,
+			   cfg_max(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP));
+		return -EINVAL;
+	}
+
+	hdd_debug("vdev_id %d: setting beacon-miss timeout to %u sec",
+		  adapter->deflink->vdev_id, miss_timeout_sec);
+
+	if (QDF_IS_STATUS_ERROR(sme_set_bmiss_timeout_sec(
+					adapter->deflink->vdev_id,
+					(uint8_t)miss_timeout_sec)))
+		return -EINVAL;
+
+	hdd_exit();
+	return 0;
+}
+
+/**
+ * wlan_hdd_cfg80211_set_sta_beacon_config() - Set STA beacon-miss threshold
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data
+ * @data_len: vendor command data length
+ *
+ * Wrapper function of __wlan_hdd_cfg80211_set_sta_beacon_config() providing
+ * per-vdev SSR protection.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_cfg80211_set_sta_beacon_config(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_sta_beacon_config(wiphy, wdev,
+							  data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * __wlan_hdd_cfg80211_get_sta_beacon_config() - Get STA beacon-miss
+ * disconnect threshold
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data (unused)
+ * @data_len: vendor command data length (unused)
+ *
+ * Returns the currently cached beacon-miss disconnect threshold for the
+ * associated STA vdev (FUNC_REQ_2). Only allowed on a STA-mode adapter
+ * (FUNC_REQ_4).
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+__wlan_hdd_cfg80211_get_sta_beacon_config(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev;
+	struct hdd_adapter *adapter;
+	struct sk_buff *skb;
+	uint8_t miss_timeout_sec;
+	int ret;
+
+	if (!wdev || !wdev->netdev) {
+		hdd_err("Invalid wdev or netdev");
+		return -EINVAL;
+	}
+	dev = wdev->netdev;
+
+	hdd_enter_dev(dev);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_err_rl("command not allowed in %d mode, vdev_id: %d",
+			   adapter->device_mode, adapter->deflink->vdev_id);
+		return -EINVAL;
+	}
+
+	wlan_mlme_get_bmiss_timeout_on_wakeup(hdd_ctx->psoc,
+					      &miss_timeout_sec);
+
+	hdd_debug("vdev_id %d: miss_timeout_sec %u",
+		  adapter->deflink->vdev_id, miss_timeout_sec);
+
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(
+			wiphy, NLA_HDRLEN + NLA_ALIGN(sizeof(uint32_t)));
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return -ENOMEM;
+	}
+
+	if (nla_put_u32(skb, WIFI_STA_BEACON_CONFIG_ATTR_MISS_TIMEOUT_SEC,
+			miss_timeout_sec)) {
+		hdd_err("nla put fail");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	ret = wlan_cfg80211_vendor_cmd_reply(skb);
+
+	hdd_exit();
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_get_sta_beacon_config() - Get STA beacon-miss threshold
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data
+ * @data_len: vendor command data length
+ *
+ * Wrapper function of __wlan_hdd_cfg80211_get_sta_beacon_config() providing
+ * per-vdev SSR protection.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_cfg80211_get_sta_beacon_config(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_sta_beacon_config(wiphy, wdev,
+							  data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* WLAN_FEATURE_STA_BEACON_LOSS_CONFIG */
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -28847,6 +29081,27 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 			 WIPHY_VENDOR_CMD_NEED_NETDEV |
 			 WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_get_power_stats,
+		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
+	},
+#endif
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+	{
+		.info.vendor_id = ANDROID_OUI,
+		.info.subcmd = ANDROID_NL80211_SUBCMD_SET_STA_BEACON_CONFIG,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_set_sta_beacon_config,
+		vendor_command_policy(wlan_hdd_sta_beacon_config_policy,
+				      WIFI_STA_BEACON_CONFIG_ATTR_MAX)
+	},
+	{
+		.info.vendor_id = ANDROID_OUI,
+		.info.subcmd = ANDROID_NL80211_SUBCMD_GET_STA_BEACON_CONFIG,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_get_sta_beacon_config,
 		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
 	},
 #endif

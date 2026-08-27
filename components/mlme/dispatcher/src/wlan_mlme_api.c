@@ -6940,6 +6940,38 @@ wlan_mlme_get_bmiss_timeout_on_sleep(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+QDF_STATUS
+wlan_mlme_set_bmiss_timeout_in_secs_on_wakeup(struct wlan_objmgr_psoc *psoc,
+					      uint8_t val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.lfr.beaconloss_timeout_onwakeup = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_set_bmiss_timeout_in_secs_on_sleep(struct wlan_objmgr_psoc *psoc,
+					     uint8_t val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.lfr.beaconloss_timeout_onsleep = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS
 wlan_mlme_get_roam_bmiss_first_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val)

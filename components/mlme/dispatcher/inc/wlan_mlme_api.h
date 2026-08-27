@@ -4523,6 +4523,32 @@ QDF_STATUS
 wlan_mlme_get_bmiss_timeout_on_sleep(struct wlan_objmgr_psoc *psoc,
 				     uint8_t *val);
 
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+/**
+ * wlan_mlme_set_bmiss_timeout_in_secs_on_wakeup() - Set bmiss timeout for
+ * non-WOW (active) mode
+ * @psoc: pointer to psoc object
+ * @val:  value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_bmiss_timeout_in_secs_on_wakeup(struct wlan_objmgr_psoc *psoc,
+					      uint8_t val);
+
+/**
+ * wlan_mlme_set_bmiss_timeout_in_secs_on_sleep() - Set bmiss timeout for WOW
+ * (sleep) mode
+ * @psoc: pointer to psoc object
+ * @val:  value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_bmiss_timeout_in_secs_on_sleep(struct wlan_objmgr_psoc *psoc,
+					     uint8_t val);
+#endif
+
 /**
  * wlan_mlme_adaptive_11r_enabled() - check if adaptive 11r feature is enaled
  * or not
