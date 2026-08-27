@@ -353,7 +353,6 @@ wlan_cm_tgt_send_roam_scan_offload_rssi_params(
 	if (!roam_tx_ops || !roam_tx_ops->send_roam_scan_offload_rssi_params) {
 		mlme_err("vdev %d send_roam_scan_offload_rssi_params is NULL",
 			 vdev_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
 
