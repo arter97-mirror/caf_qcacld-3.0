@@ -9725,7 +9725,30 @@ wlan_hdd_update_mlo_rate_info(struct wlan_hdd_station_stats_info *hdd_sinfo,
 
 	qdf_mem_copy(&hdd_sinfo->rxrate,
 		     &sinfo->rxrate, sizeof(sinfo->rxrate));
-	hdd_sinfo->filled = sinfo->filled;
+	/*
+	 * Despite the name, this is the only place in the MLO aggregation
+	 * path that sets hdd_sinfo->filled bits for byte/packet counters
+	 * (rx/tx bytes, packets, retries, failed, mpdu count, fcs errors,
+	 * rx_dropped_misc) -- wlan_hdd_update_mlo_sinfo() accumulates their
+	 * *values* but never sets their filled bits itself. So this must
+	 * stay a broad copy of sinfo->filled, NOT a narrow rate-only
+	 * whitelist (a prior fix here that restricted this to just
+	 * SIGNAL/SIGNAL_AVG/CHAIN_SIGNAL_AVG/TX_BITRATE/RX_BITRATE fixed
+	 * beacon_interval/dtim_period but silently dropped the byte/packet
+	 * fields from "iw station dump" for MLO connections).
+	 *
+	 * The only bit that must NOT be blindly copied here is
+	 * HDD_INFO_BSS_PARAM: this function runs on the first (best-RSSI)
+	 * link considered in the aggregation loop -- trivially true for
+	 * link #1, since hdd_sinfo->signal starts at WLAN_INVALID_RSSI_VALUE
+	 * -- so copying that bit here would mark BSS_PARAM as "already
+	 * merged" in hdd_sinfo before wlan_hdd_update_mlo_sinfo()'s own,
+	 * correctly-guarded merge ever copies hdd_sinfo->bss_param =
+	 * sinfo->bss_param, leaving the aggregate bss_param zeroed even
+	 * though the per-link sinfo had the correct beacon_interval/
+	 * dtim_period/flags values.
+	 */
+	hdd_sinfo->filled |= sinfo->filled & ~HDD_INFO_BSS_PARAM;
 }
 
 /*
