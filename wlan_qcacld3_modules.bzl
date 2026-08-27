@@ -2811,7 +2811,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     ]
 
     cmd = 'touch "$@"\n'
-    if target != "sa510m" and target != "sa510m.1g":
+    if target != "sa510m" and target != "sa510m.1g" and target != "pineapple":
         grep_path = "common"
     else:
         grep_path = "msm-kernel"
