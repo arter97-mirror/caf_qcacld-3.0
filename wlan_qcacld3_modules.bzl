@@ -23,6 +23,7 @@ _target_chipset_map = {
         "waipio":[
                 "qca6490",
                 "qca6750",
+		"kiwi",
         ],
         "lahaina":[
                 "qca6490",
@@ -34,7 +35,7 @@ _target_chipset_map = {
 	],
 	"malabar":[
 		"adrastea",
-	]
+	],
 }
 
 _chipset_hw_map = {
@@ -42,6 +43,7 @@ _chipset_hw_map = {
         "adrastea" : "ADRASTEA",
         "qca6750": "MOSELLE",
         "qca6490": "LITHIUM",
+        "kiwi": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -57,6 +59,10 @@ _chipset_header_map = {
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
+    "kiwi": [
+        "api/hw/kiwi/v1",
+        "cmn/hal/wifi3.0/kiwi",
+    ],
 }
 
 _hw_header_map = {
@@ -67,6 +73,9 @@ _hw_header_map = {
     ],
     "LITHIUM": [
         "cmn/hal/wifi3.0/li",
+    ],
+    "BERYLLIUM": [
+        "cmn/hal/wifi3.0/be",
     ],
 }
 
@@ -677,6 +686,15 @@ _conditional_srcs = {
             "cmn/dp/wifi3.0/be/dp_be_rx.c",
             "cmn/dp/wifi3.0/be/dp_be_tx.c",
             "cmn/dp/wifi3.0/dp_reo.c",
+            "cmn/dp/wifi3.0/dp_tx.c",
+            "cmn/dp/wifi3.0/dp_stats.c",
+            "cmn/dp/wifi3.0/dp_main.c",
+            "cmn/dp/wifi3.0/dp_arch_ops.c",
+            "cmn/dp/wifi3.0/dp_tx_desc.c",
+            "cmn/dp/wifi3.0/dp_rx.c",
+            "cmn/dp/wifi3.0/dp_htt.c",
+            "cmn/dp/wifi3.0/dp_peer.c",
+            "cmn/dp/wifi3.0/dp_rx_desc.c",
             "cmn/dp/wifi3.0/dp_rx_err.c",
             "cmn/hal/wifi3.0/be/hal_be_generic_api.c",
             "cmn/hal/wifi3.0/be/hal_be_reo.c",
@@ -684,6 +702,10 @@ _conditional_srcs = {
             "cmn/hal/wifi3.0/hal_srng.c",
             "cmn/hif/src/ce/ce_service_srng.c",
             "cmn/wlan_cfg/wlan_cfg.c",
+            "core/dp/txrx3.0/dp_txrx.c",
+            "cmn/target_if/dp/src/target_if_dp.c",
+            "cmn/dp/wifi3.0/dp_rx_defrag.c",
+            "cmn/dp/wifi3.0/dp_tx_flow_control.c",
         ],
     },
     "CONFIG_CM_UTF_ENABLE": {
@@ -1039,7 +1061,9 @@ _conditional_srcs = {
           "cmn/dp/wifi3.0/dp_rx_defrag.c",
           "cmn/dp/wifi3.0/dp_tx_flow_control.c",
       ],
-          False: [
+    },
+    "CONFIG_HELIUMPLUS": {
+        True: [
           "core/dp/txrx/ol_rx_pn.c",
           "core/dp/txrx/ol_rx_reorder.c",
           "core/dp/txrx/ol_rx_reorder_timeout.c",
@@ -1060,6 +1084,7 @@ _conditional_srcs = {
           "core/dp/htt/htt_fw_stats.c",
           "core/dp/htt/htt_tx.c",
           "cmn/hif/src/ce/ce_service_legacy.c",
+          "cmn/hif/src/hif_main_legacy.c",
           "core/dp/txrx/ol_tx_ll.c",
           "core/dp/htt/htt_rx_ll.c",
           "core/dp/txrx/ol_tx_throttle.c",
@@ -1077,6 +1102,12 @@ _conditional_srcs = {
         True: [
             "cmn/hal/wifi3.0/qca6490/hal_6490.c",
             "cmn/hif/src/qca6490def.c",
+        ],
+    },
+    "CONFIG_KIWI_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
+            "cmn/hif/src/kiwidef.c",
         ],
     },
     "CONFIG_OCB_UT_FRAMEWORK": {
