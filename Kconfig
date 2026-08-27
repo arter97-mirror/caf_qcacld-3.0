@@ -1538,6 +1538,10 @@ config WLAN_FEATURE_11BN
 	bool "Enable WLAN_FEATURE_11BN"
 	default n
 
+config WLAN_FEATURE_GVP
+	bool "Enable 6 GHz Geo-Fenced Variable Power AP type (GVP)"
+	default n
+
 config WLAN_FEATURE_SECURITY_PROFILE
 	bool "Enable Security Profile element support"
 	default n
