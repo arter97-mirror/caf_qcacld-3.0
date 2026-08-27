@@ -1769,8 +1769,10 @@ static void smd_roam_update_mlo_flags(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *link_vdev;
+	struct wlan_objmgr_vdev *other_vdev;
 	uint8_t active_links = 0;
 	uint8_t active_vdev_id = WLAN_INVALID_VDEV_ID;
+	uint8_t i;
 
 	if (!vdev)
 		return;
@@ -1810,6 +1812,30 @@ static void smd_roam_update_mlo_flags(struct wlan_objmgr_vdev *vdev)
 		  active_vdev_id);
 
 	wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
+
+	/*
+	 * The roam collapsed to a single active link on active_vdev_id.
+	 * Every other MLD vdev is now fully idle for this connection — clear
+	 * both its MLO and link-vdev flags so mlo_get_assoc_link_vdev() can't
+	 * mistake it for the assoc vdev. Left untouched, such a vdev stays
+	 * is_mlo_vdev=1 with is_mlo_link_vdev=0 (from the generic link-switch
+	 * flag toggling), which is indistinguishable from a real assoc vdev
+	 * and causes wlan_cm_set_cross_vdev_roam() to misdetect cross-vdev
+	 * roaming on the next SMD roam.
+	 */
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		other_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!other_vdev)
+			continue;
+
+		if (wlan_vdev_get_id(other_vdev) == active_vdev_id)
+			continue;
+
+		wlan_vdev_mlme_clear_mlo_vdev(other_vdev);
+		wlan_vdev_mlme_clear_mlo_link_vdev(other_vdev);
+		mlo_debug("SMD: cleared MLO/link flags on idle vdev %d",
+			  wlan_vdev_get_id(other_vdev));
+	}
 }
 
 /**
@@ -2127,6 +2153,7 @@ smd_link_recfg_assign_self_link_addr(
 	uint32_t allocated_bitmap;
 	struct wlan_mlo_link_recfg_bss_info *link_add;
 	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr vdev_own_macaddr;
 
 	if (!recfg_ctx || !recfg_req) {
 		mlo_err("Invalid recfg context or req");
@@ -2174,14 +2201,29 @@ smd_link_recfg_assign_self_link_addr(
 		}
 
 		/* todo: add validate vdev mac with link info link_add */
+		qdf_mem_copy(vdev_own_macaddr.bytes,
+			     wlan_vdev_mlme_get_macaddr(vdev),
+			     QDF_MAC_ADDR_SIZE);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
 
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) ||
 		    link_info->link_id == WLAN_INVALID_LINK_ID) {
-			link_add[idx].self_link_addr = link_info->link_addr;
+			/* links_info[] self MAC can be stale/unpopulated for a
+			 * slot the SMD prep flow never wrote to (e.g. this
+			 * vdev just went idle after its AP link was torn
+			 * down, leaving a zero-initialized entry whose
+			 * vdev_id happens to read back as a valid id). Fall
+			 * back to the vdev's own configured MAC instead of
+			 * propagating a NULL self MAC into the ST Prep OTA
+			 * frame.
+			 */
+			if (qdf_is_macaddr_zero(&link_info->link_addr))
+				link_add[idx].self_link_addr = vdev_own_macaddr;
+			else
+				link_add[idx].self_link_addr = link_info->link_addr;
 			link_add[idx].vdev_id = link_info->vdev_id;
 			mlo_debug("assign idle self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d",
-				  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+				  QDF_MAC_ADDR_REF(link_add[idx].self_link_addr.bytes),
 				  link_add[idx].link_id,
 				  link_add[idx].freq,
 				  link_info->vdev_id);
