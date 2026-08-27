@@ -531,6 +531,41 @@ ref_rel:
 	return status;
 }
 
+/**
+ * nan_pasn_peer_create_confirmed() - finish migration-recreate bookkeeping
+ * once a NAN PASN peer create for a previously-migrated peer is confirmed
+ * @psoc: pointer to psoc object
+ * @vdev_id: NAN vdev id
+ * @peer_mac_addr: peer mac address
+ *
+ * The PASN key for this peer was installed to FW before it migrated to the
+ * NDP vdev and is not reinstalled as part of this recreate, so the recreated
+ * peer object's key_installed flag must be marked explicitly once the
+ * recreate is confirmed, otherwise the WEP/Privacy bit is not set for
+ * subsequent frames to this peer.
+ *
+ * Return: none
+ */
+static void
+nan_pasn_peer_create_confirmed(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id,
+			       struct qdf_mac_addr *peer_mac_addr)
+{
+	QDF_STATUS status;
+
+	if (!peer_mac_addr) {
+		nan_err("peer mac address is null for vdev id %d", vdev_id);
+		return;
+	}
+
+	wlan_peer_set_key_install_flag(psoc, peer_mac_addr->bytes, true);
+
+	status = nan_remove_peer_in_migrated_addr_list(psoc, vdev_id,
+						       peer_mac_addr);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("fail to remove peer addr in migrated list");
+}
+
 QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 				    struct qdf_mac_addr *peer_mac_addr)
 {
@@ -602,11 +637,18 @@ QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 		nan_update_pasn_peer_count(nan_vdev, true);
 	}
 
-	status = nan_remove_peer_in_migrated_addr_list(psoc, nan_vdev_id,
-						       peer_mac_addr);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		nan_err("fail to remove peer addr in migrated list");
+	/*
+	 * When FW does not support an async peer-create-confirm event,
+	 * wma_pasn_peer_create() above has already completed the create
+	 * synchronously, so finish the migration-recreate bookkeeping
+	 * (key-installed flag + migrated-list removal) right here. When
+	 * FW does support it, defer both to nan_handle_pasn_peer_create_rsp()
+	 * once FW actually confirms the peer create, since only then is
+	 * the recreate genuinely successful.
+	 */
+	if (!wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_F_PEER_CREATE_RESP))
+		nan_pasn_peer_create_confirmed(psoc, nan_vdev_id,
+					       peer_mac_addr);
 
 ref_rel:
 	wlan_objmgr_vdev_release_ref(nan_vdev, WLAN_NAN_ID);
@@ -3308,6 +3350,10 @@ void nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 		nan_err("psoc is NULL");
 		return;
 	}
+
+	if (peer_create_status == QDF_STATUS_SUCCESS &&
+	    nan_is_peer_migrated(psoc, vdev_id, peer_mac))
+		nan_pasn_peer_create_confirmed(psoc, vdev_id, peer_mac);
 
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
