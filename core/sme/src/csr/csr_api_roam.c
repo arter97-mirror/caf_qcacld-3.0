@@ -3832,6 +3832,7 @@ static QDF_STATUS csr_roam_issue_set_context_req(struct mac_context *mac_ctx,
 	uint8_t wep_key_idx = 0;
 	struct wlan_objmgr_vdev *vdev;
 	const uint8_t *peer_mac = (const uint8_t *)mac_addr->bytes;
+	QDF_STATUS status;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, session_id,
 						    WLAN_LEGACY_MAC_ID);
@@ -3849,16 +3850,19 @@ static QDF_STATUS csr_roam_issue_set_context_req(struct mac_context *mac_ctx,
 		crypto_key = wlan_crypto_get_key(vdev, peer_mac, key_idx);
 	}
 
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-
 	sme_debug("session:%d, cipher:%d, ucast:%d, idx:%d, wep:%d, add:%d",
 		  session_id, cipher, unicast, key_idx, wep_key_idx, add_key);
-	if (!IS_WEP_CIPHER(cipher) && !add_key)
+	if (!IS_WEP_CIPHER(cipher) && !add_key) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 		return QDF_STATUS_E_INVAL;
+	}
 
-	return ucfg_crypto_set_key_req(vdev, crypto_key, (unicast ?
+	status = ucfg_crypto_set_key_req(vdev, crypto_key, (unicast ?
 				       WLAN_CRYPTO_KEY_TYPE_UNICAST :
 				       WLAN_CRYPTO_KEY_TYPE_GROUP));
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return status;
 }
 
 QDF_STATUS
