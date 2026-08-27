@@ -4155,6 +4155,9 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 	/* Update roam scan info to userspace */
 	cm_roam_scan_info_event(psoc, scan, vdev_id);
 
+	if (scan->type == ROAM_STATS_SCAN_TYPE_NO_SCAN)
+		return;
+
 	buf = qdf_mem_malloc(ROAM_CHANNEL_BUF_SIZE);
 	if (!buf)
 		return;
