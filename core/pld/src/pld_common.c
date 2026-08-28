@@ -1244,6 +1244,35 @@ int pld_exit_power_save(struct device *dev)
 	return ret;
 }
 
+int pld_set_bmps(struct device *dev, bool disable)
+{
+	int ret = 0;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_set_bmps(dev, disable);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_set_bmps(dev, disable);
+		break;
+	default:
+		pr_err("Invalid device type %d\n", type);
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
 int pld_is_device_awake(struct device *dev)
 {
 	int ret = true;

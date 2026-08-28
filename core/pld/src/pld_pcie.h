@@ -243,6 +243,11 @@ static inline void *pld_pcie_smmu_get_mapping(struct device *dev)
 }
 #endif
 
+static inline int pld_pcie_set_bmps(struct device *dev, bool disable)
+{
+	return 0;
+}
+
 static inline int
 pld_pcie_smmu_map(struct device *dev,
 		  phys_addr_t paddr, uint32_t *iova_addr, size_t size)
@@ -1267,6 +1272,11 @@ static inline
 int pld_pcie_set_vendor_wonder_priv_data(const void *priv_data)
 {
 	return cnss_set_vendor_wonder_priv_data(priv_data);
+}
+
+static inline int pld_pcie_set_bmps(struct device *dev, bool disable)
+{
+	return cnss_set_bmps(dev, disable);
 }
 #endif
 #endif

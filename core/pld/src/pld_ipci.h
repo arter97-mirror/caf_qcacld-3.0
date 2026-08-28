@@ -211,6 +211,11 @@ static inline int pld_ipci_exit_power_save(struct device *dev)
 	return 0;
 }
 
+static inline int pld_ipci_set_bmps(struct device *dev, bool disable)
+{
+	return 0;
+}
+
 static inline int pld_ipci_prevent_l1(struct device *dev)
 {
 	return 0;
@@ -564,6 +569,11 @@ static inline bool pld_ipci_is_direct_refill_supported(struct device *dev)
 static inline int pld_ipci_exit_power_save(struct device *dev)
 {
 	return icnss_exit_power_save(dev);
+}
+
+static inline int pld_ipci_set_bmps(struct device *dev, bool disable)
+{
+	return icnss_set_bmps(dev, disable);
 }
 
 static inline int pld_ipci_prevent_l1(struct device *dev)

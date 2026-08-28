@@ -1337,6 +1337,16 @@ int pld_force_wake_request_sync(struct device *dev, int timeout_us);
 int pld_exit_power_save(struct device *dev);
 
 /**
+ * pld_set_bmps() - Send BMPS_CTRL QMI to FW
+ * @dev: device
+ * @disable: true to disable BMPS, false to enable
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_set_bmps(struct device *dev, bool disable);
+
+/**
  * pld_is_device_awake() - Check if it's ready to access MMIO registers
  * @dev: device
  *
