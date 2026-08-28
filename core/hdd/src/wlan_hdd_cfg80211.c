@@ -33714,6 +33714,11 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 	if (wlan_cm_is_vdev_connected(vdev) && !is_link_roam_auth_connected)
 		return false;
 
+	if (link_id == WLAN_INVALID_LINK_ID) {
+		link_id = wlan_vdev_get_link_id(vdev);
+		hdd_debug("get link id %d from vdev", link_id);
+	}
+
 	hdd_debug("MLO:Defer set keys for link_id %d", link_id);
 	mlo_defer_set_keys(vdev, link_id, true);
 
