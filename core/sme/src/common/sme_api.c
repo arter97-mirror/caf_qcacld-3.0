@@ -6143,6 +6143,11 @@ static QDF_STATUS sme_prepare_mgmt_tx(mac_handle_t mac_handle,
 
 	sme_debug("prepares auth frame, cookie: 0x%llx", cookie);
 
+	if (!len || len > MAX_MGMT_MPDU_LEN) {
+		sme_err("Invalid mgmt frame len %u", len);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	msg_len = sizeof(*msg) + len;
 	msg = qdf_mem_malloc(msg_len);
 	if (!msg) {

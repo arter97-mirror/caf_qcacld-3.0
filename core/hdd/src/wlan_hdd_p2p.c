@@ -485,6 +485,12 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	     adapter->device_mode == QDF_NAN_DISC_MODE) &&
 	    (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
+		if (len < sizeof(struct wlan_frame_hdr) ||
+		    len > MAX_MGMT_MPDU_LEN) {
+			hdd_err("Invalid auth frame len %zu", len);
+			return -EINVAL;
+		}
+
 		/* Request ROC for PASN authentication frame */
 		if (len > (sizeof(struct wlan_frame_hdr) +
 			   WLAN_AUTH_FRAME_MIN_LEN)) {
