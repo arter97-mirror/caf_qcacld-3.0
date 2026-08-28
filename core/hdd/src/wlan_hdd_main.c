@@ -11337,6 +11337,19 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
+static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	cfg80211_del_sta(&adapter->wdev, mac, GFP_KERNEL);
+}
+#else
+static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	cfg80211_del_sta(adapter->dev, mac, GFP_KERNEL);
+}
+#endif
+
 #if defined MSM_PLATFORM && (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
 /**
  * hdd_stop_p2p_go() - call cfg80211 API to stop P2P GO

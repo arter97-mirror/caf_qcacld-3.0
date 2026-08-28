@@ -2476,6 +2476,75 @@ hdd_sap_is_recv_assoc_link(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
+static QDF_STATUS
+wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
+			  const u8 *mac, struct station_info *sinfo)
+{
+	struct wireless_dev *wdev;
+
+	wdev = &adapter->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_new_sta(wdev, mac, sinfo, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_cfg80211_del_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	struct wireless_dev *wdev;
+
+	wdev = &adapter->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_del_sta(wdev, mac, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
+			  const u8 *mac, struct station_info *sinfo)
+{
+	struct net_device *dev;
+
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_new_sta(dev, mac, sinfo, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_cfg80211_del_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	struct net_device *dev;
+
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_del_sta(dev, mac, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 				    struct sap_event *sap_event)
 {

@@ -727,9 +727,9 @@ static int cds_ol_rx_thread(void *arg)
 	bool shutdown = false;
 	int status;
 
+#if 0
 	struct sched_param scheduler_params = {0};
 
-#if 0
 	scheduler_params.sched_priority = 99;
 	sched_setscheduler(current, SCHED_FIFO, &scheduler_params);
 #endif

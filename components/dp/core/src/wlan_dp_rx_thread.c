@@ -836,6 +836,40 @@ static int dp_rx_tm_thread_napi_poll(qdf_napi_struct *napi, int budget)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+/**
+ * dp_rx_thread_get_dummy_netdev_ptr() - Get dummy netdev pointer
+ * fromdp rx thread
+ * @rx_thread: DP RX thread pointer
+ *
+ * Return: dummy netdev pointer
+ */
+static inline struct net_device *
+dp_rx_thread_get_dummy_netdev_ptr(struct dp_rx_thread *rx_thread)
+{
+	return rx_thread->netdev;
+}
+
+static inline void
+dp_rx_thread_set_dummy_netdev_ptr(struct dp_rx_thread *rx_thread,
+				  struct net_device *nd)
+{
+	rx_thread->netdev = nd;
+}
+#else
+static inline struct net_device *
+dp_rx_thread_get_dummy_netdev_ptr(struct dp_rx_thread *rx_thread)
+{
+	return &rx_thread->netdev;
+}
+
+static inline void
+dp_rx_thread_set_dummy_netdev_ptr(struct dp_rx_thread *rx_thread,
+				  struct net_device *nd)
+{
+}
+#endif
+
 /**
  * dp_rx_tm_thread_napi_init() - Initialize dummy rx_thread NAPI
  * @rx_thread: dp_rx_thread structure containing dummy napi and netdev

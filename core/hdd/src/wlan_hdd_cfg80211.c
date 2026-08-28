@@ -26891,10 +26891,12 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 /**
  * wlan_hdd_change_station() - cfg80211 change station handler function
  * @wiphy: Pointer to the wiphy structure
- * @dev: Pointer to the net device.
+ * @wdev: Pointer to the wireless device.
  * @mac: bssid
  * @params: Pointer to station parameters
  *
@@ -26904,17 +26906,38 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
  *
  * Return: 0 for success, error number on failure.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) || defined(WITH_BACKPORTS)
+static int wlan_hdd_change_station(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   const u8 *mac,
+				   struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+	struct net_device *dev;
+
+	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get ndetdev from wdev");
+		errno = -EINVAL;
+		goto out;
+	}
+	errno = __wlan_hdd_change_station(wiphy, dev, mac, params);
+
+out:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) ||\
+	defined(WITH_BACKPORTS)
 static int wlan_hdd_change_station(struct wiphy *wiphy,
 				   struct net_device *dev,
 				   const u8 *mac,
 				   struct station_parameters *params)
-#else
-static int wlan_hdd_change_station(struct wiphy *wiphy,
-				   struct net_device *dev,
-				   u8 *mac,
-				   struct station_parameters *params)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -26929,6 +26952,27 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
 
 	return errno;
 }
+#else
+static int wlan_hdd_change_station(struct wiphy *wiphy,
+				   struct net_device *dev,
+				   u8 *mac,
+				   struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_change_station(wiphy, dev, mac, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+#endif
 
 #ifdef FEATURE_WLAN_ESE
 static bool hdd_is_krk_enc_type(uint32_t cipher_type)
@@ -28942,11 +28986,18 @@ static int __wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
 /**
  * wlan_hdd_cfg80211_set_wiphy_params() - set wiphy parameters
  * @wiphy: Pointer to wiphy
+ * @radio_idx: radio index
  * @changed: Parameters changed
  *
  * Return: 0 for success, non-zero for failure
  */
-static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+					      int radio_idx, u32 changed)
+#else
+static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+					      u32 changed)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -29390,7 +29441,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
 	if (QDF_SAP_MODE != adapter->device_mode &&
 	    QDF_P2P_GO_MODE != adapter->device_mode)
-		goto fn_end;
+		return 0;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
 		struct wlan_objmgr_vdev *vdev;
@@ -29411,9 +29462,14 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						adapter->deflink->vdev_id);
 		}
 
+#if 0						 
+		if (wlan_hdd_link_removal_is_in_progress(adapter))
+			return 0;
+#endif
+
 		if (!QDF_IS_STATUS_SUCCESS(hdd_softap_deauth_all_sta(adapter,
 								     param)))
-			goto fn_end;
+			return 0;
 	} else {
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
@@ -29469,29 +29525,9 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				     STA_INFO_CFG80211_DEL_STATION);
 	}
 
-fn_end:
 	return 0;
 }
 
-#if defined(USE_CFG80211_DEL_STA_V2)
-int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac)
-{
-	struct station_del_parameters del_sta;
-
-	del_sta.mac = mac;
-	del_sta.subtype = IEEE80211_STYPE_DEAUTH >> 4;
-	del_sta.reason_code = WLAN_REASON_DEAUTH_LEAVING;
-
-	return wlan_hdd_cfg80211_del_station(adapter->wdev.wiphy,
-					     adapter->dev, &del_sta);
-}
-#else
-int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac)
-{
-	return wlan_hdd_cfg80211_del_station(adapter->wdev.wiphy,
-					     adapter->dev, mac);
-}
-#endif
 
 /**
  * _wlan_hdd_cfg80211_del_station() - delete station entry handler
@@ -29527,6 +29563,28 @@ static int _wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 }
 
 #ifdef USE_CFG80211_DEL_STA_V2
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
+int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  struct station_del_parameters *param)
+{
+	struct net_device *dev;
+
+	if (!param)
+		return -EINVAL;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get ndetdev from wdev");
+		return -EINVAL;
+	}
+
+	return _wlan_hdd_cfg80211_del_station(wiphy, dev, param->mac,
+					      param->reason_code,
+					      param->subtype);
+}
+#else
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				  struct net_device *dev,
 				  struct station_del_parameters *param)
@@ -29538,7 +29596,9 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 					      param->reason_code,
 					      param->subtype);
 }
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
+#endif
+#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 				  const uint8_t *mac)
 {
@@ -29555,6 +29615,44 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 	uint8_t subtype = SIR_MAC_MGMT_DEAUTH >> 4;
 
 	return _wlan_hdd_cfg80211_del_station(wiphy, dev, mac, reason, subtype);
+}
+#endif
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
+static int _wlan_hdd_del_station(struct hdd_adapter *adapter,
+				 struct station_del_parameters *param)
+{
+
+	return wlan_hdd_cfg80211_del_station(adapter->wdev.wiphy,
+					     &adapter->wdev, param);
+}
+#else
+static int _wlan_hdd_del_station(struct hdd_adapter *adapter,
+				 struct station_del_parameters *param)
+{
+	return wlan_hdd_cfg80211_del_station(adapter->wdev.wiphy,
+					     adapter->dev, param);
+}
+#endif
+
+#if defined(USE_CFG80211_DEL_STA_V2)
+int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac)
+{
+	struct station_del_parameters del_sta;
+
+	del_sta.mac = mac;
+	del_sta.subtype = IEEE80211_STYPE_DEAUTH >> 4;
+	del_sta.reason_code = WLAN_REASON_DEAUTH_LEAVING;
+
+	return _wlan_hdd_del_station(adapter, &del_sta);
+}
+#else
+int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac)
+{
+	return wlan_hdd_cfg80211_del_station(adapter->wdev.wiphy,
+					     adapter->dev, mac);
 }
 #endif
 
@@ -29626,25 +29724,48 @@ static int __wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 	return status;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
 /**
  * wlan_hdd_cfg80211_add_station() - add station
  * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
+ * @wdev: Pointer to wireless device
  * @mac: Pointer to station mac address
  * @params: Pointer to add station parameter
  *
  * Return: 0 for success, non-zero for failure
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
+static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 const uint8_t *mac,
+					 struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+	struct net_device *dev;
+
+	errno = osif_vdev_sync_wdev_op_start(wdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get ndetdev from wdev");
+		errno = -EINVAL;
+		goto out;
+	}
+
+	errno = __wlan_hdd_cfg80211_add_station(wiphy, dev, mac, params);
+out:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 					 struct net_device *dev,
 					 const uint8_t *mac,
 					 struct station_parameters *params)
-#else
-static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
-					 struct net_device *dev, uint8_t *mac,
-					 struct station_parameters *params)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -29659,6 +29780,25 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 
 	return errno;
 }
+#else
+static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
+					 struct net_device *dev, uint8_t *mac,
+					 struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_add_station(wiphy, dev, mac, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
 
 #if (defined(CFG80211_CONFIG_PMKSA_TIMER_PARAMS_SUPPORT) || \
 	     (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)))
@@ -31378,7 +31518,23 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	return 0;
 }
 
-/**
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+/*
+ * wlan_hdd_cfg80211_set_mon_ch() - Set monitor mode capture channel
+ * @wiphy: Handle to struct wiphy to get handle to module context.
+ * @dev: Pointer to network device
+ * @chandef: Contains information about the capture channel to be set.
+ *
+ * This interface is called if and only if monitor mode interface alone is
+ * active.
+ *
+ * Return: 0 success or error code on failure.
+ */
+static int wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
+					struct net_device *dev,
+					struct cfg80211_chan_def *chandef)
+#else
+/*
  * wlan_hdd_cfg80211_set_mon_ch() - Set monitor mode capture channel
  * @wiphy: Handle to struct wiphy to get handle to module context.
  * @chandef: Contains information about the capture channel to be set.
@@ -31389,7 +31545,8 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
  * Return: 0 success or error code on failure.
  */
 static int wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
-				       struct cfg80211_chan_def *chandef)
+					struct cfg80211_chan_def *chandef)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -32360,9 +32517,16 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
+					   int radio_idx,
+					   uint32_t tx_mask,
+					   uint32_t rx_mask)
+#else
 static int wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 					   uint32_t tx_mask,
 					   uint32_t rx_mask)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -32406,9 +32570,16 @@ static int __wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
+					   int radio_idx,
+					   uint32_t *tx_mask,
+					   uint32_t *rx_mask)
+#else
 static int wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 					   uint32_t *tx_mask,
 					   uint32_t *rx_mask)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -34301,6 +34472,76 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+/**
+ * wlan_hdd_cfg80211_setup_link_reconfig() - API to get add or
+ * delete link data from upper layer.
+ * @wiphy: wiphy struct
+ * @dev: net device
+ * @req: MLO link reconfiguration request
+ *
+ * This API fetch add or delete link params based on link id mask
+ * and invokes target if API to send add delete link info.
+ *
+ * Return: status, 0 in case of success else negative value.
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int
+wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      struct cfg80211_ml_reconf_req *req)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_setup_link_reconfig(wiphy, dev,
+							req->add_links,
+							req->rem_links);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
+/**
+ * wlan_hdd_cfg80211_setup_link_reconfig() - API to get add or
+ * delete link data from upper layer.
+ * @wiphy: wiphy struct
+ * @dev: net device
+ * @add_links: added link reconfig params
+ * @rem_links: removed link id bitmap
+ *
+ * This API fetch add or delete link params based on link id mask
+ * and invokes target if API to send add delete link info.
+ *
+ * Return: status, 0 in case of success else negative value.
+ */
+static int
+wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      struct cfg80211_assoc_link *add_links,
+				      u16 rem_links)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_setup_link_reconfig(wiphy, dev,
+							add_links,
+							rem_links);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 1))
