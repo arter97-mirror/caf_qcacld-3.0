@@ -1960,7 +1960,6 @@ QDF_STATUS smd_fw_roam_start(struct wlan_objmgr_vdev *vdev)
 	mlo_debug("SMD: Roaming started, num_vdev_repurpose_req=%u",
 		  recfg_ctx->num_vdev_repurpose_req);
 
-	qdf_mem_zero(&recfg_req, sizeof(struct wlan_mlo_link_recfg_req));
 	qdf_copy_macaddr(&recfg_req.add_link_info.mld_addr,
 			 &recfg_ctx->vdev_repurpose_req[0].mld_addr);
 
@@ -3302,6 +3301,12 @@ QDF_STATUS smd_trigger_link_recfg_sm(struct wlan_objmgr_vdev *vdev)
 		mlo_err("SMD: psoc is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	qdf_copy_macaddr(&recfg_req.add_link_info.mld_addr,
+			 &recfg_ctx->vdev_repurpose_req[0].mld_addr);
+
+	qdf_copy_macaddr(&recfg_req.add_link_info.smd_addr,
+			 &recfg_ctx->vdev_repurpose_req[0].smd_addr);
 
 	/* Build recfg_req from the vdev_repurpose_req already stored in
 	 * recfg_ctx by smd_fw_roam_sync().
