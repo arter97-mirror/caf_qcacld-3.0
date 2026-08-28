@@ -6952,6 +6952,7 @@ wlan_mlme_set_bmiss_timeout_in_secs_on_wakeup(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 
 	mlme_obj->cfg.lfr.beaconloss_timeout_onwakeup = val;
+	mlme_obj->cfg.lfr.sta_beacon_loss_config_from_user = val;
 
 	return QDF_STATUS_SUCCESS;
 }

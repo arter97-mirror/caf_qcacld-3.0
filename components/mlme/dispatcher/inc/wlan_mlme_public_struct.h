@@ -2424,6 +2424,8 @@ struct fw_scan_channels {
  * during wakeup.
  * @beaconloss_timeout_onsleep: time in sec to configure FW BMISS event
  * during sleep.
+ * @sta_beacon_loss_config_from_user: user-set bmiss timeout via vendor cmd;
+ * non-zero means user has overridden INI default; preserved across SSR
  * @roam_ho_delay_config: Roam HO delay value
  * @exclude_rm_partial_scan_freq: Exclude the channels in roam full scan that
  * are already scanned as part of partial scan.
@@ -2584,6 +2586,9 @@ struct wlan_mlme_lfr_cfg {
 	bool enable_ft_over_ds;
 	uint8_t beaconloss_timeout_onwakeup;
 	uint8_t beaconloss_timeout_onsleep;
+#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
+	uint8_t sta_beacon_loss_config_from_user;
+#endif
 	uint16_t roam_ho_delay_config;
 	uint8_t exclude_rm_partial_scan_freq;
 	uint8_t roam_full_scan_6ghz_on_disc;
