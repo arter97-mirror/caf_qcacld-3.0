@@ -1057,9 +1057,24 @@ void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
  */
 void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
 			   void *caps);
+
+/**
+ * ucfg_nan_is_fw_support_ap_assisted_dfs() - wrapper API for function
+ * nan_is_fw_support_ap_assisted_dfs()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN AP-assisted DFS operation supported by FW else false
+ */
+bool ucfg_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+bool ucfg_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

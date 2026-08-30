@@ -121,6 +121,16 @@ void target_if_nan_set_vdev_feature_config(struct wlan_objmgr_psoc *psoc,
 bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * target_if_nan_is_fw_support_ap_assisted_dfs() - return NAN AP-assisted
+ * DFS operation capability from FW.
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN AP-assisted DFS operation supported by FW else false
+ */
+bool target_if_nan_is_fw_support_ap_assisted_dfs(
+					struct wlan_objmgr_psoc *psoc);
+
+/**
  * target_if_nan_set_device_caps() - set NAN capabilities from firmware
  * @psoc: pointer to PSOC object
  * @caps: NAN capabilities to be filled

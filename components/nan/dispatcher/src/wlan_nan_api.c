@@ -153,4 +153,9 @@ void wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
 {
 	nan_handle_ndi_peer_departed(vdev, peer_mac);
 }
+
+bool tgt_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
+{
+	return target_if_nan_is_fw_support_ap_assisted_dfs(psoc);
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

@@ -728,6 +728,15 @@ QDF_STATUS nan_del_sta(struct nan_del_sta_params *params);
  */
 void nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
 				  const struct qdf_mac_addr *peer_mac);
+
+/**
+ * nan_is_fw_support_ap_assisted_dfs() - wrapper API for function
+ * tgt_nan_is_fw_support_ap_assisted_dfs()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN AP-assisted DFS operation supported by FW else false
+ */
+bool nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

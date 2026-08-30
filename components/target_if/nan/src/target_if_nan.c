@@ -2383,6 +2383,20 @@ bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 				   wmi_service_nan_standard_mode_support);
 }
 
+bool target_if_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return false;
+	}
+
+	return wmi_service_enabled(
+			wmi_handle,
+			wmi_service_nan_ap_assisted_dfs_operation_support);
+}
+
 QDF_STATUS target_if_nan_set_device_caps(struct wlan_objmgr_psoc *psoc,
 					 struct nan_capabilities *caps)
 {

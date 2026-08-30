@@ -2117,4 +2117,9 @@ QDF_STATUS ucfg_nan_del_sta(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+bool ucfg_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
+{
+	return nan_is_fw_support_ap_assisted_dfs(psoc);
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

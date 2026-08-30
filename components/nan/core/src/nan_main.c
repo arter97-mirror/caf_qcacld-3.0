@@ -3844,4 +3844,9 @@ void nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
 	if (qdf_is_macaddr_equal(&vdev_nan_obj->primary_peer_mac, peer_mac))
 		ndi_remove_and_update_primary_connection(psoc, vdev);
 }
+
+bool nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_nan_is_fw_support_ap_assisted_dfs(psoc);
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */

@@ -252,6 +252,15 @@ bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
  */
 void wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
 				       const struct qdf_mac_addr *peer_mac);
+
+/**
+ * tgt_nan_is_fw_support_ap_assisted_dfs() - wrapper API for function
+ * target_if_nan_is_fw_support_ap_assisted_dfs()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN AP-assisted DFS operation supported by FW else false
+ */
+bool tgt_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
@@ -263,6 +272,12 @@ static inline void
 wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
 				  const struct qdf_mac_addr *peer_mac)
 {
+}
+
+static inline bool
+tgt_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */
