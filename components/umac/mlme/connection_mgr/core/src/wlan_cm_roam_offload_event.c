@@ -155,7 +155,7 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 }
 
 #ifdef WLAN_FEATURE_11BN_SMD
-static QDF_STATUS
+QDF_STATUS
 cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
 		    struct roam_offload_roam_event *roam_event)
 {
@@ -216,7 +216,7 @@ cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
 }
 
 #else
-static inline QDF_STATUS
+QDF_STATUS
 cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
 		    struct roam_offload_roam_event *roam_event)
 {
