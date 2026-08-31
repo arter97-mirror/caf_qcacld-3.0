@@ -1024,11 +1024,13 @@ struct wlan_dp_stc_ctx {
  * @lpass_ep_id: HTC endpoint ID obtained at register time
  * @rx_refill_ring: LPASS RXDMA refill SRNG created at register time
  * @link_mask: bitmask of completed link-init steps
+ * @rx_drop_no_session: CE5 RX callbacks dropped with no active session
  */
 struct wifi_transport_link_state {
 	int                          lpass_ep_id;
 	struct dp_srng              *rx_refill_ring;
 	uint32_t                     link_mask;
+	uint32_t                     rx_drop_no_session;
 };
 #endif
 

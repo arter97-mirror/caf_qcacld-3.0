@@ -143,7 +143,10 @@ dp_wifi_transport_ce_msg_alloc(struct wifi_transport_host_context *wtc)
 		wtc->ce_msg_free_head = buf->next;
 		buf->next = NULL;
 		buf->bufs_added = 0;
+	} else {
+		wtc->stats.tx_ce_msg_exhausted++;
 	}
+
 	qdf_spin_unlock_bh(&wtc->ce_msg_lock);
 	return buf;
 }
@@ -395,6 +398,7 @@ dp_wifi_transport_send(struct wifi_transport_host_context *wtc,
 
 	if (!msg_buf) {
 		dp_err("ce_msg_pool exhausted for send");
+		wtc->stats.ctrl_msg_fail++;
 		ret = -ENOSPC;
 		goto error;
 	}
@@ -406,8 +410,10 @@ dp_wifi_transport_send(struct wifi_transport_host_context *wtc,
 	hdr->dbg_indx = 0;
 
 	ret = dp_wifi_transport_msg_send(wtc, wtc->hif_handle, msg_buf, nbytes);
-	if (ret)
+	if (ret) {
 		dp_wifi_transport_ce_msg_free(wtc, msg_buf);
+		wtc->stats.ctrl_msg_fail++;
+	}
 
 error:
 	return ret;
@@ -525,12 +531,15 @@ dp_wifi_transport_handle_tx_completion(
 				sizeof(xpan_tx_completion_fixed_param));
 
 	for (i = 0; i < n; i++, entry++) {
+		wtc->stats.tx_completed++;
 		cookie = entry->sw_cookie;
 		if (cookie >= WIFI_TRANSPORT_TX_BUF_POOL_SIZE)
 			continue;
 
 		ppdu_tx_tsf = (((uint64_t)entry->ppdu_tx_tsf_hi) << 32) |
 				entry->ppdu_tx_tsf_lo;
+		if (qdf_likely(entry->tx_status <= XPAN_PKT_DROP))
+			wtc->stats.tx_status[entry->tx_status]++;
 
 		if (qdf_unlikely(qdf_trace_wifi_transport_tx_completion_enabled()))
 			qdf_trace_wifi_transport_tx_completion(
@@ -596,6 +605,7 @@ dp_wifi_transport_handle_rx_indication(
 	n = fixed->num_rx_buffers;
 	entry = (xpan_rx_buffer_info *)((uint8_t *)fixed +
 				sizeof(xpan_rx_audio_fixed_param));
+	wtc->stats.rx_indications++;
 
 	if (qdf_unlikely(qdf_trace_wifi_transport_rx_indication_enabled()))
 		qdf_trace_wifi_transport_rx_indication(
@@ -611,6 +621,7 @@ dp_wifi_transport_handle_rx_indication(
 		if (qdf_unlikely(!rx_desc || !rx_desc->nbuf)) {
 			dp_err("invalid sw_cookie %u paddr %pa rx_desc %pK",
 			       entry->sw_cookie, &paddr, rx_desc);
+			wtc->stats.rx_drop_invalid_cookie++;
 			goto replenish;
 		}
 
@@ -623,9 +634,11 @@ dp_wifi_transport_handle_rx_indication(
 		eth_hdr = qdf_nbuf_data(rx_nbuf) +
 				soc->rx_pkt_tlv_size + l2_pad;
 
-		if (wtc->ops.process_rx)
+		if (wtc->ops.process_rx) {
 			wtc->ops.process_rx(WT_RX_INDICATION, eth_hdr,
 					    entry->buffer_len);
+			wtc->stats.rx_packets++;
+		}
 
 replenish:
 		qdf_mem_dma_sync_single_for_device(dp_ctx->qdf_dev, paddr,
@@ -637,6 +650,7 @@ replenish:
 		if (QDF_IS_STATUS_ERROR(status)) {
 			dp_err("refill ring full sw_cookie=%u",
 			       entry->sw_cookie);
+			wtc->stats.rx_refill_ring_full++;
 			if (rx_desc && rx_desc->nbuf) {
 				qdf_nbuf_unmap_single(dp_ctx->qdf_dev,
 						      rx_desc->nbuf,
@@ -676,6 +690,8 @@ dp_wifi_transport_handle_peer_stats(
 		(xpan_peer_stats_fixed_param *)((uint8_t *)buf +
 						sizeof(xpan_msg_hdr));
 
+	wtc->stats.rx_peer_stats++;
+
 	if (wtc->ops.process_rx)
 		wtc->ops.process_rx(WT_RX_STATS,
 				    (uint8_t *)fixed +
@@ -707,6 +723,7 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 
 	if (qdf_unlikely(!wtc)) {
 		dp_err("wtc NULL");
+		dp_ctx->wifi_transport_link.rx_drop_no_session++;
 		return;
 	}
 
@@ -822,6 +839,7 @@ dp_wifi_transport_flush_tx(struct wifi_transport_host_context *wtc)
 				dp_wifi_transport_cookie_free(
 						wtc, buf_info->sw_cookie);
 			dp_wifi_transport_ce_msg_free(wtc, msg);
+			wtc->stats.tx_ce_send_fail++;
 		}
 	}
 
@@ -854,6 +872,7 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 			    WIFI_TRANSPORT_PATH_INACTIVE)) {
 		dp_err("TX dropped — deinit in progress");
 		ret = -ESHUTDOWN;
+		wtc->stats.tx_deinit_drop++;
 		goto err_ctx;
 	}
 
@@ -864,6 +883,7 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 	if (qdf_unlikely(cookie >= WIFI_TRANSPORT_TX_BUF_POOL_SIZE)) {
 		dp_err("TX buf pool exhausted");
 		ret = -ENOSPC;
+		wtc->stats.tx_pool_exhausted++;
 		goto err_ctx;
 	}
 
@@ -954,6 +974,7 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 	buf_info->ttp_lo           = (uint32_t)(meta->ttp & 0xFFFFFFFF);
 	buf_info->ttp_hi            = (uint32_t)(meta->ttp >> 32);
 	wtc->cur_msg_buf->bufs_added++;
+	wtc->stats.tx_enqueued++;
 
 flush:
 	if (flush)
@@ -1129,6 +1150,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_atomic_inc(&wtc->ref_cnt);
 	qdf_atomic_set(&wtc->bmps_state, WIFI_TRANSPORT_BMPS_ENABLED);
 	dp_wifi_transport_send(wtc, XPAN_DIRECT_LINK_UP_INDICATION);
+	wtc->stats.direct_link_up_sent++;
 	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
 		       WIFI_TRANSPORT_PATH_ACTIVE);
 
@@ -1185,7 +1207,10 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 			/* SSR will call deinit again with is_recovery_stop=true */
 			return;
 		}
+		wtc->stats.direct_link_down_sent++;
 	}
+
+	dp_wifi_transport_display_stats(dp_ctx);
 
 	/* Clear pointer now — prevents new ctx_get() from succeeding.
 	 * For SSR the FW is gone so no link-down send is needed.
@@ -1292,6 +1317,7 @@ dp_wifi_transport_ctrl_msg_alloc(struct wifi_transport_host_context *wtc,
 	msg_buf = dp_wifi_transport_ce_msg_alloc(wtc);
 	if (!msg_buf) {
 		dp_err("Unable to allocate ms_buf");
+		wtc->stats.ctrl_msg_fail++;
 		return -ENOSPC;
 	}
 
@@ -1323,8 +1349,10 @@ dp_wifi_transport_ctrl_msg_send(struct wifi_transport_host_context *wtc,
 	int ret = dp_wifi_transport_msg_send(wtc, wtc->hif_handle,
 					     msg_buf, nbytes);
 
-	if (ret)
+	if (ret) {
 		dp_wifi_transport_ce_msg_free(wtc, msg_buf);
+		wtc->stats.ctrl_msg_fail++;
+	}
 	return ret;
 }
 
@@ -1460,6 +1488,39 @@ int dp_wifi_transport_get_params(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	return ret;
+}
+
+void dp_wifi_transport_display_stats(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wifi_transport_host_context *wtc;
+	struct wifi_transport_link_state *ls = &dp_ctx->wifi_transport_link;
+	struct wifi_transport_stats      *stats;
+
+	wtc = dp_wifi_transport_ctx_get(dp_ctx);
+	if (!wtc)
+		return;
+
+	stats = &wtc->stats;
+
+	dp_info("TX: enq=%u comp=%u ok=%u fail=%u drop=%u",
+		stats->tx_enqueued, stats->tx_completed,
+		stats->tx_status[XPAN_PKT_TX_SUCCESS],
+		stats->tx_status[XPAN_PKT_TX_FAILURE],
+		stats->tx_status[XPAN_PKT_DROP]);
+	dp_info("TX err: pool_ex=%u msg_ex=%u deinit=%u ce_fail=%u",
+		stats->tx_pool_exhausted, stats->tx_ce_msg_exhausted,
+		stats->tx_deinit_drop, stats->tx_ce_send_fail);
+	dp_info("RX: ind=%u pkts=%u pstats=%u",
+		stats->rx_indications, stats->rx_packets,
+		stats->rx_peer_stats);
+	dp_info("RX err: inv_cookie=%u no_sess=%u refill_full=%u",
+		stats->rx_drop_invalid_cookie,
+		ls->rx_drop_no_session, stats->rx_refill_ring_full);
+	dp_info("CTL: link_up=%u link_down=%u fail=%u",
+		stats->direct_link_up_sent, stats->direct_link_down_sent,
+		stats->ctrl_msg_fail);
+
+	dp_wifi_transport_ctx_put(wtc);
 }
 
 #endif /* FEATURE_WIFI_TRANSPORT */

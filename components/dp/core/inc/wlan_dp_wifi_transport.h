@@ -31,6 +31,7 @@
 #ifdef FEATURE_WIFI_TRANSPORT
 
 #include "wlan_dp_priv.h"
+#include "lpass_ce/lpass_ce.h"
 #include <wifi_transport_aux.h>
 #include "htc_api.h"
 #include <qdf_lock.h>
@@ -134,6 +135,44 @@ struct wifi_transport_ce_buf_entry {
 };
 
 /**
+ * struct wifi_transport_stats - WiFi Transport TX/RX path statistics
+ * @tx_enqueued: packets submitted to CE0 TX path via dp_wifi_transport_tx
+ * @tx_completed: total TX completions received from FW
+ * @tx_status: TX completions status stats
+ * @tx_pool_exhausted: TX buf pool was full at packet submit time
+ * @tx_ce_msg_exhausted: CE0 framing pool was full at TX or control-msg time
+ * @tx_deinit_drop: packets dropped because session deinit is in progress
+ * @tx_ce_send_fail: CE0 ring full during flush; cookies returned to pool
+ * @rx_indications: XPAN_RX_INDICATION messages received from FW
+ * @rx_packets: audio buffers delivered to ops.process_rx
+ * @rx_drop_invalid_cookie: buffers dropped due to unresolvable sw_cookie
+ * @rx_refill_ring_full: refill ring full; descriptor returned to MAC pool
+ * @rx_peer_stats: XPAN_PEER_STATS messages received and delivered
+ * @ctrl_msg_fail: control message (mode/burst/CCE/link) CE0 send failures
+ * @direct_link_up_sent: XPAN_DIRECT_LINK_UP_INDICATION control messages sent
+ * @direct_link_down_sent: XPAN_DIRECT_LINK_DOWN_REQUEST control messages sent
+ */
+struct wifi_transport_stats {
+	uint32_t tx_enqueued;
+	uint32_t tx_completed;
+	uint32_t tx_status[XPAN_PKT_DROP + 1];
+	uint32_t tx_pool_exhausted;
+	uint32_t tx_ce_msg_exhausted;
+	uint32_t tx_deinit_drop;
+	uint32_t tx_ce_send_fail;
+
+	uint32_t rx_indications;
+	uint32_t rx_packets;
+	uint32_t rx_drop_invalid_cookie;
+	uint32_t rx_refill_ring_full;
+	uint32_t rx_peer_stats;
+
+	uint32_t ctrl_msg_fail;
+	uint32_t direct_link_up_sent;
+	uint32_t direct_link_down_sent;
+};
+
+/**
  * struct wifi_transport_host_context - per-session core state object
  * @ref_cnt: reference count; last put triggers dp_wifi_transport_release()
  * @ce_msg_lock: Spinlock protecting ce_msg_free_head
@@ -165,6 +204,7 @@ struct wifi_transport_ce_buf_entry {
  * @ready_head: head of the queue of fully-assembled CE0 framing buffers
  *        waiting to be flushed to FW, in submission order
  * @ready_tail: tail pointer for the ready queue; NULL when queue is empty
+ * @stats: Tx/Rx Path statistics
  *
  * Lock hierarchy (must acquire in order — never reverse):
  *   L1: dp_ctx->wifi_transport_host_ctx_lock  (pointer guard)
@@ -198,7 +238,7 @@ struct wifi_transport_host_context {
 	struct wifi_transport_ce_msg_buf *cur_msg_buf;
 	struct wifi_transport_ce_msg_buf *ready_head;
 	struct wifi_transport_ce_msg_buf *ready_tail;
-
+	struct wifi_transport_stats      stats;
 };
 
 /**
@@ -284,6 +324,19 @@ int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 int dp_wifi_transport_get_params(struct wlan_dp_psoc_context *dp_ctx,
 				 enum wifi_transport_param_type type,
 				 union wifi_transport_param_data *data);
+
+/**
+ * dp_wifi_transport_display_stats() - Print WiFi Transport TX/RX stats
+ * @dp_ctx: DP psoc context
+ *
+ * Return: None
+ */
+void dp_wifi_transport_display_stats(struct wlan_dp_psoc_context *dp_ctx);
+#else
+static inline void
+dp_wifi_transport_display_stats(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
 
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _WLAN_DP_WIFI_TRANSPORT_H_ */
