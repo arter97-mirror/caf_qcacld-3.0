@@ -2485,6 +2485,24 @@ ucfg_dp_register_direct_link_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
 }
 #endif
 
+#ifdef FEATURE_WIFI_TRANSPORT
+static void
+ucfg_dp_register_wifi_transport_cbs(struct wlan_dp_psoc_context *dp_ctx,
+				    struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	dp_ctx->dp_ops.osif_dp_wifi_transport_register =
+		cb_obj->osif_dp_wifi_transport_register;
+	dp_ctx->dp_ops.osif_dp_wifi_transport_deregister =
+		cb_obj->osif_dp_wifi_transport_deregister;
+}
+#else
+static inline void
+ucfg_dp_register_wifi_transport_cbs(struct wlan_dp_psoc_context *dp_ctx,
+				    struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif
+
 #ifdef IPA_WDS_EASYMESH_FEATURE
 static void
 ucfg_dp_register_ipa_wds_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
@@ -2596,6 +2614,7 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
 	dp_ctx->dp_ops.dp_get_ndev_by_vdev_id = cb_obj->dp_get_ndev_by_vdev_id;
 	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
+	ucfg_dp_register_wifi_transport_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_stc_hdd_cbs(dp_ctx, cb_obj);
 	dp_ctx->dp_ops.wlan_dp_haps_update_qtime_sync_period =
@@ -3174,6 +3193,31 @@ ucfg_dp_direct_link_handle_lpass_ssr_notif(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return dp_direct_link_handle_lpass_ssr_notif(dp_ctx);
+}
+#elif defined(FEATURE_WIFI_TRANSPORT)
+QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!dp_ctx->dp_ops.osif_dp_wifi_transport_register)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	return dp_ctx->dp_ops.osif_dp_wifi_transport_register(psoc);
+}
+
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx || !dp_ctx->dp_ops.osif_dp_wifi_transport_deregister)
+		return;
+
+	dp_ctx->dp_ops.osif_dp_wifi_transport_deregister(psoc, is_ssr);
 }
 #endif
 

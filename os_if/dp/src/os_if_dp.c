@@ -33,6 +33,9 @@
 #include "wlan_osif_request_manager.h"
 #include <ol_defines.h>
 #include <os_if_dp_stc.h>
+#ifdef FEATURE_WIFI_TRANSPORT
+#include "os_if_dp_wifi_transport.h"
+#endif
 
 #ifdef FEATURE_DIRECT_LINK
 #include <linux/remoteproc/qcom_rproc.h>
@@ -1358,6 +1361,22 @@ osif_dp_register_direct_link_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 }
 #endif
 
+#ifdef FEATURE_WIFI_TRANSPORT
+static inline void
+osif_dp_register_wifi_transport_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	cb_obj->osif_dp_wifi_transport_register =
+					os_if_dp_wifi_transport_register;
+	cb_obj->osif_dp_wifi_transport_deregister =
+					os_if_dp_wifi_transport_deregister;
+}
+#else
+static inline void
+osif_dp_register_wifi_transport_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif
+
 /*
  * os_if_dp_register_event_handler() - Register osif event handler
  * @psoc: psoc handle
@@ -1383,6 +1402,7 @@ void os_if_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	cb_obj->osif_dp_process_mic_error = osif_dp_process_mic_error;
 	os_if_dp_register_txrx_callbacks(cb_obj);
 	osif_dp_register_direct_link_callbacks(cb_obj);
+	osif_dp_register_wifi_transport_callbacks(cb_obj);
 	osif_dp_register_stc_callbacks(cb_obj);
 
 	ucfg_dp_register_hdd_callbacks(psoc, cb_obj);
