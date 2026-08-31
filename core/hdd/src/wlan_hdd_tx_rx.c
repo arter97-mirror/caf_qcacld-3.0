@@ -259,6 +259,11 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 		return;
 	}
 
+	if (!soc) {
+		hdd_err("soc is NULL");
+		return;
+	}
+
 	cdp_display_stats(soc, CDP_DUMP_TX_FLOW_POOL_INFO,
 			  QDF_STATS_VERBOSITY_LEVEL_LOW);
 	wlan_hdd_display_adapter_netif_queue_history(adapter);
