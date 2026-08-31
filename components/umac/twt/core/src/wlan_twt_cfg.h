@@ -115,6 +115,44 @@ wlan_twt_get_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
 					       bool *val);
 
 /**
+ * wlan_twt_cfg_set_twt_concurrency_enable() - Set TWT concurrency enable
+ * @vdev: Pointer to global vdev
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+QDF_STATUS
+wlan_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev,
+					bool val);
+
+/**
+ * wlan_twt_cfg_set_allow_btwt_id0() - Set allow broadcast TWT ID 0
+ * @vdev: Pointer to vdev object
+ * @val: Value to set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val);
+#else
+static inline QDF_STATUS
+wlan_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev,
+					bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+/**
  * wlan_twt_cfg_is_twt_enabled() - API to check if TWT is enabled
  * @psoc: Pointer to PSOC object
  *

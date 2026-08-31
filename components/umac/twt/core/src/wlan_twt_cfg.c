@@ -787,3 +787,52 @@ wlan_twt_get_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+QDF_STATUS
+wlan_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev,
+					bool val)
+{
+	struct twt_vdev_priv_obj *twt_vdev_obj;
+
+	if (!vdev) {
+		twt_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(vdev,
+							     WLAN_UMAC_COMP_TWT);
+	if (!twt_vdev_obj) {
+		twt_err("twt vdev component object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_vdev_obj->twt_concurrency_enable = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct twt_vdev_priv_obj *twt_vdev_obj;
+
+	if (!vdev) {
+		twt_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(vdev,
+							     WLAN_UMAC_COMP_TWT);
+	if (!twt_vdev_obj) {
+		twt_err("twt vdev component object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_vdev_obj->allow_btwt_id0 = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

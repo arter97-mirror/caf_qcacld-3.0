@@ -565,6 +565,46 @@ bool ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 QDF_STATUS
 ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
+
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+/**
+ * ucfg_twt_cfg_set_allow_btwt_id0() - This API is wrapper for
+ * function "wlan_twt_cfg_set_allow_btwt_id0"
+ * @vdev: Pointer to vdev object
+ * @val: Value to set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * ucfg_twt_cfg_set_twt_concurrency_enable() - This API is wrapper for
+ * function "wlan_twt_cfg_set_twt_concurrency_enable"
+ * @vdev: Pointer to vdev object
+ * @val: value
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev, bool val);
+#else
+static inline
+QDF_STATUS
+ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS
+ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /*NAN STD MODE */
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -775,6 +815,20 @@ ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
 						  uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS
+ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS
+ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif

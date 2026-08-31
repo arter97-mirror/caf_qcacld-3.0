@@ -101,7 +101,7 @@
 #include "wlan_hdd_apf.h"
 #include "wlan_hdd_fw_state.h"
 #include "wlan_hdd_mpta_helper.h"
-
+#include "wlan_twt_ucfg_ext_api.h"
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_misc.h>
 #include <cdp_txrx_ctrl.h>
@@ -10456,7 +10456,14 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_TX] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_RX] = {.type = NLA_U8},
-
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TWT_CONCURRENCY_ENABLE] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_BTWT_ID0] = {
+		.type = NLA_U8},
+#endif
 };
 
 
@@ -15544,6 +15551,88 @@ static int hdd_set_cfg_aux_listen(struct wlan_hdd_link_info *link_info,
 	return errno;
 }
 
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+/**
+ * hdd_set_twt_concurrency_enable() - Set TWT concurrency enable
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success, else error number
+ */
+static int
+hdd_set_twt_concurrency_enable(struct wlan_hdd_link_info *link_info,
+				const struct nlattr *attr)
+{
+	uint32_t val;
+	int errno = 0;
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	val = nla_get_u8(attr);
+	hdd_debug("Received twt_concurrency_enable value %d", val);
+	status = ucfg_twt_cfg_set_twt_concurrency_enable(link_info->vdev, val);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set twt_concurrency_enable");
+		return -EINVAL;
+	}
+
+	errno = wma_cli_set_command(link_info->vdev_id,
+				    wmi_vdev_param_enable_twt_concurrency,
+				    val, VDEV_CMD);
+	if (errno)
+		hdd_err("fail to enable twt concurrency for vdev %d",
+			 link_info->vdev_id);
+
+	return errno;
+}
+
+/**
+ * hdd_set_allow_btwt_id0() - Set allow broadcast TWT ID 0
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success, else error number
+ */
+static int
+hdd_set_allow_btwt_id0(struct wlan_hdd_link_info *link_info,
+			const struct nlattr *attr)
+{
+	uint32_t val;
+	int errno = 0;
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	val = nla_get_u8(attr);
+	hdd_debug("Received allow_btwt_id0 value %d", val);
+	status = ucfg_twt_cfg_set_allow_btwt_id0(link_info->vdev, val);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set allow_btwt_id0");
+		return -EINVAL;
+	}
+
+	errno = wma_cli_set_command(link_info->vdev_id,
+				    wmi_vdev_param_use_btwt_id0,
+				    val, VDEV_CMD);
+	if (errno)
+		hdd_err("fail to set btwt id0 for vdev %d", link_info->vdev_id);
+
+	return errno;
+}
+#endif
+
+
 #ifdef WLAN_FEATURE_QSH_SCAN
 /**
  * hdd_set_cfg_qsh_scan_ctrl() - Control QSH scan suppression
@@ -15933,6 +16022,14 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_2x_ldpc_tx},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_RX,
 	 hdd_config_2x_ldpc_rx},
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TWT_CONCURRENCY_ENABLE,
+	 hdd_set_twt_concurrency_enable},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_BTWT_ID0,
+	 hdd_set_allow_btwt_id0},
+#endif
 };
 
 #ifdef WLAN_FEATURE_ELNA

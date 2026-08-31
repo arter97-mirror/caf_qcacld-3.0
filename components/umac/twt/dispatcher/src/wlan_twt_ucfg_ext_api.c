@@ -385,3 +385,20 @@ ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(psoc, vdev_id);
 }
+
+#if defined(WLAN_FEATURE_NAN) && \
+    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
+     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
+QDF_STATUS
+ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev,
+					bool val)
+{
+	return wlan_twt_cfg_set_twt_concurrency_enable(vdev, val);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return wlan_twt_cfg_set_allow_btwt_id0(vdev, val);
+}
+#endif
