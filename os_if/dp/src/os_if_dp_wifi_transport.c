@@ -20,15 +20,101 @@
 
 #include "os_if_dp_wifi_transport.h"
 #include "wlan_dp_wifi_transport_ucfg_api.h"
+#include "wlan_dp_main.h"
+#include <linux/auxiliary_bus.h>
+#include <wifi_transport_aux.h>
+
+/*
+ * Heap-allocated per-register-cycle auxiliary device instance.
+ * Freed from os_if_dp_wifi_transport_adev_release() once all kernel
+ * references drop.
+ * NULL between deregister and the next register call.
+ */
+static struct wifi_transport_auxiliary_device *g_wifi_transport_adev;
+
+/**
+ * os_if_dp_wifi_transport_adev_release() - Free auxiliary device after
+ *   last reference
+ * @dev: embedded &auxiliary_device.dev
+ *
+ * Called by the kernel kobject layer when all references to the device are
+ * dropped (after auxiliary_device_uninit()).  Frees the per-cycle allocation
+ * and resets the global pointer so the next register call starts clean.
+ *
+ * Return: None
+ */
+static void os_if_dp_wifi_transport_adev_release(struct device *dev)
+{
+	struct wifi_transport_auxiliary_device *adev =
+		container_of(dev, struct wifi_transport_auxiliary_device,
+			     adev.dev);
+
+	dp_info("auxiliary device released (%s)", dev_name(dev));
+	qdf_mem_free(adev);
+	g_wifi_transport_adev = NULL;
+}
 
 QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 {
+	struct wifi_transport_auxiliary_device *adev;
+	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	int ret;
+
+	dp_info("auxiliary device register");
+
+	if (!qdf_dev) {
+		dp_err("QDF device NULL at register");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	adev = qdf_mem_malloc(sizeof(*adev));
+	if (!adev) {
+		dp_err("Aux device allocation failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	g_wifi_transport_adev      = adev;
+	adev->adev.name            = "wifi_tp";
+	adev->adev.id              = 0;
+	adev->adev.dev.parent      = qdf_dev->dev;
+	adev->adev.dev.release     = os_if_dp_wifi_transport_adev_release;
+
+	ret = auxiliary_device_init(&adev->adev);
+	if (ret) {
+		dp_err("auxiliary_device_init failed %d", ret);
+		qdf_mem_free(adev);
+		g_wifi_transport_adev = NULL;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = auxiliary_device_add(&adev->adev);
+	if (ret) {
+		dp_err("auxiliary_device_add failed %d", ret);
+		/*
+		 * auxiliary_device_uninit() -> put_device() -> release() frees
+		 * adev and clears g_wifi_transport_adev.
+		 */
+		auxiliary_device_uninit(&adev->adev);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_info("auxiliary device registered (%s)", dev_name(&adev->adev.dev));
+
 	return QDF_STATUS_SUCCESS;
 }
 
 void os_if_dp_wifi_transport_deregister(struct wlan_objmgr_psoc *psoc,
 					bool is_recovery_stop)
 {
+	dp_info("deregistering auxiliary device, recovery=%d",
+		is_recovery_stop);
+
+	if (g_wifi_transport_adev) {
+		auxiliary_device_delete(&g_wifi_transport_adev->adev);
+		auxiliary_device_uninit(&g_wifi_transport_adev->adev);
+	}
+
+	dp_info("deregister complete");
 }
 
 QDF_STATUS os_if_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc)

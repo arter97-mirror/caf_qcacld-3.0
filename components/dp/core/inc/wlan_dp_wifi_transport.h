@@ -31,7 +31,7 @@
 #ifdef FEATURE_WIFI_TRANSPORT
 
 #include "wlan_dp_priv.h"
-#include <wifi_transport.h>
+#include <wifi_transport_aux.h>
 #include "htc_api.h"
 #include <qdf_lock.h>
 #include <qdf_mem.h>
