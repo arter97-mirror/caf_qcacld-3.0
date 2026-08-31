@@ -7322,6 +7322,7 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 	uint8_t oper_mode = BSS_OPERATIONAL_MODE_STA;
 	uint8_t vdev_id = del_sta->smesessionId;
 	bool rsp_requested = del_sta->respReqd;
+	bool is_host_4way_hs_supported;
 	void *htc_handle;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -7346,8 +7347,13 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 
 	switch (oper_mode) {
 	case BSS_OPERATIONAL_MODE_STA:
+		is_host_4way_hs_supported =
+			wlan_psoc_nif_fw_ext2_cap_get(
+					wma->psoc,
+					WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 		if (wlan_cm_is_roam_sync_in_progress(wma->psoc, vdev_id) ||
-		    MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id) ||
+		    (!is_host_4way_hs_supported &&
+		     MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id)) ||
 		    mlo_is_roaming_in_progress(wma->psoc, vdev_id)) {
 			wma_debug("LFR3: Del STA on vdev_id %d", vdev_id);
 			qdf_mem_free(del_sta);
