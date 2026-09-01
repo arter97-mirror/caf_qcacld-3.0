@@ -3013,7 +3013,7 @@ int pld_oem_event_smem_write(struct device *dev, int flags, const __u8 *data,
 }
 #endif
 
-#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+#ifdef FEATURE_DT_CPU_MASK_DP_INTR
 void pld_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
 					    unsigned int *cpumask)
 {
@@ -3041,6 +3041,18 @@ void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 		break;
 	default:
 		break;
+	}
+}
+#endif
+
+#ifdef WLAN_DP_NAPI_IPI_REDIRECT
+bool pld_get_napi_ipi_redirect_enabled(struct device *dev)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_get_napi_ipi_redirect_enabled(dev);
+	default:
+		return false;
 	}
 }
 #endif
