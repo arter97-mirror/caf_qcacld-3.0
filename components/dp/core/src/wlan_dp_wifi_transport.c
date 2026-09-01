@@ -693,7 +693,20 @@ int dp_wifi_transport_get_params(struct wlan_dp_psoc_context *dp_ctx,
 				 enum wifi_transport_param_type type,
 				 union wifi_transport_param_data *data)
 {
-	return -EINVAL;
+	int ret = 0;
+
+	dp_info("get_params type=%d", type);
+
+	switch (type) {
+	case WT_PARAM_GET_FW_QTIMER:
+		data->qtimer_val = hal_get_fw_qtime(dp_ctx->hal_soc);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
 }
 
 #endif /* FEATURE_WIFI_TRANSPORT */
