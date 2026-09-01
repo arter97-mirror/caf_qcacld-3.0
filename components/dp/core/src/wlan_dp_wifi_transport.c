@@ -23,6 +23,90 @@
 #include "dp_internal.h"
 
 /**
+ * dp_wifi_transport_tx_buf_pool_init() - allocate TX CE buffer pool
+ * @wtc: session context
+ * @dp_ctx: DP psoc context
+ *
+ * Allocates a single DMA-coherent region for all 380 TX CE audio buffers
+ * (380 x 2048 B = 760 KB) and initialises the circular cookie queue so
+ * cookie_array[i] = i at Init. All buffers stay DMA-mapped for the session
+ * lifetime; no per-packet mapping is needed on the TX hot path.
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_NOMEM
+ */
+static inline QDF_STATUS
+dp_wifi_transport_tx_buf_pool_init(struct wifi_transport_host_context *wtc,
+				   struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_device_t qdf_dev = dp_ctx->qdf_dev;
+	qdf_nbuf_t nbuf;
+	uint32_t i;
+
+	for (i = 0; i < WIFI_TRANSPORT_TX_BUF_POOL_SIZE; i++) {
+		nbuf = qdf_nbuf_alloc(qdf_dev,
+				      WIFI_TRANSPORT_TX_CE_BUF_SIZE,
+				      0, 4, false);
+		if (!nbuf)
+			goto err;
+		if (qdf_nbuf_map_single(qdf_dev, nbuf, QDF_DMA_TO_DEVICE) !=
+		    QDF_STATUS_SUCCESS) {
+			qdf_nbuf_free(nbuf);
+			goto err;
+		}
+		qdf_nbuf_mapped_paddr_set(nbuf,
+					  qdf_nbuf_get_frag_paddr(nbuf, 0));
+		wtc->buf_array[i].nbuf  = nbuf;
+		wtc->cookie_array[i]    = i;
+	}
+	wtc->buf_pool_hp         = 0;
+	wtc->buf_pool_tp         = 0;
+	wtc->buf_pool_free_count = WIFI_TRANSPORT_TX_BUF_POOL_SIZE;
+	qdf_spinlock_create(&wtc->buf_pool_lock);
+	return QDF_STATUS_SUCCESS;
+
+err:
+	while (i--) {
+		qdf_nbuf_unmap_single(qdf_dev, wtc->buf_array[i].nbuf,
+				      QDF_DMA_TO_DEVICE);
+		qdf_nbuf_free(wtc->buf_array[i].nbuf);
+		wtc->buf_array[i].nbuf = NULL;
+	}
+	return QDF_STATUS_E_NOMEM;
+}
+
+/**
+ * dp_wifi_transport_tx_buf_pool_deinit() - free TX CE buffer pool
+ * @wtc: session context
+ * @dp_ctx: DP psoc context
+ *
+ * Releases the DMA-coherent TX CE buffer pool. Safe to call if init
+ * was never completed.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_tx_buf_pool_deinit(
+				struct wifi_transport_host_context *wtc,
+				struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_device_t qdf_dev = dp_ctx->qdf_dev;
+	uint32_t i;
+
+	if (!wtc->buf_array[0].nbuf)
+		return;
+
+	qdf_spinlock_destroy(&wtc->buf_pool_lock);
+	for (i = 0; i < WIFI_TRANSPORT_TX_BUF_POOL_SIZE; i++) {
+		if (!wtc->buf_array[i].nbuf)
+			continue;
+		qdf_nbuf_unmap_single(qdf_dev, wtc->buf_array[i].nbuf,
+				      QDF_DMA_TO_DEVICE);
+		qdf_nbuf_free(wtc->buf_array[i].nbuf);
+		wtc->buf_array[i].nbuf = NULL;
+	}
+}
+
+/**
  * dp_wifi_transport_htc_tx_complete() - stub HTC TX completion callback
  * @ctx: dp_ctx (unused)
  * @pkt: completed HTC packet (unused)
@@ -179,6 +263,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	struct wifi_transport_link_state *ls =
 			&dp_ctx->wifi_transport_link;
 	void *htc_handle;
+	QDF_STATUS status;
 
 	/* Guard: link layer must be initialised first */
 	if (!ls->link_mask) {
@@ -223,6 +308,13 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	htc_vote_link_up(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 	wtc->init_mask |= WIFI_TRANSPORT_INIT_PWR_VOTE;
 
+	status = dp_wifi_transport_tx_buf_pool_init(wtc, dp_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("TX CE buf pool init failed: %d", status);
+		goto err;
+	}
+	wtc->init_mask |= WIFI_TRANSPORT_INIT_TX_BUF_POOL;
+
 	qdf_atomic_set(&wtc->bmps_state, WIFI_TRANSPORT_BMPS_ENABLED);
 	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
 		       WIFI_TRANSPORT_PATH_ACTIVE);
@@ -231,6 +323,18 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 		wtc->lpass_ep_id);
 
 	return QDF_STATUS_SUCCESS;
+
+err:
+	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE)
+		htc_vote_link_down(htc_handle,
+				   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+
+	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	dp_ctx->wifi_transport_host_ctx = NULL;
+	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	qdf_mem_free(wtc);
+
+	return status;
 }
 
 void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
@@ -258,6 +362,8 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+
+	dp_wifi_transport_tx_buf_pool_deinit(wtc, dp_ctx);
 
 	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE) {
 		htc_handle = cds_get_context(QDF_MODULE_ID_HTC);

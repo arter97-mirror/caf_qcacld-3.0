@@ -37,6 +37,15 @@
 #include <qdf_mem.h>
 #include <qdf_types.h>
 
+/*
+ * TX CE buffer pool depth: 5 TWT_SI x 38 PKT_PER_SP x 2 = 380.
+ * sw_cookie is HOST-assigned from cookie_array[TP]; range 0-379.
+ * Host bounds-checks cookie < WIFI_TRANSPORT_TX_BUF_POOL_SIZE before
+ * indexing buf_array[].
+ */
+#define WIFI_TRANSPORT_TX_BUF_POOL_SIZE       380
+/* TX CE buffer size: matches CE0 nbytes_max (2048 B) */
+#define WIFI_TRANSPORT_TX_CE_BUF_SIZE         2048
 /* CE0 framing buffer: 2048 B matches host_ce_config nbytes_max */
 #define WIFI_TRANSPORT_CE_MSG_BUF_SIZE        2048
 /* CE5 message buffer: 256 B matches !FEATURE_PKTLOG CE5 pipe profile */
@@ -49,23 +58,13 @@
 #define WIFI_TRANSPORT_MAX_INFLIGHT_TX        1024
 
 /**
- * enum wifi_transport_init_step - bitmask tracking completed Init steps
+ * enum wifi_transport_init_step - bitmask tracking session init steps
  * @WIFI_TRANSPORT_INIT_PWR_VOTE: power-save vote taken
- * @WIFI_TRANSPORT_INIT_HTC_CONNECT: HTC service connected
- * @WIFI_TRANSPORT_INIT_REFILL_RING: LPASS refill SRNG created
- * @WIFI_TRANSPORT_INIT_CE_MSG_POOL: CE0 framing pool allocated
- * @WIFI_TRANSPORT_INIT_CE5_MSG_POOL: CE5 framing pool allocated
- * @WIFI_TRANSPORT_INIT_CE_CB_REG: CE0/CE5 callbacks registered
- * @WIFI_TRANSPORT_INIT_IRQ_CFG: CE IRQs configured
+ * @WIFI_TRANSPORT_INIT_TX_BUF_POOL: TX CE buffer pool allocated and mapped
  */
 enum wifi_transport_init_step {
 	WIFI_TRANSPORT_INIT_PWR_VOTE      = BIT(0),
-	WIFI_TRANSPORT_INIT_HTC_CONNECT   = BIT(1),
-	WIFI_TRANSPORT_INIT_REFILL_RING   = BIT(2),
-	WIFI_TRANSPORT_INIT_CE_MSG_POOL   = BIT(3),
-	WIFI_TRANSPORT_INIT_CE5_MSG_POOL  = BIT(4),
-	WIFI_TRANSPORT_INIT_CE_CB_REG     = BIT(5),
-	WIFI_TRANSPORT_INIT_IRQ_CFG       = BIT(6),
+	WIFI_TRANSPORT_INIT_TX_BUF_POOL   = BIT(1),
 };
 
 /**
@@ -128,6 +127,15 @@ struct wifi_transport_ce_msg_buf {
 };
 
 /**
+ * struct wifi_transport_ce_buf_entry - single TX CE audio buffer (nbuf-backed)
+ * @nbuf: pre-allocated, DMA-mapped (TO_DEVICE) nbuf.  Audio payload copied to
+ *        qdf_nbuf_data().  DMA address cached via qdf_nbuf_mapped_paddr_get().
+ */
+struct wifi_transport_ce_buf_entry {
+	qdf_nbuf_t nbuf;
+};
+
+/**
  * struct wifi_transport_host_context - per-session core state object
  * @ref_cnt: reference count; last put triggers dp_wifi_transport_release()
  * @lock: BH spinlock protecting pool free-lists (L2 in lock hierarchy)
@@ -139,9 +147,15 @@ struct wifi_transport_ce_msg_buf {
  * @rx_refill_ring: LPASS RXDMA refill SRNG (640 x 8 B descriptors)
  * @qdf_dev: qdf_dev handle
  * @hif_handle: hif handle
- * @ce5_msg_pool: CE5 framing buffer pool (30 x 256 B, DMA-coherent)
- * @ce5_msg_pool_base_vaddr: base virtual address of ce5_msg_pool region
- * @ce5_msg_pool_base_dma: base DMA address of ce5_msg_pool region
+ * @buf_array: 380 pre-allocated DMA-mapped TX CE audio buffers
+ * @cookie_array: circular free-index queue; cookie_array[i]=i at Init
+ * @buf_pool_hp: cookie ring head — written by TX completion (BH) and error
+ *        paths; protected by buf_pool_lock
+ * @buf_pool_tp: cookie ring tail — written by TX alloc (process); protected
+ *        by buf_pool_lock
+ * @buf_pool_free_count: available slots; protected by buf_pool_lock
+ * @buf_pool_lock: _bh spinlock serialising TX alloc (process) vs TX
+ *        completion (BH) and SSR reset
  * @host_desc: TX descriptor slots indexed by .ko sw_cookie
  * @free_head: head of TX descriptor free-list
  * @avail_desc: number of free TX descriptor slots
@@ -172,10 +186,14 @@ struct wifi_transport_host_context {
 	struct dp_srng              *rx_refill_ring;
 	qdf_device_t                 qdf_dev;
 	struct hif_opaque_softc     *hif_handle;
-	struct wifi_transport_ce_msg_buf
-			ce5_msg_pool[WIFI_TRANSPORT_CE5_MSG_POOL_SIZE];
-	void                        *ce5_msg_pool_base_vaddr;
-	qdf_dma_addr_t               ce5_msg_pool_base_dma;
+	struct wifi_transport_ce_buf_entry
+			buf_array[WIFI_TRANSPORT_TX_BUF_POOL_SIZE];
+	uint16_t  cookie_array[WIFI_TRANSPORT_TX_BUF_POOL_SIZE];
+	uint32_t                     buf_pool_hp;
+	uint32_t                     buf_pool_tp;
+	uint32_t                     buf_pool_free_count;
+	qdf_spinlock_t               buf_pool_lock;
+
 	struct wifi_transport_tx_desc
 			host_desc[WIFI_TRANSPORT_MAX_INFLIGHT_TX];
 	uint32_t                     free_head;
