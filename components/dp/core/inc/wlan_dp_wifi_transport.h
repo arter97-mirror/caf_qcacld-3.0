@@ -37,6 +37,8 @@
 #include <qdf_mem.h>
 #include <qdf_types.h>
 
+/* Max ms to wait for all session reference holders to drain at deinit */
+#define WIFI_TRANSPORT_REF_DRAIN_TIMEOUT_MS      3000
 /*
  * TX CE buffer pool depth: 5 TWT_SI x 38 PKT_PER_SP x 2 = 380.
  * sw_cookie is HOST-assigned from cookie_array[TP]; range 0-379.

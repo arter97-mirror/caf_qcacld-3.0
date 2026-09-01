@@ -23,6 +23,61 @@
 #include "dp_internal.h"
 
 /**
+ * dp_wifi_transport_ctx_get() - fetch session context and take a reference
+ * @dp_ctx: DP psoc context
+ *
+ * Atomically fetches the active session context and increments its
+ * reference count under the ctx_lock spinlock.
+ *
+ * Return: pointer to wtc if a session is active, NULL otherwise
+ */
+static inline struct wifi_transport_host_context *
+dp_wifi_transport_ctx_get(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wifi_transport_host_context *wtc;
+
+	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	wtc = dp_ctx->wifi_transport_host_ctx;
+	if (wtc)
+		qdf_atomic_inc(&wtc->ref_cnt);
+	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+
+	return wtc;
+}
+
+/**
+ * dp_wifi_transport_release() - signal teardown completion
+ * @wtc: session context whose ref_cnt just reached zero
+ *
+ * Called when the last reference is dropped during deinit.
+ * Signals deregister_done so dp_wifi_transport_deinit() can
+ * proceed with resource teardown.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_release(struct wifi_transport_host_context *wtc)
+{
+	dp_info("last ref dropped, signalling deregister_done");
+	qdf_event_set(&wtc->deregister_done);
+}
+
+/**
+ * dp_wifi_transport_ctx_put() - release a session context reference
+ * @wtc: session context obtained from dp_wifi_transport_ctx_get()
+ *
+ * No lock needed — we already hold a reference so the object is stable.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_ctx_put(struct wifi_transport_host_context *wtc)
+{
+	if (wtc && qdf_atomic_dec_and_test(&wtc->ref_cnt))
+		dp_wifi_transport_release(wtc);
+}
+
+/**
  * dp_wifi_transport_ce_msg_alloc() - pop a buffer from the CE0 framing pool
  * @wtc: session context
  *
@@ -423,6 +478,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	wtc->qdf_dev = dp_ctx->qdf_dev;
 	wtc->hif_handle = cds_get_context(QDF_MODULE_ID_HIF);
 	qdf_spinlock_create(&wtc->ce_msg_lock);
+	qdf_event_create(&wtc->deregister_done);
 
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	dp_ctx->wifi_transport_host_ctx = wtc;
@@ -445,6 +501,8 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	}
 	wtc->init_mask |= WIFI_TRANSPORT_INIT_CE_MSG_POOL;
 
+	qdf_atomic_init(&wtc->ref_cnt);
+	qdf_atomic_inc(&wtc->ref_cnt);
 	qdf_atomic_set(&wtc->bmps_state, WIFI_TRANSPORT_BMPS_ENABLED);
 	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
 		       WIFI_TRANSPORT_PATH_ACTIVE);
@@ -464,6 +522,7 @@ err:
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	qdf_spinlock_destroy(&wtc->ce_msg_lock);
+	qdf_event_destroy(&wtc->deregister_done);
 	qdf_mem_free(wtc);
 
 	return status;
@@ -495,6 +554,13 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 
+	if (qdf_atomic_dec_and_test(&wtc->ref_cnt))
+		dp_wifi_transport_release(wtc);
+	if (QDF_IS_STATUS_ERROR(
+		qdf_wait_single_event(&wtc->deregister_done,
+				      WIFI_TRANSPORT_REF_DRAIN_TIMEOUT_MS)))
+		dp_err("timed out waiting for session refs to drain");
+
 	dp_wifi_transport_ce_msg_pool_deinit(wtc, dp_ctx);
 	dp_wifi_transport_tx_buf_pool_deinit(wtc, dp_ctx);
 
@@ -505,6 +571,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 					   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 	}
 
+	qdf_event_destroy(&wtc->deregister_done);
 	qdf_spinlock_destroy(&wtc->ce_msg_lock);
 	qdf_mem_free(wtc);
 	dp_info("deinit complete");
