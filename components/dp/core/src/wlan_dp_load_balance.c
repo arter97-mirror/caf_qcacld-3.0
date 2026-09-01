@@ -366,6 +366,7 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	struct cpu_load *cpu_load_avg;
 	uint32_t per_ring_pkt_avg[MAX_REO_DEST_RINGS];
 	qdf_cpu_mask *cpu_mask = &lb_data->curr_cpu_mask;
+	qdf_cpu_mask online_cpu_mask;
 	enum wlan_dp_fb_status status = FLOW_BALANCE_NOT_ELIGIBLE;
 	uint64_t start_time;
 	uint32_t num_cpus = 0;
@@ -395,9 +396,17 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	/* Take the copy of cpu load for the CPUs present in the
 	 * current cpu mask
 	 */
+	qdf_cpumask_copy(&online_cpu_mask, cpu_online_mask);
+
 	qdf_for_each_online_cpu(cpu) {
 		if (!(qdf_cpumask_test_cpu(cpu, cpu_mask)))
 			continue;
+
+		if (cpu >= QDF_MAX_AVAILABLE_CPU ||
+		    num_cpus >= QDF_MAX_AVAILABLE_CPU)
+			dp_info("cpu %d num_cpus %u curr_cpu_mask %*pbl online_cpu_mask %*pbl",
+				cpu, num_cpus, qdf_cpumask_pr_args(cpu_mask),
+				qdf_cpumask_pr_args(&online_cpu_mask));
 
 		cpu_load = &lb_data->cpu_load[cpu];
 		cpu_load_avg = &cpu_load_avgs[num_cpus];
@@ -412,11 +421,17 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 		num_cpus++;
 	}
 
+	if (!num_cpus || !total_wlan_load) {
+		qdf_spin_unlock(&lb_data->load_balance_lock);
+		return;
+	}
+
 	targeted_load_per_cpu = total_cpu_load / num_cpus;
 
 	/*calculate and update per cpu allowed wlan tput weightage */
 	for (cpu = 0; cpu < num_cpus; cpu++) {
 		cpu_load_avg = &cpu_load_avgs[cpu];
+		non_wlan_avg_load = 0;
 		if (cpu_load_avg->total_cpu_avg_load >
 		    cpu_load_avg->wlan_avg_load)
 			non_wlan_avg_load = cpu_load_avg->total_cpu_avg_load -
