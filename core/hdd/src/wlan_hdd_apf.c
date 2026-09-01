@@ -442,13 +442,17 @@ hdd_apf_read_memory_callback(void *hdd_context,
 
 	context = &link_info->adapter->apf_context;
 
+	qdf_spin_lock_bh(&context->lock);
+
 	if (context->magic != APF_CONTEXT_MAGIC) {
 		/* The caller presumably timed out, nothing to do */
+		qdf_spin_unlock_bh(&context->lock);
 		hdd_err("Caller timed out or corrupt magic, simply return");
 		return;
 	}
 
 	if (evt->offset <  context->offset) {
+		qdf_spin_unlock_bh(&context->lock);
 		hdd_err("Offset in read event(%d) smaller than offset in request(%d)!",
 					evt->offset, context->offset);
 		return;
@@ -463,6 +467,7 @@ hdd_apf_read_memory_callback(void *hdd_context,
 
 	if ((pkt_offset > context->buf_len) ||
 	    (context->buf_len - pkt_offset < evt->length)) {
+		qdf_spin_unlock_bh(&context->lock);
 		hdd_err("Read chunk exceeding allocated space");
 		return;
 	}
@@ -475,6 +480,8 @@ hdd_apf_read_memory_callback(void *hdd_context,
 		context->magic = 0;
 		qdf_event_set(&context->qdf_apf_event);
 	}
+
+	qdf_spin_unlock_bh(&context->lock);
 
 	hdd_exit();
 }
@@ -558,7 +565,9 @@ static int hdd_apf_read_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 					       WLAN_WAIT_TIME_APF_READ_MEM);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Target response timed out");
+		qdf_spin_lock_bh(&context->lock);
 		context->magic = 0;
+		qdf_spin_unlock_bh(&context->lock);
 		ret = -ETIMEDOUT;
 		goto fail;
 	}
@@ -588,10 +597,12 @@ static int hdd_apf_read_memory(struct hdd_adapter *adapter, struct nlattr **tb)
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   context->buf, read_mem_params.length);
 fail:
+	qdf_spin_lock_bh(&context->lock);
 	if (context->buf) {
 		qdf_mem_free(context->buf);
 		context->buf = NULL;
 	}
+	qdf_spin_unlock_bh(&context->lock);
 
 	return ret;
 }
