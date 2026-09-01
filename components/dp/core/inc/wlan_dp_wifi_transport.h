@@ -61,10 +61,12 @@
  * enum wifi_transport_init_step - bitmask tracking session init steps
  * @WIFI_TRANSPORT_INIT_PWR_VOTE: power-save vote taken
  * @WIFI_TRANSPORT_INIT_TX_BUF_POOL: TX CE buffer pool allocated and mapped
+ * @WIFI_TRANSPORT_INIT_CE_MSG_POOL: CE0 control-message pool allocated
  */
 enum wifi_transport_init_step {
 	WIFI_TRANSPORT_INIT_PWR_VOTE      = BIT(0),
 	WIFI_TRANSPORT_INIT_TX_BUF_POOL   = BIT(1),
+	WIFI_TRANSPORT_INIT_CE_MSG_POOL   = BIT(2),
 };
 
 /**
@@ -113,17 +115,16 @@ struct wifi_transport_tx_desc {
 };
 
 /**
- * struct wifi_transport_ce_msg_buf - one CE0 or CE5 framing buffer entry
- * @vaddr: kernel virtual address of the DMA-coherent buffer
- * @dma_addr: DMA address for hardware
- * @bufs_added: xpan_tx_buffer_info TLVs added to this CE0 message (CE0 only)
- * @next: free-list next index; sentinel = pool size constant
+ * struct wifi_transport_ce_msg_buf - CE0 framing buffer (nbuf-backed)
+ * @nbuf: pre-allocated, DMA-mapped (TO_DEVICE) nbuf; paddr cached via
+ *        qdf_nbuf_mapped_paddr_get().  Data written to qdf_nbuf_data().
+ * @bufs_added: number of xpan_tx_buffer_info TLVs accumulated
+ * @next: free-list linkage (NULL when in use)
  */
 struct wifi_transport_ce_msg_buf {
-	void           *vaddr;
-	qdf_dma_addr_t  dma_addr;
-	uint32_t        bufs_added;
-	uint32_t        next;
+	qdf_nbuf_t                     nbuf;
+	uint32_t                       bufs_added;
+	struct wifi_transport_ce_msg_buf *next;
 };
 
 /**
@@ -159,10 +160,8 @@ struct wifi_transport_ce_buf_entry {
  * @host_desc: TX descriptor slots indexed by .ko sw_cookie
  * @free_head: head of TX descriptor free-list
  * @avail_desc: number of free TX descriptor slots
- * @ce_msg_pool: CE0 framing buffer pool (32 x 2048 B, DMA-coherent)
- * @ce_msg_pool_base_vaddr: base virtual address of ce_msg_pool region
- * @ce_msg_pool_base_dma: base DMA address of ce_msg_pool region
- * @ce_msg_free_head: head index of CE0 free-list
+ * @ce_msg_pool: 32 pre-allocated DMA-mapped TX framing buffers
+ * @ce_msg_free_head: head of msg_buf free list (protected by ce_msg_lock)
  * @ce_msg_ready_head: head index of CE0 ready-to-send list
  * @ce_msg_ready_tail: tail index of CE0 ready-to-send list
  * @msg_seq_num: xpan_msg_hdr sequence counter
@@ -200,9 +199,7 @@ struct wifi_transport_host_context {
 	uint32_t                     avail_desc;
 	struct wifi_transport_ce_msg_buf
 			ce_msg_pool[WIFI_TRANSPORT_CE_MSG_POOL_SIZE];
-	void                        *ce_msg_pool_base_vaddr;
-	qdf_dma_addr_t               ce_msg_pool_base_dma;
-	uint32_t                     ce_msg_free_head;
+	struct wifi_transport_ce_msg_buf *ce_msg_free_head;
 	uint32_t                     ce_msg_ready_head;
 	uint32_t                     ce_msg_ready_tail;
 	uint16_t                     msg_seq_num;

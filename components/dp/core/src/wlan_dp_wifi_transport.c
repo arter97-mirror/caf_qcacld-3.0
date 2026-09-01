@@ -23,6 +23,84 @@
 #include "dp_internal.h"
 
 /**
+ * dp_wifi_transport_ce_msg_pool_init() - allocate CE0 framing buffer pool
+ * @wtc: session context
+ * @dp_ctx: DP psoc context
+ *
+ * Allocates a single DMA-coherent region for 32 CE0 framing buffers
+ * (32 x 2048 B = 64 KB) and chains them into a free list.  Each buffer
+ * holds [HTC_FRAME_HDR (8B)][xpan_msg_hdr (8B)][TLV payload].
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_NOMEM
+ */
+static inline QDF_STATUS
+dp_wifi_transport_ce_msg_pool_init(struct wifi_transport_host_context *wtc,
+				   struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_device_t qdf_dev = dp_ctx->qdf_dev;
+	qdf_nbuf_t nbuf;
+	uint32_t i;
+
+	for (i = 0; i < WIFI_TRANSPORT_CE_MSG_POOL_SIZE; i++) {
+		nbuf = qdf_nbuf_alloc(qdf_dev,
+				      WIFI_TRANSPORT_CE_MSG_BUF_SIZE,
+				      0, 4, false);
+		if (!nbuf)
+			goto err;
+		if (qdf_nbuf_map_single(qdf_dev, nbuf, QDF_DMA_TO_DEVICE) !=
+		    QDF_STATUS_SUCCESS) {
+			qdf_nbuf_free(nbuf);
+			goto err;
+		}
+		qdf_nbuf_mapped_paddr_set(nbuf,
+					  qdf_nbuf_get_frag_paddr(nbuf, 0));
+		wtc->ce_msg_pool[i].nbuf       = nbuf;
+		wtc->ce_msg_pool[i].bufs_added = 0;
+		wtc->ce_msg_pool[i].next       =
+			(i + 1 < WIFI_TRANSPORT_CE_MSG_POOL_SIZE) ?
+			&wtc->ce_msg_pool[i + 1] : NULL;
+	}
+	wtc->ce_msg_free_head = &wtc->ce_msg_pool[0];
+	return QDF_STATUS_SUCCESS;
+
+err:
+	while (i--) {
+		qdf_nbuf_unmap_single(qdf_dev, wtc->ce_msg_pool[i].nbuf,
+				      QDF_DMA_TO_DEVICE);
+		qdf_nbuf_free(wtc->ce_msg_pool[i].nbuf);
+		wtc->ce_msg_pool[i].nbuf = NULL;
+	}
+	return QDF_STATUS_E_NOMEM;
+}
+
+/**
+ * dp_wifi_transport_ce_msg_pool_deinit() - free CE0 framing buffer pool
+ * @wtc: session context
+ * @dp_ctx: DP psoc context
+ *
+ * Safe to call if init was never completed.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_ce_msg_pool_deinit(struct wifi_transport_host_context *wtc,
+				     struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_device_t qdf_dev = dp_ctx->qdf_dev;
+	uint32_t i;
+
+	for (i = 0; i < WIFI_TRANSPORT_CE_MSG_POOL_SIZE; i++) {
+		if (!wtc->ce_msg_pool[i].nbuf)
+			continue;
+		qdf_nbuf_unmap_single(qdf_dev, wtc->ce_msg_pool[i].nbuf,
+				      QDF_DMA_TO_DEVICE);
+		qdf_nbuf_free(wtc->ce_msg_pool[i].nbuf);
+		wtc->ce_msg_pool[i].nbuf = NULL;
+	}
+	wtc->ce_msg_free_head = NULL;
+}
+
+/**
  * dp_wifi_transport_tx_buf_pool_init() - allocate TX CE buffer pool
  * @wtc: session context
  * @dp_ctx: DP psoc context
@@ -315,6 +393,13 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	}
 	wtc->init_mask |= WIFI_TRANSPORT_INIT_TX_BUF_POOL;
 
+	status = dp_wifi_transport_ce_msg_pool_init(wtc, dp_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("CE msg pool init failed: %d", status);
+		goto err;
+	}
+	wtc->init_mask |= WIFI_TRANSPORT_INIT_CE_MSG_POOL;
+
 	qdf_atomic_set(&wtc->bmps_state, WIFI_TRANSPORT_BMPS_ENABLED);
 	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
 		       WIFI_TRANSPORT_PATH_ACTIVE);
@@ -325,6 +410,8 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	return QDF_STATUS_SUCCESS;
 
 err:
+	if (wtc->init_mask & WIFI_TRANSPORT_INIT_TX_BUF_POOL)
+		dp_wifi_transport_tx_buf_pool_deinit(wtc, dp_ctx);
 	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE)
 		htc_vote_link_down(htc_handle,
 				   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
@@ -363,6 +450,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 
+	dp_wifi_transport_ce_msg_pool_deinit(wtc, dp_ctx);
 	dp_wifi_transport_tx_buf_pool_deinit(wtc, dp_ctx);
 
 	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE) {
