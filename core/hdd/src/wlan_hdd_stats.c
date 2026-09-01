@@ -10389,7 +10389,7 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	if (!is_noise_floor_invalid(chan_info->noise_floor))
 		survey->noise = chan_info->noise_floor;
 	else
-		survey->noise = HDD_NOISE_FLOOR_DBM;
+		survey->noise = WLAN_SURVEY_NOISE_FLOOR;
 
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;

@@ -3445,4 +3445,8 @@ config SCAN_RANDOM_MAC_ADDR
 config FEATURE_DAL_DP_SUPPORT
 	bool "Enable FEATURE_DAL_DP_SUPPORT feature"
 	default n
+
+config WLAN_SURVEY_NOISE_FLOOR
+	int "Survey noise floor value reported in dBm"
+	default -96
 endif # QCA_CLD_WLAN
