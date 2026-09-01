@@ -10384,11 +10384,12 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 		return false;
 
 	survey->channel = channels;
-	survey->noise = chan_info->noise_floor;
-	survey->filled = 0;
+	survey->filled = SURVEY_INFO_NOISE_DBM;
 
 	if (!is_noise_floor_invalid(chan_info->noise_floor))
-		survey->filled |= SURVEY_INFO_NOISE_DBM;
+		survey->noise = chan_info->noise_floor;
+	else
+		survey->noise = HDD_NOISE_FLOOR_DBM;
 
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
