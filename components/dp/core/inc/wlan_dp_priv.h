@@ -1096,6 +1096,9 @@ struct wifi_transport_link_state {
  * @dp_direct_link_lock: Direct link mutex lock
  * @dp_direct_link_ctx: DP Direct Link context
  * @wifi_transport_link: WiFi transport Link context
+ * @wifi_transport_host_ctx: WiFi transport context
+ * @wifi_transport_host_ctx_lock: WiFi transport context lock
+ * @wifi_transport_active_path: WiFi transport context path active
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
@@ -1216,6 +1219,9 @@ struct wlan_dp_psoc_context {
 #endif
 #ifdef FEATURE_WIFI_TRANSPORT
 	struct wifi_transport_link_state wifi_transport_link;
+	struct wifi_transport_host_context *wifi_transport_host_ctx;
+	qdf_spinlock_t wifi_transport_host_ctx_lock;
+	qdf_atomic_t wifi_transport_active_path;
 #endif
 
 #ifdef WLAN_SUPPORT_RX_FISA

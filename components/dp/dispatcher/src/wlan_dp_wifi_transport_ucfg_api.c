@@ -47,29 +47,14 @@ void ucfg_dp_wifi_transport_link_deinit(struct wlan_objmgr_psoc *psoc)
 	dp_wifi_transport_link_deinit(dp_ctx);
 }
 
-QDF_STATUS ucfg_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS ucfg_dp_wifi_transport_init(const struct wifi_transport_ops *ops)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-
-	if (!dp_ctx) {
-		dp_err("DP context not found");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return dp_wifi_transport_init(dp_ctx);
+	return dp_wifi_transport_init(dp_get_context(), ops);
 }
 
-void ucfg_dp_wifi_transport_deinit(struct wlan_objmgr_psoc *psoc,
-				   bool is_recovery_stop)
+void ucfg_dp_wifi_transport_deinit(bool is_recovery_stop)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-
-	if (!dp_ctx) {
-		dp_err("DP context not found");
-		return;
-	}
-
-	dp_wifi_transport_deinit(dp_ctx, is_recovery_stop);
+	dp_wifi_transport_deinit(dp_get_context(), is_recovery_stop);
 }
 
 #endif /* FEATURE_WIFI_TRANSPORT */

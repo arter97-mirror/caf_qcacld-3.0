@@ -172,14 +172,103 @@ void dp_wifi_transport_link_deinit(struct wlan_dp_psoc_context *dp_ctx)
 	ls->link_mask = 0;
 }
 
-QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx)
+QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
+				  const struct wifi_transport_ops *ops)
 {
+	struct wifi_transport_host_context *wtc;
+	struct wifi_transport_link_state *ls =
+			&dp_ctx->wifi_transport_link;
+	void *htc_handle;
+
+	/* Guard: link layer must be initialised first */
+	if (!ls->link_mask) {
+		dp_err("link_init not called");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Double-init guard */
+	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	if (dp_ctx->wifi_transport_host_ctx) {
+		qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+		dp_err("init called while session active");
+		return QDF_STATUS_E_ALREADY;
+	}
+	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+
+	htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	if (!htc_handle) {
+		dp_err("HTC context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wtc = qdf_mem_malloc(sizeof(*wtc));
+	if (!wtc) {
+		dp_err("Unable to allocate wtc");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* Store WiFi Transport driver callbacks before any init step
+	 * that may fire them.
+	 */
+	wtc->ops = *ops;
+	wtc->lpass_ep_id = ls->lpass_ep_id;
+	wtc->rx_refill_ring = ls->rx_refill_ring;
+	wtc->qdf_dev = dp_ctx->qdf_dev;
+	wtc->hif_handle = cds_get_context(QDF_MODULE_ID_HIF);
+
+	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	dp_ctx->wifi_transport_host_ctx = wtc;
+	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+
+	htc_vote_link_up(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+	wtc->init_mask |= WIFI_TRANSPORT_INIT_PWR_VOTE;
+
+	qdf_atomic_set(&wtc->bmps_state, WIFI_TRANSPORT_BMPS_ENABLED);
+	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
+		       WIFI_TRANSPORT_PATH_ACTIVE);
+
+	dp_info("wifi_transport init complete, ep_id=%d",
+		wtc->lpass_ep_id);
+
 	return QDF_STATUS_SUCCESS;
 }
 
 void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 			      bool is_recovery_stop)
 {
+	struct wifi_transport_host_context *wtc;
+	void *htc_handle;
+
+	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	wtc = dp_ctx->wifi_transport_host_ctx;
+	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+
+	dp_info("deinit, recovery=%d init_mask=0x%x",
+		is_recovery_stop, wtc ? wtc->init_mask : 0);
+
+	if (!wtc || !wtc->init_mask)
+		return;
+
+	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
+		       WIFI_TRANSPORT_PATH_INACTIVE);
+
+	/* Clear pointer now — prevents new ctx_get() from succeeding.
+	 * For SSR the FW is gone so no link-down send is needed.
+	 */
+	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	dp_ctx->wifi_transport_host_ctx = NULL;
+	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+
+	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE) {
+		htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+		if (htc_handle)
+			htc_vote_link_down(htc_handle,
+					   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+	}
+
+	qdf_mem_free(wtc);
+	dp_info("deinit complete");
+
 }
 
 #endif /* FEATURE_WIFI_TRANSPORT */

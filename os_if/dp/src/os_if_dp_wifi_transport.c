@@ -74,6 +74,41 @@ static void os_if_dp_wifi_transport_log(int level, const char *buf, size_t len)
 }
 
 /**
+ * os_if_dp_wifi_transport_init() - Start a WiFi Transport session
+ * @ops: WiFi Transport driver callbacks for TX completion and RX indication
+ *
+ * Called by the WiFi Transport driver after it binds to the aux device.
+ * Validates that both required callbacks are provided, then delegates
+ * to ucfg layer.
+ *
+ * Return: 0 on success, -EINVAL if callbacks missing, -ENODEV if no session
+ */
+static int os_if_dp_wifi_transport_init(const struct wifi_transport_ops *ops)
+{
+	dp_info("init called by the WiFi Transport driver");
+	if (!ops || !ops->tx_completion || !ops->process_rx) {
+		dp_err("ops NULL");
+		return -EINVAL;
+	}
+
+	return qdf_status_to_os_return(ucfg_dp_wifi_transport_init(ops));
+}
+
+/**
+ * os_if_dp_wifi_transport_deinit() - Stop the active WiFi Transport session
+ *
+ * Called by the WiFi Transport driver on unload or link-down.
+ * Normal stop (not SSR).
+ *
+ * Return: None
+ */
+static void os_if_dp_wifi_transport_deinit(void)
+{
+	dp_info("deinit called by the WiFi Transport driver");
+	ucfg_dp_wifi_transport_deinit(false);
+}
+
+/**
  * os_if_dp_wifi_transport_adev_release() - Free auxiliary device after
  *   last reference
  * @dev: embedded &auxiliary_device.dev
@@ -123,6 +158,8 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 	}
 
 	g_wifi_transport_adev      = adev;
+	adev->host_ops.init        = os_if_dp_wifi_transport_init;
+	adev->host_ops.deinit      = os_if_dp_wifi_transport_deinit;
 	adev->host_ops.log         = os_if_dp_wifi_transport_log;
 	adev->adev.name            = "wifi_tp";
 	adev->adev.id              = 0;
@@ -166,19 +203,9 @@ void os_if_dp_wifi_transport_deregister(struct wlan_objmgr_psoc *psoc,
 		auxiliary_device_uninit(&g_wifi_transport_adev->adev);
 	}
 
+	ucfg_dp_wifi_transport_deinit(is_recovery_stop);
 	ucfg_dp_wifi_transport_link_deinit(psoc);
 	dp_info("deregister complete");
-}
-
-QDF_STATUS os_if_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc)
-{
-	return ucfg_dp_wifi_transport_init(psoc);
-}
-
-void os_if_dp_wifi_transport_deinit(struct wlan_objmgr_psoc *psoc,
-				    bool is_recovery_stop)
-{
-	ucfg_dp_wifi_transport_deinit(psoc, is_recovery_stop);
 }
 
 #endif /* FEATURE_WIFI_TRANSPORT */

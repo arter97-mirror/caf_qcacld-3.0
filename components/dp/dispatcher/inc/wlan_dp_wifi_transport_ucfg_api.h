@@ -31,6 +31,7 @@
 
 #include <wlan_objmgr_psoc_obj.h>
 #include <qdf_types.h>
+#include <wifi_transport_aux.h>
 
 /**
  * ucfg_dp_wifi_transport_link_init() - connect HTC service + create refill ring
@@ -54,20 +55,23 @@ ucfg_dp_wifi_transport_link_deinit(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_dp_wifi_transport_init() - start a wifi-transport session
- * @psoc: psoc object
+ * @ops: WiFi Transport driver callbacks for TX completion and RX indication;
+ *       must remain valid for the lifetime of the session (caller owns
+ *       the struct)
  *
  * Return: QDF_STATUS_SUCCESS or error code
  */
 QDF_STATUS
-ucfg_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc);
+ucfg_dp_wifi_transport_init(const struct wifi_transport_ops *ops);
 
 /**
  * ucfg_dp_wifi_transport_deinit() - stop a wifi-transport session
- * @psoc: psoc object
  * @is_recovery_stop: true if called from SSR-down path
+ *
+ * Return: None
  */
-void ucfg_dp_wifi_transport_deinit(struct wlan_objmgr_psoc *psoc,
-				   bool is_recovery_stop);
+void ucfg_dp_wifi_transport_deinit(bool is_recovery_stop);
+
 
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _WLAN_DP_WIFI_TRANSPORT_UCFG_API_H_ */

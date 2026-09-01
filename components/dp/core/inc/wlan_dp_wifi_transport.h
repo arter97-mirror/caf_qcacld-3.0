@@ -137,6 +137,8 @@ struct wifi_transport_ce_msg_buf {
  * @ops: .ko callbacks stored at init time
  * @lpass_ep_id: HTC endpoint ID for the LPASS_DATA_MSG_SVC service
  * @rx_refill_ring: LPASS RXDMA refill SRNG (640 x 8 B descriptors)
+ * @qdf_dev: qdf_dev handle
+ * @hif_handle: hif handle
  * @ce5_msg_pool: CE5 framing buffer pool (30 x 256 B, DMA-coherent)
  * @ce5_msg_pool_base_vaddr: base virtual address of ce5_msg_pool region
  * @ce5_msg_pool_base_dma: base DMA address of ce5_msg_pool region
@@ -168,6 +170,8 @@ struct wifi_transport_host_context {
 	struct wifi_transport_ops    ops;
 	HTC_ENDPOINT_ID              lpass_ep_id;
 	struct dp_srng              *rx_refill_ring;
+	qdf_device_t                 qdf_dev;
+	struct hif_opaque_softc     *hif_handle;
 	struct wifi_transport_ce_msg_buf
 			ce5_msg_pool[WIFI_TRANSPORT_CE5_MSG_POOL_SIZE];
 	void                        *ce5_msg_pool_base_vaddr;
@@ -211,13 +215,17 @@ void
 dp_wifi_transport_link_deinit(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
- * dp_wifi_transport_init() - allocate session context and set up CE path
+ * dp_wifi_transport_init() - allocate session context and set up TX/RX pools
  * @dp_ctx: DP psoc context
+ * @ops: WiFi Transport driver callbacks for TX completion and RX indication;
+ *       copied into wtc at init time; caller owns the struct but it must
+ *       remain valid for the session lifetime
  *
  * Return: QDF_STATUS_SUCCESS or error code
  */
 QDF_STATUS
-dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx);
+dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
+		       const struct wifi_transport_ops *ops);
 
 /**
  * dp_wifi_transport_deinit() - tear down CE path and free session context
