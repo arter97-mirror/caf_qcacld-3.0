@@ -752,6 +752,32 @@
 
 /*
  * <ini>
+ * gActionOUIAuthAssoc6Mbps2GHz_V2 - Used to send auth/assoc req with 6 Mbps
+ * rate on 2.4 GHz for specified AP using Action OUI V2 expressions.
+ *
+ * Action OUI V2 supports "&&" and "||" operators, with "&&" having higher
+ * priority than "||".  The V2 configuration is used only when both the host
+ * and firmware support Action OUI V2.
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ_V2 CFG_INI_STRING( \
+	"gActionOUIAuthAssoc6Mbps2GHz_V2", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"", \
+	"send auth/assoc req with 6 Mbps rate on 2.4 GHz for specified APs")
+
+/*
+ * <ini>
  * CFG_ACTION_OUI_DISABLE_BFORMEE - Used to disable SU/MU beamformee
  * capability for specified AP with some conditions
  *
@@ -1335,5 +1361,6 @@
  * operator "&&", use space instead of "||".
  */
 #define CFG_ACTION_OUI_V2 \
-	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2)
+	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2) \
+	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ_V2)
 #endif

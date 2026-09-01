@@ -245,10 +245,22 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 			[ACTION_OUI_RESTRICT_SLO],
 		      cfg_get(psoc, CFG_ACTION_OUI_RESTRICT_SLO),
 		      ACTION_OUI_MAX_STR_LEN);
-	qdf_str_lcopy(psoc_priv->action_oui_str
-			[ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ],
-		      cfg_get(psoc, CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ),
-		      ACTION_OUI_MAX_STR_LEN);
+	if (psoc_priv->is_action_oui_v2_enabled) {
+		qdf_str_lcopy(psoc_priv->action_oui_str
+			        [ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ],
+			      cfg_get(psoc,
+				      CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ_V2),
+			      ACTION_OUI_MAX_STR_LEN);
+		psoc_priv->is_action_oui_v2_used
+			[ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ] = true;
+	} else {
+		qdf_str_lcopy(psoc_priv->action_oui_str
+			        [ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ],
+			      cfg_get(psoc,
+				      CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ),
+			      ACTION_OUI_MAX_STR_LEN);
+	}
+
 	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_DISABLE_BFORMEE],
 		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_BFORMEE),
 			      ACTION_OUI_MAX_STR_LEN);
