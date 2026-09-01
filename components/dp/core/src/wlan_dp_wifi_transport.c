@@ -23,6 +23,50 @@
 #include "dp_internal.h"
 
 /**
+ * dp_wifi_transport_ce_msg_alloc() - pop a buffer from the CE0 framing pool
+ * @wtc: session context
+ *
+ * Takes ce_msg_lock internally (_bh: contested with tx_done BH).
+ *
+ * Return: pointer to msg_buf, or NULL if pool exhausted
+ */
+static inline struct wifi_transport_ce_msg_buf *
+dp_wifi_transport_ce_msg_alloc(struct wifi_transport_host_context *wtc)
+{
+	struct wifi_transport_ce_msg_buf *buf;
+
+	qdf_spin_lock_bh(&wtc->ce_msg_lock);
+	buf = wtc->ce_msg_free_head;
+	if (buf) {
+		wtc->ce_msg_free_head = buf->next;
+		buf->next = NULL;
+		buf->bufs_added = 0;
+	}
+	qdf_spin_unlock_bh(&wtc->ce_msg_lock);
+	return buf;
+}
+
+/**
+ * dp_wifi_transport_ce_msg_free() - return a buffer to the CE0 framing pool
+ * @wtc: session context
+ * @buf: msg_buf to return
+ *
+ * Takes ce_msg_lock internally (_bh: may be called from tx_done BH).
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_ce_msg_free(struct wifi_transport_host_context *wtc,
+			      struct wifi_transport_ce_msg_buf *buf)
+{
+	qdf_spin_lock_bh(&wtc->ce_msg_lock);
+	buf->bufs_added = 0;
+	buf->next = wtc->ce_msg_free_head;
+	wtc->ce_msg_free_head = buf;
+	qdf_spin_unlock_bh(&wtc->ce_msg_lock);
+}
+
+/**
  * dp_wifi_transport_ce_msg_pool_init() - allocate CE0 framing buffer pool
  * @wtc: session context
  * @dp_ctx: DP psoc context
@@ -378,6 +422,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	wtc->rx_refill_ring = ls->rx_refill_ring;
 	wtc->qdf_dev = dp_ctx->qdf_dev;
 	wtc->hif_handle = cds_get_context(QDF_MODULE_ID_HIF);
+	qdf_spinlock_create(&wtc->ce_msg_lock);
 
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	dp_ctx->wifi_transport_host_ctx = wtc;
@@ -415,10 +460,10 @@ err:
 	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE)
 		htc_vote_link_down(htc_handle,
 				   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
-
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
+	qdf_spinlock_destroy(&wtc->ce_msg_lock);
 	qdf_mem_free(wtc);
 
 	return status;
@@ -460,6 +505,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 					   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 	}
 
+	qdf_spinlock_destroy(&wtc->ce_msg_lock);
 	qdf_mem_free(wtc);
 	dp_info("deinit complete");
 

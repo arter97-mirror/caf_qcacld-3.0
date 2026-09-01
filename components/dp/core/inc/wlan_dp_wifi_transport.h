@@ -139,7 +139,7 @@ struct wifi_transport_ce_buf_entry {
 /**
  * struct wifi_transport_host_context - per-session core state object
  * @ref_cnt: reference count; last put triggers dp_wifi_transport_release()
- * @lock: BH spinlock protecting pool free-lists (L2 in lock hierarchy)
+ * @ce_msg_lock: Spinlock protecting ce_msg_free_head
  * @ce_index_lock: BH spinlock serializing ce_send_nolock() calls (L3)
  * @deregister_done: signalled when ref_cnt reaches zero at teardown
  * @dl_down_completion: signalled on XPAN_DIRECT_LINK_DOWN_RESPONSE
@@ -170,13 +170,13 @@ struct wifi_transport_ce_buf_entry {
  *
  * Lock hierarchy (must acquire in order — never reverse):
  *   L1: dp_ctx->wifi_transport_host_ctx_lock  (pointer guard)
- *   L2: wtc->lock                             (pool free-lists)
+ *   L2: wtc->ce_msg_lock                      (pool free-lists)
  *   L3: wtc->ce_index_lock                    (CE send serialization)
  * L2 and L3 are siblings and must never be nested with each other.
  */
 struct wifi_transport_host_context {
 	qdf_atomic_t                 ref_cnt;
-	qdf_spinlock_t               lock;
+	qdf_spinlock_t               ce_msg_lock;
 	qdf_spinlock_t               ce_index_lock;
 	qdf_event_t                  deregister_done;
 	qdf_event_t                  dl_down_completion;
