@@ -21,6 +21,8 @@
 #include "wlan_dp_wifi_transport.h"
 #include "wlan_dp_priv.h"
 #include "dp_internal.h"
+#include "wlan_dp_main.h"
+#include "lpass_ce/lpass_ce.h"
 
 /**
  * dp_wifi_transport_ctx_get() - fetch session context and take a reference
@@ -284,6 +286,89 @@ dp_wifi_transport_tx_buf_pool_deinit(
 }
 
 /**
+ * dp_wifi_transport_msg_send() - fill HTC_FRAME_HDR and submit one TX CE msg
+ * @wtc:     session context
+ * @hif_ctx: HIF opaque context (hif_wt_tx_send is called internally)
+ * @msg_buf: framing buffer containing [HTC_HDR][xpan_msg_hdr][TLV payload];
+ *           passed as transfer_ctx so tx_done callback can return it to pool
+ * @nbytes:  xpan payload size (sizeof(xpan_msg_hdr) + TLV body);
+ *           HIF adds HTC_HDR_LENGTH for the total transfer length
+ *
+ * Return: 0 on success, -EIO if the CE TX ring is full
+ */
+static inline int
+dp_wifi_transport_msg_send(struct wifi_transport_host_context *wtc,
+			   struct hif_opaque_softc *hif_ctx,
+			   struct wifi_transport_ce_msg_buf *msg_buf,
+			   uint32_t nbytes)
+{
+	qdf_nbuf_t nbuf = msg_buf->nbuf;
+	qdf_dma_addr_t dma_addr = qdf_nbuf_mapped_paddr_get(nbuf);
+	HTC_FRAME_HDR *htc_hdr = (HTC_FRAME_HDR *)qdf_nbuf_data(nbuf);
+	uint32_t total_len = HTC_HDR_LENGTH + nbytes;
+	QDF_STATUS status;
+	int ret = 0;
+
+	htc_hdr->EndpointID    = wtc->lpass_ep_id & 0xFF;
+	htc_hdr->Flags         = 0;
+	htc_hdr->PayloadLen    = nbytes;
+	htc_hdr->ControlBytes0 = 0;
+	htc_hdr->ControlBytes1 = 0;
+	htc_hdr->reserved      = 0;
+
+	qdf_mem_dma_sync_single_for_device(wtc->qdf_dev, dma_addr,
+					   total_len, DMA_TO_DEVICE);
+
+	status = hif_wt_tx_send(hif_ctx, msg_buf, dma_addr, total_len);
+	if (qdf_unlikely(QDF_IS_STATUS_ERROR(status)))
+		ret = qdf_status_to_os_return(status);
+
+	return ret;
+}
+
+/**
+ * dp_wifi_transport_send() - send a header-only CE0 control message
+ * @wtc: session context
+ * @msg_type: XPAN_MSG_TYPE_T value (header-only messages)
+ *
+ * Used for XPAN_DIRECT_LINK_UP_INDICATION and XPAN_DIRECT_LINK_DOWN_REQUEST.
+ * Allocates a CE0 framing buffer from the pool, writes HTC_FRAME_HDR and
+ * xpan_msg_hdr directly, then calls ce_send() — no qdf_nbuf involved.
+ *
+ * Return: 0 on success, -ENODEV if no session, -ENOSPC if pool empty
+ */
+static inline int
+dp_wifi_transport_send(struct wifi_transport_host_context *wtc,
+		       XPAN_MSG_TYPE_T msg_type)
+{
+	struct wifi_transport_ce_msg_buf *msg_buf;
+	xpan_msg_hdr *hdr;
+	uint32_t nbytes = sizeof(xpan_msg_hdr);
+	int ret;
+
+	msg_buf = dp_wifi_transport_ce_msg_alloc(wtc);
+
+	if (!msg_buf) {
+		dp_err("ce_msg_pool exhausted for send");
+		ret = -ENOSPC;
+		goto error;
+	}
+
+	hdr = (xpan_msg_hdr *)
+		((uint8_t *)qdf_nbuf_data(msg_buf->nbuf) + HTC_HDR_LENGTH);
+	hdr->msg_type = msg_type;
+	hdr->msg_id   = wtc->msg_seq_num++;
+	hdr->dbg_indx = 0;
+
+	ret = dp_wifi_transport_msg_send(wtc, wtc->hif_handle, msg_buf, nbytes);
+	if (ret)
+		dp_wifi_transport_ce_msg_free(wtc, msg_buf);
+
+error:
+	return ret;
+}
+
+/**
  * dp_wifi_transport_htc_tx_complete() - stub HTC TX completion callback
  * @ctx: dp_ctx (unused)
  * @pkt: completed HTC packet (unused)
@@ -326,6 +411,24 @@ static inline void
 dp_wifi_transport_tx_done(void *transfer_ctx,
 			  unsigned int nbytes)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wifi_transport_host_context *wtc =
+		dp_wifi_transport_ctx_get(dp_ctx);
+	struct wifi_transport_ce_msg_buf *msg_buf = transfer_ctx;
+
+	if (qdf_unlikely(!wtc)) {
+		dp_err("wtc NULL");
+		return;
+	}
+
+	/* Sync to CPU: framing buf safe to rewrite for next TX */
+	qdf_mem_dma_sync_single_for_cpu(
+			dp_ctx->qdf_dev,
+			qdf_nbuf_mapped_paddr_get(msg_buf->nbuf),
+			nbytes, DMA_TO_DEVICE);
+
+	dp_wifi_transport_ce_msg_free(wtc, msg_buf);
+	dp_wifi_transport_ctx_put(wtc);
 }
 
 /**
@@ -504,6 +607,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_atomic_init(&wtc->ref_cnt);
 	qdf_atomic_inc(&wtc->ref_cnt);
 	qdf_atomic_set(&wtc->bmps_state, WIFI_TRANSPORT_BMPS_ENABLED);
+	dp_wifi_transport_send(wtc, XPAN_DIRECT_LINK_UP_INDICATION);
 	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
 		       WIFI_TRANSPORT_PATH_ACTIVE);
 
