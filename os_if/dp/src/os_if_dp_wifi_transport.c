@@ -109,6 +109,40 @@ static void os_if_dp_wifi_transport_deinit(void)
 }
 
 /**
+ * os_if_dp_wifi_transport_set_params() - Apply a runtime control parameter
+ * @type: parameter selector (enum wifi_transport_param_type)
+ * @data: parameter value
+ *
+ * Return: 0 on success, -EINVAL on bad args
+ */
+static int os_if_dp_wifi_transport_set_params(
+			enum wifi_transport_param_type type,
+			const union wifi_transport_param_data *data)
+{
+	if (type >= WT_PARAM_MAX || !data)
+		return -EINVAL;
+
+	return ucfg_dp_wifi_transport_set_params(type, data);
+}
+
+/**
+ * os_if_dp_wifi_transport_get_params() - Read a runtime control parameter
+ * @type: parameter selector (enum wifi_transport_param_type)
+ * @data: output buffer
+ *
+ * Return: 0 on success, -EINVAL on bad args
+ */
+static int os_if_dp_wifi_transport_get_params(
+			enum wifi_transport_param_type type,
+			union wifi_transport_param_data *data)
+{
+	if (type >= WT_PARAM_MAX || !data)
+		return -EINVAL;
+
+	return ucfg_dp_wifi_transport_get_params(type, data);
+}
+
+/**
  * os_if_dp_wifi_transport_adev_release() - Free auxiliary device after
  *   last reference
  * @dev: embedded &auxiliary_device.dev
@@ -160,6 +194,8 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 	g_wifi_transport_adev      = adev;
 	adev->host_ops.init        = os_if_dp_wifi_transport_init;
 	adev->host_ops.deinit      = os_if_dp_wifi_transport_deinit;
+	adev->host_ops.set_params  = os_if_dp_wifi_transport_set_params;
+	adev->host_ops.get_params  = os_if_dp_wifi_transport_get_params;
 	adev->host_ops.log         = os_if_dp_wifi_transport_log;
 	adev->adev.name            = "wifi_tp";
 	adev->adev.id              = 0;

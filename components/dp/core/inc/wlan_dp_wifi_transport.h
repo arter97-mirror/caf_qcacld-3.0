@@ -252,5 +252,29 @@ dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 			      bool is_recovery_stop);
 
+/**
+ * dp_wifi_transport_set_params() - apply a control parameter
+ * @dp_ctx: DP psoc context
+ * @type: parameter type (see enum wifi_transport_param_type)
+ * @data: parameter payload
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
+				 enum wifi_transport_param_type type,
+				 const union wifi_transport_param_data *data);
+
+/**
+ * dp_wifi_transport_get_params() - retrieve a control parameter
+ * @dp_ctx: DP psoc context
+ * @type: parameter type (see enum wifi_transport_param_type)
+ * @data: output buffer
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int dp_wifi_transport_get_params(struct wlan_dp_psoc_context *dp_ctx,
+				 enum wifi_transport_param_type type,
+				 union wifi_transport_param_data *data);
+
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _WLAN_DP_WIFI_TRANSPORT_H_ */

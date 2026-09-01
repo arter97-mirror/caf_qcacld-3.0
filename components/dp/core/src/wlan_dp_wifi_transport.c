@@ -682,4 +682,18 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 
 }
 
+int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
+				 enum wifi_transport_param_type type,
+				 const union wifi_transport_param_data *data)
+{
+	return -EINVAL;
+}
+
+int dp_wifi_transport_get_params(struct wlan_dp_psoc_context *dp_ctx,
+				 enum wifi_transport_param_type type,
+				 union wifi_transport_param_data *data)
+{
+	return -EINVAL;
+}
+
 #endif /* FEATURE_WIFI_TRANSPORT */

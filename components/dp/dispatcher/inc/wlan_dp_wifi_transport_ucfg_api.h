@@ -72,6 +72,26 @@ ucfg_dp_wifi_transport_init(const struct wifi_transport_ops *ops);
  */
 void ucfg_dp_wifi_transport_deinit(bool is_recovery_stop);
 
+/**
+ * ucfg_dp_wifi_transport_set_params() - set a control parameter
+ * @type: parameter type selector
+ * @data: parameter payload
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int ucfg_dp_wifi_transport_set_params(
+			enum wifi_transport_param_type type,
+			const union wifi_transport_param_data *data);
+
+/**
+ * ucfg_dp_wifi_transport_get_params() - get a control parameter
+ * @type: parameter type selector
+ * @data: output buffer
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int ucfg_dp_wifi_transport_get_params(enum wifi_transport_param_type type,
+				      union wifi_transport_param_data *data);
 
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _WLAN_DP_WIFI_TRANSPORT_UCFG_API_H_ */

@@ -57,4 +57,18 @@ void ucfg_dp_wifi_transport_deinit(bool is_recovery_stop)
 	dp_wifi_transport_deinit(dp_get_context(), is_recovery_stop);
 }
 
+int ucfg_dp_wifi_transport_set_params(
+			enum wifi_transport_param_type type,
+			const union wifi_transport_param_data *data)
+{
+	return dp_wifi_transport_set_params(dp_get_context(), type, data);
+}
+
+int ucfg_dp_wifi_transport_get_params(
+			enum wifi_transport_param_type type,
+			union wifi_transport_param_data *data)
+{
+	return dp_wifi_transport_get_params(dp_get_context(), type, data);
+}
+
 #endif /* FEATURE_WIFI_TRANSPORT */
