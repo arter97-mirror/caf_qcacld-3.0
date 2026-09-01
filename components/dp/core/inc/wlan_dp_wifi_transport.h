@@ -69,6 +69,19 @@ enum wifi_transport_init_step {
 };
 
 /**
+ * enum wifi_transport_link_step - bitmask tracking link-init steps
+ * @WIFI_TRANSPORT_LINK_HTC_CONNECT: HTC connected (provides lpass_ep_id)
+ * @WIFI_TRANSPORT_LINK_CE_CALLBACKS: ce_send_cb and ce_recv_cb registered on
+ *   CE0/CE5 (overrides HTC's default callbacks for direct CE path)
+ * @WIFI_TRANSPORT_LINK_REFILL_RING: LPASS refill SRNG created
+ */
+enum wifi_transport_link_step {
+	WIFI_TRANSPORT_LINK_HTC_CONNECT   = BIT(0),
+	WIFI_TRANSPORT_LINK_CE_CALLBACKS  = BIT(1),
+	WIFI_TRANSPORT_LINK_REFILL_RING   = BIT(2),
+};
+
+/**
  * enum wifi_transport_bmps_state - BMPS power-save state machine
  * @WIFI_TRANSPORT_BMPS_ENABLED: BMPS on, link idle
  * @WIFI_TRANSPORT_BMPS_TRANSIT_ENABLE: QMI enable in flight
@@ -174,6 +187,28 @@ struct wifi_transport_host_context {
 	uint32_t                     init_mask;
 	qdf_atomic_t                 bmps_state;
 };
+
+/**
+ * dp_wifi_transport_link_init() - connect HTC service and register CE callbacks
+ * @dp_ctx: DP psoc context
+ *
+ * Connects LPASS_DATA_MSG_SVC via HTC to obtain lpass_ep_id, registers
+ * WiFi Transport TX/RX CE callbacks via hif_wifi_transport_register_callbacks,
+ * and creates the LPASS RXDMA refill ring.
+ *
+ * Return: QDF_STATUS_SUCCESS or error code
+ */
+QDF_STATUS
+dp_wifi_transport_link_init(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * dp_wifi_transport_link_deinit() - deregister CE callbacks, destroy ring
+ * @dp_ctx: DP psoc context
+ *
+ * Return: None
+ */
+void
+dp_wifi_transport_link_deinit(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
  * dp_wifi_transport_init() - allocate session context and set up CE path

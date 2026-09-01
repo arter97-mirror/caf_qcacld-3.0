@@ -23,6 +23,30 @@
 #include "wlan_dp_main.h"
 #include <wlan_objmgr_psoc_obj.h>
 
+QDF_STATUS ucfg_dp_wifi_transport_link_init(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return dp_wifi_transport_link_init(dp_ctx);
+}
+
+void ucfg_dp_wifi_transport_link_deinit(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return;
+	}
+
+	dp_wifi_transport_link_deinit(dp_ctx);
+}
+
 QDF_STATUS ucfg_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);

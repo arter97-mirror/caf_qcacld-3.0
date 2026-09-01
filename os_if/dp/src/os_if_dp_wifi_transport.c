@@ -100,6 +100,7 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 	struct wifi_transport_auxiliary_device *adev;
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	int ret;
+	QDF_STATUS status;
 
 	dp_info("auxiliary device register");
 
@@ -108,9 +109,16 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	status = ucfg_dp_wifi_transport_link_init(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("link_init failed %d", status);
+		return status;
+	}
+
 	adev = qdf_mem_malloc(sizeof(*adev));
 	if (!adev) {
 		dp_err("Aux device allocation failed");
+		ucfg_dp_wifi_transport_link_deinit(psoc);
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -124,6 +132,7 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 	ret = auxiliary_device_init(&adev->adev);
 	if (ret) {
 		dp_err("auxiliary_device_init failed %d", ret);
+		ucfg_dp_wifi_transport_link_deinit(psoc);
 		qdf_mem_free(adev);
 		g_wifi_transport_adev = NULL;
 		return QDF_STATUS_E_FAILURE;
@@ -137,6 +146,7 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 		 * adev and clears g_wifi_transport_adev.
 		 */
 		auxiliary_device_uninit(&adev->adev);
+		ucfg_dp_wifi_transport_link_deinit(psoc);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -156,6 +166,7 @@ void os_if_dp_wifi_transport_deregister(struct wlan_objmgr_psoc *psoc,
 		auxiliary_device_uninit(&g_wifi_transport_adev->adev);
 	}
 
+	ucfg_dp_wifi_transport_link_deinit(psoc);
 	dp_info("deregister complete");
 }
 
