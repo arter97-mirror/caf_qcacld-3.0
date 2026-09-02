@@ -627,6 +627,32 @@ replenish:
 }
 
 /**
+ * dp_wifi_transport_handle_peer_stats() - Process XPAN_PEER_STATS msg
+ * @wtc: session context
+ * @buf: pointer past HTC_FRAME_HDR in the CE5 recv buffer
+ *
+ * Delivers peer statistics payload to the WiFi Transport driver via
+ * ops.process_rx with type WT_RX_STATS.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_handle_peer_stats(
+			struct wifi_transport_host_context *wtc, void *buf)
+{
+	xpan_peer_stats_fixed_param *fixed =
+		(xpan_peer_stats_fixed_param *)((uint8_t *)buf +
+						sizeof(xpan_msg_hdr));
+
+	if (wtc->ops.process_rx)
+		wtc->ops.process_rx(WT_RX_STATS,
+				    (uint8_t *)fixed +
+				    sizeof(xpan_peer_stats_fixed_param),
+				    fixed->num_peer_stats *
+				    sizeof(xpan_peer_stats));
+}
+
+/**
  * dp_wifi_transport_rx_ready() - CE5 RX callback (FW -> host)
  * @transfer_ctx: vaddr passed to ce_recv_buf_enqueue
  * @buffer: DMA address of the received buffer (used to re-post)
@@ -674,6 +700,9 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 		break;
 	case XPAN_RX_INDICATION:
 		dp_wifi_transport_handle_rx_indication(dp_ctx, wtc, buf);
+		break;
+	case XPAN_PEER_STATS:
+		dp_wifi_transport_handle_peer_stats(wtc, buf);
 		break;
 	default:
 		dp_err("Invalid msg type: %d", hdr->msg_type);
