@@ -12406,6 +12406,7 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc,
 	enum hw_mode_bandwidth ch_sta_width;
 	QDF_STATUS status;
 	uint8_t  sta_sap_scc_on_dfs_chnl;
+	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	policy_mgr_is_any_dfs_beaconing_session_present(psoc, &dfs_ch_frq,
 							&ch_width);
@@ -12419,10 +12420,16 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
+	status = policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
+							&cfg_sta_dfs_ch_peer_scc);
+	if (QDF_IS_STATUS_ERROR(status))
+		cfg_sta_dfs_ch_peer_scc = false;
+
 	if (policy_mgr_is_sta_present_on_dfs_channel(psoc, &vdev_id,
 						     &dfs_sta_frq,
 						     &ch_sta_width) &&
-	    sta_sap_scc_on_dfs_chnl != PM_STA_SAP_ON_DFS_DEFAULT &&
+	    (sta_sap_scc_on_dfs_chnl != PM_STA_SAP_ON_DFS_DEFAULT ||
+	     cfg_sta_dfs_ch_peer_scc) &&
 	    (!policy_mgr_is_hw_dbs_capable(psoc) ||
 	     (!policy_mgr_get_dfs_master_dynamic_enabled(
 					psoc, WLAN_INVALID_VDEV_ID) &&
