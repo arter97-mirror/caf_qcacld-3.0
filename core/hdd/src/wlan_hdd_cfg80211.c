@@ -21294,14 +21294,14 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 #ifdef CFG80211_SET_KEY_WITH_SRC_MAC
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
+				     int link_id,
 				     u8 key_index, bool pairwise,
-				     const u8 *src_addr,
-				     const u8 *mac_addr,
+				     const u8 *src_addr, const u8 *mac_addr,
 				     struct key_params *params)
 #else
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
-				     u8 key_index, bool pairwise,
+				     int link_id, u8 key_index, bool pairwise,
 				     const u8 *mac_addr,
 				     struct key_params *params)
 #endif
@@ -21485,7 +21485,7 @@ static int __wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
 static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
-				     u8 key_index, bool pairwise,
+				     int link_id, u8 key_index, bool pairwise,
 				     const u8 *mac_addr, void *cookie,
 				     void (*callback)(void *cookie,
 						      struct key_params *)
@@ -21593,6 +21593,7 @@ static int __wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
  * wlan_hdd_cfg80211_del_key() - cfg80211 delete key handler function
  * @wiphy: Pointer to wiphy structure.
  * @wdev: Pointer to wireless_dev structure.
+ * @link_id: Link Identifier
  * @key_index: key index
  * @pairwise: pairwise
  * @mac_addr: mac address
@@ -21606,7 +21607,7 @@ static int __wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
 static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
-				     u8 key_index,
+				     int link_id, u8 key_index,
 				     bool pairwise, const u8 *mac_addr)
 {
 	int errno = -EINVAL;
@@ -21670,6 +21671,7 @@ static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 	return errno;
 }
 #endif
+
 static int __wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					       struct net_device *ndev,
 					       u8 key_index,
@@ -21759,43 +21761,20 @@ out:
 	return ret;
 }
 
-#ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
-static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
-					     struct wireless_dev *wdev,
-					     u8 key_index,
-					     bool unicast, bool multicast)
-{
-	int errno = -EINVAL;
-	struct osif_vdev_sync *vdev_sync;
-	struct hdd_adapter *adapter = qdf_container_of(wdev,
-						   struct hdd_adapter,
-						   wdev);
-
-	if (!adapter || wlan_hdd_validate_vdev_id(adapter->vdev_id))
-		return errno;
-
-	errno = osif_vdev_sync_op_start(adapter->dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __wlan_hdd_cfg80211_set_default_key(wiphy, adapter->dev,
-						    key_index, unicast,
-						    multicast);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-#elif defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     struct net_device *ndev,
 					     int link_id, u8 key_index,
 					     bool unicast, bool multicast)
 {
-	int errno;
+	int errno = -EINVAL;
 	struct osif_vdev_sync *vdev_sync;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 
-	errno = osif_vdev_sync_op_start(ndev, &vdev_sync);
+	if (!adapter || wlan_hdd_validate_vdev_id(adapter->vdev_id))
+		return errno;
+
+	errno = osif_vdev_sync_op_start(adapter->dev, &vdev_sync);
 	if (errno)
 		return errno;
 
@@ -21812,7 +21791,7 @@ static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     u8 key_index,
 					     bool unicast, bool multicast)
 {
-	int errno;
+	int errno = -EINVAL;
 	struct osif_vdev_sync *vdev_sync;
 
 	errno = osif_vdev_sync_op_start(ndev, &vdev_sync);
@@ -21841,7 +21820,7 @@ static int _wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
 static int wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
 						    struct wireless_dev *wdev,
-						    u8 key_index)
+						    int link_id, u8 key_index)
 {
 	int errno = -EINVAL;
 	struct osif_vdev_sync *vdev_sync;
@@ -22190,6 +22169,7 @@ static int __wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
  *				wlan_hdd_set_default_mgmt_key
  * @wiphy: pointer to wiphy
  * @wdev: pointer to wireless_device structure
+ * @link_id: Link Identifier
  * @key_index: key index
  *
  * Return: 0 on success, error number on failure
@@ -22197,7 +22177,7 @@ static int __wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
 static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 					 struct wireless_dev *wdev,
-					 u8 key_index)
+					 int link_id, u8 key_index)
 {
 	int errno = -EINVAL;
 	struct osif_vdev_sync *vdev_sync;
