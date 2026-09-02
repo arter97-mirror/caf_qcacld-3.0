@@ -3209,7 +3209,7 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, nan_evt->vdev_id,
 						    WLAN_NAN_ID);
 	if (!vdev) {
-		osif_err("vdev is null");
+		osif_err("vdev is null, vdev_id: %d", nan_evt->vdev_id);
 		goto fail;
 	}
 

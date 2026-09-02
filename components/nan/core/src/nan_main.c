@@ -2283,6 +2283,7 @@ static QDF_STATUS nan_handle_disable_ind(struct nan_event_params *nan_event,
 					 uint8_t evt_type, bool *is_drop_evt)
 {
 	uint8_t disable_req_type;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 
 	status = nan_get_disable_req_info(nan_event->psoc, &disable_req_type);
@@ -2302,6 +2303,24 @@ static QDF_STATUS nan_handle_disable_ind(struct nan_event_params *nan_event,
 		nan_cache_disable_req_info(nan_event->psoc,
 					   NAN_DISABLE_REQ_DEFAULT);
 		return QDF_STATUS_SUCCESS;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(nan_event->psoc,
+							QDF_NAN_DISC_MODE,
+							WLAN_NAN_ID);
+	if (!vdev) {
+		vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(nan_event->psoc,
+								QDF_STA_MODE,
+								WLAN_NAN_ID);
+	}
+
+	if (vdev) {
+		nan_event->vdev_id = wlan_vdev_get_id(vdev);
+		nan_debug("Populated NAN disable event vdev_id: %d",
+			  nan_event->vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	} else {
+		nan_err("vdev is null");
 	}
 
 	*is_drop_evt = false;
