@@ -23,6 +23,7 @@
 #include "dp_internal.h"
 #include "wlan_dp_main.h"
 #include "lpass_ce/lpass_ce.h"
+#include "dp_rx.h"
 
 /**
  * dp_wifi_transport_ctx_get() - fetch session context and take a reference
@@ -557,6 +558,75 @@ dp_wifi_transport_handle_tx_completion(
 }
 
 /**
+ * dp_wifi_transport_handle_rx_indication() - Process XPAN_RX_INDICATION msg
+ * @dp_ctx: DP psoc context
+ * @wtc: session context
+ * @buf: pointer past HTC_FRAME_HDR in the CE5 recv buffer
+ *
+ * Delivers each received audio buffer to the WiFi Transport driver via
+ * ops.process_rx, then re-posts the buffer to the LPASS RXDMA refill ring.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_handle_rx_indication(
+			struct wlan_dp_psoc_context *dp_ctx,
+			struct wifi_transport_host_context *wtc, void *buf)
+{
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
+	xpan_rx_audio_fixed_param *fixed;
+	xpan_rx_buffer_info *entry;
+	qdf_dma_addr_t paddr;
+	struct dp_rx_desc *rx_desc;
+	qdf_nbuf_t rx_nbuf;
+	uint8_t *eth_hdr;
+	uint32_t i, n;
+	uint16_t l2_pad;
+
+	fixed = (xpan_rx_audio_fixed_param *)((uint8_t *)buf +
+					       sizeof(xpan_msg_hdr));
+	n = fixed->num_rx_buffers;
+	entry = (xpan_rx_buffer_info *)((uint8_t *)fixed +
+				sizeof(xpan_rx_audio_fixed_param));
+
+	dp_direct_link_refill_ring_start(dp_ctx->cdp_soc, wtc->rx_refill_ring);
+	for (i = 0; i < n; i++, entry++) {
+		paddr = ((qdf_dma_addr_t)entry->buffer_addr_hi << 32) |
+			 entry->buffer_addr_lo;
+
+		rx_desc = dp_rx_sw_cookie_2_rx_desc(dp_ctx->cdp_soc,
+						    entry->sw_cookie);
+		if (qdf_unlikely(!rx_desc || !rx_desc->nbuf)) {
+			dp_err("invalid sw_cookie %u paddr %pa rx_desc %pK",
+			       entry->sw_cookie, &paddr, rx_desc);
+			goto replenish;
+		}
+
+		rx_nbuf = rx_desc->nbuf;
+		qdf_mem_dma_sync_single_for_cpu(dp_ctx->qdf_dev, paddr,
+						entry->buffer_len,
+						DMA_FROM_DEVICE);
+		l2_pad = hal_rx_msdu_end_l3_hdr_padding_get(soc->hal_soc,
+							    qdf_nbuf_data(rx_nbuf));
+		eth_hdr = qdf_nbuf_data(rx_nbuf) +
+				soc->rx_pkt_tlv_size + l2_pad;
+
+		if (wtc->ops.process_rx)
+			wtc->ops.process_rx(WT_RX_INDICATION, eth_hdr,
+					    entry->buffer_len);
+
+replenish:
+		qdf_mem_dma_sync_single_for_device(dp_ctx->qdf_dev, paddr,
+						   entry->buffer_len,
+						   DMA_FROM_DEVICE);
+		dp_replenish_direct_link_refill_ring(
+				dp_ctx->cdp_soc, wtc->rx_refill_ring,
+				paddr, entry->sw_cookie);
+	}
+	dp_direct_link_refill_ring_end(dp_ctx->cdp_soc, wtc->rx_refill_ring);
+}
+
+/**
  * dp_wifi_transport_rx_ready() - CE5 RX callback (FW -> host)
  * @transfer_ctx: vaddr passed to ce_recv_buf_enqueue
  * @buffer: DMA address of the received buffer (used to re-post)
@@ -601,6 +671,9 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 	switch (hdr->msg_type) {
 	case XPAN_TX_COMPLETION:
 		dp_wifi_transport_handle_tx_completion(wtc, buf);
+		break;
+	case XPAN_RX_INDICATION:
+		dp_wifi_transport_handle_rx_indication(dp_ctx, wtc, buf);
 		break;
 	default:
 		dp_err("Invalid msg type: %d", hdr->msg_type);
