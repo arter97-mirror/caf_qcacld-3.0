@@ -23,6 +23,7 @@
  * Implementation for the FW based roaming sync api interfaces.
  */
 #include "qdf_types.h"
+#include "qdf_time.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
@@ -1096,6 +1097,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 				qdf_mem_copy(pmksa->pmk, roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmksa->pmk_len = roaming_info->pmk_len;
+				pmksa->pmk_entry_ts =
+						qdf_get_system_timestamp();
 				status = wlan_crypto_set_del_pmksa(vdev,
 								   pmksa, true);
 				if (QDF_IS_STATUS_ERROR(status)) {
@@ -1163,6 +1166,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					     roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmksa->pmk_len = roaming_info->pmk_len;
+				pmksa->pmk_entry_ts =
+						qdf_get_system_timestamp();
 
 				status = wlan_crypto_set_del_pmksa(vdev,
 								   pmksa,
