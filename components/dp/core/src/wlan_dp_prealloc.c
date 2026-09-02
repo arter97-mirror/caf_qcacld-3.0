@@ -329,12 +329,22 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
 	NULL, NULL, 0, 0},
 #endif
+#ifdef CONFIG_BORON
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+#endif
 	/* 3 TCL data rings */
 	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
 	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
 	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
+#ifdef CONFIG_BORON
+	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
+	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
+#endif
 	/* 4 WBM2SW rings */
 #ifdef CONFIG_BORON
+	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
+	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
 	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
 	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
 	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
@@ -359,6 +369,9 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	/* 2 RXDMA buffer rings */
 	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
 	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
+#ifdef DP_FEATURE_DIRECT_REFILL
+	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
+#endif
 	/* REO Exception ring */
 	{REO_EXCEPTION, 0, 0, NULL, NULL, 0, 0},
 #ifndef CONFIG_BORON
