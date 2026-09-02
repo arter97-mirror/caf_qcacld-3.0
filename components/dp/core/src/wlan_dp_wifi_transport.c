@@ -476,6 +476,87 @@ dp_wifi_transport_tx_done(void *transfer_ctx,
 }
 
 /**
+ * dp_wifi_transport_xpan_to_wt_tx_status() - Convert LPASS CE TX status to
+ *     wifi_transport_tx_status
+ * @xpan_status: raw tx_status from xpan_tx_completion_info
+ *
+ * Return: wifi_transport_tx_status enum value
+ */
+static inline enum wifi_transport_tx_status
+dp_wifi_transport_xpan_to_wt_tx_status(uint8_t xpan_status)
+{
+	switch (xpan_status) {
+	case XPAN_PKT_TX_SUCCESS:
+		return WT_PKT_TX_SUCCESS;
+	case XPAN_PKT_TX_FAILURE:
+		return WT_PKT_TX_FAILURE;
+	case XPAN_PKT_DROP:
+		return WT_PKT_DROP;
+	default:
+		return WT_PKT_TX_FAILURE;
+	}
+}
+
+/**
+ * dp_wifi_transport_handle_tx_completion() - Process XPAN_TX_COMPLETION msg
+ * @wtc: session context
+ * @buf: pointer past HTC_FRAME_HDR in the CE5 recv buffer
+ *
+ * Return batch-returns TX cookies to the pool and notifies the WiFi
+ * Transport driver via ops.tx_completion for each completed entry.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_handle_tx_completion(
+			struct wifi_transport_host_context *wtc, void *buf)
+{
+	xpan_tx_completion_fixed_param *fixed;
+	xpan_tx_completion_info *entry;
+	uint16_t cookie;
+	uint32_t i, n;
+	uint64_t ppdu_tx_tsf;
+
+	fixed = (xpan_tx_completion_fixed_param *)((uint8_t *)buf +
+						sizeof(xpan_msg_hdr));
+	n = fixed->num_tx_comp;
+	entry = (xpan_tx_completion_info *)((uint8_t *)fixed +
+				sizeof(xpan_tx_completion_fixed_param));
+
+	for (i = 0; i < n; i++, entry++) {
+		cookie = entry->sw_cookie;
+		if (cookie >= WIFI_TRANSPORT_TX_BUF_POOL_SIZE)
+			continue;
+
+		ppdu_tx_tsf = (((uint64_t)entry->ppdu_tx_tsf_hi) << 32) |
+				entry->ppdu_tx_tsf_lo;
+
+		if (wtc->ops.tx_completion)
+			wtc->ops.tx_completion(
+				cookie,
+				dp_wifi_transport_xpan_to_wt_tx_status(
+					entry->tx_status),
+				ppdu_tx_tsf);
+	}
+
+	entry = (xpan_tx_completion_info *)((uint8_t *)fixed +
+				sizeof(xpan_tx_completion_fixed_param));
+	qdf_spin_lock_bh(&wtc->buf_pool_lock);
+	for (i = 0; i < n; i++, entry++) {
+		cookie = entry->sw_cookie;
+		if (cookie >= WIFI_TRANSPORT_TX_BUF_POOL_SIZE) {
+			dp_err("invalid TX cookie %u", cookie);
+			continue;
+		}
+		wtc->cookie_array[wtc->buf_pool_hp] = cookie;
+		wtc->buf_pool_hp = (wtc->buf_pool_hp + 1) %
+				   WIFI_TRANSPORT_TX_BUF_POOL_SIZE;
+		wtc->buf_pool_free_count++;
+	}
+	qdf_spin_unlock_bh(&wtc->buf_pool_lock);
+}
+
+/**
  * dp_wifi_transport_rx_ready() - CE5 RX callback (FW -> host)
  * @transfer_ctx: vaddr passed to ce_recv_buf_enqueue
  * @buffer: DMA address of the received buffer (used to re-post)
@@ -489,6 +570,54 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 			   qdf_dma_addr_t buffer,
 			   unsigned int nbytes)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wifi_transport_host_context *wtc =
+		dp_wifi_transport_ctx_get(dp_ctx);
+	qdf_nbuf_t nbuf = (qdf_nbuf_t)transfer_ctx;
+	xpan_msg_hdr *hdr;
+	void *buf;
+
+	if (qdf_unlikely(!wtc)) {
+		dp_err("wtc NULL");
+		return;
+	}
+
+	if (qdf_unlikely(!nbuf || !buffer)) {
+		dp_err("rx_ready invalid nbuf=%pK buffer=0x%llx", nbuf, buffer);
+		goto end;
+	}
+
+	/*
+	 * Streaming DMA buffer: invalidate CPU cache before reading so we
+	 * see the data FW wrote into this buffer.
+	 */
+	qdf_mem_dma_sync_single_for_cpu(dp_ctx->qdf_dev, buffer,
+					nbytes, DMA_FROM_DEVICE);
+
+	/* CE5 delivers [HTC_FRAME_HDR][xpan payload]; skip the HTC header */
+	buf = (void *)(qdf_nbuf_data(nbuf) + HTC_HDR_LENGTH);
+	hdr = (xpan_msg_hdr *)buf;
+
+	switch (hdr->msg_type) {
+	case XPAN_TX_COMPLETION:
+		dp_wifi_transport_handle_tx_completion(wtc, buf);
+		break;
+	default:
+		dp_err("Invalid msg type: %d", hdr->msg_type);
+		break;
+	}
+
+	/*
+	 * Re-post the nbuf to CE5.  Sync back to device so FW can write the
+	 * next completion into it.  buffer is the DMA address populated by
+	 * ce_completed_recv_next_nolock_srng from the dest ring descriptor.
+	 */
+	 /* Sync exactly the received bytes — not the full skb allocation */
+	qdf_mem_dma_sync_single_for_device(dp_ctx->qdf_dev, buffer,
+					   nbytes, DMA_FROM_DEVICE);
+	hif_wt_rx_requeue(wtc->hif_handle, (void *)nbuf, buffer);
+end:
+	dp_wifi_transport_ctx_put(wtc);
 }
 
 /**
