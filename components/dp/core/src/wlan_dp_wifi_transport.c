@@ -682,11 +682,70 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 
 }
 
+/** - enable or disable BMPS with idempotency guard
+ * @dp_ctx: DP psoc context
+ * @wtc: session context
+ * @disable: true = disable BMPS (audio active), false = enable BMPS (link idle)
+ *
+ * Return: 0 on success, -ENODEV if no session, -EBUSY if transition in flight
+ */
+static inline int
+dp_wifi_transport_bmps_set(struct wlan_dp_psoc_context *dp_ctx,
+			   struct wifi_transport_host_context *wtc,
+			   bool disable)
+{
+	enum wifi_transport_bmps_state requested, cur_state;
+	int rc;
+
+	dp_info("bmps_set disable=%d", disable);
+
+	requested = disable ? WIFI_TRANSPORT_BMPS_DISABLED :
+			      WIFI_TRANSPORT_BMPS_ENABLED;
+
+	cur_state = (enum wifi_transport_bmps_state)
+			qdf_atomic_read(&wtc->bmps_state);
+
+	if (cur_state == requested)
+		return 0;
+
+	if (cur_state == WIFI_TRANSPORT_BMPS_TRANSIT)
+		return -EBUSY;
+
+	qdf_atomic_set(&wtc->bmps_state, (int)WIFI_TRANSPORT_BMPS_TRANSIT);
+
+	rc = pld_set_bmps(dp_ctx->qdf_dev->dev, disable);
+	qdf_atomic_set(&wtc->bmps_state,
+		       rc == 0 ? (int)requested : (int)cur_state);
+
+	return rc;
+}
+
 int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 				 enum wifi_transport_param_type type,
 				 const union wifi_transport_param_data *data)
 {
-	return -EINVAL;
+	struct wifi_transport_host_context *wtc =
+				dp_wifi_transport_ctx_get(dp_ctx);
+	int ret = 0;
+
+	if (!wtc) {
+		dp_err("No active session");
+		return -ENODEV;
+	}
+
+	switch (type) {
+	case WT_PARAM_BMPS_DISABLE:
+		ret = dp_wifi_transport_bmps_set(dp_ctx, wtc,
+						 data->bmps_disable);
+		break;
+	default:
+		dp_err("unknown param type=%d", type);
+		ret = -EINVAL;
+		break;
+	}
+	dp_wifi_transport_ctx_put(wtc);
+
+	return ret;
 }
 
 int dp_wifi_transport_get_params(struct wlan_dp_psoc_context *dp_ctx,

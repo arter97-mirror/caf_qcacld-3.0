@@ -86,16 +86,14 @@ enum wifi_transport_link_step {
 
 /**
  * enum wifi_transport_bmps_state - BMPS power-save state machine
- * @WIFI_TRANSPORT_BMPS_ENABLED: BMPS on, link idle
- * @WIFI_TRANSPORT_BMPS_TRANSIT_ENABLE: QMI enable in flight
- * @WIFI_TRANSPORT_BMPS_TRANSIT_DISABLE: QMI disable in flight
- * @WIFI_TRANSPORT_BMPS_DISABLED: BMPS off, audio active
+ * @WIFI_TRANSPORT_BMPS_DISABLED: BMPS off — audio session active
+ * @WIFI_TRANSPORT_BMPS_ENABLED: BMPS on — link idle
+ * @WIFI_TRANSPORT_BMPS_TRANSIT: QMI in flight — block re-entry
  */
 enum wifi_transport_bmps_state {
-	WIFI_TRANSPORT_BMPS_ENABLED,
-	WIFI_TRANSPORT_BMPS_TRANSIT_ENABLE,
-	WIFI_TRANSPORT_BMPS_TRANSIT_DISABLE,
 	WIFI_TRANSPORT_BMPS_DISABLED,
+	WIFI_TRANSPORT_BMPS_ENABLED,
+	WIFI_TRANSPORT_BMPS_TRANSIT,
 };
 
 /**
