@@ -93,5 +93,19 @@ int ucfg_dp_wifi_transport_set_params(
 int ucfg_dp_wifi_transport_get_params(enum wifi_transport_param_type type,
 				      union wifi_transport_param_data *data);
 
+/**
+ * ucfg_dp_wifi_transport_tx() - submit one audio buffer for CE0 TX
+ * @nbuf: audio skb from the WiFi Transport driver; freed inside
+ *       dp_wifi_transport_tx(); caller must not dereference after return
+ * @meta: per-packet TX metadata (TTP, checksum, QoS)
+ * @flush: true forces immediate CE0 message flush
+ *
+ * Return: 0 on success, -ENODEV if session inactive,
+ *         -ENOSPC if TX pool or msg pool exhausted
+ */
+int ucfg_dp_wifi_transport_tx(qdf_nbuf_t nbuf,
+			      struct wifi_transport_tx_metadata *meta,
+			      bool flush);
+
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _WLAN_DP_WIFI_TRANSPORT_UCFG_API_H_ */

@@ -71,4 +71,11 @@ int ucfg_dp_wifi_transport_get_params(
 	return dp_wifi_transport_get_params(dp_get_context(), type, data);
 }
 
+int ucfg_dp_wifi_transport_tx(qdf_nbuf_t nbuf,
+			      struct wifi_transport_tx_metadata *meta,
+			      bool flush)
+{
+	return dp_wifi_transport_tx(dp_get_context(), nbuf, meta, flush);
+}
+
 #endif /* FEATURE_WIFI_TRANSPORT */

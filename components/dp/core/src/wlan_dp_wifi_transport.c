@@ -447,6 +447,19 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 {
 }
 
+int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
+			 qdf_nbuf_t nbuf,
+			 struct wifi_transport_tx_metadata *meta,
+			 bool flush)
+{
+	int ret = 0;
+
+	if (nbuf)
+		qdf_nbuf_kfree(nbuf);
+
+	return ret;
+}
+
 QDF_STATUS dp_wifi_transport_link_init(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wifi_transport_link_state *ls = &dp_ctx->wifi_transport_link;

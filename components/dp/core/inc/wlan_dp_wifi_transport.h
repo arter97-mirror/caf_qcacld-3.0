@@ -208,6 +208,23 @@ struct wifi_transport_host_context {
 };
 
 /**
+ * dp_wifi_transport_tx() - submit one audio buffer for TX
+ * @dp_ctx: DP psoc context
+ * @nbuf: audio skb from the WiFi Transport driver; payload is copied into
+ *       the pre-mapped TX pool and skb is freed immediately; caller must
+ *       not dereference after return
+ * @meta: TX metadata (dest MAC, QoS, TTP, checksum)
+ * @flush: if true, flush all pending TX CE messages immediately
+ *
+ * Return: 0 on success, -ENOSPC if TX pool or msg pool exhausted,
+ *         -ENODEV if session inactive
+ */
+int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
+			 qdf_nbuf_t nbuf,
+			 struct wifi_transport_tx_metadata *meta,
+			 bool flush);
+
+/**
  * dp_wifi_transport_link_init() - connect HTC service and register CE callbacks
  * @dp_ctx: DP psoc context
  *

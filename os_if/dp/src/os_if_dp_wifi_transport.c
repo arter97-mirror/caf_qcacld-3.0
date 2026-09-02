@@ -143,6 +143,23 @@ static int os_if_dp_wifi_transport_get_params(
 }
 
 /**
+ * os_if_dp_wifi_transport_transmit() - Submit one audio skb for CE0 TX
+ * @skb:   audio frame; freed inside dp_wifi_transport_tx()
+ * @meta:  per-packet TX metadata (TTP, checksum, QoS)
+ * @flush: true forces immediate CE0 message flush
+ *
+ * Return: 0 on success, -ENODEV if DP context unavailable,
+ *         -ENOSPC if TX pool exhausted
+ */
+static int os_if_dp_wifi_transport_transmit(
+			struct sk_buff *skb,
+			struct wifi_transport_tx_metadata *meta,
+			bool flush)
+{
+	return ucfg_dp_wifi_transport_tx(skb, meta, flush);
+}
+
+/**
  * os_if_dp_wifi_transport_adev_release() - Free auxiliary device after
  *   last reference
  * @dev: embedded &auxiliary_device.dev
@@ -194,6 +211,7 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 	g_wifi_transport_adev      = adev;
 	adev->host_ops.init        = os_if_dp_wifi_transport_init;
 	adev->host_ops.deinit      = os_if_dp_wifi_transport_deinit;
+	adev->host_ops.transmit    = os_if_dp_wifi_transport_transmit;
 	adev->host_ops.set_params  = os_if_dp_wifi_transport_set_params;
 	adev->host_ops.get_params  = os_if_dp_wifi_transport_get_params;
 	adev->host_ops.log         = os_if_dp_wifi_transport_log;
