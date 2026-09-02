@@ -61,14 +61,8 @@
 #define WIFI_TRANSPORT_TX_CE_BUF_SIZE         2048
 /* CE0 framing buffer: 2048 B matches host_ce_config nbytes_max */
 #define WIFI_TRANSPORT_CE_MSG_BUF_SIZE        2048
-/* CE5 message buffer: 256 B matches !FEATURE_PKTLOG CE5 pipe profile */
-#define WIFI_TRANSPORT_CE5_MSG_BUF_SIZE       256
 /* CE0 pool depth = src_nentries from host_ce_config (32) */
 #define WIFI_TRANSPORT_CE_MSG_POOL_SIZE       32
-/* CE5 pool depth = dest_nentries (32) minus 2 HW-reserved slots */
-#define WIFI_TRANSPORT_CE5_MSG_POOL_SIZE      30
-/* TX descriptor slots: covers full 10-bit sw_cookie wire range */
-#define WIFI_TRANSPORT_MAX_INFLIGHT_TX        1024
 
 /**
  * enum wifi_transport_init_step - bitmask tracking session init steps
@@ -118,14 +112,6 @@ enum wifi_transport_path_state {
 };
 
 /**
- * struct wifi_transport_tx_desc - single TX descriptor slot
- * @skb: skb from .ko; DMA-mapped on TX, unmapped and freed on completion
- */
-struct wifi_transport_tx_desc {
-	qdf_nbuf_t skb;
-};
-
-/**
  * struct wifi_transport_ce_msg_buf - CE0 framing buffer (nbuf-backed)
  * @nbuf: pre-allocated, DMA-mapped (TO_DEVICE) nbuf; paddr cached via
  *        qdf_nbuf_mapped_paddr_get().  Data written to qdf_nbuf_data().
@@ -151,7 +137,6 @@ struct wifi_transport_ce_buf_entry {
  * struct wifi_transport_host_context - per-session core state object
  * @ref_cnt: reference count; last put triggers dp_wifi_transport_release()
  * @ce_msg_lock: Spinlock protecting ce_msg_free_head
- * @ce_index_lock: BH spinlock serializing ce_send_nolock() calls (L3)
  * @deregister_done: signalled when ref_cnt reaches zero at teardown
  * @dl_down_completion: signalled on XPAN_DIRECT_LINK_DOWN_RESPONSE
  * @ops: .ko callbacks stored at init time
@@ -168,13 +153,8 @@ struct wifi_transport_ce_buf_entry {
  * @buf_pool_free_count: available slots; protected by buf_pool_lock
  * @buf_pool_lock: _bh spinlock serialising TX alloc (process) vs TX
  *        completion (BH) and SSR reset
- * @host_desc: TX descriptor slots indexed by .ko sw_cookie
- * @free_head: head of TX descriptor free-list
- * @avail_desc: number of free TX descriptor slots
  * @ce_msg_pool: 32 pre-allocated DMA-mapped TX framing buffers
  * @ce_msg_free_head: head of msg_buf free list (protected by ce_msg_lock)
- * @ce_msg_ready_head: head index of CE0 ready-to-send list
- * @ce_msg_ready_tail: tail index of CE0 ready-to-send list
  * @msg_seq_num: xpan_msg_hdr sequence counter
  * @init_mask: bitmask of completed init steps (enum wifi_transport_init_step)
  * @bmps_state: current BMPS state; atomic because set_params() runs lockless
@@ -195,7 +175,6 @@ struct wifi_transport_ce_buf_entry {
 struct wifi_transport_host_context {
 	qdf_atomic_t                 ref_cnt;
 	qdf_spinlock_t               ce_msg_lock;
-	qdf_spinlock_t               ce_index_lock;
 	qdf_event_t                  deregister_done;
 	qdf_event_t                  dl_down_completion;
 	struct wifi_transport_ops    ops;
@@ -210,16 +189,9 @@ struct wifi_transport_host_context {
 	uint32_t                     buf_pool_tp;
 	uint32_t                     buf_pool_free_count;
 	qdf_spinlock_t               buf_pool_lock;
-
-	struct wifi_transport_tx_desc
-			host_desc[WIFI_TRANSPORT_MAX_INFLIGHT_TX];
-	uint32_t                     free_head;
-	uint32_t                     avail_desc;
 	struct wifi_transport_ce_msg_buf
 			ce_msg_pool[WIFI_TRANSPORT_CE_MSG_POOL_SIZE];
 	struct wifi_transport_ce_msg_buf *ce_msg_free_head;
-	uint32_t                     ce_msg_ready_head;
-	uint32_t                     ce_msg_ready_tail;
 	uint16_t                     msg_seq_num;
 	uint32_t                     init_mask;
 	qdf_atomic_t                 bmps_state;
