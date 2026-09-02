@@ -3076,8 +3076,25 @@ cppflags-$(CONFIG_WMI_DBR_SUPPORT) += -DWMI_DBR_SUPPORT
 ifneq ($(CONFIG_CNSS_QCA6750), y)
 cppflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDBR_MULTI_SRNG_ENABLE
 endif
+
 cppflags-$(CONFIG_WMI_CMD_STRINGS) += -DWMI_CMD_STRINGS
 cppflags-$(CONFIG_WLAN_FEATURE_TWT) += -DWLAN_SUPPORT_TWT
+
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_ROC_ADDR_FILTER" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+endif
+
+found = $(shell if grep -qF "(*add_key)(struct wiphy *wiphy, struct wireless_dev *wdev," $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi; # ) )
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
+endif
+
+found = $(shell if grep -qF "NL80211_CMD_START_PD" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_PD_SUPPORT
+endif
+
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 ifeq ($(CONFIG_DP_USE_REDUCED_PEER_ID_FIELD_WIDTH), y)
 cppflags-y += -DDP_USE_REDUCED_PEER_ID_FIELD_WIDTH
