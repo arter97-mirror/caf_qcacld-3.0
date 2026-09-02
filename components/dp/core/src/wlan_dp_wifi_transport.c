@@ -720,12 +720,77 @@ dp_wifi_transport_bmps_set(struct wlan_dp_psoc_context *dp_ctx,
 	return rc;
 }
 
+/**
+ * dp_wifi_transport_ctrl_msg_alloc() - allocate and header-fill a CE0
+ *   control message buffer
+ * @wtc: session context
+ * @msg_type: XPAN message type to write into xpan_msg_hdr
+ * @msg_buf_out: on success, set to the allocated CE msg buffer
+ * @hdr_out: on success, set to the xpan_msg_hdr inside the buffer
+ *
+ * Handles the repeated pattern: check hif_handle, alloc from pool,
+ * fill type/seq_num/dbg_indx in the header.
+ *
+ * Return: 0 on success, -ENODEV if hif not ready, -ENOSPC if pool full
+ */
+static inline int
+dp_wifi_transport_ctrl_msg_alloc(struct wifi_transport_host_context *wtc,
+				 uint32_t msg_type,
+				 struct wifi_transport_ce_msg_buf **msg_buf_out,
+				 xpan_msg_hdr **hdr_out)
+{
+	struct wifi_transport_ce_msg_buf *msg_buf;
+	xpan_msg_hdr *hdr;
+
+	msg_buf = dp_wifi_transport_ce_msg_alloc(wtc);
+	if (!msg_buf) {
+		dp_err("Unable to allocate ms_buf");
+		return -ENOSPC;
+	}
+
+	hdr = (xpan_msg_hdr *)((uint8_t *)qdf_nbuf_data(msg_buf->nbuf) +
+			       HTC_HDR_LENGTH);
+	hdr->msg_type = msg_type;
+	hdr->msg_id   = wtc->msg_seq_num++;
+	hdr->dbg_indx = 0;
+
+	*msg_buf_out = msg_buf;
+	*hdr_out     = hdr;
+
+	return 0;
+}
+
+/**
+ * dp_wifi_transport_ctrl_msg_send() - send a control message, freeing on error
+ * @wtc: session context
+ * @msg_buf: CE msg buffer to send
+ * @nbytes: xpan payload size (excluding HTC header)
+ *
+ * Return: 0 on success, -EIO if CE ring is full (msg_buf freed)
+ */
+static inline int
+dp_wifi_transport_ctrl_msg_send(struct wifi_transport_host_context *wtc,
+				struct wifi_transport_ce_msg_buf *msg_buf,
+				uint32_t nbytes)
+{
+	int ret = dp_wifi_transport_msg_send(wtc, wtc->hif_handle,
+					     msg_buf, nbytes);
+
+	if (ret)
+		dp_wifi_transport_ce_msg_free(wtc, msg_buf);
+	return ret;
+}
+
 int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 				 enum wifi_transport_param_type type,
 				 const union wifi_transport_param_data *data)
 {
 	struct wifi_transport_host_context *wtc =
 				dp_wifi_transport_ctx_get(dp_ctx);
+	struct wifi_transport_ce_msg_buf *msg_buf;
+	xpan_mode *msg_mode;
+	xpan_msg_hdr *hdr;
+	uint32_t nbytes;
 	int ret = 0;
 
 	if (!wtc) {
@@ -737,6 +802,20 @@ int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 	case WT_PARAM_BMPS_DISABLE:
 		ret = dp_wifi_transport_bmps_set(dp_ctx, wtc,
 						 data->bmps_disable);
+		break;
+	case WT_PARAM_SET_MODE:
+		dp_info("SET_MODE mode=%u", data->mode);
+		nbytes = sizeof(xpan_msg_hdr) + sizeof(xpan_mode);
+		ret = dp_wifi_transport_ctrl_msg_alloc(wtc, XPAN_MODE,
+						       &msg_buf, &hdr);
+		if (ret)
+			break;
+		msg_mode = (xpan_mode *)((uint8_t *)hdr + sizeof(xpan_msg_hdr));
+		LPASSCETLV_SET_HDR(msg_mode,
+				   LPASSCETLV_TAG_STRUC_xpan_mode_fixed_param,
+				   LPASSCETLV_GET_STRUCT_TLVLEN(xpan_mode));
+		msg_mode->link_mode = data->mode;
+		ret = dp_wifi_transport_ctrl_msg_send(wtc, msg_buf, nbytes);
 		break;
 	default:
 		dp_err("unknown param type=%d", type);
