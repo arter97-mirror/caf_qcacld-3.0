@@ -49,9 +49,6 @@
 #include "wlan_hdd_cfr.h"
 #include "wlan_roam_debug.h"
 #include "wma_api.h"
-#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
-#include "hif_main.h"
-#endif
 
 void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -596,24 +593,6 @@ QDF_STATUS hdd_cm_napi_serialize_control(bool action)
 }
 
 #ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
-static inline
-uint16_t hdd_cm_get_perf_cpu_mask(void)
-{
-	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
-	int package_id;
-	unsigned int cpus;
-	uint16_t cpu_mask = 0;
-
-	qdf_for_each_online_cpu(cpus) {
-		package_id = qdf_topology_physical_package_id(cpus);
-		if (package_id >= 0 &&
-		    QDF_HAS_PARAM(perf_cpu_cluster, package_id))
-			cpu_mask |= (uint16_t)(1u << cpus);
-	}
-
-	return cpu_mask;
-}
-
 QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
 {
 	struct wlan_core_minfreq req;
@@ -628,8 +607,7 @@ QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
 	if (action) {
 		req.magic    = WLAN_CORE_MINFREQ_MAGIC;
 		req.reserved = 0; /* unused */
-		/* only perf cluster */
-		req.coremask = hdd_cm_get_perf_cpu_mask();
+		req.coremask = 0x00ff;/* big and little cluster */
 		req.freq     = 0xfff;/* set to max freq */
 	} else {
 		req.magic    = WLAN_CORE_MINFREQ_MAGIC;
