@@ -788,6 +788,7 @@ int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 	struct wifi_transport_host_context *wtc =
 				dp_wifi_transport_ctx_get(dp_ctx);
 	struct wifi_transport_ce_msg_buf *msg_buf;
+	xpan_set_burst_interval_info *msg_burst;
 	xpan_mode *msg_mode;
 	xpan_msg_hdr *hdr;
 	uint32_t nbytes;
@@ -815,6 +816,25 @@ int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 				   LPASSCETLV_TAG_STRUC_xpan_mode_fixed_param,
 				   LPASSCETLV_GET_STRUCT_TLVLEN(xpan_mode));
 		msg_mode->link_mode = data->mode;
+		ret = dp_wifi_transport_ctrl_msg_send(wtc, msg_buf, nbytes);
+		break;
+	case WT_PARAM_SET_BURST_INTERVAL:
+		dp_info("SET_BURST_INTERVAL ms=%u", data->burst_interval_ms);
+		nbytes = sizeof(xpan_msg_hdr) +
+			 sizeof(xpan_set_burst_interval_info);
+		ret = dp_wifi_transport_ctrl_msg_alloc(
+				wtc, XPAN_SET_BURST_INTERVAL,
+				&msg_buf, &hdr);
+		if (ret)
+			break;
+		msg_burst = (xpan_set_burst_interval_info *)
+			((uint8_t *)hdr + sizeof(xpan_msg_hdr));
+		LPASSCETLV_SET_HDR(
+		msg_burst,
+		LPASSCETLV_TAG_STRUC_xpan_set_burst_interval_fixed_param,
+		LPASSCETLV_GET_STRUCT_TLVLEN(
+			xpan_set_burst_interval_info));
+		msg_burst->burst_interval_ms = data->burst_interval_ms;
 		ret = dp_wifi_transport_ctrl_msg_send(wtc, msg_buf, nbytes);
 		break;
 	default:
