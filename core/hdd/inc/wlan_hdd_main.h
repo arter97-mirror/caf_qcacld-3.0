@@ -2971,6 +2971,14 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 void hdd_set_station_ops(struct net_device *dev);
 
 /**
+ * hdd_wdev_get_netdev() - Safely obtain net_device from wireless_dev
+ * @wdev: Pointer to wireless_dev structure
+ *
+ * Return: Pointer to net_device or NULL
+ */
+struct net_device *hdd_wdev_get_netdev(struct wireless_dev *wdev);
+
+/**
  * wlan_hdd_get_intf_addr() - Get address for the interface
  * @hdd_ctx: Pointer to hdd context
  * @interface_type: type of the interface for which address is queried

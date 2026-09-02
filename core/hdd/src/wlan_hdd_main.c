@@ -427,6 +427,24 @@ struct sock *cesium_nl_srv_sock;
 static void wlan_hdd_auto_shutdown_cb(void);
 #endif
 
+struct net_device *hdd_wdev_get_netdev(struct wireless_dev *wdev)
+{
+	struct hdd_adapter *adapter;
+
+	if (!wdev)
+		return NULL;
+
+	if (wdev->netdev)
+		return wdev->netdev;
+
+	/* Fallback: wireless_dev is embedded in hdd_adapter */
+	adapter = container_of(wdev, struct hdd_adapter, wdev);
+	if (adapter && adapter->dev)
+		return adapter->dev;
+
+	return NULL;
+}
+
 bool hdd_adapter_is_ap(struct hdd_adapter *adapter)
 {
 	if (!adapter) {
