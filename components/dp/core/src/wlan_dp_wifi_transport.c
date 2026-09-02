@@ -491,6 +491,73 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 {
 }
 
+/**
+ * dp_wifi_transport_flush_tx() - send all queued TX CE msgs to FW
+ * @wtc: session context
+ *
+ * Moves cur_msg_buf to the ready queue and submits the entire ready list
+ * to CE0.  CE ring posting does not access any wtc shared state; called
+ * only from the single-threaded TX path (WiFi Transport driver contract).
+ *
+ * Mirrors ADSP's __wifi_qdi_drv_flush_tx_pkts().
+ *
+ * Return: 0 on success, error code otherwise
+ */
+static inline int
+dp_wifi_transport_flush_tx(struct wifi_transport_host_context *wtc)
+{
+	struct wifi_transport_ce_msg_buf *msg, *next_msg, *to_send;
+	xpan_tx_audio_fixed_param *fp;
+	xpan_tx_buffer_info *buf_info;
+	uint32_t send_len, i;
+	int ret = 0;
+
+	if (wtc->cur_msg_buf) {
+		wtc->cur_msg_buf->next = NULL;
+		if (!wtc->ready_tail) {
+			wtc->ready_head = wtc->cur_msg_buf;
+			wtc->ready_tail = wtc->cur_msg_buf;
+		} else {
+			wtc->ready_tail->next = wtc->cur_msg_buf;
+			wtc->ready_tail = wtc->cur_msg_buf;
+		}
+		wtc->cur_msg_buf = NULL;
+	}
+
+	to_send = wtc->ready_head;
+	wtc->ready_head = NULL;
+	wtc->ready_tail = NULL;
+
+	for (msg = to_send; msg; msg = next_msg) {
+		next_msg = msg->next;
+		msg->next = NULL;
+
+		fp = (xpan_tx_audio_fixed_param *)
+			((uint8_t *)qdf_nbuf_data(msg->nbuf) +
+			 HTC_HDR_LENGTH + sizeof(xpan_msg_hdr));
+		fp->num_tx_buffers = msg->bufs_added;
+
+		send_len = sizeof(xpan_msg_hdr) +
+			   sizeof(xpan_tx_audio_fixed_param) +
+			   (msg->bufs_added * sizeof(xpan_tx_buffer_info));
+
+		ret = dp_wifi_transport_msg_send(wtc, wtc->hif_handle, msg,
+						 send_len);
+		if (qdf_unlikely(ret)) {
+			buf_info = (xpan_tx_buffer_info *)
+				((uint8_t *)qdf_nbuf_data(msg->nbuf) +
+				 HTC_HDR_LENGTH + sizeof(xpan_msg_hdr) +
+				 sizeof(xpan_tx_audio_fixed_param));
+			for (i = 0; i < msg->bufs_added; i++, buf_info++)
+				dp_wifi_transport_cookie_free(
+						wtc, buf_info->sw_cookie);
+			dp_wifi_transport_ce_msg_free(wtc, msg);
+		}
+	}
+
+	return ret;
+}
+
 int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 			 qdf_nbuf_t nbuf,
 			 struct wifi_transport_tx_metadata *meta,
@@ -504,7 +571,7 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_nbuf_t tx_nbuf;
 	qdf_dma_addr_t buf_dma;
 	uint32_t nbuf_len, n;
-	uint16_t cookie;
+	uint16_t cookie = 0;
 	const uint8_t *dst_addr, *src_addr;
 	int ret = 0;
 
@@ -521,7 +588,7 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	if (qdf_unlikely(!nbuf))
-		goto err_ctx;
+		goto flush;
 
 	cookie = dp_wifi_transport_cookie_alloc(wtc);
 	if (qdf_unlikely(cookie >= WIFI_TRANSPORT_TX_BUF_POOL_SIZE)) {
@@ -613,15 +680,17 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 	buf_info->ttp_lo           = (uint32_t)(meta->ttp & 0xFFFFFFFF);
 	buf_info->ttp_hi            = (uint32_t)(meta->ttp >> 32);
 	wtc->cur_msg_buf->bufs_added++;
-	ret = cookie;
 
+flush:
+	if (flush)
+		ret = dp_wifi_transport_flush_tx(wtc);
 err_ctx:
 		dp_wifi_transport_ctx_put(wtc);
 err_no_ctx:
 		if (nbuf)
 			qdf_nbuf_kfree(nbuf);
 
-	return ret;
+	return ret < 0 ? ret : cookie;
 }
 
 QDF_STATUS dp_wifi_transport_link_init(struct wlan_dp_psoc_context *dp_ctx)
