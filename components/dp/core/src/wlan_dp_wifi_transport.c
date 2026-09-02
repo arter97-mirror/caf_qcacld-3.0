@@ -704,6 +704,10 @@ dp_wifi_transport_rx_ready(void *transfer_ctx,
 	case XPAN_PEER_STATS:
 		dp_wifi_transport_handle_peer_stats(wtc, buf);
 		break;
+	case XPAN_DIRECT_LINK_DOWN_RESPONSE:
+		dp_info("link_down_response received");
+		qdf_event_set(&wtc->dl_down_completion);
+		break;
 	default:
 		dp_err("Invalid msg type: %d", hdr->msg_type);
 		break;
@@ -1059,6 +1063,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	wtc->hif_handle = cds_get_context(QDF_MODULE_ID_HIF);
 	qdf_spinlock_create(&wtc->ce_msg_lock);
 	qdf_event_create(&wtc->deregister_done);
+	qdf_event_create(&wtc->dl_down_completion);
 
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	dp_ctx->wifi_transport_host_ctx = wtc;
@@ -1103,6 +1108,7 @@ err:
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	qdf_spinlock_destroy(&wtc->ce_msg_lock);
+	qdf_event_destroy(&wtc->dl_down_completion);
 	qdf_event_destroy(&wtc->deregister_done);
 	qdf_mem_free(wtc);
 
@@ -1114,6 +1120,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 {
 	struct wifi_transport_host_context *wtc;
 	void *htc_handle;
+	QDF_STATUS status;
 
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	wtc = dp_ctx->wifi_transport_host_ctx;
@@ -1127,6 +1134,17 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 
 	qdf_atomic_set(&dp_ctx->wifi_transport_active_path,
 		       WIFI_TRANSPORT_PATH_INACTIVE);
+
+	if (!is_recovery_stop) {
+		dp_wifi_transport_send(wtc, XPAN_DIRECT_LINK_DOWN_REQUEST);
+		status = qdf_wait_single_event(&wtc->dl_down_completion, WIFI_TRANSPORT_DL_DOWN_TIMEOUT_MS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_err("FW did not ack link-down — triggering recovery");
+			cds_trigger_recovery(QDF_REASON_UNSPECIFIED);
+			/* SSR will call deinit again with is_recovery_stop=true */
+			return;
+		}
+	}
 
 	/* Clear pointer now — prevents new ctx_get() from succeeding.
 	 * For SSR the FW is gone so no link-down send is needed.
@@ -1152,6 +1170,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 					   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 	}
 
+	qdf_event_destroy(&wtc->dl_down_completion);
 	qdf_event_destroy(&wtc->deregister_done);
 	qdf_spinlock_destroy(&wtc->ce_msg_lock);
 	qdf_mem_free(wtc);

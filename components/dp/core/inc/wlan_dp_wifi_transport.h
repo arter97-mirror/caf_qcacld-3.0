@@ -48,6 +48,8 @@
 #define WIFI_TRANSPORT_MAX_BUFS_PER_CE_MSG    72
 /* Max ms to wait for all session reference holders to drain at deinit */
 #define WIFI_TRANSPORT_REF_DRAIN_TIMEOUT_MS      3000
+/* Max ms to wait for FW XPAN_DIRECT_LINK_DOWN_RESPONSE ack at deinit */
+#define WIFI_TRANSPORT_DL_DOWN_TIMEOUT_MS        1000
 /*
  * TX CE buffer pool depth: 5 TWT_SI x 38 PKT_PER_SP x 2 = 380.
  * sw_cookie is HOST-assigned from cookie_array[TP]; range 0-379.
