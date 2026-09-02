@@ -37,6 +37,15 @@
 #include <qdf_mem.h>
 #include <qdf_types.h>
 
+/* Byte offset from MAC address start to the upper 2 bytes (bytes 4-5) */
+#define WIFI_TP_MAC_HI_OFF      4
+/*
+ * Max xpan_tx_buffer_info TLVs per CE0 HTC message.
+ * Formula: (2048 - HTC_HDR(8) - xpan_msg_hdr(8)
+ *           - xpan_tx_audio_fixed_param(12))
+ *          / xpan_tx_buffer_info(28) = 72
+ */
+#define WIFI_TRANSPORT_MAX_BUFS_PER_CE_MSG    72
 /* Max ms to wait for all session reference holders to drain at deinit */
 #define WIFI_TRANSPORT_REF_DRAIN_TIMEOUT_MS      3000
 /*
@@ -167,6 +176,13 @@ struct wifi_transport_ce_buf_entry {
  * @msg_seq_num: xpan_msg_hdr sequence counter
  * @init_mask: bitmask of completed init steps (enum wifi_transport_init_step)
  * @bmps_state: current BMPS state; atomic because set_params() runs lockless
+ * @cur_msg_buf: TX burst buffer currently being assembled; TX-only state
+ *        touched exclusively from dp_wifi_transport_tx() and the deinit
+ *        path; WiFi Transport driver contract is single-threaded TX, so
+ *        no BH lock is needed
+ * @ready_head: head of the queue of fully-assembled CE0 framing buffers
+ *        waiting to be flushed to FW, in submission order
+ * @ready_tail: tail pointer for the ready queue; NULL when queue is empty
  *
  * Lock hierarchy (must acquire in order — never reverse):
  *   L1: dp_ctx->wifi_transport_host_ctx_lock  (pointer guard)
@@ -205,6 +221,10 @@ struct wifi_transport_host_context {
 	uint16_t                     msg_seq_num;
 	uint32_t                     init_mask;
 	qdf_atomic_t                 bmps_state;
+	struct wifi_transport_ce_msg_buf *cur_msg_buf;
+	struct wifi_transport_ce_msg_buf *ready_head;
+	struct wifi_transport_ce_msg_buf *ready_tail;
+
 };
 
 /**

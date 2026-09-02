@@ -496,10 +496,130 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 			 struct wifi_transport_tx_metadata *meta,
 			 bool flush)
 {
+	struct wifi_transport_host_context *wtc =
+				dp_wifi_transport_ctx_get(dp_ctx);
+	xpan_tx_audio_fixed_param *fixed;
+	xpan_tx_buffer_info *buf_info;
+	xpan_msg_hdr *hdr;
+	qdf_nbuf_t tx_nbuf;
+	qdf_dma_addr_t buf_dma;
+	uint32_t nbuf_len, n;
+	uint16_t cookie;
+	const uint8_t *dst_addr, *src_addr;
 	int ret = 0;
 
-	if (nbuf)
-		qdf_nbuf_kfree(nbuf);
+	if (qdf_unlikely(!wtc)) {
+		ret = -ENODEV;
+		goto err_no_ctx;
+	}
+
+	if (qdf_unlikely(qdf_atomic_read(&dp_ctx->wifi_transport_active_path) ==
+			    WIFI_TRANSPORT_PATH_INACTIVE)) {
+		dp_err("TX dropped — deinit in progress");
+		ret = -ESHUTDOWN;
+		goto err_ctx;
+	}
+
+	if (qdf_unlikely(!nbuf))
+		goto err_ctx;
+
+	cookie = dp_wifi_transport_cookie_alloc(wtc);
+	if (qdf_unlikely(cookie >= WIFI_TRANSPORT_TX_BUF_POOL_SIZE)) {
+		dp_err("TX buf pool exhausted");
+		ret = -ENOSPC;
+		goto err_ctx;
+	}
+
+	tx_nbuf = wtc->buf_array[cookie].nbuf;
+	nbuf_len = (uint32_t)qdf_nbuf_len(nbuf);
+	qdf_mem_copy(qdf_nbuf_data(tx_nbuf),
+		     qdf_nbuf_data(nbuf), nbuf_len);
+	qdf_mem_dma_sync_single_for_device(
+			dp_ctx->qdf_dev,
+			qdf_nbuf_mapped_paddr_get(tx_nbuf),
+			nbuf_len, DMA_TO_DEVICE);
+
+	dst_addr = qdf_nbuf_get_ether_dest_addr(tx_nbuf);
+	src_addr = qdf_nbuf_get_ether_src_addr(tx_nbuf);
+
+	if (!wtc->cur_msg_buf ||
+	    wtc->cur_msg_buf->bufs_added >=
+	    WIFI_TRANSPORT_MAX_BUFS_PER_CE_MSG) {
+		if (wtc->cur_msg_buf) {
+			wtc->cur_msg_buf->next = NULL;
+			if (!wtc->ready_tail) {
+				wtc->ready_head = wtc->cur_msg_buf;
+				wtc->ready_tail = wtc->cur_msg_buf;
+			} else {
+				wtc->ready_tail->next = wtc->cur_msg_buf;
+				wtc->ready_tail = wtc->cur_msg_buf;
+			}
+			wtc->cur_msg_buf = NULL;
+		}
+
+		wtc->cur_msg_buf = dp_wifi_transport_ce_msg_alloc(wtc);
+		if (!wtc->cur_msg_buf) {
+			dp_err("ce_msg_pool exhausted");
+			dp_wifi_transport_cookie_free(wtc, cookie);
+			ret = -ENOSPC;
+			goto err_ctx;
+		}
+
+		hdr = (xpan_msg_hdr *)
+			((uint8_t *)qdf_nbuf_data(wtc->cur_msg_buf->nbuf) +
+			HTC_HDR_LENGTH);
+		fixed = (xpan_tx_audio_fixed_param *)
+			((uint8_t *)qdf_nbuf_data(wtc->cur_msg_buf->nbuf) +
+			HTC_HDR_LENGTH + sizeof(xpan_msg_hdr));
+
+		hdr->msg_type = XPAN_TX_AUDIO_PACKET;
+		hdr->msg_id   = wtc->msg_seq_num++;
+		hdr->dbg_indx = 0;
+
+		LPASSCETLV_SET_HDR(
+			fixed,
+			LPASSCETLV_TAG_STRUC_xpan_tx_audio_fixed_param,
+			LPASSCETLV_GET_STRUCT_TLVLEN(
+				xpan_tx_audio_fixed_param));
+		fixed->src_mac_addr_31_0  =
+			*(const uint32_t *)src_addr;
+		fixed->src_mac_addr_47_32 =
+			*(const uint16_t *)(src_addr + WIFI_TP_MAC_HI_OFF);
+		fixed->num_tx_buffers = 0;
+	}
+
+	n = wtc->cur_msg_buf->bufs_added;
+	buf_dma = qdf_nbuf_mapped_paddr_get(tx_nbuf);
+	buf_info = (xpan_tx_buffer_info *)
+		((uint8_t *)qdf_nbuf_data(wtc->cur_msg_buf->nbuf) +
+		 HTC_HDR_LENGTH + sizeof(xpan_msg_hdr) +
+		 sizeof(xpan_tx_audio_fixed_param) +
+		 (n * sizeof(xpan_tx_buffer_info)));
+
+	LPASSCETLV_SET_HDR(
+		buf_info,
+		LPASSCETLV_TAG_STRUC_xpan_tx_buffer_info_array,
+		LPASSCETLV_GET_STRUCT_TLVLEN(xpan_tx_buffer_info));
+	buf_info->buffer_addr_lo = (uint32_t)(buf_dma & 0xFFFFFFFF);
+	buf_info->buffer_addr_hi = (uint32_t)(buf_dma >> 32) & 0xFF;
+	buf_info->sw_cookie         = cookie;
+	buf_info->buffer_len        = nbuf_len;
+	buf_info->dest_mac_addr_31_0  = *(const uint32_t *)dst_addr;
+	buf_info->dest_mac_addr_47_32 =
+		*(const uint16_t *)(dst_addr + WIFI_TP_MAC_HI_OFF);
+	buf_info->qos               = meta->qos;
+	buf_info->checksum_en       = meta->checksum_en;
+	buf_info->is_non_audio_pkt  = meta->is_non_audio_pkt;
+	buf_info->ttp_lo           = (uint32_t)(meta->ttp & 0xFFFFFFFF);
+	buf_info->ttp_hi            = (uint32_t)(meta->ttp >> 32);
+	wtc->cur_msg_buf->bufs_added++;
+	ret = cookie;
+
+err_ctx:
+		dp_wifi_transport_ctx_put(wtc);
+err_no_ctx:
+		if (nbuf)
+			qdf_nbuf_kfree(nbuf);
 
 	return ret;
 }
