@@ -781,6 +781,30 @@ dp_wifi_transport_ctrl_msg_send(struct wifi_transport_host_context *wtc,
 	return ret;
 }
 
+/**
+ * dp_wifi_transport_wt_to_xpan_filter_type() - Convert wifi_transport param
+ *     type to XPAN_RX_FILTER_TYPE for the CE0 CCE filter TLV
+ * @type: WT_PARAM_SET_CCE_FILTER_* value
+ *
+ * Return: XPAN_RX_FILTER_TYPE value
+ */
+static inline uint8_t
+dp_wifi_transport_wt_to_xpan_filter_type(enum wifi_transport_param_type type)
+{
+	switch (type) {
+	case WT_PARAM_SET_CCE_FILTER_UDP_DATA:
+		return XPAN_UDP_DATA;
+	case WT_PARAM_SET_CCE_FILTER_UDP_TIME_SYNC:
+		return XPAN_UDP_TIME_SYNC;
+	case WT_PARAM_SET_CCE_FILTER_ETHERTYPE:
+		return XPAN_ETHERTYPE;
+	case WT_PARAM_SET_CCE_FILTER_UDP_HEARTBEAT:
+		return XPAN_UDP_HEARTBEAT;
+	default:
+		return XPAN_UDP_DATA;
+	}
+}
+
 int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 				 enum wifi_transport_param_type type,
 				 const union wifi_transport_param_data *data)
@@ -789,6 +813,7 @@ int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 				dp_wifi_transport_ctx_get(dp_ctx);
 	struct wifi_transport_ce_msg_buf *msg_buf;
 	xpan_set_burst_interval_info *msg_burst;
+	xpan_set_rx_filter_info *msg_cce;
 	xpan_mode *msg_mode;
 	xpan_msg_hdr *hdr;
 	uint32_t nbytes;
@@ -835,6 +860,29 @@ int dp_wifi_transport_set_params(struct wlan_dp_psoc_context *dp_ctx,
 		LPASSCETLV_GET_STRUCT_TLVLEN(
 			xpan_set_burst_interval_info));
 		msg_burst->burst_interval_ms = data->burst_interval_ms;
+		ret = dp_wifi_transport_ctrl_msg_send(wtc, msg_buf, nbytes);
+		break;
+	case WT_PARAM_SET_CCE_FILTER_UDP_DATA:
+	case WT_PARAM_SET_CCE_FILTER_UDP_TIME_SYNC:
+	case WT_PARAM_SET_CCE_FILTER_ETHERTYPE:
+	case WT_PARAM_SET_CCE_FILTER_UDP_HEARTBEAT:
+		dp_info("SET_CCE_FILTER type=%d port=%u", type, data->port);
+		nbytes = sizeof(xpan_msg_hdr) + sizeof(xpan_set_rx_filter_info);
+		ret = dp_wifi_transport_ctrl_msg_alloc(
+				wtc, XPAN_SET_RX_CCE_FILTER,
+				&msg_buf, &hdr);
+		if (ret)
+			break;
+		msg_cce = (xpan_set_rx_filter_info *)
+			((uint8_t *)hdr + sizeof(xpan_msg_hdr));
+		LPASSCETLV_SET_HDR(
+			msg_cce,
+			LPASSCETLV_TAG_STRUC_xpan_set_rx_cce_filter_fixed_param,
+			LPASSCETLV_GET_STRUCT_TLVLEN(xpan_set_rx_filter_info));
+		msg_cce->filter_value = data->port;
+		msg_cce->filter_type  =
+			dp_wifi_transport_wt_to_xpan_filter_type(type);
+		msg_cce->enable       = 1;
 		ret = dp_wifi_transport_ctrl_msg_send(wtc, msg_buf, nbytes);
 		break;
 	default:
