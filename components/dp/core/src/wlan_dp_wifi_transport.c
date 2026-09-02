@@ -80,6 +80,50 @@ dp_wifi_transport_ctx_put(struct wifi_transport_host_context *wtc)
 }
 
 /**
+ * dp_wifi_transport_cookie_alloc() - allocate a TX cookie from the ring
+ * @wtc: session context
+ *
+ * Return: cookie index on success, WIFI_TRANSPORT_TX_BUF_POOL_SIZE if
+ *         pool is exhausted
+ */
+static inline uint16_t
+dp_wifi_transport_cookie_alloc(struct wifi_transport_host_context *wtc)
+{
+	uint16_t cookie;
+
+	qdf_spin_lock_bh(&wtc->buf_pool_lock);
+	if (!wtc->buf_pool_free_count) {
+		qdf_spin_unlock_bh(&wtc->buf_pool_lock);
+		return WIFI_TRANSPORT_TX_BUF_POOL_SIZE;
+	}
+	cookie = wtc->cookie_array[wtc->buf_pool_tp];
+	wtc->buf_pool_tp = (wtc->buf_pool_tp + 1) %
+			   WIFI_TRANSPORT_TX_BUF_POOL_SIZE;
+	wtc->buf_pool_free_count--;
+	qdf_spin_unlock_bh(&wtc->buf_pool_lock);
+	return cookie;
+}
+
+/**
+ * dp_wifi_transport_cookie_free() - Free cookie value
+ * @wtc: session context
+ * @cookie: Cookie value.
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_cookie_free(struct wifi_transport_host_context *wtc,
+			      uint16_t cookie)
+{
+	qdf_spin_lock_bh(&wtc->buf_pool_lock);
+	wtc->cookie_array[wtc->buf_pool_hp] = cookie;
+	wtc->buf_pool_hp = (wtc->buf_pool_hp + 1) %
+			   WIFI_TRANSPORT_TX_BUF_POOL_SIZE;
+	wtc->buf_pool_free_count++;
+	qdf_spin_unlock_bh(&wtc->buf_pool_lock);
+}
+
+/**
  * dp_wifi_transport_ce_msg_alloc() - pop a buffer from the CE0 framing pool
  * @wtc: session context
  *
