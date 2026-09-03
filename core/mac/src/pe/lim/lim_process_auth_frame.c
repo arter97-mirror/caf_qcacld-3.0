@@ -1958,6 +1958,36 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+
+	if (frame_len < 2) {
+		pe_err("invalid frame len: %d", frame_len);
+		return;
+	}
+	auth_alg = *(uint16_t *) body_ptr;
+
+	/* If this STA is already associated but the 4-way handshake (key
+         * installation) has not completed yet, drop this new Auth frame
+         * instead of restarting authentication in the middle of an ongoing
+         * key exchange.
+         */
+	if (LIM_IS_AP_ROLE(pe_session)) {
+		tpDphHashNode sta_ds;
+		uint16_t aid;
+
+		sta_ds = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa,
+					&aid, &pe_session->dph.dphHashTable);
+		if (sta_ds && auth_alg == eSIR_AUTH_TYPE_SAE &&
+		    sta_ds->mlmStaContext.mlmState ==
+		    eLIM_MLM_LINK_ESTABLISHED_STATE &&
+		    !wlan_peer_is_key_installed(mac_ctx->psoc, mac_hdr->sa)) {
+			pe_debug("vdev %d STA " QDF_MAC_ADDR_FMT " 4-way handshake in progress, drop auth frame",
+				 pe_session->vdev_id,
+				 QDF_MAC_ADDR_REF(mac_hdr->sa));
+			return;
+		}
+	}
+
 	curr_seq_num = (mac_hdr->seqControl.seqNumHi << 4) |
 		(mac_hdr->seqControl.seqNumLo);
 
@@ -1993,14 +2023,6 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	/* save seq number and mac_addr in pe_session */
 	pe_session->prev_auth_seq_num = curr_seq_num;
 	qdf_mem_copy(pe_session->prev_auth_mac_addr, mac_hdr->sa, ETH_ALEN);
-
-	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
-
-	if (frame_len < 2) {
-		pe_err("invalid frame len: %d", frame_len);
-		return;
-	}
-	auth_alg = *(uint16_t *) body_ptr;
 
 	pe_nofl_rl_info("Auth RX: vdev %d sys role %d lim_state %d from " QDF_MAC_ADDR_FMT " rssi %d auth_alg %d seq %d",
 			pe_session->vdev_id, GET_LIM_BSS_TYPE(pe_session),
