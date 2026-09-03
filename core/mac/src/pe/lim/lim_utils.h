@@ -1484,12 +1484,11 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
  * @session: pointer to PE session
  * @ie_start: pointer to start of IE buffer
  * @num_bytes: length of IE buffer
- * @band: 2g or 5g band
  *
  * Return: None
  */
 void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
-		     uint8_t *ie_start, uint32_t num_bytes, uint8_t band);
+		     uint8_t *ie_start, uint32_t num_bytes);
 
 /**
  * lim_send_he_caps_ie() - gets HE capability and send to firmware via wma
@@ -1689,8 +1688,7 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 }
 
 static inline void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
-				   uint8_t *ie_start, uint32_t num_bytes,
-				   uint8_t band)
+				   uint8_t *ie_start, uint32_t num_bytes)
 {
 }
 
@@ -1952,12 +1950,11 @@ void lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap);
  * @session: pointer to PE session
  * @ie_start: pointer to start of IE buffer
  * @num_bytes: length of IE buffer
- * @band: 2g or 5g band
  *
  * Return: None
  */
 void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band);
+		      uint8_t *ie_start, uint32_t num_bytes);
 
 /**
  * lim_send_eht_caps_ie() - gets EHT capability and send to firmware via wma
@@ -2125,7 +2122,7 @@ lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
 
 static inline void
 lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		 uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
+		 uint8_t *ie_start, uint32_t num_bytes)
 {
 }
 
