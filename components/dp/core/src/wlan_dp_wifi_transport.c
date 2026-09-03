@@ -532,6 +532,11 @@ dp_wifi_transport_handle_tx_completion(
 		ppdu_tx_tsf = (((uint64_t)entry->ppdu_tx_tsf_hi) << 32) |
 				entry->ppdu_tx_tsf_lo;
 
+		if (qdf_unlikely(qdf_trace_wifi_transport_tx_completion_enabled()))
+			qdf_trace_wifi_transport_tx_completion(
+					cookie, ppdu_tx_tsf, entry->tx_status,
+					entry->mcs);
+
 		if (wtc->ops.tx_completion)
 			wtc->ops.tx_completion(
 				cookie,
@@ -588,6 +593,10 @@ dp_wifi_transport_handle_rx_indication(
 	n = fixed->num_rx_buffers;
 	entry = (xpan_rx_buffer_info *)((uint8_t *)fixed +
 				sizeof(xpan_rx_audio_fixed_param));
+
+	if (qdf_unlikely(qdf_trace_wifi_transport_rx_indication_enabled()))
+		qdf_trace_wifi_transport_rx_indication(
+				n, n > 0 ? entry->buffer_len : 0);
 
 	dp_direct_link_refill_ring_start(dp_ctx->cdp_soc, wtc->rx_refill_ring);
 	for (i = 0; i < n; i++, entry++) {
@@ -776,6 +785,9 @@ dp_wifi_transport_flush_tx(struct wifi_transport_host_context *wtc)
 			   sizeof(xpan_tx_audio_fixed_param) +
 			   (msg->bufs_added * sizeof(xpan_tx_buffer_info));
 
+		if (qdf_unlikely(qdf_trace_wifi_transport_tx_flush_enabled()))
+			qdf_trace_wifi_transport_tx_flush(1, msg->bufs_added);
+
 		ret = dp_wifi_transport_msg_send(wtc, wtc->hif_handle, msg,
 						 send_len);
 		if (qdf_unlikely(ret)) {
@@ -840,6 +852,10 @@ int dp_wifi_transport_tx(struct wlan_dp_psoc_context *dp_ctx,
 			dp_ctx->qdf_dev,
 			qdf_nbuf_mapped_paddr_get(tx_nbuf),
 			nbuf_len, DMA_TO_DEVICE);
+
+	if (qdf_unlikely(qdf_trace_wifi_transport_tx_submit_enabled()))
+		qdf_trace_wifi_transport_tx_submit(cookie, nbuf_len,
+						   meta->ttp, flush);
 
 	dst_addr = qdf_nbuf_get_ether_dest_addr(tx_nbuf);
 	src_addr = qdf_nbuf_get_ether_src_addr(tx_nbuf);
