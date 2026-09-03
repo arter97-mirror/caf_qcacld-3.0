@@ -3379,6 +3379,9 @@ ucfg_dp_txrx_set_vdev_param(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			dp_intf->tdls_link_up++;
 		else
 			dp_intf->tdls_link_up--;
+
+		dp_info("TDLS: tdls_link_up updated to %u (vdev %u, is_up %u)",
+			dp_intf->tdls_link_up, vdev_id, is_link_up);
 end:
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
 	}
