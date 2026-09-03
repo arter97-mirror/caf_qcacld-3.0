@@ -1119,8 +1119,10 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 			      bool is_recovery_stop)
 {
 	struct wifi_transport_host_context *wtc;
+	struct wifi_transport_ce_msg_buf *msg;
 	void *htc_handle;
 	QDF_STATUS status;
+	uint32_t unflushed = 0;
 
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	wtc = dp_ctx->wifi_transport_host_ctx;
@@ -1160,6 +1162,16 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 				      WIFI_TRANSPORT_REF_DRAIN_TIMEOUT_MS)))
 		dp_err("timed out waiting for session refs to drain");
 
+	if (wtc->cur_msg_buf)
+		unflushed += wtc->cur_msg_buf->bufs_added;
+
+	while (wtc->ready_head) {
+		msg = wtc->ready_head;
+		unflushed += msg->bufs_added;
+		wtc->ready_head = msg->next;
+
+	}
+
 	dp_wifi_transport_ce_msg_pool_deinit(wtc, dp_ctx);
 	dp_wifi_transport_tx_buf_pool_deinit(wtc, dp_ctx);
 
@@ -1174,7 +1186,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_event_destroy(&wtc->deregister_done);
 	qdf_spinlock_destroy(&wtc->ce_msg_lock);
 	qdf_mem_free(wtc);
-	dp_info("deinit complete");
+	dp_info("deinit complete unflushed_tx=%u", unflushed);
 
 }
 
