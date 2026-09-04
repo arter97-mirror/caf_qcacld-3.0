@@ -2112,19 +2112,6 @@ target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
 
 	return QDF_STATUS_SUCCESS;
 }
-
-bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
-
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return false;
-	}
-
-	return wmi_service_enabled(wmi_handle,
-				   wmi_service_nan_standard_mode_support);
-}
 #else
 static inline QDF_STATUS
 target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
