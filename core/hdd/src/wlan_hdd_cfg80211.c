@@ -31902,6 +31902,11 @@ static void wlan_hdd_set_nan_cap(struct hdd_context *hdd_ctx)
 	nan_caps->max_channel_switch_time = caps.max_channel_switch_time;
 	nan_caps->dev_capabilities = caps.dev_capabilities;
 
+	if (ucfg_nan_is_fw_support_ap_assisted_dfs(hdd_ctx->psoc)) {
+		hdd_debug("device support assisted DFS");
+		nan_caps->assisted_dfs = 1;
+	}
+
 	hdd_nan_fill_wiphy_caps(hdd_ctx, nan_caps);
 }
 #else
