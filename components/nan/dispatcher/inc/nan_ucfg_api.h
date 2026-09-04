@@ -486,6 +486,15 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id);
 
 /**
+ * ucfg_nan_pasn_peer_delete_all() - This API post NAN peer delete all
+ * message to the scheduler and wait for NAN peer delete response.
+ * @psoc: pointer to PSOC object
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_nan_disable_ndi() - Disable the NDI with given vdev_id
  * @psoc: pointer to psoc object
  * @ndi_vdev_id: vdev_id of the NDI to be disabled
@@ -908,6 +917,12 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline

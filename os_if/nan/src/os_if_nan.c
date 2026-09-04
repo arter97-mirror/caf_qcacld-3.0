@@ -3531,6 +3531,13 @@ int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return -EINVAL;
 	}
 
+	status = ucfg_nan_pasn_peer_delete_all(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+		qdf_mem_free(nan_req);
+		return qdf_status_to_os_return(status);
+	}
+
 	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
