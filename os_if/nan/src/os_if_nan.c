@@ -4298,6 +4298,8 @@ static uint32_t os_if_nan_extract_peer_caps(struct station_parameters *params,
 	uint32_t he_capa_len;
 	const uint8_t *eht_capa;
 	uint32_t eht_capa_len;
+	uint32_t remaining;
+	uint32_t ext_ie_len;
 
 	if (!params || !peer_cap || !max_len)
 		return 0;
@@ -4332,24 +4334,50 @@ static uint32_t os_if_nan_extract_peer_caps(struct station_parameters *params,
 	eht_capa_len = params->link_sta_params.eht_capa_len;
 
 	/*
-	 * HE/EHT capabilities are passed by cfg80211 as full IEs
-	 * (EID + LEN + payload). For NAN peer params we forward the
-	 * same IE blob, preserving the element headers.
+	 * HE/EHT capabilities are passed by cfg80211 as element body
+	 * payload only (no EID or LEN prefix). Construct the full
+	 * extended IE (EID=255 + LEN + EXT_ID + payload) before
+	 * appending to the peer capability buffer, consistent with the
+	 * HT/VHT handling above.
+	 *
+	 * he_capa_len/eht_capa_len are attacker/peer influenced, so the
+	 * remaining-space check below only ever subtracts/compares
+	 * already-bounded quantities instead of adding them to len,
+	 * to avoid an unsigned integer overflow masking a buffer
+	 * overflow in the qdf_mem_copy() below. The computed IE length
+	 * is also validated to fit the single-byte 802.11 IE length
+	 * field before use, since silently truncating it would produce
+	 * a malformed IE instead of a memory-safety issue.
 	 */
-	if (he_capa && he_capa_len >= 2) {
-		if (len + he_capa_len <= max_len) {
-			qdf_mem_copy(buf, he_capa, he_capa_len);
-			buf += he_capa_len;
-			len += he_capa_len;
-		}
+	remaining = (max_len > len) ? max_len - len : 0;
+	ext_ie_len = sizeof(struct extn_ie_header) -
+		     sizeof(struct ie_header) + he_capa_len;
+	if (he_capa && he_capa_len >= sizeof(struct ieee80211_he_cap_elem) &&
+	    he_capa_len <= remaining &&
+	    sizeof(struct extn_ie_header) <= remaining - he_capa_len &&
+	    ext_ie_len <= U8_MAX) {
+		*buf++ = WLAN_EID_EXTENSION;
+		*buf++ = (uint8_t)ext_ie_len;
+		*buf++ = WLAN_EID_EXT_HE_CAPABILITY;
+		qdf_mem_copy(buf, he_capa, he_capa_len);
+		buf += he_capa_len;
+		len += sizeof(struct extn_ie_header) + he_capa_len;
 	}
 
-	if (eht_capa && eht_capa_len >= 2) {
-		if (len + eht_capa_len <= max_len) {
-			qdf_mem_copy(buf, eht_capa, eht_capa_len);
-			buf += eht_capa_len;
-			len += eht_capa_len;
-		}
+	remaining = (max_len > len) ? max_len - len : 0;
+	ext_ie_len = sizeof(struct extn_ie_header) -
+		     sizeof(struct ie_header) + eht_capa_len;
+	if (eht_capa &&
+	    eht_capa_len >= sizeof(struct ieee80211_eht_cap_elem_fixed) &&
+	    eht_capa_len <= remaining &&
+	    sizeof(struct extn_ie_header) <= remaining - eht_capa_len &&
+	    ext_ie_len <= U8_MAX) {
+		*buf++ = WLAN_EID_EXTENSION;
+		*buf++ = (uint8_t)ext_ie_len;
+		*buf++ = WLAN_EID_EXT_EHT_CAPABILITY;
+		qdf_mem_copy(buf, eht_capa, eht_capa_len);
+		buf += eht_capa_len;
+		len += sizeof(struct extn_ie_header) + eht_capa_len;
 	}
 
 	return len;
