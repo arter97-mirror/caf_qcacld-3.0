@@ -4467,12 +4467,20 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	struct mlo_link_info link_info = {0};
 	struct action_oui_search_attr attr = {0};
 	uint8_t tx_nss_oui, rx_nss_oui;
+	struct pe_session *session;
+	uint8_t cb_mode;
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
 		pe_err("pdev is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx,
+					     vdev->vdev_objmgr.vdev_id);
+
+	if (!session)
+		return QDF_STATUS_E_NULL_VALUE;
 
 	cache_entry =
 		wlan_scan_entry_by_bssid_and_security(pdev, link_addr,
@@ -4543,21 +4551,14 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	channel.ch_width =
 		wlan_mlme_get_ch_width_from_phymode(cache_entry->phy_mode);
 
-	/*
-	 * Supplicant needs non zero center_freq1 in case of 20 MHz connection
-	 * also as a response of get_channel request. In case of 20 MHz channel
-	 * width central frequency is same as channel frequency
-	 */
-	if (channel.ch_width == CH_WIDTH_20MHZ)
-		channel.ch_cfreq1 = channel.ch_freq;
-
+	cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session, channel.ch_freq);
 	link_info.link_chan_info = &channel;
 	link_info.link_id = link_id;
 	link_info.cnx_tx_nss = cap_tx_nss;
 	link_info.cnx_rx_nss = cap_rx_nss;
 	qdf_copy_macaddr(&link_info.ap_link_addr, link_addr);
 
-	mlo_mgr_update_ap_link_info(vdev, &link_info);
+	mlo_mgr_update_ap_link_info(vdev, &link_info, cb_mode);
 
 	/**
 	 * Reject all the partner link if any partner link  doesn’t pass the
