@@ -473,3 +473,8 @@ CONFIG_FEATURE_STATIC_IRQ_AFFINITY=y
 # CONFIG_WLAN_DP_LOAD_BALANCE_SUPPORT is not set
 # CONFIG_WLAN_DP_FLOW_BALANCE_SUPPORT is not set
 # CONFIG_FEATURE_SMEM_MAILBOX is not set
+
+# IPQ5424 fig_v2: dma_dev retarget to wlan_fig platform device for
+# IO-coherent DMA hot-path allocations (see companion cnss2 Kconfig
+# option CNSS_IO_COHERENCY). Local to this driver, not a kernel Kconfig
+CONFIG_CNSS_IO_COHERENCY=y

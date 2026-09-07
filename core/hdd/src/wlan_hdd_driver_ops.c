@@ -658,6 +658,36 @@ err_hif_close:
 	return ret;
 }
 
+#ifdef CONFIG_CNSS_IO_COHERENCY
+static void hdd_update_dma_dev(struct device *dma_dev)
+{
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!qdf_ctx || !dma_dev)
+		return;
+
+	qdf_ctx->dma_dev = dma_dev;
+	hdd_debug("IO coherent: dma_dev updated to %s", dev_name(dma_dev));
+}
+
+static void hdd_init_dma_dev(qdf_device_t qdf_dev, struct device *dev)
+{
+	/*
+	 * Default dma_dev to pci_dev (safe for all paths).
+	 * The retargeting to wlan_fig plat_dev for IO coherency is triggered
+	 * via the PLD_UPDATE_DMA_DEV uevent, fired by cnss after opening the
+	 * aggr-NoC coherent bit in cnss_wlan_enable().  This happens inside
+	 * hif_enable() before hif_config_ce() allocates CE ring descriptors,
+	 * ensuring all QDF DMA allocations use the correct device.
+	 */
+	qdf_dev->dma_dev = dev;
+}
+#else
+static void hdd_update_dma_dev(struct device *dma_dev) {}
+
+static void hdd_init_dma_dev(qdf_device_t qdf_dev, struct device *dev) {}
+#endif /* CONFIG_CNSS_IO_COHERENCY */
+
 void hdd_hif_close(struct hdd_context *hdd_ctx, void *hif_ctx)
 {
 	if (!hdd_ctx) {
@@ -699,6 +729,7 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 		return -EINVAL;
 
 	qdf_dev->dev = dev;
+	hdd_init_dma_dev(qdf_dev, dev);
 	qdf_dev->drv_hdl = bdev;
 	qdf_dev->bus_type = bus_type;
 	qdf_dev->bid = bid;
@@ -2358,6 +2389,9 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL)
 			cds_set_driver_state(CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL);
+		break;
+	case PLD_UPDATE_DMA_DEV:
+		hdd_update_dma_dev(event_data->dma_dev);
 		break;
 	default:
 		/* other events intentionally not handled */

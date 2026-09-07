@@ -207,6 +207,7 @@ struct pld_platform_cap {
  * @PLD_FW_HANG_EVENT: firmware update hang event
  * @PLD_BUS_EVENT: update bus/link event
  * @PLD_SMMU_FAULT: SMMU fault
+ * @PLD_UPDATE_DMA_DEV: platform driver wants dma_dev retargeted to a new device
  */
 enum pld_uevent {
 	PLD_FW_DOWN,
@@ -215,6 +216,7 @@ enum pld_uevent {
 	PLD_FW_HANG_EVENT,
 	PLD_BUS_EVENT,
 	PLD_SMMU_FAULT,
+	PLD_UPDATE_DMA_DEV,
 };
 
 /**
@@ -247,6 +249,7 @@ enum pld_device_config {
  * @fw_down: FW down info
  * @hang_data: FW hang data
  * @bus_data: bus related data
+ * @dma_dev: device to retarget dma_dev to, valid for PLD_UPDATE_DMA_DEV
  */
 struct pld_uevent_data {
 	enum pld_uevent uevent;
@@ -262,6 +265,7 @@ struct pld_uevent_data {
 			enum pld_bus_event etype;
 			void *event_data;
 		} bus_data;
+		struct device *dma_dev;
 	};
 };
 

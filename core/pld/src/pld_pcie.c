@@ -372,6 +372,48 @@ enum pld_bus_event pld_bus_event_type_convert(enum cnss_bus_event_type etype)
 }
 
 /**
+ * pld_pcie_handle_extra_uevent() - Handle cnss_driver_status values not
+ *				    known to every cnss2.h
+ * @uevent_data: driver uevent data
+ * @data: pld_uevent_data to fill in on a recognized status
+ *
+ * uevent_data->status values that only exist in a cnss2.h built with
+ * a specific platform feature (e.g. CNSS_UPDATE_DMA_DEV, only defined
+ * when the companion cnss2 carries IO coherency support) must never
+ * appear as a bare case label in pld_pcie_update_event(), since this
+ * file may be compiled against an older cnss2.h that does not define
+ * that enum value at all. Route them through this helper instead,
+ * which is gated at file scope and gets a no-op stub when the
+ * feature is unavailable.
+ *
+ * Return: negative error code, 0 if uevent_data->status is not
+ *	   recognized, positive if data was filled in and the caller
+ *	   should proceed to invoke pld_context->ops->uevent()
+ */
+#ifdef CONFIG_CNSS_IO_COHERENCY
+static int pld_pcie_handle_extra_uevent(struct cnss_uevent_data *uevent_data,
+					struct pld_uevent_data *data)
+{
+	switch (uevent_data->status) {
+	case CNSS_UPDATE_DMA_DEV:
+		if (!uevent_data->data)
+			return -EINVAL;
+		data->uevent = PLD_UPDATE_DMA_DEV;
+		data->dma_dev = (struct device *)uevent_data->data;
+		return 1;
+	default:
+		return 0;
+	}
+}
+#else
+static int pld_pcie_handle_extra_uevent(struct cnss_uevent_data *uevent_data,
+					struct pld_uevent_data *data)
+{
+	return 0;
+}
+#endif
+
+/**
  * pld_pcie_update_event() - update wlan driver status callback function
  * @pdev: PCIE device
  * @uevent_data: driver uevent data
@@ -419,7 +461,13 @@ static int pld_pcie_update_event(struct pci_dev *pdev,
 		break;
 	}
 	default:
-		return 0;
+	{
+		int ret = pld_pcie_handle_extra_uevent(uevent_data, &data);
+
+		if (ret <= 0)
+			return ret;
+		break;
+	}
 	}
 
 	if (pld_context->ops->uevent)
