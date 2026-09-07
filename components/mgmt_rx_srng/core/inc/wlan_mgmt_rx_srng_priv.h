@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: ISC
  */
 
@@ -15,7 +15,8 @@
 #define MGMT_RX_SRNG_ENTRIES 128
 #define MGMT_RX_BUF_SIZE 3520
 
-#if defined(IPA_OFFLOAD) && defined(FEATURE_DIRECT_LINK)
+#if defined(IPA_OFFLOAD) && (defined(FEATURE_DIRECT_LINK) || \
+	defined(FEATURE_WIFI_TRANSPORT))
 #ifdef IPA_WDI3_VLAN_SUPPORT
 #define MGMT_RX_BUF_REFILL_RING_IDX 5
 #else
@@ -27,7 +28,7 @@
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 3
 #endif
-#elif defined(FEATURE_DIRECT_LINK)
+#elif defined(FEATURE_DIRECT_LINK) || defined(FEATURE_WIFI_TRANSPORT)
 #define MGMT_RX_BUF_REFILL_RING_IDX 3
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 2
