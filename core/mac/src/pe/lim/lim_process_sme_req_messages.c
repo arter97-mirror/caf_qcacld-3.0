@@ -1735,6 +1735,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 					     struct pe_session *session,
 					     tDot11fBeaconIEs *ie_struct)
 {
+	bool follow_ap_edca;
 	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
 	struct bss_description *bss_desc =
@@ -1756,6 +1757,49 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 				wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq);
 	vendor_ap_search_attr.enable_5g =
 				wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
+
+	/*
+	 * If CCK WAR is set for current AP, update to firmware via
+	 * wmi_vdev_param_abg_mode_tx_chain_num
+	 */
+	is_vendor_ap_present = wlan_action_oui_search(mac_ctx->psoc,
+						      &vendor_ap_search_attr,
+						      ACTION_OUI_CCKM_1X1);
+	if (is_vendor_ap_present) {
+		pe_debug("vdev: %d wmi_vdev_param_abg_mode_tx_chain_num 1",
+			 session->vdev_id);
+		wma_cli_set_command(session->vdev_id,
+				    (int)wmi_vdev_param_abg_mode_tx_chain_num,
+				    1, VDEV_CMD);
+	}
+
+	/*
+	 * If Switch to 11N WAR is set for current AP, change dot11
+	 * mode to 11N.
+	 */
+	is_vendor_ap_present =
+		wlan_action_oui_search(mac_ctx->psoc,
+				       &vendor_ap_search_attr,
+				       ACTION_OUI_SWITCH_TO_11N_MODE);
+	if (mac_ctx->roam.configParam.is_force_1x1 &&
+	    mac_ctx->mlme_cfg->gen.as_enabled &&
+	    is_vendor_ap_present &&
+	    (session->dot11mode == MLME_DOT11_MODE_ALL ||
+	     session->dot11mode == MLME_DOT11_MODE_11AC ||
+	     session->dot11mode == MLME_DOT11_MODE_11AC_ONLY))
+		session->dot11mode = MLME_DOT11_MODE_11N;
+
+	follow_ap_edca =
+		wlan_action_oui_search(mac_ctx->psoc,
+				       &vendor_ap_search_attr,
+				       ACTION_OUI_DISABLE_AGGRESSIVE_EDCA);
+	mlme_set_follow_ap_edca_flag(session->vdev, follow_ap_edca);
+
+	if (wlan_action_oui_search(mac_ctx->psoc, &vendor_ap_search_attr,
+				   ACTION_OUI_HOST_RECONN))
+		mlme_set_reconn_after_assoc_timeout_flag(mac_ctx->psoc,
+							 session->vdev_id,
+							 true);
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
 		wlan_action_oui_search(mac_ctx->psoc,
