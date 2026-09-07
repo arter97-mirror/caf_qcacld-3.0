@@ -4331,12 +4331,20 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	struct scan_cache_entry *cache_entry;
 	struct wlan_channel channel = {0};
 	bool is_security_allowed;
+	struct pe_session *session;
+	uint8_t cb_mode;
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
 		pe_err("pdev is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx,
+					     vdev->vdev_objmgr.vdev_id);
+
+	if (!session)
+		return QDF_STATUS_E_NULL_VALUE;
 
 	cache_entry =
 		wlan_scan_entry_by_bssid_and_security(pdev, link_addr,
@@ -4352,17 +4360,10 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	channel.ch_cfreq2 = cache_entry->channel.cfreq1;
 	channel.ch_width =
 		wlan_mlme_get_ch_width_from_phymode(cache_entry->phy_mode);
-
-	/*
-	 * Supplicant needs non zero center_freq1 in case of 20 MHz connection
-	 * also as a response of get_channel request. In case of 20 MHz channel
-	 * width central frequency is same as channel frequency
-	 */
-	if (channel.ch_width == CH_WIDTH_20MHZ)
-		channel.ch_cfreq1 = channel.ch_freq;
+	cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session, channel.ch_freq);
 
 	mlo_mgr_update_ap_link_info(vdev, link_id, (uint8_t *)link_addr,
-				    channel);
+				    channel, cb_mode);
 
 	/**
 	 * Reject all the partner link if any partner link  doesn’t pass the

@@ -3204,6 +3204,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 	struct mlo_link_switch_context *link_ctx;
 	uint8_t i = 0;
 	QDF_STATUS status;
+	uint8_t cb_mode;
 
 	if (!session->vdev) {
 		pe_err("vdev:%d is NULL", session->vdev_id);
@@ -3229,9 +3230,12 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 	channel.ch_freq = (uint16_t)session->curr_op_freq;
 
 	mlo_mgr_reset_ap_link_info(session->vdev);
+
+	cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session, channel.ch_freq);
 	mlo_mgr_update_ap_link_info(session->vdev,
 				    wlan_vdev_get_link_id(session->vdev),
-				    session->bssId, channel);
+				    session->bssId, channel,
+				    cb_mode);
 	status =
 	lim_update_mlo_mgr_info(mac_ctx,
 				session->vdev,
@@ -3250,11 +3254,13 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 
 		qdf_mem_zero(&channel, sizeof(channel));
 		channel.ch_freq = partner_link_info->chan_freq;
-
+		cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session,
+						   channel.ch_freq);
 		mlo_mgr_update_ap_link_info(session->vdev,
 					    partner_link_info->link_id,
 					    partner_link_info->link_addr.bytes,
-					    channel);
+					    channel,
+					    cb_mode);
 		status = lim_update_mlo_mgr_info(mac_ctx,
 						 session->vdev,
 						 &partner_link_info->link_addr,
