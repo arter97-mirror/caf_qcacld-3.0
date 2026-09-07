@@ -5457,6 +5457,17 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 		lim_send_deauth_cnf(mac, pe_session->vdev_id);
 		return;
 	}
+
+	if (cds_is_driver_recovering()) {
+		pe_info("device recovery, Silent deauth, remove the peer");
+		drop_deauth = true;
+	}
+	if (drop_deauth) {
+		if (waitForAck)
+			lim_send_deauth_cnf(mac, pe_session->vdev_id);
+		return;
+	}
+
 	smeSessionId = pe_session->smeSessionId;
 
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
