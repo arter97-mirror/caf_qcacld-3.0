@@ -1806,11 +1806,16 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 					 status);
 				return;
 			}
-			ucfg_twt_cfg_get_responder(psoc, &twt_res_cfg);
-			status = osif_twt_send_responder_disable_per_vdev(
+			if (twt_arg->p2p_r2_mode || twt_arg->pcc_mode) {
+				ucfg_twt_cfg_get_responder(psoc, &twt_res_cfg);
+				status = osif_twt_send_responder_disable_per_vdev(
 								psoc, vdev_id,
 								opmode,
 								twt_res_cfg);
+			} else {
+				status = ucfg_twt_send_responder_disable_per_vdev(
+								psoc, vdev_id);
+			}
 			if (QDF_IS_STATUS_ERROR(status) &&
 			    status != QDF_STATUS_E_NOSUPPORT) {
 				osif_err("TWT responder VDEV disable cmd fails %d",
