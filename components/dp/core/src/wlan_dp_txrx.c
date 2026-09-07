@@ -466,7 +466,13 @@ void dp_get_tdls_mac_addr_if_active(struct wlan_dp_link *dp_link,
 				    qdf_nbuf_t nbuf,
 				    struct qdf_mac_addr *mac_addr_tx_allowed)
 {
-	if (qdf_likely(wlan_cm_is_vdev_active(dp_link->vdev))) {
+	bool vdev_active = wlan_cm_is_vdev_active(dp_link->vdev);
+
+	if (qdf_trace_dp_tdls_mac_selection_enabled())
+		qdf_trace_dp_tdls_mac_selection(vdev_active,
+						dp_link->dp_intf->tdls_link_up);
+
+	if (qdf_likely(vdev_active)) {
 		if (qdf_unlikely(dp_link->dp_intf->tdls_link_up))
 			/* Destination address peer mac_addr */
 			qdf_copy_macaddr(mac_addr_tx_allowed,
