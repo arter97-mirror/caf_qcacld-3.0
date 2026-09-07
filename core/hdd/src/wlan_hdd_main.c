@@ -11973,9 +11973,13 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter)
 	if (enable_lro && !(qdf_atomic_read(&hdd_ctx->vendor_disable_lro_flag)))
 		adapter->dev->features |= NETIF_F_LRO;
 
-	if (enable_csum)
+	if (enable_csum) {
 		adapter->dev->features |=
 			(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+		if (device_mode == QDF_STA_MODE &&
+		    cdp_get_dp_capabilities(soc, CDP_CFG_DP_OL_TX_CSUM))
+			adapter->dev->features |= NETIF_F_HW_CSUM;
+	}
 
 	if (cdp_cfg_get(soc, cfg_dp_tso_enable) && enable_csum) {
 		adapter->dev->features |= TSO_FEATURE_FLAGS;
