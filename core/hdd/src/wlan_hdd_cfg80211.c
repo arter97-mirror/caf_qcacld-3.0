@@ -34217,6 +34217,28 @@ done:
 			break;
 		}
 	} else {
+		keyidx = key_index;
+
+		if (ucfg_mlme_is_multipass_sap(hdd_ctx->psoc) &&
+		    params->vlan_id && !pairwise) {
+			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			sap_ctx = hdd_ap_ctx->sap_context;
+			hdd_debug("VLAN add_key: orig_key_idx %d",
+				  key_index);
+			errno = wlan_hdd_add_vlan(vdev, sap_ctx, params,
+						  key_index, &keyidx);
+			if (errno < 0) {
+				hdd_err("VLAN failed: vdev %d vlan_id %d key_idx %d errno %d",
+					wlan_vdev_get_id(vdev), params->vlan_id,
+					key_index, errno);
+				return errno;
+			}
+			hdd_debug("VLAN add_key: vdev %d vlan_id %d mapped key_idx %d",
+				  wlan_vdev_get_id(vdev),
+				  params->vlan_id, keyidx);
+			key_index = keyidx;
+		}
+
 		errno = wlan_cfg80211_store_key(vdev, key_index,
 						(pairwise ?
 						 WLAN_CRYPTO_KEY_TYPE_UNICAST :
@@ -34260,19 +34282,8 @@ done:
 			return -EINVAL;
 		}
 
-		keyidx = key_index;
-
-		if (ucfg_mlme_is_multipass_sap(hdd_ctx->psoc) &&
-		    params->vlan_id) {
-			sap_ctx = hdd_ap_ctx->sap_context;
-			errno = wlan_hdd_add_vlan(vdev, sap_ctx, params,
-						  key_index, &keyidx);
-			if (errno < 0)
-				return errno;
-		}
-
 		errno = wlan_hdd_add_key_sap(link_info, pairwise,
-					     keyidx, cipher);
+					     key_index, cipher);
 
 		break;
 	case QDF_NAN_DISC_MODE:
