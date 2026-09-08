@@ -79,10 +79,10 @@ typedef const enum policy_mgr_conc_next_action
 /**
  * enum PM_AP_DFS_MASTER_MODE - AP dfs master mode
  * @PM_STA_SAP_ON_DFS_DEFAULT: Disallow STA+SAP SCC on DFS channel
- * @PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED: Allow STA+SAP SCC
+ * @PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED: Allow STA+SAP SCC
  *        on DFS channel with master mode enabled.
  * @PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX: enhance
- *        "PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED" with below requirement:
+ *        "PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED" with below requirement:
  *	 a. Allow single SAP (GO) start on DFS channel.
  *	 b. Allow CAC process on DFS channel in single SAP (GO) mode
  *	 c. Allow DFS radar event process in single SAP (GO) mode
@@ -93,7 +93,7 @@ typedef const enum policy_mgr_conc_next_action
  */
 enum PM_AP_DFS_MASTER_MODE {
 	PM_STA_SAP_ON_DFS_DEFAULT,
-	PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED,
+	PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED,
 	PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX,
 };
 

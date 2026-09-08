@@ -464,7 +464,7 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 	if (pm_ctx->cfg.sta_sap_scc_on_dfs_chnl ==
-	    PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED) {
+	    PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED) {
 		enable = false;
 		goto end;
 	}
@@ -13300,11 +13300,12 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 					   uint8_t vdev_id, qdf_freq_t ch_freq)
 {
 	struct wlan_objmgr_psoc *psoc;
-	uint32_t sta_sap_scc_on_dfs_chan;
+	uint8_t sta_sap_scc_on_dfs_chan;
 	uint32_t sta_cnt, gc_cnt, idx;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	struct wlan_objmgr_vdev *vdev;
 	bool cfg_sta_dfs_ch_peer_scc = false;
+	bool dfs_master_mode = false;
 	enum QDF_OPMODE mode;
 	bool vdev_in_init_state = false;
 	bool vdev_in_up_state = false;
@@ -13316,8 +13317,7 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	if (!psoc)
 		return false;
 
-	sta_sap_scc_on_dfs_chan =
-		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
+	policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc, &sta_sap_scc_on_dfs_chan);
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
@@ -13354,8 +13354,9 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 							&vdev_id_list[sta_cnt],
 							PM_P2P_CLIENT_MODE);
 
-	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sta_cnt %u, gc_cnt %u",
-			 sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
+	ucfg_mlme_get_dfs_master_capability(psoc, &dfs_master_mode);
+	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, master %d, sta_cnt %u, gc_cnt %u",
+			 sta_sap_scc_on_dfs_chan, dfs_master_mode, sta_cnt, gc_cnt);
 
 	/*
 	 * Dont allow SAP on DFS channel, if master mode is disabled
@@ -13367,14 +13368,14 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	 */
 	if ((wlan_reg_get_channel_state_for_pwrmode(
 		pdev, ch_freq, REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS) &&
-	    (!policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id) ||
+	    (!dfs_master_mode ||
 	      (sta_sap_scc_on_dfs_chan == PM_STA_SAP_ON_DFS_DEFAULT &&
 	       policy_mgr_any_other_vdev_on_same_mac_as_freq(
 			psoc, ch_freq, vdev_id)) ||
-	      (sta_sap_scc_on_dfs_chan != PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
+	      (sta_sap_scc_on_dfs_chan == PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED &&
 	       !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false)))) {
-		policy_mgr_err("SAP not allowed on DFS channel if DFS master is disabled or sta_sap_scc_on_dfs_chan is %d sta_cnt %d gc_cnt %d",
-			       sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
+		policy_mgr_err("SAP not allowed on DFS channel if DFS master is %d or sta_sap_scc_on_dfs_chan is %d sta_cnt %d gc_cnt %d",
+			       dfs_master_mode, sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
 		return false;
 	}
 

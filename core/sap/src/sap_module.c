@@ -938,7 +938,7 @@ enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
 
 			sap_debug("Standalone SAP/GO: set BW coming in start req");
 			return channel_width;
-		case PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED:
+		case PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED:
 			if (scc_sta_present) {
 				sap_debug("STA present: Limit the SAP channel width");
 				channel_width = QDF_MIN(sta_chan_width,
