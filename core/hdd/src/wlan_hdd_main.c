@@ -6185,6 +6185,12 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 	hdd_register_get_port_status_notifier(hdd_ctx);
 
+	/*
+	 * Fill current time to runtime resume start time stamp to avoid
+	 * incorrect cxpc up time logging for first runtime suspend
+	 */
+	hdd_ctx->runtime_resume_start_time_stamp = qdf_get_log_timestamp_usecs();
+
 	hdd_exit();
 
 	return 0;
@@ -16758,6 +16764,9 @@ static int __hdd_psoc_idle_restart(struct hdd_context *hdd_ctx)
 
 	if (!qdf_is_fw_down())
 		cds_set_recovery_in_progress(false);
+
+	if (hdd_ctx->driver_status == DRIVER_MODULES_ENABLED)
+		hdd_ctx->runtime_resume_start_time_stamp = qdf_get_log_timestamp_usecs();
 
 	hdd_soc_idle_restart_unlock();
 

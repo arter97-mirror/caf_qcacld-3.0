@@ -2654,6 +2654,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		   TRACE_CODE_HDD_CFG80211_RESUME_WLAN,
 		   NO_SESSION, hdd_ctx->is_wiphy_suspended);
 
+	hdd_ctx->runtime_resume_start_time_stamp = qdf_get_log_timestamp_usecs();
 	hdd_ctx->is_wiphy_suspended = false;
 
 	hdd_ctx->suspend_resume_stats.resumes++;
