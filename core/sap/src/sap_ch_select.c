@@ -511,7 +511,7 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 
 		if (!include_dfs_ch ||
 		    (sta_sap_scc_on_dfs_chnl_config_value ==
-				PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED &&
+				PM_STA_SAP_ON_DFS_MASTER_MODE_ENABLED &&
 		     !policy_mgr_is_sta_sap_scc(mac->psoc,
 						ch_info->chan_freq, true))) {
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
