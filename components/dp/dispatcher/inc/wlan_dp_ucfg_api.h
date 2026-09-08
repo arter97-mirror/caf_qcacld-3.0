@@ -353,6 +353,21 @@ QDF_STATUS ucfg_dp_rx_ol_init(struct wlan_objmgr_psoc *psoc,
  */
 uint8_t ucfg_dp_get_def_link(struct wlan_objmgr_vdev *vdev);
 
+#ifdef QCA_DP_NBUF_FAST_RECYCLE_CHECK
+/**
+ * ucfg_dp_fast_xmit() - Fast TX path for L2L SFE-forwarded frames
+ * @nbuf: n/w buffer to transmit
+ * @vdev: vdev mapped to STA DP interface
+ *
+ * Inline fast path for fast_xmit=1 frames arriving from SFE.  Handles
+ * stats, suspend/transitioning guards, and tx_fast dispatch directly
+ * without calling dp_start_xmit.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
+ */
+QDF_STATUS ucfg_dp_fast_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev);
+#endif /* QCA_DP_NBUF_FAST_RECYCLE_CHECK */
+
 /**
  * ucfg_dp_start_xmit() - Transmit packet on STA interface
  * @nbuf: n/w buffer to transmitted

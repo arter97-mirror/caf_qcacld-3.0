@@ -1582,6 +1582,74 @@ ucfg_dp_update_bss_peer_info_for_tdls_ctrl(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* CONFIG_BORON */
 
+#ifdef QCA_DP_NBUF_FAST_RECYCLE_CHECK
+QDF_STATUS ucfg_dp_fast_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct dp_tx_rx_stats *stats;
+	void *soc;
+	int cpu;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		goto drop;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP intf not found");
+		goto drop;
+	}
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx)) {
+		dp_err_rl("DP ctx not found");
+		goto drop;
+	}
+	cpu = qdf_get_smp_processor_id();
+	stats = &dp_intf->dp_stats.tx_rx_stats;
+	++stats->per_cpu[cpu].tx_called;
+	stats->cont_txtimeout_cnt = 0;
+
+	if (qdf_unlikely(cds_is_driver_transitioning())) {
+		dp_err_rl("driver is transitioning, drop pkt");
+		goto drop_counted;
+	}
+
+	if (qdf_unlikely(dp_ctx->is_suspend)) {
+		dp_err_rl("Device is system suspended, drop pkt");
+		goto drop_counted;
+	}
+
+	QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(nbuf) = 1;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (qdf_unlikely(!dp_intf->txrx_ops.tx.tx_fast)) {
+		dp_debug_rl("tx_fast not registered");
+		goto drop_counted;
+	}
+	qdf_atomic_inc(&dp_intf->num_active_task);
+	if (!dp_intf->txrx_ops.tx.tx_fast(soc, dp_link->link_id, nbuf)) {
+		qdf_atomic_dec(&dp_intf->num_active_task);
+		qdf_net_stats_add_tx_bytes(&dp_intf->stats, qdf_nbuf_len(nbuf));
+		qdf_net_stats_add_tx_pkts(&dp_intf->stats, 1);
+		return QDF_STATUS_SUCCESS;
+	}
+	qdf_atomic_dec(&dp_intf->num_active_task);
+
+	dp_debug_rl("Fast TX failed from adapter %u", dp_link->link_id);
+
+drop_counted:
+	qdf_net_stats_inc_tx_dropped(&dp_intf->stats);
+	++stats->per_cpu[cpu].tx_dropped;
+drop:
+	qdf_nbuf_kfree(nbuf);
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_DP_NBUF_FAST_RECYCLE_CHECK */
+
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;

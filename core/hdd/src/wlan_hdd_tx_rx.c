@@ -777,6 +777,39 @@ hdd_handle_icmp_ps_management(struct hdd_adapter *adapter,
 #endif
 
 /**
+ * hdd_try_fast_xmit() - Attempt fast TX path for recycled SKB frames
+ * @skb: pointer to OS packet
+ * @dev: pointer to network device
+ *
+ * Return: true if the packet was consumed by the fast path (caller
+ *         must return), false if the slow path should continue.
+ */
+#ifdef QCA_DP_NBUF_FAST_RECYCLE_CHECK
+static bool hdd_try_fast_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	QDF_STATUS status;
+
+	if (!qdf_nbuf_fast_xmit((qdf_nbuf_t)skb) ||
+	    qdf_nbuf_pkt_type_is_mcast((qdf_nbuf_t)skb))
+		return false;
+
+	status = ucfg_dp_fast_xmit((qdf_nbuf_t)skb, adapter->deflink->vdev);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		netif_trans_update(dev);
+		wlan_hdd_sar_unsolicited_timer_start(adapter->hdd_ctx);
+	}
+	return true;
+}
+#else
+static inline bool hdd_try_fast_xmit(struct sk_buff *skb,
+				     struct net_device *dev)
+{
+	return false;
+}
+#endif /* QCA_DP_NBUF_FAST_RECYCLE_CHECK */
+
+/**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
  * @dev: pointer to network device
@@ -803,6 +836,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	QDF_STATUS status;
 
 	if (hdd_drop_tx_packet_on_ftm(skb))
+		return;
+
+	if (hdd_try_fast_xmit(skb, dev))
 		return;
 
 	osif_dp_mark_pkt_type(skb);
