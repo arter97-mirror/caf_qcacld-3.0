@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -854,6 +855,7 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 	cmd.source = WLAN_UMAC_COMP_LL_SAP;
 	cmd.is_high_priority = false;
 	cmd.umac_cmd = req;
+	cmd.is_blocking = true;
 
 	/*
 	 * If command is already present in active queue, don't serialize the
