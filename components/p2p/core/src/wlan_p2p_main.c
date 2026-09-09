@@ -1174,10 +1174,10 @@ const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 
 	rem_len -= P2P_OUI_SIZE;
 
-	while (rem_len) {
+	while (rem_len >= 3) {
 		attr_id = p2p_ie[0];
 		attr_len = LE_READ_2(&p2p_ie[1]);
-		if (attr_len > rem_len)  {
+		if ((3 + attr_len) > rem_len)  {
 			p2p_err("Invalid len %d for elem:%d", attr_len,
 				attr_id);
 			return NULL;
