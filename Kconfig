@@ -316,6 +316,17 @@ config DP_TRACE
 	bool "Enable DP_TRACE"
 	default n
 
+config DISABLE_DP_STATS
+	bool "Disable DP stats accounting in the hot path"
+	default n
+	help
+	  When enabled, all per-MSDU datapath statistics counters (TX/RX
+	  enqueue, drop, bytes, latency histograms, etc.) are compiled out
+	  of the hot path.  This eliminates the atomic increments and cache
+	  line bouncing associated with stats accounting, saving roughly
+	  100-140 cycles per MSDU at high throughput.  Disable only on
+	  production builds where live DP stats are not required.
+
 config DP_TRAFFIC_END_INDICATION
 	bool "Enable DP_TRAFFIC_END_INDICATION"
 	default n
@@ -1192,6 +1203,17 @@ config RX_FISA
 	bool "Enable RX_FISA"
 	default n
 
+config RX_FAST_L2L
+	bool "Enable fast L2L RX path for high throughput"
+	default n
+	help
+	  Replaces dp_rx_packet_cbk with a minimal loop that calls
+	  netif_receive_skb directly, bypassing ARP/DHCP classification,
+	  TDLS, trace, wake-lock, and connectivity stats.
+	  EAPOL frames are detected per-packet and dispatched via
+	  dp_send_rx_pkt_over_nl so PTK/GTK re-keying works correctly.
+	  Only enable for dedicated L2L forwarding scenarios.
+
 config RX_HASH_DEBUG
 	bool "Enable RX_HASH_DEBUG"
 	default n
@@ -1339,6 +1361,148 @@ config QCA_OL_TX_LOCK_LESS_ACCESS
 	help
 	  Enable lockless access to TCL data rings during TX.
 	  Requires QCA_OL_TX_MULTIQ_SUPPORT to be effective.
+
+config QCA_OL_RX_LOCK_LESS_ACCESS
+	bool "Enable lockless RX ring access"
+	default n
+	help
+	  Enable lockless access to RX destination rings (REO dest rings) on
+	  the datapath RX hot path. When set, dp_rx_srng_access_start() and
+	  dp_rx_srng_access_end() are routed through the unlocked HAL ring
+	  accessors (hal_srng_access_start_unlocked / _end_unlocked) instead
+	  of the IRQ-disabling lock variants. This eliminates a spin-lock
+	  acquire/release per REO ring poll iteration and reduces RX
+	  processing latency. Safe only when each REO ring is polled from a
+	  single CPU context (e.g. per-ring NAPI with rx_mode=4).
+
+config WLAN_TX_DESC_PER_CPU_LOCKLESS
+	bool "Enable lockless TX descriptor pool alloc/free"
+	depends on QCA_OL_TX_MULTIQ_SUPPORT
+	default n
+	help
+	  When QCA_OL_TX_MULTIQ_SUPPORT is enabled, each TX descriptor
+	  pool is owned by exactly one CPU.  Alloc and free both run in
+	  softirq/NAPI context pinned to that CPU, so no cross-CPU access
+	  is possible and the pool spinlock is redundant.  Enabling this
+	  flag replaces TX_DESC_LOCK_LOCK/UNLOCK with no-ops, eliminating
+	  ~80-120 cy/MSDU of spinlock overhead per TX packet.
+	  Requires QCA_OL_TX_MULTIQ_SUPPORT and correct TX completion IRQ
+	  CPU affinity (dp_tx_comp_intr_cpumask).
+
+config QCA_DP_RX_NBUF_NO_MAP_UNMAP
+	bool "Enable RX nbuf no-map/unmap optimization"
+	default n
+	help
+	  Skip per-packet DMA map/unmap operations on the RX hot path by
+	  using physical addresses pre-computed at SKB allocation time.
+	  This eliminates the per-MSDU dma_map/dma_unmap overhead and
+	  reduces RX processing cycles significantly on platforms that
+	  support address pre-computation (e.g. FIG v2 with NO_MAP_UNMAP).
+	  Enable only when the underlying platform and buffer pool support
+	  pre-mapped SKBs; incompatible with the page_pool RX buffer path.
+
+config QCA_DP_TX_NBUF_NO_MAP_UNMAP
+	bool "Enable TX nbuf no-map/unmap optimization"
+	default n
+	help
+	  Skip per-packet DMA map/unmap operations on the TX hot path by
+	  using physical addresses pre-computed at SKB allocation time.
+	  This eliminates per-MSDU dma_map/dma_unmap overhead in the TX
+	  enqueue and completion paths, saving roughly 100-160 cycles per
+	  MSDU on platforms that pre-map SKBs (e.g. FIG v2 NO_MAP_UNMAP).
+	  Enable only when the buffer allocator supplies pre-mapped SKBs;
+	  must be consistent with the RX no-map/unmap setting.
+
+config QCA_DP_TX_DESC_FAST_COMP_ENABLE
+	bool "Enable TX descriptor fast completion"
+	default n
+	help
+	  Enable the fast TX descriptor completion path which bypasses
+	  per-descriptor reference-count checks and deferred-free logic
+	  when the descriptor is known to be solely owned by the completion
+	  ring at the time of processing. This reduces per-packet overhead
+	  in the WBM TX completion NAPI handler. Enable on platforms where
+	  the TX descriptor lifecycle guarantees single-owner completion
+	  (e.g. FIG v2 with MULTIQ per-CPU descriptor pools).
+
+config QCA_DP_NBUF_FAST_RECYCLE_CHECK
+	bool "Enable NBUF fast recycle check in TX path"
+	default n
+	help
+	  Enable the fast SKB recycle-origin check in the datapath TX and RX
+	  buffer replenish paths. When set, dp_rx_nbuf_sync_no_dsb() checks
+	  nbuf->recycled_for_ds and, for recycler-sourced SKBs, performs a
+	  targeted dcache range-clean instead of a full dma_map, using the
+	  physical address pre-computed at allocation time. Also gates the
+	  dp_pdev_nbuf_alloc_and_map_replenish fast path that avoids the
+	  IOMMU mapping round-trip. Requires QCA_DP_RX_NBUF_NO_MAP_UNMAP
+	  and is not compatible with the x86 build target.
+
+config QCA_DP_TX_NBUF_LIST_FREE
+	bool "Enable batch TX nbuf list free"
+	default n
+	help
+	  Accumulate completed TX SKBs into a per-NAPI list during the WBM
+	  TX completion ring processing loop and free them in a single batch
+	  call (qdf_nbuf_dev_kfree_list / dev_kfree_skb_list) after the loop
+	  instead of calling qdf_nbuf_free() individually per descriptor.
+	  This reduces per-packet overhead in the TX completion NAPI handler
+	  by amortising the cost of the network stack SKB reclaim path across
+	  a full ring poll burst.
+
+config QCA_CACHED_RING_DESC
+	bool "Enable cached ring descriptor access"
+	default n
+	help
+	  Use the cached HAL accessor (hal_srng_dst_get_next_cached) for REO
+	  destination ring descriptors instead of the standard non-cached path.
+	  Reduces per-descriptor DRAM fetch latency on platforms where the ring
+	  memory is not hardware-coherent.  Must be paired with
+	  CONFIG_IO_COHERENCY on cache-coherent platforms so that the
+	  DCCIMVAC invalidation step is skipped automatically.
+
+config WLAN_ASSUME_DMA_COHERENT
+	bool "Assume DMA coherency between CPU and device"
+	default n
+	help
+	  On platforms where the CPU and WLAN device share a coherent
+	  interconnect (e.g. IPQ5424 with IO-coherent SMMU), enable this
+	  flag to skip software cache-maintenance operations on DP ring
+	  descriptors.  Must match the actual platform DMA coherency;
+	  enabling on a non-coherent platform causes data corruption.
+
+config QCA_DP_RX_NBUF_AND_NBUF_DATA_PREFETCH
+	bool "Enable RX nbuf and nbuf-data prefetch"
+	default n
+	help
+	  Issue CPU prefetch hints for the next SKB and its packet data during
+	  the REO RX processing loop.  Hides cache-miss latency for both the
+	  sk_buff control block fields (protocol, _skb_refdst, data pointer)
+	  and the first two 64-byte cache lines of packet payload, improving
+	  throughput on high-packet-rate L2L paths.
+
+config QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH
+	bool "Enable RX HW and SW descriptor pipeline prefetch"
+	depends on QCA_CACHED_RING_DESC
+	default n
+	help
+	  Pre-fetch the next hardware REO descriptor (32-byte desc at 64-byte
+	  stride) and the corresponding SW dp_rx_desc into CPU cache while the
+	  current descriptor is being processed.  Creates a 2-iteration
+	  prefetch pipeline that hides the latency of both the VA look-up from
+	  the HW descriptor and the subsequent SW descriptor access.
+	  Requires QCA_CACHED_RING_DESC to be effective.
+
+config QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
+	bool "Enable TX HW and SW descriptor pipeline prefetch"
+	depends on QCA_CACHED_RING_DESC
+	default n
+	help
+	  Pre-fetch the next hardware WBM TX-completion descriptor (32-byte
+	  desc at 64-byte stride) and the corresponding SW TX descriptor into
+	  CPU cache while the current descriptor is being processed.  Mirrors
+	  the RX-side QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH optimization for the
+	  TX completion path.  Requires QCA_CACHED_RING_DESC to be effective.
 
 config WLAN_SUPPORT_TX_DESC_PER_POOL
 	bool "Enable per-pool TX descriptor count configuration"
