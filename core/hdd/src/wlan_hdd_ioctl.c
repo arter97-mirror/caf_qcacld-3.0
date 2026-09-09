@@ -627,6 +627,11 @@ static int hdd_parse_reassoc_v1(struct wlan_hdd_link_info *link_info,
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
 
+	if (!link_info->adapter->deflink->vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
 	pdev = wlan_vdev_get_pdev(link_info->adapter->deflink->vdev);
 	ret = hdd_parse_reassoc_command_v1_data(command, bssid, &freq, pdev);
 	if (ret) {
@@ -670,6 +675,11 @@ static int hdd_parse_reassoc_v2(struct wlan_hdd_link_info *link_info,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
+
+	if (!link_info->adapter->deflink->vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
 
 	pdev = wlan_vdev_get_pdev(link_info->adapter->deflink->vdev);
 	if (total_len < sizeof(params) + 8) {
