@@ -5755,10 +5755,10 @@ void lim_delete_all_peers(struct pe_session *session)
 		pe_debug("stop_bss_reason: %d", session->stop_bss_reason);
 		if (session->stop_bss_reason == eSIR_SME_MIC_COUNTER_MEASURES)
 			__lim_counter_measures(mac_ctx, session);
-		else
-			lim_send_disassoc_mgmt_frame(mac_ctx,
-				REASON_DEAUTH_NETWORK_LEAVING,
-				bc_addr, session, false);
+		else if (!cds_is_driver_recovering())
+				lim_send_disassoc_mgmt_frame(mac_ctx,
+					REASON_DEAUTH_NETWORK_LEAVING,
+					bc_addr, session, false);
 	}
 
 	for (i = 1; i < session->dph.dphHashTable.size; i++) {

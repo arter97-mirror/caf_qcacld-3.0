@@ -3895,6 +3895,8 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 	uint8_t smeSessionId = 0;
 	struct element_info *discon_ie;
 
+	bool drop_deauth = false;
+
 	if (!pe_session) {
 		return;
 	}
@@ -3913,6 +3915,17 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 			lim_send_deauth_cnf(mac);
 		return;
 	}
+
+	if (cds_is_driver_recovering()) {
+		pe_info("device recovery, Silent deauth, remove the peer");
+		drop_deauth = true;
+	}
+	if (drop_deauth) {
+		if (waitForAck)
+			lim_send_deauth_cnf(mac);
+		return;
+	}
+
 	smeSessionId = pe_session->smeSessionId;
 
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
