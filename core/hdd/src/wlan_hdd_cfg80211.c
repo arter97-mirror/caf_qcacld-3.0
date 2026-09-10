@@ -13490,6 +13490,12 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		goto end;
 	}
 
+	if (hdd_cm_is_vdev_roaming(link_info)) {
+		hdd_debug("Roaming in progress on vdev %d", link_info->vdev_id);
+		ret = -EAGAIN;
+		goto end;
+	}
+
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS]) {
 		chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
 		if (!chn_bd) {
