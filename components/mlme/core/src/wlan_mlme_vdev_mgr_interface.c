@@ -2913,5 +2913,6 @@ static struct mlo_mlme_ext_ops mlo_ext_ops = {
 	.mlo_mlme_ext_teardown_tdls = wlan_tdls_teardown_links_for_non_dbs,
 	.mlo_mlme_ext_link_add_join_continue = lim_mlo_link_add_join_continue,
 	.mlo_mlme_ext_link_add_fetch_nss = lim_mlo_link_add_fetch_nss,
+	.mlo_mlme_ext_get_cb_mode_for_freq = lim_mlo_get_cb_mode_for_freq,
 };
 #endif

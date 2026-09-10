@@ -210,6 +210,17 @@ QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 void lim_mlo_ap_sta_assoc_suc(struct wlan_objmgr_peer *peer);
 
 /**
+ * lim_mlo_get_cb_mode_for_freq() - fetch cb_mode from freq
+ * @vdev_id: objmgr vdev id
+ * @freq: freq for which cb_mode is required
+ * @cb_mode: callback mode to fetch
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_mlo_get_cb_mode_for_freq(uint8_t vdev_id, qdf_freq_t freq,
+					uint8_t *cb_mode);
+
+/**
  * lim_ap_mlo_sta_peer_ind() - Indicate mlo mgr after receiving sta rsp
  *
  * @mac: pointer to mac_context
@@ -538,6 +549,13 @@ static inline bool lim_mlo_partner_auth_type(struct pe_session *session,
 					     tAniAuthType *auth_type)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS lim_mlo_get_cb_mode_for_freq(uint8_t vdev_id, qdf_freq_t freq,
+					uint8_t *cb_mode)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline void lim_ap_mlo_sta_peer_ind(struct mac_context *mac,

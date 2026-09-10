@@ -1516,6 +1516,30 @@ void lim_mlo_ap_sta_assoc_suc(struct wlan_objmgr_peer *peer)
 				       pe_session);
 }
 
+QDF_STATUS lim_mlo_get_cb_mode_for_freq(uint8_t vdev_id, qdf_freq_t freq,
+					uint8_t *cb_mode)
+{
+	struct mac_context *mac;
+	struct pe_session *pe_session;
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac) {
+		pe_err("mac ctx is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pe_session = pe_find_session_by_vdev_id(mac, vdev_id);
+
+	if (!pe_session) {
+		pe_err("pe_session is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*cb_mode = lim_get_cb_mode_for_freq(mac, pe_session, freq);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void lim_ap_mlo_sta_peer_ind(struct mac_context *mac,
 			     struct pe_session *pe_session,
 			     tpDphHashNode sta,
