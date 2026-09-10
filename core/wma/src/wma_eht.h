@@ -127,7 +127,8 @@ void wma_print_eht_op(tDot11fIEeht_op *eht_ops);
  * Return: None
  */
 void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
-			       tpAddStaParams params);
+			       tpAddStaParams params,
+			       struct wlan_objmgr_pdev *pdev);
 
 /**
  * wma_vdev_set_eht_bss_params() - set EHT OPs in vdev start
@@ -299,7 +300,8 @@ void wma_print_eht_op(tDot11fIEeht_op *eht_ops)
 
 static inline
 void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
-			       tpAddStaParams params)
+			       tpAddStaParams params,
+			       struct wlan_objmgr_pdev *pdev)
 {
 }
 

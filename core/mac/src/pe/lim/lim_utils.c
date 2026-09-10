@@ -11399,7 +11399,9 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 		oper_mode = CH_WIDTH_20MHZ;
 	}
 
-	fw_vht_ch_wd = wlan_mlme_get_max_bw();
+	fw_vht_ch_wd = wlan_mlme_get_max_curr_bw(mac_ctx->pdev,
+						  session->curr_op_freq,
+						  ch_width);
 
 	if (ch_width > fw_vht_ch_wd) {
 		pe_debug_rl(QDF_MAC_ADDR_FMT ": Downgrade new bw: %d to max %d",
