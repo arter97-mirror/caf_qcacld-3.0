@@ -1311,4 +1311,41 @@ void policy_mgr_dump_sap_mandatory(struct wlan_objmgr_vdev *vdev);
 enum hw_mode_bandwidth
 policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * policy_mgr_get_vdev_present_with_freq() - Check if any other  vdev present
+ * with the given freq.
+ * @pm_ctx: pointer to pm_ctx
+ * @freq: given freq
+ * @vdev_id: current vdev id.
+ *
+ * Return: vdev id of the scc vdev
+ */
+uint8_t
+policy_mgr_get_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				      qdf_freq_t freq, uint8_t vdev_id);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * policy_mgr_get_inact_vdev_present_with_freq() - Get inactive VDEV ID present
+ * with frequency
+ * @pm_ctx: pm_ctx object information
+ * @freq: Frequency to check
+ * @vdev_id: VDEV ID to check
+ *
+ * This function checks if there is an inactive VDEV ID present with the given
+ * frequency.
+ *
+ * Return: VDEV ID if found, WLAN_UMAC_VDEV_ID_MAX otherwise
+ */
+uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
+					    qdf_freq_t freq, uint8_t vdev_id);
+#else
+static inline uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
+					    qdf_freq_t freq, uint8_t vdev_id)
+{
+	return WLAN_UMAC_VDEV_ID_MAX;
+}
+#endif
 #endif

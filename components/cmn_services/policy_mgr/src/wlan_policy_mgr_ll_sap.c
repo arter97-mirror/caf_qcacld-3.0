@@ -151,12 +151,12 @@ bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	inactive_scc_vdev = policy_mgr_get_inact_vdev_present_with_freq(psoc,
+	inactive_scc_vdev = policy_mgr_get_inact_vdev_present_with_freq(pm_ctx,
 							ll_lt_sap_freq,
 							ll_lt_sap_vdev_id);
-	scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
-							ll_lt_sap_freq,
-							ll_lt_sap_vdev_id);
+	scc_vdev_id = policy_mgr_get_vdev_present_with_freq(pm_ctx,
+							    ll_lt_sap_freq,
+							    ll_lt_sap_vdev_id);
 
 	if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX ||
 	    inactive_scc_vdev != WLAN_UMAC_VDEV_ID_MAX) {

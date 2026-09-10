@@ -2020,18 +2020,11 @@ bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 }
 #ifdef WLAN_FEATURE_11BE_MLO
 uint8_t
-policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+policy_mgr_get_inact_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
 					    qdf_freq_t freq, uint8_t vdev_id)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t i;
 	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
@@ -2049,18 +2042,11 @@ policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
 #endif
 
 uint8_t
-policy_mgr_get_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+policy_mgr_get_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
 				      qdf_freq_t freq, uint8_t vdev_id)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t i;
 	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
@@ -2135,7 +2121,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 		}
 
-		scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
+		scc_vdev_id = policy_mgr_get_vdev_present_with_freq(pm_ctx,
 								pcl_channels[i],
 								vdev_id);
 		if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
@@ -2143,7 +2129,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 		}
 
-		scc_vdev_id = policy_mgr_get_inact_vdev_present_with_freq(psoc,
+		scc_vdev_id = policy_mgr_get_inact_vdev_present_with_freq(pm_ctx,
 								pcl_channels[i],
 								vdev_id);
 		if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
