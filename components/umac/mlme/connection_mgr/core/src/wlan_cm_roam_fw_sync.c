@@ -103,6 +103,8 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
+	uint32_t is_host_4way_hs_supported;
+	bool disallow_mld_connecting_state_roam_sync;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -111,6 +113,10 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	is_host_4way_hs_supported =
+		wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 
 	if (cm_is_vdev_disconnecting(vdev) ||
 	    mlo_is_any_link_disconnecting(vdev)) {
@@ -130,7 +136,24 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (mlo_is_mld_connecting(vdev) || cm_is_vdev_connecting(vdev) ||
+	/*
+	 * When emergency roaming is enabled, a Roam Sync event may be received
+	 * before the Connect Request while the MLD is still in the connecting
+	 * state (specifically in the JOIN_PENDING substate). In such cases,
+	 * the subsequent roam request activation causes the host to send
+	 * RSO_STOP, since the MLD is considered to be connecting.
+	 *
+	 * To avoid this race condition, permit Roam Sync processing when
+	 * emergency roaming is enabled. This allows the roaming flow to
+	 * proceed even if the MLD is in the connecting state. The existing
+	 * connection is first disconnected, after which the MLD completes
+	 * association with the new AP.
+	 */
+
+	disallow_mld_connecting_state_roam_sync = (!is_host_4way_hs_supported &&
+						   mlo_is_mld_connecting(vdev));
+	if (disallow_mld_connecting_state_roam_sync ||
+	    cm_is_vdev_connecting(vdev) ||
 	    cm_is_peer_preset_on_other_sta(psoc, vdev, vdev_id, event)) {
 		mlme_err("vdev %d Roam sync not handled in connecting state",
 			 vdev_id);
