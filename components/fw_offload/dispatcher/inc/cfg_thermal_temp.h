@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -411,7 +411,7 @@
  *gThermalSamplingTime - Configure the thermal mitigation sampling time in ms.
  *
  * @Min: 10
- * @Max: 100
+ * @Max: 5000
  * @Default: 100
  *
  * This ini will control the sampling time that the thermal mitigation in FW
@@ -426,7 +426,7 @@
 #define CFG_THERMAL_SAMPLING_TIME CFG_INI_UINT( \
 				"gThermalSamplingTime", \
 				10, \
-				100, \
+				5000, \
 				100, \
 				CFG_VALUE_OR_DEFAULT, \
 				"Thermal mitigation sampling time")
