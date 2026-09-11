@@ -8460,6 +8460,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);
+	wlan_hdd_undo_acs(link_info);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
