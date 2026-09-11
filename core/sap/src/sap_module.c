@@ -442,19 +442,25 @@ wlansap_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 		return;
 
 	sap_ctx = (struct sap_context *)arg;
-	if (!sap_ctx || sap_ctx->fsm_state != SAP_STARTED ||
-	    !sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode)
+	if (!sap_ctx)
 		return;
+
+	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_ctx)))
+		return;
+
+	if (sap_ctx->fsm_state != SAP_STARTED ||
+	    !sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode)
+		goto put_ctx;
 
 	if (!util_is_scan_completed(event, &success))
-		return;
+		goto put_ctx;
 
 	if (!success)
-		return;
+		goto put_ctx;
 
 	/* check if all 2 GHz channel scan got completed */
 	if (!wlansap_is_all_2ghz_channel_scanned(event))
-		return;
+		goto put_ctx;
 
 	/* Take sap vdev as a ref there may be a scenario where in sap is
 	 * not present while sta scan got completed.
@@ -523,6 +529,9 @@ cleanup:
 
 	if (list)
 		wlan_scan_purge_results(list);
+
+put_ctx:
+	wlansap_context_put(sap_ctx);
 }
 
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
