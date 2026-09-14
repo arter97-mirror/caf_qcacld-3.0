@@ -124,12 +124,15 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 	bool chan_width_support = false;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fBeaconIEs *bcn_ies;
+	struct mlme_vht_capabilities_info *vht_cap_info;
 
 	/* Nothing to be done if the session is not in STA mode */
 	if (!LIM_IS_STA_ROLE(ft_session)) {
 		pe_err("pe_session is not in STA mode");
 		return;
 	}
+
+	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
 
 	/* Package SIR_HAL_ADD_BSS_REQ message parameters */
 	pAddBssParams = qdf_mem_malloc(sizeof(struct bss_params));
@@ -228,7 +231,9 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 		pAddBssParams->staContext.listenInterval =
 					bss_desc->beaconInterval;
 
-		pAddBssParams->staContext.assocId = 0;
+		dph_lookup_hash_entry(mac, pAddBssParams->staContext.bssId,
+				      &pAddBssParams->staContext.assocId,
+				      &ft_session->dph.dphHashTable);
 		pAddBssParams->staContext.uAPSD = 0;
 		pAddBssParams->staContext.maxSPLen = 0;
 		pAddBssParams->staContext.updateSta = false;
@@ -240,6 +245,9 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 		if (IS_DOT11_MODE_HT(ft_session->dot11mode) &&
 		    bcn_ies->HTCaps.present) {
 			pAddBssParams->staContext.htCapable = 1;
+			if (ft_session->ht_config.tx_stbc)
+				sta_ctx->stbc_capable =
+					bcn_ies->HTCaps.rxSTBC;
 			if (ft_session->vhtCapability &&
 			    IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps)) {
 				pAddBssParams->staContext.vhtCapable = 1;
@@ -250,6 +258,10 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 				if (bcn_ies->VHTCaps.suBeamformeeCap &&
 				    ft_session->vht_config.su_beam_former)
 					sta_ctx->enable_su_tx_bformer = 1;
+				if (vht_caps &&
+				    sta_ctx->stbc_capable)
+					sta_ctx->stbc_capable =
+						vht_caps->rxSTBC;
 			}
 			if (lim_is_session_he_capable(ft_session) &&
 				bcn_ies->he_cap.present)
@@ -274,6 +286,26 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 					(uint8_t)bcn_ies->HTCaps.shortGI40MHz;
 			pAddBssParams->staContext.maxAmpduSize =
 					bcn_ies->HTCaps.maxRxAMPDUFactor;
+			if (pAddBssParams->staContext.vhtTxBFCapable &&
+			    vht_cap_info->disable_ldpc_with_txbf_ap) {
+				sta_ctx->htLdpcCapable = 0;
+				sta_ctx->vhtLdpcCapable = 0;
+			} else {
+				if (ft_session->txLdpcIniFeatureEnabled & 0x1)
+					sta_ctx->htLdpcCapable =
+						(uint8_t)
+						bcn_ies->HTCaps.advCodingCap;
+				else
+					sta_ctx->htLdpcCapable = 0;
+
+				if (vht_caps &&
+				    (ft_session->txLdpcIniFeatureEnabled & 0x2))
+					sta_ctx->vhtLdpcCapable =
+						(uint8_t)
+						vht_caps->ldpcCodingCap;
+				else
+					sta_ctx->vhtLdpcCapable = 0;
+			}
 		}
 
 		pAddBssParams->staContext.wmmEnabled =
@@ -624,6 +656,15 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 	ft_session->lim11hEnable = pe_session->lim11hEnable;
 	ft_session->isOSENConnection = pe_session->isOSENConnection;
 	ft_session->connected_akm = pe_session->connected_akm;
+	/*
+	 * The ft session is created zeroed, so the HT/VHT config and LDPC
+	 * INI inherited from the original session must be copied over,
+	 * otherwise stbc/ldpc of the new AP can never be enabled.
+	 */
+	ft_session->ht_config = pe_session->ht_config;
+	ft_session->vht_config = pe_session->vht_config;
+	ft_session->txLdpcIniFeatureEnabled =
+		pe_session->txLdpcIniFeatureEnabled;
 
 	/* Fields to be filled later */
 	ft_session->lim_join_req = NULL;
