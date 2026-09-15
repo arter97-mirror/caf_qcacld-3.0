@@ -4602,8 +4602,12 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	 * in the first octet. It leads to the creation of an empty RSNXE.
 	 */
 	if (!(rsnxe[2] & 0xF0)) {
-		pe_debug("None of the caps are set in 1st octet, strip RSNXE");
-		goto end;
+		if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)) {
+			pe_debug("auth mode is 8021X_IN_AUTH, retain RSNXE");
+		} else {
+			pe_debug("None of the caps are set in 1st octet, strip RSNXE");
+			goto end;
+		}
 	}
 
 	switch (ap_rsnxe_len) {
