@@ -2680,6 +2680,12 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t idx = 0, num_partner_links, link_id, link_vdev_id;
 
+	if (reassoc_rsp_len <= WLAN_MAC_HDR_LEN_3A) {
+		pe_err("MLO ROAM: Invalid Reassoc response length %u",
+		       reassoc_rsp_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	link_reassoc_rsp.ptr = qdf_mem_malloc(reassoc_rsp_len);
 	if (!link_reassoc_rsp.ptr)
 		return QDF_STATUS_E_NOMEM;
