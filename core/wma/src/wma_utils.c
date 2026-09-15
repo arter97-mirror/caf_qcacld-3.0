@@ -1481,11 +1481,14 @@ static int wma_ll_stats_evt_handler(void *handle, u_int8_t *event,
 		fixed_param->num_peer_ac_tx_stats >
 		param_buf->num_peer_ac_tx_stats ||
 		fixed_param->num_peer_ac_rx_stats >
-		param_buf->num_peer_ac_rx_stats) {
-		wma_err("excess num_peer_signal_stats:%d, num_peer_ac_tx_stats:%d, num_peer_ac_rx_stats:%d",
+		param_buf->num_peer_ac_rx_stats ||
+		fixed_param->num_chan_cca_stats >
+		param_buf->num_chan_cca_stats) {
+		wma_err("excess num_peer_signal_stats:%d, num_peer_ac_tx_stats:%d, num_peer_ac_rx_stats:%d, num_chan_cca_stats:%d",
 			fixed_param->num_peer_signal_stats,
 			fixed_param->num_peer_ac_tx_stats,
-			fixed_param->num_peer_ac_rx_stats);
+			fixed_param->num_peer_ac_rx_stats,
+			fixed_param->num_chan_cca_stats);
 		return -EINVAL;
 	}
 
