@@ -1822,8 +1822,7 @@ static QDF_STATUS ol_txrx_pdev_detach(struct cdp_soc_t *soc_hdl, uint8_t pdev_id
 				      int force)
 {
 	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
-	struct ol_txrx_pdev_t *pdev = ol_txrx_get_pdev_from_pdev_id(soc,
-								    pdev_id);
+	struct ol_txrx_pdev_t *pdev;
 	struct ol_txrx_stats_req_internal *req, *temp_req;
 	int i = 0;
 
@@ -1832,6 +1831,7 @@ static QDF_STATUS ol_txrx_pdev_detach(struct cdp_soc_t *soc_hdl, uint8_t pdev_id
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 	/*checking to ensure txrx pdev structure is not NULL */
 	if (!pdev) {
 		ol_txrx_err("pdev is NULL");
