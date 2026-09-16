@@ -110,11 +110,14 @@ void wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
  * wlan_hdd_refill_os_uhr_rateflags() - Refill UHR rate flag
  * @os_rate: rate info for os
  * @preamble: preamble type used to determine UHR mode
+ * @is_uhr_elr: true if mcs was decoded from an ELR sub-rate; selects
+ *              RATE_INFO_FLAGS_UHR_ELR_MCS instead of
+ *              RATE_INFO_FLAGS_UHR_MCS
  *
  * Return: true if preamble is UHR, false otherwise
  */
 bool wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate,
-				      uint8_t preamble);
+				      uint8_t preamble, bool is_uhr_elr);
 #else
 static inline void
 wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
@@ -123,7 +126,8 @@ wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
 }
 
 static inline bool
-wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate, uint8_t preamble)
+wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate, uint8_t preamble,
+				 bool is_uhr_elr)
 {
 	return false;
 }

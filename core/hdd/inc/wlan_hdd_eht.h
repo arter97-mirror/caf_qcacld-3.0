@@ -126,6 +126,14 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 				    enum tx_rate_info rate_flags,
 				    uint8_t dcm,
 				    enum txrate_gi guard_interval);
+
+/**
+ * hdd_map_eht_gi_to_os() - map txrate_gi to os guard interval
+ * @guard_interval: guard interval get from fw rate
+ *
+ * Return: os guard interval value
+ */
+uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval);
 #else
 static inline
 void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
@@ -164,6 +172,12 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 				    uint8_t dcm,
 				    enum txrate_gi guard_interval)
 {
+}
+
+static inline
+uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval)
+{
+	return 0;
 }
 #endif
 

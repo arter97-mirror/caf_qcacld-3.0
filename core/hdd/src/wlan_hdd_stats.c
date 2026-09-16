@@ -7697,6 +7697,28 @@ static uint32_t hdd_get_rate_flags(uint32_t rate,
 	return flags;
 }
 
+/* FW encodes UHR (802.11bn) ELR sub-rates as rate-code RATE 30/31 */
+#define UHR_ELR_MCS0 30
+#define UHR_ELR_MCS1 31
+#define GET_RATECODE_ELR_MCS(raw_mcs) ((raw_mcs) & 1)
+
+#ifdef WLAN_FEATURE_11BN
+static inline void wlan_hdd_decode_uhr_elr_mcs(uint8_t mode, uint8_t *mcs,
+					       bool *is_elr)
+{
+	if (mode == DOT11_BN &&
+	    (*mcs == UHR_ELR_MCS0 || *mcs == UHR_ELR_MCS1)) {
+		*mcs = GET_RATECODE_ELR_MCS(*mcs);
+		*is_elr = true;
+	}
+}
+#else
+static inline void wlan_hdd_decode_uhr_elr_mcs(uint8_t mode, uint8_t *mcs,
+					       bool *is_elr)
+{
+}
+#endif
+
 void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 			     struct peer_stats_info_ext_event *peer_info)
 {
@@ -7712,6 +7734,9 @@ void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	txrx_stats->tx_rate.mode = WMI_GET_HW_RATECODE_PREAM_V1(rate_code);
 	txrx_stats->tx_rate.nss = WMI_GET_HW_RATECODE_NSS_V1(rate_code) + 1;
 	txrx_stats->tx_rate.mcs = WMI_GET_HW_RATECODE_RATE_V1(rate_code);
+	wlan_hdd_decode_uhr_elr_mcs(txrx_stats->tx_rate.mode,
+				    &txrx_stats->tx_rate.mcs,
+				    &txrx_stats->tx_rate.is_uhr_elr);
 	txrx_stats->tx_rate.bw = WMI_GET_HW_RATECODE_BW_V1(rate_code);
 	txrx_stats->tx_rate.gi = WMI_GET_HW_RATECODE_GI_V1(rate_code);
 
@@ -7740,6 +7765,9 @@ void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	txrx_stats->rx_rate.mode = WMI_GET_HW_RATECODE_PREAM_V1(rate_code);
 	txrx_stats->rx_rate.nss = WMI_GET_HW_RATECODE_NSS_V1(rate_code) + 1;
 	txrx_stats->rx_rate.mcs = WMI_GET_HW_RATECODE_RATE_V1(rate_code);
+	wlan_hdd_decode_uhr_elr_mcs(txrx_stats->rx_rate.mode,
+				    &txrx_stats->rx_rate.mcs,
+				    &txrx_stats->rx_rate.is_uhr_elr);
 
 	flags = hdd_get_rate_flags(txrx_stats->rx_rate.rate / 100,
 				   txrx_stats->rx_rate.mode,
@@ -8608,7 +8636,8 @@ wlan_hdd_refill_os_bw(struct rate_info *os_rate, enum rx_tlv_bw bw)
 }
 
 static void
-wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
+wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble,
+			     bool is_uhr_elr)
 {
 	if (preamble == DOT11_N)
 		os_rate->flags |= RATE_INFO_FLAGS_MCS;
@@ -8617,7 +8646,8 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
 	else if (preamble == DOT11_AX)
 		os_rate->flags |= RATE_INFO_FLAGS_HE_MCS;
 	else if (!wlan_hdd_refill_os_eht_rateflags(os_rate, preamble))
-		wlan_hdd_refill_os_uhr_rateflags(os_rate, preamble);
+		wlan_hdd_refill_os_uhr_rateflags(os_rate, preamble,
+						 is_uhr_elr);
 }
 
 /* EAPOL/ARP legacy rate, unit 100kbps */
@@ -8640,6 +8670,7 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 	uint8_t preamble = link_info->hdd_stats.class_a_stat.tx_preamble;
 	uint8_t mcs = link_info->hdd_stats.class_a_stat.tx_mcs_index;
 	uint8_t nss = link_info->hdd_stats.class_a_stat.tx_nss;
+	bool is_uhr_elr = link_info->hdd_stats.class_a_stat.tx_is_uhr_elr;
 
 	sinfo->txrate.nss = link_info->hdd_stats.class_a_stat.tx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
@@ -8661,7 +8692,7 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 	if (!sinfo->txrate.legacy)
 		sinfo->txrate.legacy = EAPOL_ARP_LEGACY_RATE;
 
-	wlan_hdd_refill_os_rateflags(&sinfo->txrate, preamble);
+	wlan_hdd_refill_os_rateflags(&sinfo->txrate, preamble, is_uhr_elr);
 
 	if (sinfo->txrate.flags & RATE_INFO_FLAGS_MCS) {
 		if (nss == 0 || nss > MAX_HT_NSS) {
@@ -8686,6 +8717,10 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 
 	if (link_info->hdd_stats.class_a_stat.tx_gi == TXRATE_GI_0_4_US)
 		sinfo->txrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
+
+	if (is_uhr_elr)
+		sinfo->txrate.eht_gi = hdd_map_eht_gi_to_os(
+			link_info->hdd_stats.class_a_stat.tx_gi);
 
 	hdd_debug("sgi=%d, preamble=%d, bw=%d, mcs=%d, nss=%d, sinfo->mcs=%d, rate_flag=0x%x",
 		  link_info->hdd_stats.class_a_stat.tx_gi, preamble,
@@ -8713,6 +8748,7 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 {
 	uint8_t preamble = link_info->hdd_stats.class_a_stat.rx_preamble;
 	uint32_t rx_mcs = link_info->hdd_stats.class_a_stat.rx_mcs_index;
+	bool is_uhr_elr = link_info->hdd_stats.class_a_stat.rx_is_uhr_elr;
 
 	sinfo->rxrate.nss = link_info->hdd_stats.class_a_stat.rx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
@@ -8737,7 +8773,7 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 		return;
 	}
 
-	wlan_hdd_refill_os_rateflags(&sinfo->rxrate, preamble);
+	wlan_hdd_refill_os_rateflags(&sinfo->rxrate, preamble, is_uhr_elr);
 
 	sinfo->rxrate.mcs = link_info->hdd_stats.class_a_stat.rx_mcs_index;
 
@@ -8750,6 +8786,10 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 
 	if (link_info->hdd_stats.class_a_stat.rx_gi == TXRATE_GI_0_4_US)
 		sinfo->rxrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
+
+	if (is_uhr_elr)
+		sinfo->rxrate.eht_gi = hdd_map_eht_gi_to_os(
+			link_info->hdd_stats.class_a_stat.rx_gi);
 
 	hdd_debug("sgi=%d, preamble=%d, bw=%d, mcs=%d, nss=%d, rate_flag=0x%x",
 		  link_info->hdd_stats.class_a_stat.rx_gi, preamble,
@@ -9504,6 +9544,19 @@ fail:
 
 /* 11n lowest rate: HT NSS1 MCS0 rate(kbps) */
 #define HT_NSS1_MCS0_RATE 6500
+
+#ifdef WLAN_FEATURE_11BN
+static inline bool wlan_hdd_is_uhr_mode(uint8_t mode)
+{
+	return mode == DOT11_BN;
+}
+#else
+static inline bool wlan_hdd_is_uhr_mode(uint8_t mode)
+{
+	return false;
+}
+#endif
+
 /**
  * wlan_hdd_get_sta_tx_rate_stats() - get sta tx rate from peer stats
  * @link_info: Link info pointer of STA adapter to get stats
@@ -9514,7 +9567,9 @@ fail:
  * 1. Non-11a/11b/11g connection, tx_rate.rate >= HT_NSS1_MCS0_RATE, but mode
  * isn't abg, update rate, mode and mcs/nss/bw.
  * 2. Non-11a/11b/11g connection, tx_rate.rate < HT_NSS1_MCS0_RATE, downgrade
- * to 11a/11b/11g, update rate and mode.
+ * to 11a/11b/11g, update rate and mode. UHR (802.11bn) ELR is exempted from
+ * this downgrade: its real bitrate is legitimately below
+ * HT_NSS1_MCS0_RATE, so it is always treated as case 1 instead.
  * 3. 11a/11b/11g connection, update rate and mode.
  * 4. Other case: don't update, keep last mode/mcs/nss/bw.
  *
@@ -9567,7 +9622,8 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	}
 
 	if (!hdd_is_legacy_connection(link_info)) {
-		if (txrx_stats.tx_rate.rate >= HT_NSS1_MCS0_RATE &&
+		if ((txrx_stats.tx_rate.rate >= HT_NSS1_MCS0_RATE ||
+		     wlan_hdd_is_uhr_mode(txrx_stats.tx_rate.mode)) &&
 		    txrx_stats.tx_rate.mode >= DOT11_N) {
 			/* convert to 100kbps expected by upper layer */
 			hdd_stats->class_a_stat.tx_rate = txrx_stats.tx_rate.rate / 100;
@@ -9578,6 +9634,8 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 			hdd_stats->class_a_stat.tx_gi = txrx_stats.tx_rate.gi;
 			hdd_stats->class_a_stat.tx_dcm = txrx_stats.tx_rate.dcm;
 			hdd_stats->class_a_stat.tx_mcs_rate_flags = txrx_stats.tx_rate.rate_flags;
+			hdd_stats->class_a_stat.tx_is_uhr_elr =
+				txrx_stats.tx_rate.is_uhr_elr;
 		} else if (txrx_stats.tx_rate.rate < HT_NSS1_MCS0_RATE) {
 			hdd_stats->class_a_stat.tx_rate = txrx_stats.tx_rate.rate / 100;
 			hdd_stats->class_a_stat.tx_preamble = txrx_stats.tx_rate.mode;
