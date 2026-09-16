@@ -3279,9 +3279,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	status = lim_roam_store_nss_from_reassoc_req(mac_ctx, vdev_id,
 						     roam_sync_ind_ptr);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_debug("Failed to store NSS from reassoc req");
+		pe_err("Failed to store NSS from reassoc req");
 		qdf_mem_free(bss_desc);
-		return status;
+		goto roam_sync_fail;
 	}
 
 	/* Update the beacon/probe filter in mac_ctx */
