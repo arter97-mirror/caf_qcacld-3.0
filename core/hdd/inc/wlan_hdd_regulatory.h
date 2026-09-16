@@ -60,6 +60,14 @@ void hdd_deinit_regulatory_update_event(struct hdd_context *hdd_ctx);
 
 int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy);
 
+/**
+ * hdd_regulatory_deinit() - cleanup all components of regulatory
+ * @hdd_ctx: HDD context
+ *
+ * Return: None
+ */
+void hdd_regulatory_deinit(struct hdd_context *hdd_ctx);
+
 void hdd_program_country_code(struct hdd_context *hdd_ctx);
 void hdd_reset_global_reg_params(void);
 
