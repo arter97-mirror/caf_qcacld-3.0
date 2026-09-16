@@ -579,12 +579,15 @@ dp_wifi_transport_handle_rx_indication(
 			struct wifi_transport_host_context *wtc, void *buf)
 {
 	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
+	union dp_rx_desc_list_elem_t *free_head = NULL;
+	union dp_rx_desc_list_elem_t *free_tail = NULL;
 	xpan_rx_audio_fixed_param *fixed;
 	xpan_rx_buffer_info *entry;
 	qdf_dma_addr_t paddr;
 	struct dp_rx_desc *rx_desc;
 	qdf_nbuf_t rx_nbuf;
 	uint8_t *eth_hdr;
+	QDF_STATUS status;
 	uint32_t i, n;
 	uint16_t l2_pad;
 
@@ -628,11 +631,31 @@ replenish:
 		qdf_mem_dma_sync_single_for_device(dp_ctx->qdf_dev, paddr,
 						   entry->buffer_len,
 						   DMA_FROM_DEVICE);
-		dp_replenish_direct_link_refill_ring(
+		status = dp_replenish_direct_link_refill_ring(
 				dp_ctx->cdp_soc, wtc->rx_refill_ring,
 				paddr, entry->sw_cookie);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_err("refill ring full sw_cookie=%u",
+			       entry->sw_cookie);
+			if (rx_desc && rx_desc->nbuf) {
+				qdf_nbuf_unmap_single(dp_ctx->qdf_dev,
+						      rx_desc->nbuf,
+						      QDF_DMA_FROM_DEVICE);
+				qdf_nbuf_free(rx_desc->nbuf);
+				rx_desc->nbuf = NULL;
+				dp_rx_add_to_free_desc_list(&free_head,
+							    &free_tail,
+							    rx_desc);
+			}
+		}
 	}
 	dp_direct_link_refill_ring_end(dp_ctx->cdp_soc, wtc->rx_refill_ring);
+
+	if (free_head)
+		dp_rx_add_desc_list_to_free_list(soc, &free_head, &free_tail,
+						 free_head->rx_desc.pool_id,
+						 &soc->rx_desc_buf[
+						 free_head->rx_desc.pool_id]);
 }
 
 /**
