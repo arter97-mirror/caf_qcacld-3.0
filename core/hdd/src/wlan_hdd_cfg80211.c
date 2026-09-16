@@ -27315,6 +27315,7 @@ static int hdd_change_adapter_mode(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct net_device *netdev = adapter->dev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -27324,8 +27325,15 @@ static int hdd_change_adapter_mode(struct hdd_adapter *adapter,
 		hdd_stop_adapter(hdd_ctx, adapter);
 		hdd_deinit_adapter(hdd_ctx, adapter, true);
 	}
-	memset(&adapter->deflink->session, 0,
-	       sizeof(adapter->deflink->session));
+	/*
+	 * Clear session for all link_info entries (not just deflink),
+	 * since MLO adapters (e.g. multi-link SAP) may have populated
+	 * session data on other link_info entries as well.
+	 * Leaving those uncleared can leak stale data across a
+	 * device_mode change.
+	 */
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		memset(&link_info->session, 0, sizeof(link_info->session));
 	adapter->device_mode = new_mode;
 	hdd_set_station_ops(netdev);
 
