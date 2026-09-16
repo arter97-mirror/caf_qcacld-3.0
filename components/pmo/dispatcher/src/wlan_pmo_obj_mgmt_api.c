@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -290,9 +290,11 @@ QDF_STATUS pmo_vdev_object_created_notification(
 	 * 0 - PMO_PS_ADVANCED_POWER_SAVE_DISABLE
 	 * 1 - PMO_PS_ADVANCED_POWER_SAVE_ENABLE
 	 * 2 - PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED
+	 * 3 - PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED
 	 */
 	vdev_ctx->ps_params.opm_mode = psoc_ctx->psoc_cfg.power_save_mode;
 	vdev_ctx->ps_params.ps_ito = PMO_PS_DATA_INACTIVITY_TIMEOUT;
+	vdev_ctx->ps_params.ps_opm_level = PMO_PS_DATA_OPM_LEVEL;
 	vdev_ctx->ps_params.spec_wake = PMO_PS_DATA_SPEC_WAKE;
 
 out:

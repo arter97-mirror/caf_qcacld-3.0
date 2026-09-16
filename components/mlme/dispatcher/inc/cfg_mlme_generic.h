@@ -997,11 +997,15 @@ enum wlan_epcs_frame {
  * <ini>
  * gEnableRingBuffer - Enable Ring Buffer for Bug Report
  * @Min: 0
- * @Max: 1
- * @Default: 1
+ * @Max: 2
+ * @Default: 2
  *
- * This ini is used to enable Ring Buffer
+ * This ini is used to enable/disable/set Ring Buffer verbose level.
  *
+ * 0 : Completely disable logging in ring buffers for cnss_diag.
+ * 1 : Enable Complete logging in ring buffers.
+ * 2 : Only enable logging in cnss_diag if
+ *     wifi_verbose_log_level > WLAN_LOG_LEVEL_NORMAL
  * Related: None
  *
  * Supported Feature: STA/SAP
@@ -1010,9 +1014,10 @@ enum wlan_epcs_frame {
  *
  * </ini>
  */
-#define CFG_ENABLE_RING_BUFFER CFG_INI_BOOL( \
+#define CFG_ENABLE_RING_BUFFER CFG_INI_UINT( \
 		"gEnableRingBuffer", \
-		1, \
+		0, 2, 2, \
+		CFG_VALUE_OR_DEFAULT, \
 		"To Enable Ring Buffer")
 
 /*

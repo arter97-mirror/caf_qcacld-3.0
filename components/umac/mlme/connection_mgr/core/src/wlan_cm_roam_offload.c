@@ -5761,6 +5761,8 @@ static void cm_roam_clear_is_disable_btm_flag(struct wlan_objmgr_pdev *pdev,
 {
 	struct rso_config *rso_cfg;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -5778,6 +5780,17 @@ static void cm_roam_clear_is_disable_btm_flag(struct wlan_objmgr_pdev *pdev,
 	if (rso_cfg->is_disable_btm) {
 		mlme_debug("vdev: %d clear is_disable_btm flag", vdev_id);
 		rso_cfg->is_disable_btm = false;
+	}
+
+	/*
+	 * Also clear the psoc-level cache so that the flag is not
+	 * re-applied on the next vdev init after a genuine disconnect.
+	 */
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (psoc) {
+		mlme_obj = mlme_get_psoc_ext_obj(psoc);
+		if (mlme_obj)
+			mlme_obj->cfg.lfr.disable_btm_cfg = false;
 	}
 
 release_ref:
@@ -6956,6 +6969,7 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 		       struct cm_roam_req *roam_req,
 		       struct roam_invoke_req *roam_invoke_req)
 {
+	QDF_STATUS status;
 	struct scan_filter *filter;
 	qdf_list_t *candidate_list;
 	uint32_t num_bss = 0;
@@ -7000,30 +7014,46 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_EMPTY;
 	}
 
-	qdf_list_peek_front(candidate_list, &cur_node);
+	status = qdf_list_peek_front(candidate_list, &cur_node);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_debug(CM_PREFIX_FMT "Failed to get node from list",
+			   CM_PREFIX_REF(roam_req->req.vdev_id,
+					 roam_req->cm_id));
+		goto purge_list;
+	}
+
 	candidate = qdf_container_of(cur_node,
-				     struct scan_cache_node,
-				     node);
+				     struct scan_cache_node, node);
+
+	if (util_is_scan_entry_non_tx_bssid(candidate->entry)) {
+		mlme_debug(CM_PREFIX_FMT "Drop scan entry for non-Tx BSSID",
+			   CM_PREFIX_REF(roam_req->req.vdev_id,
+					 roam_req->cm_id));
+		status = QDF_STATUS_E_EMPTY;
+		goto purge_list;
+	}
 
 	roam_invoke_req->frame_len = candidate->entry->raw_frame.len;
-
-	if (!roam_invoke_req->frame_len)
-		return QDF_STATUS_E_INVAL;
+	if (!roam_invoke_req->frame_len) {
+		status = QDF_STATUS_E_INVAL;
+		goto purge_list;
+	}
 
 	roam_invoke_req->frame_buf = qdf_mem_malloc(roam_invoke_req->frame_len);
-
 	if (!roam_invoke_req->frame_buf) {
 		roam_invoke_req->frame_len = 0;
-		return QDF_STATUS_E_NOMEM;
+		status = QDF_STATUS_E_NOMEM;
+		goto purge_list;
 	}
 
 	qdf_mem_copy(roam_invoke_req->frame_buf,
 		     candidate->entry->raw_frame.ptr,
 		     roam_invoke_req->frame_len);
 
+purge_list:
 	wlan_scan_purge_results(candidate_list);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 #if (defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_ROAM_OFFLOAD))

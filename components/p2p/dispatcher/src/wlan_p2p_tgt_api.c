@@ -545,3 +545,8 @@ tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+bool tgt_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return target_if_p2p_is_fw_cancel_one_shot_noa_supported(psoc);
+}

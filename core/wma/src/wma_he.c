@@ -1015,13 +1015,16 @@ static void wma_parse_he_ppet(int8_t *rcvd_ppet,
 }
 
 void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
-			      tpAddStaParams params)
+			      tpAddStaParams params,
+			      struct wlan_objmgr_pdev *pdev)
 {
 	tDot11fIEhe_cap *he_cap = &params->he_config;
 	tDot11fIEhe_op *he_op = &params->he_op;
 	uint32_t *phy_cap = peer->peer_he_cap_phyinfo;
 	uint32_t mac_cap[PSOC_HOST_MAX_MAC_SIZE] = {0}, he_ops = 0;
 	uint8_t temp, i, chan_width;
+	enum phy_ch_width max_ch_width;
+	uint32_t freq;
 
 	if (!params->he_capable)
 		return;
@@ -1177,8 +1180,12 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 			 WMA_MCS_12_13_MAP_L80) & WMA_MCS_12_13_PEER_RATE_MAP;
 	}
 
+	freq = wlan_get_operation_chan_freq_vdev_id(pdev, peer->vdev_id);
+	max_ch_width = wlan_mlme_get_max_curr_bw(pdev, freq, params->ch_width);
 	if (params->ch_width > CH_WIDTH_80MHZ ||
-	    IS_TDLS_PEER(params->staType)) {
+	    IS_TDLS_PEER(params->staType) ||
+	    (params->ch_width == CH_WIDTH_80MHZ &&
+	     max_ch_width >= CH_WIDTH_160MHZ)) {
 		peer->peer_he_mcs_count = WMI_HOST_MAX_HE_RATE_SET;
 		peer->peer_he_rx_mcs_set[1] |=
 			params->supportedRates.rx_he_mcs_map_160;

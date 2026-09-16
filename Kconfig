@@ -1905,6 +1905,12 @@ config WLAN_FEATURE_LATENCY_SENSITIVE_REO
 	bool "enable WLAN_FEATURE_LATENCY_SENSITIVE_REO"
 	default n
 
+config WLAN_HAPS_ENABLE
+	bool "Enable CONFIG_WLAN_HAPS_ENABLE"
+	default n
+	help
+	This option enables the Host Aware Power Save feature.
+
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default "wlan"

@@ -5330,6 +5330,20 @@ static inline void wlan_hdd_set_usd_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+static inline void wlan_hdd_set_cancel_noa_feature(struct wlan_objmgr_psoc *psoc,
+						   uint8_t *feature_flags)
+{
+	if (!ucfg_p2p_is_fw_cancel_one_shot_noa_supported(psoc)) {
+		hdd_debug("cancel one shot noa feature is not supported by FW");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GO_CANCEL_ONE_SHOT_NOA);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA);
+}
+
 static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *feature_flags)
 {
@@ -5466,6 +5480,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_cancel_noa_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
@@ -8499,7 +8514,7 @@ __wlan_hdd_cfg80211_get_logger_supp_feature(struct wiphy *wiphy,
 	int status;
 	uint32_t features;
 	struct sk_buff *reply_skb = NULL;
-	bool enable_ring_buffer;
+	uint32_t enable_ring_buffer;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -8874,6 +8889,10 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO] = {.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL] = {
+		.type = NLA_U16 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL] = {
+		.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE] = {
 		.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UDP_QOS_UPGRADE] = {
 		.type = NLA_U8 },
@@ -10726,6 +10745,8 @@ hdd_vendor_opm_to_pmo_opm(enum qca_wlan_vendor_opm_mode opm_mode)
 		return PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
 	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
 		return PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED;
+	case QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED:
+		return PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED;
 	default:
 		hdd_debug("Invalid opm_mode: %d", opm_mode);
 		return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
@@ -10740,6 +10761,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev;
 	enum qca_wlan_vendor_opm_mode opm_mode;
 	struct pmo_ps_params ps_params = {0};
+	struct pmo_ps_params curr_ps_params = {0};
 	struct nlattr *power_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER];
 	struct nlattr *opm_attr =
@@ -10748,7 +10770,11 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO];
 	struct nlattr *spec_wake_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL];
-	int ret;
+	struct nlattr *ps_opm_level_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL];
+	struct nlattr *ps_latency_tolerance_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE];
+	int ret = 0;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -10778,29 +10804,18 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
+		if (!ps_opm_level_attr || !ps_latency_tolerance_attr) {
+			hdd_err_rl("Invalid Latency enabled OPM attributes");
+			return -EINVAL;
+		}
+	}
+
 	ret = hdd_set_power_config(hdd_ctx, adapter, &opm_mode);
 	if (ret)
 		return ret;
 
 	ps_params.opm_mode = hdd_vendor_opm_to_pmo_opm(opm_mode);
-	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
-		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
-		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
-
-		if (!ps_params.ps_ito)
-			return -EINVAL;
-
-		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
-			  ps_params.ps_ito, ps_params.spec_wake,
-			  ps_params.opm_mode);
-
-		ret = hdd_set_power_config_params(hdd_ctx, adapter,
-						  ps_params.ps_ito,
-						  ps_params.spec_wake);
-
-		if (ret)
-			return ret;
-	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_POWER_ID);
 	if (!vdev) {
@@ -10808,13 +10823,73 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		return 0;
 	}
 
-	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
-		ucfg_pmo_set_ps_params(vdev, &ps_params);
-	else
-		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED))
+		ucfg_pmo_get_ps_params(vdev, &curr_ps_params);
 
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
+		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
+		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
+		ps_params.ps_opm_level = curr_ps_params.ps_opm_level;
+
+		if (!ps_params.ps_ito) {
+			ret = -EINVAL;
+			goto err;
+		}
+
+		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
+			  ps_params.ps_ito, ps_params.spec_wake,
+			  ps_params.opm_mode);
+
+		ret = hdd_set_power_config_params(hdd_ctx, adapter,
+						  ps_params.ps_ito,
+						  ps_params.ps_opm_level,
+						  ps_params.spec_wake);
+
+		if (ret)
+			goto err;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
+	}
+
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
+		ps_params.ps_opm_level = nla_get_u8(ps_opm_level_attr);
+		ps_params.spec_wake = nla_get_u16(ps_latency_tolerance_attr);
+		ps_params.ps_ito = curr_ps_params.ps_ito;
+
+		if (!ps_params.ps_opm_level) {
+			ret = -EINVAL;
+			goto err;
+		}
+
+		hdd_debug("ps_opm_level %d latency_tolerance %d opm_mode %d",
+			  ps_params.ps_opm_level, ps_params.spec_wake,
+			  ps_params.opm_mode);
+
+		ret = hdd_set_power_config_params(hdd_ctx, adapter,
+						  ps_params.ps_ito,
+						  ps_params.ps_opm_level,
+						  ps_params.spec_wake);
+
+		if (ret)
+			goto err;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
+	}
+
+	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED)) {
+		ucfg_pmo_set_ps_params(vdev, &ps_params);
+	} else {
+		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, true, 0);
+	}
+
+err:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-	return 0;
+	return ret;
 }
 
 static int hdd_config_stats_avg_factor(struct wlan_hdd_link_info *link_info,
@@ -16443,6 +16518,7 @@ static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_START_MAX + 1];
 	struct sir_wifi_start_log start_log = { 0 };
 	mac_handle_t mac_handle;
+	uint32_t enable_ring_buffer;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -16501,6 +16577,18 @@ static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 	start_log.is_pktlog_buff_clear = false;
 
 	cds_set_ring_log_level(start_log.ring_id, start_log.verbose_level);
+
+	/* Get enable_ring_buffer INI value */
+	wlan_mlme_get_status_ring_buffer(hdd_ctx->psoc, &enable_ring_buffer);
+
+	/* Check if ring buffer is supported based on INI and verbose level */
+	if (enable_ring_buffer == 2) {
+		if (start_log.verbose_level <= LOG_LEVEL_NORMAL_COLLECT) {
+			hdd_debug("Ring buffer not supported for ring_id: %d, verbose_level: %d",
+				  start_log.ring_id, start_log.verbose_level);
+			return -EOPNOTSUPP;
+		}
+	}
 
 	if (start_log.ring_id == RING_ID_WAKELOCK) {
 		/* Start/stop wakelock events */
@@ -16600,6 +16688,8 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb
 		[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX + 1];
+	uint32_t enable_ring_buffer;
+	uint32_t verbose_level;
 
 	hdd_enter();
 
@@ -16628,6 +16718,23 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 
 	ring_id = nla_get_u32(
 			tb[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_ID]);
+
+	/* Get enable_ring_buffer INI value */
+	wlan_mlme_get_status_ring_buffer(hdd_ctx->psoc, &enable_ring_buffer);
+
+	/* Check if ring buffer logging is enabled based on INI and
+	 * verbose level
+	 */
+	if (enable_ring_buffer == 2) {
+		/* Get the current verbose level for the ring */
+		verbose_level = cds_get_ring_log_level(ring_id);
+
+		if (verbose_level <= LOG_LEVEL_NORMAL_COLLECT) {
+			hdd_debug("Ring buffers are not enabled for ring_id: %d",
+				  ring_id);
+			return -EINVAL;
+		}
+	}
 
 	if (ring_id == RING_ID_PER_PACKET_STATS) {
 		wlan_logging_set_per_pkt_stats();
@@ -23361,6 +23468,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 
 	FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
 	FEATURE_P2P_SET_MODE_VENDOR_COMMANDS
+	FEATURE_P2P_SET_NOA_VENDOR_COMMANDS
 
 	FEATURE_SAP_COND_CHAN_SWITCH_VENDOR_COMMANDS
 	{
@@ -27486,6 +27594,27 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		}
 	}
 
+	if (pairwise && adapter->device_mode == QDF_STA_MODE) {
+		struct wlan_objmgr_peer *peer;
+		enum wlan_peer_type peer_type;
+		struct qdf_mac_addr mac_address = {0};
+
+		qdf_mem_copy(mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+		peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+						   mac_address.bytes,
+						   WLAN_OSIF_ID);
+		if (peer) {
+			peer_type = wlan_peer_get_peer_type(peer);
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+			if (peer_type == WLAN_PEER_TDLS &&
+			    !ucfg_tdls_is_key_install_allowed(vdev,
+							      &mac_address)) {
+				hdd_debug("TDLS peer's key install disallowed");
+				return 0;
+			}
+		}
+	}
+
 	link_vdev = ucfg_tdls_get_tdls_link_vdev(vdev, WLAN_OSIF_TDLS_ID);
 	if (pairwise && link_id == -1 && !link_vdev)
 		return wlan_hdd_add_key_all_mlo_vdev(mac_handle, vdev,
@@ -31304,16 +31433,20 @@ __wlan_hdd_cfg80211_update_connect_params(struct wiphy *wiphy,
 	mac_handle = hdd_ctx->mac_handle;
 
 	if (changed & UPDATE_ASSOC_IE) {
-		assoc_ie.len = req->ie_len;
-		assoc_ie.ptr = (uint8_t *)req->ie;
-		/*
-		 * Update this assoc IE received from user space to
-		 * umac. RSO command will pick up the assoc
-		 * IEs to be sent to firmware from the umac.
-		 */
-		ucfg_cm_update_session_assoc_ie(hdd_ctx->psoc,
+		if (!hdd_cm_is_vdev_roaming(adapter->deflink)) {
+			assoc_ie.len = req->ie_len;
+			assoc_ie.ptr = (uint8_t *)req->ie;
+			/*
+			 * Update this assoc IE received from user space to
+			 * umac. RSO command will pick up the assoc
+			 * IEs to be sent to firmware from the umac.
+			 */
+			ucfg_cm_update_session_assoc_ie(
+						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
 						&assoc_ie);
+		} else
+			hdd_debug("skip assoc ie during roam");
 	}
 
 	if ((changed & UPDATE_FILS_ERP_INFO) ||

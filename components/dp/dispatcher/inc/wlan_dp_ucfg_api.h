@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -784,6 +784,15 @@ uint8_t ucfg_dp_nud_tracking_enabled(struct wlan_objmgr_psoc *psoc);
  * Return: None
  */
 void ucfg_dp_nud_indicate_roam(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_dp_get_haps_config - get the haps config
+ *
+ * @psoc: PSOC Handle
+ *
+ * Return : HAPS config value.
+ */
+uint32_t ucfg_dp_get_haps_config(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_dp_clear_arp_stats() - Clear ARP Stats
@@ -1671,6 +1680,33 @@ QDF_STATUS ucfg_dp_txrx_deinit(ol_txrx_soc_handle soc);
  */
 QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 				       uint8_t stats_id);
+
+/**
+ * ucfg_dp_haps_dump_stats() - print haps stats
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error qdf status on failure
+ */
+QDF_STATUS ucfg_dp_haps_dump_stats(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_haps_clear_stats() - clear haps stats
+ * @psoc: pointer to psoc object
+ *
+ * Return: none
+ */
+void ucfg_dp_haps_clear_stats(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_haps_set_fail_safe_timeout - set haps fail safe timer timeout
+ * @dev: netdev
+ * @is_default: is it default or user defined
+ * @timeout: latency tolerance provided by user
+ *
+ * Return: none
+ */
+void ucfg_dp_haps_set_fail_safe_timeout(qdf_netdev_t dev, bool is_default,
+					uint16_t timeout);
 /**
  * ucfg_dp_txrx_set_cpu_mask() - set CPU mask for RX threads
  * @soc: ol_txrx_soc_handle object

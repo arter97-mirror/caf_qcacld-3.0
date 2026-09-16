@@ -792,6 +792,16 @@ struct wlan_mlme_cfg_sap {
 };
 
 /**
+ * struct wlan_mlme_p2p_cfg - P2P related config items
+ * @p2p_go_cancel_one_shot_noa: Go can cancel one-shot NoA schedule
+ * @p2p_gc_keep_awake_during_noa: Gc keeps awake during NoA
+ */
+struct wlan_mlme_p2p_cfg {
+	bool p2p_go_cancel_one_shot_noa;
+	bool p2p_gc_keep_awake_during_noa;
+};
+
+/**
  * struct wlan_mlme_dfs_cfg - DFS Capabilities related config items
  * @dfs_master_capable: Is DFS master mode support enabled
  * @dfs_disable_channel_switch: disable channel switch on radar detection
@@ -1542,7 +1552,7 @@ struct wlan_mlme_generic {
 	uint8_t mgmt_retry_max;
 	bool enable_he_mcs0_for_6ghz_mgmt;
 	bool bmiss_skip_full_scan;
-	bool enable_ring_buffer;
+	uint32_t enable_ring_buffer;
 	bool enable_peer_unmap_conf_support;
 	uint8_t dfs_chan_ageout_time;
 	bool bigtk_support;
@@ -2140,6 +2150,11 @@ struct fw_scan_channels {
  * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
  * @roam_aggre_threshold: Roam threshold in aggressive mode
  * @mrsno_support: FW support for Multi RSNO feature
+ * @disable_btm_cfg: psoc-level cache of the BTM disable flag set by
+ *                  userspace via vendor command. Persists across vdev
+ *                  delete/create cycles (e.g. MAC address randomization)
+ *                  so that rso_cfg->is_disable_btm can be restored on
+ *                  every vdev init and connect request.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2273,6 +2288,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_aggre_scan_step_rssi;
 	uint8_t roam_aggre_threshold;
 	bool mrsno_support;
+	bool disable_btm_cfg;
 };
 
 /**
@@ -2879,6 +2895,7 @@ struct wlan_mlme_iot {
  * @dfs_cfg: DFS related CFG Items
  * @sap_protection_cfg: SAP erp protection related CFG items
  * @sap_cfg: sap CFG items
+ * @p2p: p2p CFG items
  * @nss_chains_ini_cfg: Per vdev nss, chains related CFG items
  * @sta: sta CFG Items
  * @stats: stats CFG Items
@@ -2934,6 +2951,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_dfs_cfg dfs_cfg;
 	struct wlan_mlme_sap_protection sap_protection_cfg;
 	struct wlan_mlme_cfg_sap sap_cfg;
+	struct wlan_mlme_p2p_cfg p2p;
 	struct wlan_mlme_nss_chains nss_chains_ini_cfg;
 	struct wlan_mlme_sta_cfg sta;
 	struct wlan_mlme_stats_cfg stats;

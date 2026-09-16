@@ -372,6 +372,7 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
 /**
  * wlan_hdd_dump_queue_history_state() - Dump hdd queue history states
  * @q_hist: pointer to hdd queue history structure
+ * @num_tx_queues: number of tx queues
  * @buf: buffer where the queue history string is dumped
  * @size: size of the buffer
  *
@@ -381,7 +382,8 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
  */
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
-				  char *buf, uint32_t size);
+				  uint8_t num_tx_queues, char *buf,
+				  uint32_t size);
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 /**

@@ -49,6 +49,7 @@
 #include "wlan_dp_stc.h"
 #include "wlan_dp_spm.h"
 #include "wlan_dp_telemetry_priv.h"
+#include "wlan_dp_haps.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -758,6 +759,26 @@ dp_nud_tracking_cfg_update(struct wlan_dp_psoc_cfg *config,
 }
 #endif
 
+#ifdef WLAN_HAPS_ENABLE
+/**
+ * dp_haps_cfg_update() - initialize HAPS config
+ * @config : Configuration parameters
+ * @psoc: psoc handle
+ */
+static void
+dp_haps_cfg_update(struct wlan_dp_psoc_cfg *config,
+		   struct wlan_objmgr_psoc *psoc)
+{
+	config->haps_config = cfg_get(psoc, CFG_HAPS_CONFIG);
+}
+#else
+static void
+dp_haps_cfg_update(struct wlan_dp_psoc_cfg *config,
+		   struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 #ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
 /**
  * dp_ini_tcp_del_ack_settings() - initialize TCP delack config
@@ -932,6 +953,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	wlan_dp_stc_cfg_init(config, psoc);
 
 	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
+	dp_haps_cfg_update(config, psoc);
 }
 
 /**
@@ -1434,6 +1456,8 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		dp_flow_priortization_init(dp_intf);
 		wlan_dp_spm_intf_ctx_init(dp_intf);
 		dp_telemetry_init(dp_intf);
+		dp_vdev_haps_attach(wlan_psoc_get_dp_handle(psoc), dp_intf,
+				    vdev->vdev_objmgr.vdev_id);
 
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
@@ -1521,6 +1545,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		 * link is deleted
 		 */
 		wlan_dp_spm_intf_ctx_deinit(dp_intf);
+		dp_vdev_haps_detach(dp_intf);
 		dp_flow_priortization_deinit(dp_intf);
 		dp_telemetry_deinit(dp_intf);
 		dp_nud_ignore_tracking(dp_intf, true);

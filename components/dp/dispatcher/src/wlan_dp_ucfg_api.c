@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -53,6 +53,7 @@
 #include "cdp_txrx_ctrl.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
+#include "wlan_dp_haps.h"
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -726,6 +727,7 @@ QDF_STATUS ucfg_dp_psoc_open(struct wlan_objmgr_psoc *psoc)
 	dp_trace_init(psoc);
 	dp_bus_bandwidth_init(psoc);
 	wlan_dp_load_balancer_init(psoc);
+	dp_haps_init(psoc);
 	qdf_wake_lock_create(&dp_ctx->rx_wake_lock, "qcom_rx_wakelock");
 
 	return QDF_STATUS_SUCCESS;
@@ -1918,6 +1920,24 @@ void ucfg_dp_nud_indicate_roam(struct wlan_objmgr_vdev *vdev)
 	dp_nud_indicate_roam(vdev);
 }
 
+#ifdef WLAN_HAPS_ENABLE
+uint32_t ucfg_dp_get_haps_config(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP Context is NULL");
+		return 0;
+	}
+	return dp_ctx->dp_cfg.haps_config;
+}
+#else
+uint32_t ucfg_dp_get_haps_config(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+#endif
+
 void ucfg_dp_clear_arp_stats(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
@@ -2491,6 +2511,8 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_stc_hdd_cbs(dp_ctx, cb_obj);
+	dp_ctx->dp_ops.wlan_dp_haps_update_qtime_sync_period =
+				cb_obj->wlan_dp_haps_update_qtime_sync_period;
 }
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -3190,6 +3212,35 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 				       uint8_t stats_id)
 {
 	return dp_txrx_ext_dump_stats(soc, stats_id);
+}
+
+QDF_STATUS ucfg_dp_haps_dump_stats(struct wlan_objmgr_psoc *psoc)
+{
+	return dp_print_haps_stats(psoc);
+}
+
+void ucfg_dp_haps_clear_stats(struct wlan_objmgr_psoc *psoc)
+{
+	return dp_clear_haps_stats(psoc);
+}
+
+void ucfg_dp_haps_set_fail_safe_timeout(qdf_netdev_t dev, bool is_default,
+					uint16_t timeout)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_intf *dp_intf;
+
+	dp_ctx = dp_get_context();
+	if (!dp_ctx)
+		return;
+
+	dp_intf = dp_get_intf_by_netdev(dp_ctx, dev);
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
+
+	return dp_haps_set_fail_safe_timeout(dp_intf, is_default, timeout);
 }
 
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,

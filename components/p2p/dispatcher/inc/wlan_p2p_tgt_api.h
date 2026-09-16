@@ -265,4 +265,14 @@ bool tgt_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id);
+
+/**
+ * tgt_p2p_is_fw_cancel_one_shot_noa_supported() - Check if FW supports
+ * cancel one shot NoA
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if FW supports cancel one shot NoA, false otherwise
+ */
+bool tgt_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_P2P_TGT_API_H_ */

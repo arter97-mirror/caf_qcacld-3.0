@@ -3558,6 +3558,8 @@ hdd_convert_opm_mode(enum qca_wlan_vendor_opm_mode opm_mode)
 		return WMA_STA_PS_OPM_AGGRESSIVE;
 	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
 		return WMA_STA_PS_USER_DEF;
+	case QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED:
+		return WMA_STA_PS_LATENCY_DEF;
 	default:
 		hdd_err("Invalid opm_mode: %d", opm_mode);
 		return WMA_STA_PS_OPM_CONSERVATIVE;
@@ -3577,7 +3579,7 @@ int hdd_set_power_config(struct hdd_context *hddctx,
 		return -EINVAL;
 	}
 
-	if (*opm_mode > QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED ||
+	if (*opm_mode > QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED ||
 	    *opm_mode < QCA_WLAN_VENDOR_OPM_MODE_DISABLE) {
 		hdd_err("invalid power value: %d", *opm_mode);
 		return -EINVAL;
@@ -3599,10 +3601,18 @@ int hdd_set_power_config(struct hdd_context *hddctx,
 }
 
 int hdd_set_power_config_params(struct hdd_context *hddctx,
-				struct hdd_adapter *adapter,
-				uint16_t ps_ito, uint16_t spec_wake)
+				struct hdd_adapter *adapter, uint16_t ps_ito,
+				uint8_t ps_opm_level, uint16_t spec_wake)
 {
 	QDF_STATUS status;
+
+	status =
+	      wma_set_power_config_opm_level(adapter->deflink->vdev_id,
+					     ps_opm_level);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("failed to configure opm level: %d", status);
+		return -EINVAL;
+	}
 
 	status = wma_set_power_config_ito(adapter->deflink->vdev_id, ps_ito);
 	if (status != QDF_STATUS_SUCCESS) {
