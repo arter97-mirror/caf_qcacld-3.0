@@ -7231,9 +7231,19 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 	attr = tb2[QCA_ATTR_ROAM_CONTROL_USER_REASON];
 	if (attr) {
 		param.user_roam_reason = nla_get_u32(attr);
-		is_wtc_param_updated = true;
+		if (param.user_roam_reason <=
+			VENDOR_BTM_REASON_RSSI_IS_STRONG_ENOUGH &&
+		    param.user_roam_reason >=
+			VENDOR_BTM_REASON_MOVE_TO_CELLULAR) {
+			is_wtc_param_updated = true;
+		} else {
+			hdd_err("Invalid vendor BTM roam reason : %d",
+				param.user_roam_reason);
+			param.user_roam_reason =
+				VENDOR_BTM_REASON_NOT_SUPPORTED;
+		}
 	} else {
-		param.user_roam_reason = DISABLE_VENDOR_BTM_CONFIG;
+		param.user_roam_reason = VENDOR_BTM_REASON_NOT_SUPPORTED;
 	}
 
 	if (tb2[QCA_ATTR_ROAM_CONTROL_BAND_MASK]) {
