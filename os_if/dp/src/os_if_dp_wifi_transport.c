@@ -209,6 +209,7 @@ QDF_STATUS os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc)
 	}
 
 	g_wifi_transport_adev      = adev;
+	adev->version              = WIFI_TRANSPORT_VERSION;
 	adev->host_ops.init        = os_if_dp_wifi_transport_init;
 	adev->host_ops.deinit      = os_if_dp_wifi_transport_deinit;
 	adev->host_ops.transmit    = os_if_dp_wifi_transport_transmit;

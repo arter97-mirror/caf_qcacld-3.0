@@ -33,6 +33,13 @@
 #include <qdf_types.h>
 
 /**
+ * WIFI_TRANSPORT_VERSION - Host driver implementation version.
+ * Stored in wifi_transport_auxiliary_device.version at registration so
+ * aux driver can verify driver compatibility.
+ */
+#define WIFI_TRANSPORT_VERSION	1
+
+/**
  * os_if_dp_wifi_transport_register() - publish auxiliary device binding point
  * @psoc: psoc object
  *
