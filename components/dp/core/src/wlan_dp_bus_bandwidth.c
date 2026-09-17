@@ -296,6 +296,34 @@ bbm_apply_tput_policy(struct wlan_dp_psoc_context *dp_ctx,
 	bbm_ctx->per_policy_vote[BBM_TPUT_POLICY] = next_vote;
 }
 
+static void bbm_apply_intf_mode_policy(struct bbm_context *bbm_ctx,
+				       enum QDF_OPMODE intf_mode, bool set)
+{
+	enum bus_bw_level *policy_vote = &bbm_ctx->intf_policy_vote[0];
+	enum bus_bw_level level = BUS_BW_LEVEL_NONE;
+	uint8_t i;
+
+	/*
+	 * To keep the API simple, currently it does not support
+	 * application of same policy more than once.
+	 */
+	switch (intf_mode) {
+	case QDF_PASSTHRU_MODE:
+		policy_vote[intf_mode] = set ? BUS_BW_LEVEL_7 :
+					       BUS_BW_LEVEL_NONE;
+		break;
+	default:
+		return;
+	}
+
+	for (i = 0; i < QDF_MAX_NO_OF_MODE; i++) {
+		if (level < policy_vote[i])
+			level = policy_vote[i];
+	}
+
+	bbm_ctx->per_policy_vote[BBM_INTF_MODE_POLICY] = level;
+}
+
 /**
  * bbm_apply_driver_mode_policy() - Apply driver mode BBM policy
  * @bbm_ctx: bus bw mgr context
@@ -475,6 +503,11 @@ void dp_bbm_apply_independent_policy(struct wlan_objmgr_psoc *psoc,
 					       params->policy_info.usr.user_level);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto done;
+		break;
+	case BBM_INTF_MODE_POLICY:
+		bbm_apply_intf_mode_policy(bbm_ctx,
+					   params->policy_info.intf.intf_mode,
+					   params->policy_info.intf.set);
 		break;
 	default:
 		dp_info("BBM policy %d not handled", params->policy);
@@ -1591,6 +1624,20 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 	}
 }
 
+#ifdef IPA_OPT_WIFI_DP
+static inline
+bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return false;
+}
+#else
+static inline
+bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc);
+}
+#endif
+
 /**
  * dp_pld_request_bus_bandwidth() - Function to control bus bandwidth
  * @dp_ctx: handle to DP context
@@ -1670,12 +1717,12 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	 * only when TPUT can reach VHT80 KPI and IPA is disabled,
 	 * for other cases, follow general voting logic
 	 */
-	if (!ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc) &&
+	if (!dp_ipa_is_fw_wdi_activated(dp_ctx) &&
 	    policy_mgr_is_current_hwmode_dbs(dp_ctx->psoc) &&
 	    (total_pkts > dp_ctx->dp_cfg.bus_bw_dbs_threshold) &&
 	    (tput_level < TPUT_LEVEL_SUPER_HIGH)) {
-		next_vote_level = PLD_BUS_WIDTH_ULTRA_HIGH;
-		tput_level = TPUT_LEVEL_ULTRA_HIGH;
+		next_vote_level = PLD_BUS_WIDTH_MAX;
+		tput_level = TPUT_LEVEL_SUPER_HIGH;
 	}
 
 	param.policy = BBM_TPUT_POLICY;

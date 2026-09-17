@@ -49,6 +49,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_mlo_mgr_peer.h"
+#include "wlan_mlo_mgr_sta.h"
 #include <wlan_cp_stats_chipset_stats.h>
 #include <wlan_cp_stats_ucfg_api.h>
 #ifdef CNSS_GENL
@@ -3977,6 +3978,12 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		return -EBUSY;
 	}
 
+	if (mlo_is_ml_connection_in_progress(hdd_ctx->psoc,
+					     link_info->vdev_id)) {
+		hdd_debug("MLO connection in progress, can't process the request");
+		return -EBUSY;
+	}
+
 	if (wlan_cfg80211_nla_parse(tb_vendor,
 				    QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_MAX,
 				    (struct nlattr *)data, data_len,
@@ -6367,6 +6374,9 @@ static void hdd_get_max_rate_he(struct hdd_station_info *stainfo,
 			if (mcsidx < stats->tx_rate.mcs)
 				mcsidx = stats->tx_rate.mcs;
 		}
+
+		if (mcsidx > MAX_HT_MCS_INDEX)
+			mcsidx = MAX_HT_MCS_INDEX;
 
 		if (rate_flags & TX_RATE_HE160)
 			tmprate =
@@ -9417,6 +9427,42 @@ static int _wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	return errno;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+/**
+ * wlan_hdd_cfg80211_get_station() - get station statistics
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @mac: Pointer to mac
+ * @sinfo: Pointer to station info
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  const uint8_t *mac,
+				  struct station_info *sinfo)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+	struct net_device *dev;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = _wlan_hdd_cfg80211_get_station(wiphy, dev, mac, sinfo);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
 /**
  * wlan_hdd_cfg80211_get_station() - get station statistics
  * @wiphy: Pointer to wiphy
@@ -9427,7 +9473,8 @@ static int _wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
  * Return: 0 for success, non-zero for failure
  */
 int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
-				  struct net_device *dev, const uint8_t *mac,
+				  struct net_device *dev,
+				  const uint8_t *mac,
 				  struct station_info *sinfo)
 {
 	int errno;
@@ -9443,6 +9490,7 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 	return errno;
 }
+#endif
 
 /**
  * __wlan_hdd_cfg80211_dump_station() - dump station statistics
@@ -9529,10 +9577,11 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 	return errno;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
 /**
  * wlan_hdd_cfg80211_dump_station() - dump station statistics
  * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
+ * @wdev: Pointer to wireless device
  * @idx: variable to determine whether to get stats or not
  * @mac: Pointer to mac
  * @sinfo: Pointer to station info
@@ -9540,9 +9589,54 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
  * Return: 0 for success, non-zero for failure
  */
 int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
-				struct net_device *dev,
-				int idx, u8 *mac,
-				struct station_info *sinfo)
+				   struct wireless_dev *wdev,
+				   int idx, u8 *mac,
+				   struct station_info *sinfo)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+	struct net_device *dev;
+
+	dev = hdd_wdev_get_netdev(wdev);
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = wlan_hdd_qmi_get_sync_resume();
+	if (errno) {
+		hdd_err("qmi sync resume failed: %d", errno);
+		goto end;
+	}
+
+	errno = __wlan_hdd_cfg80211_dump_station(wiphy, dev, idx, mac, sinfo);
+
+	wlan_hdd_qmi_put_suspend();
+
+end:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
+/**
+ * wlan_hdd_cfg80211_dump_station() - dump station statistics
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to network device
+ * @idx: variable to station index, kernel iterate all stations over idx
+ * @mac: Pointer to mac
+ * @sinfo: Pointer to station info
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
+				   struct net_device *dev,
+				   int idx, u8 *mac,
+				   struct station_info *sinfo)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -9566,6 +9660,7 @@ end:
 
 	return errno;
 }
+#endif
 
 /**
  * hdd_get_stats() - Function to retrieve interface statistics

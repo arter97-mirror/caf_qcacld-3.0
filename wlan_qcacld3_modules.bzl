@@ -2615,6 +2615,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
         },
         {
+            "pattern": "NL80211_EXT_FEATURE_ROC_ADDR_FILTER",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC",
+        },
+        {
+            "pattern": "(*add_key)(struct wiphy *wiphy, struct wireless_dev *wdev,",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV",
+        },
+        {
             "pattern": "struct link_station_parameters",
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_LINK_STA_PARAMS_PRESENT",
@@ -2640,6 +2650,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "WLAN_FEATURE_11BE_MLO_TTLM",
         },
         {
+            "pattern": "NL80211_CMD_START_PD",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_PD_SUPPORT",
+        },
+        {
             "pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
             "file": "include/net/mac80211.h",
             "flag": "CFG80211_RU_PUNC_CHANDEF",
@@ -2652,21 +2667,25 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     ]
 
     cmd = 'touch "$@"\n'
+    if target != "sa510m" and target != "pineapple":
+        grep_path = "common"
+    else:
+        grep_path = "msm-kernel"
     for feature_grep in feature_grep_map:
         cmd += """
-          if grep -qF "{pattern}" $(location //common:{file}); then
-            echo "#define {flag} (1)" >> "$@"
-          fi
+            if grep -qF "{pattern}" $(location //{grep_path}:{file}); then
+                echo "#define {flag} (1)" >> "$@"
+            fi
         """.format(
             pattern = feature_grep["pattern"],
+            grep_path = grep_path,
             file = feature_grep["file"],
             flag = feature_grep["flag"],
         )
 
     grepSrcFiles = []
     for e in feature_grep_map:
-        grepSrcFiles.append("//common:{}".format(e["file"]))
-
+        grepSrcFiles.append("//{}:{}".format(grep_path, e["file"]))
     depsetSrc = depset(grepSrcFiles)
     native.genrule(
         name = "{}_grep_defines".format(tvc),

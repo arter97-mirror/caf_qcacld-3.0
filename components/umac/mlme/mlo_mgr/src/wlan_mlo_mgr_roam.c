@@ -1425,12 +1425,6 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 	if (!assoc_vdev->mlo_dev_ctx || !assoc_vdev->mlo_dev_ctx->sta_ctx)
 		return QDF_STATUS_E_FAILURE;
 
-	if (wlan_cm_is_vdev_roaming(assoc_vdev)) {
-		mlo_err("Assoc vdev is in roaming state, ignore connect req");
-		status = QDF_STATUS_SUCCESS;
-		goto err;
-	}
-
 	sta_ctx = assoc_vdev->mlo_dev_ctx->sta_ctx;
 
 	wlan_vdev_mlme_get_ssid(assoc_vdev, ssid.ssid,
@@ -1622,6 +1616,7 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	uint8_t i;
 	uint8_t assoc_vdev_id;
 	uint8_t link_vdev_id;
+	bool is_host_4way_hs_supported = false;
 
 	if (!psoc)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -1659,7 +1654,9 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	rsp = sta_ctx->copied_reassoc_rsp;
 	partner_info = rsp->ml_parnter_info;
 	mlo_debug("partner links %d", partner_info.num_partner_links);
-
+	is_host_4way_hs_supported =
+		wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 	for (i = 0; i < partner_info.num_partner_links; i++) {
 		link_vdev_id = partner_info.partner_link_info[i].vdev_id;
 		if (assoc_vdev_id == link_vdev_id)
@@ -1677,6 +1674,14 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 			status = mlo_roam_prepare_and_send_link_connect_req(assoc_vdev,
 							link_vdev, rsp,
 							&partner_info.partner_link_info[i]);
+
+			if (QDF_IS_STATUS_ERROR(status) &&
+			    wlan_cm_is_vdev_roaming(assoc_vdev) &&
+			    is_host_4way_hs_supported) {
+				status = QDF_STATUS_SUCCESS;
+				goto err;
+			}
+
 			if (QDF_IS_STATUS_ERROR(status))
 				goto err;
 			else {

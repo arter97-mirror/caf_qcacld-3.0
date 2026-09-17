@@ -627,6 +627,7 @@ lim_fill_ft_session(struct mac_context *mac,
 	tSchBeaconStruct *pBeaconStruct;
 	uint8_t cb_mode;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct cm_roam_values_copy config = {};
 
 	pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
 	if (!pBeaconStruct)
@@ -846,6 +847,14 @@ lim_fill_ft_session(struct mac_context *mac,
 		mac->mlme_cfg->ht_caps.enable_smps,
 		mac->mlme_cfg->ht_caps.smps,
 		ft_session->supported_nss_1x1);
+
+	if (pbssDescription->adaptive_11r_ap)
+		ft_session->is_adaptive_11r_connection =
+			wlan_get_adaptive_11r_enabled(&mac->mlme_cfg->lfr);
+
+	config.bool_value = ft_session->is_adaptive_11r_connection;
+	wlan_cm_roam_cfg_set_value(mac->psoc, ft_session->vdev_id,
+				   ADAPTIVE_11R_CONNECTION, &config);
 
 exit:
 	qdf_mem_free(pBeaconStruct);

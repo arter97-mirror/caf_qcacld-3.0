@@ -3253,6 +3253,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_mlo_roam_copy_partner_info_to_session(ft_session_ptr,
 						  roam_sync_ind_ptr);
 
+	mgmt_txrx_frame_hex_dump((uint8_t *)roam_sync_ind_ptr +
+				  roam_sync_ind_ptr->reassoc_req_offset,
+				  roam_sync_ind_ptr->reassoc_req_length, true);
 	reassoc_resp = (uint8_t *)roam_sync_ind_ptr +
 			roam_sync_ind_ptr->reassoc_resp_offset;
 	mgmt_txrx_frame_hex_dump(reassoc_resp,
@@ -4326,7 +4329,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct scan_cache_entry *cache_entry;
-	struct wlan_channel channel;
+	struct wlan_channel channel = {0};
 	bool is_security_allowed;
 
 	pdev = mac_ctx->pdev;
@@ -5655,11 +5658,26 @@ void lim_passthru_peer_del(struct mac_context *mac,
 		 msg->vdev_id,
 		 QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
 
-	status = lim_del_sta(mac, sta, false, session);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		lim_delete_dph_hash_entry(mac, sta->staAddr, aid, session);
-		lim_release_peer_idx(mac, aid, session);
-	} else {
+	/*
+	 * fRespReqd=true arms LIM's defer gate (SET_LIM_PROCESS_DEFD_MESGS)
+	 * so a subsequent passthru NEW/UPDATE/DEL on this vdev is queued in
+	 * LIM's deferred queue instead of racing ahead while this delete is
+	 * still outstanding at WMA/FW -- mirrors the wait already added on
+	 * the NEW (peer create) path.
+	 *
+	 * DPH entry/AID release happens in lim_process_passthru_del_sta_rsp()
+	 * once the real WMA_DELETE_STA_RSP arrives -- not here -- so the MAC
+	 * cannot be reused by a NEW before the delete actually completes at
+	 * FW.
+	 */
+	status = lim_del_sta(mac, sta, true, session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		/*
+		 * lim_del_sta() re-arms LIM message processing itself when
+		 * posting WMA_DELETE_STA_REQ fails, so no cleanup is needed
+		 * here on that path. A NOMEM failure inside lim_del_sta()
+		 * never armed the gate to begin with.
+		 */
 		pe_err("vdev:%d lim_del_sta failed: %d",
 		       msg->vdev_id, status);
 		QDF_ASSERT(0);

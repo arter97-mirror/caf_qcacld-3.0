@@ -812,6 +812,8 @@ void wlan_cm_set_psk_pmk(struct wlan_objmgr_pdev *pdev,
 		qdf_mem_copy(rso_cfg->psk_pmk, psk_pmk, pmk_len);
 	rso_cfg->pmk_len = pmk_len;
 
+	mlme_debug("session PMK updated: vdev_id:%d pmk_len:%d",
+		   vdev_id, pmk_len);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
 			   rso_cfg->psk_pmk, WLAN_MAX_PMK_DUMP_BYTES);
 
@@ -2227,6 +2229,7 @@ void wlan_cm_fill_crypto_filter_from_vdev(struct wlan_objmgr_vdev *vdev,
 	filter->mcastcipherset = rso_cfg->orig_sec_info.mcastcipherset;
 	filter->ucastcipherset = rso_cfg->orig_sec_info.ucastcipherset;
 	filter->key_mgmt = rso_cfg->orig_sec_info.key_mgmt;
+	filter->enable_adaptive_11r = rso_cfg->is_adaptive_11r_connection;
 }
 
 static void cm_dump_occupied_chan_list(struct wlan_chan_list *occupied_ch)
@@ -3205,11 +3208,22 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_debug("Failed to update params in rso_config struct");
 
-	status = mlme_cm_osif_get_vendor_handoff_params(psoc,
+	/*
+	 * For user-triggered requests (non-NULL context), signal the waiting
+	 * thread via the osif callback so hdd_cm_get_handoff_param() can
+	 * return the result to the caller.
+	 *
+	 * For deferred fire-and-forget requests (NULL context, triggered by
+	 * cm_roam_trigger_deferred_vendor_handoff()), no thread is waiting —
+	 * skip the osif callback.
+	 *
+	 * Always reset req_in_progress so future requests are not blocked.
+	 */
+	if (vendor_handoff_context) {
+		status = mlme_cm_osif_get_vendor_handoff_params(psoc,
 							vendor_handoff_context);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_debug("Failed to free vendor handoff request");
-		return;
+		if (QDF_IS_STATUS_ERROR(status))
+			mlme_debug("Failed to notify vendor handoff request");
 	}
 
 	mlme_debug("Reset vendor handoff req in progress context");

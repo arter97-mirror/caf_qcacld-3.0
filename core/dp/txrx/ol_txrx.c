@@ -4620,6 +4620,36 @@ static void ol_txrx_disp_peer_stats(ol_txrx_pdev_handle pdev)
 }
 #endif
 
+/**
+ * ol_txrx_print_per_ce_stats() - Display Rx packets per CE, per core
+ * @pdev: the physical device the packets were received on
+ *
+ * Return: none
+ */
+static void ol_txrx_print_per_ce_stats(struct ol_txrx_pdev_t *pdev)
+{
+	uint8_t ce_id;
+	uint16_t core;
+	uint64_t total_packets;
+
+	txrx_nofl_info("Rx packets per CE:");
+	for (ce_id = 0; ce_id < OL_TXRX_CE_COUNT_MAX; ce_id++) {
+		total_packets = 0;
+		txrx_nofl_info("Packets on CE id %u:", ce_id);
+		for (core = 0; core < num_possible_cpus(); core++) {
+			if (!pdev->stats.priv.rx.ce_packets[core][ce_id])
+				continue;
+			txrx_nofl_info("Packets arriving on core %u: %llu",
+				       core,
+				       pdev->stats.priv.rx.ce_packets[core][ce_id]);
+			total_packets +=
+				pdev->stats.priv.rx.ce_packets[core][ce_id];
+		}
+		txrx_nofl_info("Total packets on CE id %u: %llu",
+			       ce_id, total_packets);
+	}
+}
+
 void ol_txrx_stats_display(ol_txrx_pdev_handle pdev,
 			   enum qdf_stats_verbosity_level level)
 {
@@ -4867,6 +4897,7 @@ ol_txrx_display_stats(struct cdp_soc_t *soc_hdl, uint16_t value,
 	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(
 							soc,
 							OL_TXRX_PDEV_ID);
+	struct hif_opaque_softc *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!pdev) {
@@ -4879,8 +4910,15 @@ ol_txrx_display_stats(struct cdp_soc_t *soc_hdl, uint16_t value,
 	case CDP_TXRX_PATH_STATS:
 		ol_txrx_stats_display(pdev, verb_level);
 		break;
+	case CDP_RX_RING_STATS:
+		ol_txrx_print_per_ce_stats(pdev);
+		break;
 	case CDP_TXRX_TSO_STATS:
 		ol_txrx_stats_display_tso(pdev);
+		break;
+	case CDP_DP_NAPI_STATS:
+		if (hif_ctx)
+			hif_print_napi_stats(hif_ctx);
 		break;
 	case CDP_DUMP_TX_FLOW_POOL_INFO:
 		if (verb_level == QDF_STATS_VERBOSITY_LEVEL_LOW)

@@ -849,6 +849,41 @@ int tdls_set_cap(struct tdls_vdev_priv_obj *tdls_vdev, const uint8_t *mac,
 	return 0;
 }
 
+/**
+ * tdls_validate_discovery_request() - validate TDLS discovery request
+ * @tdls_vdev: tdls vdev object
+ * @peer_mac: peer MAC address
+ *
+ * This function validates if discovery request should be allowed based on
+ * discovery attempt counter. It checks if the peer has exceeded the maximum
+ * allowed discovery attempts (unless it's a forced peer).
+ *
+ * Return: 0 if discovery is allowed, -EPERM if discovery attempts exceeded
+ */
+static int tdls_validate_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev,
+					   const uint8_t *peer_mac)
+{
+	struct tdls_peer *curr_peer;
+
+	curr_peer = tdls_find_peer(tdls_vdev, peer_mac);
+	if (!curr_peer)
+		return 0;
+
+	/* Allow discovery for forced peers or if attempts not exceeded */
+	if (curr_peer->is_forced_peer ||
+	    curr_peer->discovery_attempt <
+	    tdls_vdev->threshold_config.discovery_tries_n)
+		return 0;
+
+	tdls_err("Discovery attempts exceeded for peer " QDF_MAC_ADDR_FMT
+		 " attempts:%d threshold:%d",
+		 QDF_MAC_ADDR_REF(peer_mac),
+		 curr_peer->discovery_attempt,
+		 tdls_vdev->threshold_config.discovery_tries_n);
+
+	return -EPERM;
+}
+
 static int tdls_validate_setup_frames(struct tdls_soc_priv_obj *tdls_soc,
 				struct tdls_validate_action_req *tdls_validate)
 {
@@ -1035,6 +1070,12 @@ int tdls_validate_mgmt_request(struct tdls_action_frame_request *tdls_mgmt_req)
 			tdls_set_cap(tdls_vdev, tdls_validate->peer_mac,
 					      TDLS_CAP_SUPPORTED);
 	}
+
+	/* Validate discovery counter for TDLS_DISCOVERY_REQUEST */
+	if (TDLS_DISCOVERY_REQUEST == tdls_validate->action_code)
+		return tdls_validate_discovery_request(tdls_vdev,
+						       tdls_validate->peer_mac);
+
 	return 0;
 }
 

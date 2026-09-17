@@ -106,6 +106,7 @@ void wlan_hdd_stop_cfr(uint8_t vdev_id, uint32_t reason);
  * @oui_length: OUI length
  * @oui: vendor OUI
  * @format_version: Format version
+ * @report_only_last_frame: report only the latest frame per MAC each interval
  */
 struct cfr_v3_params {
 	bool is_start_capture;
@@ -121,6 +122,7 @@ struct cfr_v3_params {
 	uint8_t oui_length;
 	uint8_t oui[MAX_CFR_OUI_LEN];
 	uint8_t format_version;
+	bool report_only_last_frame;
 };
 
 /**

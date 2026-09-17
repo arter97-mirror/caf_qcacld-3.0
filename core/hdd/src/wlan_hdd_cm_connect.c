@@ -167,6 +167,19 @@ bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info)
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_roaming;
 	enum QDF_OPMODE opmode;
+	bool is_host_4way_hs_supported = false;
+	bool key_exchng_in_prog = false;
+	struct hdd_adapter *adapter = link_info->adapter;
+	mac_handle_t mac_handle;
+
+	if (hdd_validate_adapter(adapter))
+		return false;
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return false;
+	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
@@ -178,6 +191,16 @@ bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info)
 		return false;
 	}
 	is_vdev_roaming = ucfg_cm_is_vdev_roaming(vdev);
+	is_host_4way_hs_supported =
+			wlan_psoc_nif_fw_ext2_cap_get(wlan_vdev_get_psoc(vdev),
+						      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
+	key_exchng_in_prog =
+			sme_is_sta_key_exchange_in_progress(mac_handle,
+							    link_info->vdev_id);
+	if (!is_vdev_roaming &&
+	    is_host_4way_hs_supported &&
+	    key_exchng_in_prog)
+		is_vdev_roaming = true;
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
 
@@ -2083,6 +2106,17 @@ QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
 	status = ucfg_cm_roam_send_vendor_handoff_param_req(psoc, vdev_id,
 							param_id,
 							vendor_handoff_context);
+	if (status == QDF_STATUS_E_AGAIN) {
+		/*
+		 * RSO is not enabled; fetch was deferred by the core layer
+		 * (pending_fetch flag set). Return success so the caller
+		 * (NCHO enable path) does not fail — the fetch will be
+		 * triggered automatically when RSO is re-enabled.
+		 */
+		hdd_debug("vendor handoff fetch deferred, RSO not enabled");
+		status = QDF_STATUS_SUCCESS;
+		goto error;
+	}
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Unable to get vendor handoff param");
 		goto error;

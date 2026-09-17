@@ -136,27 +136,22 @@ void hdd_tx_timeout(struct net_device *dev);
  * Return: None
  */
 void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf);
-
-/**
- * hdd_get_tsf_time_cb() - HDD helper function to get TSF time
- * @netdev: netdev
- * @input_time: Input time
- * @tsf_time: time from TFS module
- *
- * Return: None
- */
-void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
-			 uint64_t *tsf_time);
 #else
 static inline
 void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf) { }
 
-static inline
-void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
-			 uint64_t *tsf_time)
-{
-}
 #endif
+
+/**
+ * hdd_get_tsf_time_cb() - HDD helper function to get TSF time
+ * @netdev: netdev
+ * @qtime: qtime
+ * @tsf_time: time from TFS module
+ *
+ * Return: None
+ */
+void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t qtime,
+			 uint64_t *tsf_time);
 
 /**
  * hdd_legacy_gro_get_napi() - HDD function to get napi in legacy gro case

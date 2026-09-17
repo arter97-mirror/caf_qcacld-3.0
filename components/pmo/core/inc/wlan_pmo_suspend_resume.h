@@ -119,6 +119,21 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 					     pmo_pld_auto_resume_cb pld_cb);
+
+/**
+ * pmo_core_psoc_apply_tbtt_nack_rtpm_delay(): arm the RTPM TBTT-nack delay
+ * @psoc: objmgr psoc
+ *
+ * Consumes the TBTT nack flag set by the just-completed runtime suspend
+ * attempt (if any) and, when set, shortens the RTPM autosuspend delay so
+ * the next suspend attempt is retried soon after the TBTT window has
+ * passed. Must be called only after the runtime suspend attempt (and any
+ * WMI traffic it generated) has fully returned, so the shortened delay is
+ * not immediately reset by that same attempt's own WMI activity.
+ *
+ * Return: none
+ */
+void pmo_core_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc);
 #endif
 
 /**
