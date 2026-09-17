@@ -1649,12 +1649,13 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 		wmi_fill_default_roam_trigger_parameters(&trigger_parameters[i],
 							 i);
 
-	/* Fill WTC roam trigger parameters */
+	/* Fill vendor BTM roam trigger parameters */
 	roam_trigger_parameters =
 		&trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM];
 	roam_trigger_parameters->trigger_reason =
 				WMI_ROAM_TRIGGER_REASON_WTC_BTM;
-	if (triggers->vendor_btm_param.user_roam_reason == 0)
+	if (triggers->vendor_btm_param.user_roam_reason !=
+			VENDOR_BTM_REASON_NOT_SUPPORTED)
 		roam_trigger_parameters->enable = 1;
 
 	roam_trigger_parameters->scan_mode =
@@ -1671,7 +1672,7 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 			triggers->roam_score_delta;
 	roam_trigger_parameters->reason_code =
 			triggers->vendor_btm_param.user_roam_reason;
-	wmi_debug("WTC_BTM: enable:%d scan_mode:%d rssi_thres:%d cand_min_rssi_thres:%d cand_ap_min_rssi_thres: 2.4 Ghz[%d] 5 Ghz[%d], 6 Ghz[%d] reason_code:%d",
+	wmi_debug("VENDOR_BTM: enable:%d scan_mode:%d rssi_thres:%d cand_min_rssi_thres:%d cand_ap_min_rssi_thres: 2.4 Ghz[%d] 5 Ghz[%d], 6 Ghz[%d] reason_code:%d",
 		  roam_trigger_parameters->enable,
 		  roam_trigger_parameters->scan_mode,
 		  roam_trigger_parameters->trigger_rssi_threshold,

@@ -117,9 +117,6 @@
 
 #define FW_ROAM_SYNC_TIMEOUT 7000
 
-/* Default value of WTC reason code */
-#define DISABLE_VENDOR_BTM_CONFIG 2
-
 #define VENDOR_ROAM_SCORE_ALGORITHM_1 1
 
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -973,6 +970,28 @@ struct wlan_roam_offload_init_params {
 };
 
 /**
+ * enum wlan_vendor_btm_reason_code - Vendor BTM reason codes
+ * @VENDOR_BTM_REASON_MOVE_TO_CELLULAR: Move to cellular network
+ * @VENDOR_BTM_REASON_UNSPECIFIED: Unspecified reason
+ * @VENDOR_BTM_REASON_NOT_SUPPORTED: BTM not supported (disables vendor BTM)
+ * @VENDOR_BTM_REASON_NO_CELLULAR_NETWORK: No cellular network available
+ * @VENDOR_BTM_REASON_CONTROLLED_BY_FRAMEWORK: Controlled by framework
+ * @VENDOR_BTM_REASON_ROAM_TO_BETTER_AP: Roam to better AP
+ * @VENDOR_BTM_REASON_SUSPEND_MODE: Device in suspend mode
+ * @VENDOR_BTM_REASON_RSSI_IS_STRONG_ENOUGH: RSSI is strong enough
+ */
+enum wlan_vendor_btm_reason_code {
+	VENDOR_BTM_REASON_MOVE_TO_CELLULAR = 0,
+	VENDOR_BTM_REASON_UNSPECIFIED = 1,
+	VENDOR_BTM_REASON_NOT_SUPPORTED = 2,
+	VENDOR_BTM_REASON_NO_CELLULAR_NETWORK = 3,
+	VENDOR_BTM_REASON_CONTROLLED_BY_FRAMEWORK = 4,
+	VENDOR_BTM_REASON_ROAM_TO_BETTER_AP = 5,
+	VENDOR_BTM_REASON_SUSPEND_MODE = 6,
+	VENDOR_BTM_REASON_RSSI_IS_STRONG_ENOUGH = 7,
+};
+
+/**
  * struct wlan_cm_roam_vendor_btm_params - vendor config roam control param
  * @scan_freq_scheme: scan frequency scheme from enum
  * qca_roam_scan_freq_scheme
@@ -984,8 +1003,10 @@ struct wlan_roam_offload_init_params {
  * band
  * @candidate_rssi_threshold_6g: RSSI threshold of the candidate AP in 6Ghz
  * band
- * @user_roam_reason: Roam triggered reason code, value zero is for enable
- * and non zero value is disable
+ * @user_roam_reason: Vendor BTM reason code from
+ * enum wlan_vendor_btm_reason_code. VENDOR_BTM_REASON_NOT_SUPPORTED (2)
+ * disables vendor BTM, other values configure vendor BTM with the
+ * specified reason code
  */
 struct wlan_cm_roam_vendor_btm_params {
 	uint32_t scan_freq_scheme;
@@ -1279,7 +1300,7 @@ enum eroam_frame_status {
  * @ROAM_TRIGGER_REASON_IDLE: Roam triggered due to inactivity of the device.
  * @ROAM_TRIGGER_REASON_STA_KICKOUT: Roam triggered due to sta kickout event.
  * @ROAM_TRIGGER_REASON_ESS_RSSI: Roam triggered due to ess rssi
- * @ROAM_TRIGGER_REASON_WTC_BTM: Roam triggered due to WTC BTM
+ * @ROAM_TRIGGER_REASON_WTC_BTM: Roam triggered due to vendor BTM
  * @ROAM_TRIGGER_REASON_PMK_TIMEOUT: Roam triggered due to PMK expiry
  * @ROAM_TRIGGER_REASON_BTC: Roam triggered due to BT Coex
  * @ROAM_TRIGGER_REASON_MAX: Maximum number of roam triggers
