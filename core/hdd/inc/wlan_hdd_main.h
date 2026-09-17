@@ -6013,7 +6013,7 @@ void hdd_netdev_update_features(struct hdd_adapter *adapter);
  */
 int hdd_stop_no_trans(struct net_device *dev);
 
-#if defined(CLD_PM_QOS)
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_DP_BUS_BANDWIDTH)
 /**
  * wlan_hdd_set_pm_qos_request() - Function to set pm_qos config in wlm mode
  * @hdd_ctx: HDD context
