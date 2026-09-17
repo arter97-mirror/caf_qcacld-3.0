@@ -344,6 +344,11 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
 	    (type == SIR_MAC_MGMT_FRAME &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
+		if (!len || len > MAX_MGMT_MPDU_LEN) {
+			hdd_err("Invalid auth frame len %zu", len);
+			return -EINVAL;
+		}
+
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
 			   TRACE_CODE_HDD_SEND_MGMT_TX, adapter->vdev_id, 0);
 
