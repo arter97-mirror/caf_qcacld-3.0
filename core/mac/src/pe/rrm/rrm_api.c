@@ -60,6 +60,14 @@
 
 /* Max passive scan dwell for wide band rrm scan, in milliseconds */
 #define RRM_SCAN_MAX_DWELL_TIME 110
+/* -------------------------------------------------------------------- */
+
+/* Define for beacon report frame sizeof(tSirMacRadioMeasureReport)*5 */
+#ifdef CONFIG_SDIO
+#define MAX_BR_MGMT_MPDU_LEN 1280
+#else
+#define MAX_BR_MGMT_MPDU_LEN MAX_MGMT_MPDU_LEN
+#endif
 
 /**
  * rrm_cache_mgmt_tx_power() - Store Tx power for management frames.
@@ -1853,8 +1861,8 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 		populated_beacon_report_size = (i * radio_meas_rpt_size);
 
 		/* Calculate num of mgmt frames to send */
-		num_frames = populated_beacon_report_size / MAX_MGMT_MPDU_LEN;
-		if (populated_beacon_report_size % MAX_MGMT_MPDU_LEN)
+		num_frames = populated_beacon_report_size / MAX_BR_MGMT_MPDU_LEN;
+		if (populated_beacon_report_size % MAX_BR_MGMT_MPDU_LEN)
 			num_frames++;
 
 		/* Calculate num of maximum mgmt reports per frame */
@@ -1862,7 +1870,8 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 			sizeof(tDot11fIEMeasurementReport) +
 			qdf_offsetof(tDot11fRadioMeasurementReport,
 				     MeasurementReport);
-		max_reports_in_frame = MAX_MGMT_MPDU_LEN / dot11_meas_rpt_size;
+		max_reports_in_frame = MAX_BR_MGMT_MPDU_LEN / dot11_meas_rpt_size;
+
 
 		for (j = 0; j < num_frames; j++) {
 			num_reports_in_frame = QDF_MIN(i - report_index,
