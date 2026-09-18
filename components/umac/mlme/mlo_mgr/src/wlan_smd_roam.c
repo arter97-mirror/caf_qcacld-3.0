@@ -4083,7 +4083,28 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
 
 bool smd_roam_skip_rso(struct wlan_objmgr_vdev *vdev)
 {
-	return cm_is_vdev_smd_roam_sync_in_progress(vdev);
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t active_vdev_id;
+
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->smd_ctx)
+		return false;
+
+	if (cm_is_vdev_smd_roam_sync_in_progress(vdev))
+		return true;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (smd_get_active_link_count(mlo_dev_ctx, &active_vdev_id) == 1 &&
+	    active_vdev_id != wlan_vdev_get_id(vdev) &&
+	    wlan_vdev_mlme_get_is_mlo_vdev(psoc, active_vdev_id)) {
+		mlo_debug("SMD: vdev %d is stale, current assoc vdev is %d, skip RSO stop",
+			  wlan_vdev_get_id(vdev), active_vdev_id);
+		return true;
+	}
+
+	return false;
 }
 
 QDF_STATUS
