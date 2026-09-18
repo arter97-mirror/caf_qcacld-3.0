@@ -3279,42 +3279,157 @@ smd_get_roam_topology(struct wlan_objmgr_vdev *vdev)
 	return mlo_dev_ctx->link_recfg_ctx->roam_topology;
 }
 
+/**
+ * smd_get_vdev_repurpose_req() - Find the SMD request for a vdev
+ * @vdev: vdev whose repurpose request is required
+ *
+ * Flow-pool callbacks are delivered with a vdev ID, while the SMD topology
+ * describes the complete MLD transition. Look up the matching request so map
+ * and unmap decisions can distinguish a cleanup-only vdev from a vdev that is
+ * being cleaned up and brought up again.
+ *
+ * Return: matching request, or NULL if no request is present
+ */
+static struct smd_vdev_repurpose_req *
+smd_get_vdev_repurpose_req(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_recfg_context *recfg_ctx;
+	uint8_t vdev_id;
+	uint8_t i;
+
+	if (!vdev)
+		return NULL;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->link_recfg_ctx)
+		return NULL;
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	for (i = 0; i < recfg_ctx->num_vdev_repurpose_req &&
+	     i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (!recfg_ctx->vdev_repurpose_req[i].is_valid)
+			continue;
+
+		if (recfg_ctx->vdev_repurpose_req[i].vdev_id == vdev_id)
+			return &recfg_ctx->vdev_repurpose_req[i];
+	}
+
+	return NULL;
+}
+
+/**
+ * smd_log_flow_pool_decision() - Log a per-vdev flow-pool decision
+ * @vdev: vdev associated with the callback
+ * @operation: map or unmap operation
+ * @topology: detected SMD roam topology
+ * @req: matching repurpose request, if available
+ * @allow: whether the callback should continue
+ */
+static void
+smd_log_flow_pool_decision(struct wlan_objmgr_vdev *vdev,
+			   const char *operation,
+			   enum smd_roam_topology_type topology,
+			   struct smd_vdev_repurpose_req *req,
+			   bool allow)
+{
+	mlo_debug("SMD: flow pool %s vdev=%u topology=%s cleanup=%u "
+		  "bringup=%u inactive=%u decision=%s",
+		  operation, vdev ? wlan_vdev_get_id(vdev) : WLAN_INVALID_VDEV_ID,
+		  smd_roam_topology_str(topology), req ? req->cleanup_vdev : 0,
+		  req ? req->bringup_vdev : 0,
+		  req ? req->inactive_link_pre_stop : 0,
+		  allow ? "allow" : "skip");
+}
+
 bool
 smd_roam_requires_flow_pool_map(struct wlan_objmgr_vdev *vdev)
 {
+	struct smd_vdev_repurpose_req *req;
+	enum smd_roam_topology_type topology;
+	bool allow;
+
 	if (!smd_is_roaming_in_progress(vdev))
 		return false;
 
-	switch (smd_get_roam_topology(vdev)) {
-	case SMD_ROAM_TOPO_ML_TO_ML:
-	case SMD_ROAM_TOPO_ML_TO_SL:
-		/* both/surviving link vdev(s) are already mapped */
-		return false;
-	default:
-		/* SL_TO_SL, SL_TO_ML add a vdev that needs mapping;
-		 * UNKNOWN (pre-M2) falls back to the permissive default.
-		 */
+	topology = smd_get_roam_topology(vdev);
+	if (topology == SMD_ROAM_TOPO_UNKNOWN) {
+		smd_log_flow_pool_decision(vdev, "map", topology, NULL, true);
 		return true;
 	}
+
+	req = smd_get_vdev_repurpose_req(vdev);
+	if (topology == SMD_ROAM_TOPO_SL_TO_SL) {
+		smd_log_flow_pool_decision(vdev, "map", topology, req, true);
+		return true;
+	}
+
+	if (!req) {
+		smd_log_flow_pool_decision(vdev, "map", topology, NULL, false);
+		return false;
+	}
+
+	switch (topology) {
+	case SMD_ROAM_TOPO_SL_TO_ML:
+		allow = req->bringup_vdev && !req->cleanup_vdev;
+		break;
+	case SMD_ROAM_TOPO_ML_TO_ML:
+	case SMD_ROAM_TOPO_ML_TO_SL:
+		allow = false;
+		break;
+	default:
+		allow = true;
+		break;
+	}
+
+	smd_log_flow_pool_decision(vdev, "map", topology, req, allow);
+	return allow;
 }
 
 bool
 smd_roam_requires_flow_pool_unmap(struct wlan_objmgr_vdev *vdev)
 {
+	struct smd_vdev_repurpose_req *req;
+	enum smd_roam_topology_type topology;
+	bool allow;
+
 	if (!smd_is_roaming_in_progress(vdev))
 		return false;
 
-	switch (smd_get_roam_topology(vdev)) {
-	case SMD_ROAM_TOPO_ML_TO_ML:
-	case SMD_ROAM_TOPO_SL_TO_ML:
-		/* no link vdev is being dropped */
-		return false;
-	default:
-		/* SL_TO_SL, ML_TO_SL drop a vdev that needs unmapping;
-		 * UNKNOWN (pre-M2) falls back to the permissive default.
-		 */
+	topology = smd_get_roam_topology(vdev);
+	if (topology == SMD_ROAM_TOPO_UNKNOWN) {
+		smd_log_flow_pool_decision(vdev, "unmap", topology, NULL, true);
 		return true;
 	}
+
+	req = smd_get_vdev_repurpose_req(vdev);
+	if (topology == SMD_ROAM_TOPO_SL_TO_SL) {
+		smd_log_flow_pool_decision(vdev, "unmap", topology, req, true);
+		return true;
+	}
+
+	if (!req) {
+		smd_log_flow_pool_decision(vdev, "unmap", topology, NULL, false);
+		return false;
+	}
+
+	switch (topology) {
+	case SMD_ROAM_TOPO_SL_TO_ML:
+	case SMD_ROAM_TOPO_ML_TO_ML:
+		allow = false;
+		break;
+	case SMD_ROAM_TOPO_ML_TO_SL:
+		allow = req->cleanup_vdev && !req->bringup_vdev;
+		break;
+	default:
+		allow = true;
+		break;
+	}
+
+	smd_log_flow_pool_decision(vdev, "unmap", topology, req, allow);
+	return allow;
 }
 
 void
@@ -4277,6 +4392,9 @@ smd_link_recfg_ctx_cleanup(struct mlo_link_recfg_context *recfg_ctx)
 	qdf_mem_zero(&recfg_ctx->smd_transition_ie,
 		     sizeof(recfg_ctx->smd_transition_ie));
 	recfg_ctx->tgt_ap_link_bitmap = 0;
+	recfg_ctx->roam_topology = SMD_ROAM_TOPO_UNKNOWN;
+	recfg_ctx->num_src_active_links = 0;
+	recfg_ctx->num_dst_accepted_links = 0;
 	recfg_ctx->smd_roam_in_progress = false;
 	recfg_ctx->current_link_index = 0;
 	recfg_ctx->st_exec_in_progress = false;
