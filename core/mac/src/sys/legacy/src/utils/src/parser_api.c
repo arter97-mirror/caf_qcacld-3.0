@@ -1532,12 +1532,16 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
 			pDot11f->supportedChannelWidthSet = 0;
-		} else {
-			if (pe_session->ch_width <= CH_WIDTH_80MHZ)
-				pDot11f->supportedChannelWidthSet = 0;
-		}
+
+		if (pe_session->ch_width < CH_WIDTH_80MHZ ||
+		    (pe_session->ch_width == CH_WIDTH_80MHZ &&
+		     wlan_mlme_get_max_curr_bw(
+				mac->pdev,
+				pe_session->curr_op_freq,
+				pe_session->ch_width) < CH_WIDTH_160MHZ))
+			pDot11f->supportedChannelWidthSet = 0;
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -12783,6 +12787,12 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &mlo_ie_ptr->mlo_ie.common_info_length);
+
+	if (mlo_ie_ptr->mlo_ie.common_info_length > ml_ie_total_len) {
+		pe_err("common info length greater than mlie length %u %u",
+		       mlo_ie_ptr->mlo_ie.common_info_length, ml_ie_total_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
 		   mlo_ie_ptr->mlo_ie.common_info_length;

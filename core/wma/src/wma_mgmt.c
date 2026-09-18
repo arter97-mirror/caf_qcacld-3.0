@@ -1983,8 +1983,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		cmd->peer_nss = WMA_MAX_NSS;
 	}
 
-	wma_populate_peer_he_cap(cmd, params);
-	wma_populate_peer_eht_cap(cmd, params);
+	wma_populate_peer_he_cap(cmd, params, mac->pdev);
+	wma_populate_peer_eht_cap(cmd, params, mac->pdev);
 	wma_populate_peer_puncture(cmd, des_chan);
 	wma_populate_peer_mlo_cap(cmd, params);
 
