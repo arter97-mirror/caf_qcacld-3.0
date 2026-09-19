@@ -4848,7 +4848,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsn_sel %d, ft11r %d, mlo %d, eht %d, fils %d nonce:%d",
+	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsn_sel %d, ft11r %d, mlo %d, eht %d, uhr %d, fils %d nonce:%d",
 		 pe_session->dot11mode, extr_ext_flag,
 		 is_open_auth, mbo_ie_len,
 		 vendor_ie_len,
@@ -4856,6 +4856,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		 adaptive_11r_ie_len,
 		 mlo_ie_len,
 		 eht_cap_ie_len,
+		 uhr_cap_ie_len,
 		 fils_hlp_ie_len, nonce_ie_len);
 
 	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d",

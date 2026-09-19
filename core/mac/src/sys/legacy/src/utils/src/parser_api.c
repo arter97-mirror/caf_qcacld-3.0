@@ -4702,11 +4702,11 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 	sir_convert_assoc_req_frame2_smd_struct(pFrame, nFrame,
 						ar, pAssocReq);
 
-	pe_debug("ht %d vht %d opmode %d vendor vht %d he %d he 6ghband %d eht %d",
+	pe_debug("ht %d vht %d opmode %d vendor vht %d he %d he 6ghband %d eht %d uhr %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->OperatingMode.present, ar->vendor_vht_ie.VHTCaps.present,
 		 ar->he_cap.present, ar->he_6ghz_band_cap.present,
-		 ar->eht_cap.present);
+		 ar->eht_cap.present, ar->uhr_cap.present);
 
 	qdf_mem_free(ar);
 	return STATUS_SUCCESS;
@@ -5558,13 +5558,13 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 						 frame_len,
 						 ar, pAssocRsp);
 	sir_copy_assoc_rsp_security_profile(ar, pAssocRsp);
-	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
+	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d uhr %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,
 		 ar->vendor_vht_ie.VHTOperation.present, ar->he_cap.present,
 		 ar->he_6ghz_band_cap.present, ar->eht_cap.present,
 		 pAssocRsp->eht_cap.support_320mhz_6ghz,
-		 ar->bss_max_idle_period.present,
+		 ar->uhr_cap.present, ar->bss_max_idle_period.present,
 		 pAssocRsp->bss_max_idle_period.max_idle_period,
 		 ar->mu_edca_param_set.present, ar->WMMParams.present,
 		 ar->QosMapSet.present,
