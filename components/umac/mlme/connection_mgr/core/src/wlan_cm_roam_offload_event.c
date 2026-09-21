@@ -713,7 +713,7 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 err:
 	/* delete newly added pe session in case of failure */
 	if (new_link_session && QDF_IS_STATUS_ERROR(status))
-		status = cm_roam_delete_session_for_sl_to_ml_failure(vdev_id);
+		cm_roam_delete_session_for_sl_to_ml_failure(vdev_id);
 
 	return status;
 }
