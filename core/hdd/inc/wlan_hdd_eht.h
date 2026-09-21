@@ -50,7 +50,7 @@ void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
 /**
  * wlan_hdd_check_11be_support() - check if beacon IE and update hw mode
  * @beacon: beacon IE buffer
- * @config: pointer to sap config
+ * @sap_hw_mode: pointer to sap hw mode
  *
  * Check if EHT cap IE is present in beacon IE, if present update hw mode
  * to 11be.
@@ -58,7 +58,7 @@ void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
  * Return: None
  */
 void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
-				 struct sap_config *config);
+				 eCsrPhyMode *sap_hw_mode);
 
 /**
  * hdd_update_wiphy_eht_cap() - update the wiphy with eht capabilities
@@ -111,7 +111,7 @@ void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
 }
 
 static inline void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
-					       struct sap_config *config)
+					       eCsrPhyMode *sap_hw_mode)
 {
 }
 
