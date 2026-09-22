@@ -589,10 +589,6 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	/* If EAPOL is offloaded to supplicant, link vdev/s are not up
-	 * at FW, in that case complete roam sync on assoc vdev
-	 * link vdev will be initialized after set key is complete.
-	 */
 	if (sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED)
 		return QDF_STATUS_SUCCESS;
 

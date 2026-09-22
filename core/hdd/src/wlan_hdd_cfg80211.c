@@ -33761,6 +33761,11 @@ static inline bool hdd_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
 }
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
+static bool hdd_is_11bi_roaming_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return ucfg_cm_is_vdev_roaming(vdev) && hdd_is_11bi_vdev(vdev);
+}
+
 static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 				struct wlan_hdd_link_info *link_info,
 				bool pairwise, u8 key_index,
@@ -34035,10 +34040,24 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 					       struct hdd_context *hdd_ctx,
 					       u8 key_index,
-					       struct key_params *params)
+					       struct key_params *params,
+					       struct qdf_mac_addr *mac_addr)
 {
 	struct mlo_link_info *mlo_link_info;
 	uint8_t link_info_iter = 0;
+	uint8_t *linkaddr;
+
+	if (hdd_is_11bi_roaming_vdev(vdev)) {
+		linkaddr = wlan_vdev_mlme_get_linkaddr(vdev);
+
+		hdd_debug("Add key link id %d", wlan_vdev_get_link_id(vdev));
+		wlan_cfg80211_store_link_key(
+			hdd_ctx->psoc, key_index,
+			WLAN_CRYPTO_KEY_TYPE_UNICAST, mac_addr->bytes, params,
+			(struct qdf_mac_addr *)linkaddr,
+			wlan_vdev_get_link_id(vdev), true);
+		return;
+	}
 
 	mlo_link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
@@ -34051,7 +34070,8 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 					     WLAN_CRYPTO_KEY_TYPE_UNICAST,
 					     (uint8_t *)&mlo_link_info->ap_link_addr,
 					     params, &mlo_link_info->link_addr,
-					     mlo_link_info->link_id);
+					     mlo_link_info->link_id,
+					     false);
 	}
 }
 
@@ -34105,7 +34125,8 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 					       struct hdd_context *hdd_ctx,
 					       u8 key_index,
-					       struct key_params *params)
+					       struct key_params *params,
+					       struct qdf_mac_addr *mac_addr)
 {
 }
 
@@ -34253,6 +34274,8 @@ done:
 		if (peer) {
 			peer_type = wlan_peer_get_peer_type(peer);
 			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+		} else if (hdd_is_11bi_roaming_vdev(vdev)) {
+			peer_type = WLAN_PEER_AP;
 		} else if (!hdd_mlo_vdev_allow_pairwise_without_peer(vdev,
 								     &mac_address,
 								     &peer_type)) {
@@ -34263,7 +34286,8 @@ done:
 		switch (peer_type) {
 		case WLAN_PEER_AP:
 			wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx,
-							   key_index, params);
+							    key_index, params,
+							    &mac_address);
 			break;
 		case WLAN_PEER_TDLS:
 			if (!ucfg_tdls_is_key_install_allowed(vdev,
@@ -34536,7 +34560,7 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
 	struct wlan_objmgr_vdev *link_vdev;
-	struct qdf_mac_addr peer_mac;
+	struct qdf_mac_addr peer_mac = {0};
 	struct wlan_objmgr_peer *peer = NULL;
 	int errno = 0;
 	uint16_t link, vdev_count = 0;
@@ -34567,6 +34591,12 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 						mac_addr);
 			break;
 		case QDF_STA_MODE:
+			if (hdd_is_11bi_roaming_vdev(link_vdev)) {
+				qdf_mem_copy(peer_mac.bytes, mac_addr,
+					     QDF_MAC_ADDR_SIZE);
+				goto add_key;
+			}
+			fallthrough;
 		default:
 			status = mlo_get_link_mac_addr_from_reassoc_rsp(link_vdev,
 									&peer_mac);
@@ -34637,6 +34667,8 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 	int errno = 0;
 	struct hdd_context *hdd_ctx;
 	struct mlo_link_info *mlo_link_info;
+	struct wlan_objmgr_vdev *link_vdev;
+	bool is_roam_eppke;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
@@ -34645,6 +34677,8 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 	if (!mlo_link_info)
 		return -EINVAL;
 
+	link_vdev = mlo_get_vdev_by_link_id(vdev, link_id, WLAN_OSIF_ID);
+	is_roam_eppke = hdd_is_11bi_roaming_vdev(link_vdev);
 	errno = wlan_cfg80211_store_link_key(
 			hdd_ctx->psoc, key_index,
 			(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST :
@@ -34652,7 +34686,9 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 			(uint8_t *)mlo_link_info->ap_link_addr.bytes,
 			params,
 			&mlo_link_info->link_addr,
-			link_id);
+			link_id, is_roam_eppke);
+	if (link_vdev)
+		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 	hdd_debug("ml defer set key link id %d", link_id);
 	mlo_defer_set_keys(vdev, link_id, true);
 	return errno;
@@ -34818,6 +34854,9 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	int errno;
 	struct qdf_mac_addr mac = QDF_MAC_ADDR_BCAST_INIT;
+	struct qdf_mac_addr *peer_link_addr;
+	const u8 *key_mac_addr;
+	bool is_11bi_roam;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -34849,9 +34888,21 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	if (!vdev)
 		return -EINVAL;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+	is_11bi_roam = hdd_is_11bi_roaming_vdev(vdev);
+	key_mac_addr = mac_addr;
+	if (is_11bi_roam) {
+		peer_link_addr = wlan_cm_roaming_get_peer_link_addr(vdev);
+		if (!peer_link_addr) {
+			hdd_err("peer roaming link addr is NULL");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			return -EINVAL;
+		}
+		key_mac_addr = peer_link_addr->bytes;
+	}
+
+	if (is_11bi_roam || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		errno = wlan_hdd_add_key_vdev(mac_handle, vdev, key_index,
-					      pairwise, mac_addr, params,
+					      pairwise, key_mac_addr, params,
 					      link_id, adapter->deflink);
 	else
 		errno = wlan_hdd_add_key_mlo_vdev(mac_handle, vdev, key_index,

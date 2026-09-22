@@ -1726,11 +1726,73 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static bool
+cm_install_link_vdev_keys_get_ap_link_addr(struct wlan_objmgr_vdev *vdev,
+					   uint8_t vdev_id,
+					   struct qdf_mac_addr **ap_link_addr)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct mlo_link_info *link_info;
+	uint16_t link_iter;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->sta_ctx) {
+		mlme_err("mlo dev ctx not found for vdev %d", vdev_id);
+		return false;
+	}
+
+	link_info = &ml_dev->sta_ctx->links_info[0];
+	for (link_iter = 0; link_iter < WLAN_MAX_ML_BSS_LINKS;
+	     link_iter++, link_info++) {
+		if (qdf_is_macaddr_zero(&link_info->link_addr))
+			continue;
+
+		if (link_info->vdev_id == vdev_id) {
+			*ap_link_addr = &link_info->ap_link_addr;
+			return true;
+		}
+	}
+
+	mlme_err("ap link addr not found for vdev %d", vdev_id);
+	return false;
+}
+#else
+static inline bool
+cm_install_link_vdev_keys_get_ap_link_addr(struct wlan_objmgr_vdev *vdev,
+					   uint8_t vdev_id,
+					   struct qdf_mac_addr **ap_link_addr)
+{
+	return true;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool cm_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_crypto_vdev_has_auth_mode(vdev,
+					       BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					       BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+#else
+static inline bool cm_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
+static bool cm_is_11bi_roaming_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return cm_is_vdev_roaming(vdev) && cm_is_11bi_vdev(vdev);
+}
+
 static void
 cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_crypto_key *crypto_key;
 	struct wlan_crypto_params *crypto_params;
+	struct qdf_mac_addr *ap_link_addr = NULL;
 	enum QDF_OPMODE op_mode;
 	uint16_t i;
 	bool pairwise;
@@ -1762,6 +1824,10 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 
 	link_id = wlan_vdev_get_link_id(vdev);
 
+	if (!cm_install_link_vdev_keys_get_ap_link_addr(vdev, vdev_id,
+							&ap_link_addr))
+		return;
+
 	if (wlan_cm_is_link_add_connecting(vdev) ||
 	    mlo_mgr_is_link_add_link_switch(vdev)) {
 		mlo_link_recfg_install_unicast_keys(vdev);
@@ -1775,7 +1841,11 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 
 	wlan_crypto_aquire_lock();
 	for (i = 0; i < max_key_index; i++) {
-		crypto_key = wlan_crypto_get_key(vdev, NULL, i);
+		crypto_key = wlan_crypto_get_key_allow_roam_bypass(
+					vdev,
+					ap_link_addr ?
+					ap_link_addr->bytes : NULL,
+					i, cm_is_11bi_roaming_vdev(vdev));
 		if (!crypto_key)
 			continue;
 
