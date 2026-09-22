@@ -2658,6 +2658,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
 		cfg_get(psoc, CFG_MLO_MLO_5GL_5GH_MLSR);
+	sta->sta_sl_with_mlo_sap =
+		cfg_get(psoc, CFG_STA_SL_WITH_MLO_SAP);
 	sta->epcs_capability =
 		cfg_get(psoc, CFG_MLO_EPCS_SUPPORT_ENABLE);
 
