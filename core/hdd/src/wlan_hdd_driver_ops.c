@@ -1885,12 +1885,13 @@ static int hdd_pld_runtime_resume_cb(void)
  * Sets the runtime pm state and coordinates resume between hif wma and
  * ol_txrx.
  *
- * Return: success since failure is a bug
+ * Return: 0 on success or an errno corresponding to the PMO failure
  */
 static int wlan_hdd_runtime_resume(struct device *dev)
 {
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
+	int err;
 	qdf_time_t delta;
 
 	hdd_debug("Starting runtime resume");
@@ -1929,6 +1930,7 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 
 	status = ucfg_pmo_psoc_bus_runtime_resume(hdd_ctx->psoc,
 						  hdd_pld_runtime_resume_cb);
+	err = qdf_status_to_os_return(status);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("PMO Runtime resume failed: %d", status);
 	} else {
@@ -1936,9 +1938,9 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 			ucfg_dp_bus_bw_compute_timer_try_start(hdd_ctx->psoc);
 	}
 
-	hdd_debug("Runtime resume done");
+	hdd_debug("Runtime resume done result: %d", err);
 
-	return 0;
+	return err;
 }
 #endif
 
