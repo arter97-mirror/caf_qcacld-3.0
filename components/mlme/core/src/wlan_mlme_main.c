@@ -3574,7 +3574,6 @@ void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
 	lfr->wes_mode_enabled = cfg_get(psoc, CFG_LFR_ENABLE_WES_MODE);
 }
 
-#ifdef CONNECTION_ROAMING_CFG
 #ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
 static void
 mlme_apply_bmiss_timeout_from_user(struct wlan_mlme_lfr_cfg *lfr,
@@ -3593,6 +3592,7 @@ mlme_apply_bmiss_timeout_from_user(struct wlan_mlme_lfr_cfg *lfr,
 }
 #endif
 
+#ifdef CONNECTION_ROAMING_CFG
 /**
  * mlme_init_bmiss_timeout() - Init bmiss timeout
  * @psoc: Pointer to psoc
@@ -3647,10 +3647,13 @@ static void mlme_init_band_weightage(struct wlan_objmgr_psoc *psoc,
 static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_mlme_lfr_cfg *lfr)
 {
-	lfr->beaconloss_timeout_onwakeup =
-		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
-	lfr->beaconloss_timeout_onsleep =
-		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+	uint8_t wakeup = cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
+	uint8_t sleep  = cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+
+	mlme_apply_bmiss_timeout_from_user(lfr, &wakeup, &sleep);
+
+	lfr->beaconloss_timeout_onwakeup = wakeup;
+	lfr->beaconloss_timeout_onsleep  = sleep;
 }
 
 static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,

@@ -29101,8 +29101,9 @@ __wlan_hdd_cfg80211_set_sta_beacon_config(struct wiphy *wiphy,
 	miss_timeout_sec =
 		nla_get_u32(tb[WIFI_STA_BEACON_CONFIG_ATTR_MISS_TIMEOUT_SEC]);
 
-	if (miss_timeout_sec > cfg_max(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP)) {
-		hdd_err_rl("miss_timeout_sec %u exceeds max %u",
+	if (miss_timeout_sec <= 0 ||
+	    miss_timeout_sec > cfg_max(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP)) {
+		hdd_err_rl("miss_timeout_sec %u out of range (1-%u)",
 			   miss_timeout_sec,
 			   cfg_max(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP));
 		return -EINVAL;
