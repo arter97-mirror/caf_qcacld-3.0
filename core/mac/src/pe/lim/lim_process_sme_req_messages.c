@@ -2305,6 +2305,7 @@ lim_handle_11ax_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		*intersected_mode = MLME_DOT11_MODE_11AX;
 		break;
 	case MLME_DOT11_MODE_11BE:
+	case MLME_DOT11_MODE_11BN:
 		if (bss_desc->bcn_ies.he_cap.present) {
 			*intersected_mode = MLME_DOT11_MODE_11AX;
 			break;
