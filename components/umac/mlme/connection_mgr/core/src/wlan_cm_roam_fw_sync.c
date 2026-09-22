@@ -47,6 +47,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_smd_roam.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_mlo_link_force.h"
@@ -822,28 +823,13 @@ cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
 #endif /* WLAN_FEATURE_11BN_SMD */
 
 #ifdef WLAN_FEATURE_11BI_SECURITY
-static void
+static inline void
 cm_set_roam_assoc_encrypted(struct wlan_objmgr_vdev *vdev,
 			    struct roam_offload_synch_ind *roam_synch_data,
 			    struct cm_vdev_join_rsp *rsp)
 {
-	const struct wlan_frame_hdr *hdr;
-	int32_t auth_mode;
-
-	if (roam_synch_data->reassoc_resp_length <=
-	    sizeof(struct wlan_frame_hdr))
-		return;
-
-	hdr = (const struct wlan_frame_hdr *)
-		((uint8_t *)roam_synch_data +
-		 roam_synch_data->reassoc_resp_offset);
-	if (!(hdr->i_fc[1] & WLAN_FC1_ISWEP))
-		return;
-
-	auth_mode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
-	if (auth_mode >= 0 &&
-	    (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
-	     QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)))
+	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE ||
+	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)
 		rsp->connect_rsp.is_assoc_encrypted = true;
 }
 #else
@@ -1293,7 +1279,7 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
+#if defined(WLAN_FEATURE_11BI_SECURITY) && defined(WLAN_FEATURE_11BE_MLO)
 /*
  * cm_roam_copy_assoc_key_to_link_vdev() - Store assoc link pairwise key in
  *					    the link vdev's psoc crypto cache
@@ -1301,6 +1287,16 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
  * @assoc_vdev: assoc vdev whose pairwise key is the source
  * @link_vdev:  target link vdev
  * @link_info:  link info entry for the target link
+ * @assoc_link_ap_addr: AP link address of the assoc link, used to look up
+ *			 the assoc vdev's EPPKE-roam pairwise key, which is
+ *			 hashed by AP link address rather than the vdev's own
+ *			 address.
+ * @is_eppke_roam: true if this update is for an EPPKE/8021X_IN_AUTH roam,
+ *		    per roam_synch_data->auth_algo at the roam-sync call
+ *		    site. Passed explicitly rather than re-derived from the
+ *		    assoc vdev's crypto authmode bitmap, since that bitmap is
+ *		    only refreshed on host-driven connect and is stale for
+ *		    the new AP during FW roam-sync.
  *
  * Copies the assoc vdev's pairwise key into the link vdev's psoc-level
  * crypto cache (equivalent to wlan_cfg80211_store_link_key) and marks
@@ -1314,13 +1310,16 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 static void
 cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
 				    struct wlan_objmgr_vdev *link_vdev,
-				    struct mlo_link_info *link_info)
+				    struct mlo_link_info *link_info,
+				    struct qdf_mac_addr *assoc_link_ap_addr,
+				    bool is_eppke_roam)
 {
 	struct wlan_crypto_key *assoc_key;
 	struct wlan_crypto_key *link_key;
 	uint16_t key_idx;
 	uint8_t link_vdev_id;
 	QDF_STATUS status;
+	bool is_roam_eppke;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1328,14 +1327,26 @@ cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
 
 	link_vdev_id = wlan_vdev_get_id(link_vdev);
 
+	is_roam_eppke = is_eppke_roam ||
+		wlan_crypto_vdev_has_auth_mode(assoc_vdev,
+					       BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+		wlan_crypto_vdev_has_auth_mode(
+				assoc_vdev,
+				BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+
 	wlan_crypto_aquire_lock();
 	for (key_idx = 0; key_idx < max_key_index; key_idx++) {
-		assoc_key = wlan_crypto_get_key(assoc_vdev, NULL, key_idx);
+		assoc_key = wlan_crypto_get_key_allow_roam_bypass(
+					assoc_vdev, assoc_link_ap_addr->bytes,
+					key_idx, is_roam_eppke);
 		if (!assoc_key || !assoc_key->key_type)
 			continue;
 
 		/* pairwise key found on assoc vdev; get or alloc link entry */
-		link_key = wlan_crypto_get_key(link_vdev, NULL, key_idx);
+		link_key = wlan_crypto_get_ml_sta_link_key(
+					wlan_vdev_get_psoc(link_vdev), key_idx,
+					&link_info->ap_link_addr,
+					link_info->link_id);
 		if (!link_key) {
 			new_key = true;
 			link_key = qdf_mem_malloc(sizeof(*link_key));
@@ -1348,13 +1359,12 @@ cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
 		}
 
 		qdf_mem_copy(link_key, assoc_key, sizeof(*link_key));
-		qdf_mem_copy(&link_key->macaddr, link_info->ap_link_addr.bytes,
-			     QDF_MAC_ADDR_SIZE);
 		wlan_crypto_release_lock();
 
-		status = wlan_crypto_save_key(link_vdev,
-					      link_info->ap_link_addr.bytes,
-					      key_idx, link_key);
+		status = wlan_crypto_save_ml_sta_key(
+					wlan_vdev_get_psoc(link_vdev), key_idx,
+					link_key, &link_info->ap_link_addr,
+					link_info->link_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_err("save key failed for link vdev %d",
 				 link_vdev_id);
@@ -1382,6 +1392,11 @@ cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
  * cm_roam_update_link_vdev_keys() - Store assoc link pairwise key in link
  *				       vdev(s) for MLO EPPKE/8021X_IN_AUTH roam.
  * @vdev: vdev object (assoc or link vdev)
+ * @is_eppke_roam: true if this is an EPPKE/8021X_IN_AUTH roam, per
+ *		    roam_synch_data->auth_algo at the roam-sync call site.
+ *		    Passed down to cm_roam_copy_assoc_key_to_link_vdev() so
+ *		    the ML key lookup is not misdirected by the assoc vdev's
+ *		    stale crypto authmode bitmap.
  *
  * For EPPKE and 8021X_IN_AUTH MLO roaming the 4-way handshake is performed
  * by the host supplicant.  Once the assoc link pairwise key is available,
@@ -1396,13 +1411,16 @@ cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
  * Return: void
  */
 static void
-cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
+cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev,
+			      bool is_eppke_roam)
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *assoc_vdev;
 	struct wlan_objmgr_vdev *link_vdev;
 	struct wlan_mlo_dev_context *ml_dev;
 	struct mlo_link_info *link_info;
+	struct mlo_link_info *assoc_link_info;
+	struct qdf_mac_addr *assoc_link_ap_addr;
 	uint16_t link_iter;
 	uint8_t assoc_vdev_id, link_vdev_id;
 
@@ -1423,6 +1441,14 @@ cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 
 	psoc = wlan_vdev_get_psoc(assoc_vdev);
 	assoc_vdev_id = wlan_vdev_get_id(assoc_vdev);
+
+	assoc_link_info = mlo_mgr_get_ap_link_by_vdev_id(ml_dev, assoc_vdev_id);
+	if (!assoc_link_info) {
+		mlme_err("assoc link ap addr not found for vdev %d",
+			 assoc_vdev_id);
+		return;
+	}
+	assoc_link_ap_addr = &assoc_link_info->ap_link_addr;
 
 	link_info = &ml_dev->sta_ctx->links_info[0];
 	for (link_iter = 0; link_iter < WLAN_MAX_ML_BSS_LINKS;
@@ -1450,10 +1476,16 @@ cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 		}
 
 		cm_roam_copy_assoc_key_to_link_vdev(assoc_vdev, link_vdev,
-						    link_info);
+						    link_info,
+						    assoc_link_ap_addr,
+						    is_eppke_roam);
 		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLME_SB_ID);
 	}
 }
+#else
+static void
+cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool is_eppke_roam)
+{}
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
 QDF_STATUS
@@ -1549,7 +1581,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	 */
 	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH ||
 	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE)
-		cm_roam_update_link_vdev_keys(vdev);
+		cm_roam_update_link_vdev_keys(vdev, true);
 
 	/*
 	 * Re-enable the disabled link on roaming as decision

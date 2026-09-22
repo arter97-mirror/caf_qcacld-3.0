@@ -2029,7 +2029,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam_offload || !is_roam) {
 		/* For FW_ROAM/LFR3 OR connect */
 		/* for LFR 3 get authenticated info from resp */
-		if (is_roam) {
+		if (is_roam &&
+		    !hdd_cm_is_11bi_connection(sta_ctx, vdev, rsp)) {
 			is_auth_required =
 				hdd_cm_is_roam_auth_required(sta_ctx, rsp,
 							     vdev);
@@ -2037,8 +2038,10 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				wlan_acquire_peer_key_wakelock(vdev,
 							       rsp->bssid.bytes);
 		}
-		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d",
-			  is_roam_offload, is_roam,  is_vdev_repurpose, is_auth_required);
+		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d  11bi %d",
+			  is_roam_offload, is_roam,  is_vdev_repurpose,
+			  is_auth_required,
+			  hdd_cm_is_11bi_connection(sta_ctx, vdev, rsp));
 		hdd_roam_register_sta(link_info, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
