@@ -2977,9 +2977,24 @@ wma_handle_peer_create_cmd(tp_wma_handle wma,
 #ifdef WLAN_FEATURE_11BI_SECURITY
 static bool wma_peer_is_11bi(struct wlan_objmgr_vdev *vdev)
 {
-	return wlan_crypto_vdev_has_auth_mode(vdev, BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
-	       wlan_crypto_vdev_has_auth_mode(vdev,
-					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+	bool eppke = wlan_crypto_vdev_has_auth_mode(vdev,
+						BIT(WLAN_CRYPTO_AUTH_EPPKE));
+	bool bi_1x = wlan_crypto_vdev_has_auth_mode(vdev,
+						BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+
+	/*
+	 * EPPKE auth bits are injected atop SAE pre-connect (only when
+	 * eppke_allowed is set) so the scan filter matches EPPKE-capable APs
+	 * alongside SAE APs, and are stripped only after peer create. Until
+	 * then the vdev auth mode can be a false positive, so when injection
+	 * happened treat the peer as EPPKE-11bi only if the selected AP
+	 * actually advertises EPPKE. A SAE-only AP must not get is_11bi_peer.
+	 */
+	if (eppke && wlan_vdev_is_eppke_allowed(vdev) &&
+	    !wlan_cm_is_connect_ap_eppke_capable(vdev))
+		eppke = false;
+
+	return eppke || bi_1x;
 }
 #else
 static inline bool wma_peer_is_11bi(struct wlan_objmgr_vdev *vdev)
