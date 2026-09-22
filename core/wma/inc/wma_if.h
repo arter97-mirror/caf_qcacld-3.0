@@ -146,25 +146,45 @@ struct med_sync_delay {
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * struct ml_partner_link_info: partner link info
+ * @vdev_id: partner link vdev ID
  * @link_id: partner link ID
+ * @link_tx_nss: negotiated Tx NSS for the partner link
+ * @link_rx_nss: negotiated Rx NSS for the partner link
  * @link_addr: partner link address
- * @ch_freq:Channel in Mhz
- * @ch_phymode: Channel phymode
+ * @self_mac_addr: Self mac address for this link
+ * @channel_info: Link channel info
  */
 struct ml_partner_link_info {
 	uint8_t vdev_id;
 	uint8_t link_id;
+	uint8_t link_tx_nss;
+	uint8_t link_rx_nss;
 	struct qdf_mac_addr link_addr;
 	struct qdf_mac_addr self_mac_addr;
 	struct wlan_channel channel_info;
 };
 
+/**
+ * struct peer_ml_info: MLO peer link information
+ * @vdev_id: vdev ID
+ * @link_id: link ID
+ * @link_addr: BSSID of the peer
+ * @channel_info: Channel info of link
+ * @self_mac_addr: Self mac addr of the link
+ * @link_tx_nss: negotiated Tx NSS for the link
+ * @link_rx_nss: negotiated Rx NSS for the link
+ * @num_links: Number of partner links
+ * @partner_info: Each partner link info
+ * @rec_max_simultaneous_links: Recommended max simultaneous links
+ */
 struct peer_ml_info {
 	uint32_t vdev_id;
 	uint32_t link_id;
 	struct qdf_mac_addr link_addr;
 	struct wlan_channel channel_info;
 	struct qdf_mac_addr self_mac_addr;
+	uint8_t link_tx_nss;
+	uint8_t link_rx_nss;
 	uint8_t num_links;
 	struct ml_partner_link_info partner_info[MLD_MAX_LINKS - 1];
 	uint8_t rec_max_simultaneous_links;
