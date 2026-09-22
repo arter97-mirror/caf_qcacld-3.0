@@ -588,7 +588,8 @@ hdd_update_standard_for_connect(struct hdd_context *hdd_ctx,
 		std = WMI_HOST_WIFI_STANDARD_6E;
 	}
 
-	if (mlme_get_vdev_wifi_std(vdev) == std)
+	/* Don't override the phymode configured via usercommand */
+	if (mlme_get_vdev_wifi_std(vdev) <= std)
 		return;
 
 	vdev_id	= wlan_vdev_get_id(vdev);

@@ -1291,7 +1291,170 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 		link_info++;
 	}
 }
-#endif
+#endif /* WLAN_FEATURE_11BE_MLO */
+
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/*
+ * cm_roam_copy_assoc_key_to_link_vdev() - Store assoc link pairwise key in
+ *					    the link vdev's psoc crypto cache
+ *					    and defer key installation.
+ * @assoc_vdev: assoc vdev whose pairwise key is the source
+ * @link_vdev:  target link vdev
+ * @link_info:  link info entry for the target link
+ *
+ * Copies the assoc vdev's pairwise key into the link vdev's psoc-level
+ * crypto cache (equivalent to wlan_cfg80211_store_link_key) and marks
+ * the link's keys as deferred via mlo_defer_set_keys().  The deferred
+ * flag ensures the key is installed by cm_install_link_vdev_keys() only
+ * after the peer assoc command has been sent to firmware, avoiding a
+ * race where keys arrive before the peer is established.
+ *
+ * Return: void
+ */
+static void
+cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
+				    struct wlan_objmgr_vdev *link_vdev,
+				    struct mlo_link_info *link_info)
+{
+	struct wlan_crypto_key *assoc_key;
+	struct wlan_crypto_key *link_key;
+	uint16_t key_idx;
+	uint8_t link_vdev_id;
+	QDF_STATUS status;
+	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
+				 WLAN_CRYPTO_MAXIGTKKEYIDX +
+				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
+	bool new_key = false;
+
+	link_vdev_id = wlan_vdev_get_id(link_vdev);
+
+	wlan_crypto_aquire_lock();
+	for (key_idx = 0; key_idx < max_key_index; key_idx++) {
+		assoc_key = wlan_crypto_get_key(assoc_vdev, NULL, key_idx);
+		if (!assoc_key || !assoc_key->key_type)
+			continue;
+
+		/* pairwise key found on assoc vdev; get or alloc link entry */
+		link_key = wlan_crypto_get_key(link_vdev, NULL, key_idx);
+		if (!link_key) {
+			new_key = true;
+			link_key = qdf_mem_malloc(sizeof(*link_key));
+			if (!link_key) {
+				mlme_err("malloc failed for link vdev %d key",
+					 link_vdev_id);
+				wlan_crypto_release_lock();
+				return;
+			}
+		}
+
+		qdf_mem_copy(link_key, assoc_key, sizeof(*link_key));
+		qdf_mem_copy(&link_key->macaddr, link_info->ap_link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+		wlan_crypto_release_lock();
+
+		status = wlan_crypto_save_key(link_vdev,
+					      link_info->ap_link_addr.bytes,
+					      key_idx, link_key);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("save key failed for link vdev %d",
+				 link_vdev_id);
+			if (new_key)
+				qdf_mem_free(link_key);
+			return;
+		}
+
+		/*
+		 * Defer key installation so that cm_install_link_vdev_keys()
+		 * sends the key to firmware only after peer assoc completes,
+		 * avoiding a race where the key arrives before the peer.
+		 */
+		mlo_defer_set_keys(link_vdev, link_info->link_id, true);
+		mlme_debug("stored pairwise key %d for link vdev %d link_id %d, deferred install",
+			   key_idx, link_vdev_id, link_info->link_id);
+		return;
+	}
+	wlan_crypto_release_lock();
+	mlme_err("no pairwise key on assoc vdev for link vdev %d",
+		 link_vdev_id);
+}
+
+/*
+ * cm_roam_update_link_vdev_keys() - Store assoc link pairwise key in link
+ *				       vdev(s) for MLO EPPKE/8021X_IN_AUTH roam.
+ * @vdev: vdev object (assoc or link vdev)
+ *
+ * For EPPKE and 8021X_IN_AUTH MLO roaming the 4-way handshake is performed
+ * by the host supplicant.  Once the assoc link pairwise key is available,
+ * copy it into each partner link vdev's psoc crypto cache and defer the key
+ * install so cm_install_link_vdev_keys() sends the key to firmware only after
+ * peer assoc completes.
+ *
+ * When @vdev is the assoc vdev all partner link vdevs are updated.
+ * When @vdev is a link vdev only that link vdev is updated, using the assoc
+ * link vdev as the key source.
+ *
+ * Return: void
+ */
+static void
+cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *assoc_vdev;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct wlan_mlo_dev_context *ml_dev;
+	struct mlo_link_info *link_info;
+	uint16_t link_iter;
+	uint8_t assoc_vdev_id, link_vdev_id;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+		if (!assoc_vdev)
+			return;
+	} else {
+		assoc_vdev = vdev;
+	}
+
+	ml_dev = assoc_vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->sta_ctx)
+		return;
+
+	psoc = wlan_vdev_get_psoc(assoc_vdev);
+	assoc_vdev_id = wlan_vdev_get_id(assoc_vdev);
+
+	link_info = &ml_dev->sta_ctx->links_info[0];
+	for (link_iter = 0; link_iter < WLAN_MAX_ML_BSS_LINKS;
+	     link_iter++, link_info++) {
+		if (qdf_is_macaddr_zero(&link_info->link_addr))
+			continue;
+
+		link_vdev_id = link_info->vdev_id;
+		if (link_vdev_id == assoc_vdev_id)
+			continue;
+
+		/*
+		 * When called on a specific link vdev, only process that one.
+		 */
+		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+		    link_vdev_id != wlan_vdev_get_id(vdev))
+			continue;
+
+		link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+								 link_vdev_id,
+								 WLAN_MLME_SB_ID);
+		if (!link_vdev) {
+			mlme_err("link vdev %d not found", link_vdev_id);
+			continue;
+		}
+
+		cm_roam_copy_assoc_key_to_link_vdev(assoc_vdev, link_vdev,
+						    link_info);
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLME_SB_ID);
+	}
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
 
 QDF_STATUS
 cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -1378,6 +1541,16 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	cm_process_roam_keys(vdev, rsp, cm_id);
+	/*
+	 * For MLO EPPKE/8021X_IN_AUTH roaming, store the assoc link pairwise
+	 * key in partner link vdev(s) and defer installation.  When called for
+	 * a link vdev the assoc link already has its key from the host EAPOL
+	 * exchange.
+	 */
+	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH ||
+	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE)
+		cm_roam_update_link_vdev_keys(vdev);
+
 	/*
 	 * Re-enable the disabled link on roaming as decision
 	 * will be taken again to disable the link on roam sync completion.

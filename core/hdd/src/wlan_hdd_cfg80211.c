@@ -28001,6 +28001,10 @@ wlan_external_auth_policy[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX + 1] = {
 #endif
 	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PTK_KCK] = {
 			.type = NLA_BINARY, .len = MAX_KCK_LEN },
+	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB] = {
+			.type = NLA_U16 },
+	[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA] = {
+			.type = NLA_BINARY },
 };
 
 /**
@@ -28123,6 +28127,24 @@ wlan_parse_external_auth_vendor_cmd(struct hdd_context *hdd_ctx,
 			hdd_err("Failed to store KCK, status %d", status);
 			return -EINVAL;
 		}
+	}
+
+	attribute = QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB;
+	if (attrs[attribute])
+		ext_auth_info->rsn_capab = nla_get_u16(attrs[attribute]);
+
+	attribute = QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA;
+	if (attrs[attribute]) {
+		size_t rsnxe_len = nla_len(attrs[attribute]);
+
+		if (rsnxe_len > sizeof(ext_auth_info->rsnxe_data)) {
+			hdd_warn("RSNXE length (%zu) exceeds max, truncating",
+				 rsnxe_len);
+			rsnxe_len = sizeof(ext_auth_info->rsnxe_data);
+		}
+		ext_auth_info->rsnxe_len = (uint8_t)rsnxe_len;
+		qdf_mem_copy(ext_auth_info->rsnxe_data,
+			     nla_data(attrs[attribute]), rsnxe_len);
 	}
 
 	ret = wlan_parse_external_auth_smd_attr(attrs, ext_auth_info);
