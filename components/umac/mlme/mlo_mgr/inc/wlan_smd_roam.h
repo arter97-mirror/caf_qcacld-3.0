@@ -675,6 +675,9 @@ smd_roam_start_link_switch(struct wlan_objmgr_vdev *vdev,
  *
  * Returns true if SMD roam sync is in progress and RSO commands must be
  * suppressed to prevent FW from retrying roam during old-link cleanup.
+ * Also returns true if the SMD connection has already collapsed to a
+ * single link and @vdev is not that surviving link's vdev, i.e. @vdev is
+ * stale and RSO must not be sent on it.
  *
  * Return: true if RSO should be skipped, false otherwise
  */
