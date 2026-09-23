@@ -452,7 +452,7 @@ int hdd_set_11be_rate_code(struct hdd_adapter *adapter, uint16_t rate_code)
  *
  * Return: os guard interval value
  */
-static inline uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval)
+uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval)
 {
 	switch (guard_interval) {
 	case TXRATE_GI_0_8_US:

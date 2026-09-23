@@ -239,13 +239,16 @@ void wlan_hdd_fill_os_uhr_rateflags(struct rate_info *os_rate,
 }
 
 bool wlan_hdd_refill_os_uhr_rateflags(struct rate_info *os_rate,
-				      uint8_t preamble)
+				      uint8_t preamble, bool is_uhr_elr)
 {
-	if (preamble == DOT11_BN) {
+	if (preamble != DOT11_BN)
+		return false;
+
+	if (is_uhr_elr)
+		os_rate->flags |= RATE_INFO_FLAGS_UHR_ELR_MCS;
+	else
 		os_rate->flags |= RATE_INFO_FLAGS_UHR_MCS;
-		return true;
-	}
-	return false;
+	return true;
 }
 #endif
 

@@ -920,6 +920,7 @@ enum bss_stop_reason {
  * @bw: band width
  * @dcm: dual carrier modulation enabled
  * @version: version of rate_info
+ * @is_uhr_elr: true if mcs was decoded from a UHR ELR sub-rate
  *
  * rate info in HDD
  */
@@ -933,6 +934,7 @@ struct hdd_rate_info {
 	uint8_t bw;
 	uint8_t dcm;
 	uint8_t version;
+	bool is_uhr_elr;
 };
 
 enum hdd_work_status {

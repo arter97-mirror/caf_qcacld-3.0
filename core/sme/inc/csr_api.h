@@ -653,6 +653,8 @@ typedef struct tagCsrGlobalClassAStatsInfo {
 	enum tx_rate_info tx_rx_rate_flags;
 	uint8_t tx_rate_version;
 	uint8_t is_tx_rate_version_checked;
+	bool tx_is_uhr_elr;
+	bool rx_is_uhr_elr;
 } tCsrGlobalClassAStatsInfo;
 
 typedef struct tagCsrGlobalClassDStatsInfo {
