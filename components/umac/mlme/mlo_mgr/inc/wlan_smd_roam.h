@@ -601,12 +601,15 @@ smd_is_roaming_in_progress(struct wlan_objmgr_vdev *vdev);
  * smd_roam_requires_flow_pool_map() - Check if flow pool map is needed
  * @vdev: vdev pointer
  *
- * False if SMD roaming is not in progress on @vdev, since flow pool map is
- * gated on roam topology only for an ongoing SMD roam. Otherwise, only
- * SL_TO_SL and SL_TO_ML topologies add a link vdev that was not previously
- * flow-pool mapped. ML_TO_ML and ML_TO_SL keep every surviving link vdev
- * already mapped, so no map is needed. Topology UNKNOWN (before M2 is
- * parsed) falls back to true, the permissive pre-topology default.
+ * False if SMD roaming is not in progress on @vdev. SL_TO_SL preserves the
+ * legacy permissive map behavior. For other known topologies, the decision
+ * uses the matching per-vdev repurpose request: a connect-only vdev is mapped,
+ * while a cleanup+connect vdev is not remapped. ML_TO_ML and ML_TO_SL keep
+ * existing link vdevs mapped, so no map is needed. Topology UNKNOWN (before
+ * M2 is parsed) falls back to true, the permissive pre-topology default.
+ *
+ * If a known non-SL_TO_SL topology has no matching request for @vdev, mapping
+ * is skipped because that vdev is not part of the transition.
  *
  * Return: true if flow pool map should proceed, false to skip it
  */
@@ -617,12 +620,16 @@ smd_roam_requires_flow_pool_map(struct wlan_objmgr_vdev *vdev);
  * smd_roam_requires_flow_pool_unmap() - Check if flow pool unmap is needed
  * @vdev: vdev pointer
  *
- * False if SMD roaming is not in progress on @vdev, since flow pool unmap is
- * gated on roam topology only for an ongoing SMD roam. Otherwise, only
- * SL_TO_SL and ML_TO_SL topologies drop a link vdev that needs to be
- * unmapped. ML_TO_ML and SL_TO_ML keep every link vdev mapped, so no unmap
- * is needed. Topology UNKNOWN (before M2 is parsed) falls back to true,
- * the permissive pre-topology default.
+ * False if SMD roaming is not in progress on @vdev. SL_TO_SL preserves the
+ * legacy permissive unmap behavior. For other known topologies, the decision
+ * uses the matching per-vdev repurpose request: a cleanup-only vdev is
+ * unmapped, while a cleanup+connect vdev is retained and not unmapped.
+ * ML_TO_ML and SL_TO_ML keep existing link vdevs mapped, so no unmap is
+ * needed. Topology UNKNOWN (before M2 is parsed) falls back to true, the
+ * permissive pre-topology default.
+ *
+ * If a known non-SL_TO_SL topology has no matching request for @vdev, unmapping
+ * is skipped because that vdev is not part of the transition.
  *
  * Return: true if flow pool unmap should proceed, false to skip it
  */
