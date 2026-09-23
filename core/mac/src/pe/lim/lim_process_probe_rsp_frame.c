@@ -631,9 +631,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 			probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);
 	}
 
-	if (!lim_validate_probe_rsp_mld_addr(session_entry, probe_rsp))
-		goto mem_free;
-
 	/*
 	 * UHR MBSSID non-TX AP: if we are waiting for a TX AP probe rsp,
 	 * handle it here before any MLO or session checks that may filter
@@ -643,6 +640,9 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	 */
 	if (lim_handle_uhr_tx_ap_probe_rsp(mac_ctx, session_entry, probe_rsp,
 					   body + 12, frame_len - 12))
+		goto mem_free;
+
+	if (!lim_validate_probe_rsp_mld_addr(session_entry, probe_rsp))
 		goto mem_free;
 
 	status =
