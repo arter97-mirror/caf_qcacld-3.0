@@ -2400,6 +2400,11 @@ void lim_sap_hlp_timeout_callback(void *priv)
 	struct pe_fils_session *fils_info;
 	struct pe_session *session;
 
+	if (!mac_ctx) {
+		pe_err("mac_ctx is NULL");
+		return;
+	}
+
 	if (!sta_pre_auth_ctx) {
 		pe_err("Preauth context is NULL");
 		return;
