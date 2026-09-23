@@ -1964,13 +1964,13 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		pe_err("invalid frame len: %d", frame_len);
 		return;
 	}
-	auth_alg = *(uint16_t *) body_ptr;
+	auth_alg = *(uint16_t *)body_ptr;
 
 	/* If this STA is already associated but the 4-way handshake (key
-         * installation) has not completed yet, drop this new Auth frame
-         * instead of restarting authentication in the middle of an ongoing
-         * key exchange.
-         */
+	 * installation) has not completed yet, drop this new Auth frame
+	 * instead of restarting authentication in the middle of an ongoing
+	 * key exchange.
+	 */
 	if (LIM_IS_AP_ROLE(pe_session)) {
 		tpDphHashNode sta_ds;
 		uint16_t aid;
