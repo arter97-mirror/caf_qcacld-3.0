@@ -93,6 +93,7 @@ struct dp_fisa_rx_fst_update_elem {
 	bool is_tcp_flow;
 	bool is_udp_flow;
 	u8 reo_id;
+	uint32_t vdev_guid;
 };
 
 enum dp_ft_lock_event_type {
