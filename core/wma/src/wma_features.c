@@ -5391,6 +5391,11 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (!wma_is_vdev_valid(vdev_id)) {
+		wma_err("vdev_id %d is not valid", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	if (aggr_type == WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU) {
 		intr[vdev_id].config.tx_ampdu = tx_size;
 		intr[vdev_id].config.rx_ampdu = rx_size;
