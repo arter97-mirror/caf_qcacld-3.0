@@ -81,16 +81,16 @@ int hdd_set_11bn_rate_code(struct hdd_adapter *adapter, uint16_t rate_code);
 /**
  * wlan_hdd_check_11bn_support() - Check if 11bn supported
  * @beacon: Pointer to beacon data
- * @config: Pointer to SAP configuration
+ * @sap_hw_mode: pointer to sap hw mode
  *
  *
  * Return: None.
  */
 void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
-				 struct sap_config *config);
+				 eCsrPhyMode *sap_hw_mode);
 #else
 static inline void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
-					       struct sap_config *config)
+					       eCsrPhyMode *sap_hw_mode)
 {
 }
 #endif
