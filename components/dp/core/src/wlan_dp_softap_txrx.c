@@ -394,10 +394,10 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 			break;
 		}
 
-		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 		dp_info("EXIT: phase=%d, nego_status=%d",
 			sta_info->dhcp_phase,
 			sta_info->dhcp_nego_status);
+		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 	}
 
 	return errno;
