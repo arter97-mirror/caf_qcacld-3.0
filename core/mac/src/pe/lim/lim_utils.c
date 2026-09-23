@@ -52,6 +52,8 @@
 #include "cds_reg_service.h"
 #include "nan_datapath.h"
 #include "wma.h"
+#include <target_if_psoc_wake_lock.h>
+#include <target_if_psoc_timer_tx_ops.h>
 #include "wlan_reg_services_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlme_public_struct.h"
@@ -12287,6 +12289,7 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	QDF_STATUS status;
 	struct pe_session *session;
 	struct mac_context *mac_ctx;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!data) {
 		mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
@@ -12304,8 +12307,16 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 		session = (struct pe_session *)data;
 	}
 
-	if (LIM_IS_NDI_ROLE(session))
+	if (LIM_IS_NDI_ROLE(session)) {
+		psoc = wlan_vdev_get_psoc(vdev_mlme->vdev);
+		if (psoc) {
+			target_if_wake_lock_timeout_release(psoc,
+							    START_WAKELOCK);
+			target_if_release_vdev_cmd_rt_lock(
+				psoc, wlan_vdev_get_id(vdev_mlme->vdev));
+		}
 		return QDF_STATUS_SUCCESS;
+	}
 
 	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
 		lim_configure_fd_for_existing_6ghz_sap(session, true);
