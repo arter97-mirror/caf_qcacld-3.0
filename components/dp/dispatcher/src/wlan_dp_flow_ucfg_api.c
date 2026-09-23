@@ -215,23 +215,4 @@ ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policies,
 	return fpm_policy_get(fpm, policies, max_count);
 }
 
-void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_dp_intf *dp_intf;
-	struct wlan_dp_link *dp_link;
-
-	dp_link = dp_get_vdev_priv_obj(vdev);
-	if (qdf_unlikely(!dp_link)) {
-		dp_err_rl("DP link not found");
-		return;
-	}
-
-	dp_intf = dp_link->dp_intf;
-	if (qdf_unlikely(!dp_intf)) {
-		dp_err_rl("DP interface not found");
-		return;
-	}
-
-	dp_fpm_display_policy(dp_intf);
-}
 #endif

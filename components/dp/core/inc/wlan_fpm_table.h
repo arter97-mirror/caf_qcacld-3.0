@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -116,14 +116,6 @@ enum dp_fpm_status fpm_policy_flow_match(struct wlan_dp_intf *dp_intf,
 					 qdf_nbuf_t skb, uint32_t *metadata,
 					 struct flow_info *flow,
 					 uint32_t *policy_id);
-
-/*
- * dp_fpm_display_policy() - Display configured FPM flows
- * @dp_intf: Interface level dp private structure
- *
- * Return: void
- */
-void dp_fpm_display_policy(struct wlan_dp_intf *dp_intf);
 
 /*
  * fpm_policy_add() - FPM policy add
