@@ -2151,6 +2151,7 @@ smd_link_recfg_assign_self_link_addr(
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t idx;
 	uint32_t allocated_bitmap;
+	uint32_t filled_bitmap;
 	struct wlan_mlo_link_recfg_bss_info *link_add;
 	struct wlan_objmgr_vdev *vdev;
 	struct qdf_mac_addr vdev_own_macaddr;
@@ -2177,53 +2178,260 @@ smd_link_recfg_assign_self_link_addr(
 
 	link_add = &recfg_req->add_link_info.link[0];
 	allocated_bitmap = 0;
-	idx = 0;
+	filled_bitmap = 0;
 
-	/* 1.select the idle vdev's self mac as first choice
-	 * for target AP add link's self link addr.
+	/* 1.select the idle vdev's self mac as first choice for target AP
+	 * add link's self link addr. Each add-link entry is matched against
+	 * FW's own per-link vdev id hint (pre-filled by
+	 * smd_populate_add_link_info()) rather than filled in links_info[]
+	 * scan order - scan order alone would hijack the slot meant for a
+	 * different, currently-active/continuing vdev whenever the idle
+	 * real vdev happens to be scanned before it (e.g. the STA's initial
+	 * link is on vdev 1, and vdev 0 - idle - is scanned before vdev 1 -
+	 * continuing - even though FW hinted the continuing vdev 1 for an
+	 * earlier add-link entry than the idle vdev 0).
 	 * for example: L1 -> L2 L3
 	 */
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS &&
-	     idx < recfg_req->add_link_info.num_links; i++) {
-		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
-		if (allocated_bitmap & (1 << i))
+	for (idx = 0; idx < recfg_req->add_link_info.num_links; idx++) {
+		if (link_add[idx].vdev_id == WLAN_INVALID_VDEV_ID)
 			continue;
 
-		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID)
-			continue;
+		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+			if (allocated_bitmap & (1 << i))
+				continue;
 
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-					psoc, link_info->vdev_id,
-					WLAN_LINK_RECFG_ID);
-		if (!vdev) {
-			mlo_err("Invalid VDEV id %d", link_info->vdev_id);
-			continue;
-		}
+			if (link_info->vdev_id != link_add[idx].vdev_id)
+				continue;
 
-		/* todo: add validate vdev mac with link info link_add */
-		qdf_mem_copy(vdev_own_macaddr.bytes,
-			     wlan_vdev_mlme_get_macaddr(vdev),
-			     QDF_MAC_ADDR_SIZE);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+						psoc, link_info->vdev_id,
+						WLAN_LINK_RECFG_ID);
+			if (!vdev) {
+				mlo_err("Invalid VDEV id %d",
+					link_info->vdev_id);
+				break;
+			}
 
-		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) ||
-		    link_info->link_id == WLAN_INVALID_LINK_ID) {
-			/* links_info[] self MAC can be stale/unpopulated for a
-			 * slot the SMD prep flow never wrote to (e.g. this
-			 * vdev just went idle after its AP link was torn
-			 * down, leaving a zero-initialized entry whose
-			 * vdev_id happens to read back as a valid id). Fall
-			 * back to the vdev's own configured MAC instead of
-			 * propagating a NULL self MAC into the ST Prep OTA
-			 * frame.
+			/* todo: add validate vdev mac with link info link_add */
+			qdf_mem_copy(vdev_own_macaddr.bytes,
+				     wlan_vdev_mlme_get_macaddr(vdev),
+				     QDF_MAC_ADDR_SIZE);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+
+			if (qdf_is_macaddr_zero(&link_info->ap_link_addr) ||
+			    link_info->link_id == WLAN_INVALID_LINK_ID) {
+				/* links_info[] self MAC can be stale/unpopulated for a
+				 * slot the SMD prep flow never wrote to (e.g. this
+				 * vdev just went idle after its AP link was torn
+				 * down, leaving a zero-initialized entry whose
+				 * vdev_id happens to read back as a valid id). Fall
+				 * back to the vdev's own configured MAC instead of
+				 * propagating a NULL self MAC into the ST Prep OTA
+				 * frame.
+				 */
+				if (qdf_is_macaddr_zero(&link_info->link_addr))
+					link_add[idx].self_link_addr = vdev_own_macaddr;
+				else
+					link_add[idx].self_link_addr = link_info->link_addr;
+				mlo_debug("assign idle self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d",
+					  QDF_MAC_ADDR_REF(link_add[idx].self_link_addr.bytes),
+					  link_add[idx].link_id,
+					  link_add[idx].freq,
+					  link_info->vdev_id);
+				mlo_debug("old link id %d flag 0x%x on vdev %d ",
+					  link_info->link_id,
+					  (uint32_t)link_info->link_status_flags,
+					  link_info->vdev_id);
+				allocated_bitmap |= 1 << i;
+				filled_bitmap |= 1 << idx;
+			}
+			/* Matched the hinted vdev - idle or not, nothing more
+			 * to look for on this add-link entry.
 			 */
-			if (qdf_is_macaddr_zero(&link_info->link_addr))
-				link_add[idx].self_link_addr = vdev_own_macaddr;
-			else
+			break;
+		}
+	}
+
+	/* 2.For SMD roaming FW indicates preferred vdev id for added links,
+	 *  validate it and use it. The vdev's current self MAC is reused
+	 *  either way - whether its current link is being deleted (mac is
+	 *  freed up for reuse, del_link_set/AP_REMOVAL_BIT case below) or
+	 *  it simply carries over unchanged into the new ML association
+	 *  (continuing link, no deletion needed). Link ids are always fresh
+	 *  for the target AP, so the old link id never reappears in the
+	 *  add list - only the vdev/self mac carries over.
+	 * for example:
+	 * L1 -> L2 L3: L3 gets an idle vdev's own mac (step 1), L2 reuses
+	 * L1's vdev/self mac (this step, continuing - no deletion).
+	 * L1 -> L2 L3 L4: L2 reuses an idle vdev's own mac (step 1), L3
+	 * reuses L1's vdev/self mac (this step, continuing), L4 gets the
+	 * standby link's self mac (step 4).
+	 */
+	for (idx = 0; idx < recfg_req->add_link_info.num_links; idx++) {
+		if (filled_bitmap & (1 << idx))
+			continue;
+		if (link_add[idx].vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
+
+		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+			if (allocated_bitmap & (1 << i))
+				continue;
+			if (link_info->vdev_id != link_add[idx].vdev_id)
+				continue;
+
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+						psoc, link_info->vdev_id,
+						WLAN_MLO_MGR_ID);
+			if (!vdev) {
+				mlo_err("Invalid VDEV id %d",
+					link_info->vdev_id);
+				break;
+			}
+
+			if (!cm_is_vdev_connected(vdev) && !cm_is_vdev_roaming(vdev)) {
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+				break;
+			}
+
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+
+			link_add[idx].self_link_addr = link_info->link_addr;
+			mlo_debug("fw preferred vdev %d for add link %d",
+				  link_add[idx].vdev_id,
+				  link_add[idx].link_id);
+
+			if (qdf_atomic_test_bit(
+					LS_F_AP_REMOVAL_BIT,
+					&link_info->link_status_flags) ||
+			    del_link_set & (1 << link_info->link_id)) {
+				mlo_debug("assign active self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d (link removed)",
+					  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+					  link_add[idx].link_id,
+					  link_add[idx].freq,
+					  link_info->vdev_id);
+				mlo_debug("current AP link id %d flag 0x%x on vdev %d ",
+					  link_info->link_id,
+					  (uint32_t)link_info->link_status_flags,
+					  link_info->vdev_id);
+				if (!*first_del_link_set_no_common) {
+					*first_del_link_set_no_common |=
+						1 << link_info->link_id;
+					mlo_debug("select link %d to delete first",
+						  link_info->link_id);
+				}
+			} else {
+				/* vdev's current link is not being torn down - it
+				 * carries over unchanged into the new ML association
+				 * (e.g. SL -> SL/ML where the original single link
+				 * becomes one of the new links). Keep its current
+				 * self MAC as-is.
+				 */
+				mlo_debug("assign continuing self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d (link continues)",
+					  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+					  link_add[idx].link_id,
+					  link_add[idx].freq,
+					  link_info->vdev_id);
+			}
+
+			allocated_bitmap |= 1 << i;
+			filled_bitmap |= 1 << idx;
+			break;
+		}
+	}
+
+	/* 3.select any other active vdev's link that is being deleted as
+	 * a 3rd choice for add link's self link addr, when FW's per-link
+	 * vdev id hint (step 2) does not resolve to a deletable link.
+	 * for example:
+	 * L1 L2 -> L3 L4: FW's hint for L3 already matched L1's vdev in
+	 * step 2. L2 is also being deleted but no add-link entry's hint
+	 * points at L2's vdev - reuse it for L4 anyway.
+	 */
+	for (idx = 0; idx < recfg_req->add_link_info.num_links; idx++) {
+		if (filled_bitmap & (1 << idx))
+			continue;
+
+		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+			if (allocated_bitmap & (1 << i))
+				continue;
+
+			if (link_info->vdev_id == WLAN_INVALID_VDEV_ID)
+				continue;
+
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+						psoc, link_info->vdev_id,
+						WLAN_LINK_RECFG_ID);
+			if (!vdev) {
+				mlo_err("Invalid VDEV id %d",
+					link_info->vdev_id);
+				continue;
+			}
+
+			if (!cm_is_vdev_connected(vdev) && !cm_is_vdev_roaming(vdev)) {
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+				continue;
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LINK_RECFG_ID);
+
+			if (qdf_atomic_test_bit(
+					LS_F_AP_REMOVAL_BIT,
+					&link_info->link_status_flags) ||
+			    del_link_set & (1 << link_info->link_id)) {
 				link_add[idx].self_link_addr = link_info->link_addr;
+				link_add[idx].vdev_id = link_info->vdev_id;
+				mlo_debug("assign deleted active self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d",
+					  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+					  link_add[idx].link_id,
+					  link_add[idx].freq,
+					  link_info->vdev_id);
+				mlo_debug("old link id %d flag 0x%x on vdev %d ",
+					  link_info->link_id,
+					  (uint32_t)link_info->link_status_flags,
+					  link_info->vdev_id);
+				if (!*first_del_link_set_no_common) {
+					*first_del_link_set_no_common |=
+						1 << link_info->link_id;
+					mlo_debug("select link %d to delete first",
+						  link_info->link_id);
+				}
+
+				allocated_bitmap |= 1 << i;
+				filled_bitmap |= 1 << idx;
+				break;
+			}
+		}
+	}
+
+	/* 4.select the standby link's self mac as 4th choice for add link's
+	 * self link addr. A standby link slot (vdev_id == WLAN_INVALID_VDEV_ID)
+	 * has no active vdev and thus no HW resource to tear down - unlike
+	 * step 2/3's real vdevs, there is nothing to gate on AP_REMOVAL_BIT/
+	 * del_link_set here. Its self MAC was derived once from the MLD
+	 * address at adapter setup (hdd_derive_link_address_from_mld()) and
+	 * pushed into links_info[] via mlo_mgr_update_link_info_mac_addr() -
+	 * reuse it whenever an add-link entry's hint reaches this slot,
+	 * instead of leaving the add link entry with a zero self MAC.
+	 * for example: L1 -> L2 L3 L4 (L4 gets this standby self mac)
+	 */
+	for (idx = 0; idx < recfg_req->add_link_info.num_links; idx++) {
+		if (filled_bitmap & (1 << idx))
+			continue;
+
+		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
+			if (allocated_bitmap & (1 << i))
+				continue;
+
+			if (link_info->vdev_id != WLAN_INVALID_VDEV_ID)
+				continue;
+
+			link_add[idx].self_link_addr = link_info->link_addr;
 			link_add[idx].vdev_id = link_info->vdev_id;
-			mlo_debug("assign idle self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d",
-				  QDF_MAC_ADDR_REF(link_add[idx].self_link_addr.bytes),
+			mlo_debug("assign standby self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d",
+				  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
 				  link_add[idx].link_id,
 				  link_add[idx].freq,
 				  link_info->vdev_id);
@@ -2231,73 +2439,9 @@ smd_link_recfg_assign_self_link_addr(
 				  link_info->link_id,
 				  (uint32_t)link_info->link_status_flags,
 				  link_info->vdev_id);
-			idx++;
 			allocated_bitmap |= 1 << i;
-		}
-	}
-
-	/* 2.For SMD roaming FW indicates preferred vdev id for added links,
-	 *  validate it and use it.
-	 * for example:
-	 * L1 L2 -> L3 L4
-	 * FW may indicate vdev id (from L1 or L2) for L3. here assign vdev
-	 * to L3.
-	 * The link will be deleted firstly. use the vdev on the deleted
-	 * link to connect to new L3.
-	 */
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS &&
-	     idx < recfg_req->add_link_info.num_links; i++) {
-		/* only checking the first one is enough */
-		if (link_add[idx].vdev_id == WLAN_INVALID_VDEV_ID)
+			filled_bitmap |= 1 << idx;
 			break;
-		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
-		if (allocated_bitmap & (1 << i))
-			continue;
-		if (link_info->vdev_id != link_add[idx].vdev_id)
-			continue;
-
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-					psoc, link_info->vdev_id,
-					WLAN_MLO_MGR_ID);
-		if (!vdev) {
-			mlo_err("Invalid VDEV id %d", link_info->vdev_id);
-			continue;
-		}
-
-		if (!cm_is_vdev_connected(vdev) && !cm_is_vdev_roaming(vdev)) {
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-			continue;
-		}
-
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-
-		if (qdf_atomic_test_bit(
-				LS_F_AP_REMOVAL_BIT,
-				&link_info->link_status_flags) ||
-		    del_link_set & (1 << link_info->link_id)) {
-			link_add[idx].self_link_addr = link_info->link_addr;
-			mlo_debug("fw preferred vdev %d for add link %d",
-				  link_add[idx].vdev_id,
-				  link_add[idx].link_id);
-			mlo_debug("assign active self link addr: " QDF_MAC_ADDR_FMT " for add link %d freq %d vdev %d",
-				  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
-				  link_add[idx].link_id,
-				  link_add[idx].freq,
-				  link_info->vdev_id);
-			mlo_debug("current AP link id %d flag 0x%x on vdev %d ",
-				  link_info->link_id,
-				  (uint32_t)link_info->link_status_flags,
-				  link_info->vdev_id);
-			if (!*first_del_link_set_no_common) {
-				*first_del_link_set_no_common |=
-					1 << link_info->link_id;
-				mlo_debug("select link %d to delete first",
-					  link_info->link_id);
-			}
-
-			idx++;
-			allocated_bitmap |= 1 << i;
-			i = -1;
 		}
 	}
 
@@ -3748,10 +3892,19 @@ void smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev)
 	struct mlo_link_info *src_link;
 	struct mlo_link_info *dst_link;
 	struct wlan_channel *chan_buf;
-	uint8_t i;
+	struct qdf_mac_addr saved_self_mac[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct qdf_mac_addr saved_standby_mac[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t idle_slots[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t num_idle_slots = 0;
+	uint32_t consumed_vdev_bitmap = 0;
+	uint32_t saved_mac_bitmap = 0;
+	uint32_t saved_standby_bitmap = 0;
+	uint8_t i, j, real_vdev_id;
 
-	if (!vdev)
+	if (!vdev) {
+		mlo_err("SMD: vdev NULL");
 		return;
+	}
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
@@ -3768,7 +3921,9 @@ void smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev)
 	}
 
 	target_bss_ctx =
-		smd_ctx->prepared_targets[smd_ctx->active_target_idx].target_bss_ctx;
+		smd_ctx->prepared_targets[smd_ctx->active_target_idx]
+		.target_bss_ctx;
+
 	if (!target_bss_ctx) {
 		mlo_err("SMD: target_bss_ctx NULL at active_target_idx=%d",
 			smd_ctx->active_target_idx);
@@ -3776,41 +3931,117 @@ void smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev)
 	}
 
 	/*
-	 * Reset all sta_ctx link slots, then copy directly from target_bss_ctx.
-	 * link_chan_info pointers are heap-allocated and owned by sta_ctx —
-	 * preserve them across the reset and copy the channel content in-place.
+	 * Save each vdev's self MAC by vdev ID before rebuilding sta_ctx.
+	 * links_info[] slots can be reassigned to a different vdev during
+	 * PASS2, so preserving the MAC by slot would attach the wrong MAC to
+	 * a reclaimed vdev.
 	 */
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		dst_link = &mlo_dev_ctx->sta_ctx->links_info[i];
+
+		if (dst_link->vdev_id == WLAN_INVALID_VDEV_ID ||
+		    dst_link->vdev_id >= WLAN_UMAC_MLO_MAX_VDEVS) {
+			if (dst_link->vdev_id == WLAN_INVALID_VDEV_ID &&
+			    !qdf_is_macaddr_zero(&dst_link->link_addr)) {
+				qdf_copy_macaddr(&saved_standby_mac[i],
+						 &dst_link->link_addr);
+				saved_standby_bitmap |= 1U << i;
+			}
+			continue;
+		}
+
+		if (qdf_is_macaddr_zero(&dst_link->link_addr))
+			continue;
+
+		qdf_copy_macaddr(&saved_self_mac[dst_link->vdev_id],
+				 &dst_link->link_addr);
+		saved_mac_bitmap |= 1U << dst_link->vdev_id;
+	}
+
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		dst_link = &mlo_dev_ctx->sta_ctx->links_info[i];
 		src_link = &target_bss_ctx->links_info[i];
 
-		/* Stash and restore the owned channel buffer pointer */
+		/* Preserve the owned channel buffer across the reset. */
 		chan_buf = dst_link->link_chan_info;
 
 		qdf_mem_zero(dst_link, sizeof(*dst_link));
 		dst_link->link_chan_info = chan_buf;
 
-		dst_link->vdev_id        = src_link->vdev_id;
-		dst_link->link_id        = src_link->link_id;
-		dst_link->chan_freq       = src_link->chan_freq;
-		dst_link->cnx_tx_nss     = src_link->cnx_tx_nss;
-		dst_link->cnx_rx_nss     = src_link->cnx_rx_nss;
-		dst_link->link_status_code = src_link->link_status_code;
-		qdf_copy_macaddr(&dst_link->link_addr, &src_link->link_addr);
-		qdf_copy_macaddr(&dst_link->ap_link_addr, &src_link->ap_link_addr);
+		if (qdf_is_macaddr_zero(&src_link->ap_link_addr)) {
+			idle_slots[num_idle_slots++] = i;
+			continue;
+		}
 
-		if (src_link->link_chan_info && dst_link->link_chan_info)
+		dst_link->vdev_id = src_link->vdev_id;
+		dst_link->link_id = src_link->link_id;
+		dst_link->chan_freq = src_link->chan_freq;
+		dst_link->cnx_tx_nss = src_link->cnx_tx_nss;
+		dst_link->cnx_rx_nss = src_link->cnx_rx_nss;
+		dst_link->link_status_code =
+			src_link->link_status_code;
+
+		qdf_copy_macaddr(&dst_link->link_addr,
+				 &src_link->link_addr);
+
+		qdf_copy_macaddr(&dst_link->ap_link_addr,
+				 &src_link->ap_link_addr);
+
+		if (src_link->link_chan_info &&
+		    dst_link->link_chan_info) {
 			qdf_mem_copy(dst_link->link_chan_info,
 				     src_link->link_chan_info,
 				     sizeof(struct wlan_channel));
+		}
 
-		if (!qdf_is_macaddr_zero(&dst_link->ap_link_addr))
-			mlo_debug("SMD: links_info[%d] vdev=%d link_id=%d freq=%d AP="
-				  QDF_MAC_ADDR_FMT " self=" QDF_MAC_ADDR_FMT,
-				  i, dst_link->vdev_id, dst_link->link_id,
-				  dst_link->chan_freq,
-				  QDF_MAC_ADDR_REF(dst_link->ap_link_addr.bytes),
-				  QDF_MAC_ADDR_REF(dst_link->link_addr.bytes));
+		if (dst_link->vdev_id != WLAN_INVALID_VDEV_ID) {
+			consumed_vdev_bitmap |=
+				(1 << dst_link->vdev_id);
+		}
+	}
+
+	for (i = 0; i < num_idle_slots; i++) {
+		dst_link =
+			&mlo_dev_ctx->sta_ctx->links_info[
+			idle_slots[i]];
+
+		dst_link->vdev_id = WLAN_INVALID_VDEV_ID;
+
+		for (j = 0; j < WLAN_UMAC_MLO_MAX_VDEVS; j++) {
+			if (!mlo_dev_ctx->wlan_vdev_list[j])
+				continue;
+
+			real_vdev_id = wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[j]);
+			if (consumed_vdev_bitmap &
+			    (1 << real_vdev_id))
+				continue;
+
+			dst_link->vdev_id = real_vdev_id;
+			consumed_vdev_bitmap |=
+				(1 << real_vdev_id);
+			break;
+		}
+
+		dst_link->link_id = WLAN_INVALID_LINK_ID;
+
+		/*
+		 * The slot may now belong to a different vdev than it did before
+		 * PASS1. Restore the self MAC using the reclaimed vdev ID.
+		 */
+		if (dst_link->vdev_id != WLAN_INVALID_VDEV_ID &&
+		    dst_link->vdev_id < WLAN_UMAC_MLO_MAX_VDEVS &&
+		    (saved_mac_bitmap & (1U << dst_link->vdev_id))) {
+			qdf_copy_macaddr(&dst_link->link_addr,
+					 &saved_self_mac[dst_link->vdev_id]);
+		} else {
+			if (saved_standby_bitmap & (1U << idle_slots[i])) {
+				qdf_copy_macaddr(&dst_link->link_addr,
+						 &saved_standby_mac[idle_slots[i]]);
+			} else {
+				qdf_mem_zero(&dst_link->link_addr,
+					     sizeof(dst_link->link_addr));
+			}
+		}
 	}
 }
 
