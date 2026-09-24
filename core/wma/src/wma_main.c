@@ -5720,13 +5720,13 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	cfg->en_11ac = wmi_service_enabled(wmi_handle,
 					      wmi_service_11ac);
 	if (cfg->en_11ac)
-		g_fw_wlan_feat_caps |= (1 << DOT11AC);
+		wma_set_fw_wlan_feat_caps(DOT11AC);
 
 	/* Proactive ARP response */
-	g_fw_wlan_feat_caps |= (1 << WLAN_PERIODIC_TX_PTRN);
+	wma_set_fw_wlan_feat_caps(WLAN_PERIODIC_TX_PTRN);
 
 	/* Enable WOW */
-	g_fw_wlan_feat_caps |= (1 << WOW);
+	wma_set_fw_wlan_feat_caps(WOW);
 
 	/* ARP offload */
 	cfg->arp_offload = wmi_service_enabled(wmi_handle,
@@ -5743,13 +5743,13 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	/* PNO offload */
 	if (wmi_service_enabled(wmi_handle, wmi_service_nlo)) {
 		cfg->pno_offload = true;
-		g_fw_wlan_feat_caps |= (1 << PNO);
+		wma_set_fw_wlan_feat_caps(PNO);
 	}
 #endif /* FEATURE_WLAN_SCAN_PNO */
 
 #ifdef FEATURE_WLAN_EXTSCAN
 	if (wmi_service_enabled(wmi_handle, wmi_service_extscan))
-		g_fw_wlan_feat_caps |= (1 << EXTENDED_SCAN);
+		wma_set_fw_wlan_feat_caps(EXTENDED_SCAN);
 #endif /* FEATURE_WLAN_EXTSCAN */
 	cfg->lte_coex_ant_share = wmi_service_enabled(wmi_handle,
 					wmi_service_lte_ant_share_support);
@@ -5757,12 +5757,12 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	/* Enable TDLS */
 	if (wmi_service_enabled(wmi_handle, wmi_service_tdls)) {
 		cfg->en_tdls = 1;
-		g_fw_wlan_feat_caps |= (1 << TDLS);
+		wma_set_fw_wlan_feat_caps(TDLS);
 	}
 	/* Enable advanced TDLS features */
 	if (wmi_service_enabled(wmi_handle, wmi_service_tdls_offchan)) {
 		cfg->en_tdls_offchan = 1;
-		g_fw_wlan_feat_caps |= (1 << TDLS_OFF_CHANNEL);
+		wma_set_fw_wlan_feat_caps(TDLS_OFF_CHANNEL);
 	}
 
 	cfg->en_tdls_uapsd_buf_sta =
@@ -5785,12 +5785,12 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 #ifdef WLAN_FEATURE_NAN
 	if (wmi_service_enabled(wmi_handle, wmi_service_nan))
-		g_fw_wlan_feat_caps |= (1 << NAN);
+		wma_set_fw_wlan_feat_caps(NAN);
 	wma_nan_set_pairing_feature();
 #endif /* WLAN_FEATURE_NAN */
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_rtt))
-		g_fw_wlan_feat_caps |= (1 << RTT);
+		wma_set_fw_wlan_feat_caps(RTT);
 
 	if (wmi_service_enabled(wmi_handle,
 			wmi_service_tx_msdu_id_new_partition_support)) {
@@ -5826,7 +5826,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 		cfg->bcn_reception_stats = true;
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_vdev_latency_config))
-		g_fw_wlan_feat_caps |= (1 << VDEV_LATENCY_CONFIG);
+		wma_set_fw_wlan_feat_caps(VDEV_LATENCY_CONFIG);
 	if (wmi_service_enabled(wmi_handle,
 				wmi_roam_scan_chan_list_to_host_support))
 		cfg->is_roam_scan_ch_to_host = true;
