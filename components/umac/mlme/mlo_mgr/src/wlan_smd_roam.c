@@ -301,6 +301,13 @@ smd_link_recfg_find_link_info_with_active_vdev(
  *   - struct body: full qdf_mem_copy
  *   - ric_tspec_data: allocated and copied if ric_data_len > 0
  *   - add_bss_params: set to NULL (not needed by SMD link switches)
+ *   - ST Exec Request/Response frames: for SMD roam sync, the
+ *     reassoc_req_frame/reassoc_rsp_frame slots (indexed via
+ *     reassoc_req_offset/reassoc_resp_offset into the WMI event buffer
+ *     trailing sync_ind) actually carry the ST Exec Request/Response
+ *     frames. These offsets are only valid while the original sync_ind
+ *     buffer is alive, so the frame bytes are copied out now into
+ *     st_exec_req_frame/st_exec_rsp_frame.
  *
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise
  */
@@ -337,7 +344,53 @@ smd_alloc_copy_roam_sync_ind(struct mlo_link_recfg_context *recfg_ctx,
 	 */
 	recfg_ctx->cached_sync_ind->add_bss_params = NULL;
 
+	/* ST Exec Request frame: copy out while sync_ind is still valid.
+	 * reassoc_req_length includes the wlan_frame_hdr; keep the raw
+	 * frame body here and let the consumer strip the header, matching
+	 * the pattern used for legacy reassoc frames elsewhere.
+	 */
+	qdf_mem_zero(&recfg_ctx->st_exec_req_frame,
+		     sizeof(recfg_ctx->st_exec_req_frame));
+	if (sync_ind->reassoc_req_length) {
+		recfg_ctx->st_exec_req_frame.ptr =
+			qdf_mem_malloc(sync_ind->reassoc_req_length);
+		if (!recfg_ctx->st_exec_req_frame.ptr) {
+			mlo_err("SMD: failed to alloc st_exec_req_frame copy");
+			goto free_and_err;
+		}
+		qdf_mem_copy(recfg_ctx->st_exec_req_frame.ptr,
+			     (uint8_t *)sync_ind + sync_ind->reassoc_req_offset,
+			     sync_ind->reassoc_req_length);
+		recfg_ctx->st_exec_req_frame.len = sync_ind->reassoc_req_length;
+	}
+
+	/* ST Exec Response frame: same pattern as above. */
+	qdf_mem_zero(&recfg_ctx->st_exec_rsp_frame,
+		     sizeof(recfg_ctx->st_exec_rsp_frame));
+	if (sync_ind->reassoc_resp_length) {
+		recfg_ctx->st_exec_rsp_frame.ptr =
+			qdf_mem_malloc(sync_ind->reassoc_resp_length);
+		if (!recfg_ctx->st_exec_rsp_frame.ptr) {
+			mlo_err("SMD: failed to alloc st_exec_rsp_frame copy");
+			goto free_and_err;
+		}
+		qdf_mem_copy(recfg_ctx->st_exec_rsp_frame.ptr,
+			     (uint8_t *)sync_ind + sync_ind->reassoc_resp_offset,
+			     sync_ind->reassoc_resp_length);
+		recfg_ctx->st_exec_rsp_frame.len = sync_ind->reassoc_resp_length;
+	}
+
 	return QDF_STATUS_SUCCESS;
+
+free_and_err:
+	qdf_mem_free(recfg_ctx->st_exec_req_frame.ptr);
+	recfg_ctx->st_exec_req_frame.ptr = NULL;
+	recfg_ctx->st_exec_req_frame.len = 0;
+	if (recfg_ctx->cached_sync_ind->ric_tspec_data)
+		qdf_mem_free(recfg_ctx->cached_sync_ind->ric_tspec_data);
+	qdf_mem_free(recfg_ctx->cached_sync_ind);
+	recfg_ctx->cached_sync_ind = NULL;
+	return QDF_STATUS_E_NOMEM;
 }
 
 /**
@@ -345,22 +398,40 @@ smd_alloc_copy_roam_sync_ind(struct mlo_link_recfg_context *recfg_ctx,
  * @recfg_ctx: Link reconfiguration context
  *
  * Frees all memory allocated by smd_alloc_copy_roam_sync_ind():
- * first the ric_tspec_data buffer (if any), then the struct itself.
+ * first the ric_tspec_data buffer (if any), then the struct itself,
+ * then the ST Prep/Exec Request/Response frame copies (if any).
  * Safe to call even if cached_sync_ind is NULL.
  */
 static void
 smd_free_cached_sync_ind(struct mlo_link_recfg_context *recfg_ctx)
 {
-	if (!recfg_ctx->cached_sync_ind)
-		return;
+	if (recfg_ctx->cached_sync_ind) {
+		if (recfg_ctx->cached_sync_ind->ric_tspec_data) {
+			qdf_mem_free(recfg_ctx->cached_sync_ind->ric_tspec_data);
+			recfg_ctx->cached_sync_ind->ric_tspec_data = NULL;
+		}
 
-	if (recfg_ctx->cached_sync_ind->ric_tspec_data) {
-		qdf_mem_free(recfg_ctx->cached_sync_ind->ric_tspec_data);
-		recfg_ctx->cached_sync_ind->ric_tspec_data = NULL;
+		qdf_mem_free(recfg_ctx->cached_sync_ind);
+		recfg_ctx->cached_sync_ind = NULL;
 	}
 
-	qdf_mem_free(recfg_ctx->cached_sync_ind);
-	recfg_ctx->cached_sync_ind = NULL;
+	if (recfg_ctx->st_exec_req_frame.ptr) {
+		qdf_mem_free(recfg_ctx->st_exec_req_frame.ptr);
+		recfg_ctx->st_exec_req_frame.ptr = NULL;
+		recfg_ctx->st_exec_req_frame.len = 0;
+	}
+
+	if (recfg_ctx->st_exec_rsp_frame.ptr) {
+		qdf_mem_free(recfg_ctx->st_exec_rsp_frame.ptr);
+		recfg_ctx->st_exec_rsp_frame.ptr = NULL;
+		recfg_ctx->st_exec_rsp_frame.len = 0;
+	}
+
+	if (recfg_ctx->st_prep_req_frame.ptr) {
+		qdf_mem_free(recfg_ctx->st_prep_req_frame.ptr);
+		recfg_ctx->st_prep_req_frame.ptr = NULL;
+		recfg_ctx->st_prep_req_frame.len = 0;
+	}
 }
 
 /**
@@ -3143,6 +3214,10 @@ smd_add_prepared_target_links_in_smd_ctx(
 		goto end;
 	}
 
+	qdf_copy_macaddr(&smd_ctx->mld_addr, &req->add_link_info.mld_addr);
+	mlo_debug("SMD ctx mld_addr updated to " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(smd_ctx->mld_addr.bytes));
+
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
 				psoc, recfg_ctx->curr_recfg_req.vdev_id,
 				WLAN_LINK_RECFG_ID);
@@ -4043,6 +4118,193 @@ void smd_roam_update_sta_ctx_links(struct wlan_objmgr_vdev *vdev)
 			}
 		}
 	}
+}
+
+/**
+ * smd_roam_copy_frame() - Deep copy an element_info frame buffer
+ * @dst: Destination element_info
+ * @src: Source element_info
+ *
+ * Return: QDF_STATUS_SUCCESS on success (including src->len == 0, in which
+ * case dst is left zeroed), error code on allocation failure
+ */
+static QDF_STATUS
+smd_roam_copy_frame(struct element_info *dst, struct element_info *src)
+{
+	if (!src->len || !src->ptr)
+		return QDF_STATUS_SUCCESS;
+
+	dst->ptr = qdf_mem_malloc(src->len);
+	if (!dst->ptr)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(dst->ptr, src->ptr, src->len);
+	dst->len = src->len;
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * smd_roam_build_connect_rsp() - Build connect rsp for SMD roam indication
+ * @vdev: New assoc vdev receiving EV_SMD_EXEC_COMPLETE
+ *
+ * Allocates and populates a struct wlan_cm_connect_resp so the existing
+ * mlme_cm_osif_connect_complete() -> osif_indicate_reassoc_results() chain
+ * can send cfg80211_roamed() and QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH
+ * to userspace for SMD roams. Must be called while target_bss_ctx and
+ * recfg_ctx's cached frame buffers are still valid — i.e. before
+ * smd_roam_cleanup_ies() runs (called from smd_exec_complete() right after
+ * EV_SMD_EXEC_COMPLETE delivery returns).
+ *
+ * MLO links (active + standby) are read from sta_ctx->links_info[], already
+ * refreshed by smd_roam_update_sta_ctx_links() for this roam. ST Prep/Exec
+ * Request/Response frames and KCK/KEK are deep-copied out of recfg_ctx and
+ * cached_sync_ind so they outlive smd_roam_cleanup_ies().
+ *
+ * Return: allocated struct wlan_cm_connect_resp on success (caller must
+ * free with wlan_cm_free_connect_resp()), NULL on failure
+ */
+struct wlan_cm_connect_resp *
+smd_roam_build_connect_rsp(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_recfg_context *recfg_ctx;
+	struct smd_context *smd_ctx;
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_cm_connect_resp *rsp;
+	struct wlan_roam_sync_info *roaming_info;
+	struct mlo_link_info *link_info;
+	uint8_t i, num_links = 0;
+	uint8_t assoc_vdev_id;
+	bool ptk_mode_per_ap_mld;
+
+	if (!vdev)
+		return NULL;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx || !mlo_dev_ctx->link_recfg_ctx) {
+		mlo_err("SMD: mlo_dev_ctx/sta_ctx/link_recfg_ctx NULL for vdev %d",
+			wlan_vdev_get_id(vdev));
+		return NULL;
+	}
+
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+
+	/*
+	 * vdev is already the new assoc vdev receiving EV_SMD_EXEC_COMPLETE
+	 * (see smd_find_new_assoc_vdev()/smd_exec_complete()).
+	 */
+	assoc_vdev_id = wlan_vdev_get_id(vdev);
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return NULL;
+
+	rsp->vdev_id = wlan_vdev_get_id(vdev);
+	rsp->is_reassoc = 1;
+	rsp->connect_status = QDF_STATUS_SUCCESS;
+
+	/*
+	 * rsp->bssid must be the assoc link's link-level BSSID — this is
+	 * what osif_indicate_reassoc_results() uses to look up the
+	 * cfg80211_bss entry via wlan_cfg80211_get_bss(). The MLD address
+	 * goes in rsp->mld_addr instead; it is not a BSSID and would not
+	 * resolve to any scan cache entry, causing the roam indication to
+	 * be dropped in favour of a disconnect.
+	 */
+	if (smd_ctx)
+		qdf_copy_macaddr(&rsp->mld_addr, &smd_ctx->mld_addr);
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &sta_ctx->links_info[i];
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		if (link_info->vdev_id == assoc_vdev_id) {
+			rsp->freq = link_info->chan_freq;
+			qdf_copy_macaddr(&rsp->bssid, &link_info->ap_link_addr);
+		}
+
+		/*
+		 * Include the assoc link's own entry too, not just partner
+		 * links. This mirrors the LFR3/legacy roam-sync path
+		 * (mlo_roam_copy_partner_info() called with fill_all_links =
+		 * true in cm_mlo_roam_copy_partner_info()), which fills
+		 * ml_parnter_info with every link -- assoc included -- since
+		 * that is what feeds the userspace-facing connect/roam
+		 * response (osif_populate_partner_links_roam_mlo_params(),
+		 * osif_send_roam_auth_mlo_links_event()). Without this, SMD
+		 * roams under-report num_partner_links by one relative to
+		 * LFR3 for the same link count.
+		 */
+		if (num_links < WLAN_MAX_ML_BSS_LINKS) {
+			struct mlo_link_info *dst =
+				&rsp->ml_parnter_info.partner_link_info[num_links];
+
+			dst->vdev_id = link_info->vdev_id;
+			dst->link_id = link_info->link_id;
+			dst->chan_freq = link_info->chan_freq;
+			/*
+			 * partner_link_info[].link_addr is the AP link BSSID
+			 * everywhere else it is produced/consumed (lim_mlo.c,
+			 * wlan_mlo_link_recfg.c, osif_send_roam_auth_mlo_links_event()
+			 * for QCA_WLAN_VENDOR_ATTR_MLO_LINK_BSSID). Keep that
+			 * convention here instead of the self address, else the
+			 * roam-auth vendor event reports the STA's own MAC as the
+			 * AP BSSID.
+			 */
+			qdf_copy_macaddr(&dst->link_addr, &link_info->ap_link_addr);
+			qdf_copy_macaddr(&dst->ap_link_addr, &link_info->ap_link_addr);
+			mlo_debug("SMD: roam rsp link_id:%d vdev:%d self:"
+				  QDF_MAC_ADDR_FMT " ap_bssid:" QDF_MAC_ADDR_FMT
+				  " is_assoc:%d",
+				  dst->link_id, dst->vdev_id,
+				  QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+				  QDF_MAC_ADDR_REF(dst->ap_link_addr.bytes),
+				  link_info->vdev_id == assoc_vdev_id);
+			num_links++;
+		}
+	}
+	rsp->ml_parnter_info.num_partner_links = num_links;
+
+	roaming_info = qdf_mem_malloc(sizeof(*roaming_info));
+	if (!roaming_info) {
+		qdf_mem_free(rsp);
+		return NULL;
+	}
+	rsp->roaming_info = roaming_info;
+
+	roaming_info->smd_transition = true;
+	ptk_mode_per_ap_mld = smd_ctx && smd_ctx->smd_capabilities.ptk_mode;
+	roaming_info->smd_ptk_mode = ptk_mode_per_ap_mld ? 1 : 0;
+	roaming_info->auth_status = ROAM_AUTH_STATUS_AUTHENTICATED;
+
+	if (recfg_ctx->cached_sync_ind) {
+		qdf_copy_macaddr(&roaming_info->target_ap_bssid,
+				 &recfg_ctx->cached_sync_ind->bssid);
+		if (ptk_mode_per_ap_mld) {
+			roaming_info->kck_len = recfg_ctx->cached_sync_ind->kck_len;
+			qdf_mem_copy(roaming_info->kck,
+				     recfg_ctx->cached_sync_ind->kck,
+				     roaming_info->kck_len);
+			roaming_info->kek_len = recfg_ctx->cached_sync_ind->kek_len;
+			qdf_mem_copy(roaming_info->kek,
+				     recfg_ctx->cached_sync_ind->kek,
+				     roaming_info->kek_len);
+		}
+	}
+
+	smd_roam_copy_frame(&roaming_info->st_prep_req,
+			    &recfg_ctx->st_prep_req_frame);
+	smd_roam_copy_frame(&roaming_info->st_prep_rsp,
+			    &recfg_ctx->rsp_frame);
+	smd_roam_copy_frame(&roaming_info->st_exec_req,
+			    &recfg_ctx->st_exec_req_frame);
+	smd_roam_copy_frame(&roaming_info->st_exec_rsp,
+			    &recfg_ctx->st_exec_rsp_frame);
+
+	return rsp;
 }
 
 /**
