@@ -2011,14 +2011,6 @@ void ucfg_dp_fim_clear_stats(struct wlan_objmgr_vdev *vdev);
 bool ucfg_dp_fpm_check_tid_override_tagged(qdf_nbuf_t nbuf);
 
 /*
- * ucfg_dp_fpm_display_policy() - Display FPM policies
- * @vdev: vdev
- *
- * Return: None
- */
-void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev);
-
-/*
  * ucfg_fpm_policy_get_ctx_by_vdev() - Fet FPM context from vdev
  * @vdev: vdev
  *
@@ -2089,11 +2081,6 @@ static inline
 bool ucfg_dp_fpm_check_tid_override_tagged(qdf_nbuf_t nbuf)
 {
 	return false;
-}
-
-static inline
-void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev)
-{
 }
 
 static inline
