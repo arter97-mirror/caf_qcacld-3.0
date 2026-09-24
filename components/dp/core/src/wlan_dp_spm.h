@@ -30,17 +30,10 @@
 #define WLAN_DP_SPM_MAX_SERVICE_CLASS_SUPPORT 32
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
-#define WLAN_DP_SPM_S_TBL_SIZE 256
-#define WLAN_DP_SPM_S_TBL_IDX_MASK 0xFF
-#define WLAN_DP_SPM_S_TBL_RETIRE_TIME_DELTA_NS (200 * QDF_NSEC_PER_MSEC)
-#define WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT 0
 #define WLAN_DP_SPM_NUM_FLOW_ENTRIES_MASK 0xFF
 #define WLAN_DP_SPM_SKID_MAX 8
 
-/* No packets received for this flow in last 2 seconds, window did not move*/
-#define WLAN_DP_SPM_MAX_LAST_WIN_START_NS (2 * QDF_NSEC_PER_SEC)
 /* voice call tx pkt rate is very low */
-#define WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC 10
 #define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 5
 
 /**
@@ -147,40 +140,13 @@ struct wlan_dp_spm_flow_info {
 };
 
 /**
- * struct wlan_dp_spm_screening_entry - Entry of screening table
- * @flags: Entry flags. This member should always be placed first as memory
- *         ops will be done to avoid this member.
- * @skb_hash: Socket buffer hash
- * @num_pkts: Number of packets
- * @init_ts: Initialisation timestamp
- */
-struct wlan_dp_spm_screening_entry {
-	unsigned long flags;
-	uint32_t skb_hash;
-	uint32_t num_pkts;
-	uint64_t init_ts;
-};
-
-/**
- * struct wlan_dp_spm_screening_ctx - Flow screening context
- * @s_tbl: Screening flow table
- * @s_flows_active: Number of flows being screened
- */
-struct wlan_dp_spm_screening_ctx {
-	struct wlan_dp_spm_screening_entry s_tbl[WLAN_DP_SPM_S_TBL_SIZE];
-	uint32_t s_flows_active;
-};
-
-/**
  * struct wlan_dp_spm_intf_context - SPM context per dp interface
  * @origin_aft_hlist: Active flow table for originating traffic
  * @o_stats: Flow table stats for originating traffic
- * @screen_flow_ctx: Flow screening context
  */
 struct wlan_dp_spm_intf_context {
 	struct hlist_head origin_aft_hlist[WLAN_DP_SPM_HASH_TBL_MAX];
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
-	struct wlan_dp_spm_screening_ctx screen_flow_ctx;
 };
 
 /**
@@ -447,18 +413,6 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf);
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf);
 
 /**
- * wlan_dp_spm_flow_screening(): Check if flow has valid packet rate for
- *                               tracking.
- *
- * @dp_intf: DP interface
- * @skb: Pointer to sk_buff
- *
- * Return: True if flow tracking rate is met, else false.
- */
-bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
-				qdf_nbuf_t skb);
-
-/**
  * dp_spm_get_tx_flow_id() - Get TX flow ID using hash-based lookup
  * @dp_intf: DP interface context
  * @nbuf: Network buffer containing the packet
@@ -540,20 +494,6 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 static inline
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 {
-}
-
-static inline
-bool wlan_dp_spm_flow_pkt_rate_valid(struct wlan_dp_intf *dp_intf,
-				     qdf_nbuf_t skb)
-{
-	return false;
-}
-
-static inline
-bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
-				qdf_nbuf_t skb)
-{
-	return false;
 }
 
 static inline
