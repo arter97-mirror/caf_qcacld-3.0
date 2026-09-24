@@ -1365,6 +1365,8 @@ wma_set_per_link_amsdu_cap(tp_wma_handle wma, wma_cli_set_cmd_t *privcmd,
 	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
 		op_mode = wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id);
 		if (op_mode == QDF_STA_MODE) {
+			if (!wma_is_vdev_valid(vdev_id))
+				continue;
 			ret = wma_set_tx_rx_aggr_size(vdev_id,
 						      privcmd->param_value,
 						      privcmd->param_value,
