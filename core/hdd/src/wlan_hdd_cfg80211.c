@@ -4200,7 +4200,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	int ret, i;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1];
 	bool ht_enabled, ht40_enabled, vht_enabled, eht_enabled;
-	uint16_t ch_width;
+	uint16_t ch_width, max_ch_width_val;
 	enum qca_wlan_vendor_acs_hw_mode hw_mode;
 	enum policy_mgr_con_mode pm_mode;
 	QDF_STATUS qdf_status;
@@ -4218,6 +4218,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint32_t last_scan_ageout_time, band_mask = 0;
 	struct wlan_hdd_link_info *link_info;
 	int link_id = -1;
+	enum phy_ch_width max_ch_width;
 
 	/* ***Note*** Do not set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
@@ -4378,6 +4379,16 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	}
 	if (is_ll_lt_sap)
 		ch_width = 20;
+
+	/* Get the maximum bandwidth supported by hardware */
+	max_ch_width = wlan_mlme_get_max_bw();
+	max_ch_width_val = wlan_reg_get_bw_value(max_ch_width);
+
+	if (ch_width  > max_ch_width_val) {
+		hdd_debug("Downgrading ch_width %d to max supported ch_width %d",
+			  ch_width, max_ch_width_val);
+		ch_width = max_ch_width_val;
+	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME])
 		last_scan_ageout_time =
