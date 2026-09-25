@@ -8181,22 +8181,83 @@ csr_process_roam_auth_sae_callback(struct mac_context *mac_ctx,
 #endif
 
 QDF_STATUS
-csr_roam_auth_offload_callback(struct mac_context *mac_ctx, uint8_t vdev_id,
-			       struct qdf_mac_addr bssid, uint32_t akm)
+csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
+			       struct auth_offload_event *auth_event)
 {
 	QDF_STATUS status;
+	uint8_t vdev_id = auth_event->vdev_id;
+	struct csr_roam_info *roam_info;
+	struct wlan_external_auth_params *params;
 
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return status;
 
-	status = csr_process_roam_auth_sae_callback(mac_ctx, vdev_id,
-						    bssid, akm);
+	if (auth_event->auth_algo != eSIR_AUTH_TYPE_EPPKE &&
+	    auth_event->auth_algo != eSIR_AUTH_TYPE_8021X_IN_AUTH) {
+		status = csr_process_roam_auth_sae_callback(mac_ctx, vdev_id,
+							    auth_event->ap_bssid,
+							    auth_event->akm);
+		sme_release_global_lock(&mac_ctx->sme);
+		return status;
+	}
 
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (!roam_info) {
+		status = QDF_STATUS_E_NOMEM;
+		goto end;
+	}
+
+	params = &roam_info->ext_auth_info;
+
+	params->vdev_id = vdev_id;
+	wlan_cm_get_roam_offload_ssid(mac_ctx->psoc, vdev_id,
+				      params->ssid.ssid,
+				      &params->ssid.length);
+
+	params->bssid = auth_event->ap_bssid;
+	scm_get_mld_addr_by_link_addr(mac_ctx->pdev, &auth_event->ap_bssid,
+				      &params->mld_addr);
+	params->auth_algo = auth_event->auth_algo;
+	params->pairwise_cipher = BIT(auth_event->pairwise_cipher);
+	params->group_cipher = BIT(auth_event->group_cipher);
+	params->group_mgmt_cipher = BIT(auth_event->group_mgmt_cipher);
+	params->akm =
+	    BIT(wlan_crypto_rsn_suite_to_keymgmt((uint8_t *)&auth_event->akm));
+
+	if (auth_event->rsn_ie_len) {
+		QDF_STATUS ret;
+
+		ret = util_scan_get_rsn_cap(auth_event->rsn_ie,
+					    auth_event->rsn_ie_len,
+					    &params->rsn_capab);
+		if (QDF_IS_STATUS_ERROR(ret))
+			sme_debug("vdev:%d Failed to extract RSN cap from RSN IE",
+				  vdev_id);
+	}
+
+	if (auth_event->rsnxe_ie_len &&
+	    auth_event->rsnxe_ie_len <= sizeof(params->rsnxe_data)) {
+		params->rsnxe_len = auth_event->rsnxe_ie_len;
+		qdf_mem_copy(params->rsnxe_data,
+			     auth_event->rsnxe_ie,
+			     auth_event->rsnxe_ie_len);
+	}
+	sme_debug("vdev:%d Roam Preauth external authentication akm:0x%x algo:%d pairwise:0x%x group_cipher:0x%x mgmt_cipher:0x%x rsn_capab:0x%x rsnxe_len:%d",
+		  auth_event->vdev_id, params->akm,
+		  params->auth_algo,
+		  params->pairwise_cipher,
+		  params->group_cipher,
+		  params->group_mgmt_cipher,
+		  params->rsn_capab, params->rsnxe_len);
+	csr_roam_call_callback(mac_ctx, vdev_id, roam_info,
+			       eCSR_ROAM_EXTERNAL_AUTH_REQUEST,
+			       eCSR_ROAM_RESULT_NONE);
+	qdf_mem_free(roam_info);
+end:
 	sme_release_global_lock(&mac_ctx->sme);
 
 	return status;
-
 }
 #endif
 

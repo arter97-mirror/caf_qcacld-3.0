@@ -660,9 +660,7 @@ struct sme_ready_req {
 	uint16_t messageType;   /* eWNI_SME_SYS_READY_IND */
 	uint16_t length;
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
-						    uint8_t vdev_id,
-						    struct qdf_mac_addr bssid,
-						    uint32_t akm);
+						    struct auth_offload_event *auth_event);
 	pe_roam_synch_fn_t pe_roam_synch_cb;
 	stop_roaming_fn_t stop_roaming_cb;
 	QDF_STATUS (*sme_msg_cb)(struct mac_context *mac,
