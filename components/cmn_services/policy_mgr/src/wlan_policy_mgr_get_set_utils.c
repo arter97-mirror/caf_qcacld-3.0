@@ -586,11 +586,13 @@ QDF_STATUS policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
 
 bool policy_mgr_get_sap_force_20mhz_for_country_id(
 					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev,
 					qdf_freq_t freq)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool force_sap_20mhz_cc_id;
 	uint8_t country_code[REG_ALPHA2_LEN + 1] = {0};
+	enum QDF_OPMODE opmode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -598,12 +600,22 @@ bool policy_mgr_get_sap_force_20mhz_for_country_id(
 		return false;
 	}
 
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return false;
+	}
+
+	/* Check if device mode is SAP */
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE)
+		return false;
+
 	force_sap_20mhz_cc_id = pm_ctx->cfg.force_sap_20mhz_cc_id;
 	wlan_reg_get_cc_and_src(psoc, country_code);
 
 	/**
 	 * Force SAP to 20MHz if freq is UNII3 band freq, INI is
-	 * enabled and country is Indonesia
+	 * enabled, country is Indonesia and device mode is SAP
 	 */
 	if (wlan_reg_is_5ghz_unii3_chan_freq(freq) &&
 	    !qdf_mem_cmp(country_code, "ID", 2) && force_sap_20mhz_cc_id)
@@ -10956,6 +10968,43 @@ static bool policy_mgr_is_third_conn_sta_p2p_p2p_valid(
 }
 
 #ifdef DRIVER_PASSTHRU_MODE
+/**
+ * policy_mgr_allow_passthru_start() - Check if Passthru mode itself is
+ * allowed to start, given the current concurrency state
+ * @psoc: PSOC object information
+ * @ch_freq: channel frequency of the Passthru connection
+ * @pcl: preferred channel list for Passthru mode
+ *
+ * Monitor mode has no PM_MONITOR_MODE entry in policy_mgr_con_mode /
+ * the PCL tables, so it is not caught by policy_mgr_get_pcl() the way
+ * SAP/P2P/NAN/NDI already are (those map to PM_MAX_PCL_TYPE against
+ * Passthru in the PCL tables and get rejected before this function is
+ * even called). Check it explicitly here via open session count.
+ *
+ * Return: true if Passthru mode is allowed to start, false otherwise
+ */
+static bool
+policy_mgr_allow_passthru_start(struct wlan_objmgr_psoc *psoc,
+				uint32_t ch_freq,
+				struct policy_mgr_pcl_list *pcl)
+{
+	uint8_t num_open_session = 0;
+
+	if (policy_mgr_mode_specific_num_open_sessions(
+			psoc, QDF_MONITOR_MODE, &num_open_session) ==
+			QDF_STATUS_SUCCESS && num_open_session) {
+		policy_mgr_err("Monitor present, Passthru is not allowed");
+		return false;
+	}
+
+	if (!pcl || !pcl->pcl_len)
+		return true;
+
+	policy_mgr_err("Unexpected scenario for Passthru mode ch_freq:%d pcl len:%d",
+		       ch_freq, pcl->pcl_len);
+	return false;
+}
+
 static bool
 policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
 				      enum policy_mgr_con_mode mode,
@@ -10976,12 +11025,7 @@ policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
 
 	switch (mode) {
 	case PM_PASSTHRU_MODE:
-		if (!pcl || !pcl->pcl_len)
-			return true;
-
-		policy_mgr_err("Unexpected scenario for Passthru mode ch_freq:%d pcl len:%d",
-			       ch_freq, pcl->pcl_len);
-		return false;
+		return policy_mgr_allow_passthru_start(psoc, ch_freq, pcl);
 	case PM_STA_MODE:
 		/*
 		 * STA + Passthru SCC concurrency is always supported
@@ -14106,6 +14150,16 @@ QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc)
 
 	if (num_open_session) {
 		policy_mgr_err("cannot add monitor mode, due to NAN concurrency");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	num_open_session = policy_mgr_mode_specific_connection_count(
+					psoc,
+					PM_PASSTHRU_MODE,
+					NULL);
+
+	if (num_open_session) {
+		policy_mgr_err("cannot add monitor mode, due to Passthru concurrency");
 		return QDF_STATUS_E_INVAL;
 	}
 

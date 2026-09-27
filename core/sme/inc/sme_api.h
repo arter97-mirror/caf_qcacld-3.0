@@ -1339,6 +1339,18 @@ int sme_update_ht_config(mac_handle_t mac_handle, uint8_t sessionId,
 			 int value);
 int16_t sme_get_ht_config(mac_handle_t mac_handle, uint8_t session_id,
 			  uint16_t ht_capab);
+
+/**
+ * sme_update_vht_rx_stbc_cap() - Sets the VHT Rx STBC capability
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @value: set value
+ *
+ * Return: 0 on success else err code
+ */
+int sme_update_vht_rx_stbc_cap(mac_handle_t mac_handle, uint8_t session_id,
+			       int value);
+
 #ifdef QCA_HT_2040_COEX
 QDF_STATUS sme_notify_ht2040_mode(mac_handle_t mac_handle,
 				  struct qdf_mac_addr macAddrSTA,
@@ -3570,12 +3582,13 @@ int sme_update_he_tx_stbc_cap(mac_handle_t mac_handle, uint8_t session_id,
  * sme_update_he_rx_stbc_cap() - Sets the HE Rx STBC capability
  * @mac_handle: Opaque handle to the global MAC context
  * @session_id: SME session id
- * @value: set value
+ * @lt_80mhz_value: set value for rx_stbc_lt_80mhz
+ * @gt_80mhz_value: set value for rx_stbc_gt_80mhz
  *
  * Return: 0 on success else err code
  */
 int sme_update_he_rx_stbc_cap(mac_handle_t mac_handle, uint8_t session_id,
-			      int value);
+			      int lt_80mhz_value, int gt_80mhz_value);
 
 /**
  * sme_update_he_frag_supp() - sets the HE fragmentation support
@@ -3717,7 +3730,8 @@ static inline int sme_update_he_tx_stbc_cap(mac_handle_t mac_handle,
 
 static inline int sme_update_he_rx_stbc_cap(mac_handle_t mac_handle,
 					    uint8_t session_id,
-					    int value)
+					    int lt_80mhz_value,
+					    int gt_80mhz_value)
 {
 	return 0;
 }

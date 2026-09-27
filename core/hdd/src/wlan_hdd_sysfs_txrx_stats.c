@@ -37,6 +37,7 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 	struct hdd_adapter *adapter = netdev_priv(net_dev);
 	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct qdf_mac_addr mac_addr = QDF_MAC_ADDR_ZERO_INIT;
 	struct cdp_txrx_stats_req req = {0};
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_context *hdd_ctx;
@@ -44,6 +45,7 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 	uint32_t val1;
 	uint8_t val2;
 	int ret;
+	QDF_STATUS status;
 
 	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
@@ -93,7 +95,16 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 		return -EINVAL;
 
 	if (val1 == CDP_TXRX_STATS_28 || val1 == CDP_TXRX_STATS_11) {
-		if (sta_ctx->conn_info.is_authenticated) {
+		/* Get optional mac addr */
+		token = strsep(&sptr, " ");
+		if (token) {
+			status = qdf_mac_parse(token, &mac_addr);
+			if (QDF_IS_STATUS_ERROR(status))
+				return -EINVAL;
+			req.peer_addr = (char *)&mac_addr;
+			hdd_debug("mac addr:" QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(req.peer_addr));
+		} else if (sta_ctx->conn_info.is_authenticated) {
 			hdd_debug("ap mac addr:" QDF_MAC_ADDR_FMT,
 				  QDF_MAC_ADDR_REF(&sta_ctx->conn_info.bssid.bytes[0]));
 			req.peer_addr =

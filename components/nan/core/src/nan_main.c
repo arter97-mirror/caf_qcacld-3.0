@@ -1662,7 +1662,10 @@ static QDF_STATUS nan_handle_schedule_update(
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct qdf_mac_addr peer_ndi_addr;
+	QDF_STATUS status;
+	uint8_t i;
 
 	psoc = wlan_vdev_get_psoc(ind->vdev);
 	if (!psoc) {
@@ -1676,12 +1679,52 @@ static QDF_STATUS nan_handle_schedule_update(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	peer = wlan_objmgr_get_peer_by_mac(psoc, ind->peer_addr.bytes,
-					   WLAN_NAN_ID);
-	if (peer) {
-		wlan_dp_notify_ndp_channel_info(peer, &ind->ch[0],
-						ind->num_channels);
-		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+	/*
+	 * peer_addr in schedule update event is the NMI address.
+	 * NDP peers are stored with NDI address. Map the NMI address
+	 * to the corresponding NDI address via the NDP instance ID,
+	 * then look up the peer using the NDI address.
+	 * Iterate through all NDP instances until a peer is found.
+	 *
+	 * Validate num_ndp_instances against the maximum array size to
+	 * guard against out-of-bounds access on malformed firmware events.
+	 */
+	if (ind->num_ndp_instances > NDP_NUM_INSTANCE_ID ||
+	    0 == ind->num_ndp_instances) {
+		nan_debug("invalid num_ndp_instances %d",
+			  ind->num_ndp_instances);
+		ind->num_ndp_instances = NDP_NUM_INSTANCE_ID;
+	}
+
+	for (i = 0; i < ind->num_ndp_instances; i++) {
+		status = nan_get_peer_ndi_addr_by_id(ind->vdev,
+						     ind->ndp_instances[i],
+						     &peer_ndi_addr);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			nan_debug("Failed to get NDI addr for ndp_instance: %d",
+				  ind->ndp_instances[i]);
+			continue;
+		}
+
+		if (qdf_is_macaddr_zero(&peer_ndi_addr)) {
+			nan_debug("Zero NDI addr for ndp_instance: %d",
+				  ind->ndp_instances[i]);
+			continue;
+		}
+
+		peer = wlan_objmgr_get_peer_by_mac(psoc,
+						   peer_ndi_addr.bytes,
+						   WLAN_NAN_ID);
+		if (peer) {
+			wlan_dp_notify_ndp_channel_info(peer,
+							&ind->ch[0],
+							ind->num_channels);
+			wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+			break;
+		}
+
+		nan_debug("Peer not found for NDI: " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(peer_ndi_addr.bytes));
 	}
 
 	ndi_update_ndp_session(ind->vdev, &ind->peer_addr, &ind->ch[0]);

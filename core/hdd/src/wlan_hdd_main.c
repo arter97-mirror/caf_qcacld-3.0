@@ -491,6 +491,24 @@ static void wlan_hdd_auto_shutdown_cb(void);
 
 static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx);
 
+struct net_device *hdd_wdev_get_netdev(struct wireless_dev *wdev)
+{
+	struct hdd_adapter *adapter;
+
+	if (!wdev)
+		return NULL;
+
+	if (wdev->netdev)
+		return wdev->netdev;
+
+	/* Fallback: wireless_dev is embedded in hdd_adapter */
+	adapter = container_of(wdev, struct hdd_adapter, wdev);
+	if (adapter && adapter->dev)
+		return adapter->dev;
+
+	return NULL;
+}
+
 /**
  * wlan_hdd_deinit_port_id_info()- Initialize/deinitialize
  * the get station client info table
@@ -2380,6 +2398,13 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	if (ht_cap_info.rx_stbc && !cfg->ht_rx_stbc)
 		ht_cap_info.rx_stbc = cfg->ht_rx_stbc;
 
+	/*
+	 * Snapshot the resolved RX STBC capability as the immutable
+	 * baseline, since ht_cap_info.rx_stbc itself gets overwritten
+	 * by runtime rx_stbc toggles (hdd_set_rx_stbc()).
+	 */
+	ucfg_mlme_set_ht_rx_stbc_orig(hdd_ctx->psoc, ht_cap_info.rx_stbc);
+
 	/* Set the LDPC capability */
 	if (ht_cap_info.adv_coding_cap && !cfg->ht_rx_ldpc)
 		ht_cap_info.adv_coding_cap = cfg->ht_rx_ldpc;
@@ -4000,6 +4025,17 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	switch (device_mode) {
 	case QDF_MONITOR_MODE:
 	case QDF_PASSTHRU_MODE:
+		if (device_mode == QDF_PASSTHRU_MODE) {
+			struct hdd_adapter *p2p_dev_adapter =
+				hdd_get_adapter(adapter->hdd_ctx, QDF_P2P_DEVICE_MODE);
+
+			if (p2p_dev_adapter &&
+			    qdf_atomic_test_bit(SME_SESSION_OPENED,
+						p2p_dev_adapter->deflink->link_flags)) {
+				hdd_err("P2P device mode present, Passthru is not allowed");
+				goto err_start_adapter;
+			}
+		}
 		ret = hdd_start_station_adapter(adapter);
 		if (ret)
 			goto err_start_adapter;
@@ -4011,6 +4047,12 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 			goto err_start_adapter;
 		fallthrough;
 	case QDF_P2P_DEVICE_MODE:
+		if (device_mode == QDF_P2P_DEVICE_MODE &&
+		    policy_mgr_mode_specific_connection_count(
+				adapter->hdd_ctx->psoc, PM_PASSTHRU_MODE, NULL)) {
+			hdd_err("Passthru present, P2P device mode is not allowed");
+			goto err_start_adapter;
+		}
 		if (device_mode == QDF_P2P_DEVICE_MODE &&
 		    hdd_use_sta_vdev_for_p2p_device_operations(adapter->hdd_ctx,
 							adapter->device_mode)) {
@@ -6276,7 +6318,7 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	/* Host should hold a wake lock until the FW event response is received
 	 * the WMI event would not be a wake up event.
 	 */
-	qdf_runtime_pm_prevent_suspend(
+	qdf_runtime_pm_prevent_suspend_sync(
 			&hdd_ctx->runtime_context.dyn_mac_addr_update);
 	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 
@@ -6335,7 +6377,8 @@ status_ret:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		ret = qdf_status_to_os_return(status);
 		goto allow_suspend;
-	} else if (!ret) {
+	}
+	if (!ret) {
 		/* need to update mac address for dp vdev in the mlo sap case */
 		status = ucfg_dp_update_link_mac_addr(vdev, &mac_addr,
 						      skip_reattach);
@@ -6354,6 +6397,8 @@ status_ret:
 	hdd_tx_latency_restore_config(link_info);
 
 allow_suspend:
+	if (ret && !skip_reattach)
+		ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
 	qdf_runtime_pm_allow_suspend(
 			&hdd_ctx->runtime_context.dyn_mac_addr_update);
@@ -6831,8 +6876,15 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 
 	if (net_if_running && adapter->deflink->vdev) {
 		ret = hdd_update_vdev_mac_address(adapter, mac_addr);
-		if (ret)
+		if (ret) {
+			hdd_err("Failed to update vdev MAC, reverting to old address "
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
+			if (hdd_update_vdev_mac_address(adapter,
+							adapter->mac_addr))
+				hdd_err("Failed to revert vdev MAC address");
 			return ret;
+		}
 	}
 
 	hdd_set_mld_address(adapter, &mac_addr);
@@ -11554,6 +11606,18 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	cfg80211_del_sta(&adapter->wdev, mac, GFP_KERNEL);
+}
+#else
+static void _hdd_delete_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	cfg80211_del_sta(adapter->dev, mac, GFP_KERNEL);
+}
+#endif
+
 #if defined MSM_PLATFORM && (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
 /**
  * hdd_stop_p2p_go() - call cfg80211 API to stop P2P GO
@@ -11595,9 +11659,7 @@ static void hdd_delete_sta(struct hdd_adapter *adapter)
 
 	hdd_debug("[SSR] send restart supplicant");
 	/* event supplicant to restart */
-	cfg80211_del_sta(adapter->dev,
-			 (const u8 *)&bcast_mac.bytes[0],
-			 GFP_KERNEL);
+	_hdd_delete_sta(adapter, (const u8 *)&bcast_mac.bytes[0]);
 }
 #endif
 
@@ -14122,6 +14184,7 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id)
 	int ret = 0;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hif_opaque_softc *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 
 	hdd_debug("stats_id %d", stats_id);
 
@@ -14134,6 +14197,10 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id)
 		break;
 	case CDP_HIF_STATS:
 		hdd_display_hif_stats();
+		break;
+	case CDP_DP_NAPI_STATS:
+		if (hif_ctx)
+			hif_print_napi_stats(hif_ctx);
 		break;
 	case CDP_NAPI_STATS:
 		if (hdd_display_napi_stats()) {

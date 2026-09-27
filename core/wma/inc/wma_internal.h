@@ -1155,6 +1155,8 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 
 int wma_d0_wow_disable_ack_event(void *handle, uint8_t *event, uint32_t len);
 
+void wma_wow_log_deferred_wakeup(struct wlan_objmgr_psoc *psoc);
+
 int wma_pdev_resume_event_handler(void *handle, uint8_t *event, uint32_t len);
 
 void wma_del_ts_req(tp_wma_handle wma, struct del_ts_params *msg);

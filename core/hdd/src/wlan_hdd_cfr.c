@@ -382,14 +382,317 @@ hdd_cfr_nl_put_vendor_info(struct sk_buff *vendor_event,
 	return 0;
 }
 
+/* Maximum payload size (bytes) for QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA
+ * in a single netlink vendor event.  If the CFR data exceeds this limit the
+ * driver bifurcates it across multiple events using the
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN /
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET /
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG attributes.
+ */
+#define HDD_CFR_MAX_NL_DATA_LEN (32 * 1024)
+
+/*
+ * hdd_cfr_emit_nl_event_v3() - build and send one CFR v3 vendor event (set),
+ * bifurcating the payload across multiple events when it exceeds
+ * HDD_CFR_MAX_NL_DATA_LEN.
+ * @hdd_ctx: hdd context
+ * @link_info: link info for the vdev
+ * @event_data: CFR metadata (carried in the first fragment only)
+ * @data: CFR payload
+ * @data_len: payload length
+ *
+ * Return: void
+ */
+static void hdd_cfr_emit_nl_event_v3(struct hdd_context *hdd_ctx,
+				     struct wlan_hdd_link_info *link_info,
+				     struct cfr_enhanced_event_data *event_data,
+				     const void *data, uint32_t data_len)
+{
+	uint32_t len;
+	uint32_t offset = 0;
+	uint32_t chunk_len;
+	uint32_t bifurcate_overhead = 0;
+	struct sk_buff *vendor_event;
+	bool bifurcate = (data_len > HDD_CFR_MAX_NL_DATA_LEN);
+	bool is_last_frag;
+	bool first_frag = true;
+
+	cfr_debug("data_len %d bifurcate %d", data_len, bifurcate);
+
+	/* When bifurcating, every fragment carries TOTAL_LEN (u32) and
+	 * OFFSET (u32); the final fragment additionally carries the
+	 * IS_LAST_FRAG flag. Account for the worst case (all three) on
+	 * every fragment so sizing is uniform.
+	 */
+	if (bifurcate)
+		bifurcate_overhead =
+			nla_total_size(sizeof(uint32_t)) + /* TOTAL_LEN */
+			nla_total_size(sizeof(uint32_t)) + /* OFFSET */
+			nla_total_size(0);                 /* IS_LAST_FRAG */
+
+	do {
+		chunk_len = data_len - offset;
+		if (chunk_len > HDD_CFR_MAX_NL_DATA_LEN)
+			chunk_len = HDD_CFR_MAX_NL_DATA_LEN;
+
+		is_last_frag = ((offset + chunk_len) >= data_len);
+
+		/* The first fragment carries all metadata (common/phy/vendor)
+		 * plus its data chunk; subsequent fragments carry only the data
+		 * chunk. hdd_get_cfr_nl_event_len(event_data, 0) returns the
+		 * metadata overhead alone, to which the properly-sized data
+		 * attribute is added explicitly so both branches size the
+		 * RESP_DATA attribute on the same basis.
+		 */
+		if (first_frag)
+			len = hdd_get_cfr_nl_event_len(*event_data, 0) +
+			      nla_total_size(chunk_len);
+		else
+			len = nla_total_size(chunk_len);
+
+		len += bifurcate_overhead;
+
+		len = nla_total_size(len + NLMSG_HDRLEN);
+
+		vendor_event = wlan_cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
+			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
+			qdf_mem_malloc_flags());
+
+		if (!vendor_event) {
+			cfr_err("alloc failed offset %d, total_len %d",
+				offset, len);
+			goto abort;
+		}
+
+		/* Common/phy/vendor metadata only in the first fragment */
+		if (first_frag &&
+		    (hdd_cfr_nl_put_common_info(vendor_event, event_data) ||
+		     hdd_cfr_nl_put_phy_info(vendor_event, event_data) ||
+		     hdd_cfr_nl_put_vendor_info(vendor_event, event_data))) {
+			cfr_err("CFR metadata put fails, offset %d", offset);
+			goto free_skb;
+		}
+
+		if (nla_put(vendor_event,
+			    QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
+			    chunk_len, (const uint8_t *)data + offset)) {
+			cfr_err("CFR data put fails, offset %d", offset);
+			goto free_skb;
+		}
+
+		if (bifurcate) {
+			if (nla_put_u32(
+				vendor_event,
+				QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN,
+				data_len) ||
+			    nla_put_u32(
+				vendor_event,
+				QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET,
+				offset)) {
+				cfr_err("bifurcation attr put fails, offset %d",
+					offset);
+				goto free_skb;
+			}
+			if (is_last_frag &&
+			    nla_put_flag(
+				vendor_event,
+				QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG)) {
+				cfr_err("IS_LAST_FRAG attr put fails, offset %d",
+					offset);
+				goto free_skb;
+			}
+		}
+
+		wlan_cfg80211_vendor_event(vendor_event,
+					   qdf_mem_malloc_flags());
+		offset += chunk_len;
+		first_frag = false;
+	} while (offset < data_len);
+
+	return;
+
+free_skb:
+	wlan_cfg80211_vendor_free_skb(vendor_event);
+abort:
+	/* Already-sent fragments cannot be recalled. If we abort mid-stream
+	 * the final IS_LAST_FRAG never arrives, so userspace must discard the
+	 * incomplete report (e.g. on reassembly timeout). Log the offset to
+	 * make such an aborted capture diagnosable.
+	 */
+	if (!first_frag)
+		cfr_err("CFR bifurcation aborted at offset %d of %d; userspace will discard incomplete report",
+			offset, data_len);
+}
+
+/*
+ * hdd_cfr_cache_last_frame() - cache the latest CFR frame for a peer MAC
+ * @pcfr: pdev cfr object
+ * @event_data: metadata for this frame
+ * @data: CFR payload
+ * @data_len: payload length
+ *
+ * When REPORT_ONLY_LAST_FRAME is enabled, frames are not sent immediately.
+ * Instead the latest frame per peer MAC is cached, overwriting (and freeing)
+ * any earlier frame cached for the same MAC in the current reporting interval.
+ * The cache is flushed when the report interval timer expires.
+ *
+ * Return: void
+ */
+static void hdd_cfr_cache_last_frame(struct pdev_cfr *pcfr,
+				     struct cfr_enhanced_event_data *event_data,
+				     const void *data, uint32_t data_len)
+{
+	int i, idx = -1;
+	void *buf, *old = NULL;
+	struct cfr_last_frame_cache *entry;
+
+	/* Allocate/copy outside the lock; qdf_mem_malloc may sleep. */
+	buf = qdf_mem_malloc(data_len);
+	if (!buf) {
+		cfr_err("Failed to alloc %d byte CFR cache buffer", data_len);
+		return;
+	}
+	qdf_mem_copy(buf, data, data_len);
+
+	qdf_spin_lock_bh(&pcfr->report_interval_lock);
+	for (i = 0; i < MAX_TA_RA_ENTRIES; i++) {
+		if (pcfr->last_frame_cache[i].valid &&
+		    !qdf_mem_cmp(pcfr->last_frame_cache[i].peer_mac_addr,
+				 event_data->peer_mac_addr,
+				 QDF_MAC_ADDR_SIZE)) {
+			idx = i;
+			break;
+		}
+		if (idx < 0 && !pcfr->last_frame_cache[i].valid)
+			idx = i;
+	}
+
+	if (idx < 0) {
+		qdf_spin_unlock_bh(&pcfr->report_interval_lock);
+		qdf_mem_free(buf);
+		cfr_err("CFR last-frame cache full (%d MACs), dropping frame for "
+			QDF_MAC_ADDR_FMT, MAX_TA_RA_ENTRIES,
+			QDF_MAC_ADDR_REF(event_data->peer_mac_addr));
+		return;
+	}
+
+	entry = &pcfr->last_frame_cache[idx];
+	old = entry->data;	/* older frame for same MAC, to be discarded */
+	entry->data = buf;
+	entry->data_len = data_len;
+	entry->event_data = *event_data;
+	qdf_mem_copy(entry->peer_mac_addr, event_data->peer_mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+	entry->valid = true;
+	qdf_spin_unlock_bh(&pcfr->report_interval_lock);
+
+	cfr_info("CFR cached last frame for " QDF_MAC_ADDR_FMT " slot %d len %d (older %s)",
+		 QDF_MAC_ADDR_REF(event_data->peer_mac_addr), idx, data_len,
+		 old ? "discarded" : "none");
+
+	/* Free the superseded frame outside the lock. */
+	if (old)
+		qdf_mem_free(old);
+}
+
+/*
+ * hdd_cfr_flush_cached_frames() - send all cached latest frames to userspace
+ * @hdd_ctx: hdd context
+ * @link_info: link info for the vdev
+ * @pcfr: pdev cfr object
+ *
+ * Called from the report-interval timer path. Detaches each valid cache entry
+ * under the lock (one at a time, to keep the lock hold short and avoid large
+ * stack usage), then emits and frees it outside the lock.
+ *
+ * Return: void
+ */
+static void hdd_cfr_flush_cached_frames(struct hdd_context *hdd_ctx,
+					struct wlan_hdd_link_info *link_info,
+					struct pdev_cfr *pcfr)
+{
+	int i;
+	uint32_t flushed = 0;
+	struct cfr_enhanced_event_data event_data;
+	void *data;
+	uint32_t data_len;
+
+	if (!pcfr->report_interval_lock_initialised)
+		return;
+
+	for (i = 0; i < MAX_TA_RA_ENTRIES; i++) {
+		qdf_spin_lock_bh(&pcfr->report_interval_lock);
+		if (!pcfr->last_frame_cache[i].valid) {
+			qdf_spin_unlock_bh(&pcfr->report_interval_lock);
+			continue;
+		}
+
+		/* Steal the cached frame out of the slot. */
+		event_data = pcfr->last_frame_cache[i].event_data;
+		data = pcfr->last_frame_cache[i].data;
+		data_len = pcfr->last_frame_cache[i].data_len;
+		pcfr->last_frame_cache[i].data = NULL;
+		pcfr->last_frame_cache[i].data_len = 0;
+		pcfr->last_frame_cache[i].valid = false;
+		qdf_spin_unlock_bh(&pcfr->report_interval_lock);
+
+		if (data) {
+			hdd_cfr_emit_nl_event_v3(hdd_ctx, link_info,
+						 &event_data, data, data_len);
+			qdf_mem_free(data);
+			flushed++;
+		}
+	}
+
+	cfr_info("CFR flushed %d cached last-frame(s) at report interval",
+		 flushed);
+}
+
+/*
+ * hdd_cfr_cleanup_last_frame_cache() - free cache + destroy lock
+ * @pcfr: pdev cfr object
+ *
+ * Frees any frames still cached (e.g. capture stopped before the interval
+ * timer fired) and tears down the report-interval lock. Safe to call when the
+ * lock was never initialised.
+ *
+ * Return: void
+ */
+static void hdd_cfr_cleanup_last_frame_cache(struct pdev_cfr *pcfr)
+{
+	int i;
+
+	if (!pcfr->report_interval_lock_initialised)
+		return;
+
+	qdf_spin_lock_bh(&pcfr->report_interval_lock);
+	for (i = 0; i < MAX_TA_RA_ENTRIES; i++) {
+		if (pcfr->last_frame_cache[i].data) {
+			qdf_mem_free(pcfr->last_frame_cache[i].data);
+			pcfr->last_frame_cache[i].data = NULL;
+		}
+		pcfr->last_frame_cache[i].data_len = 0;
+		pcfr->last_frame_cache[i].valid = false;
+	}
+	qdf_spin_unlock_bh(&pcfr->report_interval_lock);
+
+	qdf_spinlock_destroy(&pcfr->report_interval_lock);
+	pcfr->report_interval_lock_initialised = false;
+	pcfr->report_only_last_frame = false;
+}
+
 void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
 				   struct cfr_enhanced_event_data event_data,
 				   const void *data, uint32_t data_len)
 {
-	uint32_t len;
-	struct sk_buff *vendor_event;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct pdev_cfr *pcfr;
+
+	cfr_info_rl("CFR v3 data vdev_id %d len %u", vdev_id, data_len);
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		cfr_err("HDD context is NULL");
@@ -402,39 +705,40 @@ void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
 		return;
 	}
 
-	len = hdd_get_cfr_nl_event_len(event_data, data_len);
-	cfr_debug("vdev id %d data_len %d total_len %d",
-		  vdev_id, data_len, len);
-	len = nla_total_size(len + NLMSG_HDRLEN);
-
-	vendor_event = wlan_cfg80211_vendor_event_alloc(
-			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
-			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
-			qdf_mem_malloc_flags());
-
-	if (!vendor_event) {
-		cfr_err("alloc failed vdev id %d, total_len %d",
-			vdev_id, len);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_CFR_ID);
+	if (!vdev) {
+		cfr_err("Invalid vdev for vdev id %d", vdev_id);
 		return;
 	}
 
-	if (hdd_cfr_nl_put_common_info(vendor_event, &event_data) ||
-	    hdd_cfr_nl_put_phy_info(vendor_event, &event_data) ||
-	    hdd_cfr_nl_put_vendor_info(vendor_event, &event_data))
-		goto free_skb;
-
-	if (nla_put(vendor_event,
-		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
-		    data_len, data)) {
-		cfr_err("CFR event put fails");
-		goto free_skb;
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		goto put_vdev;
 	}
 
-	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
-	return;
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		goto put_vdev;
+	}
 
-free_skb:
-	wlan_cfg80211_vendor_free_skb(vendor_event);
+	cfr_info_rl("CFR v3 report_only_last_frame %d lock_init %d",
+		    pcfr->report_only_last_frame,
+		    pcfr->report_interval_lock_initialised);
+
+	/* When report-only-last-frame is set, cache the frame and defer
+	 * delivery to the report interval timer; otherwise send immediately.
+	 */
+	if (pcfr->report_only_last_frame &&
+	    pcfr->report_interval_lock_initialised)
+		hdd_cfr_cache_last_frame(pcfr, &event_data, data, data_len);
+	else
+		hdd_cfr_emit_nl_event_v3(hdd_ctx, link_info, &event_data,
+					 data, data_len);
+
+put_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
 }
 
 void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id)
@@ -475,6 +779,13 @@ void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id)
 		cfr_err("CFR private object is NULL");
 		goto put_vdev;
 	}
+
+	/* If report-only-last-frame is enabled, the interval's captured frames
+	 * were cached instead of being sent. Flush the latest frame per MAC now
+	 * (before the IS_LAST_REPORT marker) so the report delimits the burst.
+	 */
+	if (pcfr->report_only_last_frame)
+		hdd_cfr_flush_cached_frames(hdd_ctx, link_info, pcfr);
 
 	cfr_debug("vdev id %d", vdev_id);
 	total_len = NLMSG_HDRLEN;
@@ -705,6 +1016,12 @@ const struct nla_policy cfr_config_policy[
 					.type = NLA_U8,
 					.len = sizeof(uint8_t)
 	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC] = {
+					.type = NLA_FLAG,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_ONLY_LAST_FRAME] = {
+					.type = NLA_FLAG,
+	},
 };
 
 #ifdef WLAN_ENH_CFR_ENABLE
@@ -746,12 +1063,65 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 }
 
 #define DEFAULT_CFR_NSS 0xff
-#define DEFAULT_CFR_BW  0x1f
+
+/*
+ * Default bandwidth bitmask covers 20/40/80/160 MHz (and 320 MHz on
+ * EHT-capable builds). Bits follow enum nl80211_chan_width: each bit
+ * position equals the enum value.
+ */
+#ifdef WLAN_FEATURE_11BE
+#define DEFAULT_CFR_BW  (BIT(NL80211_CHAN_WIDTH_20_NOHT) | \
+			 BIT(NL80211_CHAN_WIDTH_20)      | \
+			 BIT(NL80211_CHAN_WIDTH_40)      | \
+			 BIT(NL80211_CHAN_WIDTH_80)      | \
+			 BIT(NL80211_CHAN_WIDTH_160)     | \
+			 BIT(NL80211_CHAN_WIDTH_320))
+#else
+#define DEFAULT_CFR_BW  (BIT(NL80211_CHAN_WIDTH_20_NOHT) | \
+			 BIT(NL80211_CHAN_WIDTH_20)      | \
+			 BIT(NL80211_CHAN_WIDTH_40)      | \
+			 BIT(NL80211_CHAN_WIDTH_80)      | \
+			 BIT(NL80211_CHAN_WIDTH_160))
+#endif
+
+/*
+ * cfr_remap_nl_bw_to_wmi() - Convert a bandwidth bitmask indexed by
+ * enum nl80211_chan_width (as accepted from userspace via
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW) into the bitmask expected
+ * by cmn/firmware, indexed by enum WMI_PEER_CFR_CAPTURE_BW /
+ * enum cfr_cwm_width.
+ *
+ * Both NL80211_CHAN_WIDTH_20_NOHT and NL80211_CHAN_WIDTH_20 fold into
+ * the single 20 MHz bit; 320 MHz is handled under WLAN_FEATURE_11BE.
+ */
+static inline uint16_t cfr_remap_nl_bw_to_wmi(uint32_t nl_bw_mask)
+{
+	uint16_t wmi_mask = 0;
+
+	if (nl_bw_mask & (BIT(NL80211_CHAN_WIDTH_20_NOHT) |
+			  BIT(NL80211_CHAN_WIDTH_20)))
+		wmi_mask |= BIT(CFR_CWM_WIDTH20);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_40))
+		wmi_mask |= BIT(CFR_CWM_WIDTH40);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_80))
+		wmi_mask |= BIT(CFR_CWM_WIDTH80);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_160))
+		wmi_mask |= BIT(CFR_CWM_WIDTH160);
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_80P80))
+		wmi_mask |= BIT(CFR_CWM_WIDTH80_80);
+#ifdef WLAN_FEATURE_11BE
+	if (nl_bw_mask & BIT(NL80211_CHAN_WIDTH_320))
+		wmi_mask |= BIT(CFR_CWM_WIDTH320);
+#endif
+	return wmi_mask;
+}
+
 static QDF_STATUS
 wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 				   struct nlattr *tb[])
 {
 	struct cfr_wlanconfig_param params = { 0 };
+	uint32_t nl_bw = DEFAULT_CFR_BW;
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NUMBER]) {
 		params.grp_id = nla_get_u32(tb[
@@ -811,12 +1181,12 @@ wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 		hdd_debug("nss %d", params.nss);
 	}
 
-	params.bw = DEFAULT_CFR_BW;
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW]) {
-		params.bw = nla_get_u32(tb[
+		nl_bw = nla_get_u32(tb[
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW]);
-		hdd_debug("bw %d", params.bw);
+		hdd_debug("nl_bw 0x%x", nl_bw);
 	}
+	params.bw = cfr_remap_nl_bw_to_wmi(nl_bw);
 
 	if (params.nss || params.bw) {
 		hdd_debug("set bw nss");
@@ -854,6 +1224,13 @@ wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 		ucfg_cfr_set_frame_type_subtype(vdev, &params);
 	}
 
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC]) {
+		params.agc_gain_fixed = nla_get_flag(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC]);
+		ucfg_cfr_set_capture_agc(vdev, &params);
+		hdd_debug("params.agc %d", params.agc_gain_fixed);
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -878,18 +1255,43 @@ static enum capture_type convert_vendor_cfr_capture_type(
 }
 
 static int
-wlan_cfg80211_cfr_set_config(struct wlan_objmgr_vdev *vdev,
-			     struct nlattr *tb[])
+wlan_cfg80211_cfr_set_group_table(struct wlan_objmgr_vdev *vdev,
+				  struct nlattr *tb[])
 {
 	struct nlattr *group[QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1];
 	struct nlattr *group_list;
+	int maxtype = QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX;
+	int attr = QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE;
+	int rem = 0;
+
+	nla_for_each_nested(group_list, tb[attr], rem) {
+		if (wlan_cfg80211_nla_parse(group, maxtype,
+					    nla_data(group_list),
+					    nla_len(group_list),
+					    cfr_config_policy)) {
+			hdd_err("nla_parse failed for cfr config group");
+			return -EINVAL;
+		}
+
+		if (QDF_IS_STATUS_ERROR(
+			wlan_cfg80211_cfr_set_group_config(vdev, group))) {
+			hdd_err("set group config failed");
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int
+wlan_cfg80211_cfr_set_config(struct wlan_objmgr_vdev *vdev,
+			     struct nlattr *tb[])
+{
 	struct cfr_wlanconfig_param params = { 0 };
 	enum capture_type type;
 	enum qca_wlan_vendor_cfr_capture_type vendor_capture_type;
-	int rem = 0;
-	int maxtype;
-	int attr;
 	uint64_t ul_mu_user_mask = 0;
+	int ret;
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DURATION]) {
 		params.cap_dur = nla_get_u32(tb[
@@ -947,18 +1349,9 @@ wlan_cfg80211_cfr_set_config(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE]) {
-		maxtype = QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX;
-		attr = QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE;
-		nla_for_each_nested(group_list, tb[attr], rem) {
-			if (wlan_cfg80211_nla_parse(group, maxtype,
-						    nla_data(group_list),
-						    nla_len(group_list),
-						    cfr_config_policy)) {
-				hdd_err("nla_parse failed for cfr config group");
-				return -EINVAL;
-			}
-			wlan_cfg80211_cfr_set_group_config(vdev, group);
-		}
+		ret = wlan_cfg80211_cfr_set_group_table(vdev, tb);
+		if (ret)
+			return ret;
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE]) {
@@ -1129,6 +1522,12 @@ static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
 		if (QDF_IS_STATUS_ERROR(status))
 			cfr_err("Failed to stop enhanced CFR RX capture");
 	}
+
+	/* Timer is stopped above, so no new frames will be cached and the
+	 * interval callback will not fire: free any frames still cached and
+	 * tear down the report-interval lock.
+	 */
+	hdd_cfr_cleanup_last_frame_cache(pcfr);
 
 	wlan_cfg80211_reset_cfr(pcfr, 0);
 cleanup:
@@ -1578,6 +1977,11 @@ static int cfr_extract_format_params(struct nlattr **tb,
 		cfr_debug("CFR OUI length: %d bytes", cfr_params->oui_length);
 	}
 
+	cfr_params->report_only_last_frame = nla_get_flag(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_ONLY_LAST_FRAME]);
+	if (cfr_params->report_only_last_frame)
+		cfr_debug("CFR report only last frame per MAC enabled");
+
 	return 0;
 }
 
@@ -1666,9 +2070,20 @@ static void wlan_cfg80211_configure_cfr_v3(
 	pcfr->oui_length = cfr_params->oui_length;
 	pcfr->format_version = cfr_params->format_version;
 	qdf_mem_copy(pcfr->oui, cfr_params->oui, cfr_params->oui_length);
-	cfr_debug("CFR v3 configured: frame_type=%d, frame_subtype=%d, report_interval=%d, bandwidth=%d, freq=%d, associated=%d",
+
+	pcfr->report_only_last_frame = cfr_params->report_only_last_frame;
+	if (pcfr->report_only_last_frame &&
+	    !pcfr->report_interval_lock_initialised) {
+		qdf_mem_zero(pcfr->last_frame_cache,
+			     sizeof(pcfr->last_frame_cache));
+		qdf_spinlock_create(&pcfr->report_interval_lock);
+		pcfr->report_interval_lock_initialised = true;
+	}
+
+	cfr_debug("CFR v3 configured: frame_type=%d, frame_subtype=%d, report_interval=%d, bandwidth=%d, freq=%d, associated=%d, last_frame_only=%d",
 		  pcfr->frame_type, pcfr->frame_sub_type, pcfr->report_interval,
-		  pcfr->bandwidth, pcfr->freq, pcfr->is_associated);
+		  pcfr->bandwidth, pcfr->freq, pcfr->is_associated,
+		  pcfr->report_only_last_frame);
 }
 
 static int wlan_cfg80211_start_cfr_rx_capture(struct wlan_objmgr_vdev *vdev,

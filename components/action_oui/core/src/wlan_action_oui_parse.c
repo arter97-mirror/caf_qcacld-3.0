@@ -890,7 +890,7 @@ check_for_vendor_ap_mac(struct action_oui_extension *extension,
 	uint8_t *mac_addr = attr->mac_addr;
 
 	if (!mac_addr)
-		return true;
+		return false;
 
 	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++) {
 		if ((*extension->mac_mask & mac_mask) &&

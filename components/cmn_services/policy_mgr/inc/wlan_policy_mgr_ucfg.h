@@ -349,6 +349,7 @@ QDF_STATUS ucfg_policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
  */
 bool ucfg_policy_mgr_get_sap_force_20mhz_for_country_id(
 						struct wlan_objmgr_psoc *psoc,
+						struct wlan_objmgr_vdev *vdev,
 						qdf_freq_t freq);
 /**
  * ucfg_policy_mgr_get_indoor_chnl_marking() - to get if indoor channel can be

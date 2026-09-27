@@ -1709,6 +1709,7 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	struct chan_stats_weight_info weight_info;
 	uint8_t nf_cfg, chan_free_cfg, txpwr_range_cfg, txpwr_tput_cfg;
 	uint32_t weight_config, normalized_weight = 0;
+	uint8_t connected_vdev_id;
 
 	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
 	if (!info)
@@ -1719,6 +1720,16 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	while (cur_lst) {
 		cur_node = qdf_container_of(cur_lst, struct scan_cache_node,
 					    node);
+		if (mac->pdev &&
+		    wlan_get_connected_vdev_by_bssid(
+				mac->pdev, cur_node->entry->bssid.bytes,
+				&connected_vdev_id)) {
+			qdf_list_peek_next(scan_list, cur_lst, &next_lst);
+			cur_lst = next_lst;
+			next_lst = NULL;
+			continue;
+		}
+
 		ch_info = ch_info_params->ch_info;
 		/* Defining the default values, so that any value will hold the default values */
 

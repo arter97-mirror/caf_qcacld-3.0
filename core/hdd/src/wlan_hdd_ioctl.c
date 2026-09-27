@@ -6404,14 +6404,16 @@ static int drv_cmd_invalid(struct hdd_adapter *adapter,
 }
 
 /**
- * hdd_apply_fcc_constraint() - Set FCC constraint
+ * hdd_apply_fcc_rules() - Set FCC constraint and modify unii 1 and 2A band
  * @hdd_ctx: Pointer to hdd context
  * @fcc_constraint: Fcc constraint flag
+ * @disable_unii_1_2a: Disable UNII 1 and 2A band
  *
  * Return: Return 0 incase of success else return error number
  */
-static int hdd_apply_fcc_constraint(struct hdd_context *hdd_ctx,
-				    bool fcc_constraint)
+static int hdd_apply_fcc_rules(struct hdd_context *hdd_ctx,
+			       bool fcc_constraint,
+			       bool disable_unii_1_2a)
 {
 	QDF_STATUS status;
 
@@ -6419,6 +6421,13 @@ static int hdd_apply_fcc_constraint(struct hdd_context *hdd_ctx,
 					     fcc_constraint);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to update tx power for channels 12/13");
+		return qdf_status_to_os_return(status);
+	}
+
+	status = ucfg_reg_set_disable_unii_1_2a(hdd_ctx->pdev,
+						disable_unii_1_2a);
+	if (status) {
+		hdd_err("Failed to update disable UNII 1 & 2A");
 		return qdf_status_to_os_return(status);
 	}
 
@@ -6433,22 +6442,25 @@ static int hdd_apply_fcc_constraint(struct hdd_context *hdd_ctx,
 }
 
 /**
- * hdd_apply_fcc_constraint_update_band() - Set FCC constraint and update band
+ * hdd_apply_fcc_rules_and_update_band() - Set FCC constraint and update band
+ * and modify unii 1 and 2A band
  * @link_info: Link info pointer in HDD adapter
  * @hdd_ctx: Pointer to hdd context
  * @fcc_constraint: FCC constraint flag
  * @dis_6g_keep_sta_cli_conn: Disable 6 GHz band and keep STA, P2P client
  *                            connection flag
  * @band_bitmap: Band bitmap
+ * @disable_unii_1_2a: Disable UNII 1 and 2A band
  *
  * Return:  Return 0 incase of success else return error number
  */
 static int
-hdd_apply_fcc_constraint_update_band(struct wlan_hdd_link_info *link_info,
-				     struct hdd_context *hdd_ctx,
-				     bool fcc_constraint,
-				     bool dis_6g_keep_sta_cli_conn,
-				     uint32_t band_bitmap)
+hdd_apply_fcc_rules_and_update_band(struct wlan_hdd_link_info *link_info,
+				    struct hdd_context *hdd_ctx,
+				    bool fcc_constraint,
+				    bool dis_6g_keep_sta_cli_conn,
+				    uint32_t band_bitmap,
+				    bool disable_unii_1_2a)
 {
 	QDF_STATUS status;
 
@@ -6466,6 +6478,13 @@ hdd_apply_fcc_constraint_update_band(struct wlan_hdd_link_info *link_info,
 		return qdf_status_to_os_return(status);
 	}
 
+	status = ucfg_reg_set_disable_unii_1_2a(hdd_ctx->pdev,
+						disable_unii_1_2a);
+	if (status) {
+		hdd_err("Failed to update disable UNII 1 & 2A");
+		return qdf_status_to_os_return(status);
+	}
+
 	return hdd_reg_set_band(link_info->adapter->dev, band_bitmap);
 }
 
@@ -6473,7 +6492,7 @@ hdd_apply_fcc_constraint_update_band(struct wlan_hdd_link_info *link_info,
  * drv_cmd_set_fcc_channel() - Handle fcc constraint request
  * @link_info: Link info pointer in HDD adapter
  * @hdd_ctx: HDD context
- * @command: command ptr, SET_FCC_CHANNEL 0/1/2/-1 is the command
+ * @command: command ptr, SET_FCC_CHANNEL 0/1/2/3/-1 is the command
  * @command_len: command len
  * @priv_data: private data
  *
@@ -6491,6 +6510,7 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	uint32_t band_bitmap = 0, curr_band_bitmap;
 	bool rf_test_mode, fcc_constraint, dis_6g_keep_sta_cli_conn;
 	bool modify_band = false;
+	bool disable_unii_1_2a;
 
 	/*
 	 * This command would be called by user-space when it detects WLAN
@@ -6499,11 +6519,18 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	 * off, WLAN would turn back on. So at that point the command is
 	 * expected to come down.
 	 * a) 0 means reduce power as per fcc constraint and disable 6 GHz band
-	 *    but keep existing STA/P2P Client connections intact.
-	 * b) 1 means reduce power as per fcc constraint and enable 6 GHz band.
+	 *    but keep existing STA/P2P Client connections intact and enable
+	 *    UNII 1/2A band.
+	 * b) 1 means reduce power as per fcc constraint and enable 6 GHz band
+	 *    and enable UNII 1/2A band.
 	 * c) 2 means reset fcc constraint but disable 6 GHz band but keep
-	 *    existing STA/P2P Client connections intact.
-	 * d) -1 means reset fcc constraint and enable 6 GHz band.
+	 *    existing STA/P2P Client connections intact and enable UNII 1/2A
+	 *    band.
+	 * d) -1 means reset fcc constraint and enable 6 GHz band and enable
+	 *    UNII 1/2A band
+	 * e) 3  means reduce power as per fcc constraint and disable 6 GHz
+	 *    band but keep existing STA/P2P Client connections intact,
+	 *    disable UNII 1/2A band if operating country is CA.
 	 */
 
 	err = kstrtos8(command + command_len + 1, 10, &input_value);
@@ -6518,18 +6545,28 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	case -1:
 		fcc_constraint = false;
 		dis_6g_keep_sta_cli_conn = false;
+		disable_unii_1_2a = false;
 		break;
 	case 0:
 		fcc_constraint = true;
 		dis_6g_keep_sta_cli_conn = true;
+		disable_unii_1_2a = false;
 		break;
 	case 1:
 		fcc_constraint = true;
 		dis_6g_keep_sta_cli_conn = false;
+		disable_unii_1_2a = false;
 		break;
 	case 2:
 		fcc_constraint = false;
 		dis_6g_keep_sta_cli_conn = true;
+		disable_unii_1_2a = false;
+		break;
+	case 3:
+		fcc_constraint = true;
+		dis_6g_keep_sta_cli_conn = true;
+		if (ucfg_reg_disable_unii_1_2a_for_current_cc(hdd_ctx->pdev))
+			disable_unii_1_2a = true;
 		break;
 	default:
 		hdd_err("Invalie input value");
@@ -6569,15 +6606,18 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 		if (ucfg_reg_is_fcc_constraint_set(hdd_ctx->pdev) ==
 		    fcc_constraint &&
 		    ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev) ==
-		    dis_6g_keep_sta_cli_conn && !modify_band) {
-			hdd_debug("Same FCC constraint and band bitmap value");
+		    dis_6g_keep_sta_cli_conn && !modify_band &&
+		    ucfg_reg_get_disable_unii_1_2a(hdd_ctx->pdev) ==
+		    disable_unii_1_2a) {
+			hdd_debug("Same FCC constraint and band bitmap and disable UNII 1 & 2A value");
 			return 0;
 		} else if (modify_band) {
-			return hdd_apply_fcc_constraint_update_band(link_info,
+			return hdd_apply_fcc_rules_and_update_band(link_info,
 						hdd_ctx,
 						fcc_constraint,
 						dis_6g_keep_sta_cli_conn,
-						band_bitmap);
+						band_bitmap,
+						disable_unii_1_2a);
 		}
 	} else {
 		if (ucfg_reg_is_fcc_constraint_set(hdd_ctx->pdev) ==
@@ -6587,7 +6627,7 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	return hdd_apply_fcc_constraint(hdd_ctx, fcc_constraint);
+	return hdd_apply_fcc_rules(hdd_ctx, fcc_constraint, disable_unii_1_2a);
 }
 
 /**
@@ -6979,8 +7019,10 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 	num_channels = temp_int;
 
 	chan_freq_list = qdf_mem_malloc(num_channels * sizeof(qdf_freq_t));
-	if (!chan_freq_list)
-		return -ENOMEM;
+	if (!chan_freq_list) {
+		ret = -ENOMEM;
+		goto mem_alloc_failed;
+	}
 
 	for (j = 0; j < num_channels; j++) {
 		/*

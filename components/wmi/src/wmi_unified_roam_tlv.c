@@ -1101,7 +1101,11 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 
 	roam_event->reason =
 			wmi_convert_fw_reason_to_cm_reason(wmi_event->reason);
-	roam_event->rssi = wmi_event->rssi;
+	if (!wmi_service_enabled(wmi_handle, wmi_service_hw_db2dbm_support))
+		roam_event->rssi = wmi_event->rssi +
+				   WMI_NOISE_FLOOR_DBM_DEFAULT;
+	else
+		roam_event->rssi = wmi_event->rssi;
 	roam_event->notif = wmi_convert_fw_notif_to_cm_notif(wmi_event->notif);
 	roam_event->notif_params = wmi_event->notif_params;
 	roam_event->notif_params1 = wmi_event->notif_params1;
@@ -2019,6 +2023,7 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	wmi_roam_frame_info *src_data = NULL;
 	struct roam_frame_info *dst_buf;
 	uint8_t i, subtype, idx;
+	bool db2dbm_enable;
 
 	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
 
@@ -2037,6 +2042,10 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 	dst->num_frame = num_frames;
 	dst_buf = dst->frame_info;
+
+	db2dbm_enable = wmi_service_enabled(wmi_handle,
+					    wmi_service_hw_db2dbm_support);
+
 	for (i = 0; i < num_frames; i++) {
 		dst_buf->timestamp = src_data->timestamp;
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_data->bssid,
@@ -2086,7 +2095,12 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		}
 
 		dst_buf->retry_count = src_data->retry_count;
-		dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
+		if (!db2dbm_enable)
+			dst_buf->rssi = src_data->rssi_dbm_abs +
+					WMI_NOISE_FLOOR_DBM_DEFAULT;
+		else
+			dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
+
 		dst_buf->assoc_id =
 			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
@@ -2451,6 +2465,14 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		 * key_ext carries key materials whose size
 		 * is greater than conventional 16bytes.
 		 */
+		if (key_ext->kck_len > MAX_KCK_LEN ||
+		    key_ext->kek_len > MAX_KEK_LENGTH) {
+			wmi_err("Invalid kck_len %d or kek_len %d",
+				key_ext->kck_len, key_ext->kek_len);
+			wlan_cm_free_roam_synch_frame_ind(rso_cfg);
+			return status;
+		}
+
 		kck_len = key_ext->kck_len ?
 				key_ext->kck_len : KCK_192BIT_KEY_LEN;
 		kek_len = key_ext->kek_len ?

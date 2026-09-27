@@ -119,7 +119,7 @@
  *
  * @min: 0
  * @max: 1
- * @default: 0
+ * @default: 1
  *
  * 0 - disable
  * 1 - enable
@@ -127,7 +127,7 @@
  * </ini>
  */
 #define CFG_WLM_MULTI_CLIENT_LL_SUPPORT CFG_INI_BOOL("wlm_multi_client_ll", \
-						  0, \
+						  1, \
 						  "wlm multi client ll feature")
 
 #define WLM_MULTI_CLIENT_LL_CFG CFG(CFG_WLM_MULTI_CLIENT_LL_SUPPORT)

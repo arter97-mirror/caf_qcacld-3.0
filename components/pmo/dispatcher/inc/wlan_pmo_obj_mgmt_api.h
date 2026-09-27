@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -275,6 +275,24 @@ QDF_STATUS
 pmo_unregister_is_device_in_low_pwr_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * pmo_register_wow_deferred_wakeup_cb(): API to register deferred WOW wakeup callback
+ * @psoc: objmgr psoc handle
+ * @handler: callback invoked after host wakeup indication is sent to FW
+ *
+ * Return QDF_STATUS status - in case of success else return error
+ */
+QDF_STATUS pmo_register_wow_deferred_wakeup_cb(struct wlan_objmgr_psoc *psoc,
+					       pmo_wow_deferred_wakeup_cb handler);
+
+/**
+ * pmo_unregister_wow_deferred_wakeup_cb(): API to unregister deferred WOW wakeup callback
+ * @psoc: objmgr psoc handle
+ *
+ * Return QDF_STATUS status - in case of success else return error
+ */
+QDF_STATUS pmo_unregister_wow_deferred_wakeup_cb(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_pmo_get_sap_mode_bus_suspend(): API to get SAP bus suspend config
  * @psoc: objmgr psoc handle
  *
@@ -475,6 +493,19 @@ pmo_register_is_device_in_low_pwr_mode(struct wlan_objmgr_psoc *psoc,
 
 static inline QDF_STATUS
 pmo_unregister_is_device_in_low_pwr_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+pmo_register_wow_deferred_wakeup_cb(struct wlan_objmgr_psoc *psoc,
+				    pmo_wow_deferred_wakeup_cb handler)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+pmo_unregister_wow_deferred_wakeup_cb(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }

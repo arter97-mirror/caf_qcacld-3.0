@@ -535,6 +535,25 @@ cds_cdp_update_bundle_params(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
+static inline void
+cds_cdp_update_tc_based_dyn_gro_params(struct wlan_objmgr_psoc *psoc,
+				       struct txrx_pdev_cfg_param_t *cdp_cfg,
+				       uint32_t gro_bit_set)
+{
+	if (gro_bit_set & DP_TC_BASED_DYNAMIC_GRO)
+		cdp_cfg->tc_based_dyn_gro_enable = true;
+	cdp_cfg->tc_ingress_prio = cfg_get(psoc, CFG_DP_TC_INGRESS_PRIO);
+}
+#else
+static inline void
+cds_cdp_update_tc_based_dyn_gro_params(struct wlan_objmgr_psoc *psoc,
+				       struct txrx_pdev_cfg_param_t *cdp_cfg,
+				       uint32_t gro_bit_set)
+{
+}
+#endif
+
 /**
  * cds_cdp_cfg_attach() - attach data path config module
  * @psoc: psoc handle
@@ -575,6 +594,7 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	gro_bit_set = cfg_get(psoc, CFG_DP_GRO);
 	if (gro_bit_set & DP_GRO_ENABLE_BIT_SET)
 		cdp_cfg.gro_enable = true;
+	cds_cdp_update_tc_based_dyn_gro_params(psoc, &cdp_cfg, gro_bit_set);
 	cdp_cfg.enable_flow_steering =
 		cfg_get(psoc, CFG_DP_FLOW_STEERING_ENABLED);
 	cdp_cfg.disable_intra_bss_fwd =
@@ -1222,11 +1242,15 @@ QDF_STATUS cds_pre_enable(void)
 	return QDF_STATUS_SUCCESS;
 
 stop_wmi:
-	/* Send pdev suspend to fw otherwise FW is not aware that
-	 * host is freeing resources.
+	/* Stop WMI work and send pdev suspend to fw so FW is aware that host
+	 * is freeing resources. Suspend is skipped if WMI init was never sent
+	 * since firmware has not progressed far enough to handle it.
 	 */
-	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
-		cds_suspend_target(gp_cds_context->wma_context);
+	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state())) {
+		wma_wmi_work_close();
+		if (wma_is_wmi_init_cmd_sent())
+			cds_suspend_target(gp_cds_context->wma_context);
+	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 

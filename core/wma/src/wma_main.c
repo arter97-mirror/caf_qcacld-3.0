@@ -4198,6 +4198,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					      wma_vdev_get_dtim_period);
 	pmo_register_get_beacon_interval_callback(wma_handle->psoc,
 						  wma_vdev_get_beacon_interval);
+	pmo_register_wow_deferred_wakeup_cb(wma_handle->psoc,
+					    wma_wow_log_deferred_wakeup);
 	wma_register_nan_callbacks(wma_handle);
 	wma_register_pkt_capture_callbacks(wma_handle);
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -5285,6 +5287,7 @@ QDF_STATUS wma_close(void)
 	pmo_unregister_is_device_in_low_pwr_mode(wma_handle->psoc);
 	pmo_unregister_get_pause_bitmap(wma_handle->psoc);
 	pmo_unregister_pause_bitmap_notifier(wma_handle->psoc);
+	pmo_unregister_wow_deferred_wakeup_cb(wma_handle->psoc);
 
 	tgt_psoc_info = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	init_deinit_free_num_units(wma_handle->psoc, tgt_psoc_info);
@@ -8080,6 +8083,21 @@ int wma_rx_ready_event(void *handle, uint8_t *cmd_param_info,
 	wma_debug("Exit");
 
 	return 0;
+}
+
+/**
+ * wma_is_wmi_init_cmd_sent() - check if WMI init command has been sent
+ *
+ * Return: true if WMI init command was sent to firmware, false otherwise
+ */
+bool wma_is_wmi_init_cmd_sent(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma || !wma->wmi_handle)
+		return false;
+
+	return wmi_is_init_cmd_sent(wma->wmi_handle);
 }
 
 /**

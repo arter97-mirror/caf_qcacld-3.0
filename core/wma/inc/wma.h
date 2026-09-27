@@ -197,6 +197,9 @@
 /* Delete peer response for existing ranging peer */
 #define WMA_DELETE_STA_EXISTING_PASN_PEER_RSP 0x11
 
+/* Peer create response for passthru (Wondertap) NEW peer */
+#define WMA_PASSTHRU_PEER_CREATE_RESPONSE 0x12
+
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT
@@ -1133,6 +1136,9 @@ typedef struct {
 	wma_chan_hop_status_cb chan_hop_status_cb;
 	void *chan_hop_status_cb_ctx;
 #endif
+	A_INT32 wow_wakeup_reason;
+	uint8_t wow_wakeup_vdev_id;
+	bool wow_wakeup_reason_valid;
 } t_wma_handle, *tp_wma_handle;
 
 /**

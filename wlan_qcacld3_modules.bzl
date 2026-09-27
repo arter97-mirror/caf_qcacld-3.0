@@ -36,10 +36,6 @@ _target_chipset_map = {
         "wcn7750",
         "wcn7760",
     ],
-    "volcano": [
-        "qca6750",
-        "peach-v2",
-    ],
     "x1e80100": [
         "kiwi-v2",
     ],
@@ -71,6 +67,7 @@ _target_chipset_map = {
     ],
     "hamoa": [
         "kiwi-v2",
+        "wcn7760",
     ],
     "chora": [
         "wcn7750",
@@ -82,6 +79,10 @@ _target_chipset_map = {
     "hamoa_la": [
         "kiwi-v2",
     ],
+    "glymur": [
+        "kiwi-v2",
+        "wcn7760",
+    ]
 }
 
 _chipset_hw_map = {
@@ -2610,6 +2611,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
         },
         {
+            "pattern": "NL80211_EXT_FEATURE_ROC_ADDR_FILTER",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC",
+        },
+        {
+            "pattern": "(*add_key)(struct wiphy *wiphy, struct wireless_dev *wdev,",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV",
+        },
+        {
             "pattern": "struct link_station_parameters",
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_LINK_STA_PARAMS_PRESENT",
@@ -2635,6 +2646,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "WLAN_FEATURE_11BE_MLO_TTLM",
         },
         {
+            "pattern": "NL80211_CMD_START_PD",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_PD_SUPPORT",
+        },
+        {
             "pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
             "file": "include/net/mac80211.h",
             "flag": "CFG80211_RU_PUNC_CHANDEF",
@@ -2647,21 +2663,25 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     ]
 
     cmd = 'touch "$@"\n'
+    if target != "sa510m" and target != "pineapple":
+        grep_path = "common"
+    else:
+        grep_path = "msm-kernel"
     for feature_grep in feature_grep_map:
         cmd += """
-          if grep -qF "{pattern}" $(location //common:{file}); then
-            echo "#define {flag} (1)" >> "$@"
-          fi
+            if grep -qF "{pattern}" $(location //{grep_path}:{file}); then
+                echo "#define {flag} (1)" >> "$@"
+            fi
         """.format(
             pattern = feature_grep["pattern"],
+            grep_path = grep_path,
             file = feature_grep["file"],
             flag = feature_grep["flag"],
         )
 
     grepSrcFiles = []
     for e in feature_grep_map:
-        grepSrcFiles.append("//common:{}".format(e["file"]))
-
+        grepSrcFiles.append("//{}:{}".format(grep_path, e["file"]))
     depsetSrc = depset(grepSrcFiles)
     native.genrule(
         name = "{}_grep_defines".format(tvc),
@@ -2770,7 +2790,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra" and target != "hamoa_la":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra" and target != "hamoa_la" and target != "glymur":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2809,6 +2829,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     combined_conditional_srcs = dict(_conditional_srcs)
+
+    # For adrastea (QCA_LL_TX_FLOW_CONTROL_V2 on an LL target), both
+    # CONFIG_WLAN_TX_FLOW_CONTROL and CONFIG_WLAN_TX_FLOW_CONTROL_V2 must
+    # use ol_txrx_flow_control.c instead of the cmn DP path.
+    if chipset == "adrastea":
+        adrastea_fc_srcs = ["core/dp/txrx/ol_txrx_flow_control.c"]
+        for key in ["CONFIG_WLAN_TX_FLOW_CONTROL", "CONFIG_WLAN_TX_FLOW_CONTROL_V2"]:
+            inner = dict(combined_conditional_srcs.get(key, {}))
+            inner[True] = adrastea_fc_srcs
+            combined_conditional_srcs[key] = inner
     wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
     existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
     existing_true_list = existing_inner.get(True, [])

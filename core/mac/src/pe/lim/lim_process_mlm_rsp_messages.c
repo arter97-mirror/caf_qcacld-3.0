@@ -1511,6 +1511,7 @@ void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
 		/* delete the sta_ds allocated during ADD STA */
 		lim_delete_dph_hash_entry(mac_ctx, add_sta_rsp->staMac,
 					  peer_idx, session);
+		lim_release_peer_idx(mac_ctx, peer_idx, session);
 		qdf_mem_free(add_sta_rsp);
 		return;
 	}
@@ -1524,6 +1525,7 @@ static void lim_process_passthru_del_sta_rsp(struct mac_context *mac_ctx,
 					     struct pe_session *pe_session)
 {
 	tpDeleteStaParams del_sta_params = (tpDeleteStaParams) lim_msg->bodyptr;
+	tpDphHashNode sta_ds;
 
 	if (!del_sta_params) {
 		pe_err("del_sta_params is NULL");
@@ -1534,14 +1536,35 @@ static void lim_process_passthru_del_sta_rsp(struct mac_context *mac_ctx,
 		       del_sta_params->sessionId);
 		goto skip_event;
 	}
-	if (QDF_STATUS_SUCCESS != del_sta_params->status)
+
+	sta_ds = dph_get_hash_entry(mac_ctx, del_sta_params->assocId,
+				    &pe_session->dph.dphHashTable);
+	if (!sta_ds) {
+		pe_err("DPH Entry for STA %X is missing",
+		       del_sta_params->assocId);
+		goto skip_event;
+	}
+
+	if (QDF_STATUS_SUCCESS != del_sta_params->status) {
 		pe_info("Delete STA failed: AssocID %d MAC " QDF_MAC_ADDR_FMT,
 			del_sta_params->assocId,
 			QDF_MAC_ADDR_REF(del_sta_params->staMac));
-	else
-		pe_info("Deleted STA AssocID %d MAC " QDF_MAC_ADDR_FMT,
-			del_sta_params->assocId,
-			QDF_MAC_ADDR_REF(del_sta_params->staMac));
+		goto skip_event;
+	}
+
+	pe_info("Deleted STA AssocID %d MAC " QDF_MAC_ADDR_FMT,
+		del_sta_params->assocId,
+		QDF_MAC_ADDR_REF(del_sta_params->staMac));
+
+	/*
+	 * Only release the DPH entry/AID once FW has actually confirmed the
+	 * delete -- doing this at send time (in lim_passthru_peer_del())
+	 * would let a NEW for this MAC reuse the slot before FW's delete
+	 * completes.
+	 */
+	lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr,
+				  del_sta_params->assocId, pe_session);
+	lim_release_peer_idx(mac_ctx, del_sta_params->assocId, pe_session);
 skip_event:
 	qdf_mem_free(del_sta_params);
 	lim_msg->bodyptr = NULL;
@@ -3181,6 +3204,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 	struct mlo_link_switch_context *link_ctx;
 	uint8_t i = 0;
 	QDF_STATUS status;
+	uint8_t cb_mode;
 
 	if (!session->vdev) {
 		pe_err("vdev:%d is NULL", session->vdev_id);
@@ -3206,9 +3230,12 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 	channel.ch_freq = (uint16_t)session->curr_op_freq;
 
 	mlo_mgr_reset_ap_link_info(session->vdev);
+
+	cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session, channel.ch_freq);
 	mlo_mgr_update_ap_link_info(session->vdev,
 				    wlan_vdev_get_link_id(session->vdev),
-				    session->bssId, channel);
+				    session->bssId, channel,
+				    cb_mode);
 	status =
 	lim_update_mlo_mgr_info(mac_ctx,
 				session->vdev,
@@ -3227,11 +3254,13 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 
 		qdf_mem_zero(&channel, sizeof(channel));
 		channel.ch_freq = partner_link_info->chan_freq;
-
+		cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session,
+						   channel.ch_freq);
 		mlo_mgr_update_ap_link_info(session->vdev,
 					    partner_link_info->link_id,
 					    partner_link_info->link_addr.bytes,
-					    channel);
+					    channel,
+					    cb_mode);
 		status = lim_update_mlo_mgr_info(mac_ctx,
 						 session->vdev,
 						 &partner_link_info->link_addr,

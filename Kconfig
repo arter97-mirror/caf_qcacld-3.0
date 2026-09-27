@@ -705,6 +705,10 @@ config HIF_CE_DEBUG_DATA_BUF
 	bool "Enable HIF_CE_DEBUG_DATA_BUF"
 	default n
 
+config HIF_CE_TX_DESC_DATA_DEBUG
+	bool "Enable HIF_CE_TX_DESC_DATA_DEBUG"
+	default n
+
 config HIF_CPU_PERF_AFFINE_MASK
 	bool "Enable HIF_CPU_PERF_AFFINE_MASK"
 	default n
@@ -1165,6 +1169,10 @@ config SAE_SINGLE_PMK
 	bool "Enable SAE_SINGLE_PMK"
 	default n
 
+config WLAN_FEATURE_PMKSA_DEBUG_DUMP
+	bool "Enable PMKSA table debug dump"
+	default n
+
 config SAP_AVOID_ACS_FREQ_LIST
 	bool "Enable SAP_AVOID_ACS_FREQ_LIST"
 	default n
@@ -1474,6 +1482,18 @@ config WLAN_FEATURE_11BE_MLO_TTLM
 
 config CFG80211_SETUP_LINK_RECONFIG_SUPPORT
 	bool "Enable CONFIG_CFG80211_SETUP_LINK_RECONFIG_SUPPORT"
+	default n
+
+config CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
+	bool "Enable CONFIG_CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV"
+	default n
+
+config CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
+	bool "Enable CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC"
+	default n
+
+config CFG80211_PD_SUPPORT
+	bool "Enable CFG80211_PD_SUPPORT"
 	default n
 
 config WLAN_FEATURE_11BE_MLO
@@ -3082,13 +3102,45 @@ config DT_CPU_MASK_DP_INTR
 	bool "Enable DT_CPU_MASK_DP_INTR"
 	default n
 
+config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE feature"
+	default n
+
+config WLAN_FEATURE_POWER_STATISTICS
+	bool "Enable WLAN_FEATURE_POWER_STATISTICS feature"
+	default n
+
+config SCAN_RANDOM_MAC_ADDR
+	bool "Enable SCAN_RANDOM_MAC_ADDR feature"
+	default n
+
+config FEATURE_DAL_DP_SUPPORT
+	bool "Enable FEATURE_DAL_DP_SUPPORT feature"
+	default n
+
 if CNSS_ADRASTEA
 config HIF_LARGE_CE_RING_HISTORY
 	int "Enable HIF_LARGE_CE_RING_HISTORY"
 	default 8192
 endif
+
 config WLAN_TAS_SYSFS
 	bool "Enable TAS sysfs"
 	default n
 
+config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE feature"
+	default n
+
+config WLAN_FEATURE_POWER_STATISTICS
+	bool "Enable WLAN_FEATURE_POWER_STATISTICS feature"
+	default n
+
+config SCAN_RANDOM_MAC_ADDR
+	bool "Enable SCAN_RANDOM_MAC_ADDR feature"
+	default n
+
+config FEATURE_DAL_DP_SUPPORT
+	bool "Enable FEATURE_DAL_DP_SUPPORT feature"
+	default n
 endif # QCA_CLD_WLAN

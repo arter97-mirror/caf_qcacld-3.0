@@ -509,8 +509,10 @@ ol_rx_reorder_peer_cleanup(struct ol_txrx_vdev_t *vdev,
 	int tid;
 
 	for (tid = 0; tid < OL_TXRX_NUM_EXT_TIDS; tid++) {
+		qdf_spin_lock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 		ol_rx_reorder_flush(vdev, peer, tid, 0, 0,
 				    htt_rx_flush_discard);
+		qdf_spin_unlock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 	}
 	OL_RX_REORDER_TIMEOUT_PEER_CLEANUP(peer);
 }
