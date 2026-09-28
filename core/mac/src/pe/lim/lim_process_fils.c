@@ -482,10 +482,9 @@ static void lim_generate_ap_key_auth(struct pe_session *pe_session)
  * send to AP in assoc request, AP will generate the same the verify it.
  * @pe_session: pe session pointer
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
-					uint8_t *peer_mac_addr)
+static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session)
 {
 	uint8_t *buf, *addr[1];
 	uint32_t len;
@@ -493,11 +492,13 @@ static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
 	uint8_t data[SIR_FILS_NONCE_LENGTH + SIR_FILS_NONCE_LENGTH
 			+ QDF_MAC_ADDR_SIZE + QDF_MAC_ADDR_SIZE] = {0};
 
-	if (!fils_info)
-		return;
+	if (!fils_info) {
+		pe_err("Failed to get fils_info");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	len = SIR_FILS_NONCE_LENGTH + SIR_FILS_NONCE_LENGTH +
-			QDF_MAC_ADDR_SIZE +  QDF_MAC_ADDR_SIZE;
+			QDF_MAC_ADDR_SIZE + QDF_MAC_ADDR_SIZE;
 
 	addr[0] = data;
 	buf = data;
@@ -513,12 +514,16 @@ static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
 
 	if (qdf_get_hmac_hash(lim_get_hmac_crypto_type(fils_info->akm),
 			      fils_info->ick, fils_info->ick_len, 1,
-			      &addr[0], &len, fils_info->key_auth) < 0)
+			      &addr[0], &len, fils_info->key_auth) < 0) {
 		pe_err("failed to generate key auth");
+		return QDF_STATUS_E_FAILURE;
+	}
 	fils_info->key_auth_len = lim_get_crypto_digest_len(
 				lim_get_hmac_crypto_type(fils_info->akm));
 	lim_fils_data_dump("STA Key Auth",
 			fils_info->key_auth, fils_info->key_auth_len);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -533,8 +538,7 @@ static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
  * Return: QDF_STATUS
  */
 static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
-			       struct pe_session *pe_session,
-			       tSirMacAddr peer_mac_addr)
+			       struct pe_session *pe_session)
 {
 	uint8_t key_label[] = PTK_KEY_LABEL;
 	uint8_t *data;
@@ -548,8 +552,6 @@ static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
 	uint8_t tk_len = lim_get_tk_len(pe_session->encryptType);
 	uint8_t *buf;
 	QDF_STATUS status;
-
-	fils_info = lim_get_fils_info(pe_session, peer_mac_addr);
 
 	if (!fils_info) {
 		pe_err("Failed to get fils_info");
@@ -631,7 +633,7 @@ static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
 						pe_session->vdev_id,
 						fils_info->fils_ft,
 						fils_ft_len);
-		if  (QDF_IS_STATUS_ERROR(status))
+		if (QDF_IS_STATUS_ERROR(status))
 			pe_err("Failed to update FILS FT to mlme");
 	}
 
@@ -1449,7 +1451,7 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 			return false;
 	}
 
-	status = lim_get_keys(mac_ctx, pe_session, NULL);
+	status = lim_get_keys(mac_ctx, pe_session);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 	if (pe_session->is11Rconnection) {
