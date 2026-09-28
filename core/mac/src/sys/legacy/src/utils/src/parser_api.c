@@ -1740,6 +1740,7 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			      pe_session->vht_config.csnof_beamformer_antSup;
 		} else {
 			pDot11f->muBeamformeeCap = 0;
+			pDot11f->csnofBeamformerAntSup = 0;
 		}
 		pDot11f->suBeamFormerCap =
 			pe_session->vht_config.su_beam_former;
@@ -1789,8 +1790,12 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 		nCfgValue = vht_cap_info->su_bformer;
 		pDot11f->suBeamFormerCap = (nCfgValue & 0x0001);
 
-		nCfgValue = vht_cap_info->tx_bfee_ant_supp;
-		pDot11f->csnofBeamformerAntSup = (nCfgValue & 0x0007);
+		if (pDot11f->suBeamformeeCap) {
+			nCfgValue = vht_cap_info->tx_bfee_ant_supp;
+			pDot11f->csnofBeamformerAntSup = (nCfgValue & 0x0007);
+		} else {
+			pDot11f->csnofBeamformerAntSup = 0;
+		}
 
 		nCfgValue = vht_cap_info->txop_ps;
 		pDot11f->vhtTXOPPS = (nCfgValue & 0x0001);
