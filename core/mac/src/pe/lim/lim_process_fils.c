@@ -484,7 +484,8 @@ static void lim_generate_ap_key_auth(struct pe_session *pe_session)
  *
  * Return: None
  */
-static void lim_generate_key_auth(struct pe_session *pe_session)
+static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
+					uint8_t *peer_mac_addr)
 {
 	uint8_t *buf, *addr[1];
 	uint32_t len;
@@ -529,10 +530,11 @@ static void lim_generate_key_auth(struct pe_session *pe_session)
  * FILS-FT = L(FILS-Key-Data, KCK_bits + KEK_bits + TK_bits, FILS-FT_bits)
  * @pe_session: pe session pointer
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-static void lim_get_keys(struct mac_context *mac_ctx,
-			 struct pe_session *pe_session)
+static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
+			       struct pe_session *pe_session,
+			       tSirMacAddr peer_mac_addr)
 {
 	uint8_t key_label[] = PTK_KEY_LABEL;
 	uint8_t *data;
@@ -547,8 +549,17 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 	uint8_t *buf;
 	QDF_STATUS status;
 
-	if (!fils_info)
-		return;
+	fils_info = lim_get_fils_info(pe_session, peer_mac_addr);
+
+	if (!fils_info) {
+		pe_err("Failed to get fils_info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!fils_info->fils_pmk || !fils_info->fils_pmk_len) {
+		pe_err("FILS PMK is not available");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	ick_len = lim_get_ick_len(fils_info->akm);
 	kek_len = lim_get_kek_len(fils_info->akm);
@@ -573,7 +584,7 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 	data_len = 2 * SIR_FILS_NONCE_LENGTH + 2 * QDF_MAC_ADDR_SIZE;
 	data = qdf_mem_malloc(data_len);
 	if (!data)
-		return;
+		return QDF_STATUS_E_NOMEM;
 
 	/* data is  SPA || AA ||SNonce || ANonce */
 	buf = data;
@@ -590,8 +601,10 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 			SIR_FILS_NONCE_LENGTH);
 
 	/* Derive FILS-Key-Data */
-	lim_generate_key_data(fils_info, key_label, data, data_len,
-				key_data, key_data_len);
+	status = lim_generate_key_data(fils_info, key_label, data, data_len,
+				       key_data, key_data_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto free_data;
 	buf = key_data;
 
 	qdf_mem_copy(fils_info->ick, buf, ick_len);
@@ -621,8 +634,12 @@ static void lim_get_keys(struct mac_context *mac_ctx,
 		if  (QDF_IS_STATUS_ERROR(status))
 			pe_err("Failed to update FILS FT to mlme");
 	}
+
+free_data:
 	qdf_mem_zero(data, data_len);
 	qdf_mem_free(data);
+
+	return status;
 }
 
 /**
@@ -1411,14 +1428,17 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 		}
 	}
 
-	for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
-		if (qdf_mem_cmp(dot11f_ie_rsn.pmkid[i],
-		    pe_session->fils_info->fils_pmkid,
-		    PMKID_LEN) == 0) {
-			pmkid_found = true;
-			pe_debug("pmkid match in rsn ie total_count %d",
-				dot11f_ie_rsn.pmkid_count);
-			break;
+	if (pe_session->fils_info->fils_pmk &&
+	    pe_session->fils_info->fils_pmk_len) {
+		for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
+			if (qdf_mem_cmp(dot11f_ie_rsn.pmkid[i],
+					pe_session->fils_info->fils_pmkid,
+					PMKID_LEN) == 0) {
+				pmkid_found = true;
+				pe_debug("pmkid match in rsn ie total_count %d",
+					 dot11f_ie_rsn.pmkid_count);
+				break;
+			}
 		}
 	}
 	if (!pmkid_found) {
@@ -1428,7 +1448,10 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 			rx_auth_frm_body->wrapped_data_len))
 			return false;
 	}
-	lim_get_keys(mac_ctx, pe_session);
+
+	status = lim_get_keys(mac_ctx, pe_session, NULL);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
 	if (pe_session->is11Rconnection) {
 		status = lim_generate_fils_pmkr0(pe_session);
 		if (QDF_IS_STATUS_ERROR(status))
