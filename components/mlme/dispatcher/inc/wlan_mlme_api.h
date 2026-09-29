@@ -6035,6 +6035,19 @@ QDF_STATUS
 wlan_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
 				 struct vdev_suspend_param *params);
 
+#ifdef FEATURE_CQM_RSSI
+/**
+ * wlan_mlme_set_cqm_rssi_config() - set adaptive-hysteresis RSSI CQM config
+ * @psoc: pointer to psoc object
+ * @param: CQM RSSI configuration request structure
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS
+wlan_mlme_set_cqm_rssi_config(struct wlan_objmgr_psoc *psoc,
+			      struct cqm_rssi_config_param *param);
+#endif /* FEATURE_CQM_RSSI */
+
 /**
  * wlan_mlme_is_sap_suspend_supported() - check SAP suspend support
  * @vdev: vdev object

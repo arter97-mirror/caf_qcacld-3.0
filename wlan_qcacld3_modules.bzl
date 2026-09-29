@@ -1046,6 +1046,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_concurrency_matrix.c",
         ],
     },
+    "CONFIG_FEATURE_CQM_RSSI": {
+        True: [
+            "core/hdd/src/wlan_hdd_cqm.c",
+        ],
+    },
     "CONFIG_FEATURE_DENYLIST_MGR": {
         True: [
             "components/denylist_mgr/core/src/wlan_dlm_core.c",

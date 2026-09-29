@@ -9755,6 +9755,15 @@ wlan_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
 	return tgt_sap_suspend_param_send(psoc, &param);
 }
 
+#ifdef FEATURE_CQM_RSSI
+QDF_STATUS
+wlan_mlme_set_cqm_rssi_config(struct wlan_objmgr_psoc *psoc,
+			      struct cqm_rssi_config_param *param)
+{
+	return tgt_cqm_rssi_config_send(psoc, param);
+}
+#endif /* FEATURE_CQM_RSSI */
+
 void wlan_mlme_set_keepalive_period(struct wlan_objmgr_vdev *vdev,
 				    uint16_t keep_alive_period)
 {
