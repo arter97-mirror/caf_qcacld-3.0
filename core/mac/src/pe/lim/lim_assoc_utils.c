@@ -4003,7 +4003,8 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 	vendor_ap_search_attr.enable_2g =
 		wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq);
 	vendor_ap_search_attr.enable_5g =
-		wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
+		wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq) ||
+		wlan_reg_is_6ghz_chan_freq(bss_desc->chan_freq);
 
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
