@@ -37,6 +37,8 @@
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_OPERATION_TYPE
 #define PREDICTIVE_ROAM_TX_RETRIES		\
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_TX_RETRIES
+#define PREDICTIVE_ROAM_BW_PKT_COUNT		\
+		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_BW_PKT_COUNT
 #define PREDICTIVE_ROAM_MAX			\
 		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX
 
@@ -153,6 +155,36 @@ os_if_dp_parse_classify_insights(struct nlattr *tb_attr,
 }
 
 #ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+
+#define TX_RX_VENDOR_SIZE 3
+#define TX_CNT_IDX 0
+
+/**
+ * cdp_peer_bw_to_phy_ch_width() - Map cdp_peer_bw to phy_ch_width
+ * @peer_bw: peer bandwidth of type enum cdp_peer_bw
+ *
+ * Return: corresponding enum phy_ch_width value,
+ *         CH_WIDTH_INVALID if no valid mapping exists
+ */
+static enum phy_ch_width cdp_peer_bw_to_phy_ch_width(enum cdp_peer_bw peer_bw)
+{
+	switch (peer_bw) {
+	case CDP_PEER_BW_20MHZ:
+		return CH_WIDTH_20MHZ;
+	case CDP_PEER_BW_40MHZ:
+		return CH_WIDTH_40MHZ;
+	case CDP_PEER_BW_80MHZ:
+		return CH_WIDTH_80MHZ;
+	case CDP_PEER_BW_160MHZ:
+		return CH_WIDTH_160MHZ;
+	case CDP_PEER_BW_320MHZ:
+		return CH_WIDTH_320MHZ;
+	case CDP_PEER_BW_MAX:
+	default:
+		return CH_WIDTH_INVALID;
+	}
+}
+
 static uint32_t os_if_get_predictive_roam_stats_nla_len(void)
 {
 	uint32_t nl_buf_len = NLMSG_HDRLEN;
@@ -160,7 +192,98 @@ static uint32_t os_if_get_predictive_roam_stats_nla_len(void)
 	/* Tx Retries */
 	nl_buf_len += nla_total_size(sizeof(uint32_t));
 
+	/* Add length for QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_BW_PKT_COUNT */
+	nl_buf_len += NLA_HDRLEN * CDP_PEER_BW_MAX;
+	nl_buf_len += nla_total_size(0) +
+		      CDP_PEER_BW_MAX * (nla_total_size(sizeof(uint8_t)) +
+				      nla_total_size(sizeof(uint64_t)));
+
 	return nl_buf_len;
+}
+
+static QDF_STATUS os_if_fill_tx_bw_stats(void *soc,
+					 uint8_t vdev_id,
+					 struct sk_buff *skb)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t **bw_stats;
+	struct nlattr *bw_nest, *bw;
+	int nestid, i;
+	enum nl80211_chan_width nl_chwidth;
+	enum phy_ch_width phy_ch_width;
+
+	bw_stats = qdf_mem_malloc(CDP_PEER_BW_MAX * sizeof(uint32_t *));
+	if (!bw_stats) {
+		osif_err("failed to allocate bw_stats");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	for (i = 0; i < CDP_PEER_BW_MAX; i++) {
+		bw_stats[i] = qdf_mem_malloc(TX_RX_VENDOR_SIZE *
+					      sizeof(uint32_t));
+		if (!bw_stats[i]) {
+			osif_err("failed to allocate bw_stats column");
+			status = QDF_STATUS_E_NOMEM;
+			goto free_mem;
+		}
+	}
+
+	status = cdp_get_txrx_bw(soc, vdev_id, bw_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Get stats failed, vdev_id: %d status: %d",
+			   vdev_id, status);
+		goto free_mem;
+	}
+
+	nestid = PREDICTIVE_ROAM_BW_PKT_COUNT;
+	bw_nest = nla_nest_start(skb, nestid);
+	if (!bw_nest) {
+		osif_err("nla_nest_start failed");
+		status = QDF_STATUS_E_FAILURE;
+		goto free_mem;
+	}
+
+	for (i = 0; i < CDP_PEER_BW_MAX; i++) {
+		bw = nla_nest_start(skb, i + 1);
+		if (!bw) {
+			osif_err("nla_nest_start failed");
+			status = QDF_STATUS_E_FAILURE;
+			goto free_mem;
+		}
+
+		phy_ch_width = cdp_peer_bw_to_phy_ch_width(i);
+		nl_chwidth = wlan_cfg80211_get_nl80211_chwidth(phy_ch_width);
+		if (nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_BW_PKT_BW_CHAN_WIDTH,
+			       nl_chwidth)) {
+			osif_err("nla_put_u8 BW_CHAN_WIDTH failed");
+			status = QDF_STATUS_E_FAILURE;
+			goto free_mem;
+		}
+		if (wlan_cfg80211_nla_put_u64_64bit(skb,
+				QCA_WLAN_VENDOR_ATTR_BW_PKT_TX_MSDU_COUNT,
+				(u64)bw_stats[i][TX_CNT_IDX],
+				QCA_WLAN_VENDOR_ATTR_BW_PKT_PAD)) {
+			osif_err("nla_put_u64 TX_PACKET_COUNT failed");
+			status = QDF_STATUS_E_FAILURE;
+			goto free_mem;
+		}
+		nla_nest_end(skb, bw);
+	}
+
+	nla_nest_end(skb, bw_nest);
+
+free_mem:
+	for (i = 0; i < CDP_PEER_BW_MAX; i++) {
+		if (!bw_stats[i])
+			break;
+
+		qdf_mem_free(bw_stats[i]);
+	}
+
+	qdf_mem_free(bw_stats);
+
+	return status;
 }
 
 static QDF_STATUS
@@ -204,6 +327,12 @@ os_if_dp_handle_predictive_roam_get_stats(struct wiphy *wiphy,
 	if (!skb) {
 		osif_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = os_if_fill_tx_bw_stats(soc, vdev_id, skb);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("os_if_fill_tx_bw_stats error");
+		goto free_skb;
 	}
 
 	status = cdp_get_tx_retries(soc, vdev_id, &tx_retries);
@@ -1512,4 +1641,5 @@ void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 
 #undef PREDICTIVE_ROAM_OPERATION_TYPE
 #undef PREDICTIVE_ROAM_TX_RETRIES
+#undef PREDICTIVE_ROAM_BW_PKT_COUNT
 #undef PREDICTIVE_ROAM_MAX
