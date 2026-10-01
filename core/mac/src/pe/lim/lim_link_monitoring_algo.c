@@ -48,6 +48,7 @@
 #include "wlan_dlm_api.h"
 #include <lim_mlo.h>
 #include "wlan_tdls_api.h"
+#include "lim_security_utils.h"
 
 /**
  * lim_delete_sta_util - utility function for deleting station context
@@ -331,6 +332,8 @@ lim_trigger_sta_deletion(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		return;
 	}
 	sta_ds->sta_deletion_in_progress = true;
+
+	lim_delete_pre_auth_node(mac_ctx, sta_ds->staAddr);
 
 	sta_ds->mlmStaContext.disassocReason =
 		REASON_DISASSOC_DUE_TO_INACTIVITY;
