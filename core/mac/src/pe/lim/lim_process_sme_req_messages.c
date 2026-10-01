@@ -7125,6 +7125,24 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 
 }
 
+#ifdef WLAN_FEATURE_GVP
+/**
+ * lim_get_gvp_ap_pwr_type() - Get 6 GHz AP power type for a GVP override
+ * @ap_power_type_6g: current 6 GHz AP power type
+ *
+ * Return: REG_GEO_FENCED_VARIABLE_POWER_AP
+ */
+static inline uint32_t lim_get_gvp_ap_pwr_type(uint32_t ap_power_type_6g)
+{
+	return REG_GEO_FENCED_VARIABLE_POWER_AP;
+}
+#else
+static inline uint32_t lim_get_gvp_ap_pwr_type(uint32_t ap_power_type_6g)
+{
+	return ap_power_type_6g;
+}
+#endif
+
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
 		       bool force_vlp_pwr, uint8_t gvp_tx_power)
@@ -7379,7 +7397,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 					}
 				}
 			}
-			ap_power_type_6g = REG_GEO_FENCED_VARIABLE_POWER_AP;
+			ap_power_type_6g =
+				lim_get_gvp_ap_pwr_type(ap_power_type_6g);
 			mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
 		}
 
