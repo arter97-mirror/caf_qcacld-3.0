@@ -2932,6 +2932,14 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&synch_event->bssid,
 				   roam_sync_ind->bssid.bytes);
+	if (qdf_is_macaddr_group(&roam_sync_ind->bssid) ||
+	    qdf_is_macaddr_zero(&roam_sync_ind->bssid)) {
+		wmi_err("Invalid bssid " QDF_MAC_ADDR_FMT " in roam sync event vdev %d",
+			QDF_MAC_ADDR_REF(roam_sync_ind->bssid.bytes),
+			synch_event->vdev_id);
+		wlan_cm_free_roam_synch_frame_ind(rso_cfg);
+		return status;
+	}
 	wmi_debug("roamed_vdev_id %d auth_status %d roam_reason %d rssi %d is_beacon %d",
 		  roam_sync_ind->roamed_vdev_id,
 		  roam_sync_ind->auth_status,
