@@ -6088,14 +6088,23 @@ QDF_STATUS cm_neighbor_roam_update_config(struct wlan_objmgr_pdev *pdev,
 	case REASON_LOOKUP_THRESH_2P4GHZ_CHANGED:
 		old_value = cfg_params->neighbor_lookup_threshold;
 		cfg_params->neighbor_lookup_threshold = value;
+		if (wlan_reg_freq_to_band(wlan_get_operation_chan_freq(vdev)) ==
+		    REG_BAND_2G)
+			cfg_params->next_rssi_threshold = value;
 		break;
 	case REASON_LOOKUP_THRESH_5GHZ_CHANGED:
 		old_value = cfg_params->neighbor_lookup_threshold_5ghz;
 		cfg_params->neighbor_lookup_threshold_5ghz = value;
+		if (wlan_reg_freq_to_band(wlan_get_operation_chan_freq(vdev)) ==
+		    REG_BAND_5G)
+			cfg_params->next_rssi_threshold = value;
 		break;
 	case REASON_LOOKUP_THRESH_6GHZ_CHANGED:
 		old_value = cfg_params->neighbor_lookup_threshold_6ghz;
 		cfg_params->neighbor_lookup_threshold_6ghz = value;
+		if (wlan_reg_freq_to_band(wlan_get_operation_chan_freq(vdev)) ==
+		    REG_BAND_6G)
+			cfg_params->next_rssi_threshold = value;
 		break;
 	default:
 		mlme_debug("Unknown update cfg reason");
