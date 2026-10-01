@@ -1207,11 +1207,14 @@ struct scoring_param {
  * @WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE: Neighbor unreachable
  *  detection failed when the roam trigger.
  * @WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE: Invoke from user space.
+ * @WLAN_ROAM_STATS_INVOKE_REASON_PREDICTIVE: Roam triggered by predictive
+ *  roaming based on traffic statistics.
  */
 enum roam_invoke_reason {
 	WLAN_ROAM_STATS_INVOKE_REASON_UNDEFINED = 0,
 	WLAN_ROAM_STATS_INVOKE_REASON_NUD_FAILURE = 1,
 	WLAN_ROAM_STATS_INVOKE_REASON_USER_SPACE = 2,
+	WLAN_ROAM_STATS_INVOKE_REASON_PREDICTIVE = 3,
 };
 
 /**
@@ -2663,6 +2666,8 @@ struct set_pcl_req {
  * @is_same_bssid: flag to indicate if roaming is requested for same bssid
  * @forced_roaming: Roam to any bssid in any ch (here bssid & ch is not given)
  * @skip_full_scan: skip full scan fallback when cache scan finds no candidate
+ * @num_chan: number of channels to scan
+ * @chan_freq_list: channel frequency list to scan
  */
 struct roam_invoke_req {
 	uint8_t vdev_id;
@@ -2673,6 +2678,8 @@ struct roam_invoke_req {
 	uint8_t is_same_bssid;
 	bool forced_roaming;
 	bool skip_full_scan;
+	u8 num_chan;
+	qdf_freq_t chan_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 };
 
 /**

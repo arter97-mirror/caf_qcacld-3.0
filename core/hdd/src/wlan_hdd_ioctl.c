@@ -52,6 +52,9 @@
 #include "qdf_func_tracker.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_tdls_api.h"
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+#include "cdp_txrx_host_stats.h"
+#endif
 
 #if defined(LINUX_QCMBR)
 #define SIOCIOCTLTX99 (SIOCDEVPRIVATE+13)
@@ -560,6 +563,125 @@ static int hdd_parse_reassoc_command_v1_data(const uint8_t *command,
 
 	return 0;
 }
+
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+/**
+ * hdd_parse_ooq_roam_command() - HDD Parse OOQROAM command data
+ * @command: Buffer that carries actual command data
+ * @command_len: Length of the command buffer
+ * @num_chan: number of channels parsed from command
+ * @chan_freq_list: channel frequency list parsed from command
+ * @pdev: pdev pointer
+ *
+ * This function parses the OOQROAM command data passed in the format
+ * OOQROAM<space><freq1><space><freq2>...<freqN>
+ *
+ * Example:
+ *    wpa_cli DRIVER OOQROAM 2412 5180 5745
+ *
+ * Return: 0 for success non-zero for failure
+ */
+static int hdd_parse_ooq_roam_command(const u8 *command,
+				      u8 command_len,
+				      u8 *num_chan,
+				      qdf_freq_t *chan_freq_list,
+				      struct wlan_objmgr_pdev *pdev)
+{
+	const char *in_ptr = (const char *)command;
+	int temp_int;
+	int j = 0;
+	int v = 0;
+	int i;
+	char buf[32];
+	qdf_freq_t freq;
+	bool duplicate;
+
+	hdd_debug("[HDD][OOQROAM] command received at HDD layer: %s",
+		 command);
+
+	/* skip "OOQROAM " to reach the data */
+	in_ptr = strnchr((const char *)command, strlen(command),
+			 SPACE_ASCII_VALUE);
+
+	/* no argument after the command */
+	if (!in_ptr) {
+		hdd_err("[HDD][OOQROAM] no space found after command");
+		return -EINVAL;
+	}
+
+	/* remove empty spaces */
+	while ((*in_ptr == SPACE_ASCII_VALUE) && (*in_ptr != '\0'))
+		in_ptr++;
+
+	/* no argument followed by spaces */
+	if ('\0' == *in_ptr) {
+		hdd_err("[HDD][OOQROAM] empty command after OOQROAM");
+		return -EINVAL;
+	}
+
+	/* Parse frequencies until end of string */
+	*num_chan = 0;
+	while (*in_ptr != '\0' && j < CFG_VALID_CHANNEL_LIST_LEN) {
+		/* Read next frequency */
+		v = sscanf(in_ptr, "%31s", buf);
+		if (v != 1) {
+			hdd_err("[HDD][OOQROAM] failed to read freq[%d]", j);
+			break;
+		}
+
+		v = kstrtos32(buf, 10, &temp_int);
+		if (v < 0 || temp_int <= 0) {
+			hdd_err("[HDD][OOQROAM] invalid freq token = %s, skipped",
+				buf);
+			goto next_freq;
+		}
+
+		if (!hdd_check_and_fill_freq(temp_int, &freq, pdev)) {
+			hdd_err("[HDD][OOQROAM] invalid freq token = %d, skipped",
+				temp_int);
+			goto next_freq;
+		}
+
+		duplicate = false;
+		for (i = 0; i < j; i++) {
+			if (chan_freq_list[i] == freq) {
+				duplicate = true;
+				break;
+			}
+		}
+
+		if (duplicate) {
+			hdd_debug("[HDD][OOQROAM] duplicate freq skipped = %d",
+				  freq);
+		} else {
+			chan_freq_list[j] = freq;
+			hdd_debug("[HDD][OOQROAM] parsed chan_freq_list[%d] = %d",
+				  j, chan_freq_list[j]);
+			j++;
+		}
+
+next_freq:
+		/* Move to next frequency */
+		in_ptr = strpbrk(in_ptr, " ");
+		if (!in_ptr)
+			break;  /* End of string reached */
+
+		/* remove empty spaces */
+		while ((*in_ptr == SPACE_ASCII_VALUE) && (*in_ptr != '\0'))
+			in_ptr++;
+	}
+
+	*num_chan = j;
+	if (*num_chan == 0) {
+		hdd_err("[HDD][OOQROAM] no valid frequencies parsed");
+		return -EINVAL;
+	}
+
+	hdd_debug("[HDD][OOQROAM] parsing complete num_chan = %d",
+		 *num_chan);
+	return 0;
+}
+#endif
 
 static int
 hdd_check_and_reject_reassoc_command(struct wlan_hdd_link_info *link_info,
@@ -4833,6 +4955,129 @@ exit:
 	return ret;
 }
 
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+/**
+ * drv_cmd_ooq_roam() - Handler for OOQROAM driver command
+ * @link_info: Carries link specific info, which contains adapter
+ * @hdd_ctx: pointer to hdd context
+ * @command: Buffer that carries actual command data, which can be parsed by
+ *           hdd_parse_ooq_roam_command()
+ * @command_len: Command length
+ * @priv_data: to carry any priv data, OOQROAM doesn't have any priv
+ *             data for now.
+ *
+ * This function parses the OOQROAM command data passed in the format
+ * OOQROAM<space><freq1><space><freq2>...<freqN>
+ *
+ * Example:
+ *    wpa_cli DRIVER OOQROAM 2412 5180 5745
+ *
+ * Unlike FASTREASSOC, no specific BSSID is provided.
+ * Firmware will scan the provided channels and roam to
+ * the best AP based on its scoring algorithm.
+ *
+ * Return: 0 for success non-zero for failure
+ */
+static int drv_cmd_ooq_roam(struct wlan_hdd_link_info *link_info,
+			    struct hdd_context *hdd_ctx,
+			    u8 *command,
+			    u8 command_len,
+			    struct hdd_priv_data *priv_data)
+{
+	int ret = 0;
+	u8 *value = command;
+	u8 num_chan = 0;
+	qdf_freq_t chan_freq_list[CFG_VALID_CHANNEL_LIST_LEN] = {0};
+	struct hdd_adapter *adapter;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	ol_txrx_soc_handle dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	int i;
+
+	/* NULL pointer checks to prevent kernel panic */
+	if (!link_info || !link_info->adapter || !hdd_ctx || !dp_soc) {
+		hdd_err("[HDD][OOQROAM] Invalid context pointers");
+		return -EINVAL;
+	}
+
+	adapter = link_info->adapter;
+
+	/* HDD layer - OOQROAM command handler entered */
+	hdd_debug("[HDD][OOQROAM] command handler entered vdev_id = %d",
+		  link_info->vdev_id);
+
+	/* OOQROAM is only supported in STA mode */
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_warn("[HDD][OOQROAM] unsupported mode %s(%d)",
+			 qdf_opmode_str(adapter->device_mode),
+			 adapter->device_mode);
+		return -EINVAL;
+	}
+
+	if (!cdp_is_vdev_predictive_roaming_stats_enabled(dp_soc,
+			link_info->vdev_id)) {
+		hdd_warn("Predictive roaming stats not enabled for vdev %u",
+			  link_info->vdev_id);
+		return -EOPNOTSUPP;
+	}
+
+	/* if not associated, no need to proceed */
+	if (!hdd_cm_is_vdev_associated(link_info)) {
+		hdd_warn("[HDD][OOQROAM] not associated vdev_id = %d",
+			 link_info->vdev_id);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (wlan_cm_roaming_in_progress(hdd_ctx->pdev,
+					link_info->vdev_id)) {
+		hdd_warn("Roaming in progress, Retry later");
+		ret = -EAGAIN;
+		goto exit;
+	}
+
+	hdd_debug("[HDD][OOQROAM] STA associated proceeding to parse command");
+
+	/* parse num_chan and chan_freq_list from command
+	 * format: OOQROAM <num_chan> <freq1> <freq2> ... <freqN>
+	 */
+	ret = hdd_parse_ooq_roam_command(value, command_len, &num_chan,
+					 chan_freq_list,
+					 hdd_ctx->pdev);
+	if (ret) {
+		hdd_err("[HDD][OOQROAM] failed to parse command ret = %d",
+			ret);
+		goto exit;
+	}
+
+	/* HDD layer - command parsed successfully print all freqs */
+	hdd_debug("[HDD][OOQROAM] command parsed successfully vdev_id = %d num_chan = %d",
+		  link_info->vdev_id, num_chan);
+	for (i = 0; i < num_chan; i++)
+		hdd_debug("[HDD][OOQROAM] freq[%d] = %d", i, chan_freq_list[i]);
+
+	/* HDD layer - forwarding to UCFG layer */
+	hdd_debug("[HDD][OOQROAM] forwarding to UCFG layer vdev_id = %d num_chan = %d",
+		  link_info->vdev_id, num_chan);
+
+	/* invoke roam with channel list
+	 * firmware picks best AP from given channels
+	 */
+	status = ucfg_wlan_cm_ooq_roam_invoke(hdd_ctx->pdev,
+					      link_info->vdev_id,
+					      num_chan,
+					      chan_freq_list,
+					      CM_ROAMING_USER);
+
+	/* HDD layer - UCFG returned */
+	hdd_debug("[HDD][OOQROAM] ucfg returned status = %d", status);
+	ret = qdf_status_to_os_return(status);
+
+exit:
+	hdd_debug("[HDD][OOQROAM] exit ret = %d", ret);
+	return ret;
+}
+#endif
+
 static int drv_cmd_set_okc_mode(struct wlan_hdd_link_info *link_info,
 				struct hdd_context *hdd_ctx,
 				uint8_t *command,
@@ -7659,6 +7904,9 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"SETFASTROAM",               drv_cmd_set_fast_roam, true},
 	{"SETFASTTRANSITION",         drv_cmd_set_fast_transition, true},
 	{"FASTREASSOC",               drv_cmd_fast_reassoc, true},
+#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
+	{"OOQROAM",                   drv_cmd_ooq_roam,     true},
+#endif
 	{"SETOKCMODE",                drv_cmd_set_okc_mode, true},
 	{"BTCOEXMODE",                drv_cmd_bt_coex_mode, true},
 	{"SCAN-ACTIVE",               drv_cmd_scan_active, false},

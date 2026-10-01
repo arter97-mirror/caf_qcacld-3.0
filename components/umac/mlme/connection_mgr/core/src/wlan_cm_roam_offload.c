@@ -6935,6 +6935,8 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev,
 				struct qdf_mac_addr *bssid,
 				qdf_freq_t chan_freq,
+				u8 num_chan,
+				qdf_freq_t *chan_freq_list,
 				enum wlan_cm_source source)
 {
 	struct cm_req *cm_req;
@@ -6964,8 +6966,30 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (!rso_cfg)
+	if (!rso_cfg) {
+		qdf_mem_free(cm_req);
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/*
+	 * OOQROAM path - num_chan and chan_freq_list are provided
+	 * no specific BSSID or single channel, firmware picks
+	 * best AP from the given channel list
+	 */
+	if (num_chan && chan_freq_list) {
+		mlme_debug("[CORE][OOQROAM] vdev:%d num_chan:%d source:%d",
+			   vdev_id, num_chan, source);
+
+		/* copy channel list into roam invoke req */
+		cm_req->roam_req.req.num_chan = num_chan;
+		qdf_mem_copy(cm_req->roam_req.req.chan_freq_list,
+			     chan_freq_list,
+			     num_chan * sizeof(qdf_freq_t));
+
+		mlme_debug("[CORE][OOQROAM] channel list copied forwarding to send_evt");
+		goto send_evt;
+	}
+
 
 	/* Ignore BSSID and channel validation for FW host roam */
 	if (source == CM_ROAMING_FW)
@@ -7022,6 +7046,11 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 
 send_evt:
 	cm_req->roam_req.req.source = source;
+    /* roam invoke req ready to send */
+	mlme_debug("[CORE][OOQROAM] send_evt vdev:%d source:%d num_chan:%d chan_freq:%d",
+		   vdev_id, source,
+		   cm_req->roam_req.req.num_chan,
+		   cm_req->roam_req.req.chan_freq);
 
 	/* Storing source information in rso cfg as if FW aborts
 	 * roam host will delete roam req from queue.
@@ -7921,23 +7950,29 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 
 	wlan_vdev_get_bss_peer_mac(cm_ctx->vdev, &connected_bssid);
 	wlan_mlme_get_self_bss_roam(psoc, &enable_self_bss_roam);
-	if (!enable_self_bss_roam &&
-	     cm_is_bssid_present_on_any_assoc_link(cm_ctx->vdev,
-						   &roam_req->req.bssid)) {
-		mlme_err(CM_PREFIX_FMT "self bss roam disabled. invoke_src:%d",
-			 CM_PREFIX_REF(vdev_id, cm_id),
-			 req->roam_req.req.source);
-		/*
-		 * Send roam cancel event when roam invoke triggered by
-		 * userspace reassoc command is rejected
-		 */
-		if (req->roam_req.req.source == CM_ROAMING_USER ||
-		    req->roam_req.req.source == CM_ROAMING_HOST)
-			cm_roam_reject_reassoc_event(psoc, cm_ctx->vdev,
-						     &connected_bssid);
+	/*
+	 * skip self bss roam check for OOQROAM as no specific
+	 * target bssid is provided, bssid is zero
+	 */
+	if (!roam_req->req.num_chan) {
+		if (!enable_self_bss_roam &&
+		    cm_is_bssid_present_on_any_assoc_link(cm_ctx->vdev,
+							  &roam_req->req.bssid)) {
+			mlme_err(CM_PREFIX_FMT "self bss roam disabled. invoke_src:%d",
+				 CM_PREFIX_REF(vdev_id, cm_id),
+				 req->roam_req.req.source);
+			/*
+			 * Send roam cancel event when roam invoke triggered by
+			 * userspace reassoc command is rejected
+			 */
+			if (req->roam_req.req.source == CM_ROAMING_USER ||
+			    req->roam_req.req.source == CM_ROAMING_HOST)
+				cm_roam_reject_reassoc_event(psoc, cm_ctx->vdev,
+							     &connected_bssid);
 
-		status = QDF_STATUS_E_FAILURE;
-		goto roam_err;
+			status = QDF_STATUS_E_FAILURE;
+			goto roam_err;
+		}
 	}
 
 	roam_invoke_req = qdf_mem_malloc(sizeof(*roam_invoke_req));
@@ -7953,6 +7988,29 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 
 	if (roam_req->req.forced_roaming) {
 		roam_invoke_req->forced_roaming = true;
+		goto send_cmd;
+	}
+
+	/*
+	 * OOQROAM path - num_chan and chan_freq_list are set
+	 * no specific BSSID, firmware scans given channel list
+	 * and picks best AP based on scoring algorithm
+	 */
+	if (roam_req->req.num_chan && roam_req->req.chan_freq_list[0]) {
+		mlme_debug("[CORE][OOQROAM] " CM_PREFIX_FMT
+			   "num_chan:%d copying chan list to invoke req",
+			   CM_PREFIX_REF(vdev_id, cm_id),
+			   roam_req->req.num_chan);
+
+		/* copy num_chan and chan_freq_list into wmi invoke req */
+		roam_invoke_req->num_chan = roam_req->req.num_chan;
+		qdf_mem_copy(roam_invoke_req->chan_freq_list,
+			     roam_req->req.chan_freq_list,
+			     roam_req->req.num_chan * sizeof(qdf_freq_t));
+
+		mlme_debug("[CORE][OOQROAM] " CM_PREFIX_FMT
+			   "chan list copied forwarding to send_cmd",
+			   CM_PREFIX_REF(vdev_id, cm_id));
 		goto send_cmd;
 	}
 

@@ -727,6 +727,8 @@ cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
  * @vdev_id: vdev_id
  * @bssid: Target bssid
  * @chan_freq: channel frequency on which reassoc should be send
+ * @num_chan: number of channels for OOQROAM, 0 for FASTREASSOC
+ * @chan_freq_list: channel frequency list for OOQROAM, NULL for FASTREASSOC
  * @source: source of roam
  *
  * Return: QDF_STATUS
@@ -734,6 +736,7 @@ cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
+		    u8 num_chan, qdf_freq_t *chan_freq_list,
 		    enum wlan_cm_source source);
 
 /**

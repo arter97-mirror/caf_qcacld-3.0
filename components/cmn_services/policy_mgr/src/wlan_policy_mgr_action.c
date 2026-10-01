@@ -3664,7 +3664,7 @@ policy_mgr_roam_invoke_on_sta_for_mcc(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	 */
 	qdf_set_macaddr_broadcast(&bssid);
 	status = wlan_cm_roam_invoke(pm_ctx->pdev, roam_invoke_vdev_id, &bssid,
-				     0, CM_ROAMING_STA_SAP_MCC);
+			     0, 0, NULL, CM_ROAMING_STA_SAP_MCC);
 	if (QDF_IS_STATUS_ERROR(status))
 		policy_mgr_err("Vdev %d roam invoke failed", sta_vdev_id);
 }

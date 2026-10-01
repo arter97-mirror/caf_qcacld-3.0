@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
@@ -332,6 +333,8 @@ void cm_dump_freq_list(struct rso_chan_info *chan_info);
  * @vdev: vdev
  * @bssid: Target bssid
  * @chan_freq: channel frequency on which reassoc should be send
+ * @num_chan: number of channels for OOQROAM, 0 for FASTREASSOC
+ * @chan_freq_list: channel frequency list for OOQROAM, NULL for FASTREASSOC
  * @source: source of the roam invoke
  *
  * Return: QDF_STATUS
@@ -340,7 +343,9 @@ QDF_STATUS
 cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 		     struct wlan_objmgr_vdev *vdev,
 		     struct qdf_mac_addr *bssid,
-		     uint32_t chan_freq,
+		     qdf_freq_t chan_freq,
+		     u8 num_chan,
+		     qdf_freq_t *chan_freq_list,
 		     enum wlan_cm_source source);
 #endif
 

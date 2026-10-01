@@ -5344,7 +5344,7 @@ policy_mgr_trigger_roam_on_link_removal(struct wlan_objmgr_vdev *vdev)
 			 assoc_vdev_id);
 	qdf_zero_macaddr(&bssid);
 	status = wlan_cm_roam_invoke(pdev, assoc_vdev_id, &bssid, 0,
-				     CM_ROAMING_LINK_REMOVAL);
+			     0, NULL, CM_ROAMING_LINK_REMOVAL);
 	if (QDF_IS_STATUS_ERROR(status))
 		policy_mgr_err("roam invoke failed");
 }

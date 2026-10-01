@@ -7072,7 +7072,7 @@ static QDF_STATUS sme_qos_request_reassoc(struct mac_context *mac,
 	wlan_mlme_get_bssid_vdev_id(mac->pdev, sessionId, &bssid);
 	ch_freq = wlan_get_operation_chan_freq_vdev_id(mac->pdev, sessionId);
 	status = wlan_cm_roam_invoke(mac->pdev, sessionId, &bssid, ch_freq,
-				     CM_ROAMING_HOST);
+			     0, NULL, CM_ROAMING_HOST);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		/* Update the state to Handoff so subsequent requests are

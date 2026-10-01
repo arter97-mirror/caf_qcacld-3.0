@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
@@ -309,9 +310,29 @@ ucfg_wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
-	return wlan_cm_roam_invoke(pdev, vdev_id, bssid, ch_freq, source);
+	/* FASTREASSOC - passes 0 and NULL for num_chan and chan_freq_list */
+	return wlan_cm_roam_invoke(pdev, vdev_id, bssid, ch_freq,
+				   0, NULL, source);
 }
 
+QDF_STATUS
+ucfg_wlan_cm_ooq_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+			     u8 num_chan, qdf_freq_t *chan_freq_list,
+			     enum wlan_cm_source source)
+{
+	/* UCFG layer - OOQROAM invoke received at UCFG layer */
+	mlme_debug("[UCFG][OOQROAM] received at UCFG layer vdev_id = %d num_chan = %d",
+		   vdev_id, num_chan);
+
+	/* UCFG layer - forwarding to dispatcher layer
+	 * passes NULL bssid and 0 freq as OOQROAM has no specific target
+	 * num_chan and chan_freq_list carry the channel list to scan
+	 */
+	mlme_debug("[UCFG][OOQROAM] forwarding to dispatcher layer");
+
+	return wlan_cm_roam_invoke(pdev, vdev_id, NULL, 0,
+				   num_chan, chan_freq_list, source);
+}
 uint32_t ucfg_cm_roam_get_roam_score_algo(struct wlan_objmgr_pdev *pdev)
 {
 	return wlan_cm_roam_get_roam_score_algo(pdev);
