@@ -16144,7 +16144,9 @@ static QDF_STATUS hdd_open_p2p_interface(struct hdd_context *hdd_ctx,
 	bool p2p_dev_addr_admin;
 	bool is_p2p_locally_administered = false;
 	struct hdd_adapter_create_param params = {0};
+	struct hdd_adapter *adapter;
 
+	params.is_add_virtual_iface = 1;
 	if (!qdf_is_macaddr_zero(&hdd_ctx->p2p_random_mac_addr_cache) &&
 	    restore_intf) {
 		hdd_debug("Restoring cached P2P random MAC "
@@ -16212,6 +16214,9 @@ open_adapter:
 		hdd_err("Failed to open p2p interface");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_DEVICE_MODE);
+	adapter->is_virtual_iface = true;
 
 	return QDF_STATUS_SUCCESS;
 }
