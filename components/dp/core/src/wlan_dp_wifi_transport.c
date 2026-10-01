@@ -1130,6 +1130,7 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 
 	htc_vote_link_up(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+	hif_prevent_link_low_power_states(wtc->hif_handle);
 	wtc->init_mask |= WIFI_TRANSPORT_INIT_PWR_VOTE;
 
 	status = dp_wifi_transport_tx_buf_pool_init(wtc, dp_ctx);
@@ -1162,9 +1163,11 @@ QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx,
 err:
 	if (wtc->init_mask & WIFI_TRANSPORT_INIT_TX_BUF_POOL)
 		dp_wifi_transport_tx_buf_pool_deinit(wtc, dp_ctx);
-	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE)
+	if (wtc->init_mask & WIFI_TRANSPORT_INIT_PWR_VOTE) {
 		htc_vote_link_down(htc_handle,
 				   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+		hif_allow_link_low_power_states(wtc->hif_handle);
+	}
 	qdf_spin_lock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
 	dp_ctx->wifi_transport_host_ctx = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->wifi_transport_host_ctx_lock);
@@ -1244,6 +1247,7 @@ void dp_wifi_transport_deinit(struct wlan_dp_psoc_context *dp_ctx,
 		if (htc_handle)
 			htc_vote_link_down(htc_handle,
 					   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+		hif_allow_link_low_power_states(wtc->hif_handle);
 	}
 
 	qdf_event_destroy(&wtc->dl_down_completion);
