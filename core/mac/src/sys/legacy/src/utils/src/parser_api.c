@@ -5275,6 +5275,12 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 	uint8_t *ie_ptr;
 	uint16_t status_code;
 
+	if (frame_len < SIR_MAC_ASSOC_RSP_STATUS_CODE_OFFSET +
+			sizeof(status_code)) {
+		pe_err("Assoc rsp frame too short: len %u", frame_len);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	ar = qdf_mem_malloc(sizeof(*ar));
 	if (!ar)
 		return QDF_STATUS_E_FAILURE;
