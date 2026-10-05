@@ -33,6 +33,13 @@
 #include <qdf_types.h>
 
 /**
+ * WIFI_TRANSPORT_VERSION - Host driver implementation version.
+ * Stored in wifi_transport_auxiliary_device.version at registration so
+ * aux driver can verify driver compatibility.
+ */
+#define WIFI_TRANSPORT_VERSION	1
+
+/**
  * os_if_dp_wifi_transport_register() - publish auxiliary device binding point
  * @psoc: psoc object
  *
@@ -56,26 +63,6 @@ os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc);
  */
 void os_if_dp_wifi_transport_deregister(struct wlan_objmgr_psoc *psoc,
 					bool is_recovery_stop);
-
-/**
- * os_if_dp_wifi_transport_init() - start a use-case session
- * @psoc: psoc object
- *
- * Delegated from wifi_transport_host_ops_init() after input validation.
- * May be called multiple times per driver lifetime (once per use case).
- *
- * Return: QDF_STATUS_SUCCESS or error code
- */
-QDF_STATUS
-os_if_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc);
-
-/**
- * os_if_dp_wifi_transport_deinit() - stop the active use-case session
- * @psoc: psoc object
- * @is_recovery_stop: true if called from SSR-down path
- */
-void os_if_dp_wifi_transport_deinit(struct wlan_objmgr_psoc *psoc,
-				    bool is_recovery_stop);
 
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _OS_IF_DP_WIFI_TRANSPORT_H_ */

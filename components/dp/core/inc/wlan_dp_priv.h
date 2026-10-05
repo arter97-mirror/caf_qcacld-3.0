@@ -1033,11 +1033,13 @@ struct wlan_dp_stc_ctx {
  * @lpass_ep_id: HTC endpoint ID obtained at register time
  * @rx_refill_ring: LPASS RXDMA refill SRNG created at register time
  * @link_mask: bitmask of completed link-init steps
+ * @rx_drop_no_session: CE5 RX callbacks dropped with no active session
  */
 struct wifi_transport_link_state {
 	int                          lpass_ep_id;
 	struct dp_srng              *rx_refill_ring;
 	uint32_t                     link_mask;
+	uint32_t                     rx_drop_no_session;
 };
 #endif
 
@@ -1105,6 +1107,9 @@ struct wifi_transport_link_state {
  * @dp_direct_link_lock: Direct link mutex lock
  * @dp_direct_link_ctx: DP Direct Link context
  * @wifi_transport_link: WiFi transport Link context
+ * @wifi_transport_host_ctx: WiFi transport context
+ * @wifi_transport_host_ctx_lock: WiFi transport context lock
+ * @wifi_transport_active_path: WiFi transport context path active
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
@@ -1225,6 +1230,9 @@ struct wlan_dp_psoc_context {
 #endif
 #ifdef FEATURE_WIFI_TRANSPORT
 	struct wifi_transport_link_state wifi_transport_link;
+	struct wifi_transport_host_context *wifi_transport_host_ctx;
+	qdf_spinlock_t wifi_transport_host_ctx_lock;
+	qdf_atomic_t wifi_transport_active_path;
 #endif
 
 #ifdef WLAN_SUPPORT_RX_FISA

@@ -31,6 +31,7 @@
 
 #include <wlan_objmgr_psoc_obj.h>
 #include <qdf_types.h>
+#include <wifi_transport_aux.h>
 
 /**
  * ucfg_dp_wifi_transport_link_init() - connect HTC service + create refill ring
@@ -54,20 +55,57 @@ ucfg_dp_wifi_transport_link_deinit(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_dp_wifi_transport_init() - start a wifi-transport session
- * @psoc: psoc object
+ * @ops: WiFi Transport driver callbacks for TX completion and RX indication;
+ *       must remain valid for the lifetime of the session (caller owns
+ *       the struct)
  *
  * Return: QDF_STATUS_SUCCESS or error code
  */
 QDF_STATUS
-ucfg_dp_wifi_transport_init(struct wlan_objmgr_psoc *psoc);
+ucfg_dp_wifi_transport_init(const struct wifi_transport_ops *ops);
 
 /**
  * ucfg_dp_wifi_transport_deinit() - stop a wifi-transport session
- * @psoc: psoc object
  * @is_recovery_stop: true if called from SSR-down path
+ *
+ * Return: None
  */
-void ucfg_dp_wifi_transport_deinit(struct wlan_objmgr_psoc *psoc,
-				   bool is_recovery_stop);
+void ucfg_dp_wifi_transport_deinit(bool is_recovery_stop);
+
+/**
+ * ucfg_dp_wifi_transport_set_params() - set a control parameter
+ * @type: parameter type selector
+ * @data: parameter payload
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int ucfg_dp_wifi_transport_set_params(
+			enum wifi_transport_param_type type,
+			const union wifi_transport_param_data *data);
+
+/**
+ * ucfg_dp_wifi_transport_get_params() - get a control parameter
+ * @type: parameter type selector
+ * @data: output buffer
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int ucfg_dp_wifi_transport_get_params(enum wifi_transport_param_type type,
+				      union wifi_transport_param_data *data);
+
+/**
+ * ucfg_dp_wifi_transport_tx() - submit one audio buffer for CE0 TX
+ * @nbuf: audio skb from the WiFi Transport driver; freed inside
+ *       dp_wifi_transport_tx(); caller must not dereference after return
+ * @meta: per-packet TX metadata (TTP, checksum, QoS)
+ * @flush: true forces immediate CE0 message flush
+ *
+ * Return: 0 on success, -ENODEV if session inactive,
+ *         -ENOSPC if TX pool or msg pool exhausted
+ */
+int ucfg_dp_wifi_transport_tx(qdf_nbuf_t nbuf,
+			      struct wifi_transport_tx_metadata *meta,
+			      bool flush);
 
 #endif /* FEATURE_WIFI_TRANSPORT */
 #endif /* _WLAN_DP_WIFI_TRANSPORT_UCFG_API_H_ */
