@@ -78,6 +78,7 @@ struct passthru_peer_tbl_entry {
  * @peer_tbl: passthru peer table
  * @num_peers: number of peers in the table
  * @is_peer_create_enabled: is peer created enabled
+ * @max_wt_peers_allowed: Max passthru peers allowed
  */
 struct hdd_wondertap_context {
 	struct hdd_context *hdd_ctx;
@@ -92,6 +93,7 @@ struct hdd_wondertap_context {
 	struct passthru_peer_tbl_entry peer_tbl[WLAN_PASSTHRU_MAX_PEER];
 	uint8_t num_peers;
 	bool is_peer_create_enabled;
+	uint8_t max_wt_peers_allowed;
 };
 
 struct hdd_wondertap_peer_setup {
