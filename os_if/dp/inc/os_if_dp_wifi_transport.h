@@ -51,6 +51,8 @@ os_if_dp_wifi_transport_register(struct wlan_objmgr_psoc *psoc);
  *
  * Called once from hdd_wlan_stop_modules(). Removes the auxiliary device.
  * If a session is still active, fires the deinit chain first.
+ *
+ * Return: None
  */
 void os_if_dp_wifi_transport_deregister(struct wlan_objmgr_psoc *psoc,
 					bool is_recovery_stop);

@@ -896,6 +896,8 @@ struct wlan_dp_stc_flow_status {
  * @link_monitoring_cb: Callback API to handle link speed change
  * @dp_register_lpass_ssr_notifier: Callback to register for lpass SSR notif
  * @dp_unregister_lpass_ssr_notifier: Callback to unregister for lpass SSR notif
+ * @osif_dp_wifi_transport_register: Callback to register Aux device
+ * @osif_dp_wifi_transport_deregister: Callback to unregister Aux device
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
  * @send_flow_stats_event: Callback to send flow stats vendor command
  * @send_flow_report_event: Callback to send flow report vendor command
@@ -995,6 +997,12 @@ struct wlan_dp_psoc_callbacks {
 	QDF_STATUS
 	(*dp_register_lpass_ssr_notifier)(struct wlan_objmgr_psoc *psoc);
 	void (*dp_unregister_lpass_ssr_notifier)(struct wlan_objmgr_psoc *psoc);
+#endif
+#ifdef FEATURE_WIFI_TRANSPORT
+	QDF_STATUS
+	(*osif_dp_wifi_transport_register)(struct wlan_objmgr_psoc *psoc);
+	void (*osif_dp_wifi_transport_deregister)(struct wlan_objmgr_psoc *psoc,
+						  bool is_ssr);
 #endif
 
 #ifdef IPA_WDS_EASYMESH_FEATURE

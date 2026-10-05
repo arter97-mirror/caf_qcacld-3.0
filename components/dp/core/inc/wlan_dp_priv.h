@@ -1027,6 +1027,20 @@ struct wlan_dp_stc_ctx {
 };
 #endif
 
+#ifdef FEATURE_WIFI_TRANSPORT
+/**
+ * struct wifi_transport_link_state - driver-lifetime link state
+ * @lpass_ep_id: HTC endpoint ID obtained at register time
+ * @rx_refill_ring: LPASS RXDMA refill SRNG created at register time
+ * @link_mask: bitmask of completed link-init steps
+ */
+struct wifi_transport_link_state {
+	int                          lpass_ep_id;
+	struct dp_srng              *rx_refill_ring;
+	uint32_t                     link_mask;
+};
+#endif
+
 /**
  * struct wlan_dp_psoc_context - psoc related data required for DP
  * @psoc: object manager psoc context
@@ -1090,6 +1104,7 @@ struct wlan_dp_stc_ctx {
  * @bbm_ctx: bus bandwidth manager context
  * @dp_direct_link_lock: Direct link mutex lock
  * @dp_direct_link_ctx: DP Direct Link context
+ * @wifi_transport_link: WiFi transport Link context
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
@@ -1208,6 +1223,10 @@ struct wlan_dp_psoc_context {
 	qdf_mutex_t dp_direct_link_lock;
 	struct dp_direct_link_context *dp_direct_link_ctx;
 #endif
+#ifdef FEATURE_WIFI_TRANSPORT
+	struct wifi_transport_link_state wifi_transport_link;
+#endif
+
 #ifdef WLAN_SUPPORT_RX_FISA
 	struct dp_rx_fst *rx_fst;
 	uint64_t fst_cmem_base;

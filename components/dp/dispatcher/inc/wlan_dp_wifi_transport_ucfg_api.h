@@ -33,6 +33,26 @@
 #include <qdf_types.h>
 
 /**
+ * ucfg_dp_wifi_transport_link_init() - connect HTC service + create refill ring
+ * @psoc: WLAN objmgr psoc context
+ *
+ * Called at driver register time (os_if_dp_wifi_transport_register).
+ *
+ * Return: QDF_STATUS_SUCCESS or error code
+ */
+QDF_STATUS
+ucfg_dp_wifi_transport_link_init(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_wifi_transport_link_deinit() - destroy HTC service + refill ring
+ * @psoc: WLAN objmgr psoc context
+ *
+ * Return: None
+ */
+void
+ucfg_dp_wifi_transport_link_deinit(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_dp_wifi_transport_init() - start a wifi-transport session
  * @psoc: psoc object
  *

@@ -20,6 +20,157 @@
 
 #include "wlan_dp_wifi_transport.h"
 #include "wlan_dp_priv.h"
+#include "dp_internal.h"
+
+/**
+ * dp_wifi_transport_htc_tx_complete() - stub HTC TX completion callback
+ * @ctx: dp_ctx (unused)
+ * @pkt: completed HTC packet (unused)
+ *
+ * HTC registers this callback but CE0 data path uses dp_wifi_transport_tx_done
+ * instead (registered after htc_connect_service overrides HTC's default).
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_htc_tx_complete(void *ctx, HTC_PACKET *pkt)
+{
+	dp_err("htc_tx_complete stub (CE path active)");
+}
+
+/**
+ * dp_wifi_transport_htc_rx_handler() - stub HTC RX handler
+ * @ctx: dp_ctx (unused)
+ * @pkt: received HTC packet (unused)
+ *
+ * HTC registers this callback but CE5 data path uses dp_wifi_transport_rx_ready
+ * instead (registered after htc_connect_service overrides HTC's default).
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_htc_rx_handler(void *ctx, HTC_PACKET *pkt)
+{
+	dp_err("htc_rx_handler stub (CE path active)");
+}
+
+/**
+ * dp_wifi_transport_tx_done() - CE0 TX completion callback
+ * @transfer_ctx: msg_buf pointer passed to ce_send()
+ * @nbytes: number of bytes transferred (used to sync DMA cache)
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_tx_done(void *transfer_ctx,
+			  unsigned int nbytes)
+{
+}
+
+/**
+ * dp_wifi_transport_rx_ready() - CE5 RX callback (FW -> host)
+ * @transfer_ctx: vaddr passed to ce_recv_buf_enqueue
+ * @buffer: DMA address of the received buffer (used to re-post)
+ * @nbytes: bytes received (includes HTC_FRAME_HDR)
+ *
+ *
+ * Return: None
+ */
+static inline void
+dp_wifi_transport_rx_ready(void *transfer_ctx,
+			   qdf_dma_addr_t buffer,
+			   unsigned int nbytes)
+{
+}
+
+QDF_STATUS dp_wifi_transport_link_init(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wifi_transport_link_state *ls = &dp_ctx->wifi_transport_link;
+	struct hif_opaque_softc *hif_handle =
+			cds_get_context(QDF_MODULE_ID_HIF);
+	void *htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	struct htc_service_connect_req conn_req = {0};
+	struct htc_service_connect_resp conn_resp = {0};
+	QDF_STATUS status;
+	uint32_t pdev_id;
+
+	if (!htc_handle || !hif_handle) {
+		dp_err("HTC or HIF context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev)) {
+		dp_err("direct_link not supported — cannot use LPASS CE");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	/*
+	 * Step 1: Connect to LPASS_DATA_MSG_SVC to obtain the endpoint ID.
+	 * HTC also maps CE0 (PIPEDIR_OUT) for TX and CE5 (PIPEDIR_IN) for RX.
+	 * The stub EpTxComplete / EpRecv callbacks are registered here but will
+	 * be overridden by step 2 below so they are never invoked on the
+	 * data path.
+	 */
+	conn_req.EpCallbacks.pContext     = dp_ctx;
+	conn_req.EpCallbacks.EpTxComplete = dp_wifi_transport_htc_tx_complete;
+	conn_req.EpCallbacks.EpRecv       = dp_wifi_transport_htc_rx_handler;
+	conn_req.ConnectionFlags |=
+			HTC_CONNECT_FLAGS_DISABLE_CREDIT_FLOW_CTRL;
+	conn_req.service_id = LPASS_DATA_MSG_SVC;
+
+	status = htc_connect_service(htc_handle, &conn_req, &conn_resp);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("LPASS_DATA_MSG_SVC connect failed: %d", status);
+		return status;
+	}
+	ls->lpass_ep_id = conn_resp.Endpoint;
+	ls->link_mask  |= WIFI_TRANSPORT_LINK_HTC_CONNECT;
+
+	/*
+	 * Step 2: Register CE0/CE5 callbacks via HIF so Core DP never
+	 * touches CE-internal types (struct CE_handle, ce_send, etc.).
+	 */
+	status = hif_wifi_transport_register_callbacks(
+			hif_handle,
+			dp_wifi_transport_tx_done,
+			dp_wifi_transport_rx_ready);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("CE callback registration failed");
+		return status;
+	}
+	ls->link_mask |= WIFI_TRANSPORT_LINK_CE_CALLBACKS;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(dp_ctx->pdev);
+	ls->rx_refill_ring =
+		dp_setup_direct_link_refill_ring(dp_ctx->cdp_soc, pdev_id);
+	if (!ls->rx_refill_ring) {
+		dp_err("Failed to create LPASS refill ring");
+		return QDF_STATUS_E_FAILURE;
+	}
+	ls->link_mask |= WIFI_TRANSPORT_LINK_REFILL_RING;
+
+	dp_info("wifi_transport link init ep_id=%d link_mask=0x%x",
+		ls->lpass_ep_id, ls->link_mask);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void dp_wifi_transport_link_deinit(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wifi_transport_link_state *ls = &dp_ctx->wifi_transport_link;
+	uint32_t pdev_id;
+
+	dp_info("link_deinit link_mask=0x%x", ls->link_mask);
+
+	if (ls->link_mask & WIFI_TRANSPORT_LINK_REFILL_RING) {
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(dp_ctx->pdev);
+		dp_info("destroying LPASS refill ring");
+		dp_destroy_direct_link_refill_ring(dp_ctx->cdp_soc, pdev_id);
+		ls->rx_refill_ring = NULL;
+	}
+
+	ls->link_mask = 0;
+}
 
 QDF_STATUS dp_wifi_transport_init(struct wlan_dp_psoc_context *dp_ctx)
 {

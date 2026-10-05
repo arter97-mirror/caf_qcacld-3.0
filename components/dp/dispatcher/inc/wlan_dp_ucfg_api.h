@@ -1484,7 +1484,7 @@ void ucfg_dp_prealloc_put_multi_pages(uint32_t desc_type,
 				      struct qdf_mem_multi_page_t *pages);
 #endif
 
-#ifdef FEATURE_DIRECT_LINK
+#if defined(FEATURE_DIRECT_LINK) || defined(FEATURE_WIFI_TRANSPORT)
 /**
  * ucfg_dp_direct_link_init() - Initializes Direct Link datapath
  * @psoc: psoc handle
@@ -1501,7 +1501,20 @@ QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc);
  * Return: None
  */
 void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr);
+#else
+static inline
+QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 
+static inline
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
+{
+}
+#endif
+
+#ifdef FEATURE_DIRECT_LINK
 /**
  * ucfg_dp_wfds_handle_request_mem_ind() - Process request memory indication
  *  received from QMI server
@@ -1580,17 +1593,6 @@ void *ucfg_dp_get_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 ucfg_dp_direct_link_handle_lpass_ssr_notif(struct wlan_objmgr_psoc *psoc);
 #else
-static inline
-QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc, bool is_ssr)
-{
-}
-
 #ifdef QMI_WFDS
 static inline void
 ucfg_dp_wfds_handle_request_mem_ind(struct wlan_qmi_wfds_mem_ind_msg *mem_msg)
