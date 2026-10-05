@@ -739,7 +739,7 @@ target_if_update_pairwise_key_peer_mac(struct wlan_crypto_key_entry *crypto_entr
 	if (crypto_entry->link_id == MLO_INVALID_LINK_IDX)
 		return;
 
-	for (i = 0; i < WLAN_CRYPTO_MAX_VLANKEYIX; i++) {
+	for (i = 0; i < WLAN_CRYPTO_MAXKEYIDX; i++) {
 		if (!crypto_entry->keys.key[i])
 			continue;
 
