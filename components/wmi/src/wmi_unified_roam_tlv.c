@@ -5319,6 +5319,18 @@ wmi_fill_sae_single_pmk_param(struct wlan_rso_11i_params *src_11i,
 			1 << WMI_ROAM_OFFLOAD_FLAG_SAE_SAME_PMKID;
 }
 
+static inline void
+wmi_fill_user_okc_cache_support(struct wlan_rso_11i_params *src_11i,
+				wmi_roam_11i_offload_tlv_param *roam_offload_11i)
+{
+	if (src_11i->user_okc_cache_support) {
+		WMI_SET_ROAM_OFFLOAD_USER_OKC_CACHE_SUPPORT(
+						roam_offload_11i->flags);
+		wmi_debug("User OKC cache support set in RSO 11i flags:0x%x",
+			  roam_offload_11i->flags);
+	}
+}
+
 static uint8_t *wmi_fill_sae_single_pmk_tlv(
 	struct wlan_roam_scan_offload_params *roam_req, uint8_t *buf_ptr)
 {
@@ -5348,6 +5360,11 @@ static uint8_t *wmi_fill_sae_single_pmk_tlv(
 static inline void
 wmi_fill_sae_single_pmk_param(struct wlan_rso_11i_params *src_11i,
 			      wmi_roam_11i_offload_tlv_param *roam_offload_11i)
+{}
+
+static inline void
+wmi_fill_user_okc_cache_support(struct wlan_rso_11i_params *src_11i,
+				wmi_roam_11i_offload_tlv_param *roam_offload_11i)
 {}
 
 static inline uint8_t *wmi_fill_sae_single_pmk_tlv(
@@ -5584,6 +5601,8 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 
 			wmi_fill_sae_single_pmk_param(src_11i_info,
 						      roam_offload_11i);
+			wmi_fill_user_okc_cache_support(src_11i_info,
+							roam_offload_11i);
 
 			roam_offload_11i->pmk_len =
 				src_11i_info->pmk_len > ROAM_OFFLOAD_PMK_BYTES ?

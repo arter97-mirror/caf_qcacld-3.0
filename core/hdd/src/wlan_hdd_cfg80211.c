@@ -6010,6 +6010,25 @@ wlan_hdd_set_11bi_pmkid_privacy_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
+static inline void
+wlan_hdd_set_okc_pmkid_in_assoc_feature(struct wlan_objmgr_psoc *psoc,
+					uint8_t *feature_flags)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle)
+		return;
+
+	if (!wmi_service_enabled(wmi_handle,
+				 wmi_service_skip_pmk_match_delete_support))
+		return;
+
+	hdd_debug("OKC PMKID-in-AssocReq support enabled");
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_OKC_PMKID_IN_ASSOC);
+}
+
 #if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
 static inline bool wlan_hdd_check_probe_peer_feature(struct wlan_objmgr_psoc
 						     *psoc)
@@ -6204,6 +6223,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 							      feature_flags);
 	wlan_hdd_set_smd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_11bi_pmkid_privacy_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_okc_pmkid_in_assoc_feature(hdd_ctx->psoc, feature_flags);
 
 	if (ucfg_dp_get_haps_config(hdd_ctx->psoc))
 		wlan_cfg80211_set_feature(feature_flags,
@@ -18390,6 +18410,7 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	bool smd_enabled = false;
 	bool sec_profile = false;
 	bool eppke_allowed = false;
+	bool okc_pmkid_in_assoc = false;
 	int8_t ret = 0;
 	struct nlattr *curr_attr;
 	struct qdf_mac_addr allowed_bss_link_addr[WLAN_MAX_NUM_ALLOWED_BSSIDS];
@@ -18433,6 +18454,14 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 							&sec_profile);
 
 	hdd_handle_eppke_connect_ext_feature(ext_features, &eppke_allowed);
+	if (ext_features & BIT(QCA_CONNECT_EXT_FEATURE_OKC_PMKID_IN_ASSOC)) {
+		if (wlan_psoc_nif_fw_ext2_cap_get(
+				hdd_ctx->psoc,
+				WLAN_ROAM_SKIP_PMK_MATCH_DELETE_SUPPORT))
+			okc_pmkid_in_assoc = true;
+		else
+			hdd_debug("OKC PMKID-in-assoc: FW cap not present, ignoring");
+	}
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		if (!link_info->vdev)
@@ -18448,6 +18477,8 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 		hdd_debug("vdev:%d eppke_allowed:%d ext_features:0x%x",
 			  link_info->vdev_id, eppke_allowed, ext_features);
 
+		wlan_vdev_set_okc_pmkid_in_assoc(link_info->vdev,
+						 okc_pmkid_in_assoc);
 		wma_cli_set_command(link_info->vdev_id,
 				    wmi_vdev_param_connect_ext_features,
 				    ext_features, VDEV_CMD);

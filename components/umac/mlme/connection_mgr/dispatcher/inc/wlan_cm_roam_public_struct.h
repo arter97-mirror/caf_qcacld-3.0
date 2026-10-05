@@ -1925,6 +1925,10 @@ struct wlan_rso_lfr3_caps {
  * @fw_pmksa_cache: use PMKSA cache in firmware
  * @is_sae_same_pmk: Flag to indicate fw whether WLAN_SAE_SINGLE_PMK feature is
  * enable or not
+ * @user_okc_cache_support: set when supplicant sends
+ * QCA_CONNECT_EXT_FEATURE_OKC_PMKID_IN_ASSOC; tells FW that host supplicant
+ * handles OKC PMKSA and FW should skip PMK match-based delete during OKC
+ * roam for 1X AKM
  * @psk_pmk: pre shared key/pairwise master key
  * @pmk_len: length of PMK
  */
@@ -1933,6 +1937,7 @@ struct wlan_rso_11i_params {
 	bool fw_okc;
 	bool fw_pmksa_cache;
 	bool is_sae_same_pmk;
+	bool user_okc_cache_support;
 	uint8_t psk_pmk[MAX_PMK_LEN];
 	uint8_t pmk_len;
 };

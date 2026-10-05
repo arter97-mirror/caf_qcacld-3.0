@@ -515,6 +515,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_conn_set_authenticated(link_info, false);
 	hdd_napi_serialize(0);
 	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
+	wlan_vdev_set_okc_pmkid_in_assoc(vdev, false);
 	__hdd_cm_disconnect_handler_pre_user_update(link_info);
 
 	if (rsp->req.req.source == CM_PEER_DISCONNECT ||
