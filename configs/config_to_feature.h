@@ -1444,6 +1444,10 @@
 #define FEATURE_TSO (1)
 #endif
 
+#ifdef CONFIG_DP_FEATURE_USO
+#define DP_FEATURE_USO (1)
+#endif
+
 #ifdef CONFIG_FEATURE_TSO_DEBUG
 #define FEATURE_TSO_DEBUG (1)
 #endif

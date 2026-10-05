@@ -388,10 +388,12 @@ dp_nbuf_nontso_linearize(qdf_nbuf_t nbuf)
 static inline QDF_STATUS
 dp_nbuf_nontso_linearize(qdf_nbuf_t nbuf)
 {
-	if (qdf_nbuf_is_nonlinear(nbuf) && qdf_nbuf_is_tso(nbuf) == false) {
+	if (qdf_nbuf_is_nonlinear(nbuf) && !qdf_nbuf_is_tso(nbuf) &&
+	    !qdf_nbuf_is_uso(nbuf)) {
 		if (qdf_unlikely(qdf_nbuf_linearize(nbuf)))
 			return QDF_STATUS_E_NOMEM;
 	}
+
 	return QDF_STATUS_SUCCESS;
 }
 #endif

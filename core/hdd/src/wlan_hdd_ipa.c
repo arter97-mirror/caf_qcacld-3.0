@@ -241,7 +241,6 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 
 	nbuf->dev = adapter->dev;
 	nbuf->protocol = eth_type_trans(nbuf, nbuf->dev);
-	nbuf->ip_summed = CHECKSUM_NONE;
 	len = nbuf->len;
 
 	/*

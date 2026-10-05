@@ -1340,7 +1340,10 @@ wlan_get_op_chan_freq_info_vdev_id(struct wlan_objmgr_pdev *pdev,
  * @eid_max_len: maximum length of IE @eid
  *
  * This utility function is used to strip of the requested IE if present
- * in IE buffer.
+ * in IE buffer. If the buffer pointed by @extracted is not %NULL and if
+ * any matching IE can't be added to buffer pointed by @extracted due to
+ * lack of enough memory in @extracted buffer, they will still remain in
+ * the original frame pointed by @addn_ie.
  *
  * Return: QDF_STATUS
  */

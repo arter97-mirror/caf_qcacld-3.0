@@ -1020,6 +1020,8 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 
 	qdf_mem_free(addIE);
 
+	lim_reorder_vendor_ies(mac, prb_rsp_ie_ptr, prb_rsp_ie_len);
+
 	nBytes = sizeof(tSirMacMgmtHdr) + WLAN_PROBE_RESP_IES_OFFSET +
 		 prb_rsp_ie_len;
 

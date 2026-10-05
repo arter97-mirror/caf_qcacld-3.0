@@ -1616,6 +1616,10 @@ static QDF_STATUS write_beacon_to_memory(struct mac_context *mac, uint16_t size,
 			       size, pe_session->schBeaconOffsetEnd);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		lim_reorder_vendor_ies(mac, pe_session->pSchBeaconFrameEnd,
+				       pe_session->schBeaconOffsetEnd);
+
 		for (i = 0; i < pe_session->schBeaconOffsetEnd; i++)
 			pe_session->pSchBeaconFrameBegin[size++] =
 				pe_session->pSchBeaconFrameEnd[i];

@@ -12921,6 +12921,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_scc_conn = 0;
 	uint8_t num_5_or_6_conn = 0;
 	bool ml_sap_vdev = false;
+	bool is_same_vdev = false, is_5ghz = false, is_dfs = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -12945,22 +12946,30 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
 		if (!connection[i].in_use)
 			continue;
-		if (connection[i].vdev_id == vdev_id) {
-			if (WLAN_REG_IS_5GHZ_CH_FREQ(connection[i].freq) &&
-			    (connection[i].ch_flagext & (IEEE80211_CHAN_DFS |
-					      IEEE80211_CHAN_DFS_CFREQ2)))
+
+		is_same_vdev = (connection[i].vdev_id == vdev_id);
+		is_5ghz = WLAN_REG_IS_5GHZ_CH_FREQ(connection[i].freq);
+		is_dfs = connection[i].ch_flagext &
+			(IEEE80211_CHAN_DFS | IEEE80211_CHAN_DFS_CFREQ2);
+
+		if (is_same_vdev) {
+			if (is_5ghz && is_dfs)
 				sap_on_dfs = true;
 			sap_found = true;
-		} else {
-			if (connection[i].freq == freq)
-				num_scc_conn++;
-			else
-				num_mcc_conn++;
-
-			if (!WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq))
-				num_5_or_6_conn++;
+			continue;
 		}
+
+		if (connection[i].freq == freq)
+			num_scc_conn++;
+		else if (policy_mgr_2_freq_always_on_same_mac(
+					psoc,
+					connection[i].freq, freq))
+			num_mcc_conn++;
+
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq))
+			num_5_or_6_conn++;
 	}
+
 	if (!sap_found) {
 		policy_mgr_err("Invalid vdev id: %d", vdev_id);
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);

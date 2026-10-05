@@ -497,6 +497,10 @@ config FEATURE_TSO
 	bool "Enable TCP Segmentation Offload"
 	default n
 
+config DP_FEATURE_USO
+	bool "Enable UDP Segmentation Offload"
+	default n
+
 config FEATURE_TSO_DEBUG
 	bool "Enable TCP Segmentation Offload with debug"
 	depends on FEATURE_TSO

@@ -1095,6 +1095,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
 	bool keep_6ghz_sta_cli_conn;
+	bool has_legacy_ap = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1119,6 +1120,14 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 			break;
 		}
 	}
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		    pm_conc_connection_list[i].in_use &&
+		    !WLAN_REG_IS_6GHZ_CHAN_FREQ(pm_conc_connection_list[i].freq)) {
+			has_legacy_ap = true;
+			break;
+		}
+	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	if (!sta_gc_6ghz_freq)
@@ -1137,6 +1146,10 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	 * VLP STA + SAP - Allowed with VLP Power
 	 * LPI STA + SAP - Allowed with VLP power if channel supports VLP.
 	 * LPI STA + SAP - Allowed with LPI power if gindoor_channel_support=1
+	 *
+	 * PSC check is skipped for non-PSC channels if a 2G/5G AP is already
+	 * active, because RNR (Reduced Neighbor Report) in the legacy AP beacon
+	 * enables clients to discover the 6GHz BSS on non-PSC channels.
 	 */
 	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
 	policy_mgr_debug("STA power type : %d", ap_pwr_type_6g);
@@ -1146,7 +1159,8 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 								pm_ctx->pdev);
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_list_org[i])) {
-			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) ||
+			if ((!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) &&
+			     !has_legacy_ap) ||
 			    keep_6ghz_sta_cli_conn)
 				continue;
 			if (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP)
@@ -4126,8 +4140,36 @@ enum policy_mgr_three_connection_mode
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
 			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
-		} else {
-			index =  PM_MAX_THREE_CONNECTION_MODE;
+		} else if (policy_mgr_is_current_hwmode_sbs(psoc)) {
+			policy_mgr_get_index_for_3_given_freq_sbs(
+				pm_ctx,
+				&index,
+				pm_conc_connection_list[list_sap[0]].freq,
+				pm_conc_connection_list[list_sap[1]].freq,
+				pm_conc_connection_list[list_sta[0]].freq);
+		} else if (policy_mgr_is_current_hwmode_dbs(psoc)) {
+			policy_mgr_get_index_for_3_given_freq_dbs(
+				pm_ctx,
+				&index,
+				pm_conc_connection_list[list_sap[0]].freq,
+				pm_conc_connection_list[list_sap[1]].freq,
+				pm_conc_connection_list[list_sta[0]].freq);
+		}
+		if (index == PM_MAX_THREE_CONNECTION_MODE) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[0]].freq) &&
+			    WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[1]].freq) &&
+			    WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sta[0]].freq))
+				index = PM_SAP_SAP_STA_SCC_24_SMM;
+			else if (!WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[0]].freq) &&
+				!WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[1]].freq) &&
+				!WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sta[0]].freq))
+				index = PM_SAP_SAP_STA_SCC_5_SMM;
 		}
 	} else if (num_ml_sta == 2 && count_sap == 1) {
 		/* This covers the below combinations,
@@ -4530,7 +4572,25 @@ enum policy_mgr_four_connection_mode
 		policy_mgr_get_index_for_4sap_sbs(pm_ctx,
 						  &index,
 						  freq_list_sap);
-	else
+	else if (num_ml_sta == 2 && count_sap == 2 &&
+		 policy_mgr_is_current_hwmode_dbs(psoc)) {
+		qdf_freq_t combined_freq[4] = {
+			freq_list_sap[0], freq_list_sap[1],
+			freq_list[ml_sta_idx[0]], freq_list[ml_sta_idx[1]]
+		};
+		/* dbs logic same as 4 sap */
+		policy_mgr_get_index_for_4sap_dbs(pm_ctx, &index,
+						  combined_freq);
+	} else if (num_ml_sta == 2 && count_sap == 2 &&
+		   policy_mgr_is_current_hwmode_sbs(psoc)) {
+		qdf_freq_t combined_freq[4] = {
+			freq_list_sap[0], freq_list_sap[1],
+			freq_list[ml_sta_idx[0]], freq_list[ml_sta_idx[1]]
+		};
+		/* sbs logic same as 4 sap */
+		policy_mgr_get_index_for_4sap_sbs(pm_ctx, &index,
+						  combined_freq);
+	} else
 		index =  PM_MAX_FOUR_CONNECTION_MODE;
 
 	policy_mgr_debug(

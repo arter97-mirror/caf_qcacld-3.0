@@ -7556,7 +7556,6 @@ static void hdd_check_wait_for_hw_mode_completion(struct hdd_context *hdd_ctx)
 static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 					    struct wlan_objmgr_vdev *vdev)
 {
-	enum policy_mgr_con_mode mode;
 	struct wlan_objmgr_psoc *psoc;
 	enum QDF_OPMODE op_mode;
 
@@ -7565,13 +7564,8 @@ static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 	 */
 	psoc = wlan_vdev_get_psoc(vdev);
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode,
-						    wlan_vdev_get_id(vdev));
-	if ((policy_mgr_get_connection_count(psoc) == 1 &&
-	     policy_mgr_mode_specific_connection_count(psoc,
-						       mode, NULL) == 1) ||
-	     (!policy_mgr_get_connection_count(psoc) &&
-	     !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx))) {
+	if (!policy_mgr_get_connection_count(psoc) &&
+	    !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx)) {
 		policy_mgr_check_and_stop_opportunistic_timer(
 						psoc,
 						wlan_vdev_get_id(vdev));
@@ -10622,6 +10616,8 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter)
 
 	if (cdp_cfg_get(soc, cfg_dp_tso_enable) && enable_csum) {
 		adapter->dev->features |= TSO_FEATURE_FLAGS;
+		if (cdp_cfg_get(soc, cfg_dp_uso_enable))
+			adapter->dev->features |= USO_FEATURE_FLAGS;
 		adapter->tso_csum_feature_enabled = 1;
 	}
 
@@ -15822,6 +15818,7 @@ hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		if (test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags) &&
+		    link_info->vdev &&
 		    wlan_vdev_get_link_id(link_info->vdev) == link_id)
 			return link_info;
 	}
@@ -18958,6 +18955,10 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 
 	sme_register_set_disconnect_cb(mac_handle,
 				       hdd_set_disconnect_link_info_cb);
+
+	sme_register_sap_channel_bw_update_cb(mac_handle,
+					      hdd_sap_channel_bw_update_cb);
+
 	hdd_exit();
 
 	return ret;
@@ -18986,6 +18987,8 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	mac_handle = hdd_ctx->mac_handle;
 
 	sme_deregister_disconnect_cb(mac_handle);
+
+	sme_deregister_sap_channel_bw_update_cb(mac_handle);
 
 	sme_deregister_ssr_on_pagefault_cb(mac_handle);
 
@@ -23196,6 +23199,35 @@ void hdd_set_disconnect_link_info_cb(uint8_t vdev_id)
 
 	adapter->discon_link_info = link_info;
 	hdd_debug("vdev_id %d", link_info->vdev_id);
+}
+
+void hdd_sap_channel_bw_update_cb(uint8_t vdev_id)
+{
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD CTX is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Link info is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+
+	adapter = link_info->adapter;
+	if (!adapter || adapter->device_mode != QDF_SAP_MODE) {
+		hdd_err("adapter is NULL or not sap mode");
+		return;
+	}
+
+	hdd_debug("Notify hostapd vdev_id %d channel bw change", vdev_id);
+	link_info->ch_chng_info.ch_chng_type = CHAN_SWITCH_COMPLETE_NOTIFY;
+	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE

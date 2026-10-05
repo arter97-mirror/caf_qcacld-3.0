@@ -1899,7 +1899,15 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			adapter->device_mode);
 	}
 
-	if (ucfg_ipa_is_enabled() && !is_auth_required) {
+	/*
+	 * For MLO STA, only fire WLAN_IPA_STA_CONNECT on the assoc link.
+	 * Non-assoc (partner) links share the same net_device and would
+	 * trigger a spurious WLAN_STA_DISCONNECT + WAN teardown in IPACM.
+	 * Exception: link switch repurpose (is_vdev_repurpose) must always
+	 * fire so IPACM can update WAN rules for the new assoc link vdev.
+	 */
+	if (ucfg_ipa_is_enabled() && !is_auth_required &&
+	    (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) || is_vdev_repurpose)) {
 		status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info, &alt_pipe);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_debug("Failed to get alternate pipe for vdev %d",

@@ -6354,15 +6354,48 @@ non_punctured_psd_update:
 		if (local_eirp_set && reg_eirp_set) {
 			local_tpe = tpe_ies[local_eirp_idx];
 			reg_tpe = tpe_ies[reg_eirp_idx];
+			if (local_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+				pe_debug("Invalid local EIRP max count: %d",
+					 local_tpe.max_tx_pwr_count);
+				local_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ;
+			}
+			if (reg_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+				pe_debug("Invalid reg EIRP max count: %d",
+					 reg_tpe.max_tx_pwr_count);
+				reg_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ;
+			}
 		} else if (local_psd_set && reg_psd_set) {
 			local_tpe = tpe_ies[local_psd_idx];
 			reg_tpe = tpe_ies[reg_psd_idx];
+			if (local_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
+				pe_debug("Invalid local PSD max count: %d",
+					 local_tpe.max_tx_pwr_count);
+				local_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ_PSD;
+			}
+			if (reg_tpe.max_tx_pwr_count >
+			    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
+				pe_debug("Invalid reg PSD max tx count: %d",
+					 reg_tpe.max_tx_pwr_count);
+				reg_tpe.max_tx_pwr_count =
+					MAX_TX_PWR_COUNT_FOR_160MHZ_PSD;
+			}
 		} else {
 			return;
 		}
 
 		min_count = QDF_MIN(local_tpe.max_tx_pwr_count,
 				    reg_tpe.max_tx_pwr_count);
+		if (non_psd_set && min_count >= MAX_NUM_EIRP_PWR_LEVEL) {
+			pe_debug("Clamp min_count %d to %d for chan_eirp_power",
+				 min_count, MAX_NUM_EIRP_PWR_LEVEL - 1);
+			min_count = MAX_NUM_EIRP_PWR_LEVEL - 1;
+		}
 		for (i = 0; i < min_count + 1; i++) {
 			if (vdev_mlme->reg_tpc_obj.tpe[i] !=
 			    QDF_MIN(local_tpe.tx_power[i], reg_tpe.tx_power[i]))
@@ -9557,7 +9590,8 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
 	enum phy_ch_width non_eht_ch_width;
-	struct wlan_channel *des_chan;
+	struct vdev_mlme_obj *mlme_obj;
+	struct wlan_channel *des_chan, *bss_chan;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9578,6 +9612,26 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 		goto fail;
 	}
 
+	wlan_objmgr_vdev_get_ref(session->vdev, WLAN_LEGACY_SME_ID);
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		goto release_vdev_ref;
+	}
+
+	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
+	if (!des_chan) {
+		pe_err("des_chan is NULL");
+		goto release_vdev_ref;
+	}
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(session->vdev);
+	if (!bss_chan) {
+		pe_err("bss_chan is NULL");
+		goto release_vdev_ref;
+	}
+
 	ch_params.ch_width = req->ch_width;
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						session->curr_op_freq,
@@ -9596,6 +9650,29 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	session->gLimChannelSwitch.ch_center_freq_seg1 =
 						ch_params.center_freq_seg1;
 
+	des_chan->ch_freq = session->curr_op_freq;
+	des_chan->ch_width = ch_params.ch_width;
+	des_chan->ch_freq_seg1 = ch_params.center_freq_seg0;
+	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
+	des_chan->ch_ieee = wlan_reg_freq_to_chan(mac_ctx->pdev,
+						  des_chan->ch_freq);
+	lim_update_des_chan_puncture(des_chan, &ch_params);
+
+	if (lim_set_ch_phy_mode(session->vdev, session->dot11mode)) {
+		pe_err("Failed to set channel phy mode");
+		goto release_vdev_ref;
+	}
+
+	if (wlan_vdev_mlme_is_active(mlme_obj->vdev) ==
+				     QDF_STATUS_SUCCESS) {
+		qdf_mem_copy(bss_chan, des_chan,
+			     sizeof(struct wlan_channel));
+	} else {
+		pe_err("vdev %d not active, cannot update bss_chan",
+		       vdev_id);
+		goto release_vdev_ref;
+	}
+
 	non_eht_ch_width = req->ch_width;
 	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
 	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
@@ -9605,8 +9682,7 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
 
-	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
-	des_chan->ch_width = ch_params.ch_width;
+	wlan_objmgr_vdev_release_ref(session->vdev, WLAN_LEGACY_SME_ID);
 
 	/* Send ECSA to the peers */
 	send_extended_chan_switch_action_frame(mac_ctx,
@@ -9623,6 +9699,9 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	 * out of sync issues if any other WMI commands go to fw
 	 */
 	return;
+
+release_vdev_ref:
+	wlan_objmgr_vdev_release_ref(session->vdev, WLAN_LEGACY_SME_ID);
 
 fail:
 	pe_err("vdev %d: send bandwidth update fail", vdev_id);

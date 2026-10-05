@@ -2725,7 +2725,7 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	struct sir_bcn_update_rsp *param;
 	enum policy_mgr_conn_update_reason reason;
 	uint32_t request_id;
-	uint8_t vdev_id;
+	uint8_t vdev_id, sap_vdev_id;
 	QDF_STATUS status = QDF_STATUS_E_NOMEM;
 
 	param = (struct sir_bcn_update_rsp *)msg;
@@ -2758,10 +2758,17 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	reason = command->u.bw_update_cmd.reason;
 	request_id = command->u.bw_update_cmd.request_id;
 	vdev_id = command->u.bw_update_cmd.conc_vdev_id;
+
+	sap_vdev_id = command->u.bw_update_cmd.vdev_id;
+	if (sap_vdev_id >= WLAN_MAX_VDEVS) {
+		sme_err("Invalid sap_vdev_id %d", sap_vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	if (param)
 		status = param->status;
-	sme_debug("vdev %d reason %d status %d cm_id 0x%x",
-		  vdev_id, reason, status, request_id);
+	sme_debug("vdev %d reason %d status %d cm_id 0x%x sap_vdev_id %d",
+		  vdev_id, reason, status, request_id, sap_vdev_id);
 
 	if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA) {
 		sme_debug("Continue channel switch for STA on vdev %d",
@@ -2772,6 +2779,12 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 			  vdev_id, reason, status, request_id);
 		wlan_cm_handle_hw_mode_change_resp(mac->pdev, vdev_id,
 						   request_id, status);
+	}
+
+	if (CSR_IS_SESSION_VALID(mac, sap_vdev_id) &&
+	    mac->sme.sap_channel_bw_update_cb) {
+		sme_debug("Notify vdev %d channel bw change", sap_vdev_id);
+		mac->sme.sap_channel_bw_update_cb(sap_vdev_id);
 	}
 
 	policy_mgr_set_connection_update(mac->psoc);
@@ -17386,6 +17399,39 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		mac->sme.set_disconnect_link_info_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_register_sap_channel_bw_update_cb(mac_handle_t mac_handle,
+			void (*sap_channel_bw_update_cb)(uint8_t vdev_id))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.sap_channel_bw_update_cb = sap_channel_bw_update_cb;
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_deregister_sap_channel_bw_update_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.sap_channel_bw_update_cb = NULL;
 		sme_release_global_lock(&mac->sme);
 	}
 
