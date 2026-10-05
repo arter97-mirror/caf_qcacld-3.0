@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,7 +88,7 @@ void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 /**
  * wlan_hdd_check_11ax_support() - check if beacon IE and update hw mode
  * @beacon: beacon IE buffer
- * @config: pointer to sap config
+ * @sap_hw_mode: pointer to sap hw mode
  *
  * Check if HE cap IE is present in beacon IE, if present update hw mode
  * to 11ax.
@@ -95,7 +96,7 @@ void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
  * Return: None
  */
 void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
-				 struct sap_config *config);
+				 eCsrPhyMode *sap_hw_mode);
 
 /**
  * hdd_update_he_cap_in_cfg() - update HE cap in global CFG
@@ -183,7 +184,7 @@ static inline void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 }
 
 static inline void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
-					       struct sap_config *config)
+					       eCsrPhyMode *sap_hw_mode)
 {
 }
 
