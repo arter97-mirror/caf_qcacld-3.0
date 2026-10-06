@@ -238,12 +238,15 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc);
  * wlan_is_nan_allowed_on_freq() - Check if NAN is allowed on given freq
  * @pdev: pdev context
  * @freq: Frequency to be checked
+ * @allow_sta_peer_scc: Allow NAN on an indoor channel occupied by STA
  *
  * Check if NAN/NDP can be enabled on given frequency.
  *
  * Return: True if NAN is allowed on the given frequency
  */
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq);
+bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev,
+				 uint32_t freq,
+				 bool allow_sta_peer_scc);
 
 /**
  * wlan_get_disable_6g_nan() - Check if NAN is disabled on 6Ghz
@@ -392,7 +395,9 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
+bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev,
+				 uint32_t freq,
+				 bool allow_sta_peer_scc)
 {
 	return false;
 }

@@ -1668,7 +1668,7 @@ QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc)
 
 bool ucfg_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 {
-	return wlan_is_nan_allowed_on_freq(pdev, freq);
+	return wlan_is_nan_allowed_on_freq(pdev, freq, true);
 }
 
 bool ucfg_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)

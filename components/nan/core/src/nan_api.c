@@ -480,7 +480,9 @@ end:
 	return ret;
 }
 
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
+bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev,
+				 uint32_t freq,
+				 bool allow_sta_peer_scc)
 {
 	bool nan_allowed = true;
 	bool enable_nan_on_dfs_channels = false;
@@ -531,7 +533,8 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 		} else
 			return false;
 	} else if (wlan_reg_is_freq_indoor(pdev, freq)) {
-		if ((cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_NAN_SCC)) {
+		if (allow_sta_peer_scc &&
+		    (cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_NAN_SCC)) {
 			for (i = 0; i < sta_count; i++) {
 				if (freq_list[i] == freq)
 					return true;
