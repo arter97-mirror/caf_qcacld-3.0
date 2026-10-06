@@ -1266,6 +1266,8 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 		     QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(&mlo_params->mac_addr, &ml_info->self_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
+	mlo_params->link_tx_nss = ml_info->link_tx_nss;
+	mlo_params->link_rx_nss = ml_info->link_rx_nss;
 
 	mlo_params->rec_max_simultaneous_links =
 		ml_info->rec_max_simultaneous_links;
@@ -1277,6 +1279,10 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 					ml_info->partner_info[i].vdev_id;
 		ml_links->partner_info[i].link_id =
 					ml_info->partner_info[i].link_id;
+		ml_links->partner_info[i].link_tx_nss =
+					ml_info->partner_info[i].link_tx_nss;
+		ml_links->partner_info[i].link_rx_nss =
+					ml_info->partner_info[i].link_rx_nss;
 		qdf_mem_copy(&ml_links->partner_info[i].chan,
 			     &ml_info->partner_info[i].channel_info,
 			     sizeof(struct wlan_channel));

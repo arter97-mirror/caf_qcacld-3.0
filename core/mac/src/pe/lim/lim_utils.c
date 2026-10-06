@@ -11006,6 +11006,8 @@ lim_extract_ml_info_smd_partner_link(struct pe_session *session,
 	partner = &ml_link->partner_info[*partner_idx];
 	partner->vdev_id = tgt_link_info->vdev_id;
 	partner->link_id = tgt_link_info->link_id;
+	partner->link_tx_nss = tgt_link_info->cnx_tx_nss;
+	partner->link_rx_nss = tgt_link_info->cnx_rx_nss;
 	if (tgt_link_info->link_chan_info)
 		qdf_mem_copy(&partner->channel_info,
 			     tgt_link_info->link_chan_info,
@@ -11088,6 +11090,8 @@ void lim_extract_ml_info(struct pe_session *session,
 		     QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(&ml_link->self_mac_addr, &link_info->link_addr,
 		     QDF_MAC_ADDR_SIZE);
+	ml_link->link_tx_nss = link_info->cnx_tx_nss;
+	ml_link->link_rx_nss = link_info->cnx_rx_nss;
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
 		if (!wlan_cm_is_link_add_connecting(session->vdev) &&
@@ -11100,6 +11104,8 @@ void lim_extract_ml_info(struct pe_session *session,
 			partner = &ml_link->partner_info[partner_idx];
 			partner->vdev_id = link_info->vdev_id;
 			partner->link_id = link_info->link_id;
+			partner->link_tx_nss = link_info->cnx_tx_nss;
+			partner->link_rx_nss = link_info->cnx_rx_nss;
 			qdf_mem_copy(&partner->channel_info,
 				     link_info->link_chan_info,
 				     sizeof(partner->channel_info));
@@ -11142,6 +11148,8 @@ void lim_extract_ml_info(struct pe_session *session,
 			partner = &ml_link->partner_info[partner_idx];
 			partner->vdev_id = link_info->vdev_id;
 			partner->link_id = link_info->link_id;
+			partner->link_tx_nss = link_info->cnx_tx_nss;
+			partner->link_rx_nss = link_info->cnx_rx_nss;
 
 			qdf_mem_copy(&partner->channel_info,
 				     link_info->link_chan_info,
