@@ -1168,6 +1168,9 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 	case PM_LL_LT_SAP_MODE:
 		count = strlcat(cc_mode, "LT_SAP", length);
 		break;
+	case PM_PASSTHRU_MODE:
+		count = strlcat(cc_mode, "PASSTHRU", length);
+		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
 		break;
@@ -1244,6 +1247,11 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+LT_SAP",
 					length);
+		break;
+	case PM_PASSTHRU_MODE:
+		count = policy_mgr_dump_current_concurrency_one_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+PASSTHRU", length);
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);

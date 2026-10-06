@@ -416,6 +416,7 @@ enum policy_mgr_conc_priority_mode {
  * @PM_NDI_MODE: NDI mode
  * @PM_NAN_DISC_MODE: NAN Discovery mode
  * @PM_LL_LT_SAP_MODE: Low latency low throughput SAP
+ * @PM_PASSTHRU_MODE: Passthrough mode
  * @PM_MAX_NUM_OF_MODE: max value place holder
  */
 enum policy_mgr_con_mode {
@@ -426,6 +427,7 @@ enum policy_mgr_con_mode {
 	PM_NDI_MODE,
 	PM_NAN_DISC_MODE,
 	PM_LL_LT_SAP_MODE,
+	PM_PASSTHRU_MODE,
 	PM_MAX_NUM_OF_MODE
 };
 
@@ -606,6 +608,10 @@ enum policy_mgr_pcl_type {
  * @PM_NDI_5_2x2:  NAN Datapath using 2x2@5 Ghz
  * @PM_LL_LT_SAP_5_1x1: Low latency low throughput SAP using 1x1@5 Ghz
  * @PM_LL_LT_SAP_5_2x2: Low latency low throughput SAP using 2x2@5 Ghz
+ * @PM_PASSTHRU_24_1x1_2x2: Passthrough mode connection on 2.4 GHz band
+ *   supporting both 1x1 and 2x2 spatial streams
+ * @PM_PASSTHRU_5_1x1_2x2: Passthrough mode connection on 5 GHz band
+ *   supporting both 1x1 and 2x2 spatial streams
  * @PM_MAX_ONE_CONNECTION_MODE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -636,6 +642,8 @@ enum policy_mgr_one_connection_mode {
 	PM_NDI_5_2x2,
 	PM_LL_LT_SAP_5_1x1,
 	PM_LL_LT_SAP_5_2x2 = PM_LL_LT_SAP_5_1x1,
+	PM_PASSTHRU_24_1x1_2x2,
+	PM_PASSTHRU_5_1x1_2x2,
 
 	PM_MAX_ONE_CONNECTION_MODE
 };

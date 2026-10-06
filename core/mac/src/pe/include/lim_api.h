@@ -57,6 +57,8 @@
 #define LIM_IS_P2P_DEVICE_GO(pe_session)     (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_P2P_DEVICE_GO)
 #define LIM_IS_NDI_ROLE(pe_session) \
 		(GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_NDI_ROLE)
+#define LIM_IS_PASSTHRU_ROLE(pe_session) \
+		(GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_PASSTHRU_ROLE)
 /* gLimSmeState */
 #define GET_LIM_SME_STATE(mac)                 (mac->lim.gLimSmeState)
 #define SET_LIM_SME_STATE(mac, state)          (mac->lim.gLimSmeState = state)
@@ -1080,5 +1082,79 @@ QDF_STATUS lim_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
-/************************************************************/
+
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * lim_passthrough_init_session() - Initialize PE session for passthrough mode
+ * @mac_ptr: Pointer to global MAC context
+ * @msg: Pointer to session creation message containing BSSID and vdev ID
+ *
+ * This function creates a new PE session for passthrough mode operation.
+ *
+ * Return: None
+ */
+void lim_passthrough_init_session(struct mac_context *mac_ptr,
+				  struct sir_create_session *msg);
+
+/**
+ * lim_passthrough_deinit_session() - Delete PE session for passthrough mode
+ * @mac_ptr: Pointer to global MAC context
+ * @msg: Pointer to session deletion message containing vdev ID
+ *
+ * This function deletes an existing PE session that was created for
+ * passthrough mode operation. It triggers the VDEV state machine to
+ * transition to DOWN state and then removes the session from PE.
+ *
+ * Return: None
+ */
+void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
+				    struct sir_delete_session *msg);
+/**
+ * lim_passthrough_peer_setup() - peer setup/update for passthrough mode
+ * @mac: pointer to global MAC context
+ * @msg: pointer to peer setup message (create_only=1 for NEW, 0 for UPDATE)
+ *
+ * Handles both NEW (create DPH entry, WMI_PEER_CREATE) and UPDATE (update
+ * caps in DPH entry, WMI_PEER_ASSOC) actions from set_station_info.
+ *
+ * Return: None
+ */
+void lim_passthrough_peer_setup(struct mac_context *mac,
+				struct sir_passthru_peer_setup_msg *msg);
+
+/**
+ * lim_passthru_peer_del() - delete a passthru peer by MAC address
+ * @mac: pointer to global MAC context
+ * @msg: pointer to peer deletion message
+ *
+ * Looks up the DPH entry by MAC address and calls lim_del_sta() to post
+ * WMA_DELETE_STA_REQ, then removes the DPH entry and releases the AID.
+ *
+ * Return: None
+ */
+void lim_passthru_peer_del(struct mac_context *mac,
+			   struct sir_passthru_peer_del_msg *msg);
+#else
+static inline
+void lim_passthrough_init_session(struct mac_context *mac_ptr,
+				  struct sir_create_session *msg)
+{
+}
+static inline
+void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
+				    struct sir_delete_session *msg)
+{
+}
+static inline
+void lim_passthrough_peer_setup(struct mac_context *mac,
+				struct sir_passthru_peer_setup_msg *msg)
+{
+}
+
+static inline
+void lim_passthru_peer_del(struct mac_context *mac,
+			   struct sir_passthru_peer_del_msg *msg)
+{
+}
+#endif
 #endif /* __LIM_API_H */

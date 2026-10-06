@@ -42,6 +42,7 @@
 #include "cdp_txrx_host_stats.h"
 #include "wlan_cm_roam_api.h"
 #include "hif_main.h"
+#include "wlan_dp_haps.h"
 
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 /*
@@ -239,6 +240,8 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 			return BUS_BW_LEVEL_5;
 		else
 			return (*lkp_table)[QCA_WLAN_802_11_MODE_11AX][tput_level];
+	case QDF_PASSTHRU_MODE:
+		return (*lkp_table)[QCA_WLAN_802_11_MODE_11BE][tput_level];
 	default:
 		break;
 	}
@@ -292,6 +295,34 @@ bbm_apply_tput_policy(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	bbm_ctx->per_policy_vote[BBM_TPUT_POLICY] = next_vote;
+}
+
+static void bbm_apply_intf_mode_policy(struct bbm_context *bbm_ctx,
+				       enum QDF_OPMODE intf_mode, bool set)
+{
+	enum bus_bw_level *policy_vote = &bbm_ctx->intf_policy_vote[0];
+	enum bus_bw_level level = BUS_BW_LEVEL_NONE;
+	uint8_t i;
+
+	/*
+	 * To keep the API simple, currently it does not support
+	 * application of same policy more than once.
+	 */
+	switch (intf_mode) {
+	case QDF_PASSTHRU_MODE:
+		policy_vote[intf_mode] = set ? BUS_BW_LEVEL_7 :
+					       BUS_BW_LEVEL_NONE;
+		break;
+	default:
+		return;
+	}
+
+	for (i = 0; i < QDF_MAX_NO_OF_MODE; i++) {
+		if (level < policy_vote[i])
+			level = policy_vote[i];
+	}
+
+	bbm_ctx->per_policy_vote[BBM_INTF_MODE_POLICY] = level;
 }
 
 /**
@@ -473,6 +504,11 @@ void dp_bbm_apply_independent_policy(struct wlan_objmgr_psoc *psoc,
 					       params->policy_info.usr.user_level);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto done;
+		break;
+	case BBM_INTF_MODE_POLICY:
+		bbm_apply_intf_mode_policy(bbm_ctx,
+					   params->policy_info.intf.intf_mode,
+					   params->policy_info.intf.set);
 		break;
 	default:
 		dp_info("BBM policy %d not handled", params->policy);
@@ -1157,6 +1193,7 @@ static void dp_display_periodic_stats(struct wlan_dp_psoc_context *dp_ctx,
 				(ctx, QDF_STATS_VERBOSITY_LEVEL_LOW);
 			cdp_display_txrx_hw_info(soc);
 			qdf_dp_trace_dump_stats();
+			dp_print_haps_stats(dp_ctx->psoc);
 		}
 		counter = 0;
 		data_in_time_period = false;

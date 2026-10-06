@@ -48,6 +48,7 @@
 #include "wlan_utility.h"
 #include "wlan_hdd_object_manager.h"
 #include "nan_ucfg_api.h"
+#include "wlan_dp_api.h"
 
 #define SCAN_DONE_EVENT_BUF_SIZE 4096
 #define RATE_MASK 0x7f
@@ -496,6 +497,12 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		return -EIO;
 	}
 
+	if (!wlan_dp_is_local_pkt_capture_active(hdd_ctx->psoc) &&
+	    policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc)) {
+		hdd_err("STA + MON exist, STA scan is not allowed");
+		return -EINVAL;
+	}
+
 	enable_connected_scan = ucfg_scan_is_connected_scan_enabled(
 							hdd_ctx->psoc);
 	if (!enable_connected_scan &&
@@ -512,7 +519,8 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	 * connection and it does not support scan request either.
 	 */
 	if (QDF_NDI_MODE == adapter->device_mode ||
-	    QDF_MONITOR_MODE == adapter->device_mode) {
+	    QDF_MONITOR_MODE == adapter->device_mode ||
+	    QDF_PASSTHRU_MODE == adapter->device_mode) {
 		hdd_err("Scan not supported for %s",
 			qdf_opmode_str(adapter->device_mode));
 		return -EINVAL;

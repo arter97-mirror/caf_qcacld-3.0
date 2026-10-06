@@ -467,10 +467,14 @@ static void tdls_get_all_peers_from_list(
 	struct tdls_soc_priv_obj *tdls_soc_obj;
 	struct tdls_osif_indication indication;
 
-	if (!get_tdls_peers->vdev) {
+	if (!get_tdls_peers)
+		return;
+
+	if (!get_tdls_peers->vdev || !get_tdls_peers->buf) {
 		qdf_mem_free(get_tdls_peers);
 		return;
 	}
+
 	len = __tdls_get_all_peers_from_list(get_tdls_peers);
 
 	indication.status = len;
@@ -1129,6 +1133,34 @@ bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 
 	return true;
 }
+
+bool tdls_check_if_offchannel_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	uint32_t mac_id = wlan_mlme_get_vdev_mac_id(vdev);
+
+	if (policy_mgr_mode_specific_connection_count(psoc, PM_PASSTHRU_MODE,
+						      NULL)) {
+		tdls_debug("TDLS offchannel disallowed: wondertap concurrency");
+		return false;
+	}
+
+	if (policy_mgr_is_hw_dbs_capable(psoc))
+		return true;
+
+	if (mac_id > MAX_MAC)
+		return false;
+
+	/* NON-DBS + SCC */
+	if (policy_mgr_get_conc_vdev_on_same_mac(psoc, wlan_vdev_get_id(vdev),
+						 mac_id) !=
+						WLAN_INVALID_VDEV_ID) {
+		tdls_debug("TDLS offchannel is not allowed due to concurrency");
+		return false;
+	}
+
+	return true;
+}
 #endif
 
 void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
@@ -1251,6 +1283,9 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	tdls_debug("vdev:%d enter", wlan_vdev_get_id(tdls_vdev));
+
+	/* Check if TDLS is allowed */
 	if (!tdls_check_is_tdls_allowed(tdls_vdev)) {
 		tdls_debug("Disable the tdls in FW due to concurrency");
 		if (wlan_vdev_mlme_is_mlo_vdev(tdls_vdev))
@@ -1263,9 +1298,14 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	tdls_debug("vdev:%d enter", wlan_vdev_get_id(tdls_vdev));
+	/* If TDLS is allowed, check if off-channel is allowed */
+	if (tdls_check_if_offchannel_allowed(tdls_vdev))
+		tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
+	else if (tdls_priv_soc->tdls_fw_off_chan_mode !=
+		   DISABLE_ACTIVE_CHANSWITCH)
+		tdls_set_tdls_offchannelmode(tdls_vdev,
+					     DISABLE_ACTIVE_CHANSWITCH);
 
-	tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
 	tdls_set_ct_mode(psoc, tdls_vdev);
 
 	wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_TDLS_NB_ID);
@@ -1278,6 +1318,9 @@ QDF_STATUS
 tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_objmgr_vdev *tdls_obj_vdev;
+	struct tdls_vdev_priv_obj *tdls_priv_vdev;
+	struct tdls_soc_priv_obj *tdls_priv_soc;
+	QDF_STATUS status;
 
 	tdls_debug("Enter");
 	if (!psoc)
@@ -1294,6 +1337,14 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	if (!tdls_obj_vdev)
 		return QDF_STATUS_E_FAILURE;
 
+	status = tdls_get_vdev_objects(tdls_obj_vdev, &tdls_priv_vdev,
+				       &tdls_priv_soc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_debug("TDLS vdev objects NULL");
+		wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (!tdls_check_is_tdls_allowed(tdls_obj_vdev))
 		goto release_ref;
 
@@ -1308,6 +1359,11 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 		tdls_process_enable_disable_for_ml_vdev(tdls_obj_vdev, true);
 	else
 		tdls_process_enable_for_vdev(tdls_obj_vdev);
+
+	if (tdls_check_if_offchannel_allowed(tdls_obj_vdev) &&
+	    tdls_priv_soc->tdls_fw_off_chan_mode != ENABLE_CHANSWITCH &&
+	    tdls_priv_soc->connected_peer_count == 1)
+		tdls_set_tdls_offchannelmode(tdls_obj_vdev,  ENABLE_CHANSWITCH);
 
 release_ref:
 	wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);

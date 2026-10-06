@@ -850,3 +850,9 @@ ucfg_p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val)
 {
 	return p2p_force_restrict_dfs_go_csa(vdev, val);
 }
+
+bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id)
+{
+	return p2p_is_p2p_go_noa_in_progress(pdev, vdev_id);
+}

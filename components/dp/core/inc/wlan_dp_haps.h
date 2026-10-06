@@ -10,6 +10,7 @@
 
 #ifdef WLAN_HAPS_ENABLE
 
+#define HAPS_FAIL_SAFE_OFFSET_MS 100
 #define HAPS_TRY_AGAIN_TIME_NS 200000
 #define HAPS_MAX_PAUSE_TIME_MS 200
 #define QTIME_SYNC_PERIOD      3000
@@ -30,7 +31,12 @@ void dp_vdev_haps_detach(struct wlan_dp_intf *dp_intf);
 
 void dp_haps_init(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS dp_print_haps_stats(struct dp_soc *soc);
+QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc);
+
+void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc);
+
+void dp_haps_set_fail_safe_timeout(struct wlan_dp_intf *dp_intf,
+				   bool is_default, uint16_t timeout);
 
 static inline void dp_haps_kill_timer(qdf_hrtimer_data_t *timer)
 {
@@ -69,7 +75,10 @@ static inline bool dp_is_haps_enabled(ol_osif_vdev_handle osif_vdev)
 {
 	struct dp_haps *haps_ctx = dp_get_haps_ctx_from_vdev(osif_vdev);
 
-	return haps_ctx->is_enable;
+	if (haps_ctx)
+		return haps_ctx->is_enable;
+	else
+		return false;
 }
 
 /**
@@ -84,7 +93,7 @@ bool dp_is_haps_paused(struct dp_soc *soc, ol_osif_vdev_handle osif_vdev)
 {
 	struct dp_haps *haps_ctx = dp_get_haps_ctx_from_vdev(osif_vdev);
 
-	if (!haps_ctx->is_enable)
+	if (!haps_ctx || !haps_ctx->is_enable)
 		return false;
 
 	if (haps_ctx->state == STATE_PAUSE)
@@ -107,9 +116,19 @@ static inline void dp_haps_init(struct wlan_objmgr_psoc *psoc)
 {
 }
 
-static inline QDF_STATUS dp_print_haps_stats(struct dp_soc *soc)
+static inline QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline
+void dp_haps_set_fail_safe_timeout(struct wlan_dp_intf *dp_intf,
+				   bool is_default, uint16_t timeout)
+{
 }
 #endif
 #endif

@@ -2486,4 +2486,9 @@ endif
 config DELAYED_REG_FORCE_WRITE
 	bool "Enable Delayed Reg force write"
 	default n
+
+config DRIVER_PASSTHRU_MODE
+	bool "Enable Driver Passthrough mode"
+	default n
+
 endif # QCA_CLD_WLAN

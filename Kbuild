@@ -583,6 +583,10 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wifi_pos_pasn.o
 endif
 endif
 
+ifeq ($(CONFIG_DRIVER_PASSTHRU_MODE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wondertap.o
+endif
+
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
 
 ###### OSIF_SYNC ########
@@ -1281,7 +1285,13 @@ FTM_OBJS := $(FTM_DISP_SRC)/wlan_ftm_init_deinit.o \
 	    $(FTM_CORE_SRC)/wlan_ftm_svc.o \
 	    $(TARGET_IF_FTM_SRC)/target_if_ftm.o
 
-ifeq ($(QCA_WIFI_FTM_NL80211), y)
+ifeq ($(CONFIG_NL80211_TESTMODE), y)
+	CONFIG_QCA_WIFI_FTM_NL80211 := y
+endif
+
+ifeq ($(CONFIG_QCA_WIFI_FTM_NL80211), y)
+FTM_OBJS += $(OS_IF_FTM_SRC)/wlan_cfg80211_ftm.o
+else ifeq ($(QCA_WIFI_FTM_NL80211), y)
 FTM_OBJS += $(OS_IF_FTM_SRC)/wlan_cfg80211_ftm.o
 endif
 
@@ -3667,6 +3677,7 @@ ccflags-$(CONFIG_WLAN_RESIDENT_DRIVER) += -DFEATURE_WLAN_RESIDENT_DRIVER
 ccflags-$(CONFIG_FEATURE_GPIO_CFG) += -DWLAN_FEATURE_GPIO_CFG
 ccflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 ccflags-$(CONFIG_DP_BE_WAR) += -DDP_BE_WAR
+ccflags-$(CONFIG_DRIVER_PASSTHRU_MODE) += -DDRIVER_PASSTHRU_MODE
 
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 ccflags-y += -DCONFIG_PLD_IPCIE_FW_SIM

@@ -25,6 +25,7 @@
 #include "wlan_mlme_dbg.h"
 #include "wlan_cm_api.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_policy_mgr_i.h"
 #include "wlan_p2p_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
@@ -1168,12 +1169,11 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 #endif
 
 QDF_STATUS
-cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
-		       struct cm_connect_req *conn_req)
+cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
+		       struct cm_connect_req *conn_req,
+		       uint8_t mlo_support_link_num)
 {
 	uint8_t i, j = 0;
-	uint8_t mlo_support_link_num;
-	struct wlan_objmgr_psoc *psoc;
 	struct scan_cache_entry *scan_entry = conn_req->cur_candidate->entry;
 	struct mlo_partner_info *partner_info = &conn_req->req.ml_parnter_info;
 
@@ -1188,13 +1188,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	if (!scan_entry->ml_info.num_links)
 		return QDF_STATUS_SUCCESS;
 
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc) {
-		mlme_err("psoc is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	mlme_debug("sta mlo support link num: %d", mlo_support_link_num);
 
 	/* TODO: Make sure that scan_entry->ml_info->link_info is a sorted
@@ -1217,6 +1210,16 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		if (!scan_entry->ml_info.link_info[i].is_valid_link)
 			continue;
 
+		if (policy_mgr_mode_specific_connection_count(psoc,
+							      PM_PASSTHRU_MODE,
+							      NULL) &&
+		    (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
+					scan_entry->ml_info.link_info[i].freq,
+					HW_MODE_20_MHZ, 1, NULL))) {
+			mlme_debug("Concurrency not allowed for partner link freq: %d",
+				   scan_entry->ml_info.link_info[i].freq);
+			continue;
+		}
 		partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 		partner_info->partner_link_info[j].link_id =
@@ -1404,6 +1407,7 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct rso_config *rso_cfg;
 
 	if (!vdev || !req)
 		return QDF_STATUS_E_FAILURE;
@@ -1418,6 +1422,23 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * Re-apply the psoc-level BTM disable cache into rso_cfg on every
+	 * connect request. This handles the case where the vdev was
+	 * destroyed and recreated (e.g. MAC address randomization) after
+	 * the vendor command set the flag, causing wlan_cm_rso_config_init
+	 * to have already restored it; but also covers any edge case where
+	 * the flag may not yet be reflected in rso_cfg.
+	 */
+	if (mlme_obj->cfg.lfr.disable_btm_cfg) {
+		rso_cfg = wlan_cm_get_rso_config(vdev);
+		if (rso_cfg) {
+			mlme_debug(CM_PREFIX_FMT "restore disable_btm_cfg into rso_cfg",
+				   CM_PREFIX_REF(req->vdev_id, req->cm_id));
+			rso_cfg->is_disable_btm = true;
+		}
+	}
 
 	join_req = qdf_mem_malloc(sizeof(*join_req));
 	if (!join_req)

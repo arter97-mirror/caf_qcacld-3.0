@@ -3019,3 +3019,23 @@ void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 	}
 }
 #endif
+
+#ifdef DRIVER_PASSTHRU_MODE
+int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_set_vendor_wonder_priv_data(priv_data);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_set_vendor_wonder_priv_data(priv_data);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+#endif

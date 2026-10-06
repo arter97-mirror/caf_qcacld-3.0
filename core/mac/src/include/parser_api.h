@@ -52,10 +52,23 @@
 #define VHT_2x2_MCS9_MAP 0xA
 #define VHT_1x1_MCS8_VAL 0xFFFD
 #define VHT_2x2_MCS8_VAL 0xFFF5
+#define VHT_MCS_0_7 0x0
+#define VHT_MCS_0_8 0x1
+#define VHT_MCS_0_9 0x2
+#define VHT_MCS_DISABLE 0x3
 #define VHT_1x1_MCS_MASK 0x3
 #define VHT_2x2_MCS_MASK 0xF
 #define DISABLE_VHT_MCS_9(mcs, nss) \
 	(mcs = (nss > 1) ? VHT_2x2_MCS8_VAL : VHT_1x1_MCS8_VAL)
+#define VHT_MCS_NSS_SHIFT(_nss) (((_nss) - 1) << 1)
+#define VHT_MCS_MSK_FOR_NSS(_nss) (0x3 << VHT_MCS_NSS_SHIFT(_nss))
+#define VHT_GET_MCS_FOR_NSS(_mcsmap, _nss) \
+	(((_mcsmap) >> VHT_MCS_NSS_SHIFT(_nss)) & 0x3)
+#define VHT_SET_MCS_FOR_NSS(_mcsmap, _mcs, _nss) \
+	(((_mcsmap) & ~VHT_MCS_MSK_FOR_NSS(_nss)) | \
+	 ((_mcs) << VHT_MCS_NSS_SHIFT(_nss)))
+#define VHT_MCS_IS_NSS_ENABLED(_mcsmap, _nss) \
+	(VHT_GET_MCS_FOR_NSS((_mcsmap), (_nss)) != VHT_MCS_DISABLE)
 
 #define NSS_1x1_MODE 1
 #define NSS_2x2_MODE 2
@@ -1375,12 +1388,16 @@ void update_fils_data(struct sir_fils_indication *fils_ind,
  *                             in beacon/probe response structure
  * @mac_context: pointer to mac context
  * @pe_session: pointer to pe session
+ * @opmode: OP mode for which caps to be filled
+ * @freq: Freq to fill caps for
+ * @ch_width: Chan width to fill he caps for
  * @he_cap: he capability IE
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS populate_dot11f_he_caps(struct mac_context *, struct pe_session *,
-				   tDot11fIEhe_cap *);
+				   enum QDF_OPMODE, qdf_freq_t,
+				   enum phy_ch_width, tDot11fIEhe_cap *);
 
 /**
  * populate_dot11f_he_caps_by_band() - pouldate HE Capability IE by band
@@ -1449,7 +1466,11 @@ static inline QDF_STATUS populate_dot11f_he_bss_color_change(
 #endif
 #else
 static inline QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
-			struct pe_session *session, tDot11fIEhe_cap *he_cap)
+						 struct pe_session *session,
+						 enum QDF_OPMODE opmode,
+						 qdf_freq_t freq,
+						 enum phy_ch_width ch_width,
+						 tDot11fIEhe_cap *he_cap)
 {
 	return QDF_STATUS_SUCCESS;
 }

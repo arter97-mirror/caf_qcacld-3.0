@@ -1,4 +1,12 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+config_setting(
+    name = "wonder_enabled",
+    define_values = {
+        "CONFIG_WONDER_SUPPORT": "y",
+    },
+)
+
 load(":wlan_qcacld3_modules.bzl", "define_modules")
 
 package(

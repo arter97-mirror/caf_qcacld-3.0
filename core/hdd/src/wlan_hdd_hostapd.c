@@ -2477,6 +2477,74 @@ hdd_sap_is_recv_assoc_link(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+static QDF_STATUS
+wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
+			  const u8 *mac, struct station_info *sinfo)
+{
+	struct wireless_dev *wdev;
+
+	wdev = &adapter->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_new_sta(wdev, mac, sinfo, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_cfg80211_del_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	struct wireless_dev *wdev;
+
+	wdev = &adapter->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_del_sta(wdev, mac, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
+			  const u8 *mac, struct station_info *sinfo)
+{
+	struct net_device *dev;
+
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_new_sta(dev, mac, sinfo, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_cfg80211_del_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	struct net_device *dev;
+
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_del_sta(dev, mac, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 				    struct sap_event *sap_event)
 {
@@ -3128,11 +3196,16 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 
 			if (notify_new_sta &&
 			    hdd_sap_is_recv_assoc_link(hdd_ctx->psoc,
-						       event->staMac.bytes))
-				cfg80211_new_sta(dev,
-						 (const u8 *)&event->
-						 staMac.bytes[0],
-						 sta_info, GFP_KERNEL);
+						       event->staMac.bytes)) {
+				qdf_status = wlan_hdd_cfg80211_new_sta(adapter,
+							(const u8 *)&event->
+							staMac.bytes[0],
+							sta_info);
+				if (QDF_IS_STATUS_ERROR(qdf_status)) {
+					qdf_mem_free(sta_info);
+					return status;
+				}
+			}
 
 			if (adapter->device_mode == QDF_SAP_MODE &&
 			    ucfg_mlme_get_wds_mode(hdd_ctx->psoc))
@@ -3309,10 +3382,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		if ((adapter->device_mode != QDF_P2P_GO_MODE ||
 		     (!cds_is_driver_recovering())) &&
 		     is_last_sta_info) {
-			cfg80211_del_sta(dev,
-					 (const u8 *)&sta_addr.bytes[0],
-					 GFP_KERNEL);
-			hdd_debug("indicate sta deletion event");
+			qdf_status = wlan_hdd_cfg80211_del_sta(adapter,
+						(const u8 *)&sta_addr.bytes[0]);
+			if (QDF_IS_STATUS_ERROR(status))
+				hdd_err("Error with sta deletion event");
+			else
+				hdd_debug("indicate sta deletion event");
 		}
 
 		/* Update the beacon Interval if it is P2P GO */
@@ -3838,13 +3913,15 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx,
+					       enum QDF_OPMODE op_mode)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTING;
 	struct wlan_hdd_link_info *link_info;
 	bool is_connecting = false, is_switching_link = false;
+	bool key_exchng_in_prog = false;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -3865,12 +3942,26 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
 			    wlan_hdd_is_link_switch_in_progress(link_info))
 				is_switching_link = true;
 
-			if (!is_connecting && !is_switching_link)
+			/* In case of P2P GO + STA/CLI concurrency, when EAPOL
+			 * is in progress for STA/CLI, the P2P GO will still be
+			 * in NOA and if CSA is allowed then CSA frames won't
+			 * go over the air as P2P GO is in NOA.
+			 * In case of SAP, it doesn't need to check the EAPOL
+			 * in progress as the STA/CLI channel will be already
+			 * decided after getting connect complete indication.
+			 */
+			if (op_mode == QDF_P2P_GO_MODE)
+				key_exchng_in_prog =
+					sme_is_sta_key_exchange_in_progress(
+							hdd_ctx->mac_handle,
+							link_info->vdev_id);
+			if (!is_connecting && !is_switching_link &&
+			    !key_exchng_in_prog)
 				continue;
 
-			hdd_debug("vdev_id %d: connecting %d switching link %d",
+			hdd_debug("vdev_id %d: connecting %d switching link %d key_exchng_in_prog %d",
 				  link_info->vdev_id, is_connecting,
-				  is_switching_link);
+				  is_switching_link, key_exchng_in_prog);
 
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
@@ -3942,9 +4033,21 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * Eg: The concurrency could be safe when link switch vdev is torn down
 	 * during link switch. However, when the link comes up, the combination
 	 * could be undesired.
+	 *
+	 * When P2P GO + STA/P2P-CLI concurrency arises. Dont allow CSA on GO
+	 * iface while eapol is in progress for STA/P2P-CLI vdev's or noa is in
+	 * progress in p2p go iface. Because for STA/P2P-CLI connection+eapol,
+	 * firmware does NOA(max 2.5 secs) on GO iface and during this time it
+	 * cannot do CSA as it won't be able to send CSA frames during NOA
+	 * period
 	 */
-	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx)) {
-		hdd_err("Do not allow CSA, STA connect/link switch is in progress");
+	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx,
+						      adapter->device_mode) ||
+	    (adapter->device_mode == QDF_P2P_GO_MODE &&
+	     ucfg_p2p_is_p2p_go_noa_in_progress(hdd_ctx->pdev,
+						link_info->vdev_id))) {
+		hdd_err("vdev %d Do not allow CSA, STA connect/link switch/eapol/noa is in progress",
+			link_info->vdev_id);
 		return -EBUSY;
 	}
 
@@ -8826,6 +8929,100 @@ static void hdd_update_param_chandef(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * wlan_hdd_go_5ghz_mcc_160_bw_override() - Override 5 GHz BW for GO,
+ * to avoid 160 Mhz DFS GO in MCC.
+ * @link_info: Link info pointer in HDD adapter
+ * @chandef: GO starting channel
+ * @new_chandef: new override GO channel
+ *
+ * The function will override the GO BW to 80 MHz from 160 MHz, if any other
+ * MCC interface is present and scc is not enabled.
+ *
+ * Return: true if bandwidth override
+ */
+static bool
+wlan_hdd_go_5ghz_mcc_160_bw_override(struct wlan_hdd_link_info *link_info,
+				     struct cfg80211_chan_def *chandef,
+				     struct cfg80211_chan_def *new_chandef)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct ch_params ch_params = {0};
+	uint32_t freq;
+	enum nl80211_channel_type channel_type;
+	struct ieee80211_channel *ieee_chan;
+
+	if (!hdd_ctx || !chandef || !new_chandef || !chandef->chan) {
+		hdd_err("hdd context or chandef is NULL");
+		return false;
+	}
+
+	freq = chandef->chan->center_freq;
+	/*
+	 * No need to downgrade BW if:
+	 * - Its not 5 GHz freq
+	 * - BW is not 160 ie less than 160.
+	 * - center freq itself is DFS.
+	 * - Go force scc is enabled.
+	 * - MCC interface not present.
+	 */
+	if (!WLAN_REG_IS_5GHZ_CH_FREQ(freq) ||
+	    (chandef->width != NL80211_CHAN_WIDTH_80P80 &&
+	     chandef->width != NL80211_CHAN_WIDTH_160))
+		return false;
+
+	if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq))
+		return false;
+
+	if (policy_mgr_go_scc_enforced(hdd_ctx->psoc))
+		return false;
+
+	if (!policy_mgr_will_freq_lead_to_mcc(hdd_ctx->psoc, freq))
+		return false;
+
+	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy, freq);
+	if (!ieee_chan) {
+		hdd_err("Vdev %d, freq %d get channel failed",
+			link_info->vdev_id, freq);
+		return false;
+	}
+	qdf_mem_copy(new_chandef, chandef, sizeof(*new_chandef));
+	ch_params.ch_width = CH_WIDTH_80MHZ;
+	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev, freq, 0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
+
+	switch (ch_params.sec_ch_offset) {
+	case PHY_SINGLE_CHANNEL_CENTERED:
+		channel_type = NL80211_CHAN_HT20;
+		break;
+	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+		channel_type = NL80211_CHAN_HT40MINUS;
+		break;
+	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+		channel_type = NL80211_CHAN_HT40PLUS;
+		break;
+	default:
+		channel_type = NL80211_CHAN_NO_HT;
+		break;
+	}
+
+	cfg80211_chandef_create(new_chandef, ieee_chan, channel_type);
+
+	if (ch_params.ch_width == CH_WIDTH_80MHZ) {
+		new_chandef->width = NL80211_CHAN_WIDTH_80;
+		new_chandef->center_freq1 = ch_params.mhz_freq_seg0;
+		new_chandef->center_freq2 = 0;
+	}
+
+	hdd_debug("Vdev %d, override SAP/GO freq %d's BW %d (f1 %d, f2 %d) to BW %d (f1 %d, f2 %d)",
+		  link_info->vdev_id, new_chandef->chan->center_freq,
+		  chandef->width, chandef->center_freq1, chandef->center_freq2,
+		  new_chandef->width, new_chandef->center_freq1,
+		  new_chandef->center_freq2);
+	return true;
+}
+
+/**
  * __wlan_hdd_cfg80211_start_ap() - start soft ap mode
  * @wiphy: Pointer to wiphy structure
  * @dev: Pointer to net_device structure
@@ -8893,12 +9090,14 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 
-	hdd_nofl_info("%s(vdevid-%d): START AP: mode %s(%d) %d bw %d (5MHz %d 10MHz %d)",
+	hdd_nofl_info("%s(vdevid-%d): START AP: mode %s(%d) %d bw %d(f1 %d, f2 %d) (5MHz %d 10MHz %d)",
 		      dev->name, link_info->vdev_id,
 		      qdf_opmode_str(adapter->device_mode),
 		      adapter->device_mode,
 		      params->chandef.chan->center_freq,
 		      params->chandef.width,
+		      params->chandef.center_freq1,
+		      params->chandef.center_freq2,
 		      cds_is_5_mhz_enabled(),
 		      cds_is_10_mhz_enabled());
 
@@ -8938,6 +9137,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		freq = (qdf_freq_t)chandef->chan->center_freq;
 		channel_width = wlan_hdd_get_channel_bw(chandef->width);
 	}
+
+	if (adapter->device_mode == QDF_P2P_GO_MODE &&
+	    wlan_hdd_go_5ghz_mcc_160_bw_override(link_info,
+						 chandef, &new_chandef)) {
+		chandef = &new_chandef;
+		freq = (qdf_freq_t)chandef->chan->center_freq;
+		channel_width = wlan_hdd_get_channel_bw(chandef->width);
+	}
+
 	intf_pm_mode =
 		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
 						     adapter->device_mode,

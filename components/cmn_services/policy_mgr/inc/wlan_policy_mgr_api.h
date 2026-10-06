@@ -157,6 +157,7 @@ static inline const char *device_mode_to_string(uint32_t idx)
 	CASE_RETURN_STRING(PM_NDI_MODE);
 	CASE_RETURN_STRING(PM_NAN_DISC_MODE);
 	CASE_RETURN_STRING(PM_LL_LT_SAP_MODE);
+	CASE_RETURN_STRING(PM_PASSTHRU_MODE);
 	default:
 		return "Unknown";
 	}
@@ -492,6 +493,28 @@ policy_mgr_get_sta_sap_scc_lte_coex_chnl(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *sap_mandt_chnl);
+
+/*
+ * policy_mgr_get_sap_force_20mhz_for_country_id() - to find out if SAP
+ * force 20Mhz is enabled and country code is ID
+ * @psoc: pointer to psoc
+ * @freq: freq
+ * @vdev: vdev object pointer to check device mode
+ *
+ * This API is used to find out whether SAP's force 20Mhz support
+ * is enabled. Returns true only when all three conditions are met:
+ * 1. Device mode is SAP (verified via vdev opmode)
+ * 2. Frequency is in 5GHz UNII-3 band
+ * 3. Country code is Indonesia ("ID") and INI gForceSAP20Mhz_cc_id is enabled
+ *
+ * Return: bool
+ */
+bool
+policy_mgr_get_sap_force_20mhz_for_country_id(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev,
+					qdf_freq_t freq);
+
 /**
  * policy_mgr_get_indoor_chnl_marking() - to get if indoor channel can be
  *						marked as disabled
@@ -5348,6 +5371,23 @@ bool policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc);
 
+/*
+ * policy_mgr_sta_ml_link_enable_allowed() - Check with given ML links and
+ * existing concurrencies, a disabled ml link can be enabled back.
+ * @psoc: psoc ctx
+ * @num_disabled_ml_sta: Number of existing disabled links
+ * @num_ml_sta: Number of total ML STA links
+ * @ml_freq_lst: ML STA freq list
+ * @ml_vdev_lst: ML STA vdev id list
+ *
+ * Return: if link can be enabled or not
+ */
+bool
+policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
+				      uint8_t num_disabled_ml_sta,
+				      uint8_t num_ml_sta,
+				      qdf_freq_t *ml_freq_lst,
+				      uint8_t *ml_vdev_lst);
 /**
  * policy_mgr_is_mlo_in_mode_sbs() - Check whether MLO present is SBS (with both
  * links on 5/6 ghz band)
@@ -6266,4 +6306,21 @@ uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 bool
 policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
 	struct wlan_objmgr_psoc *psoc);
+
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * policy_mgr_is_chan_change_allowed_for_passthru() - check if channel change
+ *  is allowed for passthru vdev
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @freq: channel frequency
+ * @bw: bandwidth
+ *
+ * Return: true if allowed else false
+ */
+bool
+policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id, uint32_t freq,
+					       enum hw_mode_bandwidth bw);
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */

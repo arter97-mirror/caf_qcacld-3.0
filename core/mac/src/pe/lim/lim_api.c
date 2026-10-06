@@ -3653,7 +3653,8 @@ void lim_mon_deinit_session(struct mac_context *mac_ptr,
 
 	session = pe_find_session_by_vdev_id(mac_ptr, msg->vdev_id);
 
-	if (session && session->bssType == eSIR_MONITOR_MODE) {
+	if (session && (session->bssType == eSIR_MONITOR_MODE ||
+			session->bssType == eSIR_PASSTHRU_MODE)) {
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_DOWN,
 					      0, NULL);
@@ -5178,5 +5179,572 @@ void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 	wlan_vdev_mlme_set_srg_pd_offset(session_entry->vdev, srg_max_pd_offset,
 					 srg_min_pd_offset);
 
+}
+#endif
+
+#ifdef DRIVER_PASSTHRU_MODE
+void lim_passthrough_init_session(struct mac_context *mac_ptr,
+				  struct sir_create_session *msg)
+{
+	struct pe_session *psession_entry;
+	uint8_t session_id;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_vht_config vht_config;
+	struct wlan_ht_config ht_caps;
+
+	psession_entry = pe_create_session(mac_ptr, msg->bss_id.bytes,
+					   &session_id,
+					   mac_ptr->lim.max_sta_of_pe_session,
+					   eSIR_PASSTHRU_MODE,
+					   msg->vdev_id);
+	if (!psession_entry) {
+		pe_err("Passthrough mode: Session can not be created for: "
+			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(msg->bss_id.bytes));
+		return;
+	}
+	lim_init_peer_idxpool(mac_ptr, psession_entry);
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(psession_entry->vdev);
+	if (!vdev_mlme) {
+		pe_err("VDEV mlme obj is NULL");
+		return;
+	}
+	vht_config.caps = vdev_mlme->proto.vht_info.caps;
+	vht_config.su_beam_formee = 0;
+	vht_config.su_beam_former = 0;
+	vht_config.csnof_beamformer_antSup = 0;
+	vht_config.mu_beam_formee = 0;
+	vht_config.shortgi160and80plus80 = 0;
+	vht_config.supported_channel_widthset = 0;
+
+	psession_entry->vht_config = vht_config;
+
+	ht_caps.caps = vdev_mlme->proto.ht_info.ht_caps;
+	psession_entry->ht_config = ht_caps.ht_caps;
+
+	/*
+	 * Initialize session capability flags from vdev MLME.
+	 * cap_tx_nss is set to 0 here; lim_fill_session_nss_params_on_create()
+	 * will populate it correctly when the channel is configured during init
+	 * (lim_utils.c — LIM_IS_PASSTHRU_ROLE guard).  set_station_info(NEW)
+	 * is only called by WONDER after init completes, so cap_tx_nss is valid
+	 * by then.
+	 */
+	psession_entry->htCapability  = ht_caps.caps ? 1 : 0;
+	psession_entry->vhtCapability = vht_config.caps ? 1 : 0;
+
+	pe_debug("cur_op_freq %d HT capability 0x%x VHT capability 0x%x",
+		 psession_entry->curr_op_freq, ht_caps.caps, vht_config.caps);
+}
+
+void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
+				    struct sir_delete_session *msg)
+{
+	struct pe_session *session;
+
+	session = pe_find_session_by_vdev_id(mac_ptr, msg->vdev_id);
+
+	if (session && LIM_IS_PASSTHRU_ROLE(session)) {
+		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					      WLAN_VDEV_SM_EV_DOWN, 0, NULL);
+		pe_delete_session(mac_ptr, session);
+	}
+}
+
+static void
+lim_passthru_update_rate_set(struct mac_context *mac, tDphHashNode *sta,
+			     struct pe_session *pe_session,
+			     struct sir_passthru_peer_setup_msg *msg)
+{
+	uint32_t i, j, is_a_rate;
+	tSirMacRateSet temp_rate_set;
+	uint32_t phymode;
+	uint8_t mcsSet[SIZE_OF_SUPPORTED_MCS_SET];
+	struct supported_rates *rates;
+	uint8_t a_rateindex = 0;
+	uint8_t b_rateindex = 0;
+	uint8_t nss;
+	qdf_size_t val_len;
+	uint8_t validBytes;
+
+	is_a_rate = 0;
+
+	lim_get_basic_rates(&temp_rate_set, pe_session->curr_op_freq);
+	lim_get_phy_mode(mac, &phymode, pe_session);
+
+	rates = &sta->supportedRates;
+	qdf_mem_zero(rates, sizeof(*rates));
+
+	for (j = 0; j < temp_rate_set.numRates; j++) {
+		if ((b_rateindex > SIR_NUM_11B_RATES) ||
+		    (a_rateindex > SIR_NUM_11A_RATES)) {
+			pe_warn("Invalid number of rates (11b->%d, 11a->%d)",
+				b_rateindex, a_rateindex);
+			return;
+		}
+		if (sirIsArate(temp_rate_set.rate[j] & 0x7f)) {
+			is_a_rate = 1;
+			if (a_rateindex < SIR_NUM_11A_RATES)
+				rates->llaRates[a_rateindex++] =
+						temp_rate_set.rate[j];
+		} else {
+			if (b_rateindex < SIR_NUM_11B_RATES)
+				rates->llbRates[b_rateindex++] =
+						temp_rate_set.rate[j];
+		}
+	}
+
+	nss = QDF_MIN(msg->nss, pe_session->nss);
+
+	validBytes = VALID_MCS_SIZE / 8;
+
+	/* compute the matching MCS rate set,
+	 * if peer is 11n capable and self mode is 11n */
+	if (sta->mlmStaContext.htCapability) {
+		val_len = SIZE_OF_SUPPORTED_MCS_SET;
+		if (wlan_mlme_get_cfg_str(
+			mcsSet,
+			&mac->mlme_cfg->rates.supported_mcs_set,
+			&val_len) != QDF_STATUS_SUCCESS) {
+			/* Could not get rateset from CFG. Log error. */
+			pe_err("could not retrieve supportedMCSSet");
+			return;
+		}
+
+		for (i = 0; i < validBytes; i++)
+			sta->supportedRates.supportedMCSSet[i] =
+				mcsSet[i];
+
+		pe_debug("MCS Rate Set Bitmap from CFG and DPH");
+		for (i = 0; i < SIR_MAC_MAX_SUPPORTED_MCS_SET; i++) {
+			pe_debug("%x %x", mcsSet[i],
+				 sta->supportedRates.supportedMCSSet[i]);
+		}
+	} else {
+		nss = 1;
+	}
+	sta->nss = nss;
+}
+
+static void
+lim_passthru_apply_vht_mcs_cap(struct mac_context *mac,
+			       tDphHashNode *sta,
+			       struct pe_session *pe_session,
+			       tDot11fIEVHTCaps *vht_caps,
+			       struct sir_passthru_peer_setup_msg *msg)
+{
+	uint8_t max_nss, vht_mcs, i;
+
+	max_nss = QDF_MIN(pe_session->nss, msg->nss);
+	sta->vhtLdpcCapable = vht_caps->ldpcCodingCap;
+	sta->vhtBeamFormerCapable = 0;
+	lim_populate_vht_mcs_set(mac, &sta->supportedRates, vht_caps,
+				 pe_session, max_nss, NULL);
+	/* Cap per-NSS MCS to max_mcs from tx_rate_cfg / peer VHT map */
+	if (msg->max_mcs >= 9)
+		vht_mcs = VHT_MCS_0_9;
+	else if (msg->max_mcs >= 8)
+		vht_mcs = VHT_MCS_0_8;
+	else
+		vht_mcs = VHT_MCS_0_7;
+	for (i = 1; i <= max_nss; i++) {
+		if (!VHT_MCS_IS_NSS_ENABLED(sta->supportedRates.vhtRxMCSMap,
+					    i))
+			continue;
+		if (VHT_GET_MCS_FOR_NSS(sta->supportedRates.vhtRxMCSMap,
+					i) > vht_mcs)
+			VHT_SET_MCS_FOR_NSS(sta->supportedRates.vhtRxMCSMap,
+					    vht_mcs, i);
+		if (VHT_GET_MCS_FOR_NSS(sta->supportedRates.vhtTxMCSMap,
+					i) > vht_mcs)
+			VHT_SET_MCS_FOR_NSS(sta->supportedRates.vhtTxMCSMap,
+					    vht_mcs, i);
+	}
+}
+
+static void
+lim_passthru_apply_he_mcs_cap(struct mac_context *mac,
+			      tDphHashNode *sta,
+			      struct pe_session *pe_session,
+			      struct sir_passthru_peer_setup_msg *msg)
+{
+	uint8_t max_nss = QDF_MIN(pe_session->nss, msg->nss);
+	uint8_t he_mcs, i;
+
+	sta->mlmStaContext.he_capable = 1;
+	lim_populate_he_mcs_set(mac, &sta->supportedRates,
+				&sta->he_config, pe_session,
+				max_nss);
+	if (msg->max_mcs >= 11)
+		he_mcs = HE_MCS_0_11;
+	else if (msg->max_mcs >= 9)
+		he_mcs = HE_MCS_0_9;
+	else
+		he_mcs = HE_MCS_0_7;
+	for (i = 1; i <= max_nss; i++) {
+		if (!HE_MCS_IS_NSS_ENABLED(
+				sta->supportedRates.rx_he_mcs_map_lt_80, i))
+			continue;
+		if (HE_GET_MCS_4_NSS(
+				sta->supportedRates.rx_he_mcs_map_lt_80,
+				i) > he_mcs)
+			HE_SET_MCS_4_NSS(
+				sta->supportedRates.rx_he_mcs_map_lt_80,
+				he_mcs, i);
+		if (HE_GET_MCS_4_NSS(
+				sta->supportedRates.tx_he_mcs_map_lt_80,
+				i) > he_mcs)
+			HE_SET_MCS_4_NSS(
+				sta->supportedRates.tx_he_mcs_map_lt_80,
+				he_mcs, i);
+	}
+}
+
+static void
+lim_passthru_update_hash_node_info(struct mac_context *mac, tDphHashNode *sta,
+				   struct pe_session *pe_session,
+				   struct sir_passthru_peer_setup_msg *msg)
+{
+	tDot11fIEHTCaps  ht_caps  = {0};
+	tDot11fIEVHTCaps vht_caps = {0};
+	tDot11fIEhe_cap  he_peer  = {0};
+	uint32_t he_unpack_status;
+	uint16_t capability;
+	union {
+		uint16_t                         raw;
+		struct mlme_ht_capabilities_info fields;
+	} ht_info;
+
+	pe_debug("Dot11Mode %d MCS %d NSS %d", msg->dot11mode,
+		 msg->max_mcs, msg->nss);
+	if (msg->htcap_present) {
+		/* UPDATE: peer HT caps delivered via set_station_info */
+		pe_debug("vdev:%d Populate HT caps from peer",
+			 pe_session->vdev_id);
+		ht_info.raw = msg->peer_ht_cap.cap_info;
+		ht_caps.advCodingCap     = ht_info.fields.adv_coding_cap;
+		ht_caps.mimoPowerSave    = ht_info.fields.mimo_power_save;
+		ht_caps.greenField       = ht_info.fields.green_field;
+		ht_caps.shortGI20MHz     = ht_info.fields.short_gi_20_mhz;
+		ht_caps.shortGI40MHz     = ht_info.fields.short_gi_40_mhz;
+		ht_caps.txSTBC           = ht_info.fields.tx_stbc;
+		ht_caps.rxSTBC           = ht_info.fields.rx_stbc;
+		ht_caps.maximalAMSDUsize = ht_info.fields.maximal_amsdu_size;
+		ht_caps.dsssCckMode40MHz = ht_info.fields.dsss_cck_mode_40_mhz;
+		ht_caps.maxRxAMPDUFactor = msg->peer_ht_cap.ampdu_params & 0x3;
+		ht_caps.mpduDensity      =
+			(msg->peer_ht_cap.ampdu_params >> 2) & 0x7;
+		qdf_mem_copy(ht_caps.supportedMCSSet, msg->peer_ht_cap.mcs_set,
+			     SIZE_OF_SUPPORTED_MCS_SET);
+		sta->htSupportedChannelWidthSet =
+			ht_info.fields.supported_channel_width_set ? 1 : 0;
+		sta->mlmStaContext.htCapability = 1;
+	} else if (msg->create_only && IS_DOT11_MODE_HT(msg->dot11mode)) {
+		/* NEW: self session caps */
+		pe_debug("vdev:%d Populate HT caps from session",
+			 pe_session->vdev_id);
+		populate_dot11f_ht_caps(mac, pe_session, &ht_caps);
+		sta->htSupportedChannelWidthSet =
+			(msg->ch_width > CH_WIDTH_20MHZ) ? 1 : 0;
+		sta->mlmStaContext.htCapability = 1;
+	} else {
+		sta->mlmStaContext.htCapability = 0;
+	}
+
+	if (sta->mlmStaContext.htCapability) {
+		sta->htGreenfield = ht_caps.greenField;
+		pe_debug("vdev:%d htSupportedChannelWidthSet: 0x%x",
+			 pe_session->vdev_id, sta->htSupportedChannelWidthSet);
+		sta->ch_width = sta->htSupportedChannelWidthSet;
+		sta->htMIMOPSState = ht_caps.mimoPowerSave;
+		sta->htMaxAmsduLength = ht_caps.maximalAMSDUsize;
+		sta->htAMpduDensity = ht_caps.mpduDensity;
+		sta->htDsssCckRate40MHzSupport = ht_caps.dsssCckMode40MHz;
+		sta->htShortGI20Mhz = ht_caps.shortGI20MHz;
+		sta->htShortGI40Mhz = ht_caps.shortGI40MHz;
+		sta->htMaxRxAMpduFactor = ht_caps.maxRxAMPDUFactor;
+		sta->htLdpcCapable = ht_caps.advCodingCap;
+		lim_fill_rx_highest_supported_rate(
+				mac,
+				&sta->supportedRates.rxHighestDataRate,
+				ht_caps.supportedMCSSet);
+	}
+	lim_passthru_update_rate_set(mac, sta, pe_session, msg);
+	if (msg->vhtcap_present) {
+		/* UPDATE: peer VHT caps delivered via set_station_info */
+		pe_debug("vdev:%d Populate VHT caps from peer",
+			 pe_session->vdev_id);
+		vht_caps.present          = 1;
+		vht_caps.ldpcCodingCap    =
+			(msg->peer_vht_cap.cap_info >> 4) & 1;
+		/* bits[3:2]: 0=80MHz, 1=160MHz, 2=80+80MHz */
+		vht_caps.supportedChannelWidthSet =
+			(msg->peer_vht_cap.cap_info >> 2) & 0x3;
+		vht_caps.rxMCSMap          = msg->peer_vht_cap.rx_mcs_map;
+		vht_caps.txMCSMap          = msg->peer_vht_cap.tx_mcs_map;
+		vht_caps.rxHighSupDataRate =
+			msg->peer_vht_cap.rx_highest & 0x1fff;
+		vht_caps.txSupDataRate     =
+			msg->peer_vht_cap.tx_highest & 0x1fff;
+		sta->vhtSupportedChannelWidthSet =
+			((msg->peer_vht_cap.cap_info >> 2) & 0x3) == 1 ?
+			WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ :
+			WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+		if (sta->htSupportedChannelWidthSet) {
+			if (sta->vhtSupportedChannelWidthSet >
+			    WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+				sta->ch_width = CH_WIDTH_160MHZ;
+			else
+				sta->ch_width =
+					sta->vhtSupportedChannelWidthSet + 1;
+		} else {
+			sta->ch_width = CH_WIDTH_20MHZ;
+		}
+		pe_debug("vdev:%d vhtSuppChWidth %hu htSuppChWidth %hu ch_width %d",
+			 pe_session->vdev_id, sta->vhtSupportedChannelWidthSet,
+			 sta->htSupportedChannelWidthSet, sta->ch_width);
+		sta->mlmStaContext.vhtCapability = 1;
+		lim_passthru_apply_vht_mcs_cap(mac, sta, pe_session,
+					       &vht_caps, msg);
+	} else if (msg->create_only && IS_DOT11_MODE_VHT(msg->dot11mode)) {
+		/* NEW: self session caps, ch_width from tx_rate_cfg */
+		pe_debug("vdev:%d Populate VHT caps from session",
+			 pe_session->vdev_id);
+		populate_dot11f_vht_caps(mac, pe_session, &vht_caps);
+		sta->mlmStaContext.vhtCapability = 1;
+
+		switch (msg->ch_width) {
+		case CH_WIDTH_80MHZ:
+		case CH_WIDTH_80P80MHZ:
+			sta->vhtSupportedChannelWidthSet =
+				WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+			break;
+		case CH_WIDTH_160MHZ:
+			sta->vhtSupportedChannelWidthSet =
+				WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+			break;
+		default:
+			sta->vhtSupportedChannelWidthSet =
+				WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+			break;
+		}
+		if (sta->htSupportedChannelWidthSet) {
+			if (sta->vhtSupportedChannelWidthSet >
+			    WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+				sta->ch_width = CH_WIDTH_160MHZ;
+			else
+				sta->ch_width =
+					   sta->vhtSupportedChannelWidthSet + 1;
+		} else {
+			sta->ch_width = CH_WIDTH_20MHZ;
+		}
+		pe_debug("vhtSuppChWidth %hu htSuppChWidth %hu sta_ch_width %d",
+			 sta->vhtSupportedChannelWidthSet,
+			 sta->htSupportedChannelWidthSet,
+			 sta->ch_width);
+		lim_passthru_apply_vht_mcs_cap(mac, sta, pe_session,
+					       &vht_caps, msg);
+	} else {
+		sta->mlmStaContext.vhtCapability = 0;
+		sta->vhtSupportedChannelWidthSet =
+			WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+	}
+	if (msg->hecap_present) {
+		/* UPDATE: peer HE MAC/PHY caps from wonder.
+		 * peer_he_cap is 17 bytes: 6 MAC + 11 PHY.
+		 * dot11f_unpack_ie_he_cap consumes all 17 bytes
+		 * successfully, then fails with DOT11F_INCOMPLETE_IE
+		 * when trying to read rx_he_mcs_map_lt_80 (needs 2
+		 * more bytes). All MAC/PHY fields are fully parsed
+		 * before that point so he_peer fields are valid.
+		 * he_peer.present is set to 0 on that error; we do
+		 * not use it.
+		 */
+		populate_dot11f_he_caps(mac, NULL, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &sta->he_config);
+		he_unpack_status =
+			dot11f_unpack_ie_he_cap(mac,
+						(uint8_t *)&msg->peer_he_cap,
+						sizeof(msg->peer_he_cap),
+						&he_peer, false);
+		pe_debug("vdev:%d he_unpack status 0x%x",
+			 pe_session->vdev_id, he_unpack_status);
+		sta->he_config.htc_he          = he_peer.htc_he;
+		sta->he_config.ldpc_coding     = he_peer.ldpc_coding;
+		sta->he_config.chan_width_0    = he_peer.chan_width_0;
+		sta->he_config.chan_width_1    = he_peer.chan_width_1;
+		sta->he_config.chan_width_2    = he_peer.chan_width_2;
+		sta->he_config.chan_width_3    = he_peer.chan_width_3;
+		sta->he_config.su_beamformee   = he_peer.su_beamformee;
+		sta->he_config.mu_beamformer   = he_peer.mu_beamformer;
+		sta->he_config.ul_mu           = he_peer.ul_mu;
+		sta->he_config.doppler         = he_peer.doppler;
+		pe_debug("vdev:%d HE peer caps: ldpc %d su_bfee %d ul_mu %d htc_he %d chan_width %d%d%d%d",
+			 pe_session->vdev_id,
+			 he_peer.ldpc_coding, he_peer.su_beamformee,
+			 he_peer.ul_mu, he_peer.htc_he,
+			 he_peer.chan_width_0, he_peer.chan_width_1,
+			 he_peer.chan_width_2, he_peer.chan_width_3);
+		lim_passthru_apply_he_mcs_cap(mac, sta, pe_session, msg);
+	} else if (msg->create_only && IS_DOT11_MODE_HE(msg->dot11mode)) {
+		/* NEW: peer HE caps not yet known, use self caps */
+		populate_dot11f_he_caps(mac, NULL, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &sta->he_config);
+		lim_passthru_apply_he_mcs_cap(mac, sta, pe_session, msg);
+	} else {
+		sta->mlmStaContext.he_capable = 0;
+	}
+	/* Lets enable QOS parameter */
+	sta->qosMode = 1;
+	sta->wmeEnabled = 1;
+	sta->lleEnabled = 0;
+	capability = (1 << CAPABILITIES_QOS_OFFSET);
+	sta->mlmStaContext.capabilityInfo =
+		(*(tSirMacCapabilityInfo *)&capability);
+}
+
+void lim_passthru_peer_del(struct mac_context *mac,
+			   struct sir_passthru_peer_del_msg *msg)
+{
+	struct pe_session *session;
+	tpDphHashNode sta;
+	QDF_STATUS status;
+	uint16_t aid = 0;
+
+	session = pe_find_session_by_vdev_id(mac, msg->vdev_id);
+	if (!session || !LIM_IS_PASSTHRU_ROLE(session)) {
+		pe_err("vdev:%d session not found or not passthru",
+		       msg->vdev_id);
+		return;
+	}
+
+	sta = dph_lookup_hash_entry(mac, msg->peer_mac_addr.bytes, &aid,
+				    &session->dph.dphHashTable);
+	if (!sta) {
+		pe_err("vdev:%d peer " QDF_MAC_ADDR_FMT " not found",
+		       msg->vdev_id,
+		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		return;
+	}
+
+	pe_debug("vdev:%d deleting passthru peer " QDF_MAC_ADDR_FMT,
+		 msg->vdev_id,
+		 QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+
+	/*
+	 * fRespReqd=true arms LIM's defer gate (SET_LIM_PROCESS_DEFD_MESGS)
+	 * so a subsequent passthru NEW/UPDATE/DEL on this vdev is queued in
+	 * LIM's deferred queue instead of racing ahead while this delete is
+	 * still outstanding at WMA/FW -- mirrors the wait already added on
+	 * the NEW (peer create) path.
+	 *
+	 * DPH entry/AID release happens in lim_process_passthru_del_sta_rsp()
+	 * once the real WMA_DELETE_STA_RSP arrives -- not here -- so the MAC
+	 * cannot be reused by a NEW before the delete actually completes at
+	 * FW.
+	 */
+	status = lim_del_sta(mac, sta, true, session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		/*
+		 * lim_del_sta() re-arms LIM message processing itself when
+		 * posting WMA_DELETE_STA_REQ fails, so no cleanup is needed
+		 * here on that path. A NOMEM failure inside lim_del_sta()
+		 * never armed the gate to begin with.
+		 */
+		pe_err("vdev:%d lim_del_sta failed: %d",
+		       msg->vdev_id, status);
+		QDF_ASSERT(0);
+	}
+}
+
+void lim_passthrough_peer_setup(struct mac_context *mac,
+				struct sir_passthru_peer_setup_msg *msg)
+{
+	struct pe_session *session;
+	tpDphHashNode sta = NULL;
+	struct wlan_objmgr_peer *peer;
+	QDF_STATUS status;
+	uint16_t aid = 0;
+
+	session = pe_find_session_by_vdev_id(mac, msg->vdev_id);
+	if (!session) {
+		pe_err("PE Session does not exist for given sme sessionId: %d",
+		       msg->vdev_id);
+		return;
+	}
+	if (!LIM_IS_PASSTHRU_ROLE(session)) {
+		pe_err("PE Session is not PASSTHRU mode");
+		return;
+	}
+	pe_debug("vdev:%d Passthru peer %s " QDF_MAC_ADDR_FMT,
+		 msg->vdev_id,
+		 msg->create_only ? "NEW" : "UPDATE",
+		 QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+	pe_debug("dot11mode %d, ch_width %d, gi %d, nss %d, max_mcs %d",
+		 msg->dot11mode, msg->ch_width, msg->gi_val, msg->nss,
+		 msg->max_mcs);
+
+	sta = dph_lookup_hash_entry(mac, msg->peer_mac_addr.bytes, &aid,
+				    &session->dph.dphHashTable);
+
+	if (!msg->create_only && sta) {
+		/* UPDATE: peer must already exist from prior NEW */
+		lim_passthru_update_hash_node_info(mac, sta, session, msg);
+		status = lim_add_sta(mac, sta, true, session);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_err("vdev:%d peer assoc failed", session->vdev_id);
+		return;
+	}
+
+	/* NEW: peer must not already exist */
+	if (sta) {
+		pe_err("vdev:%d entry for peer " QDF_MAC_ADDR_FMT
+		       " already exist, cannot add new entry",
+		       session->vdev_id,
+		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		return;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc, msg->peer_mac_addr.bytes,
+					   WLAN_LEGACY_MAC_ID);
+	if (peer) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		pe_err("vdev:%d peer_obj for " QDF_MAC_ADDR_FMT
+		       " already exist",
+		       session->vdev_id,
+		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		return;
+	}
+
+	aid = lim_assign_peer_idx(mac, session);
+	if (!aid) {
+		pe_err("No more free AID for peer: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+		return;
+	}
+	pe_debug("vdev:%d Aid: %d, for peer: " QDF_MAC_ADDR_FMT,
+		 session->vdev_id, aid,
+		 QDF_MAC_ADDR_REF(msg->peer_mac_addr.bytes));
+	sta = dph_add_hash_entry(mac, msg->peer_mac_addr.bytes,
+				 aid, &session->dph.dphHashTable);
+
+	if (!sta) {
+		lim_release_peer_idx(mac, aid, session);
+		pe_err("vdev:%d add hash entry failed for AID %d",
+		       session->vdev_id, aid);
+		return;
+	}
+	lim_passthru_update_hash_node_info(mac, sta, session, msg);
+	sta->staType = STA_ENTRY_PASSTHRU_PEER;
+	session->passthru_pending_create_only = msg->create_only;
+	status = lim_add_sta(mac, sta, false, session);
+	session->passthru_pending_create_only = 0;
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("vdev:%d add sta failed", session->vdev_id);
+		lim_delete_dph_hash_entry(mac, sta->staAddr, aid, session);
+		lim_release_peer_idx(mac, aid, session);
+	}
 }
 #endif

@@ -218,7 +218,7 @@ static inline void osif_dp_napi_flush(struct napi_struct *napi)
 		napi->gro.rx_count = 0;
 	}
 }
-#else
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 static inline void osif_dp_napi_flush(struct napi_struct *napi)
 {
 	if (napi->rx_count) {
@@ -226,6 +226,10 @@ static inline void osif_dp_napi_flush(struct napi_struct *napi)
 		qdf_init_list_head(&napi->rx_list);
 		napi->rx_count = 0;
 	}
+}
+#else
+static inline void osif_dp_napi_flush(struct napi_struct *napi)
+{
 }
 #endif /* KERNEL_VERSION(6, 15, 0)*/
 

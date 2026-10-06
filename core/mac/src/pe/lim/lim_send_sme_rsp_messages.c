@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,6 +61,7 @@
 #include <spatial_reuse_api.h>
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_public_struct.h"
+#include "wlan_mlme_api.h"
 #include <wlan_mlo_mgr_link_switch.h>
 #include "wlan_policy_mgr_i.h"
 
@@ -1808,7 +1809,11 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	enum QDF_OPMODE mode;
 	qdf_freq_t csa_freq = csa_params->csa_chan_freq, sec_ch_2g_freq = 0;
 	enum phy_ch_width new_ch_width = csa_params->new_ch_width;
-	enum channel_state chan_state;
+	enum channel_state chan_state = CHANNEL_STATE_ENABLE;
+	enum reg_6g_ap_type power_type;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int8_t rf_mode_force_pwr_type;
+	uint32_t passthru_vdev_id, passthru_freq = 0;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1826,16 +1831,38 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 			sec_ch_2g_freq = csa_freq - HT40_SEC_OFFSET;
 	}
 
-	chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
-						mac_ctx->pdev,
-						csa_freq, new_ch_width,
-						sec_ch_2g_freq,
-						REG_CURRENT_PWR_MODE);
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(csa_freq)) {
+		status = wlan_mlme_get_rf_mode_force_pwr_type(
+						mac_ctx->psoc,
+						&rf_mode_force_pwr_type);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Get rf test mode force power type failed");
+			chan_state = CHANNEL_STATE_INVALID;
+		} else {
+			status = wlan_reg_get_best_6g_power_type(
+						mac_ctx->psoc, mac_ctx->pdev,
+						&power_type,
+						session_entry->best_6g_power_type,
+						csa_freq,
+						rf_mode_force_pwr_type);
+			if (QDF_IS_STATUS_ERROR(status))
+				chan_state = CHANNEL_STATE_INVALID;
+		}
+	} else {
+		chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
+							mac_ctx->pdev,
+							csa_freq, new_ch_width,
+							sec_ch_2g_freq,
+							REG_CURRENT_PWR_MODE);
+	}
+
 	if (chan_state == CHANNEL_STATE_INVALID ||
 	    chan_state == CHANNEL_STATE_DISABLE) {
-		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d. Disconnect",
+		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d pwr_type %d. Disconnect",
 		       csa_freq, new_ch_width, csa_params->new_ch_freq_seg1,
-		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq);
+		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq,
+		       session_entry->best_6g_power_type);
+
 		lim_tear_down_link_with_ap(mac_ctx,
 					   session_entry->peSessionId,
 					   REASON_CHANNEL_SWITCH_FAILED,
@@ -1847,6 +1874,24 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
 		if (!lim_is_validate_punc_bitmap(csa_params))
 			return false;
+	}
+	if (policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+						      PM_PASSTHRU_MODE, NULL)) {
+		passthru_vdev_id =
+			policy_mgr_mode_specific_vdev_id(mac_ctx->psoc,
+							 PM_PASSTHRU_MODE);
+		if (WLAN_INVALID_VDEV_ID != passthru_vdev_id) {
+			status =
+			policy_mgr_get_chan_by_session_id(mac_ctx->psoc,
+							  passthru_vdev_id,
+							  &passthru_freq);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    (passthru_freq != csa_freq)) {
+				pe_warn("Ignore CSA: Passthru freq %d, csa %d",
+					passthru_freq, csa_freq);
+				return false;
+			}
+		}
 	}
 
 	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
@@ -2010,11 +2055,30 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 			       tLimChannelSwitchInfo *lim_ch_switch,
 			       struct ch_params ch_params)
 {
+	enum phy_ch_width max_ch_width, assoc_ch_width;
+	struct mlme_legacy_priv *mlme_priv;
+
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
-		pe_debug("Ignore CSA, no change in ch, bw and puncture");
-		return false;
+		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+		if (!mlme_priv) {
+			pe_err("null mlme priv");
+			return false;
+		}
+		assoc_ch_width =
+			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
+		max_ch_width = wlan_mlme_get_max_bw();
+		if (assoc_ch_width == CH_WIDTH_80MHZ &&
+		    ch_params.ch_width == CH_WIDTH_160MHZ &&
+		    max_ch_width >= CH_WIDTH_160MHZ) {
+			pe_debug("BW upgrade %d->%d",
+				 assoc_ch_width,
+				 ch_params.ch_width);
+		} else {
+			pe_debug("Ignore CSA, no change in ch, bw and puncture");
+			return false;
+		}
 	}
 	return true;
 }

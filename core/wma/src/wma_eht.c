@@ -658,12 +658,15 @@ void wma_print_eht_op(tDot11fIEeht_op *eht_ops)
 }
 
 void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
-			       tpAddStaParams params)
+			       tpAddStaParams params,
+			       struct wlan_objmgr_pdev *pdev)
 {
 	tDot11fIEeht_cap *eht_cap = &params->eht_config;
 	uint32_t *phy_cap = peer->peer_eht_cap_phyinfo;
 	uint32_t *mac_cap = peer->peer_eht_cap_macinfo;
 	struct supported_rates *rates;
+	enum phy_ch_width ch_width, max_ch_width;
+	uint32_t freq;
 
 	if (!params->eht_capable)
 		return;
@@ -768,6 +771,15 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	peer->peer_eht_mcs_count = 0;
 	rates = &params->supportedRates;
 
+	ch_width = params->ch_width;
+	freq = wlan_get_operation_chan_freq_vdev_id(pdev, peer->vdev_id);
+	max_ch_width = wlan_mlme_get_max_curr_bw(pdev, freq, ch_width);
+	/* In case AP starts on 80MHz and upgrades to 160MHz, add 160MHz
+	 * nss/mcs rates during peer association.
+	 */
+	if (ch_width == CH_WIDTH_80MHZ && max_ch_width >= CH_WIDTH_160MHZ)
+		ch_width = CH_WIDTH_160MHZ;
+
 	/*
 	 * Convert eht mcs to firmware understandable format
 	 * BITS 0:3 indicates support for mcs 0 to 7
@@ -775,7 +787,7 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	 * BITS 8:11 indicates support for mcs 10 and 11
 	 * BITS 12:15 indicates support for mcs 12 and 13
 	 */
-	switch (params->ch_width) {
+	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
 		peer->peer_eht_mcs_count++;
 		QDF_SET_BITS(peer->peer_eht_rx_mcs_set[EHTCAP_TXRX_MCS_NSS_IDX2],

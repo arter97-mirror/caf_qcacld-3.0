@@ -514,6 +514,46 @@ QDF_STATUS policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool policy_mgr_get_sap_force_20mhz_for_country_id(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev,
+					qdf_freq_t freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool force_sap_20mhz_cc_id;
+	uint8_t country_code[REG_ALPHA2_LEN + 1] = {0};
+	enum QDF_OPMODE opmode;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return false;
+	}
+
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return false;
+	}
+
+	/* Check if device mode is SAP */
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE)
+		return false;
+
+	force_sap_20mhz_cc_id = pm_ctx->cfg.force_sap_20mhz_cc_id;
+	wlan_reg_get_cc_and_src(psoc, country_code);
+
+	/**
+	 * Force SAP to 20MHz if freq is UNII3 band freq, INI is
+	 * enabled, country is Indonesia and device mode is SAP
+	 */
+	if (wlan_reg_is_5ghz_unii3_chan_freq(freq) &&
+	    !qdf_mem_cmp(country_code, "ID", 2) && force_sap_20mhz_cc_id)
+		return true;
+
+	return false;
+}
+
 QDF_STATUS
 policy_mgr_get_indoor_chnl_marking(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *indoor_chnl_marking)
@@ -4236,6 +4276,7 @@ void policy_mgr_set_concurrency_mode(struct wlan_objmgr_psoc *psoc,
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
 	case QDF_MONITOR_MODE:
+	case QDF_PASSTHRU_MODE:
 		pm_ctx->concurrency_mode |= (1 << mode);
 		pm_ctx->no_of_open_sessions[mode]++;
 		break;
@@ -4274,6 +4315,7 @@ void policy_mgr_clear_concurrency_mode(struct wlan_objmgr_psoc *psoc,
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
 	case QDF_MONITOR_MODE:
+	case QDF_PASSTHRU_MODE:
 		pm_ctx->no_of_open_sessions[mode]--;
 		if (!(pm_ctx->no_of_open_sessions[mode]))
 			pm_ctx->concurrency_mode &= (~(1 << mode));
@@ -5601,6 +5643,7 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 	case QDF_SAP_MODE:
 	case QDF_NAN_DISC_MODE:
 	case QDF_NDI_MODE:
+	case QDF_PASSTHRU_MODE:
 		pm_ctx->no_of_active_sessions[mode]++;
 		break;
 	default:
@@ -5844,6 +5887,7 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	case QDF_SAP_MODE:
 	case QDF_NAN_DISC_MODE:
 	case QDF_NDI_MODE:
+	case QDF_PASSTHRU_MODE:
 		if (pm_ctx->no_of_active_sessions[mode])
 			pm_ctx->no_of_active_sessions[mode]--;
 		break;
@@ -6228,6 +6272,9 @@ bool policy_mgr_concurrent_sta_on_different_mac(struct wlan_objmgr_psoc *psoc)
 	bool is_different_mac = false;
 	int i;
 
+	if (wlan_mlme_support_non_dbs_dual_sta_roaming(psoc))
+		return true;
+
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		return false;
 
@@ -6466,7 +6513,7 @@ bool policy_mgr_is_6ghz_conc_mode_supported(
 	struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode)
 {
 	if (mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE ||
-	    policy_mgr_is_beaconing_mode(mode))
+	    mode == PM_PASSTHRU_MODE || policy_mgr_is_beaconing_mode(mode))
 		return true;
 	else
 		return false;
@@ -6480,7 +6527,7 @@ bool policy_mgr_is_6ghz_conc_mode_supported(
  * @mode: new connection mode
  * @ch_freq: channel freq
  *
- * 1. Only STA/SAP are allowed on 6Ghz.
+ * 1. Only STA/SAP/PASSTHRU are allowed on 6Ghz.
  * 2. If there is DFS beacon entity existing on 5G band, 5G+6G MCC is not
  * allowed.
  *
@@ -6503,7 +6550,7 @@ static bool policy_mgr_is_6g_channel_allowed(
 	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq))
 		return true;
 
-	/* Only STA/SAP is supported on 6Ghz currently */
+	/* Only STA/SAP/PASSTHRU is supported on 6Ghz currently */
 	if (!policy_mgr_is_6ghz_conc_mode_supported(psoc, mode)) {
 		policy_mgr_rl_debug("mode %d for 6ghz not supported", mode);
 		return false;
@@ -8643,23 +8690,11 @@ policy_mgr_handle_mcc_ml_sta(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
- * policy_mgr_sta_ml_link_enable_allowed() - Check with given ML links and
- * existing concurrencies, a disabled ml link can be enabled back.
- * @psoc: psoc ctx
- * @num_disabled_ml_sta: Number of existing disabled links
- * @num_ml_sta: Number of total ML STA links
- * @ml_freq_lst: ML STA freq list
- * @ml_vdev_lst: ML STA vdev id list
- *
- * Return: if link can be enabled or not
- */
-static bool
-policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
-				      uint8_t num_disabled_ml_sta,
-				      uint8_t num_ml_sta,
-				      qdf_freq_t *ml_freq_lst,
-				      uint8_t *ml_vdev_lst)
+bool policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
+					   uint8_t num_disabled_ml_sta,
+					   uint8_t num_ml_sta,
+					   qdf_freq_t *ml_freq_lst,
+					   uint8_t *ml_vdev_lst)
 {
 	union conc_ext_flag conc_ext_flags;
 	uint8_t disabled_link_vdev_id;
@@ -10647,6 +10682,110 @@ static bool policy_mgr_is_third_conn_sta_p2p_p2p_valid(
 	return true;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * policy_mgr_allow_passthru_start() - Check if Passthru mode itself is
+ * allowed to start, given the current concurrency state
+ * @psoc: PSOC object information
+ * @ch_freq: channel frequency of the Passthru connection
+ * @pcl: preferred channel list for Passthru mode
+ *
+ * Monitor mode has no PM_MONITOR_MODE entry in policy_mgr_con_mode /
+ * the PCL tables, so it is not caught by policy_mgr_get_pcl() the way
+ * SAP/P2P/NAN/NDI already are (those map to PM_MAX_PCL_TYPE against
+ * Passthru in the PCL tables and get rejected before this function is
+ * even called). Check it explicitly here via open session count.
+ *
+ * Return: true if Passthru mode is allowed to start, false otherwise
+ */
+static bool
+policy_mgr_allow_passthru_start(struct wlan_objmgr_psoc *psoc,
+				uint32_t ch_freq,
+				struct policy_mgr_pcl_list *pcl)
+{
+	uint8_t num_open_session = 0;
+
+	if (policy_mgr_mode_specific_num_open_sessions(
+			psoc, QDF_MONITOR_MODE, &num_open_session) ==
+			QDF_STATUS_SUCCESS && num_open_session) {
+		policy_mgr_err("Monitor present, Passthru is not allowed");
+		return false;
+	}
+
+	if (!pcl || !pcl->pcl_len)
+		return true;
+
+	policy_mgr_err("Unexpected scenario for Passthru mode ch_freq:%d pcl len:%d",
+		       ch_freq, pcl->pcl_len);
+	return false;
+}
+
+static bool
+policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
+				      enum policy_mgr_con_mode mode,
+				      uint32_t ch_freq,
+				      struct policy_mgr_pcl_list *pcl)
+{
+	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t conn_count;
+	uint32_t i;
+
+	conn_count =
+		policy_mgr_mode_specific_connection_count(psoc,
+							  PM_PASSTHRU_MODE,
+							  list);
+
+	if (mode != PM_PASSTHRU_MODE && !conn_count)
+		return true;
+
+	switch (mode) {
+	case PM_PASSTHRU_MODE:
+		return policy_mgr_allow_passthru_start(psoc, ch_freq, pcl);
+	case PM_STA_MODE:
+		/*
+		 * STA + Passthru SCC concurrency is always supported
+		 * irrespective of HW capability.
+		 */
+		if (pm_conc_connection_list[list[0]].freq == ch_freq)
+			return true;
+
+		if (!pcl || !pcl->pcl_len) {
+			if (policy_mgr_2_freq_same_mac_in_dbs(psoc,
+						      pm_conc_connection_list[list[0]].freq,
+						      ch_freq))
+				return false;
+			else
+				return true;
+		}
+
+		for (i = 0; i < pcl->pcl_len; i++) {
+			if (pcl->pcl_list[i] == ch_freq) {
+				policy_mgr_debug("%s mode allowed on %dMhz",
+						 device_mode_to_string(mode),
+						 ch_freq);
+				return true;
+			}
+		}
+
+		policy_mgr_debug("%s mode not allowed on %dMhz",
+				 device_mode_to_string(mode), ch_freq);
+
+		return false;
+	default:
+		return true;
+	}
+}
+#else
+static inline bool
+policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
+				      enum policy_mgr_con_mode mode,
+				      uint32_t ch_freq,
+				      struct policy_mgr_pcl_list *pcl)
+{
+	return true;
+}
+#endif
+
 bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
@@ -10685,6 +10824,10 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (ch_freq) {
+		if (!policy_mgr_allow_passthru_concurrency(psoc, mode, ch_freq,
+							   pcl))
+			return status;
+
 		if (wlan_reg_is_5ghz_ch_freq(ch_freq)) {
 			qdf_mem_zero(&ch_params, sizeof(ch_params));
 			ch_params.ch_width = policy_mgr_get_ch_width(bw);
@@ -11041,6 +11184,7 @@ bool policy_mgr_will_freq_lead_to_mcc(struct wlan_objmgr_psoc *psoc,
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 	     conn_index++) {
 		if (pm_conc_connection_list[conn_index].in_use &&
+		    (freq != pm_conc_connection_list[conn_index].freq) &&
 		    policy_mgr_2_freq_always_on_same_mac(psoc, freq,
 		     pm_conc_connection_list[conn_index].freq)) {
 			is_mcc = true;
@@ -11290,6 +11434,9 @@ policy_mgr_qdf_opmode_to_pm_con_mode(struct wlan_objmgr_psoc *psoc,
 	case QDF_NDI_MODE:
 		mode = PM_NDI_MODE;
 		break;
+	case QDF_PASSTHRU_MODE:
+		mode = PM_PASSTHRU_MODE;
+		break;
 	default:
 		policy_mgr_debug("Unsupported mode (%d)",
 				 device_mode);
@@ -11322,6 +11469,9 @@ enum QDF_OPMODE policy_mgr_get_qdf_mode_from_pm(
 		break;
 	case PM_NDI_MODE:
 		mode = QDF_NDI_MODE;
+		break;
+	case PM_PASSTHRU_MODE:
+		mode = QDF_PASSTHRU_MODE;
 		break;
 	default:
 		policy_mgr_debug("Unsupported policy mgr mode (%d)",
@@ -12062,6 +12212,12 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 			   policy_mgr_get_mode_specific_conn_info(
 					psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
+
+	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
+		cc_count = cc_count +
+			   policy_mgr_get_mode_specific_conn_info(
+					psoc, &op_ch_freq_list[cc_count],
+					&vdev_id[cc_count], PM_PASSTHRU_MODE);
 
 	if (!cc_count) {
 		*ok = true;
@@ -13607,6 +13763,16 @@ QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	num_open_session = policy_mgr_mode_specific_connection_count(
+					psoc,
+					PM_PASSTHRU_MODE,
+					NULL);
+
+	if (num_open_session) {
+		policy_mgr_err("cannot add monitor mode, due to Passthru concurrency");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -14585,3 +14751,28 @@ policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
 	}
 	return false;
 }
+
+#ifdef DRIVER_PASSTHRU_MODE
+bool
+policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id, uint32_t freq,
+					       enum hw_mode_bandwidth bw)
+{
+	struct policy_mgr_conc_connection_info info;
+	uint8_t num_cxn_del = 0;
+	bool allow = false;
+
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc,
+						      vdev_id,
+						      &info,
+						      &num_cxn_del);
+
+	allow = policy_mgr_allow_concurrency(psoc, PM_PASSTHRU_MODE, freq, bw,
+					     0, vdev_id);
+
+	if (num_cxn_del)
+		policy_mgr_restore_deleted_conn_info(psoc, &info, num_cxn_del);
+
+	return allow;
+}
+#endif

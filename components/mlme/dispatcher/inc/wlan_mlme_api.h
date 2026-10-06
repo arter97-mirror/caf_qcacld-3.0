@@ -3661,7 +3661,7 @@ wlan_mlme_get_mgmt_6ghz_rate_support(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 wlan_mlme_get_status_ring_buffer(struct wlan_objmgr_psoc *psoc,
-				 bool *enable_ring_buffer);
+				 uint32_t *enable_ring_buffer);
 
 /**
  * wlan_mlme_get_peer_unmap_conf() - Indicate if peer unmap confirmation
@@ -3970,9 +3970,26 @@ wlan_mlme_get_sae_roam_auth_retry_count(struct wlan_objmgr_psoc *psoc,
  */
 bool
 wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_support_non_dbs_dual_sta_roaming  - API to get if dual station
+ * roaming is enabled on non_dbs hardware
+ * @psoc: Pointer to global psoc object
+ *
+ * Return: True if dual sta roaming is enabled on non_dbs card else return
+ * false
+ */
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -5098,6 +5115,19 @@ wlan_mlme_get_sap_ps_with_twt(struct wlan_objmgr_psoc *psoc);
  *
  */
 enum phy_ch_width wlan_mlme_get_max_bw(void);
+
+/**
+ * wlan_mlme_get_max_curr_bw() - get max current bw
+ *
+ * @pdev: pdev pointer
+ * @curr_op_freq: current operating freq
+ * @chan_bw: chan bw
+ *
+ * Return: enum phy_ch_width
+ */
+enum phy_ch_width wlan_mlme_get_max_curr_bw(struct wlan_objmgr_pdev *pdev,
+					    qdf_freq_t curr_op_freq,
+					    enum phy_ch_width chan_bw);
 
 /**
  * wlan_mlme_get_sta_ch_width() - Get current operating

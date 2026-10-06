@@ -582,6 +582,12 @@ pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 						 unsigned int *cpumask)
 {
 }
+
+static inline
+int pld_pcie_set_vendor_wonder_priv_data(const void *priv_data)
+{
+	return -EINVAL;
+}
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 int pld_pcie_set_wfc_mode(struct device *dev,
@@ -1148,5 +1154,11 @@ pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 {
 }
 #endif /* CONFIG_DT_CPU_MASK_DP_INTR */
+
+static inline
+int pld_pcie_set_vendor_wonder_priv_data(const void *priv_data)
+{
+	return cnss_set_vendor_wonder_priv_data(priv_data);
+}
 #endif
 #endif

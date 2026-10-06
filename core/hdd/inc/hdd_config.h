@@ -1670,6 +1670,29 @@ enum host_log_level {
 			CFG_VALUE_OR_DEFAULT, \
 			"User delay interval")
 
+/*
+ * <ini>
+ * gForceSAP20Mhz_cc_id - Force SAP to 20MHz bandwidth for country Indonesia
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to force the SAP to operate in 20MHz bandwidth for
+ * country Indonesia regardless of other configurations.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_FORCE_SAP_20MHZ_CC_ID_ENABLE CFG_INI_BOOL( \
+			"gForceSAP20Mhz_cc_id", \
+			0, \
+			"Force SAP to 20MHz bandwidth")
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1722,5 +1745,6 @@ enum host_log_level {
 	CFG_EPM_VALUE_ALL \
 	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL \
 	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS) \
-	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL)
+	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL) \
+	CFG(CFG_FORCE_SAP_20MHZ_CC_ID_ENABLE)
 #endif

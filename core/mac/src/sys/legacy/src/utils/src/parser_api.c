@@ -1532,12 +1532,16 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
 			pDot11f->supportedChannelWidthSet = 0;
-		} else {
-			if (pe_session->ch_width <= CH_WIDTH_80MHZ)
-				pDot11f->supportedChannelWidthSet = 0;
-		}
+
+		if (pe_session->ch_width < CH_WIDTH_80MHZ ||
+		    (pe_session->ch_width == CH_WIDTH_80MHZ &&
+		     wlan_mlme_get_max_curr_bw(
+				mac->pdev,
+				pe_session->curr_op_freq,
+				pe_session->ch_width) < CH_WIDTH_160MHZ))
+			pDot11f->supportedChannelWidthSet = 0;
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -8212,26 +8216,40 @@ populate_dot11f_twt_he_cap(struct mac_context *mac_ctx,
  *
  * Populdate the HE capability IE based on the session.
  */
-QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_session *session,
+QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
+				   struct pe_session *session,
+				   enum QDF_OPMODE opmode, qdf_freq_t freq,
+				   enum phy_ch_width ch_width,
 				   tDot11fIEhe_cap *he_cap)
 {
-	uint8_t *ppet;
+	uint8_t *ppet, nss;
 	uint32_t value = 0;
 
 	he_cap->present = 1;
+	nss = session ? session->nss : WLAN_MAX_VDEV_NSS;
 
 	if (!session) {
 		qdf_mem_copy(he_cap, &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
 			     sizeof(tDot11fIEhe_cap));
-		return QDF_STATUS_SUCCESS;
+		if (!freq)
+			goto fill_nss;
+	} else {
+		/** TODO: String items needs attention. **/
+		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
+		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 	}
 
-	/** TODO: String items needs attention. **/
-	qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
+	/*
+	 * session can be NULL from this point on (caller supplied
+	 * freq/ch_width directly instead of a session, e.g. passthru
+	 * peer setup) -- use the freq/ch_width params below, never
+	 * session->curr_op_freq or session->ch_width, or this will
+	 * NULL deref.
+	 */
 	if (he_cap->ppet_present) {
 		value = WNI_CFG_HE_PPET_LEN;
 		/* if session is present, populate PPET based on band */
-		if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		if (!wlan_reg_is_24ghz_ch_freq(freq))
 			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
 				     mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
 				     value);
@@ -8246,17 +8264,38 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 	} else {
 		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
 	}
-	populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 
-	if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq) ||
-	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
-		if (session->ch_width <= CH_WIDTH_80MHZ) {
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
+		he_cap->chan_width_1 = 0;
+		he_cap->chan_width_2 = 0;
+		he_cap->chan_width_3 = 0;
+		he_cap->chan_width_5 = 0;
+		he_cap->chan_width_6 = 0;
+	} else {
+		he_cap->chan_width_0 = 0;
+		he_cap->chan_width_4 = 0;
+		he_cap->chan_width_6 = 0;
+		if (ch_width < CH_WIDTH_40MHZ) {
+			he_cap->chan_width_1 = 0;
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
-		} else if (session->ch_width == CH_WIDTH_160MHZ) {
+		} else if (ch_width <= CH_WIDTH_80MHZ) {
+			he_cap->chan_width_2 = 0;
+			he_cap->chan_width_3 = 0;
+		} else if (ch_width == CH_WIDTH_160MHZ) {
 			he_cap->chan_width_3 = 0;
 		}
 	}
+
+fill_nss:
+	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 |=
+					HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 |=
+					HE_DISABLE_MCS_OVER_NSS(nss);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -10684,12 +10723,23 @@ QDF_STATUS lim_ieee80211_unpack_tpe(const uint8_t *tpe_ie,
 	} else {
 		if (!dot11f_tpe->max_tx_pwr_count) {
 			dot11f_tpe->num_tx_power = dot11f_tpe->max_tx_pwr_count;
+			if (!ie_len) {
+				pe_err("TPE IE: no payload for tx_power");
+				return QDF_STATUS_E_BADMSG;
+			}
 			qdf_mem_copy(dot11f_tpe->tx_power, buf, 1);
 			return QDF_STATUS_SUCCESS;
 		}
 		else
 			dot11f_tpe->num_tx_power =
 					1 << (dot11f_tpe->max_tx_pwr_count - 1);
+	}
+
+	if (dot11f_tpe->num_tx_power > sizeof(dot11f_tpe->tx_power) ||
+	    ie_len < dot11f_tpe->num_tx_power) {
+		pe_err("TPE IE: invalid num_tx_power %u ie_len %u",
+		       dot11f_tpe->num_tx_power, ie_len);
+		return QDF_STATUS_E_BADMSG;
 	}
 
 	qdf_mem_copy(dot11f_tpe->tx_power, buf, dot11f_tpe->num_tx_power);
@@ -12772,6 +12822,12 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &mlo_ie_ptr->mlo_ie.common_info_length);
+
+	if (mlo_ie_ptr->mlo_ie.common_info_length > ml_ie_total_len) {
+		pe_err("common info length greater than mlie length %u %u",
+		       mlo_ie_ptr->mlo_ie.common_info_length, ml_ie_total_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
 		   mlo_ie_ptr->mlo_ie.common_info_length;

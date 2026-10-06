@@ -349,7 +349,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (IS_DOT11_MODE_HE(dot11mode) && pesession)
 		lim_update_session_he_capable(mac_ctx, pesession);
 
-	populate_dot11f_he_caps(mac_ctx, pesession, &pr->he_cap);
+	populate_dot11f_he_caps(mac_ctx, pesession, pesession->opmode,
+				pesession->curr_op_freq, pesession->ch_width,
+				&pr->he_cap);
 	populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
 				    &pr->he_6ghz_band_cap);
 
@@ -831,8 +833,9 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
-		populate_dot11f_he_caps(mac_ctx, pe_session,
-					&frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &frm->he_cap);
 		populate_dot11f_he_operation(mac_ctx, pe_session,
 					     &frm->he_op);
 		populate_dot11f_sr_info(mac_ctx, pe_session,
@@ -1166,13 +1169,15 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 	if (wlan_reg_is_5ghz_ch_freq(freq) ||
 	    (wlan_reg_is_24ghz_ch_freq(freq) &&
 	     mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)) {
-		populate_dot11f_vht_caps(mac_ctx, NULL, &frm.VHTCaps);
+		populate_dot11f_vht_caps(mac_ctx, session, &frm.VHTCaps);
 	}
 
 	if (lim_is_session_he_capable(session)) {
-		populate_dot11f_he_caps(mac_ctx, NULL, &frm.he_cap);
+		populate_dot11f_he_caps(mac_ctx, NULL, session->opmode,
+					session->curr_op_freq,
+					session->ch_width, &frm.he_cap);
 		if (wlan_reg_is_6ghz_chan_freq(freq)) {
-			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
+			populate_dot11f_he_6ghz_cap(mac_ctx, session,
 						    &frm.he_6ghz_band_cap);
 		}
 	}
@@ -1252,6 +1257,9 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	void *pkt_ptr = NULL;
 	uint8_t *frame_ptr;
 	uint8_t tx_flag = 0;
+	uint16_t bw;
+	enum phy_ch_width ch_width;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 	tpSirMacMgmtHdr mac_hdr;
 	uint32_t status, num_bytes, payload;
 	struct policy_mgr_pcl_list pcl = {0};
@@ -1301,6 +1309,8 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 		} else {
 			freq = wlan_reg_legacy_chan_to_freq(pdev, req_chan);
 		}
+		opclass = req_op_class;
+		chan_num = req_chan;
 	} else if (pcl.pcl_len) {
 		wlan_reg_freq_to_chan_op_class(pdev, pcl.pcl_list[0], true,
 					       BIT(BEHAV_NONE), &opclass,
@@ -1321,6 +1331,11 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	if (!freq)
 		goto pack_frame;
 
+	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
+	bw = wlan_reg_dmn_get_chanwidth_from_opclass_auto(country_code,
+							  chan_num, opclass);
+	ch_width = wlan_reg_find_chwidth_from_bw(bw);
+
 	populate_dot11f_ht_caps(mac_ctx, session, &frm->HTCaps);
 
 	if (wlan_reg_is_5ghz_ch_freq(freq) ||
@@ -1330,7 +1345,8 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	}
 
 	if (lim_is_session_he_capable(session)) {
-		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, NULL, session->opmode,
+					freq, ch_width, &frm->he_cap);
 		if (wlan_reg_is_6ghz_chan_freq(freq)) {
 			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
 						    &frm->he_6ghz_band_cap);
@@ -2240,6 +2256,9 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		if (lim_is_sta_he_capable(sta) &&
 		    lim_is_session_he_capable(pe_session)) {
 			populate_dot11f_he_caps(mac_ctx, pe_session,
+						pe_session->opmode,
+						pe_session->curr_op_freq,
+						pe_session->ch_width,
 						&frm.he_cap);
 			populate_dot11f_sr_info(mac_ctx, pe_session,
 						&frm.spatial_reuse);
@@ -3278,12 +3297,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		lim_update_session_he_capable(mac_ctx, pe_session);
 
 	if (lim_is_session_he_capable(pe_session)) {
-		populate_dot11f_he_caps(mac_ctx, pe_session,
-					&frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	} else if (pe_session->he_with_wep_tkip) {
-		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, NULL, pe_session->opmode,
+					0, CH_WIDTH_20MHZ, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}
@@ -7012,7 +7033,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 uint8_t addba_extn_present,
 					 uint8_t amsdu_support, uint8_t is_wep,
 					 uint16_t calc_buff_size,
-					 tSirMacAddr bssid)
+					 tSirMacAddr bssid,
+					 uint8_t req_dialog_token)
 {
 
 	tDot11faddba_rsp frm;
@@ -7023,9 +7045,9 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status;
 	uint8_t tx_flag = 0;
 	uint8_t vdev_id = 0;
-	uint16_t buff_size, status_code, batimeout;
+	uint16_t buff_size = 0, status_code = 0, batimeout = 0;
 	uint16_t frm_buff_size = 0;
-	uint8_t dialog_token;
+	uint8_t dialog_token = 0;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t he_frag = 0;
 	tpDphHashNode sta_ds = NULL;
@@ -7038,20 +7060,38 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 
 	vdev_id = session->vdev_id;
 
-	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
-				&dialog_token, &status_code, &buff_size,
-				&batimeout);
+	sta_ds = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
+				       &session->dph.dphHashTable);
 
 	qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 	frm.Category.category = ACTION_CATEGORY_BACK;
 	frm.Action.action = ADDBA_RESPONSE;
 
+	if (!sta_ds && LIM_IS_PASSTHRU_ROLE(session)) {
+		/*
+		 * No local host/FW peer exists for this PASSTHRU vdev peer
+		 * (e.g. beyond the max supported passthru peer count).
+		 * cdp_addba_responsesetup()/cdp_tid_update_ba_win_size()
+		 * cannot be used since there is no DP peer either, so decline
+		 * outright instead of leaving the ADDBA req unanswered, which
+		 * makes the peer keep retrying and repeatedly stall Rx.
+		 */
+		frm.DialogToken.token = req_dialog_token;
+		frm.Status.status = STATUS_REQUEST_DECLINED;
+		frm.addba_param_set.tid = tid;
+		pe_err("vdev:%d refused addba req from " QDF_MAC_ADDR_FMT
+		       ": no passthru peer entry",
+		       vdev_id, QDF_MAC_ADDR_REF(peer_mac));
+		goto send_addba_rsp;
+	}
+
+	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
+				&dialog_token, &status_code, &buff_size,
+				&batimeout);
+
 	frm.DialogToken.token = dialog_token;
 	frm.Status.status = status_code;
-
-	sta_ds = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
-				       &session->dph.dphHashTable);
 
 	if (sta_ds && lim_is_session_he_capable(session))
 		he_cap = lim_is_sta_he_capable(sta_ds);
@@ -7132,6 +7172,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	else
 		frm.addba_param_set.amsdu_supp = 0;
 
+send_addba_rsp:
 	frm.addba_param_set.policy = SIR_MAC_BA_POLICY_IMMEDIATE;
 	frm.ba_timeout.timeout = batimeout;
 	if (addba_extn_present) {

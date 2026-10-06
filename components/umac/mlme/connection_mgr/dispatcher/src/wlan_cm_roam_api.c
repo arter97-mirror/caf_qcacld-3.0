@@ -541,7 +541,8 @@ wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 
-	if (!connected_sta_freq_list || !sta_count)
+	if (!connected_sta_freq_list || !sta_count ||
+	    wlan_mlme_support_non_dbs_dual_sta_roaming(psoc))
 		return true;
 
 	for (i = 0; i < sta_count; i++) {
@@ -659,7 +660,6 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 
 	if (!wlan_mlme_get_dual_sta_roaming_enabled(psoc))
 		return;
-
 	/*
 	 * Check if primary iface is configured. If yes,
 	 * then allow further STA connection to all
@@ -1865,7 +1865,12 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
-	rso_cfg->is_disable_btm = false;
+	/*
+	 * Restore is_disable_btm from the psoc-level cache so that the flag
+	 * set by userspace via vendor command survives vdev delete/create
+	 * cycles caused by MAC address randomization.
+	 */
+	rso_cfg->is_disable_btm = mlme_obj->cfg.lfr.disable_btm_cfg;
 
 	return status;
 }
@@ -2616,6 +2621,16 @@ QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, bool is_disable_btm)
 {
 	struct cm_roam_values_copy src_config = {};
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	/*
+	 * Persist the flag at psoc level so it survives vdev delete/create
+	 * cycles (e.g. MAC address randomization before connection).
+	 * wlan_cm_rso_config_init() will restore it into the new rso_cfg.
+	 */
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (mlme_obj)
+		mlme_obj->cfg.lfr.disable_btm_cfg = is_disable_btm;
 
 	src_config.bool_value = is_disable_btm;
 	return wlan_cm_roam_cfg_set_value(psoc, vdev_id, IS_DISABLE_BTM,
@@ -3825,13 +3840,23 @@ cm_roam_stats_print_11kv_info(struct wlan_objmgr_psoc *psoc,
 
 	tmp = buf;
 	if (num_ch) {
-		buf_cons = qdf_snprint(tmp, buf_left, "{ ");
+                buf_cons = qdf_snprint(tmp, buf_left, "{ ");
 		buf_left -= buf_cons;
 		tmp += buf_cons;
 
 		for (i = 0; i < num_ch; i++) {
+			if (!buf_left) {
+				mlme_err("buf_left is empty");
+				qdf_mem_free(buf);
+				return;
+			}
 			buf_cons = qdf_snprint(tmp, buf_left, "%d ",
 					       neigh_rpt->freq[i]);
+			if (!buf_cons || buf_cons > buf_left) {
+				mlme_err("buf_cons is empty");
+				qdf_mem_free(buf);
+				return;
+			}
 			buf_left -= buf_cons;
 			tmp += buf_cons;
 		}

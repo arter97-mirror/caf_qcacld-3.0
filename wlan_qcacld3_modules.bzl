@@ -2475,6 +2475,36 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
 
+    deps = deps + select({
+        ":wonder_enabled": [
+	    # Add dependency of wonder here
+        ],
+        "//conditions:default": [],
+    })
+
+    wonder_srcs = "wonder_srcs_{}".format(tvc)
+    native.filegroup(
+        name = wonder_srcs,
+        srcs = select({
+            ":wonder_enabled": [
+                "core/hdd/src/wlan_hdd_wondertap.c",
+            ],
+            "//conditions:default": ["core/hdd/inc/wlan_hdd_wondertap.h"],
+        }),
+        visibility = ["//visibility:private"],
+    )
+
+    combined_conditional_srcs = dict(_conditional_srcs)
+    wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
+    existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
+    existing_true_list = existing_inner.get(True, [])
+    existing_true_list = existing_true_list + [
+            ":{}".format(wonder_srcs),
+    ]
+    existing_inner = dict(existing_inner)
+    existing_inner[True] = existing_true_list
+    combined_conditional_srcs[wonder_kcfg_key] = existing_inner
+
     print("name=", name)
     print("hw=", hw)
     print("ipaths=", ipaths)
@@ -2492,7 +2522,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
-        conditional_srcs = _conditional_srcs,
+        conditional_srcs = combined_conditional_srcs,
         copts = copts,
         out = out,
         kernel_build = kernel_build,

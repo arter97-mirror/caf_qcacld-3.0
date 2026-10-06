@@ -1445,6 +1445,41 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS ucfg_dp_passthrough_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
+{
+	struct ol_txrx_ops txrx_ops;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	/* Register the vdev transmit and receive functions */
+	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
+
+	txrx_ops.rx.rx = dp_rx_packet_cbk_passthru;
+	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
+	if (!(txrx_ops.tx.tx && cdp_vdev)) {
+		dp_err("vdev register fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
+	dp_intf->txrx_ops = txrx_ops;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 					    struct ol_txrx_ops *txrx_ops)
 {
@@ -1542,7 +1577,10 @@ QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 	 */
 	tx_dp_link = dp_intf->def_link;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_start_xmit(tx_dp_link, nbuf);
+	if (qdf_likely(wlan_vdev_mlme_get_opmode(vdev) != QDF_PASSTHRU_MODE))
+		status = dp_start_xmit(tx_dp_link, nbuf);
+	else
+		status = dp_start_xmit_passthru(tx_dp_link, nbuf);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;
@@ -3212,6 +3250,35 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 				       uint8_t stats_id)
 {
 	return dp_txrx_ext_dump_stats(soc, stats_id);
+}
+
+QDF_STATUS ucfg_dp_haps_dump_stats(struct wlan_objmgr_psoc *psoc)
+{
+	return dp_print_haps_stats(psoc);
+}
+
+void ucfg_dp_haps_clear_stats(struct wlan_objmgr_psoc *psoc)
+{
+	return dp_clear_haps_stats(psoc);
+}
+
+void ucfg_dp_haps_set_fail_safe_timeout(qdf_netdev_t dev, bool is_default,
+					uint16_t timeout)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_intf *dp_intf;
+
+	dp_ctx = dp_get_context();
+	if (!dp_ctx)
+		return;
+
+	dp_intf = dp_get_intf_by_netdev(dp_ctx, dev);
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
+
+	return dp_haps_set_fail_safe_timeout(dp_intf, is_default, timeout);
 }
 
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,

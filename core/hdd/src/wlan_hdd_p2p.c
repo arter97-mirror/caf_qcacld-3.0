@@ -201,8 +201,14 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
 	if (policy_mgr_is_sta_mon_concurrency(psoc) &&
-	    !hdd_lpc_is_work_scheduled(hdd_ctx))
+	    !hdd_lpc_is_work_scheduled(hdd_ctx)) {
 		return -EINVAL;
+	} else if (policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							     PM_PASSTHRU_MODE,
+							     NULL)) {
+		hdd_err("Passthru mode active - rejecting roc req");
+		return -EINVAL;
+	}
 
 	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
