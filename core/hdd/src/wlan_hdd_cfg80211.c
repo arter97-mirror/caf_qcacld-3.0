@@ -34861,6 +34861,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	struct qdf_mac_addr *peer_link_addr;
 	const u8 *key_mac_addr;
 	bool is_11bi_roam;
+	QDF_STATUS status;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -34912,6 +34913,22 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 		errno = wlan_hdd_add_key_mlo_vdev(mac_handle, vdev, key_index,
 						  pairwise, mac_addr, params,
 						  link_id, adapter);
+
+	/*
+	 * 11bi installs the assoc link PTK during preauth, before the partner
+	 * links exist, so post the partner link connect on the assoc vdev's
+	 * group keys that follow instead.  copied_reassoc_rsp is only populated
+	 * by roam sync, so this cannot fire on an initial connection.
+	 */
+	if (!errno && !pairwise && wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    hdd_is_11bi_vdev(vdev) &&
+	    mlo_roam_is_auth_status_connected(hdd_ctx->psoc,
+					      wlan_vdev_get_id(vdev))) {
+		status = mlo_roam_link_connect_notify(hdd_ctx->psoc,
+						      wlan_vdev_get_id(vdev));
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Posting of link connect request failed");
+	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
