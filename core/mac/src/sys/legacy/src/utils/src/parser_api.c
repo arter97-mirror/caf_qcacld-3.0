@@ -14906,8 +14906,7 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	aux_emlsr_support = wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc);
 
 	/* Check if STA supports EMLSR and vendor command prefers EMLSR mode */
-	if ((emlsr_cap && emlsr_enabled) ||
-	    aux_emlsr_support) {
+	if ((emlsr_cap || aux_emlsr_support) && emlsr_enabled) {
 		wlan_mlme_get_eml_params(psoc, &eml_cap);
 		mlo_ie->eml_capab_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EMLCAP_P;
