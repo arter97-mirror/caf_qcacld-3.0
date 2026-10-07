@@ -1787,8 +1787,47 @@ static bool cm_is_11bi_roaming_vdev(struct wlan_objmgr_vdev *vdev)
 	return cm_is_vdev_roaming(vdev) && cm_is_11bi_vdev(vdev);
 }
 
-static void
-cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
+/*
+ * Partner link keys are hashed either by the vdev's own link address or by the
+ * AP link address, so try the regular lookup and then both addresses directly.
+ */
+static struct wlan_crypto_key *
+cm_get_link_vdev_key_any_hash(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *ap_link_addr,
+			      uint8_t key_index)
+{
+	struct wlan_crypto_key *crypto_key;
+	struct qdf_mac_addr *self_link_addr;
+	uint8_t link_id;
+
+	crypto_key = wlan_crypto_get_key_allow_roam_bypass(
+				vdev,
+				ap_link_addr ? ap_link_addr->bytes : NULL,
+				key_index, cm_is_11bi_roaming_vdev(vdev));
+	if (crypto_key)
+		return crypto_key;
+
+	link_id = wlan_vdev_get_link_id(vdev);
+	self_link_addr =
+		(struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
+	if (self_link_addr) {
+		crypto_key = wlan_crypto_get_ml_sta_link_key(
+					wlan_vdev_get_psoc(vdev), key_index,
+					self_link_addr, link_id);
+		if (crypto_key)
+			return crypto_key;
+	}
+
+	if (!ap_link_addr)
+		return NULL;
+
+	return wlan_crypto_get_ml_sta_link_key(wlan_vdev_get_psoc(vdev),
+					       key_index, ap_link_addr,
+					       link_id);
+}
+
+void
+cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool from_roam_sync)
 {
 	struct wlan_crypto_key *crypto_key;
 	struct wlan_crypto_params *crypto_params;
@@ -1828,8 +1867,19 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 							&ap_link_addr))
 		return;
 
-	if (wlan_cm_is_link_add_connecting(vdev) ||
-	    mlo_mgr_is_link_add_link_switch(vdev)) {
+	/*
+	 * mlo_link_recfg_install_unicast_keys() resolves the assoc key by the
+	 * vdev's own link address, which never matches for an 11bi roam - that
+	 * key is staged under the AP link address - and its failure path
+	 * disconnects with REASON_KEY_FAIL_TO_INSTALL.  The loop below does the
+	 * 11bi aware lookup, so never divert to link recfg on the roam sync
+	 * path.  Note wlan_cm_is_link_add_connecting() is also true whenever no
+	 * command is active, since cm_is_link_add_cmd() tests
+	 * CM_ID_LINKADD_BIT without excluding CM_ID_INVALID (0xFFFFFFFF).
+	 */
+	if (!from_roam_sync &&
+	    (wlan_cm_is_link_add_connecting(vdev) ||
+	     mlo_mgr_is_link_add_link_switch(vdev))) {
 		mlo_link_recfg_install_unicast_keys(vdev);
 		return;
 	}
@@ -1841,11 +1891,8 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 
 	wlan_crypto_aquire_lock();
 	for (i = 0; i < max_key_index; i++) {
-		crypto_key = wlan_crypto_get_key_allow_roam_bypass(
-					vdev,
-					ap_link_addr ?
-					ap_link_addr->bytes : NULL,
-					i, cm_is_11bi_roaming_vdev(vdev));
+		crypto_key = cm_get_link_vdev_key_any_hash(vdev, ap_link_addr,
+							   i);
 		if (!crypto_key)
 			continue;
 
@@ -2004,7 +2051,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			psoc, vdev_id,
 			ml_nlink_connect_completion_evt, NULL);
 		cm_process_connect_complete(psoc, pdev, vdev, rsp);
-		cm_install_link_vdev_keys(vdev);
+		cm_install_link_vdev_keys(vdev, false);
 		wlan_tdls_notify_sta_connect(vdev_id,
 					     mlme_get_tdls_chan_switch_prohibited(vdev),
 					     mlme_get_tdls_prohibited(vdev),

@@ -834,4 +834,23 @@ cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
 		       struct cm_connect_req *conn_req,
 		       uint8_t mlo_support_link_num);
 #endif
+/**
+ * cm_install_link_vdev_keys() - Send an MLO link vdev's deferred keys to
+ *				  firmware
+ * @vdev: MLO link vdev whose deferred keys are to be installed
+ * @from_roam_sync: true when called from the roam sync path.  Keeps the lookup
+ *		     on the 11bi aware path instead of diverting to
+ *		     mlo_link_recfg_install_unicast_keys(), which resolves the
+ *		     key by the vdev's own link address and would disconnect
+ *		     with REASON_KEY_FAIL_TO_INSTALL after an 11bi roam.
+ *
+ * Drains the keys that were stashed in the psoc crypto cache while the link
+ * vdev had its set-key deferred (mlo_defer_set_keys()), and clears the defer
+ * flag.  A no-op unless @vdev is an STA mode MLO link vdev with keys pending.
+ *
+ * Return: void
+ */
+void
+cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool from_roam_sync);
+
 #endif /* __WLAN_CM_VDEV_API_H__ */

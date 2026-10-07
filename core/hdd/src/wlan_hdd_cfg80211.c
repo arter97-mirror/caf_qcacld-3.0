@@ -34102,6 +34102,10 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		return false;
 
+	if (is_link_roam_auth_connected && wlan_cm_is_vdev_connected(vdev) &&
+	    !ucfg_cm_is_vdev_roaming(vdev))
+		return false;
+
 	/*
 	 * Defer key install unless the vdev is already connected and this
 	 * isn't the MLO link vdev roam-auth-connected case.
