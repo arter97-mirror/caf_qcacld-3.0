@@ -3569,8 +3569,6 @@ lim_uhr_nontx_mbssid_redirect_probe_to_tx_ap(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	lim_process_bcn_tpe_and_set_tpc(mac_ctx, session_entry);
-
 	lim_send_probe_req_mgmt_frame(
 		mac_ctx, session_entry,
 		&session_entry->lim_join_req->addIEScan.length,
@@ -3714,6 +3712,7 @@ static void lim_process_switch_channel_join_req(
 		}
 	}
 
+	lim_process_bcn_tpe_and_set_tpc(mac_ctx, session_entry);
 	/*
 	 * MBSSID: Non Tx BSS may or may not respond to unicast
 	 * probe request.So dont send unicast probe request
@@ -3753,7 +3752,6 @@ static void lim_process_switch_channel_join_req(
 		if (mlo_status == QDF_STATUS_E_FAILURE)
 			goto error;
 		/* QDF_STATUS_E_NOSUPPORT: non-UHR session, fall through */
-
 		session_entry->limMlmState = eLIM_MLM_JOINED_STATE;
 		join_cnf.sessionId = session_entry->peSessionId;
 		join_cnf.resultCode = eSIR_SME_SUCCESS;
@@ -3793,8 +3791,6 @@ static void lim_process_switch_channel_join_req(
 			 mac_ctx->lim.gLimMlmState));
 		goto error;
 	}
-
-	lim_process_bcn_tpe_and_set_tpc(mac_ctx, session_entry);
 
 	/* include additional IE if there is */
 	lim_send_probe_req_mgmt_frame(mac_ctx, session_entry,
