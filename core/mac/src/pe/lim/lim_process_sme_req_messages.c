@@ -2097,6 +2097,13 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 {
 	enum mlme_dot11_mode bss_dot11_mode;
 
+	/*
+	 * Japan channel 14 permits DSSS/CCK only. Do not infer an HT/HE/EHT
+	 * mode from capability IEs sent by an AP on this frequency.
+	 */
+	if (bss_desc->chan_freq == wlan_reg_ch_to_freq(CHAN_ENUM_2484))
+		return MLME_DOT11_MODE_11B;
+
 	switch (bss_desc->nwType) {
 	case eSIR_11B_NW_TYPE:
 		return MLME_DOT11_MODE_11B;
