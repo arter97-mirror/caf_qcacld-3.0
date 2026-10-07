@@ -112,14 +112,14 @@ void wlan_hdd_get_mlo_link_id(struct hdd_beacon_data *beacon,
 }
 
 void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
-				 struct sap_config *config)
+				 eCsrPhyMode *sap_hw_mode)
 {
 	const uint8_t *ie;
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE,
 					     beacon->tail, beacon->tail_len);
 	if (ie)
-		config->SapHw_mode = eCSR_DOT11_MODE_11be;
+		*sap_hw_mode = eCSR_DOT11_MODE_11be;
 }
 
 static void
