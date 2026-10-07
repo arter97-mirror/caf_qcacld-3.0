@@ -1260,14 +1260,23 @@ void infra_enhance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 				    void *context)
 {
 	struct osif_request *request = osif_request_get(context);
-	struct infra_cp_stats_event *priv = osif_request_priv(request);
+	struct infra_cp_stats_event *priv;
 	int i, j;
 
 	if (!request)
 		return;
 
+	priv = osif_request_priv(request);
+
+	if (!infra_event) {
+		hdd_err("Null infra_event");
+		osif_request_complete(request);
+		osif_request_put(request);
+		return;
+	}
+
 	// Copy other response data to priv as necessary
-	if (infra_event && infra_event->request_id != priv->request_id) {
+	if (infra_event->request_id != priv->request_id) {
 		hdd_err("Request_id is not same as expected infra_event request_id: %d and priv request_id: %d",
 			infra_event->request_id, priv->request_id);
 		osif_request_put(request);
