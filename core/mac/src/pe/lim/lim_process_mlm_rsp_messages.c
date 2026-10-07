@@ -3091,7 +3091,7 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	struct element_info link_assoc_rsp;
 	tLimMlmJoinCnf mlm_join_cnf;
 	tLimMlmAssocCnf assoc_cnf;
-	struct qdf_mac_addr bssid;
+	struct qdf_mac_addr bssid = {0};
 	uint8_t link_id = 0;
 
 	if (!session_entry->ml_partner_info.num_partner_links) {
@@ -3129,9 +3129,20 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 	link_assoc_rsp.len = assoc_rsp.len;
 	session_entry->limMlmState = eLIM_MLM_WT_REASSOC_RSP_STATE;
-	mlo_get_link_mac_addr_from_reassoc_rsp(session_entry->vdev, &bssid);
-	sir_copy_mac_addr(session_entry->limReAssocbssId, bssid.bytes);
 	link_id = wlan_vdev_get_link_id(session_entry->vdev);
+
+	/*
+	 * Without the link BSSID the reassoc rsp generated below is refused by
+	 * lim_process_assoc_rsp_frame() as being from an unexpected peer.
+	 */
+	status = mlo_get_link_mac_addr_from_reassoc_rsp(session_entry->vdev,
+							&bssid);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("MLO_ROAM: vdev:%d link_id:%d no link mac in reassoc rsp",
+		       session_entry->vdev_id, link_id);
+		goto assoc_fail;
+	}
+	sir_copy_mac_addr(session_entry->limReAssocbssId, bssid.bytes);
 	pe_debug("MLO ROAM: Generate and process assoc rsp for link_id:%d vdev %d",
 		 link_id, session_entry->vdev_id);
 
