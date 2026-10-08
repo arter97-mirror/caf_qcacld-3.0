@@ -1208,6 +1208,59 @@ hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
 #endif
 
 /**
+ * hdd_process_deferred_setsuspend() - Process deferred SETSUSPENDMODE 1
+ * @hdd_ctx: HDD context
+ * @adapter: HDD adapter
+ *
+ * A SETSUSPENDMODE 1 command is deferred while DHCP is in progress. Process
+ * it once DHCP has completed. DHCP completion is signalled either by the
+ * IPv4 address change notifier or by the DHCP stop indication sent through
+ * power save, the latter being the only indication when the lease is
+ * renewed without an IP address change.
+ *
+ * Only ONE idle roam is allowed per screen-off state. If idle roam monitor
+ * was already enabled earlier in this screen-off period, do NOT re-enable
+ * it, as that would make the firmware trigger a second idle roam scan.
+ *
+ * If SETSUSPENDMODE 0 was received before DHCP completed,
+ * dhcp_config_setsuspend was cleared and nothing is done here.
+ *
+ * Return: None
+ */
+static void hdd_process_deferred_setsuspend(struct hdd_context *hdd_ctx,
+					    struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	/* Test and clear so only one DHCP-complete trigger acts on it */
+	if (!adapter->dhcp_config_setsuspend)
+		return;
+	adapter->dhcp_config_setsuspend = false;
+
+	if (adapter->idle_roam_monitor_enabled) {
+		hdd_nofl_debug("Idle roam already enabled this screen-off, skip re-enable after DHCP");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+					      adapter->deflink->vdev_id);
+	if (!link_info)
+		return;
+
+	if (hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1))
+		goto retry;
+	if (hdd_send_idle_roam_suspend_mode(hdd_ctx, 1))
+		goto retry;
+
+	adapter->idle_roam_monitor_enabled = true;
+	return;
+
+retry:
+	/* Keep it deferred so the next DHCP-complete trigger can retry */
+	adapter->dhcp_config_setsuspend = true;
+}
+
+/**
  * __wlan_hdd_ipv4_changed() - IPv4 notifier callback function
  * @net_dev: the net_device whose IP address changed
  *
@@ -1223,7 +1276,6 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(net_dev);
 	struct hdd_context *hdd_ctx;
 	int errno;
-	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(net_dev);
 
@@ -1244,43 +1296,7 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		hdd_dhcp_v4_done_ind(hdd_ctx->mac_handle, adapter);
 
-		if (adapter->dhcp_config_setsuspend) {
-			/*
-			 * DHCP renewal completed. A SETSUSPENDMODE 1 command
-			 * was deferred while DHCP was in progress.
-			 *
-			 * Only ONE idle roam is allowed per screen-off state.
-			 * If idle roam monitor was already
-			 * enabled earlier in this screen-off period (e.g. the
-			 * first SETSUSPENDMODE 1 before any DHCP), do NOT
-			 * re-enable it here. Re-enabling would cause the
-			 * firmware to trigger a second idle roam scan.
-			 *
-			 * Only send the WMI enable if idle roam monitor has
-			 * not been enabled yet during this screen-off state.
-			 *
-			 * if SETSUSPENDMODE 0 was received before DHCP
-			 * completed, dhcp_config_setsuspend
-			 * was cleared and we won't reach here.
-			 */
-			if (adapter->idle_roam_monitor_enabled) {
-				hdd_nofl_debug("Idle roam already enabled this screen-off, skip re-enable after DHCP");
-			} else {
-				link_info = hdd_get_link_info_by_vdev(hdd_ctx,
-						adapter->deflink->vdev_id);
-				if (!link_info) {
-					adapter->dhcp_config_setsuspend = false;
-					goto exit;
-				}
-
-				if (hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1))
-					goto exit;
-				if (hdd_send_idle_roam_suspend_mode(hdd_ctx, 1))
-					goto exit;
-				adapter->idle_roam_monitor_enabled = true;
-			}
-			adapter->dhcp_config_setsuspend = false;
-		}
+		hdd_process_deferred_setsuspend(hdd_ctx, adapter);
 
 		/*
 		 * If SETSUSPENDMODE 1 was already processed before this DHCP
@@ -3115,6 +3131,14 @@ static void hdd_stop_dhcp_ind(struct wlan_hdd_link_info *link_info,
 			  mac, link_info->vdev_id);
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DHCP);
 	qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.connect);
+
+	/*
+	 * DHCP is done. The IPv4 notifier may never fire (e.g. lease renewal
+	 * with the same IP), so process a deferred SETSUSPENDMODE 1 here too.
+	 */
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		hdd_process_deferred_setsuspend(hdd_ctx, adapter);
 }
 
 /**
