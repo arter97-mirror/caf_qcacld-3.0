@@ -1966,8 +1966,20 @@ static bool lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 					  struct bss_description *bss_desc,
 					  uint8_t vdev_id)
 {
+	struct wlan_objmgr_vdev *vdev;
 	struct scan_cache_entry *scan_entry;
 	bool is_eht_allowed;
+
+	vdev =  wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						     WLAN_OSIF_CM_ID);
+	if (vdev) {
+		if (wlan_vdev_mlme_get_user_dis_eht_flag(vdev)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_CM_ID);
+			return false;
+		}
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_CM_ID);
+	}
 
 	scan_entry =
 		wlan_scan_entry_by_bssid_and_security(mac_ctx->pdev,

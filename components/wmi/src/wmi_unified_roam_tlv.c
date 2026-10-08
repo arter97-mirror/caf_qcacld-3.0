@@ -2940,12 +2940,13 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		wlan_cm_free_roam_synch_frame_ind(rso_cfg);
 		return status;
 	}
-	wmi_debug("roamed_vdev_id %d auth_status %d roam_reason %d rssi %d is_beacon %d",
+	wmi_debug("roamed_vdev_id %d auth_status %d roam_reason %d rssi %d is_beacon %d auth_algo %d",
 		  roam_sync_ind->roamed_vdev_id,
 		  roam_sync_ind->auth_status,
 		  roam_sync_ind->roam_reason,
 		  roam_sync_ind->rssi,
-		  roam_sync_ind->is_beacon);
+		  roam_sync_ind->is_beacon,
+		  roam_sync_ind->auth_algo);
 
 	cdp_update_roaming_peer_in_vdev(soc, synch_event->vdev_id,
 					roam_sync_ind->bssid.bytes,

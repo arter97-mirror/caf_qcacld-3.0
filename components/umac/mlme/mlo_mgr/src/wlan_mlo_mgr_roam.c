@@ -589,10 +589,6 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	/* If EAPOL is offloaded to supplicant, link vdev/s are not up
-	 * at FW, in that case complete roam sync on assoc vdev
-	 * link vdev will be initialized after set key is complete.
-	 */
 	if (sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED)
 		return QDF_STATUS_SUCCESS;
 
@@ -1715,6 +1711,9 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		link_vdev_id = partner_info.partner_link_info[i].vdev_id;
 		if (assoc_vdev_id == link_vdev_id)
 			continue;
+		/* Standby link has no vdev, nothing to connect */
+		if (link_vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
 		link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 								 link_vdev_id,
 								 WLAN_MLME_SB_ID);
@@ -1744,6 +1743,12 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 			}
 		}
 	}
+
+	/*
+	 * No link left to connect. Keep copied_reassoc_rsp, the link connect
+	 * posted earlier is still in flight and needs it.
+	 */
+	goto end;
 err:
 	if (link_vdev)
 		mlo_clear_connect_req_links_bmap(link_vdev);

@@ -39,6 +39,8 @@
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_smd_roam.h"
+#include "wlan_crypto_global_api.h"
+#include "ani_system_defs.h"
 
 static QDF_STATUS
 cm_fw_roam_ser_cb(struct wlan_serialization_command *cmd,
@@ -589,6 +591,48 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/**
+ * cm_roam_sync_refresh_authmode() - Refresh vdev authmodeset with the auth
+ * algo negotiated with the new AP on FW roam-sync, before any peer
+ * create/assoc WMI command consumes the (otherwise stale) authmodeset.
+ * @vdev: vdev on which roam-sync is being processed
+ * @sync_ind: FW roam synch indication carrying the negotiated auth_algo
+ *
+ * vdev->crypto_params.authmodeset is set only during the host CONNECT flow
+ * and is never refreshed on a FW-offloaded roam. For an EPPKE/8021X_IN_AUTH
+ * AP, this leaves authmodeset stale (missing the EPPKE/8021X_IN_AUTH bit),
+ * which is read by wma_create_peer()/wma_handle_peer_assoc_send() further
+ * down cm_roam_update_vdev() to build the PEER_CREATE/PEER_ASSOC WMI
+ * commands. Merge in the correct bit (read-modify-write, since
+ * wlan_crypto_set_authmode() does a full replace) before that happens.
+ *
+ * Return: None
+ */
+static void
+cm_roam_sync_refresh_authmode(struct wlan_objmgr_vdev *vdev,
+			      struct roam_offload_synch_ind *sync_ind)
+{
+	int32_t authmode;
+	uint32_t new_bit;
+
+	if (sync_ind->auth_algo == eSIR_AUTH_TYPE_EPPKE)
+		new_bit = WLAN_CRYPTO_AUTH_EPPKE;
+	else if (sync_ind->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)
+		new_bit = WLAN_CRYPTO_AUTH_8021X_IN_AUTH;
+	else
+		return;
+
+	authmode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+	if (authmode < 0)
+		authmode = 0;
+
+	if (authmode & (1 << new_bit))
+		return;
+
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE,
+				   (uint32_t)authmode | (1 << new_bit));
+}
+
 QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 					 uint8_t *event,
 					 uint32_t len)
@@ -692,6 +736,8 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 		mlme_err("LFR3: vdev:%d PE roam synch cb failed", vdev_id);
 		goto err;
 	}
+
+	cm_roam_sync_refresh_authmode(vdev, sync_ind);
 
 	status = cm_roam_update_vdev(vdev, sync_ind);
 	if (QDF_IS_STATUS_ERROR(status))

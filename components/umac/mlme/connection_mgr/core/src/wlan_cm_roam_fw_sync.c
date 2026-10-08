@@ -47,6 +47,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_smd_roam.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_mlo_link_force.h"
@@ -822,28 +823,13 @@ cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
 #endif /* WLAN_FEATURE_11BN_SMD */
 
 #ifdef WLAN_FEATURE_11BI_SECURITY
-static void
+static inline void
 cm_set_roam_assoc_encrypted(struct wlan_objmgr_vdev *vdev,
 			    struct roam_offload_synch_ind *roam_synch_data,
 			    struct cm_vdev_join_rsp *rsp)
 {
-	const struct wlan_frame_hdr *hdr;
-	int32_t auth_mode;
-
-	if (roam_synch_data->reassoc_resp_length <=
-	    sizeof(struct wlan_frame_hdr))
-		return;
-
-	hdr = (const struct wlan_frame_hdr *)
-		((uint8_t *)roam_synch_data +
-		 roam_synch_data->reassoc_resp_offset);
-	if (!(hdr->i_fc[1] & WLAN_FC1_ISWEP))
-		return;
-
-	auth_mode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
-	if (auth_mode >= 0 &&
-	    (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
-	     QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)))
+	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE ||
+	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)
 		rsp->connect_rsp.is_assoc_encrypted = true;
 }
 #else
@@ -1291,7 +1277,361 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 		link_info++;
 	}
 }
-#endif
+#endif /* WLAN_FEATURE_11BE_MLO */
+
+#if defined(WLAN_FEATURE_11BI_SECURITY) && defined(WLAN_FEATURE_11BE_MLO)
+/*
+ * The keys were hashed under the pre-roam link id, which the vdev no longer
+ * carries by the time the assoc vdev is propagated, so probe for it.
+ * Caller must hold the crypto lock.
+ */
+static uint8_t
+cm_roam_find_assoc_pairwise_key_link_id(struct wlan_objmgr_psoc *psoc,
+					struct qdf_mac_addr *ap_link_addr)
+{
+	uint16_t key_idx;
+	uint8_t link_id;
+	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX;
+
+	for (link_id = 0; link_id <= MAX_MLO_LINK_ID; link_id++) {
+		for (key_idx = 0; key_idx < max_key_index; key_idx++) {
+			if (wlan_crypto_get_ml_sta_link_key(psoc, key_idx,
+							    ap_link_addr,
+							    link_id))
+				return link_id;
+		}
+	}
+
+	return WLAN_INVALID_LINK_ID;
+}
+
+/*
+ * cm_roam_copy_assoc_key_to_link_vdev() - Store assoc link pairwise key in
+ *					    the partner link's psoc crypto cache
+ *					    and defer key installation.
+ * @assoc_vdev: assoc vdev whose pairwise key is the source
+ * @link_vdev:  target link vdev, NULL for a standby link
+ * @link_info:  link info entry for the target link
+ * @assoc_link_ap_addr: AP link address of the assoc link, used to look up
+ *			 the assoc vdev's EPPKE-roam pairwise key, which is
+ *			 hashed by AP link address rather than the vdev's own
+ *			 address.
+ * @assoc_key_link_id: link id the assoc vdev's keys are hashed under
+ *
+ * Copies the assoc vdev's pairwise key into the partner link's psoc-level
+ * crypto cache via wlan_crypto_copy_ml_sta_link_key(), which performs the
+ * lookup, copy and store under the crypto lock, and marks the link's keys as
+ * deferred via mlo_defer_set_keys().  The deferred flag ensures the key is
+ * installed by cm_install_link_vdev_keys() only after the peer assoc command
+ * has been sent to firmware, avoiding a race where keys arrive before the
+ * peer is established.  A standby link has no vdev and no peer, so nothing
+ * is deferred.
+ *
+ * Return: void
+ */
+static void
+cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
+				    struct wlan_objmgr_vdev *link_vdev,
+				    struct mlo_link_info *link_info,
+				    struct qdf_mac_addr *assoc_link_ap_addr,
+				    uint8_t assoc_key_link_id)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_crypto_ml_key_copy_params key_copy = {0};
+	uint8_t link_vdev_id;
+	QDF_STATUS status;
+
+	psoc = wlan_vdev_get_psoc(assoc_vdev);
+	link_vdev_id = link_vdev ? wlan_vdev_get_id(link_vdev)
+				 : WLAN_INVALID_VDEV_ID;
+
+	if (assoc_key_link_id == WLAN_INVALID_LINK_ID) {
+		mlme_err("no assoc vdev key entry for " QDF_MAC_ADDR_FMT
+			 ", link vdev %d not staged",
+			 QDF_MAC_ADDR_REF(assoc_link_ap_addr->bytes),
+			 link_vdev_id);
+		return;
+	}
+
+	/*
+	 * The source key is hashed by the assoc link's AP address and the link
+	 * id its keys were stamped with.  The copy is stored keyed by this
+	 * link's self address, as the install path fetches it that way, and
+	 * points at this link's AP as the peer.
+	 */
+	key_copy.key_type = WLAN_CRYPTO_KEY_TYPE_UNICAST;
+	key_copy.src_link_addr = assoc_link_ap_addr;
+	key_copy.src_link_id = assoc_key_link_id;
+	key_copy.dst_link_addr = &link_info->link_addr;
+	key_copy.dst_link_id = link_info->link_id;
+	key_copy.dst_peer_addr = &link_info->ap_link_addr;
+
+	status = wlan_crypto_copy_ml_sta_link_key(psoc, &key_copy);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("no pairwise key staged for link vdev %d (assoc key link_id %d ap addr "
+			 QDF_MAC_ADDR_FMT ") status %d",
+			 link_vdev_id, assoc_key_link_id,
+			 QDF_MAC_ADDR_REF(assoc_link_ap_addr->bytes), status);
+		return;
+	}
+
+	/*
+	 * Defer key installation so that cm_install_link_vdev_keys()
+	 * sends the key to firmware only after peer assoc completes,
+	 * avoiding a race where the key arrives before the peer.
+	 */
+	if (link_vdev)
+		mlo_defer_set_keys(link_vdev, link_info->link_id, true);
+
+	mlme_debug("staged pairwise key %d for %s link, vdev %d link_id %d self link addr "
+		   QDF_MAC_ADDR_FMT " (from assoc key link_id %d)",
+		   key_copy.copied_key_index, link_vdev ? "active" : "standby",
+		   link_vdev_id, link_info->link_id,
+		   QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+		   assoc_key_link_id);
+}
+
+/*
+ * cm_roam_update_link_vdev_keys() - Store assoc link pairwise key in link
+ *				       vdev(s) for MLO EPPKE/8021X_IN_AUTH roam.
+ * @vdev: vdev object (assoc or link vdev)
+ *
+ * For EPPKE and 8021X_IN_AUTH MLO roaming the 4-way handshake is performed
+ * by the host supplicant.  Once the assoc link pairwise key is available,
+ * copy it into each partner link vdev's psoc crypto cache and defer the key
+ * install so cm_install_link_vdev_keys() sends the key to firmware only after
+ * peer assoc completes.
+ *
+ * When @vdev is the assoc vdev all partner link vdevs are updated.
+ * When @vdev is a link vdev only that link vdev is updated, using the assoc
+ * link vdev as the key source.
+ *
+ * Return: void
+ */
+static void
+cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *assoc_vdev;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct wlan_mlo_dev_context *ml_dev;
+	struct mlo_link_info *link_info;
+	struct mlo_link_info *assoc_link_info;
+	struct qdf_mac_addr *assoc_link_ap_addr;
+	uint16_t link_iter;
+	uint8_t assoc_vdev_id, link_vdev_id, assoc_key_link_id;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+		if (!assoc_vdev)
+			return;
+	} else {
+		assoc_vdev = vdev;
+	}
+
+	ml_dev = assoc_vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->sta_ctx)
+		return;
+
+	psoc = wlan_vdev_get_psoc(assoc_vdev);
+	assoc_vdev_id = wlan_vdev_get_id(assoc_vdev);
+
+	assoc_link_info = mlo_mgr_get_ap_link_by_vdev_id(ml_dev, assoc_vdev_id);
+	if (!assoc_link_info) {
+		mlme_err("assoc link ap addr not found for vdev %d",
+			 assoc_vdev_id);
+		return;
+	}
+	assoc_link_ap_addr = &assoc_link_info->ap_link_addr;
+
+	wlan_crypto_aquire_lock();
+	assoc_key_link_id =
+		cm_roam_find_assoc_pairwise_key_link_id(psoc,
+							assoc_link_ap_addr);
+	wlan_crypto_release_lock();
+
+	mlme_debug("assoc vdev %d ap link addr " QDF_MAC_ADDR_FMT
+		   ": keys hashed under link_id %d (vdev link_id %d)",
+		   assoc_vdev_id, QDF_MAC_ADDR_REF(assoc_link_ap_addr->bytes),
+		   assoc_key_link_id, wlan_vdev_get_link_id(assoc_vdev));
+
+	link_info = &ml_dev->sta_ctx->links_info[0];
+	for (link_iter = 0; link_iter < WLAN_MAX_ML_BSS_LINKS;
+	     link_iter++, link_info++) {
+		if (qdf_is_macaddr_zero(&link_info->link_addr))
+			continue;
+
+		link_vdev_id = link_info->vdev_id;
+		if (link_vdev_id == assoc_vdev_id)
+			continue;
+
+		/*
+		 * When called on a specific link vdev, only process that one.
+		 */
+		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+		    link_vdev_id != wlan_vdev_get_id(vdev))
+			continue;
+
+		/* Standby link: no vdev to look up, stage the key directly */
+		if (link_vdev_id == WLAN_INVALID_VDEV_ID) {
+			cm_roam_copy_assoc_key_to_link_vdev(assoc_vdev, NULL,
+							    link_info,
+							    assoc_link_ap_addr,
+							    assoc_key_link_id);
+			continue;
+		}
+
+		link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+								 link_vdev_id,
+								 WLAN_MLME_SB_ID);
+		if (!link_vdev) {
+			mlme_err("link vdev %d not found", link_vdev_id);
+			continue;
+		}
+
+		cm_roam_copy_assoc_key_to_link_vdev(assoc_vdev, link_vdev,
+						    link_info,
+						    assoc_link_ap_addr,
+						    assoc_key_link_id);
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLME_SB_ID);
+	}
+}
+
+/*
+ * cm_roam_rehash_assoc_vdev_keys() - Move the assoc vdev's 11bi roam keys from
+ *				       (pre-roam link id, AP link address) to
+ *				       (post-roam link id, self link address)
+ * @vdev: vdev object (only the assoc vdev is processed)
+ *
+ * The supplicant installs the key during preauth, so it lands under the AP link
+ * address; every lookup after roam sync uses the vdev's own link address.
+ * Depends on the assoc vdev being propagated last, since the destination is the
+ * pair cm_delete_crypto_keys_for_all_links() frees on every invocation.
+ *
+ * Return: void
+ */
+static void
+cm_roam_rehash_assoc_vdev_keys(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlo_dev_context *ml_dev;
+	struct mlo_link_info *assoc_link_info;
+	struct wlan_crypto_key *ap_key;
+	struct wlan_crypto_key *self_key;
+	struct qdf_mac_addr *self_link_addr;
+	struct qdf_mac_addr ap_link_addr;
+	uint8_t vdev_id, src_link_id, dst_link_id;
+	uint16_t key_idx;
+	bool rehashed = false;
+	QDF_STATUS status;
+	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
+				 WLAN_CRYPTO_MAXIGTKKEYIDX +
+				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
+
+	/* Only the assoc vdev stores its keys against the AP link address */
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
+	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->sta_ctx)
+		return;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	assoc_link_info = mlo_mgr_get_ap_link_by_vdev_id(ml_dev, vdev_id);
+	if (!assoc_link_info) {
+		mlme_err("assoc link ap addr not found for vdev %d", vdev_id);
+		return;
+	}
+	qdf_copy_macaddr(&ap_link_addr, &assoc_link_info->ap_link_addr);
+
+	self_link_addr =
+		(struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
+	if (!self_link_addr) {
+		mlme_err("self link addr NULL for vdev %d", vdev_id);
+		return;
+	}
+
+	wlan_crypto_aquire_lock();
+	src_link_id = cm_roam_find_assoc_pairwise_key_link_id(psoc,
+							      &ap_link_addr);
+	wlan_crypto_release_lock();
+
+	if (src_link_id == WLAN_INVALID_LINK_ID) {
+		mlme_debug("vdev %d: no keys hashed under ap addr "
+			   QDF_MAC_ADDR_FMT ", nothing to re-hash",
+			   vdev_id, QDF_MAC_ADDR_REF(ap_link_addr.bytes));
+		return;
+	}
+	dst_link_id = assoc_link_info->link_id;
+
+	/* Already hashed the way post-roam lookups will ask for it */
+	if (src_link_id == dst_link_id &&
+	    qdf_is_macaddr_equal(&ap_link_addr, self_link_addr))
+		return;
+
+	for (key_idx = 0; key_idx < max_key_index; key_idx++) {
+		wlan_crypto_aquire_lock();
+		ap_key = wlan_crypto_get_ml_sta_link_key(psoc, key_idx,
+							 &ap_link_addr,
+							 src_link_id);
+		if (!ap_key) {
+			wlan_crypto_release_lock();
+			continue;
+		}
+
+		self_key = qdf_mem_malloc(sizeof(*self_key));
+		if (!self_key) {
+			wlan_crypto_release_lock();
+			mlme_err("vdev %d: malloc failed for key %d",
+				 vdev_id, key_idx);
+			break;
+		}
+		qdf_mem_copy(self_key, ap_key, sizeof(*self_key));
+		wlan_crypto_release_lock();
+
+		status = wlan_crypto_save_ml_sta_key(psoc, key_idx, self_key,
+						     self_link_addr,
+						     dst_link_id);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("vdev %d: re-hash of key %d failed, status %d",
+				 vdev_id, key_idx, status);
+			qdf_mem_free(self_key);
+			break;
+		}
+
+		rehashed = true;
+		mlme_debug("vdev %d: key %d re-hashed from ap addr "
+			   QDF_MAC_ADDR_FMT " link_id %d to self link addr "
+			   QDF_MAC_ADDR_FMT " link_id %d",
+			   vdev_id, key_idx,
+			   QDF_MAC_ADDR_REF(ap_link_addr.bytes), src_link_id,
+			   QDF_MAC_ADDR_REF(self_link_addr->bytes),
+			   dst_link_id);
+	}
+
+	/* Drop the source only if every key was copied */
+	if (rehashed && key_idx == max_key_index)
+		ucfg_crypto_free_key_by_link_id(psoc, &ap_link_addr,
+						src_link_id);
+}
+#else
+static void
+cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
+{}
+
+static void
+cm_roam_rehash_assoc_vdev_keys(struct wlan_objmgr_vdev *vdev)
+{}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
 
 QDF_STATUS
 cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -1378,6 +1718,18 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	cm_process_roam_keys(vdev, rsp, cm_id);
+	/*
+	 * For MLO EPPKE/8021X_IN_AUTH roaming, store the assoc link pairwise
+	 * key in partner link vdev(s) and defer installation.  When called for
+	 * a link vdev the assoc link already has its key from the host EAPOL
+	 * exchange.
+	 */
+	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH ||
+	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE) {
+		cm_roam_update_link_vdev_keys(vdev);
+		cm_roam_rehash_assoc_vdev_keys(vdev);
+	}
+
 	/*
 	 * Re-enable the disabled link on roaming as decision
 	 * will be taken again to disable the link on roam sync completion.

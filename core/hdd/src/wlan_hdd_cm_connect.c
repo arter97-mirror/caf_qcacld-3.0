@@ -588,7 +588,8 @@ hdd_update_standard_for_connect(struct hdd_context *hdd_ctx,
 		std = WMI_HOST_WIFI_STANDARD_6E;
 	}
 
-	if (mlme_get_vdev_wifi_std(vdev) == std)
+	/* Don't override the phymode configured via usercommand */
+	if (mlme_get_vdev_wifi_std(vdev) <= std)
 		return;
 
 	vdev_id	= wlan_vdev_get_id(vdev);
@@ -1638,10 +1639,55 @@ bool hdd_cm_is_fils_connection(struct wlan_cm_connect_resp *rsp)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool hdd_cm_is_11bi_connection(struct hdd_station_ctx *sta_ctx,
+				      struct wlan_objmgr_vdev *vdev,
+				      struct wlan_cm_connect_resp *rsp)
+{
+	/*
+	 * During roam-sync the host wlan_crypto authmodeset is re-derived
+	 * from the reassoc-req RSN/WPA IE and silently drops the EPPKE bit
+	 * that was only expanded in at connect time (see
+	 * cm_set_roam_assoc_encrypted()), so neither conn_info.auth_type nor
+	 * wlan_crypto_vdev_has_auth_mode() can be trusted here for a roamed
+	 * connection. rsp->is_assoc_encrypted is derived from the FW-reported
+	 * auth_algo/PE session auth mode at the time of the actual auth
+	 * exchange and stays correct across roam-sync, so check it first.
+	 */
+	return rsp->is_assoc_encrypted ||
+	       sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_EPPKE ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
+	       wlan_crypto_vdev_has_auth_mode(vdev,
+					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+#else
+static inline bool hdd_cm_is_11bi_connection(struct hdd_station_ctx *sta_ctx,
+					     struct wlan_objmgr_vdev *vdev,
+					     struct wlan_cm_connect_resp *rsp)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
-					 struct wlan_cm_connect_resp *rsp)
+					 struct wlan_cm_connect_resp *rsp,
+					 struct wlan_objmgr_vdev *vdev)
 {
+	/*
+	 * For 11bi (EPPKE) roams the PTK is installed via the Authentication
+	 * frame exchange before FW roam-sync completes, so unlike SAE/FT/OWE
+	 * there is no fresh post-roam EAPOL/key-install to wait for. The one
+	 * key-install-complete event FW does send for it can arrive while
+	 * the vdev is still marked as roaming and gets dropped by
+	 * target_if_crypto_install_key_comp_evt_handler(), so FW's
+	 * auth_status can't be relied upon here either. Bypass the wait the
+	 * same way the non-roam EPPKE connect path already does.
+	 */
+	if (hdd_cm_is_11bi_connection(sta_ctx, vdev, rsp))
+		return false;
+
 	if (!rsp->roaming_info)
 		return false;
 
@@ -1652,7 +1698,8 @@ static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
 }
 #else
 static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
-					 struct wlan_cm_connect_resp *rsp)
+					 struct wlan_cm_connect_resp *rsp,
+					 struct wlan_objmgr_vdev *vdev)
 {
 	return true;
 }
@@ -1821,24 +1868,6 @@ hdd_cm_is_seamless_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static bool hdd_cm_is_11bi_connection(struct hdd_station_ctx *sta_ctx,
-				      struct wlan_objmgr_vdev *vdev)
-{
-	return sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_EPPKE ||
-	       wlan_crypto_vdev_has_auth_mode(vdev,
-					      BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
-	       wlan_crypto_vdev_has_auth_mode(vdev,
-					      BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
-}
-#else
-static inline bool hdd_cm_is_11bi_connection(struct hdd_station_ctx *sta_ctx,
-					     struct wlan_objmgr_vdev *vdev)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_11BI_SECURITY */
-
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -1989,7 +2018,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	    (sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_NONE ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OPEN_SYSTEM ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SHARED_KEY ||
-	     hdd_cm_is_11bi_connection(sta_ctx, vdev) ||
+	     hdd_cm_is_11bi_connection(sta_ctx, vdev, rsp) ||
 	     hdd_cm_is_fils_connection(rsp))))
 		is_auth_required = false;
 
@@ -2000,15 +2029,19 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam_offload || !is_roam) {
 		/* For FW_ROAM/LFR3 OR connect */
 		/* for LFR 3 get authenticated info from resp */
-		if (is_roam) {
+		if (is_roam &&
+		    !hdd_cm_is_11bi_connection(sta_ctx, vdev, rsp)) {
 			is_auth_required =
-				hdd_cm_is_roam_auth_required(sta_ctx, rsp);
+				hdd_cm_is_roam_auth_required(sta_ctx, rsp,
+							     vdev);
 			if (is_auth_required)
 				wlan_acquire_peer_key_wakelock(vdev,
 							       rsp->bssid.bytes);
 		}
-		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d",
-			  is_roam_offload, is_roam,  is_vdev_repurpose, is_auth_required);
+		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d  11bi %d",
+			  is_roam_offload, is_roam,  is_vdev_repurpose,
+			  is_auth_required,
+			  hdd_cm_is_11bi_connection(sta_ctx, vdev, rsp));
 		hdd_roam_register_sta(link_info, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
