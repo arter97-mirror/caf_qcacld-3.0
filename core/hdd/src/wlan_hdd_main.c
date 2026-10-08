@@ -14159,6 +14159,11 @@ static inline void _hdd_pm_qos_update_request(struct hdd_context *hdd_ctx,
 
 	if (qdf_cpumask_empty(pm_qos_cpu_mask)) {
 		for_each_present_cpu(cpu) {
+			if (cpu >= QDF_MAX_AVAILABLE_CPU) {
+				hdd_debug_rl("cpu %d exceeds QDF_MAX_AVAILABLE_CPU %d, skipping",
+					     cpu, QDF_MAX_AVAILABLE_CPU);
+				continue;
+			}
 			dev_pm_qos_update_request(
 				&hdd_ctx->pm_qos_req[cpu],
 				default_latency);
@@ -14168,12 +14173,22 @@ static inline void _hdd_pm_qos_update_request(struct hdd_context *hdd_ctx,
 			  default_latency);
 	} else { /* Set latency to default for CPUs not included in mask */
 		qdf_for_each_cpu_not(cpu, &hdd_ctx->qos_cpu_mask) {
+			if (cpu >= QDF_MAX_AVAILABLE_CPU) {
+				hdd_debug_rl("cpu %d exceeds QDF_MAX_AVAILABLE_CPU %d, skipping",
+					     cpu, QDF_MAX_AVAILABLE_CPU);
+				continue;
+			}
 			dev_pm_qos_update_request(
 				&hdd_ctx->pm_qos_req[cpu],
 				default_latency);
 		}
 		/* Set latency for CPUs included in mask */
 		qdf_for_each_cpu(cpu, &hdd_ctx->qos_cpu_mask) {
+			if (cpu >= QDF_MAX_AVAILABLE_CPU) {
+				hdd_debug_rl("cpu %d exceeds QDF_MAX_AVAILABLE_CPU %d, skipping",
+					     cpu, QDF_MAX_AVAILABLE_CPU);
+				continue;
+			}
 			dev_pm_qos_update_request(
 				&hdd_ctx->pm_qos_req[cpu],
 				latency);
@@ -14215,6 +14230,11 @@ static inline void hdd_pm_qos_add_request(struct hdd_context *hdd_ctx)
 	hdd_pm_qos_update_cpu_mask(&hdd_ctx->qos_cpu_mask, false);
 
 	for_each_present_cpu(cpu) {
+		if (cpu >= QDF_MAX_AVAILABLE_CPU) {
+			hdd_debug_rl("cpu %d exceeds QDF_MAX_AVAILABLE_CPU %d, skipping",
+				     cpu, QDF_MAX_AVAILABLE_CPU);
+			continue;
+		}
 		cpu_dev = get_cpu_device(cpu);
 		dev_pm_qos_add_request(cpu_dev, &hdd_ctx->pm_qos_req[cpu],
 				       DEV_PM_QOS_RESUME_LATENCY,
@@ -14229,6 +14249,11 @@ static inline void hdd_pm_qos_remove_request(struct hdd_context *hdd_ctx)
 	int cpu;
 
 	for_each_present_cpu(cpu) {
+		if (cpu >= QDF_MAX_AVAILABLE_CPU) {
+			hdd_debug_rl("cpu %d exceeds QDF_MAX_AVAILABLE_CPU %d, skipping",
+				     cpu, QDF_MAX_AVAILABLE_CPU);
+			continue;
+		}
 		dev_pm_qos_remove_request(&hdd_ctx->pm_qos_req[cpu]);
 		hdd_debug("Remove dev_pm_qos_request for all cpus: %d", cpu);
 	}
