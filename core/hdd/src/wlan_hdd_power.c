@@ -2723,8 +2723,18 @@ int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	int errno;
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
-	if (errno)
+	if (errno) {
+		/*
+		 * Return success if recovery is in progress, otherwise the
+		 * linux kernel will shutdown all interfaces in wiphy_resume.
+		 */
+		if (cds_is_driver_recovering()) {
+			hdd_debug("op_start failed %d, recovery in progress",
+				  errno);
+			return 0;
+		}
 		return errno;
+	}
 
 	errno = _wlan_hdd_cfg80211_resume_wlan(wiphy);
 
