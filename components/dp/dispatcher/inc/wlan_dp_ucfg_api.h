@@ -228,6 +228,26 @@ void ucfg_dp_conn_info_set_arp_service(struct wlan_objmgr_vdev *vdev,
 				       uint8_t proxy_arp_service);
 
 /**
+ * ucfg_dp_conn_info_get_ul_delay_max() - get max uplink delay from the
+ *  rolling window of recent uplink delay samples
+ * @vdev: vdev mapped to STA DP interface
+ *
+ * Return: max uplink delay value across the stored sample window
+ */
+uint32_t ucfg_dp_conn_info_get_ul_delay_max(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_dp_conn_info_record_ul_delay_sample() - record an uplink delay sample
+ *  into the rolling window in connection info
+ * @vdev: vdev mapped to STA DP interface
+ * @ul_delay: uplink delay sample value to record
+ *
+ * Return: None
+ */
+void ucfg_dp_conn_info_record_ul_delay_sample(struct wlan_objmgr_vdev *vdev,
+					      uint32_t ul_delay);
+
+/**
  * ucfg_dp_conn_info_set_peer_authenticate() - set Peer authenticated state
  * @vdev: vdev mapped to STA DP interface
  * @is_authenticated: Peer authenticated info

@@ -29,6 +29,7 @@
 #include <qca_vendor.h>
 #include <linux/errqueue.h>
 #include "wlan_hdd_ll_lt_sap.h"
+#include "dp_types.h"
 
 #if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ) || \
 	defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC) || \
@@ -1544,7 +1545,8 @@ QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 
 	if (hdd_tsf_auto_report_enabled(adapter)) {
 		status = cdp_get_uplink_delay(soc, adapter->deflink->vdev_id,
-					      &ul_delay);
+					      UL_DELAY_CALC_ID_TSF,
+					      &ul_delay, NULL);
 		if (QDF_IS_STATUS_ERROR(status))
 			ul_delay = 0;
 	} else {

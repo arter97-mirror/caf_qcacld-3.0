@@ -31,6 +31,7 @@
 #include "wlan_dp_public_struct.h"
 #include "wlan_dp_priv.h"
 #include <cdp_txrx_misc.h>
+#include "wlan_dp_ucfg_api.h"
 
 typedef const enum bus_bw_level
 	bus_bw_table_type[QCA_WLAN_802_11_MODE_INVALID][TPUT_LEVEL_MAX];

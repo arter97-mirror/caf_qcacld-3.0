@@ -46,6 +46,10 @@
 #include "wlan_dp_stc.h"
 #include "wlan_dp_haps.h"
 #include "wlan_dp_wifi_transport.h"
+#include "cdp_txrx_ctrl.h"
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#include "dp_types.h"
+#endif
 
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 /*
@@ -2400,11 +2404,55 @@ dp_dump_periodic_stats(struct wlan_dp_intf *dp_intf,
 	    !dp_ops->dp_is_roaming_in_progress(ctx))
 		cdp_dump_custom_stats(soc, dp_intf->def_link->link_id);
 }
-#else
 
+/**
+ * dp_bus_bw_update_ul_delay() - Update uplink delay stats for predictive roaming
+ * @dp_ctx: handle to DP context
+ * @dp_intf: handle to DP interface
+ * @vdev: handle to vdev object
+ *
+ * Returns: None
+ */
+static void dp_bus_bw_update_ul_delay(struct wlan_dp_psoc_context *dp_ctx,
+				      struct wlan_dp_intf *dp_intf,
+				      struct wlan_objmgr_vdev *vdev)
+{
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	struct wlan_dp_psoc_callbacks *dp_ops;
+	QDF_STATUS status;
+	uint32_t val, num_pkts;
+
+	if (dp_intf->device_mode != QDF_STA_MODE ||
+	    !cdp_is_vdev_predictive_roaming_stats_enabled(
+					soc, dp_intf->def_link->link_id))
+		return;
+
+	status = cdp_get_uplink_delay(soc, dp_intf->def_link->link_id,
+				      UL_DELAY_CALC_ID_INTERNAL,
+				      &val, &num_pkts);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		val = 0;
+		num_pkts = 0;
+	}
+
+	dp_ops = &dp_ctx->dp_ops;
+	if (dp_intf->dump_periodic_custom_stats &&
+	    !dp_ops->dp_is_roaming_in_progress(ctx))
+		dp_info("UL delay = %u, pkts %d", val, num_pkts);
+
+	ucfg_dp_conn_info_record_ul_delay_sample(vdev, val);
+}
+#else
 static inline void
 dp_dump_periodic_stats(struct wlan_dp_intf *dp_intf,
 		       struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline void dp_bus_bw_update_ul_delay(struct wlan_dp_psoc_context *dp_ctx,
+					     struct wlan_dp_intf *dp_intf,
+					     struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
@@ -2505,6 +2553,7 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 
 		cdp_process_ul_delay(soc, dp_intf->def_link->link_id);
 		dp_dump_periodic_stats(dp_intf, dp_ctx);
+		dp_bus_bw_update_ul_delay(dp_ctx, dp_intf, vdev);
 
 		ret = A_ERROR;
 		fwd_tx_packets = 0;

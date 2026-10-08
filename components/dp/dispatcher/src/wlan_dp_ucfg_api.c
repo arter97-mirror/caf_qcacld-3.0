@@ -823,6 +823,53 @@ void ucfg_dp_conn_info_set_arp_service(struct wlan_objmgr_vdev *vdev,
 	dp_link->conn_info.proxy_arp_service = proxy_arp_service;
 }
 
+uint32_t ucfg_dp_conn_info_get_ul_delay_max(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_conn_info *conn_info;
+	uint32_t max_delay = 0;
+	uint8_t i, count;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (!dp_link) {
+		dp_err("Unable to get DP vdev private object");
+		return 0;
+	}
+
+	conn_info = &dp_link->conn_info;
+	count = conn_info->ul_delay_win_filled ?
+			WLAN_DP_UL_DELAY_WINDOW_SIZE : conn_info->ul_delay_win_idx;
+
+	for (i = 0; i < count; i++)
+		max_delay = QDF_MAX(max_delay, conn_info->ul_delay_win[i]);
+
+	return max_delay;
+}
+
+void ucfg_dp_conn_info_record_ul_delay_sample(struct wlan_objmgr_vdev *vdev,
+					      uint32_t ul_delay)
+{
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_conn_info *conn_info;
+	uint8_t idx;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return;
+	}
+
+	conn_info = &dp_link->conn_info;
+	idx = conn_info->ul_delay_win_idx;
+	conn_info->ul_delay_win[idx] = ul_delay;
+
+	if (++idx == WLAN_DP_UL_DELAY_WINDOW_SIZE) {
+		idx = 0;
+		conn_info->ul_delay_win_filled = 1;
+	}
+	conn_info->ul_delay_win_idx = idx;
+}
+
 void ucfg_dp_conn_info_set_peer_authenticate(struct wlan_objmgr_vdev *vdev,
 					     uint8_t is_authenticated)
 {
