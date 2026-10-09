@@ -41,6 +41,7 @@
 #include "wlan_mlme_main.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_ap.h"
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_ucfg_api.h"
@@ -7811,6 +7812,57 @@ bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc)
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	return mlo_sta_present;
+}
+
+bool policy_mgr_is_ml_sap_present(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t conn_index;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *ml_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint8_t sap_vdev_ids[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t num_sap = 0, j;
+	uint16_t ml_vdev_count, i;
+	bool mlo_sap_present = false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (pm_conc_connection_list[conn_index].mode != PM_SAP_MODE ||
+		    !pm_conc_connection_list[conn_index].in_use)
+			continue;
+
+		sap_vdev_ids[num_sap++] =
+			pm_conc_connection_list[conn_index].vdev_id;
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	for (j = 0; j < num_sap && !mlo_sap_present; j++) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    sap_vdev_ids[j],
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev)
+			continue;
+
+		if (wlan_vdev_mlme_is_mlo_ap(vdev)) {
+			ml_vdev_count = 0;
+			mlo_ap_get_vdev_list(vdev, &ml_vdev_count,
+					     ml_vdev_list);
+			for (i = 0; i < ml_vdev_count; i++)
+				mlo_release_vdev_ref(ml_vdev_list[i]);
+
+			mlo_sap_present = ml_vdev_count > 1;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	return mlo_sap_present;
 }
 
 bool policy_mgr_is_mlo_in_mode_sbs(struct wlan_objmgr_psoc *psoc,
