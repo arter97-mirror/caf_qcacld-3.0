@@ -873,9 +873,11 @@ def_chan:
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
 				hdd_ctx->psoc, PM_SAP_MODE,
 				true, link_info->vdev_id);
-
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
-	    ch_bw > CH_WIDTH_20MHZ) {
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) {
+		/* The non-DFS fallback must use a width valid in 2.4 GHz. */
+		ch_bw = CH_WIDTH_20MHZ;
+	} else if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
+		   ch_bw > CH_WIDTH_20MHZ) {
 		struct ch_params ch_params;
 
 		qdf_mem_zero(&ch_params, sizeof(ch_params));
