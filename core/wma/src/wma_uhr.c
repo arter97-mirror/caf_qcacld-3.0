@@ -85,6 +85,9 @@ static void wma_convert_uhr_cap(struct wlan_uhr_cap_info *uhr_cap,
 	uhr_cap->co_sr_support = WMI_UHRCAP_MAC_COSR_SUPPORT_GET(mac_cap);
 	uhr_cap->mapc_enh_meas_support =
 			WMI_UHRCAP_MAC_MAPC_ENH_MEAS_GET(mac_cap);
+	uhr_cap->hg_rtwt_support = WMI_UHRCAP_MAC_HG_RTWT_SUPPORT_GET(mac_cap);
+	uhr_cap->extended_channel_usage_support =
+			WMI_UHRCAP_MAC_EXTENDED_CHANNEL_USAGE_SUPPORT_GET(mac_cap);
 
 	/* UHR PHY capabilities */
 	uhr_cap->max_nss_rx_ndp_sounding_80mhz =
@@ -144,25 +147,40 @@ static void wma_convert_uhr_cap(struct wlan_uhr_cap_info *uhr_cap,
 	uhr_cap->dru_rru_hybrid_support =
 		WMI_UHRCAP_PHY_DRU_RRU_HYBRID_SUPPORT_GET(phy_cap);
 
-	/* DBE Capability Parameters (conditional on dbe_support) */
+	/*
+	 * DBE Capability Parameters (conditional on dbe_support).
+	 * D2.0 header is 3 bytes: byte 0 is unchanged (max_sup_bw,
+	 * mcs160_present, mcs320_present); bytes 1-2 carry the new
+	 * bw_switch_time_period/mode_change_interval fields, for which
+	 * TODO: no WMI_UHRCAP_DBE_* macro exists yet, fw-api update
+	 * pending. Zero-filled until FW adds support. Each per-band block
+	 * grows from 3 to 4 bytes: 3 bytes of EHT MCS map (unchanged
+	 * content) plus 1 new byte of num_sounding_dim/non_ofdma_ul_mumimo/
+	 * mu_beamformer/beamformee_ss, also zero-filled for the same
+	 * reason.
+	 */
 	if (uhr_cap->dbe_support && dbe_cap) {
 		uhr_cap->dbe_param[0] =
 			(uint8_t)(WMI_UHRCAP_DBE_MAX_SUP_BW_GET(dbe_cap) |
 			(WMI_UHRCAP_DBE_EHT_MCS_160_PRESENT_GET(dbe_cap) << 3) |
 			(WMI_UHRCAP_DBE_EHT_MCS_320_PRESENT_GET(dbe_cap) << 4));
+		uhr_cap->dbe_param[1] = 0;
+		uhr_cap->dbe_param[2] = 0;
 		if (WMI_UHRCAP_DBE_EHT_MCS_160_PRESENT_GET(dbe_cap)) {
 			uint32_t map160 =
 				WMI_UHRCAP_DBE_EHT_MCS_MAP_160_GET(dbe_cap);
-			uhr_cap->dbe_param[1] = (uint8_t)(map160 & 0xFF);
-			uhr_cap->dbe_param[2] = (uint8_t)((map160 >> 8) & 0xFF);
-			uhr_cap->dbe_param[3] = (uint8_t)((map160 >> 16) & 0xFF);
+			uhr_cap->dbe_param[3] = (uint8_t)(map160 & 0xFF);
+			uhr_cap->dbe_param[4] = (uint8_t)((map160 >> 8) & 0xFF);
+			uhr_cap->dbe_param[5] = (uint8_t)((map160 >> 16) & 0xFF);
+			uhr_cap->dbe_param[6] = 0;
 		}
 		if (WMI_UHRCAP_DBE_EHT_MCS_320_PRESENT_GET(dbe_cap)) {
 			uint32_t map320 =
 				WMI_UHRCAP_DBE_EHT_MCS_MAP_320_GET(dbe_cap);
-			uhr_cap->dbe_param[4] = (uint8_t)(map320 & 0xFF);
-			uhr_cap->dbe_param[5] = (uint8_t)((map320 >> 8) & 0xFF);
-			uhr_cap->dbe_param[6] = (uint8_t)((map320 >> 16) & 0xFF);
+			uhr_cap->dbe_param[7] = (uint8_t)(map320 & 0xFF);
+			uhr_cap->dbe_param[8] = (uint8_t)((map320 >> 8) & 0xFF);
+			uhr_cap->dbe_param[9] = (uint8_t)((map320 >> 16) & 0xFF);
+			uhr_cap->dbe_param[10] = 0;
 		}
 	}
 }
@@ -211,6 +229,9 @@ static void wma_aggregate_uhr_cap(struct wlan_uhr_cap_info *aggr_uhr_cap,
 	aggr_uhr_cap->cobf_support |= uhr_cap->cobf_support;
 	aggr_uhr_cap->co_sr_support |= uhr_cap->co_sr_support;
 	aggr_uhr_cap->mapc_enh_meas_support |= uhr_cap->mapc_enh_meas_support;
+	aggr_uhr_cap->hg_rtwt_support |= uhr_cap->hg_rtwt_support;
+	aggr_uhr_cap->extended_channel_usage_support |=
+					uhr_cap->extended_channel_usage_support;
 
 	/* UHR PHY capabilities */
 	aggr_uhr_cap->max_nss_rx_ndp_sounding_80mhz |=
@@ -285,9 +306,11 @@ static void wma_print_uhr_cap(struct wlan_uhr_cap_info *uhr_cap)
 		       uhr_cap->param_update_adv_notify,
 		       uhr_cap->update_ind_in_tim, uhr_cap->bounded_ess,
 		       uhr_cap->btm_assurance);
-	wma_nofl_debug(" Co-BF 0x%01x Co-SR 0x%01x MAPC Enh Meas 0x%01x",
+	wma_nofl_debug(" Co-BF 0x%01x Co-SR 0x%01x MAPC Enh Meas 0x%01x HG-RTWT 0x%01x Ext Chan Usage 0x%01x",
 		       uhr_cap->cobf_support, uhr_cap->co_sr_support,
-		       uhr_cap->mapc_enh_meas_support);
+		       uhr_cap->mapc_enh_meas_support,
+		       uhr_cap->hg_rtwt_support,
+		       uhr_cap->extended_channel_usage_support);
 	wma_nofl_debug("UHR PHY Caps: Max NSS RX NDP Sounding: 80MHz 0x%01x 160MHz 0x%01x 320MHz 0x%01x",
 		       uhr_cap->max_nss_rx_ndp_sounding_80mhz,
 		       uhr_cap->max_nss_rx_ndp_sounding_160mhz,
@@ -479,6 +502,9 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 	WMI_UHRCAP_MAC_COSR_SUPPORT_SET(mac_cap, uhr_cap->co_sr_support);
 	WMI_UHRCAP_MAC_MAPC_ENH_MEAS_SET(mac_cap,
 					 uhr_cap->mapc_enh_meas_support);
+	WMI_UHRCAP_MAC_HG_RTWT_SUPPORT_SET(mac_cap, uhr_cap->hg_rtwt_support);
+	WMI_UHRCAP_MAC_EXTENDED_CHANNEL_USAGE_SUPPORT_SET(
+			mac_cap, uhr_cap->extended_channel_usage_support);
 
 	/* UHR PHY Capabilities */
 	WMI_UHRCAP_PHY_MAX_NSS_RX_80_SET(
@@ -538,7 +564,16 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 	WMI_UHRCAP_PHY_DRU_RRU_HYBRID_SUPPORT_SET(
 			phy_cap, uhr_cap->dru_rru_hybrid_support);
 
-	/* DBE Capability Parameters */
+	/*
+	 * DBE Capability Parameters.
+	 * D2.0 header is 3 bytes (byte 0 unchanged; bytes 1-2 carry
+	 * bw_switch_time_period/mode_change_interval, for which
+	 * TODO: no WMI_UHRCAP_DBE_* SET macro exists yet, fw-api update
+	 * pending — not forwarded to FW). Each per-band block is now 4
+	 * bytes: 3 bytes of EHT MCS map (unchanged content) plus 1 new
+	 * byte of num_sounding_dim/non_ofdma_ul_mumimo/mu_beamformer/
+	 * beamformee_ss, which is likewise not forwarded to FW yet.
+	 */
 	qdf_mem_zero(dbe_cap,
 		     WMI_HOST_MAX_UHRCAP_DBE_SIZE * sizeof(*dbe_cap));
 	if (uhr_cap->dbe_support && uhr_cap->dbe_param[0]) {
@@ -553,15 +588,15 @@ void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
 		WMI_UHRCAP_DBE_EHT_MCS_320_PRESENT_SET(dbe_cap,
 						       mcs320_present);
 		if (mcs160_present) {
-			map160 = uhr_cap->dbe_param[1] |
-				 ((uint32_t)uhr_cap->dbe_param[2] << 8) |
-				 ((uint32_t)uhr_cap->dbe_param[3] << 16);
+			map160 = uhr_cap->dbe_param[3] |
+				 ((uint32_t)uhr_cap->dbe_param[4] << 8) |
+				 ((uint32_t)uhr_cap->dbe_param[5] << 16);
 			WMI_UHRCAP_DBE_EHT_MCS_MAP_160_SET(dbe_cap, map160);
 		}
 		if (mcs320_present) {
-			map320 = uhr_cap->dbe_param[4] |
-				 ((uint32_t)uhr_cap->dbe_param[5] << 8) |
-				 ((uint32_t)uhr_cap->dbe_param[6] << 16);
+			map320 = uhr_cap->dbe_param[7] |
+				 ((uint32_t)uhr_cap->dbe_param[8] << 8) |
+				 ((uint32_t)uhr_cap->dbe_param[9] << 16);
 			WMI_UHRCAP_DBE_EHT_MCS_MAP_320_SET(dbe_cap, map320);
 		}
 	}

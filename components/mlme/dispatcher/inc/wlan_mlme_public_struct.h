@@ -1157,7 +1157,7 @@ struct wlan_mlme_eht_caps {
 #endif
 
 #ifdef WLAN_FEATURE_11BN
-#define WLAN_UHR_CAP_IE_MAX_LEN 21
+#define WLAN_UHR_CAP_IE_MAX_LEN 25
 
 /**
  * struct wlan_mlme_uhr_caps - UHR (Ultra High Reliability) capability info
@@ -1191,7 +1191,11 @@ struct wlan_mlme_eht_caps {
  * @bounded_ess: Bounded ESS (Extended Service Set)
  * @btm_assurance: BTM (BSS Transition Management) assurance
  * @cobf_support: COBF (Coordinated beamforming) support
- * @reserved_mac_b37_b47: Reserved MAC caps bits (B37-B47)
+ * @co_sr_support: COSR (Coordinated Spatial Reuse) support
+ * @mapc_enh_meas_support: MAPC Enhanced Measurement support
+ * @hg_rtwt_support: HG-rTWT (Hybrid Group restricted TWT) support (B41)
+ * @extended_channel_usage_support: Extended Channel Usage support (B42)
+ * @reserved_mac_b43_b47: Reserved MAC caps bits (B43-B47)
  * @max_nss_rx_ndp_sounding_80mhz: Maximum NSS for RX NDP sounding in 80MHz
  * @max_nss_rx_dl_mumimo_80mhz: Maximum NSS for RX downlink MU-MIMO in 80MHz
  * @max_nss_rx_ndp_sounding_160mhz: Maximum NSS for RX NDP sounding in 160MHz
@@ -1225,7 +1229,8 @@ struct wlan_mlme_eht_caps {
  * @dru_dbw60_pbw_ge80_support: DRU DBW=60 in PBW>=80 MHz support (B30)
  * @dru_rru_hybrid_support: DRU+RRU hybrid mode support (B31)
  * @reserved_phy_b32_b39: Reserved PHY bits (B32-B39)
- * @dbe_param: DBE Capability Parameters (0, 1, 4, or 7 bytes)
+ * @dbe_param: DBE Capability Parameters (0, 3, 7, or 11 bytes: 3-byte header
+ *             plus 0, 1, or 2 optional 4-byte per-band blocks)
  * @num_data: Length of data
  * @data: UHR capability IE data. Element ID + length + extension element ID +
  *        UHR capability information
@@ -1255,12 +1260,16 @@ struct wlan_mlme_uhr_caps {
 	uint16_t        txspg_support:1;
 	uint16_t txop_return_support_intxspg:1;
 	uint16_t uhr_op_mode_param_update_timeout:4;
-	uint16_t param_update_adv_notify:3;
+	uint16_t param_update_adv_notify:5;
 	uint16_t    update_ind_in_tim:5;
 	uint16_t          bounded_ess:1;
 	uint16_t        btm_assurance:1;
 	uint16_t         cobf_support:1;
-	uint16_t reserved_mac_b37_b47:11;
+	uint16_t         co_sr_support:1;
+	uint16_t mapc_enh_meas_support:1;
+	uint16_t       hg_rtwt_support:1;
+	uint16_t extended_channel_usage_support:1;
+	uint16_t reserved_mac_b43_b47:5;
 	uint16_t max_nss_rx_ndp_sounding_80mhz:1;
 	uint16_t max_nss_rx_dl_mumimo_80mhz:1;
 	uint16_t max_nss_rx_ndp_sounding_160mhz:1;
@@ -1292,7 +1301,7 @@ struct wlan_mlme_uhr_caps {
 	uint8_t  dru_dbw60_pbw_ge80_support:1;
 	uint8_t  dru_rru_hybrid_support:1;
 	uint8_t  reserved_phy_b32_b39:8;
-	uint8_t  dbe_param[7];
+	uint8_t  dbe_param[11];
 	uint16_t num_data;
 	uint8_t data[WLAN_UHR_CAP_IE_MAX_LEN];
 } qdf_packed;
