@@ -1022,6 +1022,17 @@ const struct nla_policy cfr_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_ONLY_LAST_FRAME] = {
 					.type = NLA_FLAG,
 	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG] = {
+					.type = NLA_FLAG,
+	},
 };
 
 #ifdef WLAN_ENH_CFR_ENABLE
