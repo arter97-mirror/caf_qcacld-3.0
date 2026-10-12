@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -822,9 +822,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	 * include addIE.
 	 */
 	if (sendProbeReq)
-		lim_send_probe_req_mgmt_frame(mac_ctx, &session->ssId,
-			session->bssId, session->curr_op_freq,
-			session->self_mac_addr, session->dot11mode, NULL, NULL);
+		lim_send_probe_req_mgmt_frame(mac_ctx, session, NULL, NULL);
 
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
 	    && beaconParams.paramChangeBitmap) {

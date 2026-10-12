@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1756,8 +1756,6 @@ void lim_process_join_failure_timeout(struct mac_context *mac_ctx)
 static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ctx)
 {
 	struct pe_session *session;
-	tSirMacSSid ssid;
-	tSirMacAddr bssid;
 
 	session = pe_find_session_by_session_id(mac_ctx,
 	      mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId);
@@ -1771,15 +1769,7 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 	if ((true ==
 	    tx_timer_running(&mac_ctx->lim.lim_timers.gLimJoinFailureTimer))
 		&& (session->limMlmState == eLIM_MLM_WT_JOIN_BEACON_STATE)) {
-		qdf_mem_copy(ssid.ssId, session->ssId.ssId,
-			     session->ssId.length);
-		ssid.length = session->ssId.length;
-		sir_copy_mac_addr(bssid,
-				  session->pLimMlmJoinReq->bssDescription.bssId);
-
-		lim_send_probe_req_mgmt_frame(mac_ctx, &ssid, bssid,
-					      session->curr_op_freq,
-			session->self_mac_addr, session->dot11mode,
+		lim_send_probe_req_mgmt_frame(mac_ctx, session,
 			&session->lim_join_req->addIEScan.length,
 			session->lim_join_req->addIEScan.addIEdata);
 		lim_deactivate_and_change_timer(mac_ctx,

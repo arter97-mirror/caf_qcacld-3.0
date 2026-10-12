@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3584,6 +3584,14 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 							 sizeof(uint64_t) +
 							 NLMSG_HDRLEN,
 							 index, GFP_KERNEL);
+
+		if (!reply_skb) {
+			hdd_err("vdev:%d memory allocation failed for index %d",
+				adapter->deflink->vdev_id, index);
+			status = -ENOMEM;
+			goto end;
+		}
+
 		if (hdd_wlan_nla_put_u64(reply_skb,
 					 QCA_WLAN_VENDOR_ATTR_TSF_TIMER_VALUE,
 					 target_tsf)) {

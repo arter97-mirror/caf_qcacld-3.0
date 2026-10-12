@@ -1372,6 +1372,88 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool policy_mgr_dual_sl_sap_present(
+		struct wlan_objmgr_psoc *psoc,
+		struct policy_mgr_psoc_priv_obj *pm_ctx,
+		uint8_t new_vdev_id)
+{
+	bool dual_sl_sap = false;
+	struct qdf_mac_addr existing_mld = {0};
+	struct qdf_mac_addr new_mld_addr = {0};
+	struct qdf_mac_addr *addr;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t conn_index;
+	uint8_t legacy_sap = 0, ml_sap = 0;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (!pm_conc_connection_list[conn_index].in_use ||
+		    pm_conc_connection_list[conn_index].mode != PM_SAP_MODE)
+			continue;
+
+		uint8_t vdev_id = pm_conc_connection_list[conn_index].vdev_id;
+
+		if (vdev_id == new_vdev_id)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			psoc,
+			vdev_id, WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev for vdev_id:%d is NULL", vdev_id);
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return false;
+		}
+
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			ml_sap++;
+			addr = (struct qdf_mac_addr *)
+				wlan_vdev_mlme_get_mldaddr(vdev);
+			if (addr)
+				qdf_mem_copy(&existing_mld,
+					     addr, QDF_MAC_ADDR_SIZE);
+		} else {
+			legacy_sap++;
+		}
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	/* get new vdev and check its MLD status */
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			psoc, new_vdev_id,
+			WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev for vdev_id:%d is NULL", new_vdev_id);
+		return false;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return (ml_sap + legacy_sap == 1);
+	}
+
+	addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	if (addr)
+		qdf_mem_copy(&new_mld_addr, addr, QDF_MAC_ADDR_SIZE);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	/* If existing MLD is zero, no valid ML SAP found */
+	if (qdf_is_macaddr_zero(&existing_mld))
+		return false;
+
+	/* If MLD addresses differ, it's dual SL SAP */
+	if (!qdf_is_macaddr_equal(&new_mld_addr, &existing_mld))
+		dual_sl_sap = true;
+
+	return dual_sl_sap;
+}
+
 /**
  * policy_mgr_modify_dual_sap_band_pcl_filter() - API to filter out dual sap
  * channel with
@@ -1400,7 +1482,9 @@ policy_mgr_modify_dual_sap_band_pcl_filter(
 	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t pcl_len = 0;
-	bool multi_sap_allowed_on_same_band;
+	qdf_freq_t user_config_freq = 0;
+	enum reg_wifi_band user_band, curr_band;
+	bool allow_scc = false;
 
 	if (mode != PM_SAP_MODE)
 		return QDF_STATUS_SUCCESS;
@@ -1409,27 +1493,39 @@ policy_mgr_modify_dual_sap_band_pcl_filter(
 							psoc, freq_list,
 							vdev_id_list,
 							PM_SAP_MODE);
-	if (!sap_count || sap_count > 1)
+	if (sap_count != 1)
 		return QDF_STATUS_SUCCESS;
 
-	/* check only when multi sap on same band is not supported */
-	policy_mgr_get_multi_sap_allowed_on_same_band(
-					psoc,
-					&multi_sap_allowed_on_same_band);
-
-	if (multi_sap_allowed_on_same_band)
+	if (!policy_mgr_dual_sl_sap_present(psoc, pm_ctx, vdev_id))
 		return QDF_STATUS_SUCCESS;
 
-	/* check owe */
-	if (policy_mgr_is_owe_connection_present(pm_ctx->pdev, vdev_id))
-		return QDF_STATUS_SUCCESS;
+	policy_mgr_debug("dual sap present vdev_id %d", vdev_id);
+	user_config_freq =
+			policy_mgr_get_user_config_sap_freq(psoc,
+							    vdev_id);
+	user_band = wlan_reg_freq_to_band(user_config_freq);
+	curr_band = wlan_reg_freq_to_band(freq_list[0]);
+	if (curr_band <= user_band || user_band == REG_BAND_UNKNOWN)
+		allow_scc = true;
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		/* filter frequency of existing SAP */
-		if (WLAN_REG_IS_SAME_BAND_FREQS(pcl_list_org[i],
-						freq_list[0]))
+		if (WLAN_REG_IS_SAME_BAND_FREQS(
+					pcl_list_org[i],
+					freq_list[0]) &&
+					pcl_list_org[i] != freq_list[0])
 			continue;
-
+		/* remove scc freq if not allowed */
+		if (pcl_list_org[i] == freq_list[0] && !allow_scc)
+			continue;
+		/* remove 5 GHz freq in case of 6 GHz sap */
+		if (wlan_reg_is_6ghz_chan_freq(freq_list[0]) &&
+		    wlan_reg_is_5ghz_ch_freq(pcl_list_org[i]))
+			continue;
+		/* remove 6 GHZ freq in case of 5 GHz sap */
+		if (wlan_reg_is_5ghz_ch_freq(freq_list[0]) &&
+		    wlan_reg_is_6ghz_chan_freq(pcl_list_org[i]))
+			continue;
 		pcl_list_org[pcl_len] = pcl_list_org[i];
 		weight_list_org[pcl_len++] = weight_list_org[i];
 	}

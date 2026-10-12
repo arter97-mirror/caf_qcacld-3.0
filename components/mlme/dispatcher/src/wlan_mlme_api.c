@@ -1399,7 +1399,7 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	bool eht_capab;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mlme_obj)
+	if (!mlme_obj || !mac_ctx)
 		return QDF_STATUS_E_FAILURE;
 
 	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
