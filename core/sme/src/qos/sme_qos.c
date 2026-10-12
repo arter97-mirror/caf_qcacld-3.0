@@ -4822,7 +4822,7 @@ static QDF_STATUS sme_qos_process_preauth_success_ind(struct mac_context *mac_ct
 	 * create the RIC IEs
 	 */
 	for (ac = QCA_WLAN_AC_BE; ac < QCA_WLAN_AC_ALL; ac++) {
-		volatile uint8_t tspec_idx = 0;
+		uint8_t tspec_idx = 0;
 
 		ric_ielen = 0;
 		ac_info = &qos_session->ac_info[ac];

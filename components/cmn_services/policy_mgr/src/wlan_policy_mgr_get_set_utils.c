@@ -41,6 +41,7 @@
 #include "wlan_mlme_main.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_ap.h"
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_ucfg_api.h"
@@ -7813,6 +7814,57 @@ bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc)
 	return mlo_sta_present;
 }
 
+bool policy_mgr_is_ml_sap_present(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t conn_index;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *ml_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint8_t sap_vdev_ids[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t num_sap = 0, j;
+	uint16_t ml_vdev_count, i;
+	bool mlo_sap_present = false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (pm_conc_connection_list[conn_index].mode != PM_SAP_MODE ||
+		    !pm_conc_connection_list[conn_index].in_use)
+			continue;
+
+		sap_vdev_ids[num_sap++] =
+			pm_conc_connection_list[conn_index].vdev_id;
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	for (j = 0; j < num_sap && !mlo_sap_present; j++) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    sap_vdev_ids[j],
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev)
+			continue;
+
+		if (wlan_vdev_mlme_is_mlo_ap(vdev)) {
+			ml_vdev_count = 0;
+			mlo_ap_get_vdev_list(vdev, &ml_vdev_count,
+					     ml_vdev_list);
+			for (i = 0; i < ml_vdev_count; i++)
+				mlo_release_vdev_ref(ml_vdev_list[i]);
+
+			mlo_sap_present = ml_vdev_count > 1;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	return mlo_sap_present;
+}
+
 bool policy_mgr_is_mlo_in_mode_sbs(struct wlan_objmgr_psoc *psoc,
 				   enum policy_mgr_con_mode mode,
 				   uint8_t *mlo_vdev_lst, uint8_t *num_mlo)
@@ -12926,72 +12978,6 @@ bool policy_mgr_is_owe_connection_present(struct wlan_objmgr_pdev *pdev,
 	}
 
 	return false;
-}
-
-bool policy_mgr_is_multi_sap_allowed_on_same_band(
-					struct wlan_objmgr_pdev *pdev,
-					enum policy_mgr_con_mode mode,
-					qdf_freq_t ch_freq,
-					uint8_t vdev_id)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	bool multi_sap_allowed_on_same_band;
-	QDF_STATUS status;
-
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc)
-		return false;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
-
-	if (!ch_freq || !policy_mgr_is_sap_mode(mode))
-		return true;
-
-	status = policy_mgr_get_multi_sap_allowed_on_same_band(psoc,
-					&multi_sap_allowed_on_same_band);
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		policy_mgr_err("Failed to get multi_sap_allowed_on_same_band");
-		/* Allow multi SAPs started on same band by default. */
-		multi_sap_allowed_on_same_band = true;
-	}
-
-	if (policy_mgr_is_owe_connection_present(pdev, vdev_id)) {
-		multi_sap_allowed_on_same_band = true;
-		policy_mgr_debug("multi sap on same band is allowed for owe");
-	}
-
-	if (!multi_sap_allowed_on_same_band) {
-		uint32_t ap_cnt, index = 0;
-		uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-		struct policy_mgr_conc_connection_info *ap_info;
-
-		ap_cnt = policy_mgr_get_sap_mode_count(psoc, list);
-		if (!ap_cnt)
-			return true;
-
-		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-		while (index < ap_cnt) {
-			ap_info = &pm_conc_connection_list[list[index]];
-
-			if (!(ap_info->vdev_id == vdev_id) &&
-			    WLAN_REG_IS_SAME_BAND_FREQS(ch_freq,
-							ap_info->freq)) {
-				policy_mgr_debug("Don't allow SAP on same band");
-				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-				return false;
-			}
-			index++;
-		}
-		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-	}
-
-	return true;
 }
 
 bool policy_mgr_is_special_mode_active_5g(struct wlan_objmgr_psoc *psoc,

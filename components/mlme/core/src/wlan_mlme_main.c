@@ -2658,6 +2658,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
 		cfg_get(psoc, CFG_MLO_MLO_5GL_5GH_MLSR);
+	sta->sta_sl_with_mlo_sap =
+		cfg_get(psoc, CFG_STA_SL_WITH_MLO_SAP);
 	sta->epcs_capability =
 		cfg_get(psoc, CFG_MLO_EPCS_SUPPORT_ENABLE);
 
@@ -5786,7 +5788,6 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 		mlme_debug("Cannot set user config freq for mode %d", opmode);
 		return QDF_STATUS_E_FAILURE;
 	}
-
 	mlme_priv->mlme_ap.user_config_sap_ch_freq = freq;
 	return QDF_STATUS_SUCCESS;
 }
