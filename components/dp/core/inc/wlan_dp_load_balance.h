@@ -90,7 +90,7 @@ struct cpu_irq_load {
  * @reo_cpu_map: REO to CPU mapping
  */
 struct wlan_dp_lb_data {
-	struct cpu_irq_load cpu_load[NR_CPUS];
+	struct cpu_irq_load cpu_load[QDF_MAX_AVAILABLE_CPU];
 	qdf_cpu_mask def_cpumask;
 	qdf_cpu_mask preferred_cpu_mask;
 	qdf_cpu_mask curr_cpu_mask;

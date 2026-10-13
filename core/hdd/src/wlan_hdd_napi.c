@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -551,7 +551,7 @@ int hdd_clear_napi_stats(void)
 	for (i = 0; i < CE_COUNT_MAX; i++)
 		if (napid->ce_map & (0x01 << i)) {
 			napii = napid->napis[i];
-			for (j = 0; j < NR_CPUS; j++) {
+			for (j = 0; j < num_possible_cpus(); j++) {
 				napis = &(napii->stats[j]);
 				qdf_mem_zero(napis,
 					     sizeof(struct qca_napi_stat));

@@ -194,7 +194,7 @@ void ol_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id, uint8_t vdev_id,
 				 QDF_DP_TRACE_TXRX_FAST_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(skb),
-				 sizeof(qdf_nbuf_data(skb)),
+				 sizeof(uint8_t *),
 				 msdu_id, vdev_id, 0,
 				 op_mode));
 

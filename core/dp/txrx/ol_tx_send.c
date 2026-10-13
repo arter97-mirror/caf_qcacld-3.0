@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -210,7 +210,7 @@ ol_tx_send(struct ol_txrx_pdev_t *pdev,
 	DPTRACE(qdf_dp_trace_ptr(msdu, QDF_DP_TRACE_TXRX_PACKET_PTR_RECORD,
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(msdu),
-				sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
+				sizeof(uint8_t *), tx_desc->id,
 				vdev_id, 0,
 				tx_desc->vdev->qdf_opmode
 				));
@@ -351,7 +351,7 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 				 QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(msdu),
-				 sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
+				 sizeof(uint8_t *), tx_desc->id,
 				 dp_status, 0, opmode
 				 ));
 
@@ -1126,7 +1126,7 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 			QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(netbuf),
-			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, status,
+			sizeof(uint8_t *), tx_desc->id, status,
 			dp_status, opmode));
 
 		/*

@@ -10780,12 +10780,23 @@ QDF_STATUS lim_ieee80211_unpack_tpe(const uint8_t *tpe_ie,
 	} else {
 		if (!dot11f_tpe->max_tx_pwr_count) {
 			dot11f_tpe->num_tx_power = dot11f_tpe->max_tx_pwr_count;
+			if (!ie_len) {
+				pe_err("TPE IE: no payload for tx_power");
+				return QDF_STATUS_E_BADMSG;
+			}
 			qdf_mem_copy(dot11f_tpe->tx_power, buf, 1);
 			return QDF_STATUS_SUCCESS;
 		}
 		else
 			dot11f_tpe->num_tx_power =
 					1 << (dot11f_tpe->max_tx_pwr_count - 1);
+	}
+
+	if (dot11f_tpe->num_tx_power > sizeof(dot11f_tpe->tx_power) ||
+	    ie_len < dot11f_tpe->num_tx_power) {
+		pe_err("TPE IE: invalid num_tx_power %u ie_len %u",
+		       dot11f_tpe->num_tx_power, ie_len);
+		return QDF_STATUS_E_BADMSG;
 	}
 
 	qdf_mem_copy(dot11f_tpe->tx_power, buf, dot11f_tpe->num_tx_power);
@@ -12894,6 +12905,12 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &mlo_ie_ptr->mlo_ie.common_info_length);
+
+	if (mlo_ie_ptr->mlo_ie.common_info_length > ml_ie_total_len) {
+		pe_err("common info length greater than mlie length %u %u",
+		       mlo_ie_ptr->mlo_ie.common_info_length, ml_ie_total_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
 		   mlo_ie_ptr->mlo_ie.common_info_length;

@@ -1765,15 +1765,8 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 			pe_session->fWaitForProbeRsp = true;
 			pe_info(QDF_MAC_ADDR_FMT ": capabilities are not matching, sending directed probe request",
 				QDF_MAC_ADDR_REF(pe_session->bssId));
-			status =
-				lim_send_probe_req_mgmt_frame(
-					mac, &pe_session->ssId,
-					pe_session->bssId,
-					pe_session->curr_op_freq,
-					pe_session->self_mac_addr,
-					pe_session->dot11mode,
-					NULL, NULL);
-
+			status = lim_send_probe_req_mgmt_frame(mac, pe_session,
+							       NULL, NULL);
 			if (QDF_STATUS_SUCCESS != status) {
 				pe_err("send ProbeReq failed");
 				pe_session->fWaitForProbeRsp = false;
@@ -2648,6 +2641,13 @@ uint8_t *lim_process_rmf_disconnect_frame(struct mac_context *mac,
 	mmie_len = (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC) ?
 		    cds_get_mmie_size() : cds_get_gmac_mmie_size());
 
+	if (deauth_disassoc_frame_len < mmie_len) {
+		pe_err("Frame len %d less than MMIE len %d",
+		       deauth_disassoc_frame_len, mmie_len);
+		*extracted_length = 0;
+		return NULL;
+	}
+
 	efrm = orig_ptr + deauth_disassoc_frame_len;
 	if (!mac->pmf_offload &&
 	    !wlan_crypto_is_mmie_valid(session->vdev, orig_ptr, efrm)) {
@@ -2869,6 +2869,12 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 	struct mlo_partner_info *ml_partner_info;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t idx = 0, num_partner_links, link_id, link_vdev_id;
+
+	if (reassoc_rsp_len <= WLAN_MAC_HDR_LEN_3A) {
+		pe_err("MLO ROAM: Invalid Reassoc response length %u",
+		       reassoc_rsp_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	link_reassoc_rsp.ptr = qdf_mem_malloc(reassoc_rsp_len);
 	if (!link_reassoc_rsp.ptr)

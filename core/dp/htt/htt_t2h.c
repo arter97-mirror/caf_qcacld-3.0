@@ -1140,7 +1140,7 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 			unsigned int rx_mpdu_range_offset_bytes;
 			u_int16_t peer_id;
 			u_int8_t tid;
-			msg_len = qdf_nbuf_len(htt_t2h_msg);
+			int msg_len = qdf_nbuf_len(htt_t2h_msg);
 
 			peer_id = HTT_RX_IND_PEER_ID_GET(*msg_word);
 			tid = HTT_RX_IND_EXT_TID_GET(*msg_word);
@@ -1148,6 +1148,12 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 				qdf_print("HTT_T2H_MSG_TYPE_RX_IND, invalid tid %d\n",
 					tid);
 				WARN_ON(1);
+				break;
+			}
+			if (msg_len < (2 + HTT_RX_PPDU_DESC_SIZE32 + 1) *
+			    sizeof(uint32_t)) {
+				qdf_print("HTT_T2H_MSG_TYPE_RX_IND, invalid msg_len %d\n",
+					  msg_len);
 				break;
 			}
 			num_msdu_bytes =
@@ -1206,6 +1212,14 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 				qdf_print("HTT_T2H_MSG_TYPE_RX_IND, %s %u\n",
 					  "invalid offset_words + mpdu_ranges",
 					  calculated_msg_len);
+				WARN_ON(1);
+				break;
+			}
+			if (qdf_unlikely(pdev->rx_mpdu_range_offset_words +
+					 (num_mpdu_ranges * 4) > msg_len)) {
+				qdf_print("HTT_T2H_MSG_TYPE_RX_IND, invalid mpdu_ranges %d\n",
+					  (pdev->rx_mpdu_range_offset_words +
+					   (num_mpdu_ranges * 4)));
 				WARN_ON(1);
 				break;
 			}

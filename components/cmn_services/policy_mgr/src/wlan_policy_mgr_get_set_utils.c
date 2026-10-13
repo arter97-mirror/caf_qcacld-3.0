@@ -6539,6 +6539,13 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 			if (ch_freq == pcl.pcl_list[i])
 				return true;
 
+		if (mode == PM_SAP_MODE &&
+		    policy_mgr_allow_4th_new_freq(psoc, ch_freq, mode, 0)) {
+			policy_mgr_debug("4th port SAP ch %d allowed via hw mode check",
+					 ch_freq);
+			return true;
+		}
+
 		policy_mgr_err("4th port failed on ch freq %d with mode %d",
 			       ch_freq, mode);
 
@@ -10930,7 +10937,6 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		go_force_scc = policy_mgr_go_scc_enforced(psoc);
 		if ((mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) &&
 		    (!sta_sap_scc_on_dfs_chan ||
-		     !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false) ||
 		     (!go_force_scc && mode == PM_P2P_GO_MODE))) {
 			if (is_dfs_ch)
 				match = policy_mgr_disallow_mcc(psoc,
@@ -12920,72 +12926,6 @@ bool policy_mgr_is_owe_connection_present(struct wlan_objmgr_pdev *pdev,
 	}
 
 	return false;
-}
-
-bool policy_mgr_is_multi_sap_allowed_on_same_band(
-					struct wlan_objmgr_pdev *pdev,
-					enum policy_mgr_con_mode mode,
-					qdf_freq_t ch_freq,
-					uint8_t vdev_id)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	bool multi_sap_allowed_on_same_band;
-	QDF_STATUS status;
-
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc)
-		return false;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
-
-	if (!ch_freq || !policy_mgr_is_sap_mode(mode))
-		return true;
-
-	status = policy_mgr_get_multi_sap_allowed_on_same_band(psoc,
-					&multi_sap_allowed_on_same_band);
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		policy_mgr_err("Failed to get multi_sap_allowed_on_same_band");
-		/* Allow multi SAPs started on same band by default. */
-		multi_sap_allowed_on_same_band = true;
-	}
-
-	if (policy_mgr_is_owe_connection_present(pdev, vdev_id)) {
-		multi_sap_allowed_on_same_band = true;
-		policy_mgr_debug("multi sap on same band is allowed for owe");
-	}
-
-	if (!multi_sap_allowed_on_same_band) {
-		uint32_t ap_cnt, index = 0;
-		uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-		struct policy_mgr_conc_connection_info *ap_info;
-
-		ap_cnt = policy_mgr_get_sap_mode_count(psoc, list);
-		if (!ap_cnt)
-			return true;
-
-		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-		while (index < ap_cnt) {
-			ap_info = &pm_conc_connection_list[list[index]];
-
-			if (!(ap_info->vdev_id == vdev_id) &&
-			    WLAN_REG_IS_SAME_BAND_FREQS(ch_freq,
-							ap_info->freq)) {
-				policy_mgr_debug("Don't allow SAP on same band");
-				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-				return false;
-			}
-			index++;
-		}
-		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-	}
-
-	return true;
 }
 
 bool policy_mgr_is_special_mode_active_5g(struct wlan_objmgr_psoc *psoc,

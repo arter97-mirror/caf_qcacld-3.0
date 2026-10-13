@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +32,7 @@
 #include "wma_api.h"
 #include "wlan_osif_features.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include "wlan_cmn_ieee80211.h"
 
 #if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
 #define CHAN_WIDTH_SET_40MHZ_IN_2G \
@@ -120,6 +121,75 @@ void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
 		config->SapHw_mode = eCSR_DOT11_MODE_11be;
 }
 
+/**
+ * hdd_populate_eht_mcs_nss_80() - populate BW <= 80 MHz eht_mcs_nss_supp
+ *                                 from eht_cap
+ * @supp_80: destination wiphy eht mcs/nss support struct for BW <= 80 MHz
+ * @eht_cap: source firmware-reported eht capabilities
+ *
+ * Return: None
+ */
+static void
+hdd_populate_eht_mcs_nss_80(struct ieee80211_eht_mcs_nss_supp_bw *supp_80,
+			    tDot11fIEeht_cap *eht_cap)
+{
+	supp_80->rx_tx_mcs9_max_nss =
+		eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 |
+		(eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 << 4);
+	supp_80->rx_tx_mcs11_max_nss =
+		eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 |
+		(eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 << 4);
+	supp_80->rx_tx_mcs13_max_nss =
+		eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 |
+		(eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 << 4);
+}
+
+/**
+ * hdd_populate_eht_mcs_nss_160() - populate BW = 160 MHz eht_mcs_nss_supp
+ *                                  from eht_cap
+ * @supp_160: destination wiphy eht mcs/nss support struct for BW = 160 MHz
+ * @eht_cap: source firmware-reported eht capabilities
+ *
+ * Return: None
+ */
+static void
+hdd_populate_eht_mcs_nss_160(struct ieee80211_eht_mcs_nss_supp_bw *supp_160,
+			     tDot11fIEeht_cap *eht_cap)
+{
+	supp_160->rx_tx_mcs9_max_nss =
+		eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 |
+		(eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 << 4);
+	supp_160->rx_tx_mcs11_max_nss =
+		eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 |
+		(eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 << 4);
+	supp_160->rx_tx_mcs13_max_nss =
+		eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 |
+		(eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 << 4);
+}
+
+/**
+ * hdd_populate_eht_mcs_nss_320() - populate BW = 320 MHz eht_mcs_nss_supp
+ *                                  from eht_cap
+ * @supp_320: destination wiphy eht mcs/nss support struct for BW = 320 MHz
+ * @eht_cap: source firmware-reported eht capabilities
+ *
+ * Return: None
+ */
+static void
+hdd_populate_eht_mcs_nss_320(struct ieee80211_eht_mcs_nss_supp_bw *supp_320,
+			     tDot11fIEeht_cap *eht_cap)
+{
+	supp_320->rx_tx_mcs9_max_nss =
+		eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 |
+		(eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 << 4);
+	supp_320->rx_tx_mcs11_max_nss =
+		eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 |
+		(eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 << 4);
+	supp_320->rx_tx_mcs13_max_nss =
+		eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 |
+		(eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 << 4);
+}
+
 static void
 hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 			       tDot11fIEeht_cap eht_cap)
@@ -162,12 +232,75 @@ hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 	if (eht_cap.su_beamformee)
 		phy_info[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
 
+	hdd_populate_eht_mcs_nss_80(
+		&hdd_ctx->iftype_data_6g->eht_cap.eht_mcs_nss_supp.bw._80,
+		&eht_cap);
+	hdd_populate_eht_mcs_nss_160(
+		&hdd_ctx->iftype_data_6g->eht_cap.eht_mcs_nss_supp.bw._160,
+		&eht_cap);
+	if (eht_cap.support_320mhz_6ghz)
+		hdd_populate_eht_mcs_nss_320(
+			&hdd_ctx->iftype_data_6g->eht_cap.eht_mcs_nss_supp.bw._320,
+			&eht_cap);
+
 	qdf_mem_copy(iftype_ap, hdd_ctx->iftype_data_6g,
 		     sizeof(struct ieee80211_supported_band));
 
 	iftype_sta->types_mask = BIT(NL80211_IFTYPE_STATION);
 	iftype_ap->types_mask = BIT(NL80211_IFTYPE_AP);
 }
+
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
+    defined(CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS)
+static struct wiphy_iftype_ext_capab wlan_hdd_ap_iftype_ext_capab = {
+	.iftype = NL80211_IFTYPE_AP,
+};
+
+void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
+{
+	struct wiphy_iftype_ext_capab *ap_capab = NULL;
+	uint8_t max_simul_links;
+	int i;
+
+	if (!(hdd_ctx->wiphy->flags & WIPHY_FLAG_SUPPORTS_MLO))
+		return;
+
+	max_simul_links = wlan_mlme_get_mlo_sap_support_link(hdd_ctx->psoc);
+	if (!max_simul_links)
+		return;
+
+	/*
+	 * wifi_pos (RTT/11AZ) may have already registered an AP iftype entry.
+	 * Patch EML/MLD fields into it rather than overwriting the pointer,
+	 * so both ext_capa (RTT) and eml/mld caps coexist in one entry.
+	 */
+	for (i = 0; i < hdd_ctx->wiphy->num_iftype_ext_capab; i++) {
+		if (hdd_ctx->wiphy->iftype_ext_capab[i].iftype ==
+		    NL80211_IFTYPE_AP) {
+			ap_capab = (struct wiphy_iftype_ext_capab *)
+					&hdd_ctx->wiphy->iftype_ext_capab[i];
+			break;
+		}
+	}
+
+	if (ap_capab) {
+		ap_capab->eml_capabilities = 0;
+		QDF_SET_BITS(ap_capab->mld_capa_and_ops,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_IDX,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_BITS,
+			     max_simul_links - 1);
+	} else {
+		wlan_hdd_ap_iftype_ext_capab.eml_capabilities = 0;
+		QDF_SET_BITS(wlan_hdd_ap_iftype_ext_capab.mld_capa_and_ops,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_IDX,
+			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_BITS,
+			     max_simul_links - 1);
+		hdd_ctx->wiphy->iftype_ext_capab =
+				&wlan_hdd_ap_iftype_ext_capab;
+		hdd_ctx->wiphy->num_iftype_ext_capab = 1;
+	}
+}
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP && CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS */
 
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 {
@@ -218,6 +351,10 @@ void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 		if (eht_cap_cfg.su_beamformee)
 			phy_info_2g[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
 
+		hdd_populate_eht_mcs_nss_80(
+			&hdd_ctx->iftype_data_2g->eht_cap.eht_mcs_nss_supp.bw._80,
+			&eht_cap_cfg);
+
 		qdf_mem_copy(iftype_ap, hdd_ctx->iftype_data_2g,
 			     sizeof(struct ieee80211_supported_band));
 
@@ -248,6 +385,13 @@ band_5ghz:
 
 		if (eht_cap_cfg.su_beamformee)
 			phy_info_5g[0] |= IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
+
+		hdd_populate_eht_mcs_nss_80(
+			&hdd_ctx->iftype_data_5g->eht_cap.eht_mcs_nss_supp.bw._80,
+			&eht_cap_cfg);
+		hdd_populate_eht_mcs_nss_160(
+			&hdd_ctx->iftype_data_5g->eht_cap.eht_mcs_nss_supp.bw._160,
+			&eht_cap_cfg);
 
 		qdf_mem_copy(iftype_ap, hdd_ctx->iftype_data_5g,
 			     sizeof(struct ieee80211_supported_band));

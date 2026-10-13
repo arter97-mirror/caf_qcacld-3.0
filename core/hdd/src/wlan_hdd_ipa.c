@@ -226,7 +226,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 			     QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,
 			     qdf_nbuf_data_addr(nbuf),
-			     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
+			     qdf_nbuf_len(nbuf), QDF_RX));
 	DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
 				      QDF_DP_TRACE_RX_PACKET_RECORD, 0,
 				      QDF_RX));
