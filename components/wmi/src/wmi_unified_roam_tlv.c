@@ -2635,6 +2635,20 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 	roam_event->notif_params = wmi_event->notif_params;
 	roam_event->notif_params1 = wmi_event->notif_params1;
 
+	if (wmi_event->notif_params1 &&
+	    roam_event->reason == ROAM_REASON_DEAUTH) {
+		if (wmi_event->notif_params1 >
+		    param_buf->num_deauth_disassoc_frame) {
+			wmi_err("deauth frame len %u > TLV len %u, vdev %u",
+				wmi_event->notif_params1,
+				param_buf->num_deauth_disassoc_frame,
+				roam_event->vdev_id);
+			return QDF_STATUS_E_FAILURE;
+		}
+		roam_event->deauth_disassoc_frame =
+			param_buf->deauth_disassoc_frame;
+	}
+
 	wlan_roam_debug_log(roam_event->vdev_id, DEBUG_ROAM_EVENT,
 			    DEBUG_INVALID_PEER_ID, NULL, NULL,
 			    roam_event->reason,
@@ -2663,9 +2677,6 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 		roam_event->hw_mode_trans_ind = hw_mode_trans_ind;
 	}
 
-	if (wmi_event->notif_params1)
-		roam_event->deauth_disassoc_frame =
-			param_buf->deauth_disassoc_frame;
 end:
 	return status;
 }
