@@ -4697,20 +4697,18 @@ lim_fill_complete_uhr_op_ie(struct pe_session *session,
 
 #ifdef WLAN_FEATURE_SECURITY_PROFILE
 /**
- * lim_fill_session_security_profile() - Store Security Profile IE info
- * in PE session from the scan entry
+ * lim_fill_session_security_profile() - Store scan Security Profile info
  * @session: PE session
  * @entry: scan cache entry for the candidate AP
  *
- * Sets session->sec_profile_num and copies the raw AP Security Profile IE
- * when both the vdev and AP support the Security Profile element.
+ * Sets session->sec_profile_num when both the vdev and AP support the
+ * Security Profile element.
  */
 void lim_fill_session_security_profile(struct pe_session *session,
 				       struct scan_cache_entry *entry);
 
 /**
- * lim_update_session_security_profile() - Push Security Profile IE
- * info from PE session into the roam offload config
+ * lim_update_session_security_profile() - Update roam Security Profile
  * @psoc: psoc pointer
  * @session: PE session
  *
@@ -4721,8 +4719,7 @@ void lim_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
 					 struct pe_session *session);
 
 /**
- * lim_populate_security_profile_ie() - Populate Security Profile IE in
- * the (Re)Association Request frame
+ * lim_populate_security_profile_ie() - Populate request Security Profile
  * @pe_session: PE session
  * @frm: dot11f AssocRequest frame structure
  * @rsnx_ie: raw RSNXE from the supplicant assoc IEs, or NULL
@@ -4736,22 +4733,18 @@ void lim_populate_security_profile_ie(struct pe_session *pe_session,
 				      const uint8_t *rsnx_ie);
 
 /**
- * lim_validate_assoc_rsp_security_profile() - Validate Security Profile
- * IE in (Re)Association Response against the AP IE from scan
- * @mac_ctx: MAC context
+ * lim_validate_assoc_rsp_security_profile() - Validate response profile
  * @session_entry: PE session
  * @assoc_rsp: parsed (Re)Association Response
  *
  * Return: true if validation passes, false if the frame must be rejected
  */
 bool lim_validate_assoc_rsp_security_profile(
-		struct mac_context *mac_ctx,
 		struct pe_session *session_entry,
 		tSirAssocRsp *assoc_rsp);
 
-/*
+/**
  * lim_override_ap_rsnxe_from_security_profile() - Override AP RSNXE
- * pointers from the Security Profile IE Extended RSN Capabilities field
  * @session: PE session
  * @sp_ie: raw AP Security Profile IE from scan entry (may be NULL)
  * @ap_rsnxe: pointer to AP RSNXE pointer to override
@@ -4770,8 +4763,7 @@ void lim_override_ap_rsnxe_from_security_profile(
 			uint8_t *buf, uint8_t buf_len);
 
 /**
- * lim_security_profile_has_ext_rsn_caps() - Check whether the session
- * Security Profile IE carries an Extended RSN Capabilities field
+ * lim_security_profile_has_ext_rsn_caps() - Check for extended RSN caps
  * @session: PE session
  * @sp_ie: raw AP Security Profile IE from scan entry (may be NULL)
  *
@@ -4780,6 +4772,15 @@ void lim_override_ap_rsnxe_from_security_profile(
  */
 bool lim_security_profile_has_ext_rsn_caps(struct pe_session *session,
 					   const uint8_t *sp_ie);
+
+/**
+ * lim_security_profile_has_smd_cap() - Check AP Security Profile SMD cap
+ * @session: PE session
+ *
+ * Return: true if selected AP Security Profile advertises SMD in Extended
+ * RSN Capabilities, false otherwise
+ */
+bool lim_security_profile_has_smd_cap(struct pe_session *session);
 #else
 static inline void
 lim_fill_session_security_profile(struct pe_session *session,
@@ -4792,7 +4793,6 @@ lim_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
 				    struct pe_session *session)
 {
 }
-
 static inline void
 lim_populate_security_profile_ie(struct pe_session *pe_session,
 				 tDot11fAssocRequest *frm,
@@ -4802,7 +4802,6 @@ lim_populate_security_profile_ie(struct pe_session *pe_session,
 
 static inline bool
 lim_validate_assoc_rsp_security_profile(
-		struct mac_context *mac_ctx,
 		struct pe_session *session_entry,
 		tSirAssocRsp *assoc_rsp)
 {
@@ -4821,6 +4820,12 @@ lim_override_ap_rsnxe_from_security_profile(
 static inline bool
 lim_security_profile_has_ext_rsn_caps(struct pe_session *session,
 				      const uint8_t *sp_ie)
+{
+	return false;
+}
+
+static inline bool
+lim_security_profile_has_smd_cap(struct pe_session *session)
 {
 	return false;
 }

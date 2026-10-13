@@ -47,6 +47,39 @@
 
 #include "wma_types.h"
 #include "wlan_utility.h"
+#include "wlan_vdev_mgr_utils_api.h"
+
+#define LIM_RSNXE_SMD_IE_LEN 7
+#define LIM_RSNXE_SMD_CAP_OCTETS 5
+#define LIM_RSNXE_SMD_CAP_OCTET_OFFSET 6
+#define LIM_RSNXE_SMD_CAP_BIT BIT(5)
+
+#ifdef WLAN_FEATURE_11BN_SMD
+static void lim_set_smd_rsnxe_raw(struct pe_session *pe_session,
+				  uint8_t *rsnxe, uint16_t rsnxe_len,
+				  const char *frame_type)
+{
+	if (!pe_session || !pe_session->vdev ||
+	    !wlan_vdev_is_smd_enabled(pe_session->vdev) ||
+	    !lim_security_profile_has_smd_cap(pe_session) || !rsnxe ||
+	    rsnxe_len < LIM_RSNXE_SMD_IE_LEN)
+		return;
+
+	rsnxe[SIR_MAC_IE_TYPE_OFFSET] = WLAN_ELEMID_RSNXE;
+	rsnxe[SIR_MAC_IE_LEN_OFFSET] = LIM_RSNXE_SMD_CAP_OCTETS;
+	rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] =
+		(rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] & 0xF0) |
+		(LIM_RSNXE_SMD_CAP_OCTETS - 1);
+	rsnxe[LIM_RSNXE_SMD_CAP_OCTET_OFFSET] |= LIM_RSNXE_SMD_CAP_BIT;
+	pe_debug("%s: set SMD RSNXE bit 37", frame_type);
+}
+#else
+static inline void lim_set_smd_rsnxe_raw(struct pe_session *pe_session,
+					 uint8_t *rsnxe, uint16_t rsnxe_len,
+					 const char *frame_type)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 
 /**
  * lim_send_reassoc_req_with_ft_ies_mgmt_frame() - Send Reassoc Req with FTIEs.
@@ -78,6 +111,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t add_ie_len;
 	uint8_t *add_ie;
 	const uint8_t *wps_ie = NULL, *rsnxe_ptr = NULL;
+	bool smd_rsnxe_required = false;
 	uint8_t tx_flag = 0;
 	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
@@ -393,14 +427,28 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 
 	rsnxe_ptr = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie,
 					     add_ie_len);
-	if (add_ie_len && rsnxe_ptr) {
-		rsnxe_len = rsnxe_ptr[1] + 2;
+	smd_rsnxe_required = pe_session->vdev &&
+			     wlan_vdev_is_smd_enabled(pe_session->vdev) &&
+			     lim_security_profile_has_smd_cap(pe_session);
+	if (smd_rsnxe_required || rsnxe_ptr) {
+		if (rsnxe_ptr) {
+			rsnxe_len = rsnxe_ptr[1] + 2;
+			if (smd_rsnxe_required &&
+			    rsnxe_len < LIM_RSNXE_SMD_IE_LEN)
+				rsnxe_len = LIM_RSNXE_SMD_IE_LEN;
+		} else {
+			rsnxe_len = LIM_RSNXE_SMD_IE_LEN;
+		}
 
 		rsnxe = qdf_mem_malloc(rsnxe_len);
 		if (!rsnxe)
 			goto end;
 
-		qdf_mem_copy(rsnxe, rsnxe_ptr, rsnxe_len);
+		qdf_mem_zero(rsnxe, rsnxe_len);
+		if (rsnxe_ptr)
+			qdf_mem_copy(rsnxe, rsnxe_ptr, rsnxe_ptr[1] + 2);
+		lim_set_smd_rsnxe_raw(pe_session, rsnxe, rsnxe_len,
+				      "FT Reassoc Request");
 	}
 
 	/*

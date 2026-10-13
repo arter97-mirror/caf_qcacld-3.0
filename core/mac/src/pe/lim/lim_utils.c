@@ -10166,6 +10166,131 @@ QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,
 #endif
 
 #ifdef WLAN_FEATURE_SECURITY_PROFILE
+#define LIM_RSNXE_CAP_LEN_MASK 0x0F
+#define LIM_SECURITY_PROFILE_VENDOR_LEN 4
+#define LIM_RSNXE_SMD_CAP_OCTETS 5
+
+static uint8_t lim_get_security_profile_ext_rsn_caps(const uint8_t *sp_ie,
+						     uint16_t sp_ie_len,
+						     uint8_t *ext_rsn_caps,
+						     uint8_t buf_len)
+{
+	uint8_t num_bitmap_octets, num_vendor, offset, ext_len;
+
+	if (!sp_ie || sp_ie_len < 7 || sp_ie[1] < 4)
+		return 0;
+
+	num_bitmap_octets = sp_ie[4] & 0x0f;
+	num_vendor        = (sp_ie[4] >> 4) & 0x0f;
+
+	/* Extended RSN Capabilities offset within IE data:
+	 * EIDext(1)+ReducedRSNCap(1)+SecProfileInd(1)+bitmap(N)+vendor(M*4)
+	 */
+	offset = 1 + 1 + 1 + num_bitmap_octets + num_vendor * 4;
+	if (sp_ie[1] <= offset)
+		return 0;
+
+	ext_len = sp_ie[1] - offset;
+	ext_len = QDF_MIN(ext_len, buf_len ? buf_len : ext_len);
+	if ((uint16_t)(SIR_MAC_IE_TYPE_LEN_SIZE + offset + ext_len) >
+	    sp_ie_len)
+		return 0;
+
+	if (ext_rsn_caps)
+		qdf_mem_copy(ext_rsn_caps,
+			     sp_ie + SIR_MAC_IE_TYPE_LEN_SIZE + offset,
+			     ext_len);
+
+	return ext_len;
+}
+
+#ifdef WLAN_FEATURE_11BN_SMD
+static bool lim_raw_security_profile_has_smd_cap(const uint8_t *sp_ie,
+						 uint16_t sp_ie_len)
+{
+	uint8_t ext_rsn_caps[SIR_MAC_RSNX_CAP_MAX_LEN];
+	uint8_t ext_len;
+
+	ext_len = lim_get_security_profile_ext_rsn_caps(sp_ie, sp_ie_len,
+							ext_rsn_caps,
+							sizeof(ext_rsn_caps));
+	if (ext_len < 5 ||
+	    ((ext_rsn_caps[0] & LIM_RSNXE_CAP_LEN_MASK) + 1) < 5)
+		return false;
+
+	return !!(ext_rsn_caps[4] & BIT(5));
+}
+
+/* checkpatch-suppress CamelCase */
+static void lim_set_smd_cap_in_security_profile(struct pe_session *pe_session,
+						tDot11fIEsecurity_profile *sp)
+{
+	uint8_t ext_rsn_offset;
+	uint8_t ext_rsn_len;
+
+	if (!pe_session || !sp ||
+	    !wlan_vdev_is_smd_enabled(pe_session->vdev) ||
+	    !lim_security_profile_has_smd_cap(pe_session))
+		return;
+
+	ext_rsn_offset =
+		sp->number_of_octets_of_security_profile_bitmap +
+		(sp->number_of_vendor_security_profile *
+		 LIM_SECURITY_PROFILE_VENDOR_LEN);
+	ext_rsn_len = sp->num_data > ext_rsn_offset ?
+		      sp->num_data - ext_rsn_offset : 0;
+
+	if (ext_rsn_offset >= sizeof(sp->data) ||
+	    ext_rsn_offset + LIM_RSNXE_SMD_CAP_OCTETS > sizeof(sp->data))
+		return;
+
+	if (ext_rsn_len < LIM_RSNXE_SMD_CAP_OCTETS) {
+		qdf_mem_zero(&sp->data[ext_rsn_offset + ext_rsn_len],
+			     LIM_RSNXE_SMD_CAP_OCTETS - ext_rsn_len);
+		ext_rsn_len = LIM_RSNXE_SMD_CAP_OCTETS;
+		sp->num_data = ext_rsn_offset + ext_rsn_len;
+	}
+
+	sp->data[ext_rsn_offset] =
+		(sp->data[ext_rsn_offset] & 0xF0) | (ext_rsn_len - 1);
+	sp->data[ext_rsn_offset + 4] |= BIT(5);
+}
+#else
+static inline bool lim_raw_security_profile_has_smd_cap(const uint8_t *sp_ie,
+							uint16_t sp_ie_len)
+{
+	return false;
+}
+
+static inline void
+lim_set_smd_cap_in_security_profile(struct pe_session *pe_session,
+				    tDot11fIEsecurity_profile *sp)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool lim_is_security_profile_assoc_encrypted(struct pe_session *session)
+{
+	int32_t auth_mode;
+
+	if (!session->assoc_rsp_protected)
+		return false;
+
+	auth_mode = wlan_crypto_get_param(session->vdev,
+					  WLAN_CRYPTO_PARAM_AUTH_MODE);
+	return auth_mode >= 0 &&
+	       (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
+		QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
+}
+#else
+static inline bool
+lim_is_security_profile_assoc_encrypted(struct pe_session *session)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 void lim_fill_session_security_profile(struct pe_session *session,
 				       struct scan_cache_entry *entry)
 {
@@ -10240,12 +10365,12 @@ void lim_populate_security_profile_ie(struct pe_session *pe_session,
 			     rsnx_ie[TAG_LEN_POS]);
 		sp->num_data += rsnx_ie[TAG_LEN_POS];
 	}
+	lim_set_smd_cap_in_security_profile(pe_session, sp);
 	pe_debug("vdev %d: Security Profile IE added, profile %d",
 		 pe_session->vdev_id, profile_num);
 }
 
 bool lim_validate_assoc_rsp_security_profile(
-		struct mac_context *mac_ctx,
 		struct pe_session *session_entry,
 		tSirAssocRsp *assoc_rsp)
 {
@@ -10256,8 +10381,7 @@ bool lim_validate_assoc_rsp_security_profile(
 	bool sp_match = false;
 
 	if (session_entry->sec_profile_num < 0 ||
-	    !session_entry->assoc_req ||
-	    !((tSirMacMgmtHdr *)session_entry->assoc_req)->fc.wep)
+	    !lim_is_security_profile_assoc_encrypted(session_entry))
 		return true;
 
 	scan_entry = wlan_cm_get_curr_candidate_entry(session_entry->vdev,
@@ -10269,7 +10393,7 @@ bool lim_validate_assoc_rsp_security_profile(
 	}
 
 	ap_sp_ie = util_scan_entry_security_profile(scan_entry);
-	ap_sp_len = ap_sp_ie ? ap_sp_ie[1] + 2 : 0;
+	ap_sp_len = ap_sp_ie ? ap_sp_ie[1] + SIR_MAC_IE_TYPE_LEN_SIZE : 0;
 
 	if (assoc_rsp->security_profile.present && ap_sp_len >= 5) {
 		ap_bitmap_octets = ap_sp_ie[4] & 0x0f;
@@ -10297,37 +10421,6 @@ bool lim_validate_assoc_rsp_security_profile(
 	return false;
 }
 
-static uint8_t lim_get_security_profile_ext_rsn_caps(const uint8_t *sp_ie,
-						     uint16_t sp_ie_len,
-						     uint8_t *ext_rsn_caps,
-						     uint8_t buf_len)
-{
-	uint8_t num_bitmap_octets, num_vendor, offset, ext_len;
-
-	if (!sp_ie || sp_ie_len < 7 || sp_ie[1] < 4)
-		return 0;
-
-	num_bitmap_octets = sp_ie[4] & 0x0f;
-	num_vendor        = (sp_ie[4] >> 4) & 0x0f;
-
-	/* Extended RSN Capabilities offset within IE data:
-	 * EIDext(1)+ReducedRSNCap(1)+SecProfileInd(1)+bitmap(N)+vendor(M*4)
-	 */
-	offset = 1 + 1 + 1 + num_bitmap_octets + num_vendor * 4;
-	if (sp_ie[1] <= offset)
-		return 0;
-
-	ext_len = sp_ie[1] - offset;
-	ext_len = QDF_MIN(ext_len, buf_len ? buf_len : ext_len);
-	if ((uint16_t)(2 + offset + ext_len) > sp_ie_len)
-		return 0;
-
-	if (ext_rsn_caps)
-		qdf_mem_copy(ext_rsn_caps, sp_ie + 2 + offset, ext_len);
-
-	return ext_len;
-}
-
 void lim_override_ap_rsnxe_from_security_profile(
 			struct pe_session *session,
 			const uint8_t *sp_ie,
@@ -10336,11 +10429,12 @@ void lim_override_ap_rsnxe_from_security_profile(
 {
 	uint8_t ext_len;
 
-	if (session->sec_profile_num < 0 || !sp_ie)
+	if (session->sec_profile_num < 0 || !sp_ie ||
+	    buf_len <= SIR_MAC_IE_TYPE_LEN_SIZE)
 		return;
 
 	ext_len = lim_get_security_profile_ext_rsn_caps(
-			sp_ie, sp_ie[1] + 2,
+			sp_ie, sp_ie[1] + SIR_MAC_IE_TYPE_LEN_SIZE,
 			buf + SIR_MAC_IE_TYPE_LEN_SIZE,
 			buf_len - SIR_MAC_IE_TYPE_LEN_SIZE);
 	if (ext_len) {
@@ -10354,11 +10448,37 @@ void lim_override_ap_rsnxe_from_security_profile(
 bool lim_security_profile_has_ext_rsn_caps(struct pe_session *session,
 					   const uint8_t *sp_ie)
 {
-	if (session->sec_profile_num < 0 || !sp_ie)
+	if (!session || session->sec_profile_num < 0 || !sp_ie)
 		return false;
 
-	return lim_get_security_profile_ext_rsn_caps(sp_ie, sp_ie[1] + 2,
-						     NULL, 0) > 0;
+	return lim_get_security_profile_ext_rsn_caps(
+				sp_ie,
+				sp_ie[1] + SIR_MAC_IE_TYPE_LEN_SIZE,
+				NULL, 0) > 0;
+}
+
+bool lim_security_profile_has_smd_cap(struct pe_session *session)
+{
+	struct scan_cache_entry *scan_entry;
+	const uint8_t *sp_ie;
+	bool has_smd_cap;
+
+	if (!session || session->sec_profile_num < 0)
+		return false;
+
+	scan_entry = wlan_cm_get_curr_candidate_entry(session->vdev,
+						      session->cm_id);
+	if (!scan_entry)
+		return false;
+
+	sp_ie = util_scan_entry_security_profile(scan_entry);
+	has_smd_cap = sp_ie &&
+		      lim_raw_security_profile_has_smd_cap(
+				sp_ie,
+				sp_ie[1] + SIR_MAC_IE_TYPE_LEN_SIZE);
+	util_scan_free_cache_entry(scan_entry);
+
+	return has_smd_cap;
 }
 #endif /* WLAN_FEATURE_SECURITY_PROFILE */
 

@@ -929,6 +929,7 @@ struct dar_config {
  * @wait_key_timer: wait key timer
  * @eht_config: Eht capability configuration
  * @smd_enabled: SMD enabled flag for this vdev
+ * @security_profile_enabled: Security Profile enabled flag for this vdev
  * @ml_reconfig_ie: link reconfig ie raw data
  * @elem_len: link reconfig ie length
  * @link_removal_delay_for_csa: link removal when SAP is doing CSA, wait for
@@ -1013,6 +1014,7 @@ struct mlme_legacy_priv {
 #endif
 #ifdef WLAN_FEATURE_11BN_SMD
 	bool smd_enabled;
+	bool security_profile_enabled;
 #endif
 #ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 	uint8_t *ml_reconfig_ie;
