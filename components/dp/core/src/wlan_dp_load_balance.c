@@ -637,6 +637,9 @@ wlan_dp_lb_compute_cpu_load_average(struct wlan_dp_psoc_context *dp_ctx)
 	hif_get_wlan_rx_time_stats(hif_ctx, wlan_irq_time, wlan_ksoftirqd_time);
 
 	qdf_for_each_online_cpu(cpu) {
+		if (cpu >= QDF_MAX_AVAILABLE_CPU)
+			continue;
+
 		cpu_load = &lb_data->cpu_load[cpu];
 		kcpustat_cpu_fetch(&kcpustat, cpu);
 
