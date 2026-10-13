@@ -131,6 +131,8 @@ struct wlan_fwol_coex_config {
  * @priority_wpps: Priority of the wpps mitigation to consider by fw
  * @thermal_action: thermal action as defined enum thermal_mgmt_action_code
  * @therm_stats_offset: thermal temp offset as set in gThermalStatsTempOffset
+ * @thermal_algo_type: thermal throttling algorithm type as set in
+ *                     thermal_algo_type ini. Refer enum thermal_algo_type
  */
 struct wlan_fwol_thermal_temp {
 	bool     thermal_mitigation_enable;
@@ -145,6 +147,9 @@ struct wlan_fwol_thermal_temp {
 	enum thermal_mgmt_action_code thermal_action;
 #ifdef THERMAL_STATS_SUPPORT
 	uint8_t therm_stats_offset;
+#endif
+#ifdef THERMAL_UTIL_THROTTLE_SUPPORT
+	enum thermal_algo_type thermal_algo_type;
 #endif
 };
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -536,6 +536,43 @@
 					CFG_VALUE_OR_DEFAULT, \
 					"Thermal Stats Temperature Offset")
 
+#ifdef THERMAL_UTIL_THROTTLE_SUPPORT
+/*
+ * <ini>
+ * thermal_algo_type - Configure the thermal throttling algorithm type
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini selects the thermal throttling algorithm to be used by firmware.
+ * The valid values are defined by enum thermal_algo_type
+ * 0 - THERMAL_ALGO_TIMER_BASED: Timer based thermal throttling (Default)
+ * 1 - THERMAL_ALGO_UTIL_BASED: Utilization based thermal throttling
+ *
+ * Value 1 is applicable only if firmware advertises
+ * WMI_SERVICE_UTIL_BASED_THROTTLING service capability, else host falls
+ * back to timer based thermal throttling.
+ *
+ * Usage: External
+ *
+ * Supported features: Thermal Mitigation
+ *
+ * </ini>
+ */
+#define CFG_THERMAL_ALGO_TYPE CFG_INI_UINT( \
+				"thermal_algo_type", \
+				0, \
+				1, \
+				0, \
+				CFG_VALUE_OR_DEFAULT, \
+				"Thermal throttling algorithm type")
+
+#define CFG_THERMAL_ALGO_TYPE_ALL \
+	CFG(CFG_THERMAL_ALGO_TYPE)
+#else
+#define CFG_THERMAL_ALGO_TYPE_ALL
+#endif /* THERMAL_UTIL_THROTTLE_SUPPORT */
+
 /* <ini>
  *ddr_bwm_sampling_time - Configure the ddr bw mitigation sampling time in ms.
  *
@@ -755,6 +792,7 @@
 	CFG(CFG_THERMAL_WPPS_PRIOITY) \
 	CFG(CFG_THERMAL_MGMT_ACTION) \
 	CFG(CFG_THERMAL_STATS_TEMP_OFFSET) \
+	CFG_THERMAL_ALGO_TYPE_ALL \
 	CFG(CFG_DDR_BWM_SAMPLING_TIME) \
 	CFG(CFG_DDR_BW_MITIGATION_ENABLE) \
 	CFG(CFG_DDR_BWM_PRIORITY) \
