@@ -164,6 +164,13 @@ lim_process_updated_ies_in_probe_rsp(struct mac_context *mac_ctx,
 						     session_entry, false);
 	}
 
+	if (!sta_ds) {
+		pe_err_rl("vdev %d: peer entry not found for " QDF_MAC_ADDR_FMT,
+			  session_entry->vdev_id,
+			  QDF_MAC_ADDR_REF(session_entry->bssId));
+		return;
+	}
+
 	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, probe_rsp,
 				  session_entry->dot11mode);
 	lim_update_nss(mac_ctx, sta_ds, nss_ies.op_rx_nss, session_entry);
