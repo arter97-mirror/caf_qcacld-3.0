@@ -4265,6 +4265,11 @@ uint32_t wlansap_get_2g_first_safe_chan_freq(struct sap_context *sap_ctx)
 	uint32_t *acs_freq_list;
 	uint8_t acs_list_count;
 
+	if (!sap_ctx->acs_cfg) {
+		sap_debug("ACS config is NULL.");
+		return TWOG_CHAN_6_IN_MHZ;
+	}
+
 	pdev = sap_ctx->vdev->vdev_objmgr.wlan_pdev;
 	psoc = pdev->pdev_objmgr.wlan_psoc;
 
