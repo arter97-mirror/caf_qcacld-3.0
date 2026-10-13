@@ -78,9 +78,17 @@ QDF_STATUS wlan_cfg80211_tdls_osif_priv_init(struct wlan_objmgr_vdev *vdev)
 	init_completion(&tdls_priv->tdls_user_cmd_comp);
 	init_completion(&tdls_priv->tdls_antenna_switch_comp);
 
+	tdls_priv->tdls_user_cmd_buf = qdf_mem_malloc(PAGE_SIZE);
+	if (!tdls_priv->tdls_user_cmd_buf)
+		goto err_buf_alloc;
+
 	osif_priv->osif_tdls = tdls_priv;
 
 	return QDF_STATUS_SUCCESS;
+
+err_buf_alloc:
+	qdf_mem_free(tdls_priv);
+	return QDF_STATUS_E_NOMEM;
 }
 
 void wlan_cfg80211_tdls_osif_priv_deinit(struct wlan_objmgr_vdev *vdev)
@@ -94,8 +102,11 @@ void wlan_cfg80211_tdls_osif_priv_deinit(struct wlan_objmgr_vdev *vdev)
 	}
 
 	osif_debug("deinitialize tdls os if layer private structure");
-	if (osif_priv->osif_tdls)
+	if (osif_priv->osif_tdls) {
+		qdf_mem_free(osif_priv->osif_tdls->tdls_user_cmd_buf);
+		osif_priv->osif_tdls->tdls_user_cmd_buf = NULL;
 		qdf_mem_free(osif_priv->osif_tdls);
+	}
 	osif_priv->osif_tdls = NULL;
 }
 
@@ -842,8 +853,11 @@ int wlan_cfg80211_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	tdls_priv->tdls_user_cmd_in_progress = true;
 	wlan_cfg80211_update_tdls_peers_rssi(vdev);
 
+	tdls_priv->tdls_user_cmd_len = 0;
+	qdf_mem_zero(tdls_priv->tdls_user_cmd_buf, PAGE_SIZE);
 	reinit_completion(&tdls_priv->tdls_user_cmd_comp);
-	status = ucfg_tdls_get_all_peers(vdev, buf, buflen);
+	status = ucfg_tdls_get_all_peers(vdev, tdls_priv->tdls_user_cmd_buf,
+					 PAGE_SIZE);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		osif_err("ucfg_tdls_get_all_peers failed err %d", status);
 		len = scnprintf(buf, buflen,
@@ -867,6 +881,10 @@ int wlan_cfg80211_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	}
 
 	len = tdls_priv->tdls_user_cmd_len;
+	if (len > 0) {
+		len = min_t(int32_t, len, buflen);
+		qdf_mem_copy(buf, tdls_priv->tdls_user_cmd_buf, len);
+	}
 
 error_get_tdls_peers:
 	tdls_priv->tdls_user_cmd_in_progress = false;
