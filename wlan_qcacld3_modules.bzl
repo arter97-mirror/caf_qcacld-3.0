@@ -1,6 +1,7 @@
-load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load(":target_variants.bzl", "get_all_variants")
+load("@rules_pkg//pkg:install.bzl", "pkg_install")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 
 _target_chipset_map = {
         "blair":[
@@ -20,6 +21,11 @@ _target_chipset_map = {
                 "qca6750",
                 "adrastea",
         ],
+        "waipio":[
+                "qca6490",
+                "qca6750",
+		"kiwi",
+        ],
         "lahaina":[
                 "qca6490",
                 "qca6750",
@@ -30,7 +36,7 @@ _target_chipset_map = {
 	],
 	"malabar":[
 		"adrastea",
-	]
+	],
 }
 
 _chipset_hw_map = {
@@ -38,6 +44,7 @@ _chipset_hw_map = {
         "adrastea" : "ADRASTEA",
         "qca6750": "MOSELLE",
         "qca6490": "LITHIUM",
+        "kiwi": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -53,6 +60,10 @@ _chipset_header_map = {
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
+    "kiwi": [
+        "api/hw/kiwi/v1",
+        "cmn/hal/wifi3.0/kiwi",
+    ],
 }
 
 _hw_header_map = {
@@ -63,6 +74,9 @@ _hw_header_map = {
     ],
     "LITHIUM": [
         "cmn/hal/wifi3.0/li",
+    ],
+    "BERYLLIUM": [
+        "cmn/hal/wifi3.0/be",
     ],
 }
 
@@ -673,6 +687,15 @@ _conditional_srcs = {
             "cmn/dp/wifi3.0/be/dp_be_rx.c",
             "cmn/dp/wifi3.0/be/dp_be_tx.c",
             "cmn/dp/wifi3.0/dp_reo.c",
+            "cmn/dp/wifi3.0/dp_tx.c",
+            "cmn/dp/wifi3.0/dp_stats.c",
+            "cmn/dp/wifi3.0/dp_main.c",
+            "cmn/dp/wifi3.0/dp_arch_ops.c",
+            "cmn/dp/wifi3.0/dp_tx_desc.c",
+            "cmn/dp/wifi3.0/dp_rx.c",
+            "cmn/dp/wifi3.0/dp_htt.c",
+            "cmn/dp/wifi3.0/dp_peer.c",
+            "cmn/dp/wifi3.0/dp_rx_desc.c",
             "cmn/dp/wifi3.0/dp_rx_err.c",
             "cmn/hal/wifi3.0/be/hal_be_generic_api.c",
             "cmn/hal/wifi3.0/be/hal_be_reo.c",
@@ -680,6 +703,10 @@ _conditional_srcs = {
             "cmn/hal/wifi3.0/hal_srng.c",
             "cmn/hif/src/ce/ce_service_srng.c",
             "cmn/wlan_cfg/wlan_cfg.c",
+            "core/dp/txrx3.0/dp_txrx.c",
+            "cmn/target_if/dp/src/target_if_dp.c",
+            "cmn/dp/wifi3.0/dp_rx_defrag.c",
+            "cmn/dp/wifi3.0/dp_tx_flow_control.c",
         ],
     },
     "CONFIG_CM_UTF_ENABLE": {
@@ -1035,7 +1062,9 @@ _conditional_srcs = {
           "cmn/dp/wifi3.0/dp_rx_defrag.c",
           "cmn/dp/wifi3.0/dp_tx_flow_control.c",
       ],
-          False: [
+    },
+    "CONFIG_HELIUMPLUS": {
+        True: [
           "core/dp/txrx/ol_rx_pn.c",
           "core/dp/txrx/ol_rx_reorder.c",
           "core/dp/txrx/ol_rx_reorder_timeout.c",
@@ -1056,6 +1085,7 @@ _conditional_srcs = {
           "core/dp/htt/htt_fw_stats.c",
           "core/dp/htt/htt_tx.c",
           "cmn/hif/src/ce/ce_service_legacy.c",
+          "cmn/hif/src/hif_main_legacy.c",
           "core/dp/txrx/ol_tx_ll.c",
           "core/dp/htt/htt_rx_ll.c",
           "core/dp/txrx/ol_tx_throttle.c",
@@ -1073,6 +1103,12 @@ _conditional_srcs = {
         True: [
             "cmn/hal/wifi3.0/qca6490/hal_6490.c",
             "cmn/hif/src/qca6490def.c",
+        ],
+    },
+    "CONFIG_KIWI_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
+            "cmn/hif/src/kiwidef.c",
         ],
     },
     "CONFIG_OCB_UT_FRAMEWORK": {
@@ -1998,6 +2034,16 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
         },
         {
+            "pattern": "NL80211_EXT_FEATURE_ROC_ADDR_FILTER",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC",
+        },
+        {
+            "pattern": "(*add_key)(struct wiphy *wiphy, struct wireless_dev *wdev,",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV",
+        },
+        {
             "pattern": "struct link_station_parameters",
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_LINK_STA_PARAMS_PRESENT",
@@ -2016,6 +2062,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "pattern": "NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
             "file": "include/uapi/linux/nl80211.h",
             "flag": "CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
+        },
+        {
+            "pattern": "NL80211_CMD_START_PD",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_PD_SUPPORT",
         },
     ]
 
@@ -2112,7 +2163,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "lahaina" and target != "parrot" and target != "malabar":
+    if target != "lahaina" and target != "parrot" and target != "malabar" and target != "waipio" :
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2154,28 +2205,33 @@ def define_dist(target, variant, chipsets):
         tvc = "{}_{}_{}".format(target, variant, c)
         name = "{}_qca_cld_{}".format(tv, c)
         dataList.append(":{}".format(name))
-        copy_to_dist_dir(
-            name = "{}_modules_dist".format(tvc),
-            data =  [":{}".format(name)],
-            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
-            flat = True,
-            wipe_dist_dir = False,
-            allow_duplicate_filenames = False,
-            mode_overrides = {"**/*": "644"},
-            log = "info",
+
+        pkg_files(
+            name = tvc + "_dist_files",
+            srcs = [":{}".format(name)],
+            visibility = ["//visibility:private"],
+            strip_prefix = strip_prefix.files_only(),
         )
+        pkg_install(
+            name = "{}_modules_dist".format(tvc),
+            srcs = [":{}_dist_files".format(tvc)],
+            destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+        )
+
     if target == "bilair" or target == "monaco" or target == "bengal":
         return
-    copy_to_dist_dir(
-        name = "{}_all_modules_dist".format(tv),
-        data = dataList,
-        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
-        flat = True,
-        wipe_dist_dir = False,
-        allow_duplicate_filenames = False,
-        mode_overrides = {"**/*": "644"},
-        log = "info",
+    pkg_files(
+        name = tv + "_dist_files",
+        srcs = dataList,
+        visibility = ["//visibility:private"],
+        strip_prefix = strip_prefix.files_only(),
     )
+    pkg_install(
+        name = "{}_all_modules_dist".format(tv),
+        srcs = [":{}_dist_files".format(tv)],
+        destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+    )
+
 
 def define_modules():
     for (t, v) in get_all_variants():

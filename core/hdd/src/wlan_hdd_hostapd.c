@@ -1998,6 +1998,74 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+static QDF_STATUS
+wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
+			  const u8 *mac, struct station_info *sinfo)
+{
+	struct wireless_dev *wdev;
+
+	wdev = &adapter->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_new_sta(wdev, mac, sinfo, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_cfg80211_del_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	struct wireless_dev *wdev;
+
+	wdev = &adapter->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_del_sta(wdev, mac, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wlan_hdd_cfg80211_new_sta(struct hdd_adapter *adapter,
+			  const u8 *mac, struct station_info *sinfo)
+{
+	struct net_device *dev;
+
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_new_sta(dev, mac, sinfo, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wlan_hdd_cfg80211_del_sta(struct hdd_adapter *adapter, const u8 *mac)
+{
+	struct net_device *dev;
+
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_del_sta(dev, mac, GFP_KERNEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				    void *context)
 {
@@ -2657,11 +2725,16 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_hostapd_sap_fill_peer_ml_info(adapter, sta_info,
 							  event->staMac.bytes);
 
-			if (notify_new_sta)
-				cfg80211_new_sta(dev,
-						 (const u8 *)&event->
-						 staMac.bytes[0],
-						 sta_info, GFP_KERNEL);
+			if (notify_new_sta) {
+				qdf_status = wlan_hdd_cfg80211_new_sta(adapter,
+							(const u8 *)&event->
+							staMac.bytes[0],
+							sta_info);
+				if (QDF_IS_STATUS_ERROR(qdf_status)) {
+					qdf_mem_free(sta_info);
+					return status;
+				}
+			}
 			qdf_mem_free(sta_info);
 		}
 		/* Lets abort scan to ensure smooth authentication for client */
@@ -2822,10 +2895,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 */
 		if ((adapter->device_mode != QDF_P2P_GO_MODE) ||
 		     (!cds_is_driver_recovering())) {
-			cfg80211_del_sta(dev,
-					 (const u8 *)&sta_addr.bytes[0],
-					 GFP_KERNEL);
-			hdd_debug("indicate sta deletion event");
+			qdf_status = wlan_hdd_cfg80211_del_sta(adapter,
+						(const u8 *)&sta_addr.bytes[0]);
+			if (QDF_IS_STATUS_ERROR(status))
+				hdd_err("Error with sta deletion event");
+			else
+				hdd_debug("indicate sta deletion event");
 		}
 
 		/* Update the beacon Interval if it is P2P GO */
