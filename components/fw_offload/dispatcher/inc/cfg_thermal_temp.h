@@ -411,7 +411,7 @@
  *gThermalSamplingTime - Configure the thermal mitigation sampling time in ms.
  *
  * @Min: 10
- * @Max: 100
+ * @Max: 5000
  * @Default: 100
  *
  * This ini will control the sampling time that the thermal mitigation in FW
@@ -426,7 +426,7 @@
 #define CFG_THERMAL_SAMPLING_TIME CFG_INI_UINT( \
 				"gThermalSamplingTime", \
 				10, \
-				100, \
+				5000, \
 				100, \
 				CFG_VALUE_OR_DEFAULT, \
 				"Thermal mitigation sampling time")
