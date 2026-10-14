@@ -248,6 +248,26 @@ void ucfg_dp_conn_info_record_ul_delay_sample(struct wlan_objmgr_vdev *vdev,
 					      uint32_t ul_delay);
 
 /**
+ * ucfg_dp_conn_info_get_tx_phy_rate_avg() - get average tx phy rate across
+ *  the rolling window of recent tx phy rate samples
+ * @vdev: vdev mapped to STA DP interface
+ *
+ * Return: average tx phy rate across the stored sample window
+ */
+uint32_t ucfg_dp_conn_info_get_tx_phy_rate_avg(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_dp_conn_info_record_tx_phy_rate_sample() - record a tx phy rate
+ *  sample into the rolling window in connection info
+ * @vdev: vdev mapped to STA DP interface
+ * @phy_rate: tx phy rate sample value to record
+ *
+ * Return: None
+ */
+void ucfg_dp_conn_info_record_tx_phy_rate_sample(struct wlan_objmgr_vdev *vdev,
+						 uint32_t phy_rate);
+
+/**
  * ucfg_dp_conn_info_set_peer_authenticate() - set Peer authenticated state
  * @vdev: vdev mapped to STA DP interface
  * @is_authenticated: Peer authenticated info

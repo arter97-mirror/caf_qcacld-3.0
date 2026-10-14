@@ -419,6 +419,7 @@ struct wlan_dp_sta_info {
 };
 
 #define WLAN_DP_UL_DELAY_WINDOW_SIZE 10
+#define WLAN_DP_TX_PHY_RATE_WINDOW_SIZE 10
 
 struct wlan_dp_conn_info {
 	struct qdf_mac_addr bssid;
@@ -428,6 +429,11 @@ struct wlan_dp_conn_info {
 	uint32_t ul_delay_win[WLAN_DP_UL_DELAY_WINDOW_SIZE];
 	uint8_t ul_delay_win_idx;
 	uint8_t ul_delay_win_filled;
+	uint32_t tx_phy_rate_win[WLAN_DP_TX_PHY_RATE_WINDOW_SIZE];
+	uint8_t tx_phy_rate_win_idx;
+	uint8_t tx_phy_rate_win_filled;
+	uint64_t prev_phy_rate_sum;
+	uint64_t prev_phy_rate_cnt;
 };
 
 /**
