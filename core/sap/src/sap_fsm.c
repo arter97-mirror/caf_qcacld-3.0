@@ -2766,11 +2766,18 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 	/**
 	 * Force SAP to 20MHz if INI is enabled and country is Indonesia
 	 */
-	if (policy_mgr_get_sap_force_20mhz_for_country_id(
+	if (sap_ctx->ch_params.ch_width > CH_WIDTH_20MHZ &&
+	    policy_mgr_get_sap_force_20mhz_for_country_id(
 					mac_ctx->psoc,
 					sap_ctx->vdev,
-					(qdf_freq_t)sap_ctx->chan_freq))
+					(qdf_freq_t)sap_ctx->chan_freq)) {
 		sap_ctx->ch_params.ch_width = CH_WIDTH_20MHZ;
+		sap_ctx->ch_params.sec_ch_offset = 0;
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+					       sap_ctx->chan_freq,
+					       sap_ctx->ch_params.sec_ch_offset,
+					       &sap_ctx->ch_params);
+	}
 
 	if (orig_ch_width != sap_ctx->ch_params.ch_width ||
 	    orig_phymode != sap_ctx->phyMode)
@@ -2895,9 +2902,10 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	sap_validate_chanmode_and_chwidth(mac_ctx, sap_ctx);
 	/* Channel selected. Now can sap_goto_starting */
 	sap_ctx->fsm_state = SAP_STARTING;
-	sap_debug("from state %s => %s phyMode %d, bw %d",
+	sap_debug("from state %s => %s phyMode %d, bw %d, sec offset %d",
 		  "SAP_INIT", "SAP_STARTING", sap_ctx->phyMode,
-		  sap_ctx->ch_params.ch_width);
+		  sap_ctx->ch_params.ch_width,
+		  sap_ctx->ch_params.sec_ch_offset);
 	/* Specify the channel */
 	sap_ctx->csr_roamProfile.ChannelInfo.numOfChannels =
 					1;

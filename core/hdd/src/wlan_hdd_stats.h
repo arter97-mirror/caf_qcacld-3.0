@@ -328,6 +328,21 @@ int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 
 #endif /* End of WLAN_FEATURE_STATS_EXT */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+/**
+ * wlan_hdd_cfg80211_get_station() - get station statistics
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @mac: Pointer to mac
+ * @sinfo: Pointer to station info
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  const uint8_t *mac,
+				  struct station_info *sinfo);
+#else
 /**
  * wlan_hdd_cfg80211_get_station() - get station statistics
  * @wiphy: Pointer to wiphy
@@ -346,7 +361,24 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 				  struct net_device *dev, uint8_t *mac,
 				  struct station_info *sinfo);
 #endif
+#endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21))
+/**
+ * wlan_hdd_cfg80211_dump_station() - dump station statistics
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @idx: variable to determine whether to get stats or not
+ * @mac: Pointer to mac
+ * @sinfo: Pointer to station info
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   int idx, u8 *mac,
+				   struct station_info *sinfo);
+#else
 /**
  * wlan_hdd_cfg80211_dump_station() - dump station statistics
  * @wiphy: Pointer to wiphy
@@ -358,9 +390,10 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
  * Return: 0 for success, non-zero for failure
  */
 int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
-				struct net_device *dev,
-				int idx, u8 *mac,
-				struct station_info *sinfo);
+				   struct net_device *dev,
+				   int idx, u8 *mac,
+				   struct station_info *sinfo);
+#endif
 
 struct net_device_stats *hdd_get_stats(struct net_device *dev);
 
