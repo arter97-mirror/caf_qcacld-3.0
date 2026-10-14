@@ -1542,7 +1542,7 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 			hif_set_napi_redirect_cpu(
 					hif_ctx,
 					cdp_get_tx_rings_grp_bitmap(soc),
-					0, true);
+					0, cpumask, true);
 	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
 		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
 		if (!dp_keep_perf_affinity())
@@ -1553,7 +1553,7 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 
 		hif_set_napi_redirect_cpu(hif_ctx,
 					  cdp_get_tx_rings_grp_bitmap(soc),
-					  0, false);
+					  0, cpumask, false);
 	}
 }
 
@@ -1591,7 +1591,7 @@ dp_set_rx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 			hif_set_napi_redirect_cpu(
 					hif_ctx, 0,
 					cdp_get_rx_rings_grp_bitmap(soc),
-					true);
+					cpumask, true);
 
 	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
 		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
@@ -1603,7 +1603,7 @@ dp_set_rx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 
 		hif_set_napi_redirect_cpu(hif_ctx, 0,
 					  cdp_get_rx_rings_grp_bitmap(soc),
-					  false);
+					  cpumask, false);
 	}
 }
 #else
