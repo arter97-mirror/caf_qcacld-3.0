@@ -40838,6 +40838,11 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 						chan_info->ch_freq, sec_2g_freq,
 						&ch_params,
 						REG_CURRENT_PWR_MODE);
+	if (ch_params.ch_width >= CH_WIDTH_INVALID) {
+		hdd_debug("invalid channel width %d for freq %d",
+			  ch_params.ch_width, chan_info->ch_freq);
+		return -EINVAL;
+	}
 
 	if (chan_info->ch_cfreq1 != ch_params.mhz_freq_seg0 ||
 	    chan_info->ch_cfreq2 != ch_params.mhz_freq_seg1 ||

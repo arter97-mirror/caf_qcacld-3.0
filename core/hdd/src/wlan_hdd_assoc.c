@@ -731,9 +731,12 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 
 	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
 	if (link_info &&
-	    !wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_info->vdev))
+	    !wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_info->vdev)) {
+		hdd_debug("Aborting ongoing STA connection vdev_id %d",
+			  link_info->vdev_id);
 		wlan_hdd_cm_issue_disconnect(link_info,
 					     REASON_UNSPEC_FAILURE, false);
+        }
 }
 
 void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx)

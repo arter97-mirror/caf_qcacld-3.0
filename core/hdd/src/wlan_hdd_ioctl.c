@@ -6932,6 +6932,10 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	/* Abort an ongoing connection before disabling the 6 GHz band.*/
+	if (dis_6g_keep_sta_cli_conn)
+		hdd_abort_ongoing_sta_connection(hdd_ctx);
+
 	status = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
 						   &rf_test_mode);
 	if (!QDF_IS_STATUS_SUCCESS(status_6G)) {
