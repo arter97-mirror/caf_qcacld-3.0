@@ -1800,7 +1800,7 @@ void lim_send_mscs_req_action_frame(struct mac_context *mac,
 			bytes);
 	}
 
-	bytes = payload + sizeof(struct qdf_mac_addr);
+	bytes = payload + sizeof(tSirMacMgmtHdr);
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
