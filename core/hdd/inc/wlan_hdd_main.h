@@ -2269,6 +2269,7 @@ struct hdd_tx_powerboost {
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
  * @tx_pb: Tx powerboost context
+ * @ipa_pipe_reset: true when IPA pipes are currently disconnected
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2579,6 +2580,9 @@ struct hdd_context {
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	struct hdd_tx_powerboost tx_pb;
 #endif
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+	bool ipa_pipe_reset;
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
 };
 
 /**

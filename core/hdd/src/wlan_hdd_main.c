@@ -18535,6 +18535,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	hdd_ctx->is_dual_mac_cfg_updated = false;
 	hdd_ctx->driver_status = DRIVER_MODULES_CLOSED;
 	hdd_ctx->is_fw_dbg_log_levels_configured = false;
+	hdd_ipa_pipe_reset_set(hdd_ctx, false);
 	wlan_hdd_deinit_port_id_info(hdd_ctx);
 	hdd_unregister_get_port_status_notifier(hdd_ctx);
 	hdd_debug("Wlan transitioned (now CLOSED)");
