@@ -4680,6 +4680,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		capable |= CONN_6GHZ_FLAG_SECURITY_ALLOWED;
 
 	if ((keymgmt & (1 << WLAN_CRYPTO_KEY_MGMT_SAE |
+			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256 |
 			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B |
 			1 << WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192 |
 			1 << WLAN_CRYPTO_KEY_MGMT_OWE |
