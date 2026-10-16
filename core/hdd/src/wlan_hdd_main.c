@@ -16013,6 +16013,7 @@ err_free_config:
 
 err_free_hdd_context:
 	qdf_delayed_work_destroy(&hdd_ctx->psoc_idle_timeout_work);
+	hdd_pm_notifier_deinit(hdd_ctx);
 
 wiphy_dealloc:
 	wiphy_free(hdd_ctx->wiphy);

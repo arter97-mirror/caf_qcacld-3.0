@@ -1923,6 +1923,16 @@ bool wlan_mlme_is_5gl_5gh_mlsr_supported(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.sta.mlo_5gl_5gh_mlsr;
 }
 
+bool wlan_mlme_get_sta_sl_with_mlo_sap(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+	return mlme_obj->cfg.sta.sta_sl_with_mlo_sap;
+}
+
 void
 wlan_mlme_get_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
 				    int8_t *mlo_prefer_percentage)

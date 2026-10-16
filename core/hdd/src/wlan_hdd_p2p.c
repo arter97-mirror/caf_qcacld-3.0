@@ -413,9 +413,14 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	if (ret)
 		return ret;
 
+	if (!buf) {
+		hdd_err("mgmt tx: invalid buf");
+		return -EINVAL;
+	}
+
 	link_info = NULL;
 	if (adapter->device_mode == QDF_SAP_MODE && link_id == -1 &&
-	    buf && len >= sizeof(struct wlan_frame_hdr))
+	    len >= sizeof(struct wlan_frame_hdr))
 		link_info = hdd_get_ml_sap_link_info_by_frame_da(adapter, buf);
 	if (!link_info)
 		link_info = hdd_get_link_info_by_link_id(adapter, link_id);

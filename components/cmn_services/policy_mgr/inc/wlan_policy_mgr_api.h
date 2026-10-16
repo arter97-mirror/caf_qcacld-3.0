@@ -5409,6 +5409,15 @@ bool policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_ml_sap_present() - Check whether a MLO SAP is
+ *                                  present
+ * @psoc: PSOC object information
+ *
+ * Return: True if any MLO SAP has more than one link, otherwise false.
+ */
+bool policy_mgr_is_ml_sap_present(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_mlo_in_mode_sbs() - Check whether MLO present is SBS (with both
  * links on 5/6 ghz band)
  * @psoc: PSOC object information
@@ -5705,6 +5714,11 @@ policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline bool policy_mgr_is_mlo_sta_present(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool policy_mgr_is_ml_sap_present(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

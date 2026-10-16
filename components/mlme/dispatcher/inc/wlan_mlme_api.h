@@ -4607,6 +4607,16 @@ uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc);
 bool wlan_mlme_is_5gl_5gh_mlsr_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mlme_get_sta_sl_with_mlo_sap() - check if STA MLO connection should
+ *                                       be restricted to single link when a
+ *                                       multi-link MLO SAP is concurrently up
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if the restriction is enabled via INI, otherwise false
+ */
+bool wlan_mlme_get_sta_sl_with_mlo_sap(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_set_sta_mlo_conn_max_num() - set max number of links that sta mlo
  *                                        connection can support
  * @psoc: pointer to psoc object
@@ -4770,6 +4780,12 @@ static inline bool
 wlan_mlme_is_5gl_5gh_mlsr_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
+}
+
+static inline bool
+wlan_mlme_get_sta_sl_with_mlo_sap(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 
 static inline QDF_STATUS

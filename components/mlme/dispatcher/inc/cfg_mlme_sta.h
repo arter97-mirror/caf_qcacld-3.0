@@ -771,9 +771,39 @@
 		"enable epcs support")
 
 #define CFG_MLO_EPCS_SUPPORT_ENABLE_CFG CFG(CFG_MLO_EPCS_SUPPORT_ENABLE)
+
+/*
+ * <ini>
+ * sta_sl_with_mlo_sap - Force STA MLO connection to single link
+ *                       when a MLO SAP is concurrently up
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When enabled, if a MLO SAP is already up on this device, a subsequent
+ * STA connection to a MLO capable AP is restricted to single link (SL)
+ * instead of negotiating multi-link. The STA connection itself is still
+ * allowed, only the number of active links is restricted.
+ *
+ * Related: None
+ *
+ * Supported Feature: MLO
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_STA_SL_WITH_MLO_SAP CFG_INI_BOOL( \
+		"sta_sl_with_mlo_sap",\
+		0, \
+		"force STA MLO connection to single link when MLO SAP is up")
+
+#define CFG_STA_SL_WITH_MLO_SAP_CFG CFG(CFG_STA_SL_WITH_MLO_SAP)
 #else
 #define CFG_MLO_MLO_5GL_5GH_MLSR_CFG
 #define CFG_MLO_EPCS_SUPPORT_ENABLE_CFG
+#define CFG_STA_SL_WITH_MLO_SAP_CFG
 #endif
 
 #define CFG_STA_ALL \
@@ -803,5 +833,6 @@
 	CFG_MLO_PREFER_PERCENTAGE_CFG \
 	CFG_MLO_SAME_LINK_MLD_ADDR_CFG \
 	CFG_MLO_MLO_5GL_5GH_MLSR_CFG \
-	CFG_MLO_EPCS_SUPPORT_ENABLE_CFG
+	CFG_MLO_EPCS_SUPPORT_ENABLE_CFG \
+	CFG_STA_SL_WITH_MLO_SAP_CFG
 #endif /* CFG_MLME_STA_H__ */
