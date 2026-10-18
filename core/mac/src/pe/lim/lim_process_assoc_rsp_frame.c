@@ -1262,6 +1262,11 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) ||
 	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
+		if (frame_body_len <= SIR_MAC_HDR_LEN_3A) {
+			pe_err("LFR3: Invalid Reassoc response length %u",
+			       frame_body_len);
+			return;
+		}
 		hdr = (tpSirMacMgmtHdr)rx_pkt_info;
 		rssi = 0;
 	} else {
