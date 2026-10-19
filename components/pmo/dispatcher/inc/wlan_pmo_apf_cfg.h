@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -95,6 +95,33 @@
 
 /*
  * <ini>
+ * gApfv6DisableOffloadBitmap - Control offload in APFv6 mode
+ * @Min: 0
+ * @Max: 0x0F
+ * @Default: 0x0F
+ *
+ * This config item controls offloads in APFv6 mode. There are 6 offload for\
+ * packet filtering:
+ * BIT 0: ARP offload
+ * BIT 1: NS offload
+ * BIT 2: IGMP offload
+ * BIT 3: ICMP offload
+ *
+ * Supported Feature: APFv6 feature
+ *
+ * Usage: External
+ * </ini>
+ */
+#define CFG_OFFLOAD_APFV6_MODE CFG_INI_UINT( \
+	"gApfv6DisableOffloadBitmap", \
+	0, \
+	0x0F, \
+	0x0F, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Control Offload in APFv6 mode")
+
+/*
+ * <ini>
  * gConfigureAPFperScreenState - Configure active mode APF enable/disable
  * as per screen off/on state
  * @Min: 0
@@ -115,10 +142,32 @@
 		1, \
 		"Enable APF Support")
 
+/*
+ * <ini>
+ * gEnableAPFMode - Configure APF mode enable/disable
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When set to 1 host will be able to change APF mode
+ *
+ * Supported Feature: Android packet filter
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_APF_MODE CFG_INI_BOOL( \
+		"gEnableAPFMode", \
+		0, \
+		"Control APF Mode")
+
 #define CFG_PMO_APF_ALL \
 	CFG(CFG_PMO_APF_ENABLE) \
 	CFG(CFG_ACTIVE_UC_APF_MODE) \
 	CFG(CFG_ACTIVE_MC_BC_APF_MODE) \
-	CFG(CFG_CONFIGURE_APF_PER_SCREEN_STATE)
+	CFG(CFG_CONFIGURE_APF_PER_SCREEN_STATE) \
+	CFG(CFG_OFFLOAD_APFV6_MODE) \
+	CFG(CFG_ENABLE_APF_MODE)
 
 #endif /* WLAN_PMO_APF_CFG_H__ */

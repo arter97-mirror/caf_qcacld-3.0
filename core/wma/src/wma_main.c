@@ -745,6 +745,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->haps_feature_flags = ucfg_dp_get_haps_config(wma_handle->psoc);
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
+	tgt_cfg->apfv6_offload_disabled = cfg_get(wma_handle->psoc,
+						  CFG_OFFLOAD_APFV6_MODE);
 
 	con_mode = cds_get_conparam();
 	if (con_mode == QDF_GLOBAL_MONITOR_MODE)
@@ -6670,6 +6672,11 @@ static void wma_set_pmo_caps(struct wlan_objmgr_psoc *psoc)
 		wmi_service_enabled(wma->wmi_handle,
 				    wmi_service_listen_interval_offload_support
 				    );
+	caps.apf_offload_enabled =
+		wmi_service_enabled(wma->wmi_handle,
+				    wmi_service_apf_data_offload_support_enabled
+				    );
+
 
 	status = ucfg_pmo_psoc_set_caps(psoc, &caps);
 	if (QDF_IS_STATUS_ERROR(status))
