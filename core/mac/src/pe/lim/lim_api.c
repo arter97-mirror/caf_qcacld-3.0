@@ -1765,15 +1765,8 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 			pe_session->fWaitForProbeRsp = true;
 			pe_info(QDF_MAC_ADDR_FMT ": capabilities are not matching, sending directed probe request",
 				QDF_MAC_ADDR_REF(pe_session->bssId));
-			status =
-				lim_send_probe_req_mgmt_frame(
-					mac, &pe_session->ssId,
-					pe_session->bssId,
-					pe_session->curr_op_freq,
-					pe_session->self_mac_addr,
-					pe_session->dot11mode,
-					NULL, NULL);
-
+			status = lim_send_probe_req_mgmt_frame(mac, pe_session,
+							       NULL, NULL);
 			if (QDF_STATUS_SUCCESS != status) {
 				pe_err("send ProbeReq failed");
 				pe_session->fWaitForProbeRsp = false;

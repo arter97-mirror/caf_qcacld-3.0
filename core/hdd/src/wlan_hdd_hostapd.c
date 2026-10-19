@@ -2412,7 +2412,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t link_id = 0;
-	struct wlan_channel chan;
+	struct wlan_channel chan = {0}, *chan_ptr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct net_device *dev;
 	struct cfg80211_chan_def chandef;
@@ -2455,6 +2455,11 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 	}
 
 	hdd_copy_chan_params(pdev, ch_params, &chan, freq);
+	/* Get phymode to know dot11mode from current channel info */
+	chan_ptr = wlan_vdev_get_active_channel(vdev);
+	if (chan_ptr)
+		chan.ch_phymode = chan_ptr->ch_phymode;
+
 	status = hdd_create_chandef(adapter, &chan, &chandef);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Vdev %d failed to create channel def", vdev_id);
@@ -7851,20 +7856,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		if (config->akm_list.authType[i] == eCSR_AUTH_TYPE_OWE)
 			wlan_sap_set_owe_connection_support(vdev, true);
 
-	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
-						hdd_ctx->psoc,
-						adapter->device_mode,
-						link_info->vdev_id);
-
-	if (!policy_mgr_is_multi_sap_allowed_on_same_band(
-						hdd_ctx->pdev,
-						pm_con_mode,
-						config->chan_freq,
-						link_info->vdev_id)) {
-		ret = -EINVAL;
-		goto error;
-	}
-
 	if (config->RSNWPAReqIELength > sizeof(config->RSNWPAReqIE)) {
 		hdd_err("RSNWPAReqIELength is too large");
 		ret = -EINVAL;
@@ -8122,6 +8113,11 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		ret = 0;
 		goto free;
 	}
+
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+					hdd_ctx->psoc,
+					adapter->device_mode,
+					link_info->vdev_id);
 
 	if (check_for_concurrency &&
 	    !policy_mgr_mode_specific_connection_count(
@@ -9257,6 +9253,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
 	user_config_freq = freq;
+	wlan_set_sap_user_config_freq(link_info->vdev, user_config_freq);
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
