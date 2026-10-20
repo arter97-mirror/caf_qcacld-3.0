@@ -6047,12 +6047,11 @@ static void wlan_hdd_set_sap_hwmode(struct wlan_hdd_link_info *link_info)
 	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 	struct ieee80211_mgmt *mgmt_frame =
 		(struct ieee80211_mgmt *)beacon->head;
+	eCsrPhyMode sap_hw_mode = eCSR_DOT11_MODE_11b;
 	u8 checkRatesfor11g = true;
 	u8 require_ht = false, require_vht = false;
 	const u8 *ie;
 	ssize_t size;
-
-	config->SapHw_mode = eCSR_DOT11_MODE_11b;
 
 	size = beacon->head_len - sizeof(mgmt_frame->u.beacon) -
 	      (sizeof(*mgmt_frame) - sizeof(mgmt_frame->u));
@@ -6068,7 +6067,7 @@ static void wlan_hdd_set_sap_hwmode(struct wlan_hdd_link_info *link_info)
 	if (ie) {
 		ie += 1;
 		wlan_hdd_check_11gmode(ie, &require_ht, &require_vht,
-			&checkRatesfor11g, &config->SapHw_mode);
+			&checkRatesfor11g, &sap_hw_mode);
 	}
 
 	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_EXT_SUPP_RATES,
@@ -6076,31 +6075,33 @@ static void wlan_hdd_set_sap_hwmode(struct wlan_hdd_link_info *link_info)
 	if (ie) {
 		ie += 1;
 		wlan_hdd_check_11gmode(ie, &require_ht, &require_vht,
-			&checkRatesfor11g, &config->SapHw_mode);
+			&checkRatesfor11g, &sap_hw_mode);
 	}
 
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(config->chan_freq))
-		config->SapHw_mode = eCSR_DOT11_MODE_11a;
+		sap_hw_mode = eCSR_DOT11_MODE_11a;
 
 	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_HT_CAPABILITY,
 				      beacon->tail, beacon->tail_len);
 	if (ie) {
-		config->SapHw_mode = eCSR_DOT11_MODE_11n;
+		sap_hw_mode = eCSR_DOT11_MODE_11n;
 		if (require_ht)
-			config->SapHw_mode = eCSR_DOT11_MODE_11n_ONLY;
+			sap_hw_mode = eCSR_DOT11_MODE_11n_ONLY;
 	}
 
 	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_VHT_CAPABILITY,
 				      beacon->tail, beacon->tail_len);
 	if (ie) {
-		config->SapHw_mode = eCSR_DOT11_MODE_11ac;
+		sap_hw_mode = eCSR_DOT11_MODE_11ac;
 		if (require_vht)
-			config->SapHw_mode = eCSR_DOT11_MODE_11ac_ONLY;
+			sap_hw_mode = eCSR_DOT11_MODE_11ac_ONLY;
 	}
 
-	wlan_hdd_check_11ax_support(beacon, config);
+	wlan_hdd_check_11ax_support(beacon, &sap_hw_mode);
 
-	wlan_hdd_check_11be_support(beacon, config);
+	wlan_hdd_check_11be_support(beacon, &sap_hw_mode);
+
+	config->SapHw_mode = sap_hw_mode;
 
 	hdd_debug("SAP hw_mode: %d", config->SapHw_mode);
 }
