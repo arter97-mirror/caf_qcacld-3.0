@@ -330,6 +330,10 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
 				    &pr->he_6ghz_band_cap);
 
+	/* Populate Non-AP STA Regulatory connectivity element */
+	if (IS_DOT11_MODE_HE(dot11mode))
+		populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
+
 	if (addn_ielen && additional_ie) {
 		qdf_mem_zero((uint8_t *)&extracted_ext_cap,
 			sizeof(tDot11fIEExtCap));
@@ -2303,6 +2307,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 					    &frm->he_6ghz_band_cap);
 	}
 
+	/* Populate Non-AP STA Regulatory connectivity element */
+	if (IS_DOT11_MODE_HE(pe_session->dot11mode))
+		populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
+
 	if (pe_session->lim_join_req->is11Rconnection) {
 		struct bss_description *bssdescr;
 
@@ -2639,6 +2647,13 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	mac_hdr = (tpSirMacMgmtHdr) frame;
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
+
+	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsnx %d, mscs %d, ft11r %d",
+		 pe_session->dot11mode, extr_ext_flag,
+		 is_open_auth, mbo_ie_len,
+		 vendor_ie_len, rsnx_ie_len,
+		 mscs_ext_ie_len,
+		 adaptive_11r_ie_len);
 
 	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d", pe_session->vdev_id,
 		     QDF_MAC_ADDR_REF(pe_session->bssId),

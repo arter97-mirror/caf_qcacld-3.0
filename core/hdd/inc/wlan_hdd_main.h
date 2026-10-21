@@ -1964,6 +1964,9 @@ struct hdd_context {
 	/** P2P Device MAC Address for the adapter  */
 	struct qdf_mac_addr p2p_device_address;
 
+	/** P2P Random MAC caching for intf re-init */
+	struct qdf_mac_addr p2p_random_mac_addr_cache;
+
 	qdf_wake_lock_t rx_wake_lock;
 	qdf_wake_lock_t sap_wake_lock;
 
