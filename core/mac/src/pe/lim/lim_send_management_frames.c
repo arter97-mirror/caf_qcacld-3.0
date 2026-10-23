@@ -378,7 +378,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	populate_dot11f_btm_extended_caps(mac_ctx, pesession, &pr->ExtCap);
 
-	if (lim_is_session_eht_capable(pesession)) {
+	if (IS_DOT11_MODE_EHT(dot11mode)) {
 		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
 		if (!eht_cap_ie) {
 			pe_err("malloc failed for eht_cap_ie");

@@ -197,6 +197,22 @@ static bool lim_validate_he160_mcs_map(struct mac_context *mac_ctx,
 		(tx_he_mcs_map != HE_MCS_ALL_DISABLED));
 }
 
+static void lim_update_session_capabilities_for_dot11mode(
+				 struct pe_session *session,
+				 uint8_t dot11mode)
+{
+	if (!IS_DOT11_MODE_HE(dot11mode))
+		lim_reset_session_he_capable(session);
+
+	if (!IS_DOT11_MODE_EHT(dot11mode))
+		lim_update_session_eht_capable(session, false);
+
+	if (!IS_DOT11_MODE_VHT(dot11mode))
+		session->vhtCapability = 0;
+
+	session->dot11mode = dot11mode;
+}
+
 static void lim_check_is_he_mcs_valid(struct pe_session *session,
 				      tSirProbeRespBeacon *beacon_struct)
 {
@@ -211,11 +227,13 @@ static void lim_check_is_he_mcs_valid(struct pe_session *session,
 		if (((mcs_map >> (i * 2)) & 0x3) != 0x3)
 			return;
 	}
-	session->he_capable = false;
+
 	if (session->vhtCapability)
-		session->dot11mode = MLME_DOT11_MODE_11AC;
+		lim_update_session_capabilities_for_dot11mode(
+						 session, MLME_DOT11_MODE_11AC);
 	else
-		session->dot11mode = MLME_DOT11_MODE_11N;
+		lim_update_session_capabilities_for_dot11mode(
+						 session, MLME_DOT11_MODE_11N);
 	pe_err("vdev %d: Invalid LT80 MCS map 0x%x with NSS %d, fallback to dot11mode %d",
 	       session->vdev_id, mcs_map, session->nss, session->dot11mode);
 }
@@ -354,7 +372,7 @@ void lim_extract_eht_op(struct mac_context *mac,
 	uint32_t max_eht_bw;
 	uint32_t self_cb_mode;
 
-	if (!session->eht_capable)
+	if (!session->he_capable || !session->eht_capable)
 		return;
 
 	if (!beacon_struct->eht_op.present)
@@ -407,7 +425,7 @@ void lim_extract_eht_op(struct mac_context *mac,
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			       tSirProbeRespBeacon *beacon)
 {
-	if (!session->eht_capable)
+	if (!session->he_capable || !session->eht_capable)
 		return;
 
 	if ((session->opmode == QDF_STA_MODE ||
@@ -550,13 +568,14 @@ static void lim_check_peer_ldpc_and_update(struct pe_session *session,
 	    beacon_struct->he_cap.present &&
 	    lim_check_he_80_mcs11_supp(session, &beacon_struct->he_cap) &&
 	    !beacon_struct->he_cap.ldpc_coding) {
-		session->he_capable = false;
 		pe_err("LDPC check failed for HE operation");
 		if (session->vhtCapability) {
-			session->dot11mode = MLME_DOT11_MODE_11AC;
+			lim_update_session_capabilities_for_dot11mode(
+						 session, MLME_DOT11_MODE_11AC);
 			pe_debug("Update dot11mode to 11ac");
 		} else {
-			session->dot11mode = MLME_DOT11_MODE_11N;
+			lim_update_session_capabilities_for_dot11mode(
+						 session, MLME_DOT11_MODE_11N);
 			pe_debug("Update dot11mode to 11N");
 		}
 	}
@@ -850,10 +869,18 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	lim_check_is_he_mcs_valid(session, beacon_struct);
 	lim_check_peer_ldpc_and_update(session, beacon_struct);
 	lim_extract_he_op(mac_ctx, session, beacon_struct);
+	lim_update_eht_bw_cap_mcs(session, beacon_struct);
 	lim_extract_eht_op(mac_ctx, session, beacon_struct);
 	if (!mac_ctx->usr_eht_testbed_cfg)
 		lim_update_he_bw_cap_mcs(session, beacon_struct);
-	lim_update_eht_bw_cap_mcs(session, beacon_struct);
+
+	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev) &&
+	    !IS_DOT11_MODE_EHT(session->dot11mode)) {
+		pe_err("vdev %d: MLO vdev has non-EHT dot11mode %d",
+		       session->vdev_id, session->dot11mode);
+		qdf_mem_free(beacon_struct);
+		return QDF_STATUS_E_INVAL;
+	}
 	/* Extract the UAPSD flag from WMM Parameter element */
 	if (beacon_struct->wmeEdcaPresent)
 		*uapsd = beacon_struct->edcaParams.qosInfo.uapsd;
