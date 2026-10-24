@@ -1485,6 +1485,7 @@ policy_mgr_modify_dual_sap_band_pcl_filter(
 	qdf_freq_t user_config_freq = 0;
 	enum reg_wifi_band user_band, curr_band;
 	bool allow_scc = false;
+	bool multi_sap_allowed_on_same_band;
 
 	if (mode != PM_SAP_MODE)
 		return QDF_STATUS_SUCCESS;
@@ -1500,6 +1501,15 @@ policy_mgr_modify_dual_sap_band_pcl_filter(
 		return QDF_STATUS_SUCCESS;
 
 	policy_mgr_debug("dual sap present vdev_id %d", vdev_id);
+
+	/* check only when multi sap on same band is not supported */
+	policy_mgr_get_multi_sap_allowed_on_same_band(
+					psoc,
+					&multi_sap_allowed_on_same_band);
+
+	if (multi_sap_allowed_on_same_band)
+		return QDF_STATUS_SUCCESS;
+
 	user_config_freq =
 			policy_mgr_get_user_config_sap_freq(psoc,
 							    vdev_id);
