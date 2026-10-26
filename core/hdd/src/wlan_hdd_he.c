@@ -82,14 +82,14 @@ void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 }
 
 void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
-				 struct sap_config *config)
+				 eCsrPhyMode *sap_hw_mode)
 {
 	const uint8_t *ie;
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE,
 					    beacon->tail, beacon->tail_len);
 	if (ie)
-		config->SapHw_mode = eCSR_DOT11_MODE_11ax;
+		*sap_hw_mode = eCSR_DOT11_MODE_11ax;
 }
 
 int hdd_update_he_cap_in_cfg(struct hdd_context *hdd_ctx)
