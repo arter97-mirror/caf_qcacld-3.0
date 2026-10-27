@@ -2887,7 +2887,7 @@ extract_roam_scan_chan_list_tlv(wmi_unified_t wmi_handle,
 	data->chan_list = (uint32_t *)(data + 1);
 	data->vdev_id = fixed_param->vdev_id;
 	data->command_resp = fixed_param->command_response;
-	data->num_channels = param_buf->num_channel_list;
+	data->num_channels = num_ch;
 
 	for (i = 0; i < num_ch; i++)
 		data->chan_list[i] = param_buf->channel_list[i];
