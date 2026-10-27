@@ -97,7 +97,7 @@ static void wlan_hdd_pre_cac_success(struct hdd_adapter *adapter)
 	chan_freq = ucfg_pre_cac_get_freq(ap_adapter->deflink->vdev);
 	i = hdd_softap_set_channel_change(ap_adapter->deflink, chan_freq, 0,
 					  pre_cac_ch_width, NO_SCHANS_PUNC,
-					  false, false, NULL);
+					  false, false);
 	if (i) {
 		hdd_err("failed to change channel");
 		ucfg_pre_cac_complete_set(ap_adapter->deflink->vdev, false);
@@ -292,8 +292,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 							SAP_PRE_CAC_IFNAME);
 	if (pre_cac_adapter) {
 		hdd_debug("pre cac SAP adapter is present");
-		if (qdf_atomic_test_bit(SME_SESSION_OPENED,
-					pre_cac_adapter->deflink->link_flags)) {
+		if (test_bit(SME_SESSION_OPENED,
+			     &pre_cac_adapter->deflink->link_flags)) {
 			hdd_debug("pre cac is on-going");
 			return 0;
 		}
@@ -381,7 +381,7 @@ pre_cac_adapter_created:
 	 * will continue to operate on the same bandwidth as that of the 2.4GHz
 	 * operations. Only bandwidths 20MHz/40MHz are possible on 2.4GHz band.
 	 * Now some customer request to start AP on higher BW such as 80Mhz.
-	 * Hence use max possible supported BW based on phymode configured
+	 * Hence use max possible supported BW based on phymode configurated
 	 * on SAP.
 	 */
 	cac_ch_width = wlansap_get_max_bw_by_phymode(hdd_ap_ctx->sap_context);
@@ -445,7 +445,6 @@ pre_cac_adapter_created:
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ucfg_pre_cac_clear_work(hdd_ctx->psoc);
 	ucfg_pre_cac_set_freq_before_pre_cac(link_info->vdev,
 					     hdd_ap_ctx->operating_chan_freq);
 	ucfg_pre_cac_set_freq(link_info->vdev, pre_cac_chan_freq);
@@ -529,8 +528,7 @@ int wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx, uint32_t chan_freq)
 		goto destroy_sync;
 
 	if (is_vdev_sync_created)
-		osif_vdev_sync_register(adapter->dev, &adapter->wdev,
-					vdev_sync);
+		osif_vdev_sync_register(adapter->dev, vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return 0;

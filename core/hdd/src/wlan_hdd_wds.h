@@ -58,23 +58,6 @@ void hdd_wds_config_dp_repeater_mode(struct wlan_objmgr_vdev *vdev);
  */
 void hdd_wds_replace_peer_mac(void *soc, struct hdd_adapter *adapter,
 			      uint8_t *mac_addr);
-
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/**
- * hdd_wds_ext_peer_learn() - API to trigger cfg80211 rx unexpected 4addr frame event
- * @vdev: object manager vdev context
- * @peer_mac_addr: peer mac address
- *
- * Return: None
- */
-void hdd_wds_ext_peer_learn(struct wlan_objmgr_vdev *vdev,
-			    uint8_t *peer_mac_addr);
-#else
-static inline void
-hdd_wds_ext_peer_learn(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mac_addr)
-{
-}
-#endif
 #else
 static inline
 void hdd_wds_config_dp_repeater_mode(struct wlan_objmgr_vdev *vdev)
@@ -84,11 +67,6 @@ void hdd_wds_config_dp_repeater_mode(struct wlan_objmgr_vdev *vdev)
 static inline
 void hdd_wds_replace_peer_mac(void *soc, struct hdd_adapter *adapter,
 			      uint8_t *mac_addr)
-{
-}
-
-static inline void
-hdd_wds_ext_peer_learn(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mac_addr)
 {
 }
 #endif /* FEATURE_WDS*/

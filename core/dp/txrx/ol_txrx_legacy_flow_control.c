@@ -303,7 +303,7 @@ ol_tx_vdev_pause_queue_append(struct ol_txrx_vdev_t *vdev,
 			QDF_DP_TRACE_TXRX_QUEUE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(msdu_list),
-			qdf_nbuf_len(msdu_list), QDF_TX));
+			sizeof(qdf_nbuf_data(msdu_list)), QDF_TX));
 
 		vdev->ll_pause.txq.depth++;
 		if (!vdev->ll_pause.txq.head) {

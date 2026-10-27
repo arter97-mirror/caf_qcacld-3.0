@@ -23,7 +23,7 @@
  * hdd_sysfs_pm_cinfo_create(): Initialize pm_cinfo specific sysfs
  * @driver_kobject: Driver Kobject
  *
- * Function to initialize pm_cinfo specific mode sysfs files.
+ * Function to initialize pm_cinfo specific mode syfs files.
  *
  * Return: NONE
  */
@@ -33,7 +33,7 @@ void hdd_sysfs_pm_cinfo_create(struct kobject *driver_kobject);
  * hdd_sysfs_pm_cinfo_destroy(): Remove pm_cinfo sysfs file
  * @driver_kobject: Driver Kobject
  *
- * Function to remove pm_cinfo specific mode sysfs files.
+ * Function to remove pm_cinfo specific mode syfs files.
  *
  * Return: NONE
  */

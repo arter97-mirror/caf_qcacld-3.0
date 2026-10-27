@@ -42,9 +42,6 @@
 #include <include/wlan_mlme_cmn.h>
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_hdd_main.h>
-#include <ol_ath_ucfg.h>
-#include <cfg_ucfg_api.h>
-#include <cdp_txrx_ctrl.h>
 
 static struct son_callbacks g_son_os_if_cb;
 static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
@@ -966,6 +963,8 @@ uint8_t os_if_son_get_chan_util(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_host_dcs_ch_util_stats dcs_son_stats = {};
 	struct wlan_objmgr_psoc *psoc;
+	uint8_t mac_id;
+	QDF_STATUS status;
 
 	if (!vdev) {
 		osif_err("null vdev");
@@ -977,8 +976,15 @@ uint8_t os_if_son_get_chan_util(struct wlan_objmgr_vdev *vdev)
 		osif_err("null psoc");
 		return 0;
 	}
+	status = policy_mgr_get_mac_id_by_session_id(psoc,
+						     wlan_vdev_get_id(vdev),
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to get mac_id");
+		return 0;
+	}
 
-	ucfg_dcs_get_ch_util(psoc, wlan_vdev_get_id(vdev), &dcs_son_stats);
+	ucfg_dcs_get_ch_util(psoc, mac_id, &dcs_son_stats);
 	osif_debug("get_chan_util %d", dcs_son_stats.total_cu);
 
 	return dcs_son_stats.total_cu;
@@ -990,6 +996,8 @@ void os_if_son_get_phy_stats(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_host_dcs_ch_util_stats dcs_son_stats = {};
 	struct wlan_objmgr_psoc *psoc;
+	uint8_t mac_id;
+	QDF_STATUS status;
 
 	if (!vdev) {
 		osif_err("null vdev");
@@ -1001,8 +1009,15 @@ void os_if_son_get_phy_stats(struct wlan_objmgr_vdev *vdev,
 		osif_err("null psoc");
 		return;
 	}
+	status = policy_mgr_get_mac_id_by_session_id(psoc,
+						     wlan_vdev_get_id(vdev),
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to get mac_id");
+		return;
+	}
 
-	ucfg_dcs_get_ch_util(psoc, wlan_vdev_get_id(vdev), &dcs_son_stats);
+	ucfg_dcs_get_ch_util(psoc, mac_id, &dcs_son_stats);
 
 	phy_stats->ap_rx_util = dcs_son_stats.rx_cu;
 	phy_stats->ap_tx_util = dcs_son_stats.tx_cu;
@@ -1121,7 +1136,7 @@ static QDF_STATUS os_if_son_get_apcap(struct wlan_objmgr_vdev *vdev,
 	struct mlme_ht_capabilities_info ht_cap_info;
 	struct wlan_objmgr_psoc *psoc;
 	tDot11fIEhe_cap he_cap = {0};
-	uint8_t enable_mimo;
+	bool enabled;
 	QDF_STATUS status;
 	int32_t vht_caps = 0;
 
@@ -1150,8 +1165,8 @@ static QDF_STATUS os_if_son_get_apcap(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* Fetch VHT CAP */
-	status = ucfg_mlme_get_vht_mimo_cap(psoc, &enable_mimo);
-	if (enable_mimo) {
+	status = ucfg_mlme_get_vht_enable2x2(psoc, &enabled);
+	if (enabled) {
 		apcap->wlan_ap_vht_capabilities_valid = 1;
 		ucfg_mlme_cfg_get_vht_tx_mcs_map(psoc, &value);
 		apcap->vhtcap.supp_tx_mcs = value;
@@ -2374,8 +2389,7 @@ QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
 
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 						      vdev->vdev_objmgr.vdev_id);
-		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-					link_info->link_flags)) {
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 			ucfg_mc_cp_stats_get_tx_power(vdev, &dbm);
 			node_info->max_txpower = (uint8_t)dbm;
 		} else {
@@ -2487,23 +2501,6 @@ nla_put_failed:
 }
 
 qdf_export_symbol(os_if_son_send_status_nlink_msg);
-
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-void wlan_hdd_enable_wds_ext(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_objmgr_vdev *vdev)
-{
-	void *dp_handle;
-	cdp_config_param_type val = {0};
-
-	dp_handle = wlan_psoc_get_dp_handle(psoc);
-	val.cdp_vdev_param_wds_ext = cfg_get(psoc, CFG_SAP_ENABLE_WDS_EXT);
-	cdp_txrx_set_vdev_param(dp_handle,
-				wlan_vdev_get_id(vdev),
-				CDP_CFG_WDS_EXT, val);
-}
-
-qdf_export_symbol(wlan_hdd_enable_wds_ext);
-#endif
 
 #ifdef WLAN_FEATURE_SON
 struct mlme_external_tx_ops mlme_tx_ops;

@@ -464,11 +464,6 @@ wlan_cfg80211_coap_offload_cache_deliver(struct wiphy *wiphy,
 	}
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, skb_len);
-	if (!skb) {
-		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		return -ENOMEM;
-	}
-
 	attr = nla_nest_start(skb, COAP_ATTR(CACHES));
 	if (!attr) {
 		hdd_err("nla_nest_start failed");

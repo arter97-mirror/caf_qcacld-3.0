@@ -31,9 +31,6 @@
 #define P2P_MC_ADDR      "\x51\x6F\x9A\x02"
 #define P2P_MC_ADDR_SIZE 4
 
-#define USD_ADDR    "\x51\x6F\x9A\x01"
-#define USD_ADDR_SIZE 4
-
 #define HEADER_LEN_P2P_IE  6
 
 #define P2P_1X1_WAR_OUI   "\x00\x50\xf2\x04"
@@ -306,32 +303,6 @@ struct p2p_chan_switch_req_params {
 };
 
 /**
- * struct p2p_chan_usage_unavail_params - Unavailability parameters for P2P
- * @wake_duration: Wake duration in multiples of 256us
- * @wake_intvl_mantissa: Wake interval mantissa in TU
- * @req_type: TWT request type
- * @responder_pm_mode: Responder PM mode (0 or 1)
- * @flow_type: Flow type (0: Announced, 1: Unannounced)
- * @wake_intvl_exp: Wake interval exponent
- * @is_trigger_enabled: TWT with trigger support
- * @is_protection_enabled: Protection required
- * @mac_addr: Optional peer MAC address
- * @mac_addr_valid: Indicates if mac_addr field is valid
- */
-struct p2p_chan_usage_unavail_params {
-	uint32_t wake_duration;
-	uint32_t wake_intvl_mantissa;
-	uint8_t req_type;
-	uint8_t responder_pm_mode;
-	uint8_t flow_type;
-	uint8_t wake_intvl_exp;
-	bool is_trigger_enabled;
-	bool is_protection_enabled;
-	struct qdf_mac_addr mac_addr;
-	bool mac_addr_valid;
-};
-
-/**
  * struct p2p_ap_assist_dfs_group_params - Params of assisted AP for DFS
  * P2P group
  * @vdev_id: VDEV ID of p2p entity
@@ -431,7 +402,7 @@ enum p2p_attr_id {
 	P2P_ATTR_VENDOR_SPECIFIC = 221
 };
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 #define P2P_USD_SERVICE_LEN                    6
 #define P2P_USD_SSI_LEN                        1400
 #define P2P_USD_FRAME_LEN                      1024
@@ -537,7 +508,6 @@ struct p2p_usd_ssi {
  * @vdev_id: VDEV ID
  * @op_type: OP type
  * @p2p_mac_addr: P2P MAC address
- * @multicast_mac_addr: Multicast mac address used in USD discovery
  * @instance_id: instance ID
  * @service_info: Service information structure
  * @ssi: SSI information structure
@@ -549,7 +519,6 @@ struct p2p_usd_attr_params {
 	uint32_t vdev_id;
 	enum p2p_usd_op_type op_type;
 	struct qdf_mac_addr p2p_mac_addr;
-	struct qdf_mac_addr multicast_mac_addr;
 	uint8_t instance_id;
 	struct p2p_usd_service_info service_info;
 	struct p2p_usd_ssi ssi;
@@ -558,9 +527,6 @@ struct p2p_usd_attr_params {
 	uint16_t ttl;
 };
 
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 /**
  * enum p2p_mode_type: P2P mode type
  * @P2P_MODE_WFD_R1: Wi-Fi Direct R1 only
@@ -578,5 +544,6 @@ enum p2p_mode_type {
 	P2P_MODE_WFD_MAX,
 	P2P_MODE_WFD_INVALID = 0xFF,
 };
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC */
+
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _WLAN_P2P_PUBLIC_STRUCT_H_ */

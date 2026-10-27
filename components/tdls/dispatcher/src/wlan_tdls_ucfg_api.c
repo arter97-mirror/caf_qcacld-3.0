@@ -26,7 +26,6 @@
 #include <wlan_tdls_ucfg_api.h>
 #include <wlan_tdls_tgt_api.h>
 #include "../../core/src/wlan_tdls_main.h"
-#include "../../core/src/wlan_tdls_stats.h"
 #include "../../core/src/wlan_tdls_cmds_process.h"
 #include "../../core/src/wlan_tdls_ct.h"
 #include "../../core/src/wlan_tdls_mgmt.h"
@@ -216,8 +215,6 @@ static QDF_STATUS tdls_object_init_params(
 			cfg_get(psoc, CFG_TL_DELAYED_TRGR_FRM_INTERVAL);
 	tdls_soc_obj->tdls_configs.tdls_wmm_mode_enable =
 			cfg_get(psoc,  CFG_TDLS_WMM_MODE_ENABLE);
-	tdls_soc_obj->tdls_configs.tdls_stats_enable =
-			cfg_get(psoc, CFG_TDLS_STATS_ENABLE);
 	tdls_soc_obj->tdls_configs.tdls_off_chan_enable =
 			cfg_get(psoc, CFG_TDLS_OFF_CHANNEL_ENABLED);
 	tdls_soc_obj->tdls_configs.tdls_buffer_sta_enable =
@@ -322,33 +319,6 @@ QDF_STATUS ucfg_tdls_psoc_open(struct wlan_objmgr_psoc *psoc)
 	}
 
 	status = tdls_global_init(soc_obj);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
-
-	/*
-	 * Create the TDLS stats state machine here (Active domain) rather
-	 * than in tdls_psoc_obj_create_notification() (Init domain).
-	 *
-	 * ucfg_tdls_psoc_close() (which destroys the SM) is called from
-	 * hdd_component_psoc_close() while the QDF memory domain is still
-	 * Active.  Allocating the SM in the Init domain would cause a
-	 * "Memory domain mismatch; allocated:Init(0), current:Active(1)"
-	 * panic when ucfg_tdls_psoc_close() tries to free it.
-	 *
-	 * This function is called from hdd_component_psoc_open() which runs
-	 * after hdd_debug_domain_set(QDF_DEBUG_DOMAIN_ACTIVE) in
-	 * hdd_wlan_startup(), so the domain is Active here.
-	 *
-	 * Non-fatal: if SM creation fails, stats logging is unavailable
-	 * but the psoc open still succeeds.
-	 */
-	status = tdls_stats_sm_create(psoc, &soc_obj->stats_ctx);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		tdls_err("TDLS stats SM create failed (status %d) - stats logging unavailable",
-			 status);
-		soc_obj->stats_ctx = NULL;
-		status = QDF_STATUS_SUCCESS;
-	}
 
 	return status;
 }
@@ -523,7 +493,6 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	soc_obj->tdls_add_sta_req = req->tdls_add_sta_req;
 	soc_obj->tdls_del_sta_req = req->tdls_del_sta_req;
 	soc_obj->tdls_update_peer_state = req->tdls_update_peer_state;
-	soc_obj->tdls_update_offchan_mode = req->tdls_update_offchan_mode;
 	soc_obj->tdls_del_all_peers = req->tdls_del_all_peers;
 	soc_obj->tdls_update_dp_vdev_flags = req->tdls_update_dp_vdev_flags;
 	soc_obj->tdls_dp_vdev_update = req->tdls_dp_vdev_update;
@@ -533,8 +502,6 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	       req->tdls_osif_update_cb.tdls_osif_conn_update;
 	soc_obj->tdls_osif_update_cb.tdls_osif_disconn_update =
 	       req->tdls_osif_update_cb.tdls_osif_disconn_update;
-	soc_obj->stats_emit_cb = req->tdls_stats_emit_cb;
-
 	tdls_pm_call_backs.tdls_notify_increment_session =
 			tdls_notify_increment_session;
 
@@ -692,32 +659,6 @@ QDF_STATUS ucfg_tdls_psoc_close(struct wlan_objmgr_psoc *psoc)
 	if (!tdls_soc) {
 		tdls_err("Failed to get tdls psoc component");
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	/*
-	 * Destroy the TDLS stats SM here rather than relying on
-	 * tdls_psoc_obj_destroy_notification().
-	 *
-	 * ucfg_tdls_deinit() (called from hdd_component_deinit() via
-	 * hdd_driver_unload()) unregisters the psoc destroy handler
-	 * *before* hdd_context_destroy() calls
-	 * wlan_objmgr_psoc_obj_delete().  As a result,
-	 * tdls_psoc_obj_destroy_notification() is never invoked during
-	 * normal driver unload, so the stats SM would otherwise be leaked.
-	 *
-	 * ucfg_tdls_psoc_close() is called from hdd_wlan_stop_modules()
-	 * which runs before hdd_driver_unload(), so the psoc object is
-	 * still valid here and the cleanup is safe.
-	 *
-	 * Set stats_ctx to NULL *before* calling tdls_stats_sm_destroy()
-	 * so that any concurrent WMI event handler sees NULL and skips
-	 * the push, preventing use-after-free.
-	 */
-	if (tdls_soc->stats_ctx) {
-		struct tdls_stats_context *stats_ctx = tdls_soc->stats_ctx;
-
-		tdls_soc->stats_ctx = NULL;
-		tdls_stats_sm_destroy(stats_ctx);
 	}
 
 	status = tdls_global_deinit(tdls_soc);
@@ -940,12 +881,6 @@ QDF_STATUS ucfg_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	struct tdls_get_all_peers *tdls_peers;
 	QDF_STATUS status;
 
-	if (!vdev || !buf || buflen <= 0) {
-		tdls_err("Invalid parameters: vdev=%pK, buf=%pK, buflen=%d",
-			 vdev, buf, buflen);
-		return QDF_STATUS_E_INVAL;
-	}
-
 	tdls_peers = qdf_mem_malloc(sizeof(*tdls_peers));
 	if (!tdls_peers)
 		return QDF_STATUS_E_NOMEM;
@@ -964,7 +899,7 @@ QDF_STATUS ucfg_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	if (status != QDF_STATUS_SUCCESS)
 		qdf_mem_free(tdls_peers);
 
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS tdls_send_mgmt_frame_flush_callback(struct scheduler_msg *msg)
@@ -1375,10 +1310,4 @@ void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
 bool ucfg_tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev)
 {
 	return tdls_is_vdev_allowed_to_tx(vdev);
-}
-
-bool ucfg_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
-				      struct qdf_mac_addr *mac_addr)
-{
-	return wlan_tdls_is_key_install_allowed(vdev, mac_addr);
 }

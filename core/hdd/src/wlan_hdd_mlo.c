@@ -280,34 +280,14 @@ static void hdd_mlo_update_vdev_active_flag(uint8_t vdev_id,
 	link_info->is_mlo_vdev_active = is_link_active;
 }
 
-/**
- * hdd_get_def_dp_link_vdev - Get default dp link vdev id
- * @vdev: vdev object
- *
- * Return: default dp link vdev id
- */
-static uint8_t
-hdd_get_def_dp_link_vdev(struct wlan_objmgr_vdev *vdev)
-{
-	return ucfg_dp_get_def_link(vdev);
-}
-
 static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
-	.mlo_mgr_osif_clear_link_info = hdd_cm_clear_link_info,
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
 	.mlo_roam_osif_update_mac_addr = hdd_roam_vdev_mac_addr_update,
 	.mlo_mgr_osif_link_rej_update_mac_addr = hdd_link_rej_mac_addr_update,
-	.mlo_link_recfg_osif_update_mac_addr = hdd_link_recfg_mac_addr_update,
 	.mlo_mgr_osif_link_switch_notification =
 					hdd_adapter_link_switch_notification,
-	.mlo_roam_osif_update_deflink = hdd_mlo_roam_deflink_update,
 	.mlo_mgr_osif_update_link_state = hdd_mlo_update_vdev_active_flag,
-	.mlo_mgr_osif_chan_switch_notification =
-					hdd_mlo_channel_switch_notify,
-	.mlo_mgr_osif_update_link_state_change =
-					hdd_mlo_update_link_state_change,
-	.mlo_mgr_osif_get_def_dp_link_vdev = hdd_get_def_dp_link_vdev,
 };
 
 QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
@@ -387,116 +367,7 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 
 	return found ? QDF_STATUS_SUCCESS : QDF_STATUS_E_FAILURE;
 }
-
-QDF_STATUS hdd_mlo_roam_deflink_update(struct wlan_objmgr_vdev *vdev,
-				       uint8_t roamed_vdev_id)
-{
-	struct wlan_hdd_link_info *link_info, *new_link_info = NULL;
-	struct hdd_adapter *adapter;
-	struct hdd_context *hdd_ctx;
-	struct vdev_osif_priv *osif_priv;
-
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv) {
-		hdd_err("osif_priv is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	link_info = osif_priv->legacy_osif_priv;
-	if (!link_info) {
-		hdd_err("link_info is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	adapter = link_info->adapter;
-	if (!adapter) {
-		hdd_err("adapter is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	hdd_adapter_for_each_link_info(adapter, new_link_info) {
-		if (new_link_info->vdev_id == roamed_vdev_id) {
-			hdd_debug("Found link_info for new vdev_id: %d",
-				  roamed_vdev_id);
-			adapter->deflink = new_link_info;
-			break;
-		}
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
 #endif
-
-static struct wlan_hdd_link_info *
-hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx,
-			   struct qdf_mac_addr *bssid)
-{
-	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct hdd_station_ctx *sta_ctx;
-	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_BSSID;
-	struct wlan_hdd_link_info *link_info;
-
-	if (qdf_is_macaddr_zero(bssid)) {
-		hdd_debug("Invalid bssid");
-		return NULL;
-	}
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
-		hdd_adapter_for_each_link_info(adapter, link_info) {
-			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-
-			if (qdf_is_macaddr_equal(bssid,
-						 &sta_ctx->conn_info.bssid)) {
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
-				return link_info;
-			}
-		}
-
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-	}
-
-	return NULL;
-}
-
-QDF_STATUS
-hdd_mlo_channel_switch_notify(struct qdf_mac_addr *link_mac_address)
-{
-	struct wlan_hdd_link_info *link_info;
-	struct hdd_context *hdd_ctx;
-
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-
-	hdd_debug("Standby Link CSA: BSSID " QDF_MAC_ADDR_FMT,
-		  QDF_MAC_ADDR_REF(link_mac_address->bytes));
-
-	link_info = hdd_get_link_info_by_bssid(hdd_ctx, link_mac_address);
-	if (!link_info) {
-		hdd_debug("hdd link info is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Notify channel switch complete for standby link to HDD */
-	link_info->ch_chng_info.ch_chng_type = CHAN_SWITCH_COMPLETE_NOTIFY;
-	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
-
-	return QDF_STATUS_SUCCESS;
-}
 
 void hdd_mlo_t2lm_register_callback(struct wlan_objmgr_vdev *vdev)
 {
@@ -635,9 +506,9 @@ bool hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
 		}
 
 		/* Swap link flags */
-		link_flags = temp_link_info->link_flags[0];
-		temp_link_info->link_flags[0] = link_info->link_flags[0];
-		link_info->link_flags[0] = link_flags;
+		link_flags = temp_link_info->link_flags;
+		temp_link_info->link_flags = link_info->link_flags;
+		link_info->link_flags = link_flags;
 
 		/* Update the mapping, current link info's mapping will be
 		 * set to be proper.
@@ -1131,14 +1002,6 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
-		/* Check if link is marked for removal */
-		if (wlan_get_link_removed_flag_by_link_id(
-				vdev, sta_ctx->conn_info.ieee_link_id)) {
-			hdd_debug("link: %d marked for removal, skip",
-				  sta_ctx->conn_info.ieee_link_id);
-			continue;
-		}
-
 		ml_link_info = mlo_mgr_get_ap_link_by_link_id(
 				mlo_ctx,
 				sta_ctx->conn_info.ieee_link_id);
@@ -1153,9 +1016,9 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 
 		link_iter++;
 
-		hdd_debug("vdev id %d sta_ctx->conn_info.ieee_link_id %d is_mlo_vdev_active %d ",
-			  link_info->vdev_id, sta_ctx->conn_info.ieee_link_id,
-			  ml_link_info->is_link_active);
+		hdd_debug_rl("vdev id %d sta_ctx->conn_info.ieee_link_id %d is_mlo_vdev_active %d ",
+			     link_info->vdev_id, sta_ctx->conn_info.ieee_link_id,
+			     ml_link_info->is_link_active);
 	}
 
 	link_state_event.num_mlo_vdev_link_info = link_iter;
@@ -1164,10 +1027,10 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 	link_state_event.mldaddr = *mld_addr;
 
-	hdd_debug("cached link_state_resp: vdev id %d status %d num %d MAC addr " QDF_MAC_ADDR_FMT,
-		  link_state_event.vdev_id, link_state_event.status,
-		  link_state_event.num_mlo_vdev_link_info,
-		  QDF_MAC_ADDR_REF(link_state_event.mldaddr.bytes));
+	hdd_debug_rl("cached link_state_resp: vdev id %d status %d num %d MAC addr " QDF_MAC_ADDR_FMT,
+		     link_state_event.vdev_id, link_state_event.status,
+		     link_state_event.num_mlo_vdev_link_info,
+		     QDF_MAC_ADDR_REF(link_state_event.mldaddr.bytes));
 
 	skb_len = hdd_get_ml_link_state_response_len(&link_state_event);
 

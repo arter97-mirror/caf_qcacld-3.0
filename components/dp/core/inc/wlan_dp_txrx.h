@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -161,46 +160,13 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 QDF_STATUS dp_rx_flush_packet_cbk(void *dp_link_context, uint8_t link_id);
 
 /**
- * dp_softap_init_tx_exc_metadata() - Init tx exception metadata during xmit
- * @dp_link: DP link handle for SAP interface
- * @nbuf: pointer to network socket buffer
- * @tem: pointer of struct cdp_tx_exception_metadata
- *
- * Return: true if xmit exception with tx exception metadata being set. False
- *	   for regular xmit.
- */
-bool dp_softap_init_tx_exc_metadata(struct wlan_dp_link *dp_link,
-				    qdf_nbuf_t nbuf,
-				    struct cdp_tx_exception_metadata *tem);
-
-/**
  * dp_softap_start_xmit() - Transmit a frame for SAP interface
  * @nbuf: pointer to Network buffer
  * @dp_link: DP link handle
- * @tx_exc_param: pointer of struct cdp_tx_exception_metadata
- * @exception: boolean flag to indicate whether @nbuf is transmitted as an
- *	       exception packet
  *
  * Return: QDF_STATUS_SUCCESS on successful transmission
  */
-QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link,
-				struct cdp_tx_exception_metadata *tx_exc_param,
-				bool exception);
-
-#ifdef WLAN_FEATURE_FILS_SK_SAP
-/**
- * dp_softap_fils_hlp_rx() - Handle FILS HLP packet reception for SoftAP
- * @dp_intf: Pointer to DP interface context
- * @netbuf: Pointer to Network buffer
- *
- * Return: None
- */
-void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t netbuf);
-#else
-static inline
-void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t netbuf)
-{ }
-#endif
+QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link);
 
 /**
  * dp_softap_tx_timeout() - TX timeout handler
@@ -238,72 +204,6 @@ dp_softap_rx_packet_cbk(void *intf_ctx, qdf_nbuf_t rx_buf);
  */
 QDF_STATUS
 dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf);
-
-#if defined(DRIVER_PASSTHRU_MODE)
-/**
- * dp_start_xmit_passthru() - Transmit function for passthrough mode
- * @dp_link: DP link handle
- * @nbuf: network buffer to transmit
- *
- * This function is based on dp_start_xmit() but simplified for
- * passthrough mode:
- * - Does not set FLAGS_NOTIFY in qdf_nbuf->cb{}
- * - Does not get pkt_type and eliminates pkt_type comparison logic
- * - Uses empty functions for timestamp and connectivity stats
- * - Uses simplified MAC address retrieval for passthrough mode only
- * - Does not call dp_get_tx_resource()
- * - Does not check for qdf_nbuf_ipa_owned_get()
- * - Does not check for TSO or EAPOL
- * - Eliminates dp_nbuf_nontso_linearize code block
- * - Does not call dp_fix_broadcast_eapol()
- * - Eliminates drop_pkt_accounting section
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_FAILURE on failure
- */
-QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link,
-				  qdf_nbuf_t nbuf);
-
-/**
- * dp_rx_packet_cbk_passthru() - Receive packet handler
- * @dp_link_context: pointer to DP link context
- * @rx_buf: pointer to rx qdf_nbuf
- *
- * Receive callback registered with data path.  DP will call this to notify
- * when one or more packets were received for a registered
- * STA.
- *
- * Return: QDF_STATUS_E_FAILURE if any errors encountered,
- *	   QDF_STATUS_SUCCESS otherwise
- */
-QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_buf);
-
-/**
- * wlan_dp_rx_deliver_to_stack_passthru() - DP helper function to deliver RX
- *  pkts to stack.
- * @dp_intf: pointer to DP interface context
- * @nbuf: pointer to nbuf
- *
- * The function calls the appropriate stack function to push to the stack
- *
- * Return: QDF_STATUS_E_FAILURE if any errors encountered,
- *	   QDF_STATUS_SUCCESS otherwise
- */
-QDF_STATUS wlan_dp_rx_deliver_to_stack_passthru(struct wlan_dp_intf *dp_intf,
-						qdf_nbuf_t nbuf);
-#else
-static inline
-QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link,
-				  qdf_nbuf_t nbuf)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_buf)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /* DP_PASSTHRU_MODE */
 
 /**
  * dp_tx_timeout() - DP Tx timeout API
@@ -470,12 +370,10 @@ dp_nbuf_nontso_linearize(qdf_nbuf_t nbuf)
 static inline QDF_STATUS
 dp_nbuf_nontso_linearize(qdf_nbuf_t nbuf)
 {
-	if (qdf_nbuf_is_nonlinear(nbuf) && !qdf_nbuf_is_tso(nbuf) &&
-	    !qdf_nbuf_is_uso(nbuf)) {
+	if (qdf_nbuf_is_nonlinear(nbuf) && qdf_nbuf_is_tso(nbuf) == false) {
 		if (qdf_unlikely(qdf_nbuf_linearize(nbuf)))
 			return QDF_STATUS_E_NOMEM;
 	}
-
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -785,51 +683,5 @@ void dp_rx_pkt_da_check(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 {
 }
 #endif
-
-#ifdef CONFIG_BORON
-static inline
-void dp_set_peer_search_idx(qdf_nbuf_t nbuf,
-			    struct cdp_peer_output_param *peer_info)
-{
-	if (qdf_likely(peer_info->txpt_classify_idx_valid)) {
-		QDF_NBUF_CB_PEER_SEARCH_IDX_VALID(nbuf) = 1;
-		QDF_NBUF_CB_PEER_SEARCH_IDX_VALUE(nbuf) =
-						peer_info->txpt_classify_idx;
-	}
-}
-#else
-#if defined(CONFIG_BERYLLIUM) && defined(DRIVER_PASSTHRU_MODE)
-static inline
-void dp_set_peer_search_idx(qdf_nbuf_t nbuf,
-			    struct cdp_peer_output_param *peer_info)
-{
-	if (qdf_likely(peer_info->ast_idx != CDP_INVALID_PEER_AST_IDX)) {
-		QDF_NBUF_CB_PEER_SEARCH_IDX_VALID(nbuf) = 1;
-		QDF_NBUF_CB_PEER_SEARCH_IDX_VALUE(nbuf) = peer_info->ast_idx;
-	}
-}
-#else
-static inline
-void dp_set_peer_search_idx(qdf_nbuf_t nbuf,
-			    struct cdp_peer_output_param *peer_info)
-{
-}
-#endif /* CONFIG_BERYLLIUM and DRIVER_PASSTHRU_MODE */
-#endif /* CONFIG_BORON */
-
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/**
- * dp_softap_wds_ext_rx_handler() - RX handler for wds_ext interface
- * @link: pointer to DP link
- * @dev: pointer to wds_ext net interface
- * @rxbuf: pointer to rx socket buffer
- *
- * Return: QDF_STATUS_E_FAILURE if any errors encountered,
- *	   QDF_STATUS_SUCCESS otherwise
- */
-QDF_STATUS dp_softap_wds_ext_rx_handler(struct wlan_dp_link *link,
-					struct net_device *dev,
-					qdf_nbuf_t rxbuf);
-#endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 #endif

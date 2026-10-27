@@ -23,7 +23,6 @@
  */
 
 #include "wlan_hdd_main.h"
-#include "wlan_hdd_n79_coex.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_trace.h"
 #include <osif_cm_req.h>
@@ -52,14 +51,6 @@
 #include "wlan_hdd_hostapd.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wma.h"
-#include "wlan_hdd_apf.h"
-#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
-#include "hif_main.h"
-#endif
-#include "wlan_mlo_mgr_public_api.h"
-#ifdef WLAN_FEATURE_11BN_SMD
-#include "wlan_smd_roam.h"
-#endif
 
 void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -138,8 +129,7 @@ static void hdd_cm_print_bss_info(struct hdd_station_ctx *hdd_sta_ctx)
  * @link_info: Link info pointer in HDD adapter
  * @sta_ctx: pointer to struct hdd_station_ctx
  * @mac_addr: pointer to AP mld addr if MLO deflink. Otherwise pointer to
- *	      AP BSSID. Also fires for link switch to update IPA WAN rules
- *	      for the old assoc link even after deflink has been updated.
+ *	      AP BSSID.
  *
  * This function handles STA MLO connection and only deflink information
  * is registered to IPA component for STA_DISCONNECT event.
@@ -151,12 +141,10 @@ static bool hdd_handle_ipa_sta_mlo_disconn(struct wlan_hdd_link_info *link_info,
 					   struct hdd_station_ctx *sta_ctx,
 					   uint8_t **mac_addr)
 {
-	struct wlan_objmgr_vdev *vdev = link_info->vdev;
 	struct qdf_mac_addr mac = {0};
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		if (WLAN_HDD_IS_DEFLINK(link_info) ||
-		    wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+	if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)) {
+		if (WLAN_HDD_IS_DEFLINK(link_info)) {
 			qdf_mem_copy(&mac, &sta_ctx->conn_info.mld_addr,
 				     QDF_MAC_ADDR_SIZE);
 			*mac_addr = sta_ctx->conn_info.mld_addr.bytes;
@@ -199,7 +187,7 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	uint8_t *mac_addr;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	hdd_reset_tsf_sync(adapter);
+	hdd_stop_tsf_sync(adapter);
 	time_buffer_size = sizeof(sta_ctx->conn_info.connect_time);
 	qdf_mem_zero(sta_ctx->conn_info.connect_time, time_buffer_size);
 
@@ -207,7 +195,7 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	    hdd_handle_ipa_sta_mlo_disconn(link_info, sta_ctx, &mac_addr))
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
-				  link_info->vdev_id, false,
+				  link_info->vdev_id,
 				  WLAN_IPA_STA_DISCONNECT,
 				  mac_addr,
 				  false);
@@ -227,11 +215,6 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 
 	hdd_wmm_dscp_initial_state(adapter);
 	wlan_deregister_txrx_packetdump(OL_TXRX_PDEV_ID);
-
-	if (adapter->user_nss_ctx) {
-		qdf_mem_free(adapter->user_nss_ctx);
-		adapter->user_nss_ctx = NULL;
-	}
 
 	hdd_place_marker(adapter, "DISCONNECTED", NULL);
 }
@@ -300,25 +283,22 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
+	struct hdd_adapter *link_adapter;
+	struct hdd_station_ctx *link_sta_ctx;
 	bool is_link_switch =
 			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
 
 	mac_handle = hdd_ctx->mac_handle;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (mlo_mgr_optimized_link_switch_in_progress(hdd_ctx->psoc, vdev))
-		return;
-
 	/* update P2P connection status */
 	ucfg_p2p_status_disconnect(vdev);
 	hdd_cfr_disconnect(vdev);
 
-	if (!is_link_switch) {
-		ucfg_cm_ft_reset(vdev);
-		ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
-		hdd_clear_roam_profile_ie(adapter);
-	}
-	wlan_hdd_reset_bcn_rssi_history_stats(link_info);
+	hdd_wmm_adapter_clear(adapter);
+	ucfg_cm_ft_reset(vdev);
+	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
+	hdd_clear_roam_profile_ie(adapter);
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		wlan_crypto_reset_vdev_params(vdev);
@@ -331,7 +311,16 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 						 SCAN_EVENT_TYPE_MAX, true);
 	}
 
-	link_info->is_mlo_vdev_active = false;
+	if (adapter->device_mode == QDF_STA_MODE &&
+	    hdd_adapter_is_ml_adapter(adapter)) {
+		/* Clear connection info in assoc link adapter as well */
+		link_adapter = hdd_get_assoc_link_adapter(adapter);
+		if (link_adapter) {
+			link_sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(link_adapter->deflink);
+			hdd_conn_remove_connect_info(link_sta_ctx);
+		}
+	}
 
 	if (!is_link_switch) {
 		/* Clear saved connection information in HDD */
@@ -343,12 +332,10 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		 * valid link_info for the given adapter. So avoid this reset
 		 * for Link Switch disconnect/internal disconnect
 		 */
-		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
-			hdd_wmm_adapter_clear(adapter);
+		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
 			hdd_adapter_reset_station_ctx(adapter);
-		} else {
+		else
 			hdd_cm_clear_ieee_link_id(link_info, false);
-		}
 	}
 
 	ucfg_dp_remove_conn_info(vdev);
@@ -382,16 +369,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	hdd_cm_print_bss_info(sta_ctx);
 	hdd_clear_conn_info_roam_count(adapter);
-	/*
-	 * Clear user/wpa_supplicant disabled_roaming flag of current
-	 * connection.
-	 */
-	ucfg_clear_user_disabled_roaming(hdd_ctx->psoc, link_info->vdev_id);
-	/* Clear Extended MLD capability support flag of current connection */
-	wlan_mlme_set_ext_mld_cap_supp(hdd_ctx->psoc, false);
-	/* Clear psoc MLO config that includes partner link info */
-	wlan_cm_clear_mlo_allowed_bss_links(hdd_ctx->psoc);
-	hdd_n79_coex_sta_disconnect(hdd_ctx, vdev);
 }
 
 #ifdef WLAN_FEATURE_MSCS
@@ -498,7 +475,6 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
-	bool is_locally_generated;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -515,14 +491,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_conn_set_authenticated(link_info, false);
 	hdd_napi_serialize(0);
 	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
-	wlan_vdev_set_okc_pmkid_in_assoc(vdev, false);
 	__hdd_cm_disconnect_handler_pre_user_update(link_info);
-
-	if (rsp->req.req.source == CM_PEER_DISCONNECT ||
-	    rsp->req.req.source == CM_SB_DISCONNECT)
-		is_locally_generated = false;
-	else
-		is_locally_generated = true;
 
 	hdd_handle_disassociation_event(link_info, &rsp->req.req.bssid);
 
@@ -540,16 +509,6 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	adapter->last_disconnect_reason =
 			osif_cm_mac_to_qca_reason(rsp->req.req.reason_code);
 	hdd_set_disconnect_link_info_cb(link_info->vdev_id, false);
-
-	if (adapter->discon_link_info &&
-	    adapter->discon_link_info->vdev_id == link_info->vdev_id)
-		wlan_connectivity_disconnect_event(vdev,
-						   rsp->req.req.bssid.bytes,
-						   rsp->req.req.reason_code,
-						   link_info->rssi_on_disconnect,
-						   is_locally_generated);
-
-	hdd_apf_reset_history(adapter);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -605,8 +564,6 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 			hdd_err("reset wlm mode failed: %d", status);
 		}
 	}
-
-	adapter->cached_latency_level = HDD_WLM_LATENCY_LEVEL_NORMAL;
 }
 
 /**
@@ -641,20 +598,20 @@ static void hdd_cm_reset_udp_qos_upgrade_config(struct hdd_adapter *adapter)
 }
 
 #ifdef WLAN_FEATURE_11BE
-static inline enum phy_ch_width get_max_bw(void)
+static inline enum eSirMacHTChannelWidth get_max_bw(void)
 {
 	uint32_t max_bw = wma_get_orig_eht_ch_width();
 
 	if (max_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
-		return CH_WIDTH_320MHZ;
+		return eHT_CHANNEL_WIDTH_320MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		return CH_WIDTH_160MHZ;
+		return eHT_CHANNEL_WIDTH_160MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
-		return CH_WIDTH_80P80MHZ;
+		return eHT_CHANNEL_WIDTH_80P80MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-		return CH_WIDTH_80MHZ;
+		return eHT_CHANNEL_WIDTH_80MHZ;
 	else
-		return CH_WIDTH_40MHZ;
+		return eHT_CHANNEL_WIDTH_40MHZ;
 }
 
 static
@@ -678,18 +635,18 @@ void wlan_hdd_re_enable_320mhz_6g_conection(struct hdd_context *hdd_ctx,
 		mlme_obj->cfg.eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 }
 #else
-static inline enum phy_ch_width get_max_bw(void)
+static inline enum eSirMacHTChannelWidth get_max_bw(void)
 {
 	uint32_t max_bw = wma_get_vht_ch_width();
 
 	if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		return CH_WIDTH_160MHZ;
+		return eHT_CHANNEL_WIDTH_160MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
-		return CH_WIDTH_80P80MHZ;
+		return eHT_CHANNEL_WIDTH_80P80MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-		return CH_WIDTH_80MHZ;
+		return eHT_CHANNEL_WIDTH_80MHZ;
 	else
-		return CH_WIDTH_40MHZ;
+		return eHT_CHANNEL_WIDTH_40MHZ;
 }
 
 static
@@ -704,7 +661,7 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct mlme_legacy_priv *mlme_priv;
-	enum phy_ch_width max_bw;
+	enum eSirMacHTChannelWidth max_bw;
 	struct wlan_channel *des_chan;
 	uint8_t link_id = 0xFF;
 	int ret;
@@ -715,8 +672,6 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
 		return;
-
-	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -733,9 +688,8 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 		wlan_hdd_re_enable_320mhz_6g_conection(hdd_ctx, assoc_ch_width);
 
 	wlan_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc, &cb_mode);
-	if (cb_mode == 0 &&
-	    !wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
-		max_bw = CH_WIDTH_20MHZ;
+	if (cb_mode == 0 && !wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
+		max_bw = cb_mode;
 	else
 		max_bw = get_max_bw();
 
@@ -756,7 +710,6 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
-	struct wlan_channel *des_chan = vdev->vdev_mlme.des_chan;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -795,15 +748,8 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 						     rsp->req.req.source);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
-	if (!wlan_mlo_mgr_is_link_switch_in_progress(vdev))
-		ucfg_mlme_set_ml_link_control_mode(
-				hdd_ctx->psoc,
-				vdev->vdev_objmgr.vdev_id, 0);
-
-	if (des_chan)
-		hdd_send_gvp_oper_ctrl_event(hdd_ctx,
-					     vdev->vdev_mlme.des_chan->ch_freq,
-					     adapter->device_mode, false);
+	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,
+					   vdev->vdev_objmgr.vdev_id, 0);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -872,30 +818,6 @@ QDF_STATUS hdd_cm_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
-#ifdef WLAN_FEATURE_11BN_SMD
-static bool hdd_cm_smd_roam_skip_netif_stop(struct wlan_objmgr_vdev *vdev,
-					    enum netif_action_type action)
-{
-	if (action != WLAN_STOP_ALL_NETIF_QUEUE)
-		return false;
-
-	if (smd_is_roaming_in_progress(vdev)) {
-		hdd_debug("vdev %d: skip netif queue stop for SMD roam",
-			  wlan_vdev_get_id(vdev));
-		return true;
-	}
-
-	return false;
-}
-#else
-static inline bool
-hdd_cm_smd_roam_skip_netif_stop(struct wlan_objmgr_vdev *vdev,
-				enum netif_action_type action)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
-
 QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 				      enum netif_action_type action,
 				      enum netif_reason_type reason)
@@ -913,9 +835,6 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
-
-	if (hdd_cm_smd_roam_skip_netif_stop(vdev, action))
-		return QDF_STATUS_SUCCESS;
 
 	wlan_hdd_netif_queue_control(link_info->adapter, action, reason);
 
@@ -941,24 +860,6 @@ QDF_STATUS hdd_cm_napi_serialize_control(bool action)
 }
 
 #ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
-static inline
-uint16_t hdd_cm_get_perf_cpu_mask(void)
-{
-	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
-	int package_id;
-	unsigned int cpus;
-	uint16_t cpu_mask = 0;
-
-	qdf_for_each_online_cpu(cpus) {
-		package_id = qdf_topology_physical_package_id(cpus);
-		if (package_id >= 0 &&
-		    QDF_HAS_PARAM(perf_cpu_cluster, package_id))
-			cpu_mask |= (uint16_t)(1u << cpus);
-	}
-
-	return cpu_mask;
-}
-
 QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
 {
 	struct wlan_core_minfreq req;
@@ -973,8 +874,7 @@ QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
 	if (action) {
 		req.magic    = WLAN_CORE_MINFREQ_MAGIC;
 		req.reserved = 0; /* unused */
-		/* only perf cluster */
-		req.coremask = hdd_cm_get_perf_cpu_mask();
+		req.coremask = 0x00ff;/* big and little cluster */
 		req.freq     = 0xfff;/* set to max freq */
 	} else {
 		req.magic    = WLAN_CORE_MINFREQ_MAGIC;

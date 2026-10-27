@@ -63,10 +63,6 @@
 #include "wlan_mlme_public_struct.h"
 #include <wlan_mlo_mgr_link_switch.h>
 #include "wlan_policy_mgr_i.h"
-#include "wlan_mlo_mgr_peer.h"
-#ifdef WLAN_FEATURE_11BI_SECURITY
-#include "wlan_crypto_global_api.h"
-#endif
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -192,7 +188,7 @@ lim_get_he_rate_info_flag(tpDphHashNode sta_ds)
 static enum tx_rate_info
 lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
 {
-	if (sta_ds->ch_width == CH_WIDTH_320MHZ)
+	if (sta_ds->eht_config.support_320mhz_6ghz)
 		return  TX_RATE_EHT320;
 	else if (sta_ds->ch_width == CH_WIDTH_160MHZ)
 		return  TX_RATE_EHT160;
@@ -310,7 +306,7 @@ static void lim_send_smps_intolerent(struct mac_context *mac_ctx,
 						SIR_MAC_VENDOR_AP_1_OUI_LEN,
 						bcn_ie_ptr, bcn_ie_len);
 	if (mac_ctx->roam.configParam.is_force_1x1 &&
-	    vendor_ap_1 && (pe_session->cap_tx_nss > NSS_1x1_MODE) &&
+	    vendor_ap_1 && (pe_session->nss == 2) &&
 	    (!mac_ctx->mlme_cfg->gen.as_enabled ||
 	     wlan_reg_is_5ghz_ch_freq(pe_session->curr_op_freq))) {
 		/* SET vdev param */
@@ -369,33 +365,20 @@ static inline void lim_free_tspec_ie(struct pe_session *pe_session)
 {}
 #endif
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static void
-lim_set_assoc_encrypted(struct pe_session *pe_session,
-			struct wlan_cm_connect_resp *connect_rsp,
-			QDF_STATUS connect_status)
+static void lim_cm_fill_rsp_from_stads(struct mac_context *mac_ctx,
+				       struct pe_session *pe_session,
+				       struct cm_vdev_join_rsp *rsp)
 {
-	int32_t auth_mode;
+	tpDphHashNode sta_ds;
 
-	if (!pe_session->assoc_rsp_protected ||
-	    !QDF_IS_STATUS_SUCCESS(connect_status))
+	sta_ds = dph_get_hash_entry(mac_ctx,
+				    DPH_STA_HASH_INDEX_PEER,
+				    &pe_session->dph.dphHashTable);
+	if (!sta_ds)
 		return;
 
-	auth_mode = wlan_crypto_get_param(pe_session->vdev,
-					  WLAN_CRYPTO_PARAM_AUTH_MODE);
-	if (auth_mode >= 0 &&
-	    (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_EPPKE) ||
-	     QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)))
-		connect_rsp->is_assoc_encrypted = true;
+	rsp->nss = sta_ds->nss;
 }
-#else
-static inline void
-lim_set_assoc_encrypted(struct pe_session *pe_session,
-			struct wlan_cm_connect_resp *connect_rsp,
-			QDF_STATUS connect_status)
-{
-}
-#endif
 
 static QDF_STATUS
 lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
@@ -460,7 +443,6 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		qdf_mem_copy(connect_ie->assoc_rsp.ptr, pe_session->assocRsp,
 			     connect_ie->assoc_rsp.len);
 	}
-	lim_set_assoc_encrypted(pe_session, connect_rsp, connect_status);
 	connect_rsp->is_wps_connection = pe_session->wps_registration;
 	connect_rsp->is_osen_connection = pe_session->isOSENConnection;
 
@@ -484,17 +466,12 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		lim_copy_tspec_ie(pe_session, rsp);
 
 		lim_send_smps_intolerent(mac_ctx, pe_session, bcn_len, bcn_ptr);
+		lim_cm_fill_rsp_from_stads(mac_ctx, pe_session, rsp);
 		rsp->uapsd_mask = pe_session->gUapsdPerAcBitmask;
 
-		/* Link ID is valid only for MLO connections; skip for
-		 * single link connections where no link ID is assigned.
-		 */
-		if (wlan_vdev_get_link_id(pe_session->vdev) !=
-		    WLAN_LINK_ID_INVALID)
-			mlo_mgr_update_link_status_code(
-					pe_session->vdev,
-					wlan_vdev_get_link_id(pe_session->vdev),
-					STATUS_SUCCESS);
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+						wlan_vdev_get_link_id(pe_session->vdev),
+						STATUS_SUCCESS);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -764,58 +741,6 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 				       prot_status_code, is_reassoc);
 
 	/* add reassoc resp API */
-}
-
-void lim_send_unified_connect_rsp(struct mac_context *mac_ctx,
-				  uint8_t vdev_id,
-				  QDF_STATUS evt_status)
-{
-	struct pe_session *session_entry;
-	tSirResultCodes result_code = eSIR_SME_SUCCESS;
-	uint16_t prot_status_code = STATUS_SUCCESS;
-
-	pe_debug("Unified connect response for vdev_id: %d, evt_status: %d",
-		 vdev_id, evt_status);
-
-	/* Find the PE session for this vdev */
-	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
-	if (!session_entry) {
-		pe_err("Session not found for vdev_id: %d", vdev_id);
-		result_code = eSIR_SME_INVALID_SESSION;
-	} else {
-		/* Map firmware status to result codes */
-		switch (evt_status) {
-		case QDF_STATUS_SUCCESS:
-			result_code = eSIR_SME_SUCCESS;
-			prot_status_code = STATUS_SUCCESS;
-			break;
-		case QDF_STATUS_E_TIMEOUT:
-			/*
-			 * Timeout when firmware didn't send unified command
-			 * response to host
-			 */
-			result_code = eSIR_SME_JOIN_TIMEOUT_RESULT_CODE;
-			prot_status_code = STATUS_UNSPECIFIED_FAILURE;
-			break;
-		case QDF_STATUS_E_FAILURE:
-		case QDF_STATUS_E_NOMEM:
-		default:
-			/* Failure when firmware sent evt_status as failed */
-			if (session_entry->result_code != eSIR_SME_SUCCESS) {
-				result_code = session_entry->result_code;
-				prot_status_code =
-					session_entry->prot_status_code;
-			} else {
-				result_code = eSIR_SME_ASSOC_REFUSED;
-				prot_status_code = STATUS_UNSPECIFIED_FAILURE;
-			}
-			break;
-		}
-	}
-
-	/* Call the existing lim_send_sme_join_reassoc_rsp function */
-	lim_send_sme_join_reassoc_rsp(mac_ctx, false, result_code,
-				      prot_status_code, session_entry, vdev_id);
 }
 
 void lim_send_sme_start_bss_rsp(struct mac_context *mac,
@@ -1231,14 +1156,14 @@ lim_send_sme_deauth_ind(struct mac_context *mac, tpDphHashNode sta,
 	pSirSmeDeauthInd->length = sizeof(*pSirSmeDeauthInd);
 
 	pSirSmeDeauthInd->vdev_id = pe_session->smeSessionId;
-	if (LIM_IS_AP_ROLE(pe_session))
+	if (eSIR_INFRA_AP_MODE == pe_session->bssType) {
 		pSirSmeDeauthInd->status_code =
 			(tSirResultCodes) sta->mlmStaContext.cleanupTrigger;
-	else
+	} else {
 		/* Need to indicate the reason code over the air */
 		pSirSmeDeauthInd->status_code =
 			(tSirResultCodes) sta->mlmStaContext.disassocReason;
-
+	}
 	/* BSSID */
 	qdf_mem_copy(pSirSmeDeauthInd->bssid.bytes, pe_session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -1883,10 +1808,7 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	enum QDF_OPMODE mode;
 	qdf_freq_t csa_freq = csa_params->csa_chan_freq, sec_ch_2g_freq = 0;
 	enum phy_ch_width new_ch_width = csa_params->new_ch_width;
-	enum channel_state chan_state = CHANNEL_STATE_ENABLE;
-	enum reg_6g_ap_type power_type;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t passthru_vdev_id, passthru_freq = 0;
+	enum channel_state chan_state;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1904,29 +1826,16 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 			sec_ch_2g_freq = csa_freq - HT40_SEC_OFFSET;
 	}
 
-	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(csa_freq)) {
-		status = wlan_reg_get_best_6g_power_type(
-					mac_ctx->psoc, mac_ctx->pdev,
-					&power_type,
-					session_entry->best_6g_power_type,
-					csa_freq);
-		if (QDF_IS_STATUS_ERROR(status))
-			chan_state = CHANNEL_STATE_INVALID;
-	} else {
-		chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
-							mac_ctx->pdev,
-							csa_freq, new_ch_width,
-							sec_ch_2g_freq,
-							REG_CURRENT_PWR_MODE);
-	}
-
+	chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
+						mac_ctx->pdev,
+						csa_freq, new_ch_width,
+						sec_ch_2g_freq,
+						REG_CURRENT_PWR_MODE);
 	if (chan_state == CHANNEL_STATE_INVALID ||
 	    chan_state == CHANNEL_STATE_DISABLE) {
-		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d pwr_type %d. Disconnect",
+		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d. Disconnect",
 		       csa_freq, new_ch_width, csa_params->new_ch_freq_seg1,
-		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq,
-		       session_entry->best_6g_power_type);
-
+		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq);
 		lim_tear_down_link_with_ap(mac_ctx,
 					   session_entry->peSessionId,
 					   REASON_CHANNEL_SWITCH_FAILED,
@@ -1938,24 +1847,6 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
 		if (!lim_is_validate_punc_bitmap(csa_params))
 			return false;
-	}
-	if (policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
-						      PM_PASSTHRU_MODE, NULL)) {
-		passthru_vdev_id =
-			policy_mgr_mode_specific_vdev_id(mac_ctx->psoc,
-							 PM_PASSTHRU_MODE);
-		if (WLAN_INVALID_VDEV_ID != passthru_vdev_id) {
-			status =
-			policy_mgr_get_chan_by_session_id(mac_ctx->psoc,
-							  passthru_vdev_id,
-							  &passthru_freq);
-			if (QDF_IS_STATUS_SUCCESS(status) &&
-			    (passthru_freq != csa_freq)) {
-				pe_warn("Ignore CSA: Passthru freq %d, csa %d",
-					passthru_freq, csa_freq);
-				return false;
-			}
-		}
 	}
 
 	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
@@ -2119,40 +2010,11 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 			       tLimChannelSwitchInfo *lim_ch_switch,
 			       struct ch_params ch_params)
 {
-	enum phy_ch_width max_ch_width, assoc_ch_width;
-	struct mlme_legacy_priv *mlme_priv;
-	struct wlan_objmgr_pdev *pdev;
-
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
-	    session_entry->ch_center_freq_seg1 == ch_params.center_freq_seg1 &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
-		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
-		if (!mlme_priv) {
-			pe_err("null mlme priv");
-			return false;
-		}
-		assoc_ch_width =
-			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
-
-		pdev = wlan_vdev_get_pdev(session_entry->vdev);
-		if (!pdev) {
-			pe_err("null pdev");
-			return false;
-		}
-		max_ch_width = wlan_get_bw_for_mcs_set(assoc_ch_width,
-						session_entry->dot11mode, pdev,
-						lim_ch_switch->sw_target_freq, 0);
-
-		/* Allow CSA if it represents a bandwidth upgrade */
-		if (assoc_ch_width < ch_params.ch_width &&
-		    max_ch_width >= ch_params.ch_width) {
-			pe_debug("BW upgrade %d->%d", assoc_ch_width,
-				 ch_params.ch_width);
-		} else {
-			pe_debug("Ignore CSA, no change in ch, bw and puncture");
-			return false;
-		}
+		pe_debug("Ignore CSA, no change in ch, bw and puncture");
+		return false;
 	}
 	return true;
 }
@@ -2209,12 +2071,7 @@ static void lim_csa_update_channel_width_for_dot11mode(
 	enum phy_ch_width max_ch_width;
 
 	max_ch_width = lim_get_max_channel_width_from_dot11mode(
-			session_entry->dot11mode);
-
-	if (wlan_reg_is_24ghz_ch_freq(csa_params->csa_chan_freq))
-		max_ch_width = qdf_min(max_ch_width, CH_WIDTH_40MHZ);
-	else if (wlan_reg_is_5ghz_ch_freq(csa_params->csa_chan_freq))
-		max_ch_width = qdf_min(max_ch_width, CH_WIDTH_160MHZ);
+						session_entry->dot11mode);
 
 	/* If AP wants to set in 80 + 80 BW, do not change to 160 MHz */
 	if (csa_params->new_ch_width == CH_WIDTH_80P80MHZ &&
@@ -2284,8 +2141,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
 
-	lim_csa_update_channel_width_for_dot11mode(session_entry,
-						   csa_params);
+	lim_csa_update_channel_width_for_dot11mode(session_entry, csa_params);
 	ch_params.ch_width = csa_params->new_ch_width;
 
 	if (IS_DOT11_MODE_EHT(session_entry->dot11mode))
@@ -2297,15 +2153,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					     csa_params->csa_chan_freq,
 					     0, &ch_params,
 					     REG_CURRENT_PWR_MODE);
-	if (csa_params->new_ch_width > ch_params.ch_width) {
-		pe_debug("CSA BW downgrade: requested %d -> regulatory max %d",
-			 csa_params->new_ch_width, ch_params.ch_width);
-		csa_params->new_ch_width = ch_params.ch_width;
-	}
-
 	lim_set_chan_sw_puncture(lim_ch_switch, &ch_params);
 
-	qdf_mem_zero(&ch_params, sizeof(struct ch_params));
+	if (!lim_sta_follow_csa(session_entry, csa_params,
+				lim_ch_switch, ch_params))
+		goto send_event;
+	else
+		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
@@ -2326,7 +2180,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	lim_update_tdls_set_state_for_fw(session_entry, false);
 	lim_delete_tdls_peers(mac_ctx, session_entry,
-			      TDLS_PEER_DEL_REASON_CSA);
+			      TDLS_PEER_DEL_REASON_NONE);
 
 	lim_ch_switch->switchMode = csa_params->switch_mode;
 	/* timer already started by firmware, switch immediately */
@@ -2581,11 +2435,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
 		update_csa_link_info(session_entry->vdev, link_id, csa_params);
+	} else {
+		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+		if (!mlme_priv)
+			goto send_event;
+		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
+						csa_params->new_ch_width;
 	}
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
-	if (!mlme_priv)
-		goto send_event;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&
 	    session_entry->dot11mode == MLME_DOT11_MODE_11A)
@@ -2603,7 +2459,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 						   RSO_CHANNEL_SWITCH);
 
 	if (mlo_is_any_link_disconnecting(session_entry->vdev)) {
-		pe_info_rl("Ignore CSA, vdev is in not in connected state");
+		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
 		goto send_event;
 	}
 
@@ -3028,9 +2884,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 				  void *event)
 {
 	struct pe_session *session;
+	struct wlan_objmgr_vdev *vdev;
 	bool csa_tx_offload, is_sap_go_moved_before_sta = false;
-	struct sap_ch_switch_info *ch_switch_info;
-
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
@@ -3040,31 +2895,29 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	}
 
-	is_sap_go_moved_before_sta =
-		wlan_vdev_mlme_is_sap_go_move_before_sta(session->vdev);
-	wlan_vdev_mlme_set_sap_go_move_before_sta(session->vdev, false);
-
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		is_sap_go_moved_before_sta =
+			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
+		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
 	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
-		 session->vdev_id, GET_LIM_BSS_TYPE(session),
+		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
 		 session->gLimChannelSwitch.switchCount,
 		 is_sap_go_moved_before_sta);
 
-	if (!LIM_IS_AP_ROLE(session)) {
+	if (!LIM_IS_AP_ROLE(session))
 		return;
-	}
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
-	ch_switch_info = wlan_get_sap_ch_sw_info(session->vdev);
-	if (!ch_switch_info) {
-		pe_err("Invalid channel info");
-		return;
-	}
-
 	if ((session->dfsIncludeChanSwIe && !csa_tx_offload &&
 	     ((session->gLimChannelSwitch.switchCount ==
-	       ch_switch_info->sap_ch_switch_beacon_cnt) ||
+	       mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
 	      (session->gLimChannelSwitch.switchCount == 1) ||
 	      is_sap_go_moved_before_sta)) ||
 	     session->bw_update_include_ch_sw_ie)

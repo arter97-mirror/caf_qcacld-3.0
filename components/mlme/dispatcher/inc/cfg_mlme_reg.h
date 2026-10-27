@@ -128,29 +128,6 @@
 
 /*
  * <ini>
- * enable_nan_on_dfs_channels - Enable DFS channels for NAN
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to support dfs channels for NAN interface
- * Customer can config this item to enable/disable NAN in dfs channel
- *
- * Related: None
- *
- * Supported Feature: NAN
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DFS_CHANNEL_SUPPORT_FOR_NAN CFG_INI_BOOL( \
-	"enable_nan_on_dfs_channels", \
-	0, \
-	"enable/disable dfs channel for NAN")
-
-/*
- * <ini>
  * fcc_5dot9_ghz_chan_in_master_mode - Enable/disable 5.9 GHz channels in
  * master mode for US
  * @Min: 0
@@ -508,131 +485,6 @@ enum ignore_fw_coex_info_modes {
 #define CFG_COEX_UNSAFE_CHAN_ALL
 #endif
 
-#ifdef CONFIG_BAND_6GHZ
-/*
- * <ini>
- * enable_c2c_support - Used to enable C2C support
- *
- * @Min: 0 (Disable C2C support)
- * @Max: 1 (Enable C2C support)
- * Default: 0
- *
- * This ini is used to enable/disable C2C support
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ENABLE_C2C_SUPPORT CFG_INI_BOOL( \
-		"enable_c2c_support", \
-		false, \
-		"Enable C2C support")
-#define CFG_C2C_SUPPORT \
-	CFG(CFG_ENABLE_C2C_SUPPORT)
-#else
-#define CFG_C2C_SUPPORT
-#endif
-
-/* <ini>
- * sta_indoor_ch_peer_scc – Support STA connected indoor channel for
- * peer-to-peer (SAP/P2P GO/NAN) connections.
- * @Min: 0
- * @Max: 7
- * @Default: 0
- *
- * This ini is used to enable or disable support for STA
- * connected indoor channel for peer-to-peer connections
- * (SAP/P2P GO/NAN) and form SCC.
- *
- * BIT 0 - SUPPORT STA-P2P SCC
- * BIT 1 - SUPPORT STA-NAN SCC
- * BIT 2 - SUPPORT STA-SAP SCC
- *
- * SAP:
- * If sta_indoor_ch_peer_scc has BIT 2 set, even with
- * sta_sap_scc_on_indoor_chan = 0, STA+SAP SCC is allowed on
- * Indoor only channel.
- * This feature leverages the configuration set by ini value
- * sta_sap_scc_on_indoor_chan, and sets its value to 1.
- *
- * P2P:
- * p2p_go_on_5ghz_indoor_chan = 1, P2P GO allowed on indoor channels with or
- * without concurrency.
- * If sta_indoor_ch_peer_scc has BIT 0 set, allow P2P GO operation
- * only on STA connected indoor only channel.
- *
- * NAN:
- * enable_nan_indoor_channel = 1, allows NAN connections on all indoor channels
- * If sta_indoor_ch_peer_scc has BIT 1 set, allow NAN connection only on
- * STA connected indoor only channel.
- *
- * Related: sta_sap_scc_on_indoor_chan/p2p_go_on_5ghz_indoor_chan/
- *          enable_nan_indoor_channel
- *
- * Supported Feature: STA + P2P/SAP/NAN
- *
- * </ini>
- */
-#define CFG_ENABLE_STA_INDOOR_CH_PEER_SCC CFG_INI_UINT( \
-	"sta_indoor_ch_peer_scc", \
-	0, \
-	7, \
-	0, \
-	CFG_VALUE_OR_DEFAULT, \
-	"enable/disable sta_indoor_ch_peer_scc")
-
-/* <ini>
- * sta_dfs_ch_peer_scc – Support STA connected DFS channel for
- * peer to peer connections and form SCC.
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to indicate feature support for STA connected DFS channel
- * for peer-to-peer connections and form SCC.
- *
- * Note: Currently this ini supports just P2P connections in SCC with STA
- * connected DFS channel. In future, if support gets enabled for NAN and SAP
- * same ini can be used.
- *
- * Related: None
- *
- * Supported Feature: STA + P2P
- *
- * </ini>
- */
-#define CFG_ENABLE_STA_DFS_CH_PEER_SCC CFG_INI_BOOL( \
-	"sta_dfs_ch_peer_scc", \
-	0, \
-	"enable/disable sta_dfs_ch_peer_scc")
-
-/*
- * <ini>
- * gEnableSocialChannelsOn2gDisable - Enable 2 GHz social channels
- * when 2 GHz band is disabled
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * When set to 1 and the 2.4 GHz band is disabled (e.g. 5G only, 6G only,
- * or 5G+6G band config), the 2.4 GHz social channels (2412, 2437, 2462 MHz)
- * are kept enabled so that P2P and NAN discovery can still operate. When
- * set to 0, these channels are disabled along with the rest of the 2.4 GHz
- * band, and P2P/NAN discovery will not be able to use them while 2 GHz
- * band is disabled.
- *
- * Related: BandCapability
- *
- * Supported Feature: P2P/NAN
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE CFG_INI_BOOL( \
-	"gEnableSocialChannelsOn2gDisable", \
-	0, \
-	"Enable social channels when 2 GHz band is disabled")
-
 #define CFG_REG_ALL \
 	CFG_COEX_UNSAFE_CHAN_ALL \
 	CFG(CFG_SELF_GEN_FRM_PWR) \
@@ -647,11 +499,6 @@ enum ignore_fw_coex_info_modes {
 	CFG(CFG_IGNORE_FW_REG_OFFLOAD_IND) \
 	CFG_AFC_REG_ALL \
 	CFG(CFG_RETAIN_NOL_ACROSS_REG_DOMAIN) \
-	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL \
-	CFG_C2C_SUPPORT \
-	CFG(CFG_DFS_CHANNEL_SUPPORT_FOR_NAN) \
-	CFG(CFG_ENABLE_STA_INDOOR_CH_PEER_SCC) \
-	CFG(CFG_ENABLE_STA_DFS_CH_PEER_SCC) \
-	CFG(CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE)
+	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL
 
 #endif /* CFG_MLME_REG_H__ */

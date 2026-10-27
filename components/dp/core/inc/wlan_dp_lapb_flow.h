@@ -87,19 +87,5 @@ static inline bool wlan_dp_is_lapb_frame(struct dp_soc *soc, qdf_nbuf_t nbuf)
 {
 	return IS_LAPB_FRAME(nbuf->mark);
 }
-
-/**
- * wlan_dp_is_lapb_flush_ind_set() - Check if lapb flush indication is set
- * @soc: Datapath global soc handle
- * @nbuf: sk_buff abstraction
- *
- * Returns: QDF_STATUS
- */
-static inline bool
-wlan_dp_is_lapb_flush_ind_set(struct dp_soc *soc, qdf_nbuf_t nbuf)
-{
-	return IS_LAPB_FRAME(nbuf->mark) &&
-	       GET_FLAGS_LAPB_FLUSH_IND(nbuf->mark);
-}
 #endif /* WLAN_SUPPORT_LAPB */
 #endif

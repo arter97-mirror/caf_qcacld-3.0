@@ -37,7 +37,6 @@
 #include <wlan_mlme_twt_public_struct.h>
 #endif
 #include <wlan_mlme_api.h>
-#include <wlan_reg_services_api.h>
 
 #ifdef WLAN_SUPPORT_TWT
 
@@ -462,10 +461,6 @@ QDF_STATUS ucfg_mc_cp_stats_inc_wake_lock_stats_by_protocol(
 		stats->icmpv6_count++;
 		stats->ipv6_mcast_na_stats++;
 		break;
-	case QDF_PROTO_ICMPV6_MLQ:
-		stats->icmpv6_count++;
-		stats->ipv6_mcast_mlq_stats++;
-		break;
 	default:
 		break;
 	}
@@ -586,7 +581,6 @@ static void vdev_iterator(struct wlan_objmgr_psoc *psoc, void *vdev, void *arg)
 	stats->ipv6_mcast_ra_stats += vdev_stats->ipv6_mcast_ra_stats;
 	stats->ipv6_mcast_ns_stats += vdev_stats->ipv6_mcast_ns_stats;
 	stats->ipv6_mcast_na_stats += vdev_stats->ipv6_mcast_na_stats;
-	stats->ipv6_mcast_mlq_stats += vdev_stats->ipv6_mcast_mlq_stats;
 	stats->icmpv4_count += vdev_stats->icmpv4_count;
 	stats->icmpv6_count += vdev_stats->icmpv6_count;
 	stats->rssi_breach_wake_up_count +=
@@ -704,7 +698,6 @@ QDF_STATUS ucfg_mc_cp_stats_write_wow_stats(
 			     "\tIPv6 multicast RA: %u\n"
 			     "\tIPv6 multicast NS: %u\n"
 			     "\tIPv6 multicast NA: %u\n"
-			     "\tIPv6 multicast MLQ: %u\n"
 			     "\tICMPv4: %u\n"
 			     "\tICMPv6: %u\n"
 			     "\tRSSI Breach: %u\n"
@@ -725,7 +718,6 @@ QDF_STATUS ucfg_mc_cp_stats_write_wow_stats(
 			     wow_stats.ipv6_mcast_ra_stats,
 			     wow_stats.ipv6_mcast_ns_stats,
 			     wow_stats.ipv6_mcast_na_stats,
-			     wow_stats.ipv6_mcast_mlq_stats,
 			     wow_stats.icmpv4_count,
 			     wow_stats.icmpv6_count,
 			     wow_stats.rssi_breach_wake_up_count,
@@ -746,121 +738,18 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 					       enum stats_req_type type,
 					       struct request_info *info)
 {
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
-	bool pending = false;
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	QDF_STATUS status;
 
-	if (!psoc) {
-		cp_stats_err("psoc is null");
-		return status;
-	}
-
-	status = ucfg_mc_cp_stats_set_pending_req(psoc, type, info);
+	status = ucfg_mc_cp_stats_set_pending_req(wlan_vdev_get_psoc(vdev),
+						  type, info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cp_stats_err("ucfg_mc_cp_stats_set_pending_req pdev failed: %d",
 			     status);
 		return status;
 	}
 
-	status = tgt_send_mc_cp_stats_req(psoc, type, info);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("send cp stats req type %d failed %d",
-			     type, status);
-		ucfg_mc_cp_stats_reset_pending_req(psoc, type, info, &pending);
-	}
-
-	return status;
+	return tgt_send_mc_cp_stats_req(wlan_vdev_get_psoc(vdev), type, info);
 }
-
-#ifdef WLAN_FEATURE_CTAS
-bool
-ucfg_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_cp_stats_is_ctas_plim_indication_supported(psoc);
-}
-
-QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-				       enum host_tas_direction direction)
-{
-	return tgt_cp_stats_send_tas_mode(psoc, direction);
-}
-
-QDF_STATUS
-ucfg_mc_cp_stats_send_get_avg_tx_power(
-		struct wlan_objmgr_psoc *psoc,
-		uint32_t dsi_id,
-		void (*cb)(struct wlan_tas_metrics_event *ev, void *cookie),
-		void *cookie)
-{
-	QDF_STATUS status;
-	bool pending = false;
-	struct request_info info = {0};
-
-	if (!psoc) {
-		cp_stats_err("psoc is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	info.u.get_tas_metrics_cb = cb;
-	info.cookie = cookie;
-
-	status = ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_TAS_METRICS,
-						  &info);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("Failed to set pending TAS metrics req: %d",
-			     status);
-		return status;
-	}
-
-	status = tgt_cp_stats_send_get_avg_tx_power(psoc, dsi_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("send_get_avg_tx_power failed: %d", status);
-		ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_TAS_METRICS,
-						   &info, &pending);
-	}
-
-	return status;
-}
-
-QDF_STATUS
-ucfg_mc_cp_stats_send_get_tx_power_calling(
-		struct wlan_objmgr_psoc *psoc,
-		uint32_t dsi_id,
-		void (*cb)(struct wlan_tas_plimit_event *ev, void *cookie),
-		void *cookie)
-{
-	QDF_STATUS status;
-	bool pending = false;
-	struct request_info info = {0};
-
-	if (!psoc) {
-		cp_stats_err("psoc is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	info.u.get_tas_current_plimit_cb = cb;
-	info.cookie = cookie;
-
-	status = ucfg_mc_cp_stats_set_pending_req(psoc,
-						  TYPE_TAS_CURRENT_PLIMIT,
-						  &info);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("Failed to set pending TAS plimit req: %d",
-			     status);
-		return status;
-	}
-
-	status = tgt_cp_stats_send_get_tx_power_calling(psoc, dsi_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("send_get_tx_power_calling failed: %d", status);
-		ucfg_mc_cp_stats_reset_pending_req(psoc,
-						   TYPE_TAS_CURRENT_PLIMIT,
-						   &info, &pending);
-	}
-
-	return status;
-}
-#endif /* WLAN_FEATURE_CTAS */
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
@@ -916,46 +805,6 @@ void ucfg_mc_cp_get_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
-						  enum stats_req_type type,
-						  struct request_info *info)
-{
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
-	bool pending = false;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!vdev) {
-		cp_stats_err("vdev is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		cp_stats_err("psoc is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	/* Store pending request with pdev_id */
-	status = ucfg_mc_cp_stats_set_pending_req(psoc, type, info);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("ucfg_mc_cp_stats_set_pending_req failed: %d",
-			     status);
-		return status;
-	}
-
-	/* Send request to firmware */
-	status = tgt_send_mc_cp_stats_req(psoc, type, info);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("send cp stats req type %d failed %d",
-			     type, status);
-		ucfg_mc_cp_stats_reset_pending_req(psoc, type, info, &pending);
-		if (!pending)
-			cp_stats_debug("No pending request found during cleanup - possible race condition");
-	}
-
-	return status;
-}
-
 QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 					 int *dbm)
 {
@@ -995,7 +844,7 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc,
 						vdev->vdev_objmgr.vdev_id);
 	if (mac_id >= MAX_MAC) {
-		cp_stats_rl_err("invalid mac_id %d", mac_id);
+		cp_stats_err("invalid mac_id %d", mac_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1170,8 +1019,6 @@ void ucfg_mc_cp_stats_free_stats_resources(struct stats_event *ev)
 	qdf_mem_free(ev->peer_extended_stats);
 	ucfg_mc_cp_stats_free_peer_stats_info_ext(ev);
 	qdf_mem_free(ev->vdev_extd_stats);
-	if (ev->bcn_stats)
-		qdf_mem_free(ev->bcn_stats);
 	qdf_mem_zero(ev, sizeof(*ev));
 }
 
@@ -1485,13 +1332,10 @@ wlan_cp_stats_update_channel_stats(struct per_channel_stats *channel_stats,
 	if (scanned_ch_width == CH_WIDTH_20MHZ) {
 		start_freq = ev_channel_stat->channel_freq;
 		end_freq = ev_channel_stat->channel_freq;
-	} else if (scanned_ch_width == CH_WIDTH_40MHZ &&
-		   wlan_reg_is_24ghz_ch_freq(ev_channel_stat->channel_freq)) {
-		start_freq = ev_channel_stat->channel_freq - 20;
-		end_freq = ev_channel_stat->channel_freq + 20;
 	} else {
-		range = wlan_reg_get_bonded_chan_entry(ev_channel_stat->channel_freq,
-						       scanned_ch_width, 0);
+		range =
+		   wlan_reg_get_bonded_chan_entry(ev_channel_stat->channel_freq,
+						  scanned_ch_width, 0);
 		if (!range) {
 			cp_stats_debug("range is NULL for freq %d, ch_width %d",
 				       ev_channel_stat->channel_freq,
@@ -1606,8 +1450,8 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 				     sizeof(*channel_status_list));
 			channel_stats->total_channel = total_channel;
 		} else {
-			cp_stats_debug("Chan cnt exceed, channel_id=%d",
-				       ev_channel_stat->channel_id);
+			cp_stats_err("Chan cnt exceed, channel_id=%d",
+				     ev_channel_stat->channel_id);
 		}
 	}
 
@@ -1664,46 +1508,4 @@ void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev)
 	}
 }
 
-#endif
-
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-QDF_STATUS
-ucfg_cp_stats_get_power_datapath_stats(struct wlan_objmgr_pdev *pdev,
-				       struct cp_stats_power_datapath_info *stats)
-{
-	struct pdev_cp_stats *pdev_cp_stats_priv;
-	struct pdev_mc_cp_stats *pdev_mc_stats;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-
-	if (!pdev || !stats) {
-		cp_stats_err("Invalid input parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Get CP stats pdev object */
-	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
-	if (!pdev_cp_stats_priv) {
-		cp_stats_err("Failed to get pdev CP stats object");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Read stats with locking */
-	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
-	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
-
-	if (!pdev_mc_stats->power_datapath_stats_valid) {
-		cp_stats_debug("Power datapath stats not valid");
-		status = QDF_STATUS_E_EMPTY;
-		goto unlock_and_exit;
-	}
-
-	/* Copy stats to output buffer */
-	qdf_mem_copy(stats, &pdev_mc_stats->power_datapath_stats,
-		     sizeof(*stats));
-	status = QDF_STATUS_SUCCESS;
-
-unlock_and_exit:
-	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
-	return status;
-}
 #endif

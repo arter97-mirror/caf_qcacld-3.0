@@ -607,7 +607,7 @@ uint8_t os_if_son_get_rx_streams(struct wlan_objmgr_vdev *vdev);
 
 /**
  * os_if_son_cfg80211_reply() - replies to cfg80211
- * @sk_buf: sk_buff to upper layer
+ * @sk_buf: sk_buff to uper layer
  *
  * Return: QDF_STATUS_SUCCESS on success
  */

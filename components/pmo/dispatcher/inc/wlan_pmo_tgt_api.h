@@ -93,20 +93,6 @@ QDF_STATUS pmo_tgt_enable_arp_offload_req(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS pmo_tgt_disable_arp_offload_req(struct wlan_objmgr_vdev *vdev,
 		uint8_t vdev_id);
 
-/**
- * pmo_tgt_set_apf_mode_req() - Set APF mode
- * @psoc: pointer to psoc object
- * @apf_mode: apf mode
- * @vdev_id: vdev id
- *
- * API to set APF mode
- *
- * Return: QDF_STATUS_SUCCESS in case of success else return error
- */
-QDF_STATUS pmo_tgt_set_apf_mode_req(struct wlan_objmgr_psoc *psoc,
-				    uint32_t apf_mode,
-				    uint32_t vdev_id);
-
 #ifdef WLAN_NS_OFFLOAD
 /**
  * pmo_tgt_enable_ns_offload_req() -  Send ns offload req to targe
@@ -468,12 +454,12 @@ QDF_STATUS pmo_tgt_psoc_set_runtime_pm_inprogress(struct wlan_objmgr_psoc *psoc,
 						  bool value);
 
 /**
- * pmo_tgt_psoc_get_runtime_pm_inprogress() -get runtime status
+ * pmo_tgt_psoc_get_runtime_pm_in_progress() -get runtime status
  * @psoc: objmgr psoc
  *
  * Return: true if runtime pm is in progress else false
  */
-bool pmo_tgt_psoc_get_runtime_pm_inprogress(struct wlan_objmgr_psoc *psoc);
+bool pmo_tgt_psoc_get_runtime_pm_in_progress(struct wlan_objmgr_psoc *psoc);
 
 /**
  * pmo_tgt_psoc_send_host_wakeup_ind() -Send host wake up indication to fwr

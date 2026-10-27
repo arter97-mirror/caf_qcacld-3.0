@@ -19,7 +19,6 @@
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "wlan_mlme_api.h"
 #include <../../core/src/wlan_twt_main.h>
-#include "twt/core/src/wlan_twt_common.h"
 
 QDF_STATUS
 wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val)
@@ -28,29 +27,9 @@ wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
-					 bool *val)
+wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 {
-	return wlan_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, val);
-}
-
-QDF_STATUS
-wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			  bool *val)
-{
-	return wlan_twt_cfg_get_responder_flag(psoc, vdev_id, val);
-}
-
-QDF_STATUS
-wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
-{
-	return wlan_twt_cfg_get_twt_disabled_on_scan(psoc, val);
-}
-
-QDF_STATUS
-wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
-{
-	return wlan_twt_cfg_get_setup_deferred_on_scan(psoc, val);
+	return wlan_twt_cfg_get_responder_flag(psoc, val);
 }
 
 QDF_STATUS
@@ -61,20 +40,13 @@ wlan_twt_cfg_get_req_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_res_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
-					bool *val)
-{
-	return wlan_twt_get_responder_support_for_ht_vht_mode(psoc, val);
-}
-
-QDF_STATUS
 wlan_twt_get_requestor_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_requestor(psoc, val);
 }
 
 QDF_STATUS
-wlan_twt_get_responder_cfg(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+wlan_twt_get_responder_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_responder(psoc, val);
 }

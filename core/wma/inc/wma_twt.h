@@ -147,7 +147,7 @@ wma_twt_process_resume_dialog(t_wma_handle *wma_handle,
  * @wh: wma handle
  * @tgt_cfg: target configuration to be updated
  *
- * Update broadcast twt support based on service bit.
+ * Update braodcast twt support based on service bit.
  *
  * Return: None
  */

@@ -25,7 +25,6 @@
 #include "wlan_mlme_dbg.h"
 #include "wlan_cm_api.h"
 #include "wlan_policy_mgr_api.h"
-#include "wlan_policy_mgr_i.h"
 #include "wlan_p2p_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
@@ -302,6 +301,18 @@ error:
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 #ifdef WLAN_FEATURE_11BE
+static const
+char *cm_diag_get_eht_dot11_mode_str(enum mgmt_dot11_mode dot11mode)
+{
+
+	switch (dot11mode) {
+	CASE_RETURN_STRING(DOT11_MODE_11BE);
+	CASE_RETURN_STRING(DOT11_MODE_11BE_ONLY);
+	default:
+		return "Unknown";
+	}
+}
+
 static const char *cm_diag_get_320_ch_width_str(uint8_t ch_width)
 {
 	switch (ch_width) {
@@ -311,6 +322,12 @@ static const char *cm_diag_get_320_ch_width_str(uint8_t ch_width)
 	}
 }
 #else
+static const
+char *cm_diag_get_eht_dot11_mode_str(enum mgmt_dot11_mode dot11mode)
+{
+	return "Unknown";
+}
+
 static const char *cm_diag_get_320_ch_width_str(uint8_t ch_width)
 {
 	return "Unknown";
@@ -347,12 +364,8 @@ static const char *cm_diag_get_dot11_mode_str(enum mgmt_dot11_mode dot11mode)
 	CASE_RETURN_STRING(DOT11_MODE_11AC_ONLY);
 	CASE_RETURN_STRING(DOT11_MODE_11AX);
 	CASE_RETURN_STRING(DOT11_MODE_11AX_ONLY);
-	CASE_RETURN_STRING(DOT11_MODE_11BE);
-	CASE_RETURN_STRING(DOT11_MODE_11BE_ONLY);
-	CASE_RETURN_STRING(DOT11_MODE_11BN);
-	CASE_RETURN_STRING(DOT11_MODE_11BN_ONLY);
 	default:
-		return "unknown";
+		return cm_diag_get_eht_dot11_mode_str(dot11mode);
 	}
 }
 
@@ -469,23 +482,6 @@ cm_get_diag_eht_320_ch_width(enum phy_ch_width ch_width)
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BN)
-static enum mgmt_dot11_mode
-cm_diag_uhr_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
-{
-	if (IS_WLAN_PHYMODE_UHR(phymode))
-		return DOT11_MODE_11BN;
-	else
-		return DOT11_MODE_MAX;
-}
-#else
-static enum mgmt_dot11_mode
-cm_diag_uhr_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
-{
-	return DOT11_MODE_MAX;
-}
-#endif
-
 static enum mgmt_dot11_mode
 cm_diag_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
 {
@@ -507,11 +503,8 @@ cm_diag_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
 			return DOT11_MODE_11AC;
 		else if (IS_WLAN_PHYMODE_HE(phymode))
 			return DOT11_MODE_11AX;
-		else if (cm_diag_eht_dot11_mode_from_phy_mode(phymode) !=
-			 DOT11_MODE_MAX)
-			return cm_diag_eht_dot11_mode_from_phy_mode(phymode);
 		else
-			return cm_diag_uhr_dot11_mode_from_phy_mode(phymode);
+			return cm_diag_eht_dot11_mode_from_phy_mode(phymode);
 	}
 }
 
@@ -638,27 +631,6 @@ static void cm_diag_fill_wapi_auth_type(uint8_t *auth_type, uint32_t akm)
 		*auth_type = AUTH_WAPI_PSK;
 }
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static bool cm_diag_fill_11bi_auth_type(uint8_t *auth_type,
-					uint32_t authmodeset)
-{
-	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_EPPKE)) {
-		*auth_type = AUTH_EPPKE;
-		return true;
-	}
-	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)) {
-		*auth_type = AUTH_1X_OVER_AUTH;
-		return true;
-	}
-	return false;
-}
-#else
-static inline bool cm_diag_fill_11bi_auth_type(uint8_t *auth_type,
-					       uint32_t authmodeset)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_11BI_SECURITY */
 static void cm_diag_get_auth_type(uint8_t *auth_type,
 				  uint32_t authmodeset, uint32_t akm,
 				  uint32_t ucastcipherset)
@@ -689,9 +661,6 @@ static void cm_diag_get_auth_type(uint8_t *auth_type,
 		*auth_type = AUTH_SHARED;
 		return;
 	}
-
-	if (cm_diag_fill_11bi_auth_type(auth_type, authmodeset))
-		return;
 
 	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||
@@ -739,32 +708,6 @@ cm_connect_success_diag(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	WLAN_HOST_DIAG_EVENT_REPORT(&connect_status, EVENT_WLAN_STATUS_V2);
 }
 
-#ifdef WLAN_FEATURE_11BN_SMD
-static void cm_print_smd_info(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct smd_context *smd_ctx;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
-		return;
-
-	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->smd_ctx)
-		return;
-
-	smd_ctx = mlo_dev_ctx->smd_ctx;
-	if (qdf_is_macaddr_zero(&smd_ctx->smd_identifier))
-		return;
-
-	mlme_nofl_debug("smd_mac_addr:" QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes));
-}
-#else
-static void cm_print_smd_info(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
 {
@@ -795,12 +738,10 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 		     struct qdf_mac_addr *bssid, struct wlan_ssid *ssid,
 		     qdf_freq_t freq)
 {
-	QDF_STATUS status;
 	struct wlan_channel *des_chan;
 	struct vdev_mlme_obj *vdev_mlme;
 	struct wlan_crypto_params *crypto_params;
-	uint8_t supp_tx_nss, supp_rx_nss;
-	uint8_t cap_tx_nss = 0, cap_rx_nss = 0, op_tx_nss, op_rx_nss;
+	uint8_t max_supported_nss;
 	enum QDF_OPMODE opmode;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
@@ -879,19 +820,8 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	conn_stats.reason_code = 0;
 	conn_stats.op_freq = freq;
 
-	status = mlme_get_vdev_nss_by_freq_from_ini(vdev, freq,
-						    &supp_tx_nss, &supp_rx_nss);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		supp_tx_nss = WLAN_MAX_VDEV_NSS;
-		supp_rx_nss = WLAN_MAX_VDEV_NSS;
-	}
-
-	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
-						   &cap_tx_nss, &cap_rx_nss,
-						   &op_tx_nss, &op_rx_nss);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_debug("Failed to fetch curr bss nss %d", status);
-
+	max_supported_nss = mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2 ?
+			    MAX_VDEV_NSS : 1;
 	mlme_nofl_debug("+---------CONNECTION INFO START------------+");
 	mlme_nofl_debug("VDEV-ID: %d self_mac:"QDF_MAC_ADDR_FMT,
 			wlan_vdev_get_id(vdev),
@@ -907,13 +837,12 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 			cm_diag_get_akm_str(conn_stats.auth_type,
 					    crypto_params->key_mgmt),
 			cm_diag_get_encr_type_str(conn_stats.encryption_type));
-	mlme_nofl_debug("DUT Tx/Rx NSS: %dx%d | Intersected Tx/Rx NSS: %dx%d",
-			supp_tx_nss, supp_rx_nss, cap_tx_nss, cap_rx_nss);
+	mlme_nofl_debug("DUT_NSS: %d | Intersected NSS:%d",
+			max_supported_nss, wlan_vdev_mlme_get_nss(vdev));
 	mlme_nofl_debug("Qos enable: %d | Associated: %s",
 			conn_stats.qos_capability,
 			(conn_stats.result_code ? "yes" : "no"));
 	cm_print_mlo_info(vdev);
-	cm_print_smd_info(vdev);
 	mlme_nofl_debug("+---------CONNECTION INFO END------------+");
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&conn_stats, EVENT_WLAN_CONN_STATS_V2);
@@ -1007,14 +936,13 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 	struct wlan_crypto_params *crypto_params;
 	qdf_freq_t oper_freq;
 	int8_t rssi = 0;
-	uint32_t hw_mode;
+	uint32_t nss, hw_mode;
 	struct policy_mgr_conc_connection_info *conn_info;
 	uint32_t i = 0, len = 0, max_cxn = 0;
 	enum mgmt_ch_width ch_width;
 	enum mgmt_dot11_mode dot11mode;
 	enum mgmt_bss_type type;
 	uint8_t authtype;
-	uint8_t cap_tx_nss = 0, cap_rx_nss = 0, op_tx_nss = 0, op_rx_nss = 0;
 	enum mgmt_encrypt_type enctype;
 	enum QDF_OPMODE opmode;
 	struct wlan_objmgr_pdev *pdev;
@@ -1103,16 +1031,11 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 			break;
 	len += qdf_scnprintf(buf + len, buf_sz - len,
 			     "\n\tmac: %d", conn_info->mac);
-
-	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
-						   &cap_tx_nss, &cap_rx_nss,
-						   &op_tx_nss, &op_rx_nss);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_debug("Failed to fetch curr bss nss %d", status);
-
+	nss = wlan_vdev_mlme_get_nss(vdev);
 	len += qdf_scnprintf(buf + len, buf_sz - len,
-			     "\n\tcap_nss: %dx%d op_nss: %dx%d",
-			     cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss);
+			     "\n\torig_nss: %dx%d neg_nss: %dx%d",
+			     conn_info->original_nss, conn_info->original_nss,
+			     nss, nss);
 	hw_mode = policy_mgr_is_current_hwmode_dbs(psoc);
 	len += qdf_scnprintf(buf + len, buf_sz - len,
 			     "\n\tis_current_hw_mode_dbs: %s",
@@ -1246,11 +1169,12 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 #endif
 
 QDF_STATUS
-cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
-		       struct cm_connect_req *conn_req,
-		       uint8_t mlo_support_link_num)
+cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
+		       struct cm_connect_req *conn_req)
 {
 	uint8_t i, j = 0;
+	uint8_t mlo_support_link_num;
+	struct wlan_objmgr_psoc *psoc;
 	struct scan_cache_entry *scan_entry = conn_req->cur_candidate->entry;
 	struct mlo_partner_info *partner_info = &conn_req->req.ml_parnter_info;
 
@@ -1265,6 +1189,13 @@ cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
 	if (!scan_entry->ml_info.num_links)
 		return QDF_STATUS_SUCCESS;
 
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mlme_err("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	mlme_debug("sta mlo support link num: %d", mlo_support_link_num);
 
 	/* TODO: Make sure that scan_entry->ml_info->link_info is a sorted
@@ -1287,16 +1218,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
 		if (!scan_entry->ml_info.link_info[i].is_valid_link)
 			continue;
 
-		if (policy_mgr_mode_specific_connection_count(psoc,
-							      PM_PASSTHRU_MODE,
-							      NULL) &&
-		    (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
-					scan_entry->ml_info.link_info[i].freq,
-					HW_MODE_20_MHZ, 1, NULL))) {
-			mlme_debug("Concurrency not allowed for partner link freq: %d",
-				   scan_entry->ml_info.link_info[i].freq);
-			continue;
-		}
 		partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 		partner_info->partner_link_info[j].link_id =
@@ -1484,7 +1405,6 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct rso_config *rso_cfg;
 
 	if (!vdev || !req)
 		return QDF_STATUS_E_FAILURE;
@@ -1499,23 +1419,6 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_INVAL;
-
-	/*
-	 * Re-apply the psoc-level BTM disable cache into rso_cfg on every
-	 * connect request. This handles the case where the vdev was
-	 * destroyed and recreated (e.g. MAC address randomization) after
-	 * the vendor command set the flag, causing wlan_cm_rso_config_init
-	 * to have already restored it; but also covers any edge case where
-	 * the flag may not yet be reflected in rso_cfg.
-	 */
-	if (mlme_obj->cfg.lfr.disable_btm_cfg) {
-		rso_cfg = wlan_cm_get_rso_config(vdev);
-		if (rso_cfg) {
-			mlme_debug(CM_PREFIX_FMT "restore disable_btm_cfg into rso_cfg",
-				   CM_PREFIX_REF(req->vdev_id, req->cm_id));
-			rso_cfg->is_disable_btm = true;
-		}
-	}
 
 	join_req = qdf_mem_malloc(sizeof(*join_req));
 	if (!join_req)
@@ -1639,7 +1542,6 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 	int32_t ucast_cipher, akm;
 	uint32_t key_interval;
 	struct element_info *bcn_probe_rsp = &rsp->connect_ies.bcn_probe_rsp;
-	bool is_link_switch = rsp->cm_id & CM_ID_LSWITCH_BIT;
 
 	if (bcn_probe_rsp->ptr &&
 	    bcn_probe_rsp->len > sizeof(struct wlan_frame_hdr)) {
@@ -1649,11 +1551,9 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 				     bcn_probe_rsp->ptr +
 				     sizeof(struct wlan_frame_hdr));
 	}
-
 	akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
-	if (!is_link_switch &&
-	    (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
-	     QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))) {
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY)) {
 		mlme_debug("Update the MDID in PMK cache for FT-SAE case");
 		cm_update_pmk_cache_ft(psoc, vdev_id, NULL);
 	}
@@ -1726,112 +1626,11 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-static bool
-cm_install_link_vdev_keys_get_ap_link_addr(struct wlan_objmgr_vdev *vdev,
-					   uint8_t vdev_id,
-					   struct qdf_mac_addr **ap_link_addr)
-{
-	struct wlan_mlo_dev_context *ml_dev;
-	struct mlo_link_info *link_info;
-	uint16_t link_iter;
-
-	ml_dev = vdev->mlo_dev_ctx;
-	if (!ml_dev || !ml_dev->sta_ctx) {
-		mlme_err("mlo dev ctx not found for vdev %d", vdev_id);
-		return false;
-	}
-
-	link_info = &ml_dev->sta_ctx->links_info[0];
-	for (link_iter = 0; link_iter < WLAN_MAX_ML_BSS_LINKS;
-	     link_iter++, link_info++) {
-		if (qdf_is_macaddr_zero(&link_info->link_addr))
-			continue;
-
-		if (link_info->vdev_id == vdev_id) {
-			*ap_link_addr = &link_info->ap_link_addr;
-			return true;
-		}
-	}
-
-	mlme_err("ap link addr not found for vdev %d", vdev_id);
-	return false;
-}
-#else
-static inline bool
-cm_install_link_vdev_keys_get_ap_link_addr(struct wlan_objmgr_vdev *vdev,
-					   uint8_t vdev_id,
-					   struct qdf_mac_addr **ap_link_addr)
-{
-	return true;
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static bool cm_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
-{
-	return wlan_crypto_vdev_has_auth_mode(vdev,
-					       BIT(WLAN_CRYPTO_AUTH_EPPKE)) ||
-	       wlan_crypto_vdev_has_auth_mode(vdev,
-					       BIT(WLAN_CRYPTO_AUTH_8021X_IN_AUTH));
-}
-#else
-static inline bool cm_is_11bi_vdev(struct wlan_objmgr_vdev *vdev)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_11BI_SECURITY */
-
-static bool cm_is_11bi_roaming_vdev(struct wlan_objmgr_vdev *vdev)
-{
-	return cm_is_vdev_roaming(vdev) && cm_is_11bi_vdev(vdev);
-}
-
-/*
- * Partner link keys are hashed either by the vdev's own link address or by the
- * AP link address, so try the regular lookup and then both addresses directly.
- */
-static struct wlan_crypto_key *
-cm_get_link_vdev_key_any_hash(struct wlan_objmgr_vdev *vdev,
-			      struct qdf_mac_addr *ap_link_addr,
-			      uint8_t key_index)
-{
-	struct wlan_crypto_key *crypto_key;
-	struct qdf_mac_addr *self_link_addr;
-	uint8_t link_id;
-
-	crypto_key = wlan_crypto_get_key_allow_roam_bypass(
-				vdev,
-				ap_link_addr ? ap_link_addr->bytes : NULL,
-				key_index, cm_is_11bi_roaming_vdev(vdev));
-	if (crypto_key)
-		return crypto_key;
-
-	link_id = wlan_vdev_get_link_id(vdev);
-	self_link_addr =
-		(struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
-	if (self_link_addr) {
-		crypto_key = wlan_crypto_get_ml_sta_link_key(
-					wlan_vdev_get_psoc(vdev), key_index,
-					self_link_addr, link_id);
-		if (crypto_key)
-			return crypto_key;
-	}
-
-	if (!ap_link_addr)
-		return NULL;
-
-	return wlan_crypto_get_ml_sta_link_key(wlan_vdev_get_psoc(vdev),
-					       key_index, ap_link_addr,
-					       link_id);
-}
-
-void
-cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool from_roam_sync)
+static void
+cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_crypto_key *crypto_key;
 	struct wlan_crypto_params *crypto_params;
-	struct qdf_mac_addr *ap_link_addr = NULL;
 	enum QDF_OPMODE op_mode;
 	uint16_t i;
 	bool pairwise;
@@ -1863,23 +1662,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool from_roam_sync)
 
 	link_id = wlan_vdev_get_link_id(vdev);
 
-	if (!cm_install_link_vdev_keys_get_ap_link_addr(vdev, vdev_id,
-							&ap_link_addr))
-		return;
-
-	/*
-	 * mlo_link_recfg_install_unicast_keys() resolves the assoc key by the
-	 * vdev's own link address, which never matches for an 11bi roam - that
-	 * key is staged under the AP link address - and its failure path
-	 * disconnects with REASON_KEY_FAIL_TO_INSTALL.  The loop below does the
-	 * 11bi aware lookup, so never divert to link recfg on the roam sync
-	 * path.  Note wlan_cm_is_link_add_connecting() is also true whenever no
-	 * command is active, since cm_is_link_add_cmd() tests
-	 * CM_ID_LINKADD_BIT without excluding CM_ID_INVALID (0xFFFFFFFF).
-	 */
-	if (!from_roam_sync &&
-	    (wlan_cm_is_link_add_connecting(vdev) ||
-	     mlo_mgr_is_link_add_link_switch(vdev))) {
+	if (wlan_cm_is_link_add_connecting(vdev)) {
 		mlo_link_recfg_install_unicast_keys(vdev);
 		return;
 	}
@@ -1891,8 +1674,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool from_roam_sync)
 
 	wlan_crypto_aquire_lock();
 	for (i = 0; i < max_key_index; i++) {
-		crypto_key = cm_get_link_vdev_key_any_hash(vdev, ap_link_addr,
-							   i);
+		crypto_key = wlan_crypto_get_key(vdev, NULL, i);
 		if (!crypto_key)
 			continue;
 
@@ -2033,12 +1815,17 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 				psoc, vdev_id,
 				ml_nlink_link_switch_pre_completion_evt, NULL);
 
-		policy_mgr_update_flow_pool_map(psoc, vdev);
 		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
 								false) ||
 		    (!policy_mgr_is_hw_dbs_capable(psoc) &&
 		     wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 		     wlan_vdev_mlme_is_mlo_link_vdev(vdev))) {
+			/*
+			 * Update flow pool map for both the vdevs during
+			 * initial connection
+			 */
+			policy_mgr_update_flow_pool_map(psoc, vdev);
+
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 								psoc, vdev_id);
 
@@ -2051,7 +1838,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			psoc, vdev_id,
 			ml_nlink_connect_completion_evt, NULL);
 		cm_process_connect_complete(psoc, pdev, vdev, rsp);
-		cm_install_link_vdev_keys(vdev, false);
+		cm_install_link_vdev_keys(vdev);
 		wlan_tdls_notify_sta_connect(vdev_id,
 					     mlme_get_tdls_chan_switch_prohibited(vdev),
 					     mlme_get_tdls_prohibited(vdev),
@@ -2076,6 +1863,8 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	    !(rsp->cm_id & (CM_ID_LSWITCH_BIT | CM_ID_LINKADD_BIT)))
 		ucfg_policy_mgr_post_sta_p2p_start_failed(wlan_vdev_get_psoc(vdev),
 							  wlan_vdev_get_id(vdev));
+
+	mlo_roam_connect_complete(vdev);
 
 	if (op_mode == QDF_STA_MODE &&
 		(wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
@@ -2129,29 +1918,6 @@ bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return connected;
-}
-
-bool cm_is_vdevid_roaming(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{
-	struct wlan_objmgr_vdev *vdev;
-	bool roaming;
-	enum QDF_OPMODE opmode;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_MLME_CM_ID);
-	if (!vdev) {
-		mlme_err("vdev %d: vdev not found", vdev_id);
-		return false;
-	}
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-		return false;
-	}
-	roaming = cm_is_vdev_roaming(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-
-	return roaming;
 }
 
 bool cm_is_vdevid_active(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
@@ -2242,7 +2008,7 @@ cm_send_force_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev)
 
 	join_req = qdf_mem_malloc(sizeof(*join_req));
 	if (!join_req) {
-		cm_send_bss_peer_delete_req(vdev);
+		mlme_err("malloc fail");
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -2250,8 +2016,6 @@ cm_send_force_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err(CM_PREFIX_FMT "Failed to copy join req",
 			 CM_PREFIX_REF(req.vdev_id, req.cm_id));
-		cm_send_bss_peer_delete_req(vdev);
-
 		cm_free_join_req(join_req);
 		return QDF_STATUS_E_FAILURE;
 	}

@@ -57,17 +57,6 @@ QDF_STATUS wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
  */
 void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
 
-#ifdef WLAN_DP_FEATURE_STC
-/*
- * wlan_dp_fisa_rx_fst_inv_peer_id() - Invalidate the peer_id in all the FST
- *				      entries which belong to this peer
- * @peer_id: peer_id for which the invalidation is to be done
- *
- * Return: None
- */
-void wlan_dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id);
-#endif
-
 /**
  * wlan_dp_set_fst_in_cmem() - Set flag to indicate FST is in CMEM
  * @fst_in_cmem: Flag to indicate FST is in CMEM
@@ -196,13 +185,6 @@ void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
 					  uint32_t old_mac_id,
 					  uint32_t new_mac_id);
 
-/**
- * dp_rx_pool_get_dynamic_size() - get page pool size based resource level
- * @rsrc_level: resource level
- *
- * Return: size of page pool
- */
-uint16_t dp_rx_pool_get_dynamic_size(uint32_t rsrc_level);
 #ifdef WLAN_FEATURE_NAN
 /**
  * wlan_dp_notify_ndp_channel_info() - Notify DP about NDP peer channel info
@@ -237,15 +219,4 @@ wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
 }
 #endif
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */
-
-/**
- * wlan_dp_get_vdev_stats() -  API to get vdev stats
- * @soc: dp soc object
- * @vdev_id: Vdev ID of vdev for which stats is requested
- * @buf: Pointer to buffer in which stats need to be updated
- *
- * Return: QDF_STATUS_SUCCESS on success else error code
- */
-QDF_STATUS wlan_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
-				  struct cdp_vdev_stats *buf);
 #endif

@@ -28,7 +28,6 @@
 #include "os_if_nan.h"
 #include "wlan_nan_api.h"
 #include "nan_ucfg_api.h"
-#include "nan_public_structs.h"
 #include "wlan_osif_priv.h"
 #include <net/cfg80211.h>
 #include "wlan_cfg80211.h"
@@ -39,7 +38,6 @@
 #include "wlan_osif_request_manager.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_tdls_ucfg_api.h"
-#include "wlan_cmn_ieee80211.h"
 
 #define NAN_CMD_MAX_SIZE 2048
 
@@ -177,14 +175,6 @@ const struct nla_policy vendor_attr_policy[
 	},
 	[QCA_WLAN_VENDOR_ATTR_NDP_GTK_REQUIRED] = {
 						.type = NLA_FLAG,
-	},
-	[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS] = {
-						.type = NLA_U32,
-						.len = sizeof(uint32_t)
-	},
-	[QCA_WLAN_VENDOR_ATTR_NDP_TPUT] = {
-						.type = NLA_U32,
-						.len = sizeof(uint32_t)
 	},
 };
 
@@ -497,7 +487,7 @@ static int os_if_nan_process_ndi_create(struct wlan_objmgr_psoc *psoc,
 	if (errno)
 		goto destroy_sync;
 
-	osif_vdev_sync_register(net_dev, wdev, vdev_sync);
+	osif_vdev_sync_register(net_dev, vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return 0;
@@ -629,7 +619,7 @@ static int os_if_nan_process_ndi_delete(struct wlan_objmgr_psoc *psoc,
 	return 0;
 
 reregister:
-	osif_vdev_sync_register(net_dev, wdev, vdev_sync);
+	osif_vdev_sync_register(net_dev, vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return errno;
@@ -1170,81 +1160,6 @@ static int os_if_nan_process_ndp_end_req(struct wlan_objmgr_psoc *psoc,
 	return errno;
 }
 
-static int __os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
-						 struct nlattr **tb)
-{
-	int ret = 0;
-	QDF_STATUS status;
-	struct wlan_objmgr_vdev *ndi_vdev;
-	struct nan_datapath_update_config config = {0};
-
-	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]) {
-		osif_err("Instance ID is unavailable");
-		return -EINVAL;
-	}
-	config.ndp_instance_id =
-		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]);
-
-	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS] &&
-	    !tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT]) {
-		osif_err("Max latency and throughput are unavailable");
-		return -EINVAL;
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS])
-		config.latency_ms =
-		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS]);
-	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT])
-		config.tput_mbps =
-			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT]);
-
-	ndi_vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NDI_MODE,
-							    WLAN_NAN_ID);
-	if (!ndi_vdev) {
-		osif_err("NAN data interface is not available");
-		return -EINVAL;
-	}
-
-	config.vdev = ndi_vdev;
-
-	status = ucfg_nan_req_processor(ndi_vdev, &config, NDP_UPDATE_CONFIG);
-	ret = qdf_status_to_os_return(status);
-
-	if (ret)
-		wlan_objmgr_vdev_release_ref(ndi_vdev, WLAN_NAN_ID);
-	return ret;
-}
-
-static int os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
-					       struct nlattr **tb)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct net_device *net_dev;
-	struct osif_vdev_sync *vdev_sync;
-	int errno;
-
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NDI_MODE,
-							WLAN_NAN_ID);
-	if (!vdev)
-		return -EINVAL;
-
-	errno = osif_net_dev_from_vdev(vdev, &net_dev);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-	if (errno)
-		return errno;
-
-	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __os_if_nan_process_ndp_update_config(psoc, tb);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
 int os_if_nan_process_ndp_cmd(struct wlan_objmgr_psoc *psoc,
 			      const void *data, int data_len,
 			      bool is_ndp_allowed,
@@ -1318,8 +1233,6 @@ int os_if_nan_process_ndp_cmd(struct wlan_objmgr_psoc *psoc,
 			return -EOPNOTSUPP;
 		}
 		return os_if_nan_process_ndp_end_req(psoc, tb);
-	case QCA_WLAN_VENDOR_NDP_SUB_CMD_UPDATE_CONFIG:
-		return os_if_nan_process_ndp_update_config(psoc, tb);
 	default:
 		osif_err("Unrecognized NDP vendor cmd %d", ndp_cmd_type);
 		return -EINVAL;
@@ -1794,47 +1707,6 @@ static QDF_STATUS os_if_ndp_confirm_pack_ch_info(struct sk_buff *event,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef NDP_TX_BW_FLOW_CTRL
-static void os_if_ndp_update_peer_bw(struct wlan_objmgr_vdev *vdev,
-				     struct qdf_mac_addr *peer_mac,
-				     struct nan_datapath_channel_info *ch,
-				     uint32_t num_channels)
-{
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	struct nan_callbacks cb_obj;
-	enum phy_ch_width max_peer_bw;
-	QDF_STATUS status;
-	uint32_t i;
-
-	if (!num_channels)
-		return;
-
-	status = ucfg_nan_get_callbacks(psoc, &cb_obj);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to get NAN callbacks");
-		return;
-	}
-
-	max_peer_bw = ch[0].ch_width;
-	for (i = 1; i < num_channels; i++) {
-		if (ch[i].ch_width > max_peer_bw)
-			max_peer_bw = ch[i].ch_width;
-	}
-
-	if (cb_obj.ndp_update_peer_bw)
-		cb_obj.ndp_update_peer_bw(vdev_id, peer_mac, max_peer_bw);
-}
-#else
-static inline
-void os_if_ndp_update_peer_bw(struct wlan_objmgr_vdev *vdev,
-			      struct qdf_mac_addr *peer_mac,
-			      struct nan_datapath_channel_info *ch,
-			      uint32_t num_channels)
-{
-}
-#endif
-
 /**
  * os_if_ndp_confirm_ind_handler() - NDP confirm indication handler
  * @vdev: pointer to vdev object
@@ -1873,9 +1745,6 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 		osif_err("Invalid NDP Initiator response");
 		return;
 	}
-
-	os_if_ndp_update_peer_bw(vdev, &ndp_confirm->peer_ndi_mac_addr,
-				 ndp_confirm->ch, ndp_confirm->num_channels);
 
 	ifname = os_if_ndi_get_if_name(vdev);
 	if (!ifname) {
@@ -1958,7 +1827,7 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 
 	os_if_cstats_log_ndp_confirm_evt(vdev, ndp_confirm);
 
-	osif_debug("NDP confirm sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
+	osif_debug("NDP confim sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
 		   ndp_confirm->ndp_instance_id,
 		   QDF_MAC_ADDR_REF(ndp_confirm->peer_ndi_mac_addr.bytes),
 		   ndp_confirm->rsp_code, ndp_confirm->reason_code);
@@ -2131,45 +2000,6 @@ ndp_end_ind_nla_failed:
 	qdf_mem_free(ndp_instance_array);
 }
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * os_if_nan_ndi_peer_create_rsp_signal() - Signal completion of a pending
- * NDI peer create request
- * @vdev: vdev object on which the new NDP peer was indicated
- *
- * This function signals completion of the waiting thread in
- * os_if_nan_ndi_peer_create() once firmware indicates the NDI peer has
- * actually been created.
- *
- * Return: none
- */
-static void os_if_nan_ndi_peer_create_rsp_signal(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct osif_request *request;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return;
-	}
-
-	request = osif_request_get(nan_get_ndp_peer_create_ctx(psoc));
-	if (!request) {
-		osif_debug("Obsolete request");
-		return;
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-#else
-static inline void
-os_if_nan_ndi_peer_create_rsp_signal(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-
 /**
  * os_if_new_peer_ind_handler() - NDP new peer indication handler
  * @vdev: vdev object
@@ -2214,8 +2044,6 @@ static void os_if_new_peer_ind_handler(struct wlan_objmgr_vdev *vdev,
 	ucfg_nan_set_active_peers(vdev, active_peers);
 	ucfg_nan_cache_ndp_peer_mac_addr(psoc, &peer_ind->peer_mac_addr);
 	osif_debug("num_peers: %d", active_peers);
-
-	os_if_nan_ndi_peer_create_rsp_signal(vdev);
 }
 
 /**
@@ -2244,52 +2072,6 @@ static void os_if_ndp_end_all_handler(struct wlan_objmgr_vdev *vdev)
 	osif_request_complete(request);
 	osif_request_put(request);
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * os_if_nan_ndi_peer_delete_rsp_signal() - Signal completion of a pending
- * NDI peer delete request
- * @vdev: vdev object on which the NDP peer departed indication was received
- *
- * This function signals completion of the waiting thread in
- * os_if_nan_process_del_sta() once firmware indicates the NDI peer has
- * actually departed/been deleted.
- *
- * Return: none
- */
-static void os_if_nan_ndi_peer_delete_rsp_signal(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_priv is NULL");
-		return;
-	}
-
-	request = osif_request_get(psoc_priv->ndp_peer_delete_ctx);
-	if (!request) {
-		osif_debug("Obsolete request");
-		return;
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-#else
-static inline void
-os_if_nan_ndi_peer_delete_rsp_signal(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**
  * os_if_peer_departed_ind_handler() - Handle NDP peer departed indication
@@ -2324,8 +2106,6 @@ static void os_if_peer_departed_ind_handler(struct wlan_objmgr_vdev *vdev,
 	cb_obj.peer_departed_ind(vdev_id, peer_ind->sta_id,
 				&peer_ind->peer_mac_addr,
 				(active_peers == 0 ? true : false));
-
-	os_if_nan_ndi_peer_delete_rsp_signal(vdev);
 
 	/* if no peer left, stop wait timer for NDP_END_ALL` */
 	if (!active_peers)
@@ -2602,23 +2382,10 @@ static void os_if_ndp_sch_update_ind_handler(struct wlan_objmgr_vdev *vdev,
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
 	enum qca_nl80211_vendor_subcmds_index index =
 		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
-	struct qdf_mac_addr peer_ndi_addr;
 
 	if (!sch_update) {
 		osif_err("Invalid sch update params");
 		return;
-	}
-
-	for (idx = 0; idx < sch_update->num_ndp_instances; idx++) {
-		status = ucfg_nan_get_peer_ndi_addr_by_id(vdev,
-						 sch_update->ndp_instances[idx],
-						 &peer_ndi_addr);
-		if (status != QDF_STATUS_SUCCESS)
-			continue;
-
-		os_if_ndp_update_peer_bw(vdev, &peer_ndi_addr,
-					 sch_update->ch,
-					 sch_update->num_channels);
 	}
 
 	ifname = os_if_ndi_get_if_name(vdev);
@@ -2683,202 +2450,6 @@ ndp_sch_ind_nla_failed:
 	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * os_if_nan_local_schedule_rsp_handler() - NAN local schedule response handler
- * @vdev: pointer to vdev object
- * @rsp: response parameters
- *
- * This function handles the response from firmware for NAN local schedule
- * configuration request and signals completion to the waiting thread.
- *
- * Return: none
- */
-static void
-os_if_nan_local_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
-				     struct nan_local_sched_rsp *rsp)
-{
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!rsp) {
-		osif_err("Invalid NAN local schedule response");
-		return;
-	}
-
-	osif_debug("NAN local schedule response: status=%u, reason=%u",
-		   rsp->status, rsp->reason);
-
-	if (rsp->status == NAN_DATAPATH_RSP_STATUS_SUCCESS)
-		osif_debug("NAN local schedule configured successfully");
-	else
-		osif_err("NAN local schedule configuration failed, reason: %u",
-			 rsp->reason);
-
-	ucfg_nan_set_local_sched_rsp_status(vdev, rsp->status);
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_priv is NULL");
-		return;
-	}
-
-	request = osif_request_get(psoc_priv->nan_local_sched_ctx);
-	if (!request) {
-		osif_debug("Obsolete request");
-		return;
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-
-/**
- * os_if_nan_peer_schedule_rsp_handler() - NAN peer schedule response handler
- * @vdev: pointer to vdev object
- * @rsp: response parameters
- *
- * This function handles the response from firmware for NAN peer schedule
- * configuration request and signals completion to the waiting thread.
- *
- * Return: none
- */
-static void os_if_nan_peer_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
-						struct nan_peer_sched_rsp *rsp)
-{
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!rsp) {
-		osif_err("Invalid NAN peer schedule response");
-		return;
-	}
-
-	osif_debug("NAN peer schedule response: status=%u",
-		   rsp->status);
-
-	if (rsp->status == NAN_DATAPATH_RSP_STATUS_SUCCESS)
-		osif_debug("NAN peer schedule configured successfully");
-	else
-		osif_err("NAN peer schedule configuration failed, status: %u",
-			 rsp->status);
-
-	ucfg_nan_set_peer_sched_rsp_status(vdev, rsp->status);
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_priv is NULL");
-		return;
-	}
-
-	request = osif_request_get(psoc_priv->nan_peer_sched_ctx);
-	if (!request) {
-		osif_debug("Obsolete request");
-		return;
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-
-/**
- * os_if_nan_peer_params_rsp_handler() - NAN peer params response handler
- * @vdev: pointer to vdev object
- * @rsp: response parameters
- *
- * This function handles the response from firmware for NAN peer params
- * configuration request and signals completion to the waiting thread.
- *
- * Return: none
- */
-static void os_if_nan_peer_params_rsp_handler(struct wlan_objmgr_vdev *vdev,
-					      struct nan_peer_params_rsp *rsp)
-{
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!rsp) {
-		osif_err("Invalid NAN peer params response");
-		return;
-	}
-
-	osif_debug("NAN peer params response: status=%u", rsp->status);
-
-	if (rsp->status == NAN_DATAPATH_RSP_STATUS_SUCCESS)
-		osif_debug("NAN peer params configured successfully");
-	else
-		osif_err("NAN peer params configuration failed, status: %u",
-			 rsp->status);
-
-	ucfg_nan_set_peer_params_rsp_status(vdev, rsp->status);
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_priv is NULL");
-		return;
-	}
-
-	request = osif_request_get(psoc_priv->nan_peer_params_ctx);
-	if (!request) {
-		osif_debug("Obsolete request");
-		return;
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-#else
-/**
- * os_if_nan_local_schedule_rsp_handler() - Dummy NAN local schedule
- * response handler
- * @vdev: pointer to vdev object
- * @rsp: response parameters
- *
- * This is a dummy inline function when FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
- * is not defined.
- *
- * Return: none
- */
-static inline void os_if_nan_local_schedule_rsp_handler(
-				struct wlan_objmgr_vdev *vdev,
-				struct nan_local_sched_rsp *rsp)
-{
-}
-
-static inline void
-os_if_nan_peer_schedule_rsp_handler(struct wlan_objmgr_vdev *vdev,
-				    struct nan_peer_sched_rsp *rsp)
-{
-}
-
-static inline void
-os_if_nan_peer_params_rsp_handler(struct wlan_objmgr_vdev *vdev,
-				  struct nan_peer_params_rsp *rsp)
-{
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-
 static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_vdev *vdev,
 					     uint32_t type, void *msg)
@@ -2917,217 +2488,10 @@ static void os_if_nan_datapath_event_handler(struct wlan_objmgr_psoc *psoc,
 	case NDP_SCHEDULE_UPDATE:
 		os_if_ndp_sch_update_ind_handler(vdev, msg);
 		break;
-	case NAN_LOCAL_SCHEDULE_RSP:
-		os_if_nan_local_schedule_rsp_handler(vdev, msg);
-		break;
-	case NAN_PEER_SCHEDULE_RSP:
-		os_if_nan_peer_schedule_rsp_handler(vdev, msg);
-		break;
-	case NAN_PEER_PARAMS_RSP:
-		os_if_nan_peer_params_rsp_handler(vdev, msg);
-		break;
 	default:
 		break;
 	}
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * os_if_nan_process_cluster_event() - Process NAN cluster event
- * @vdev: vdev object
- * @cluster_event: cluster event information
- *
- * This function processes the cluster event and calls
- * cfg80211_nan_cluster_joined to notify the kernel/userspace.
- *
- * Return: None
- */
-static void
-os_if_nan_process_cluster_event(struct wlan_objmgr_vdev *vdev,
-				struct nan_cluster_event *cluster_event)
-{
-	struct wireless_dev *wdev;
-	struct vdev_osif_priv *osif_priv;
-	bool new_cluster;
-
-	if (!vdev || !cluster_event) {
-		nan_err("Invalid parameters");
-		return;
-	}
-
-	/* Get wireless_dev from vdev */
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv || !osif_priv->wdev) {
-		nan_err("Failed to get wdev from vdev");
-		return;
-	}
-	wdev = osif_priv->wdev;
-
-	/* Determine new_cluster flag based on event type */
-	if (cluster_event->event_type == NAN_CLUSTER_EVENT_STARTED) {
-		new_cluster = true;
-		nan_debug("NAN started new cluster");
-	} else if (cluster_event->event_type == NAN_CLUSTER_EVENT_JOINED) {
-		new_cluster = false;
-		nan_debug("NAN joined existing cluster");
-	} else {
-		nan_err("Invalid cluster event type: %d",
-			cluster_event->event_type);
-		return;
-	}
-
-	nan_debug("Cluster event: vdev_id=%d, cluster_id=%02x:%02x:%02x:%02x:%02x:%02x, new_cluster=%d",
-		  cluster_event->vdev_id,
-		  cluster_event->cluster_id[0], cluster_event->cluster_id[1],
-		  cluster_event->cluster_id[2], cluster_event->cluster_id[3],
-		  cluster_event->cluster_id[4], cluster_event->cluster_id[5],
-		  new_cluster);
-
-	/*
-	 * Call cfg80211_nan_cluster_joined to notify kernel/userspace
-	 *
-	 * Parameters:
-	 * - wdev: wireless device
-	 * - cluster_id: 6-byte cluster identifier
-	 * - new_cluster: true if started new cluster, false if joined existing
-	 * - gfp: GFP_KERNEL for process context (we're in work queue context)
-	 */
-	cfg80211_nan_cluster_joined(wdev, cluster_event->cluster_id,
-				    new_cluster, GFP_KERNEL);
-
-	return;
-}
-
-/**
- * os_if_nan_next_dw_notif_handler() - Handler for NAN next DW notification
- * @vdev: VDEV object
- * @event: NAN next DW info event
- *
- * This function notifies the kernel about the next NAN discovery window
- * using cfg80211_next_nan_dw_notif().
- *
- * Return: None
- */
-static void os_if_nan_next_dw_notif_handler(
-	struct wlan_objmgr_vdev *vdev,
-	struct nan_next_dw_info_event *event)
-{
-	struct vdev_osif_priv *osif_priv;
-	struct wireless_dev *wdev;
-	struct ieee80211_channel *chan;
-	struct wlan_objmgr_pdev *pdev;
-	struct pdev_osif_priv *pdev_osif_priv;
-	struct wiphy *wiphy;
-
-	if (!vdev || !event) {
-		osif_err("Invalid parameters");
-		return;
-	}
-
-	/* Get OSIF private structure */
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv || !osif_priv->wdev) {
-		osif_err("OSIF priv or wdev is NULL");
-		return;
-	}
-
-	wdev = osif_priv->wdev;
-
-	/* Get wiphy from pdev */
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		osif_err("PDEV is NULL");
-		return;
-	}
-
-	pdev_osif_priv = wlan_pdev_get_ospriv(pdev);
-	if (!pdev_osif_priv || !pdev_osif_priv->wiphy) {
-		osif_err("PDEV OSIF priv or wiphy is NULL");
-		return;
-	}
-
-	wiphy = pdev_osif_priv->wiphy;
-
-	/* Convert frequency to ieee80211_channel */
-	chan = ieee80211_get_channel(wiphy, event->channel_freq);
-	if (!chan) {
-		osif_err("Failed to convert frequency to channel");
-		return;
-	}
-
-	osif_debug("Notifying kernel: vdev_id=%u, freq=%u",
-		   event->vdev_id, event->channel_freq);
-
-	/* Notify kernel about next NAN discovery window */
-	cfg80211_next_nan_dw_notif(wdev, chan, GFP_ATOMIC);
-
-}
-
-/**
- * os_if_nan_dfs_channel_availability_handler() - Handler for NAN DFS channel
- *     availability indication
- * @vdev: VDEV object
- * @event: NAN DFS channel availability indication event
- *
- * Translates the firmware DFS channel availability status to the corresponding
- * nl80211_channel_evac_reason and notifies the kernel via
- * cfg80211_nan_channel_evac().
- *
- * WMI status -> nl80211_channel_evac_reason mapping:
- *   WMI_NAN_STATUS_STA_DISCONNECTED_FROM_DFS         ->
- *       NL80211_CHAN_EVAC_REASON_DFS_MASTER_MODE_STOP
- *   WMI_NAN_STATUS_NO_NAN_AVAIL_DFS_CHANNEL_DETECTED ->
- *       NL80211_CHAN_EVAC_REASON_ASSISTED_DFS_PEER_VACATE
- *   WMI_NAN_STATUS_NO_DFS_BEACONS_RECEIVED           ->
- *       NL80211_CHAN_EVAC_REASON_ASSISTED_DFS_PEER_VACATE
- *
- * Return: None
- */
-static void
-os_if_nan_dfs_channel_availability_handler(
-	struct wlan_objmgr_vdev *vdev,
-	struct nan_dfs_channel_availability_ind *event)
-{
-	struct vdev_osif_priv *osif_priv;
-	struct wireless_dev *wdev;
-	enum nl80211_channel_evac_reason reason;
-
-	if (!vdev || !event) {
-		osif_err("Invalid parameters");
-		return;
-	}
-
-	osif_debug("NAN DFS channel availability: vdev_id=%u status=%u",
-		   event->vdev_id, event->status);
-
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv || !osif_priv->wdev) {
-		osif_err("OSIF priv or wdev is NULL");
-		return;
-	}
-
-	wdev = osif_priv->wdev;
-
-	switch (event->status) {
-	case WMI_NAN_STATUS_STA_DISCONNECTED_FROM_DFS:
-		reason = NL80211_CHAN_EVAC_REASON_DFS_MASTER_MODE_STOP;
-		break;
-	case WMI_NAN_STATUS_NO_NAN_AVAIL_DFS_CHANNEL_DETECTED:
-	case WMI_NAN_STATUS_NO_DFS_BEACONS_RECEIVED:
-		reason = NL80211_CHAN_EVAC_REASON_ASSISTED_DFS_PEER_VACATE;
-		break;
-	default:
-		osif_err("Unknown DFS channel availability status: %u",
-			 event->status);
-		return;
-	}
-
-	osif_debug("Notifying kernel: vdev_id=%u reason=%d",
-		   event->vdev_id, reason);
-
-	cfg80211_nan_channel_evac(wdev, reason, GFP_ATOMIC);
-}
-#endif
 
 int os_if_nan_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
 				     struct nan_callbacks *cb_obj)
@@ -3363,7 +2727,7 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, nan_evt->vdev_id,
 						    WLAN_NAN_ID);
 	if (!vdev) {
-		osif_err("vdev is null, vdev_id: %d", nan_evt->vdev_id);
+		osif_err("vdev is null");
 		goto fail;
 	}
 
@@ -3403,239 +2767,13 @@ fail:
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
 }
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-static
-void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
-				   struct nan_callbacks *cb_obj)
-{
-	cb_obj->os_if_nan_next_dw_notif_handler =
-					os_if_nan_next_dw_notif_handler;
-	cb_obj->os_if_nan_dfs_channel_availability_handler =
-			os_if_nan_dfs_channel_availability_handler;
-}
-
-static
-void osif_nan_register_cluster_event_cb(struct wlan_objmgr_psoc *psoc,
-					struct nan_callbacks *cb_obj)
-{
-	cb_obj->os_if_nan_process_cluster_event =
-					os_if_nan_process_cluster_event;
-}
-#else
-static inline
-void osif_nan_register_dw_notif_cb(struct wlan_objmgr_psoc *psoc,
-				   struct nan_callbacks *cb_obj)
-{}
-
-static
-void osif_nan_register_cluster_event_cb(struct wlan_objmgr_psoc *psoc,
-					struct nan_callbacks *cb_obj)
-{}
-#endif
-
 int os_if_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				     struct nan_callbacks *cb_obj)
 {
 	cb_obj->os_if_ndp_event_handler = os_if_nan_datapath_event_handler;
 	cb_obj->os_if_nan_event_handler = os_if_nan_discovery_event_handler;
-	osif_nan_register_dw_notif_cb(psoc, cb_obj);
-	osif_nan_register_cluster_event_cb(psoc, cb_obj);
 	return ucfg_nan_register_hdd_callbacks(psoc, cb_obj);
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * os_if_nan_copy_cfg80211_to_internal() - Copy kernel NAN config to internal
- * @internal_cfg: Pointer to internal nan_conf structure
- * @kernel_cfg: Pointer to kernel cfg80211_nan_conf structure
- *
- * This function copies NAN configuration from kernel structure to internal
- * structure, avoiding direct kernel structure usage in NAN module.
- */
-static void os_if_nan_copy_cfg80211_to_internal(struct nan_conf *internal_cfg,
-						struct cfg80211_nan_conf *kernel_cfg)
-{
-	int i;
-
-	internal_cfg->master_pref = kernel_cfg->master_pref;
-	internal_cfg->bands = kernel_cfg->bands;
-
-	if (kernel_cfg->cluster_id) {
-		qdf_mem_copy(internal_cfg->cluster_id, kernel_cfg->cluster_id,
-			     NAN_CLUSTER_ID_LEN);
-		internal_cfg->cluster_id_len = NAN_CLUSTER_ID_LEN;
-	} else {
-		internal_cfg->cluster_id_len = 0;
-	}
-
-	internal_cfg->scan_period = kernel_cfg->scan_period;
-	internal_cfg->scan_dwell_time = kernel_cfg->scan_dwell_time;
-	internal_cfg->discovery_beacon_interval =
-		kernel_cfg->discovery_beacon_interval;
-
-	for (i = 0; i < NAN_MAX_BANDS; i++) {
-		if (kernel_cfg->band_cfgs[i].chan) {
-			internal_cfg->band_cfgs[i].freq =
-				kernel_cfg->band_cfgs[i].chan->center_freq;
-		} else {
-			internal_cfg->band_cfgs[i].freq = 0;
-		}
-		internal_cfg->band_cfgs[i].rssi_close =
-			kernel_cfg->band_cfgs[i].rssi_close;
-		internal_cfg->band_cfgs[i].rssi_middle =
-			kernel_cfg->band_cfgs[i].rssi_middle;
-		internal_cfg->band_cfgs[i].awake_dw_interval =
-			kernel_cfg->band_cfgs[i].awake_dw_interval;
-		internal_cfg->band_cfgs[i].disable_scan =
-			kernel_cfg->band_cfgs[i].disable_scan;
-	}
-
-	if (kernel_cfg->extra_nan_attrs && kernel_cfg->extra_nan_attrs_len > 0) {
-		internal_cfg->extra_nan_attrs_len =
-			QDF_MIN(kernel_cfg->extra_nan_attrs_len,
-				NAN_MAX_EXTRA_ATTRS_LEN);
-		qdf_mem_copy(internal_cfg->extra_nan_attrs,
-			     kernel_cfg->extra_nan_attrs,
-			     internal_cfg->extra_nan_attrs_len);
-	} else {
-		internal_cfg->extra_nan_attrs_len = 0;
-	}
-
-	if (kernel_cfg->vendor_elems && kernel_cfg->vendor_elems_len > 0) {
-		internal_cfg->vendor_elems_len =
-			QDF_MIN(kernel_cfg->vendor_elems_len,
-				NAN_MAX_VENDOR_ELEMS_LEN);
-		qdf_mem_copy(internal_cfg->vendor_elems,
-			     kernel_cfg->vendor_elems,
-			     internal_cfg->vendor_elems_len);
-	} else {
-		internal_cfg->vendor_elems_len = 0;
-	}
-}
-
-int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
-{
-	struct nan_disable_req *nan_req;
-	struct wlan_objmgr_pdev *pdev;
-	QDF_STATUS status;
-
-	nan_req = qdf_mem_malloc(sizeof(*nan_req));
-	if (!nan_req)
-		return -ENOMEM;
-
-	nan_req->psoc = psoc;
-	nan_req->vdev_id = vdev_id;
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_NAN_ID);
-	if (!pdev) {
-		qdf_mem_free(nan_req);
-		return -EINVAL;
-	}
-
-	status = ucfg_nan_pasn_peer_delete_all(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
-		qdf_mem_free(nan_req);
-		return qdf_status_to_os_return(status);
-	}
-
-	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
-
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		osif_debug("Successfully sent NAN Disable request");
-		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
-	} else {
-		osif_err("Unable to send NAN Disable request");
-	}
-
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
-	qdf_mem_free(nan_req);
-	return qdf_status_to_os_return(status);
-}
-
-int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
-		    struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-		    struct cfg80211_nan_conf *conf)
-{
-	struct nan_enable_req *nan_req;
-	QDF_STATUS status;
-
-	nan_req = qdf_mem_malloc(sizeof(*nan_req));
-	if (!nan_req)
-		return -ENOMEM;
-
-	nan_req->psoc = psoc;
-	nan_req->pdev = pdev;
-	nan_req->vdev_id = vdev_id;
-
-	if (conf->band_cfgs[NL80211_BAND_2GHZ].chan)
-		nan_req->social_chan_2g_freq =
-			conf->band_cfgs[NL80211_BAND_2GHZ].chan->center_freq;
-	else
-		nan_req->social_chan_2g_freq = 0;
-
-	if (conf->band_cfgs[NL80211_BAND_5GHZ].chan)
-		nan_req->social_chan_5g_freq =
-			conf->band_cfgs[NL80211_BAND_5GHZ].chan->center_freq;
-	else
-		nan_req->social_chan_5g_freq = 0;
-
-	/* Copy from kernel cfg80211_nan_conf to internal nan_conf */
-	os_if_nan_copy_cfg80211_to_internal(&nan_req->nan_conf, conf);
-
-	status = ucfg_nan_discovery_req(nan_req, NAN_ENABLE_REQ);
-
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		osif_debug("Successfully sent NAN Enable request");
-		os_if_cstats_log_nan_disc_enable_req_evt(vdev_id, nan_req);
-	} else {
-		osif_err("Unable to send NAN Enable request");
-	}
-
-	qdf_mem_free(nan_req);
-	return qdf_status_to_os_return(status);
-}
-
-/**
- * os_if_nan_change_conf() - change NAN configuration using internal nan_conf
- * @psoc: psoc object
- * @pdev: pdev object
- * @vdev_id: vdev id
- * @conf: kernel cfg80211_nan_conf with updated values
- * @changes: bitmap of changed parameters (from cfg80211)
- *
- * This function converts the kernel cfg80211_nan_conf into internal nan_conf
- * and sends a NAN_CHANGE_CONF_REQ using nan_change_conf_req.
- */
-int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
-			  struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-			  struct cfg80211_nan_conf *conf,
-			  u32 changes)
-{
-	struct nan_change_conf_req *nan_req;
-	QDF_STATUS status;
-
-	nan_req = qdf_mem_malloc(sizeof(*nan_req));
-	if (!nan_req)
-		return -ENOMEM;
-
-	nan_req->psoc = psoc;
-	nan_req->pdev = pdev;
-	nan_req->vdev_id = vdev_id;
-	nan_req->param_bit_map = changes;
-
-	/* Copy from kernel cfg80211_nan_conf to internal nan_conf */
-	os_if_nan_copy_cfg80211_to_internal(&nan_req->nan_conf, conf);
-
-	status = ucfg_nan_discovery_req(nan_req, NAN_CHANGE_CONF_REQ);
-	if (QDF_IS_STATUS_SUCCESS(status))
-		osif_debug("Successfully sent NAN change conf request");
-	else
-		osif_err("Unable to send NAN change conf request");
-
-	qdf_mem_free(nan_req);
-	return qdf_status_to_os_return(status);
-}
-#endif
 
 static int os_if_nan_generic_req(struct wlan_objmgr_psoc *psoc,
 				 struct nlattr **tb)
@@ -3668,81 +2806,45 @@ static int os_if_nan_generic_req(struct wlan_objmgr_psoc *psoc,
 }
 
 static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
-					 struct nlattr **tb, uint8_t vdev_id)
+					 struct nlattr **tb)
 {
 	uint8_t *data;
 	uint32_t data_len;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
 
 	data = nla_data(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
 	data_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
-	if (!vdev) {
-		osif_err("vdev is null for id %d", vdev_id);
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
 
-	if (QDF_NAN_DISC_MODE == wlan_vdev_mlme_get_opmode(vdev))
-		status = ucfg_nan_cache_disable_req_info(psoc,
-							 NAN_DISABLE_REQ_NB);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	status = ucfg_disable_nan_discovery(psoc, data, data_len);
 
-	if (QDF_IS_STATUS_SUCCESS(status))
-		status = ucfg_disable_nan_discovery(psoc, data, data_len,
-						    vdev_id);
-
-end:
 	return qdf_status_to_os_return(status);
 }
 
 static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 					struct nlattr **tb, uint8_t vdev_id)
 {
-	uint32_t chan_freq_2g = 0, chan_freq_5g = 0;
+	uint32_t chan_freq_2g, chan_freq_5g = 0;
 	uint32_t buf_len;
 	QDF_STATUS status;
 	uint32_t fine_time_meas_cap;
 	struct nan_enable_req *nan_req;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ])
-		chan_freq_2g =
-			nla_get_u32(tb[
-				QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ]);
-	else
-		osif_debug("NAN Social channel for 2.4GHz not provided, defaulting to 0");
+	if (!tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ]) {
+		osif_err("NAN Social channel for 2.4Gz is unavailable!");
+		return -EINVAL;
+	}
+	chan_freq_2g =
+		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_24GHZ_BAND_FREQ]);
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ])
 		chan_freq_5g =
 			nla_get_u32(tb[
 				QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ]);
-	else
-		osif_debug("NAN Social channel for 5GHz not provided, defaulting to 0");
 
-	if (chan_freq_2g &&
-	    (!wlan_reg_is_24ghz_ch_freq(chan_freq_2g) ||
-	     !wlan_reg_is_freq_enabled(pdev, chan_freq_2g,
-				       REG_CURRENT_PWR_MODE) ||
-	     !ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id))) {
-		osif_err("NAN Enable not allowed at this moment for 2.4GHz channel %d",
+	if (!ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id)) {
+		osif_err("NAN Enable not allowed at this moment for channel %d",
 			 chan_freq_2g);
-		chan_freq_2g = 0;
-	}
-
-	if (chan_freq_5g &&
-	    (!wlan_reg_is_5ghz_ch_freq(chan_freq_5g) ||
-	     !wlan_reg_is_freq_enabled(pdev, chan_freq_5g,
-				       REG_CURRENT_PWR_MODE) ||
-	     !ucfg_is_nan_enable_allowed(psoc, chan_freq_5g, vdev_id))) {
-		osif_err("NAN Enable not allowed at this moment for 5GHz channel %d",
-			 chan_freq_5g);
-		chan_freq_5g = 0;
-	}
-
-	if (!chan_freq_2g && !chan_freq_5g) {
-		osif_err("NAN Enable needs at least one of 2.4GHz/5GHz social channel");
 		return -EINVAL;
 	}
 
@@ -3780,863 +2882,6 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_free(nan_req);
 	return qdf_status_to_os_return(status);
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * os_if_nan_copy_cfg80211_to_internal() - Copy kernel NAN config to internal
- * @internal_cfg: Pointer to internal nan_config structure
- * @kernel_cfg: Pointer to kernel cfg80211_nan_conf structure
- *
- * This function copies NAN configuration from kernel structure to internal
- * structure, avoiding direct kernel structure usage in NAN module.
- *
- * Return: None
- */
-static void os_if_nan_copy_cfg80211_to_internal(struct nan_conf *internal_cfg,
-						struct cfg80211_nan_conf *kernel_cfg)
-{
-	int i;
-
-	/* Copy basic fields */
-	internal_cfg->master_pref = kernel_cfg->master_pref;
-	internal_cfg->bands = kernel_cfg->bands;
-
-	/* Copy cluster ID if present */
-	if (kernel_cfg->cluster_id) {
-		qdf_mem_copy(internal_cfg->cluster_id, kernel_cfg->cluster_id,
-			     NAN_CLUSTER_ID_LEN);
-	}
-
-	/* Copy scan parameters */
-	internal_cfg->scan_period = kernel_cfg->scan_period;
-	internal_cfg->scan_dwell_time = kernel_cfg->scan_dwell_time;
-	internal_cfg->discovery_beacon_interval =
-		kernel_cfg->discovery_beacon_interval;
-
-	/* Copy band configurations */
-	for (i = 0; i < NAN_MAX_BANDS; i++) {
-		if (kernel_cfg->band_cfgs[i].chan) {
-			internal_cfg->band_cfgs[i].freq =
-				kernel_cfg->band_cfgs[i].chan->center_freq;
-		}
-		internal_cfg->band_cfgs[i].rssi_close =
-			kernel_cfg->band_cfgs[i].rssi_close;
-		internal_cfg->band_cfgs[i].rssi_middle =
-			kernel_cfg->band_cfgs[i].rssi_middle;
-		internal_cfg->band_cfgs[i].awake_dw_interval =
-			kernel_cfg->band_cfgs[i].awake_dw_interval;
-		internal_cfg->band_cfgs[i].disable_scan =
-			kernel_cfg->band_cfgs[i].disable_scan;
-	}
-
-	/* Copy extra NAN attributes */
-	if (kernel_cfg->extra_nan_attrs && kernel_cfg->extra_nan_attrs_len > 0) {
-		internal_cfg->extra_nan_attrs_len =
-			QDF_MIN(kernel_cfg->extra_nan_attrs_len,
-				NAN_MAX_EXTRA_ATTRS_LEN);
-		qdf_mem_copy(internal_cfg->extra_nan_attrs,
-			     kernel_cfg->extra_nan_attrs,
-			     internal_cfg->extra_nan_attrs_len);
-	}
-
-	/* Copy vendor elements */
-	if (kernel_cfg->vendor_elems && kernel_cfg->vendor_elems_len > 0) {
-		internal_cfg->vendor_elems_len =
-			QDF_MIN(kernel_cfg->vendor_elems_len,
-				NAN_MAX_VENDOR_ELEMS_LEN);
-		qdf_mem_copy(internal_cfg->vendor_elems,
-			     kernel_cfg->vendor_elems,
-			     internal_cfg->vendor_elems_len);
-	}
-}
-
-int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
-{
-	struct nan_disable_req *nan_req;
-	struct wlan_objmgr_pdev *pdev;
-	QDF_STATUS status;
-
-	nan_req = qdf_mem_malloc(sizeof(*nan_req));
-	if (!nan_req)
-		return -ENOMEM;
-
-	nan_req->psoc = psoc;
-	nan_req->vdev_id = vdev_id;
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_NAN_ID);
-	if (!pdev) {
-		qdf_mem_free(nan_req);
-		return -EINVAL;
-	}
-
-	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
-
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		osif_debug("Successfully sent NAN Disable request");
-		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
-	} else {
-		osif_err("Unable to send NAN Disable request");
-	}
-
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
-	qdf_mem_free(nan_req);
-	return qdf_status_to_os_return(status);
-}
-
-int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
-		    struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-		    struct cfg80211_nan_conf *conf)
-{
-	struct nan_enable_req *nan_req;
-	QDF_STATUS status;
-
-	if (!psoc || !pdev || !conf) {
-		osif_err("Invalid parameters: psoc/pdev/conf is NULL");
-		return -EINVAL;
-	}
-
-	nan_req = qdf_mem_malloc(sizeof(*nan_req));
-	if (!nan_req)
-		return -ENOMEM;
-
-	nan_req->psoc = psoc;
-	nan_req->pdev = pdev;
-	nan_req->vdev_id = vdev_id;
-	nan_req->social_chan_2g_freq = 0;
-	nan_req->social_chan_5g_freq = 0;
-
-	/* Copy from kernel cfg80211_nan_conf to internal nan_config */
-	os_if_nan_copy_cfg80211_to_internal(&nan_req->nan_conf, conf);
-
-	status = ucfg_nan_discovery_req(nan_req, NAN_ENABLE_REQ);
-
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		osif_debug("Successfully sent NAN Enable request");
-		os_if_cstats_log_nan_disc_enable_req_evt(vdev_id, nan_req);
-	} else {
-		osif_err("Unable to send NAN Enable request");
-	}
-
-	qdf_mem_free(nan_req);
-	return qdf_status_to_os_return(status);
-}
-
-int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
-			  struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-			  struct cfg80211_nan_conf *conf,
-			  u32 changes)
-{
-	struct nan_change_conf_req *nan_req;
-	QDF_STATUS status;
-
-	nan_req = qdf_mem_malloc(sizeof(*nan_req));
-	if (!nan_req)
-		return -ENOMEM;
-
-	nan_req->psoc = psoc;
-	nan_req->pdev = pdev;
-	nan_req->vdev_id = vdev_id;
-	nan_req->param_bit_map = changes;
-	os_if_nan_copy_cfg80211_to_internal(&nan_req->nan_conf, conf);
-
-	status = ucfg_nan_discovery_req(nan_req, NAN_CHANGE_CONF_REQ);
-	if (QDF_IS_STATUS_SUCCESS(status))
-		osif_debug("Successfully sent NAN change conf request");
-	else
-		osif_err("Unable to send NAN change conf request");
-
-	qdf_mem_free(nan_req);
-	return qdf_status_to_os_return(status);
-}
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
-#define NAN_LOCAL_SCHEDULE_TIMEOUT_MS 4000
-int os_if_nan_process_local_schedule(uint8_t vdev_id,
-				     struct wlan_objmgr_psoc *psoc,
-				     struct cfg80211_nan_local_sched *sched)
-{
-	struct nan_local_sched_params ucfg_params;
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request = NULL;
-	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
-	int ret;
-	uint8_t i;
-	uint16_t slot_idx;
-	const struct cfg80211_nan_channel *cfg_chan;
-	static const struct osif_request_params req_params = {
-		.priv_size = 0,
-		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
-	};
-
-	/* Validate input parameters */
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return -EINVAL;
-	}
-
-	if (!sched) {
-		osif_err("Invalid schedule parameter");
-		return -EINVAL;
-	}
-
-	/* Validate channel count early */
-	if (sched->n_channels > NAN_MAX_CHANNELS) {
-		osif_err("Invalid channel count: %u (max: %u)",
-			 sched->n_channels, NAN_MAX_CHANNELS);
-		return -EINVAL;
-	}
-
-	/* Initialize UCFG parameters directly */
-	qdf_mem_zero(&ucfg_params, sizeof(ucfg_params));
-	ucfg_params.vdev_id = vdev_id;
-	ucfg_params.psoc = psoc;
-	ucfg_params.num_channels = sched->n_channels;
-
-	/* Convert schedule slots directly */
-	for (slot_idx = 0; slot_idx < NAN_MAX_SCHEDULE_SLOTS; slot_idx++)
-		ucfg_params.schedule[slot_idx] = sched->schedule[slot_idx];
-
-	/* Convert channels directly to UCFG format */
-	cfg_chan = sched->nan_channels;
-	for (i = 0; i < sched->n_channels; i++) {
-		ucfg_params.ch[i].freq = cfg_chan[i].chandef.chan->center_freq;
-
-		/* Convert and validate bandwidth */
-		switch (cfg_chan[i].chandef.width) {
-		case NL80211_CHAN_WIDTH_20:
-			ucfg_params.ch[i].ch_width = CH_WIDTH_20MHZ;
-			break;
-		case NL80211_CHAN_WIDTH_40:
-			ucfg_params.ch[i].ch_width = CH_WIDTH_40MHZ;
-			break;
-		case NL80211_CHAN_WIDTH_80:
-			ucfg_params.ch[i].ch_width = CH_WIDTH_80MHZ;
-			break;
-		case NL80211_CHAN_WIDTH_160:
-			ucfg_params.ch[i].ch_width = CH_WIDTH_160MHZ;
-			break;
-		default:
-			osif_err("Unsupported bandwidth: %d for channel %u",
-				 cfg_chan[i].chandef.width, i);
-			return -EINVAL;
-		}
-
-		ucfg_params.ch[i].rx_nss = cfg_chan[i].rx_nss;
-		qdf_mem_copy(ucfg_params.ch[i].channel_entry,
-			     cfg_chan[i].channel_entry,
-			     NAN_CHANNEL_ENTRY_LEN);
-		ucfg_params.ch[i].channel_entry_len = NAN_CHANNEL_ENTRY_LEN;
-		ucfg_params.ch[i].center_freq1 =
-			cfg_chan[i].chandef.center_freq1;
-		ucfg_params.ch[i].center_freq2 =
-			cfg_chan[i].chandef.center_freq2;
-
-		osif_debug("i%d freq%d bw%d rx_nss%d cf1%d cf2%d chan entry",
-			   i, cfg_chan[i].chandef.chan->center_freq,
-			   cfg_chan[i].chandef.width, cfg_chan[i].rx_nss,
-			   cfg_chan[i].chandef.center_freq1,
-			   cfg_chan[i].chandef.center_freq2);
-
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
-				   cfg_chan[i].channel_entry,
-				   NAN_CHANNEL_ENTRY_LEN);
-	}
-
-	/* Allocate request for waiting on response */
-	request = osif_request_alloc(&req_params);
-	if (!request) {
-		osif_err("Request allocation failure");
-		return -ENOMEM;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_nan_obj is null");
-		osif_request_put(request);
-		return -EINVAL;
-	}
-
-	psoc_priv->nan_local_sched_ctx = osif_request_cookie(request);
-
-	/* Send to lower layers */
-	status = ucfg_nan_set_local_schedule(&ucfg_params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to set local schedule: %d", status);
-		ret = -EIO;
-		goto end;
-	}
-
-	/* Wait for response */
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		osif_err("NAN local schedule request timed out: %d", ret);
-		ret = -ETIMEDOUT;
-		goto end;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		osif_err("vdev is null for vdev_id: %d", vdev_id);
-		ret = -EINVAL;
-		goto end;
-	}
-
-	if (ucfg_nan_get_local_sched_rsp_status(vdev) !=
-					NAN_DATAPATH_RSP_STATUS_SUCCESS) {
-		osif_err("NAN local schedule configuration failed");
-		ret = -EINVAL;
-	}
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-end:
-	osif_request_put(request);
-	psoc_priv->nan_local_sched_ctx = NULL;
-
-	return ret;
-}
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)) */
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-int os_if_nan_process_peer_schedule(uint8_t vdev_id,
-				    struct wlan_objmgr_psoc *psoc,
-				    struct cfg80211_nan_peer_sched *sched)
-{
-	struct nan_peer_sched_params *ucfg_params;
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request = NULL;
-	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
-	int ret;
-	uint8_t i, j;
-	size_t req_size;
-	static const struct osif_request_params req_params = {
-		.priv_size = 0,
-		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
-	};
-
-	/* Validate input parameters */
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return -EINVAL;
-	}
-
-	if (!sched) {
-		osif_err("Invalid schedule parameter");
-		return -EINVAL;
-	}
-
-	/* Validate channel count early */
-	if (sched->n_channels > NAN_MAX_CHANNELS) {
-		osif_err("Invalid channel count: %u (max: %u)",
-			 sched->n_channels, NAN_MAX_CHANNELS);
-		return -EINVAL;
-	}
-
-	req_size = sizeof(*ucfg_params) + sched->ulw_size;
-	ucfg_params = qdf_mem_malloc(req_size);
-	if (!ucfg_params)
-		return -ENOMEM;
-
-	ucfg_params->vdev_id = vdev_id;
-	ucfg_params->psoc = psoc;
-	qdf_mem_copy(ucfg_params->peer_addr.bytes, sched->peer_addr,
-		     QDF_MAC_ADDR_SIZE);
-	ucfg_params->seq_id = sched->seq_id;
-	ucfg_params->committed_dw = sched->committed_dw;
-	ucfg_params->max_chan_switch = sched->max_chan_switch;
-	ucfg_params->ulw_size = sched->ulw_size;
-	ucfg_params->num_channels = sched->n_channels;
-
-	qdf_mem_copy(ucfg_params->init_ulw, sched->init_ulw,
-		     ucfg_params->ulw_size);
-
-	for (i = 0; i < ucfg_params->num_channels; i++) {
-		struct cfg80211_nan_channel *cfg_chan = &sched->nan_channels[i];
-
-		ucfg_params->nan_channels[i].freq =
-					cfg_chan->chandef.chan->center_freq;
-		switch (cfg_chan->chandef.width) {
-		case NL80211_CHAN_WIDTH_20:
-			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_20MHZ;
-			break;
-		case NL80211_CHAN_WIDTH_40:
-			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_40MHZ;
-			break;
-		case NL80211_CHAN_WIDTH_80:
-			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_80MHZ;
-			break;
-		case NL80211_CHAN_WIDTH_160:
-			ucfg_params->nan_channels[i].ch_width = CH_WIDTH_160MHZ;
-			break;
-		default:
-			osif_err("Unsupported bandwidth: %d for channel %u",
-				 cfg_chan->chandef.width, i);
-			qdf_mem_free(ucfg_params);
-			return -EINVAL;
-		}
-
-		ucfg_params->nan_channels[i].rx_nss = cfg_chan->rx_nss;
-		qdf_mem_copy(ucfg_params->nan_channels[i].channel_entry,
-			     cfg_chan->channel_entry, NAN_CHANNEL_ENTRY_LEN);
-		ucfg_params->nan_channels[i].channel_entry_len =
-							NAN_CHANNEL_ENTRY_LEN;
-		ucfg_params->nan_channels[i].center_freq1 =
-			cfg_chan->chandef.center_freq1;
-		ucfg_params->nan_channels[i].center_freq2 =
-			cfg_chan->chandef.center_freq2;
-
-		osif_debug("i%d freq%d bw%d rx_nss%d cf1%d cf2%d chan entry",
-			   i, cfg_chan->chandef.chan->center_freq,
-			   cfg_chan->chandef.width, cfg_chan->rx_nss,
-			   cfg_chan->chandef.center_freq1,
-			   cfg_chan->chandef.center_freq2);
-
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
-				   cfg_chan->channel_entry,
-				   NAN_CHANNEL_ENTRY_LEN);
-	}
-
-	for (i = 0; i < CFG80211_NAN_MAX_PEER_MAPS; i++) {
-		ucfg_params->maps[i].map_id = sched->maps[i].map_id;
-		for (j = 0; j < NAN_MAX_SCHEDULE_SLOTS; j++)
-			ucfg_params->maps[i].schedule[j] =
-						sched->maps[i].schedule[j];
-	}
-
-	/* Allocate request for waiting on response */
-	request = osif_request_alloc(&req_params);
-	if (!request) {
-		osif_err("Request allocation failure");
-		qdf_mem_free(ucfg_params);
-		return -ENOMEM;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_nan_obj is null");
-		osif_request_put(request);
-		qdf_mem_free(ucfg_params);
-		return -EINVAL;
-	}
-
-	psoc_priv->nan_peer_sched_ctx = osif_request_cookie(request);
-
-	/* Send to lower layers */
-	status = ucfg_nan_set_peer_schedule(ucfg_params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to set peer schedule: %d", status);
-		ret = -EIO;
-		goto end;
-	}
-
-	/* Wait for response */
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		osif_err("NAN peer schedule request timed out: %d", ret);
-		ret = -ETIMEDOUT;
-		goto end;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		osif_err("vdev is null for vdev_id: %d", vdev_id);
-		ret = -EINVAL;
-		goto end;
-	}
-
-	if (ucfg_nan_get_peer_sched_rsp_status(vdev) !=
-					NAN_DATAPATH_RSP_STATUS_SUCCESS) {
-		osif_err("NAN peer schedule configuration failed");
-		ret = -EINVAL;
-	}
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-end:
-	osif_request_put(request);
-	psoc_priv->nan_peer_sched_ctx = NULL;
-	qdf_mem_free(ucfg_params);
-
-	return ret;
-}
-
-/**
- * os_if_nan_convert_sta_flags_to_peer_flags() - Convert NL80211 STA flags to
- * NAN peer flags
- * @sta_flags_set: Station flags set from kernel (NL80211_STA_FLAG_*)
- *
- * This function converts kernel NL80211_STA_FLAG_* flags to NAN peer flags.
- * The mapping is:
- * - NL80211_STA_FLAG_MFP -> NAN_PEER_FLAG_PMF
- * - NL80211_STA_FLAG_AUTHENTICATED -> NAN_PEER_FLAG_AUTHENTICATED
- * - NL80211_STA_FLAG_ASSOCIATED -> NAN_PEER_FLAG_ASSOCIATED
- * - NL80211_STA_FLAG_AUTHORIZED -> NAN_PEER_FLAG_AUTHORIZED
- *
- * Return: Converted NAN peer flags
- */
-static uint32_t
-os_if_nan_convert_sta_flags_to_peer_flags(uint32_t sta_flags_set)
-{
-	uint32_t peer_flags = 0;
-
-	if (sta_flags_set & BIT(NL80211_STA_FLAG_MFP))
-		peer_flags |= NAN_PEER_FLAG_PMF;
-
-	if (sta_flags_set & BIT(NL80211_STA_FLAG_AUTHENTICATED))
-		peer_flags |= NAN_PEER_FLAG_AUTHENTICATED;
-
-	if (sta_flags_set & BIT(NL80211_STA_FLAG_ASSOCIATED))
-		peer_flags |= NAN_PEER_FLAG_ASSOCIATED;
-
-	if (sta_flags_set & BIT(NL80211_STA_FLAG_AUTHORIZED))
-		peer_flags |= NAN_PEER_FLAG_AUTHORIZED;
-
-	return peer_flags;
-}
-
-#ifdef WLAN_LINK_STA_PARAMS_PRESENT
-/**
- * os_if_nan_extract_peer_caps() - Extract peer capabilities from params
- * @params: Station parameters
- * @peer_cap: Buffer to store capabilities
- * @max_len: Maximum length of buffer
- *
- * Return: Length of capabilities extracted
- */
-static uint32_t os_if_nan_extract_peer_caps(struct station_parameters *params,
-					    uint8_t *peer_cap,
-					    uint32_t max_len)
-{
-	uint32_t len = 0;
-	uint8_t *buf = peer_cap;
-	const uint8_t *he_capa;
-	uint32_t he_capa_len;
-	const uint8_t *eht_capa;
-	uint32_t eht_capa_len;
-	uint32_t remaining;
-	uint32_t ext_ie_len;
-
-	if (!params || !peer_cap || !max_len)
-		return 0;
-
-	/* HT Capability */
-	if (params->link_sta_params.ht_capa) {
-		if (len + 2 + sizeof(struct htcap_cmn_ie) <= max_len) {
-			*buf++ = WLAN_EID_HT_CAPABILITY;
-			*buf++ = sizeof(struct htcap_cmn_ie);
-			qdf_mem_copy(buf, params->link_sta_params.ht_capa,
-				     sizeof(struct htcap_cmn_ie));
-			buf += sizeof(struct htcap_cmn_ie);
-			len += 2 + sizeof(struct htcap_cmn_ie);
-		}
-	}
-
-	/* VHT Capability */
-	if (params->link_sta_params.vht_capa) {
-		if (len + 2 + sizeof(struct vhtcap) <= max_len) {
-			*buf++ = WLAN_EID_VHT_CAPABILITY;
-			*buf++ = sizeof(struct vhtcap);
-			qdf_mem_copy(buf, params->link_sta_params.vht_capa,
-				     sizeof(struct vhtcap));
-			buf += sizeof(struct vhtcap);
-			len += 2 + sizeof(struct vhtcap);
-		}
-	}
-
-	he_capa = params->link_sta_params.he_capa;
-	he_capa_len = params->link_sta_params.he_capa_len;
-	eht_capa = params->link_sta_params.eht_capa;
-	eht_capa_len = params->link_sta_params.eht_capa_len;
-
-	/*
-	 * HE/EHT capabilities are passed by cfg80211 as element body
-	 * payload only (no EID or LEN prefix). Construct the full
-	 * extended IE (EID=255 + LEN + EXT_ID + payload) before
-	 * appending to the peer capability buffer, consistent with the
-	 * HT/VHT handling above.
-	 *
-	 * he_capa_len/eht_capa_len are attacker/peer influenced, so the
-	 * remaining-space check below only ever subtracts/compares
-	 * already-bounded quantities instead of adding them to len,
-	 * to avoid an unsigned integer overflow masking a buffer
-	 * overflow in the qdf_mem_copy() below. The computed IE length
-	 * is also validated to fit the single-byte 802.11 IE length
-	 * field before use, since silently truncating it would produce
-	 * a malformed IE instead of a memory-safety issue.
-	 */
-	remaining = (max_len > len) ? max_len - len : 0;
-	ext_ie_len = sizeof(struct extn_ie_header) -
-		     sizeof(struct ie_header) + he_capa_len;
-	if (he_capa && he_capa_len >= sizeof(struct ieee80211_he_cap_elem) &&
-	    he_capa_len <= remaining &&
-	    sizeof(struct extn_ie_header) <= remaining - he_capa_len &&
-	    ext_ie_len <= U8_MAX) {
-		*buf++ = WLAN_EID_EXTENSION;
-		*buf++ = (uint8_t)ext_ie_len;
-		*buf++ = WLAN_EID_EXT_HE_CAPABILITY;
-		qdf_mem_copy(buf, he_capa, he_capa_len);
-		buf += he_capa_len;
-		len += sizeof(struct extn_ie_header) + he_capa_len;
-	}
-
-	remaining = (max_len > len) ? max_len - len : 0;
-	ext_ie_len = sizeof(struct extn_ie_header) -
-		     sizeof(struct ie_header) + eht_capa_len;
-	if (eht_capa &&
-	    eht_capa_len >= sizeof(struct ieee80211_eht_cap_elem_fixed) &&
-	    eht_capa_len <= remaining &&
-	    sizeof(struct extn_ie_header) <= remaining - eht_capa_len &&
-	    ext_ie_len <= U8_MAX) {
-		*buf++ = WLAN_EID_EXTENSION;
-		*buf++ = (uint8_t)ext_ie_len;
-		*buf++ = WLAN_EID_EXT_EHT_CAPABILITY;
-		qdf_mem_copy(buf, eht_capa, eht_capa_len);
-		buf += eht_capa_len;
-		len += sizeof(struct extn_ie_header) + eht_capa_len;
-	}
-
-	return len;
-}
-#else
-static uint32_t os_if_nan_extract_peer_caps(struct station_parameters *params,
-					    uint8_t *peer_cap,
-					    uint32_t max_len)
-{
-	return 0;
-}
-#endif /* WLAN_LINK_STA_PARAMS_PRESENT */
-
-#define NAN_PEER_PARAMS_MAX_CAP_LEN 512
-int os_if_nan_process_peer_params(uint8_t vdev_id,
-				  struct wlan_objmgr_psoc *psoc,
-				  struct station_parameters *params,
-				  struct qdf_mac_addr *mac_addr)
-{
-	struct nan_peer_params_req *ucfg_params;
-	struct nan_psoc_priv_obj *psoc_priv;
-	struct osif_request *request = NULL;
-	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
-	int ret;
-	size_t req_size;
-	uint8_t *peer_cap_buf = NULL;
-	uint32_t peer_cap_len = 0;
-	static const struct osif_request_params req_params = {
-		.priv_size = 0,
-		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
-	};
-
-	/* Validate input parameters */
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return -EINVAL;
-	}
-
-	if (!mac_addr) {
-		osif_err("mac addr is NULL");
-		return -EINVAL;
-	}
-
-	if (!params) {
-		osif_err("Invalid peer params");
-		return -EINVAL;
-	}
-
-	peer_cap_buf = qdf_mem_malloc(NAN_PEER_PARAMS_MAX_CAP_LEN);
-	if (!peer_cap_buf)
-		return -ENOMEM;
-
-	peer_cap_len = os_if_nan_extract_peer_caps(params, peer_cap_buf,
-						   NAN_PEER_PARAMS_MAX_CAP_LEN);
-
-	req_size = sizeof(*ucfg_params) + peer_cap_len;
-	ucfg_params = qdf_mem_malloc(req_size);
-	if (!ucfg_params) {
-		qdf_mem_free(peer_cap_buf);
-		return -ENOMEM;
-	}
-
-	if (params->nmi_mac) {
-		qdf_mem_copy(ucfg_params->peer_nmi_addr.bytes, params->nmi_mac,
-			     QDF_MAC_ADDR_SIZE);
-		qdf_mem_copy(ucfg_params->peer_ndi_mac_addr.bytes,
-			     mac_addr->bytes, QDF_MAC_ADDR_SIZE);
-	} else {
-		qdf_mem_copy(ucfg_params->peer_nmi_addr.bytes,
-			     mac_addr->bytes, QDF_MAC_ADDR_SIZE);
-	}
-
-	ucfg_params->vdev_id = vdev_id;
-	ucfg_params->psoc = psoc;
-	ucfg_params->peer_flags =
-		os_if_nan_convert_sta_flags_to_peer_flags(
-							params->sta_flags_set);
-	ucfg_params->peer_cap_len = peer_cap_len;
-
-	if (peer_cap_len)
-		qdf_mem_copy(ucfg_params->peer_cap, peer_cap_buf,
-			     peer_cap_len);
-
-	qdf_mem_free(peer_cap_buf);
-
-	/* Allocate request for waiting on response */
-	request = osif_request_alloc(&req_params);
-	if (!request) {
-		osif_err("Request allocation failure");
-		qdf_mem_free(ucfg_params);
-		return -ENOMEM;
-	}
-
-	psoc_priv = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_priv) {
-		osif_err("psoc_nan_obj is null");
-		osif_request_put(request);
-		qdf_mem_free(ucfg_params);
-		return -EINVAL;
-	}
-
-	psoc_priv->nan_peer_params_ctx = osif_request_cookie(request);
-
-	/* Send to lower layers */
-	status = ucfg_nan_req_peer_params(ucfg_params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to req peer params: %d", status);
-		ret = -EIO;
-		goto end;
-	}
-
-	/* Wait for response */
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		osif_err("NAN peer params request timed out: %d", ret);
-		ret = -ETIMEDOUT;
-		goto end;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		osif_err("vdev is null for vdev_id: %d", vdev_id);
-		ret = -EINVAL;
-		goto end;
-	}
-
-	if (ucfg_nan_get_peer_params_rsp_status(vdev) !=
-					NAN_DATAPATH_RSP_STATUS_SUCCESS) {
-		osif_err("NAN peer params configuration failed");
-		ret = -EINVAL;
-	}
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-end:
-	osif_request_put(request);
-	psoc_priv->nan_peer_params_ctx = NULL;
-	qdf_mem_free(ucfg_params);
-
-	return ret;
-}
-
-int os_if_nan_ndi_peer_create(uint8_t vdev_id,
-			      struct wlan_objmgr_psoc *psoc,
-			      struct qdf_mac_addr *peer_mac)
-{
-	QDF_STATUS status;
-	static const struct osif_request_params req_params = {
-		.priv_size = 0,
-		.timeout_ms = NAN_LOCAL_SCHEDULE_TIMEOUT_MS,
-	};
-	struct osif_request *request = NULL;
-	int ret;
-
-	if (!psoc) {
-		osif_err("psoc is NULL");
-		return -EINVAL;
-	}
-
-	if (!peer_mac) {
-		osif_err("peer_mac is NULL");
-		return -EINVAL;
-	}
-
-	osif_debug("Creating NDI peer: vdev_id=%u, peer_mac=" QDF_MAC_ADDR_FMT,
-		   vdev_id, QDF_MAC_ADDR_REF(peer_mac->bytes));
-
-	/*
-	 * When NMI == NDI the peer already exists on the NAN discovery vdev.
-	 * Delete it synchronously here, before posting the NDI peer-create
-	 * request, so firmware has fully processed the delete before the
-	 * create arrives -- avoiding the race that arises when both happen
-	 * inside the WMA/scheduler context.
-	 */
-	if (ucfg_nan_is_peer_exist_for_opmode(psoc, peer_mac,
-					      QDF_NAN_DISC_MODE)) {
-		struct wlan_objmgr_peer *nmi_peer;
-		uint8_t nmi_vdev_id;
-
-		nmi_peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac->bytes,
-						       WLAN_NAN_ID);
-		if (!nmi_peer) {
-			osif_err("NMI peer " QDF_MAC_ADDR_FMT " not in objmgr",
-				 QDF_MAC_ADDR_REF(peer_mac->bytes));
-			return -EINVAL;
-		}
-		nmi_vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(nmi_peer));
-		wlan_objmgr_peer_release_ref(nmi_peer, WLAN_NAN_ID);
-
-		osif_debug("NMI peer " QDF_MAC_ADDR_FMT " on disc vdev %d",
-			   QDF_MAC_ADDR_REF(peer_mac->bytes), nmi_vdev_id);
-
-		status = ucfg_nan_send_delete_pasn_peer(psoc, nmi_vdev_id,
-							peer_mac);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			osif_err("Failed to delete NMI peer before NDI create, status: %d",
-				 status);
-			return qdf_status_to_os_return(status);
-		}
-
-		status = ucfg_nan_add_peer_in_migrated_addr_list(psoc,
-								 nmi_vdev_id,
-								 peer_mac);
-		if (QDF_IS_STATUS_ERROR(status))
-			osif_err("Failed to record migration " QDF_MAC_ADDR_FMT,
-				 QDF_MAC_ADDR_REF(peer_mac->bytes));
-	}
-
-	status = ucfg_nan_ndi_peer_create(psoc, vdev_id, peer_mac);
-	if (status == QDF_STATUS_E_ALREADY)
-		return 0;
-	if (QDF_IS_STATUS_ERROR(status))
-		return qdf_status_to_os_return(status);
-
-	/* Allocate request for waiting on response */
-	request = osif_request_alloc(&req_params);
-	if (!request) {
-		osif_err("Request allocation failure");
-		return -ENOMEM;
-	}
-
-	nan_set_ndp_peer_create_ctx(psoc, osif_request_cookie(request));
-
-	/* Wait for response */
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		osif_err("NAN peer params request timed out: %d", ret);
-		goto end;
-	}
-
-	osif_debug("NDI peer created successfully");
-	ret = 0;
-end:
-	osif_request_put(request);
-	nan_set_ndp_peer_create_ctx(psoc, NULL);
-	return ret;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			  const void *data, int data_len)
@@ -4681,91 +2926,12 @@ int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		return os_if_process_nan_enable_req(pdev, tb, vdev_id);
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_DISABLE_REQ:
 		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
-		return os_if_process_nan_disable_req(psoc, tb, vdev_id);
+		return os_if_process_nan_disable_req(psoc, tb);
 	default:
 		osif_err("Unrecognized NAN subcmd type(%d)", nan_subcmd);
 		return -EINVAL;
 	}
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-
-#define NAN_PEER_DELETE_TIMEOUT_MS 4000
-int os_if_nan_process_del_sta(uint8_t vdev_id,
-			      struct wlan_objmgr_psoc *psoc,
-			      const uint8_t *peer_addr)
-{
-	struct nan_del_sta_params *params;
-	QDF_STATUS status;
-	static const struct osif_request_params req_params = {
-		.priv_size = 0,
-		.timeout_ms = NAN_PEER_DELETE_TIMEOUT_MS,
-	};
-	struct osif_request *request = NULL;
-	int ret;
-
-	if (!psoc || !peer_addr) {
-		osif_err("Invalid input parameters");
-		return -EINVAL;
-	}
-
-	/* Validate peer address is not all zeros */
-	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_addr)) {
-		osif_err("Invalid peer MAC address (all zeros)");
-		return -EINVAL;
-	}
-
-	/* Allocate request structure */
-	params = qdf_mem_malloc(sizeof(*params));
-	if (!params) {
-		osif_err("Failed to allocate memory for del_sta params");
-		return -ENOMEM;
-	}
-
-	/* Populate parameters */
-	params->vdev_id = vdev_id;
-	params->psoc = psoc;
-	qdf_mem_copy(&params->peer_addr, peer_addr, QDF_MAC_ADDR_SIZE);
-
-	osif_debug("Deleting NAN peer: " QDF_MAC_ADDR_FMT " on vdev %d",
-		   QDF_MAC_ADDR_REF(peer_addr), vdev_id);
-
-	/* Call UCFG layer */
-	status = ucfg_nan_del_sta(psoc, params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to delete NAN peer, status: %d", status);
-		ret = qdf_status_to_os_return(status);
-		goto end;
-	}
-
-	/* Allocate request for waiting on response */
-	request = osif_request_alloc(&req_params);
-	if (!request) {
-		osif_err("Request allocation failure");
-		ret = -ENOMEM;
-		goto end;
-	}
-
-	nan_set_ndp_peer_delete_ctx(psoc, osif_request_cookie(request));
-
-	/* Wait for response */
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		osif_err("NAN peer params request timed out: %d", ret);
-		goto req_cleanup;
-	}
-
-	osif_debug("NDI peer deleted successfully");
-
-req_cleanup:
-	osif_request_put(request);
-	nan_set_ndp_peer_delete_ctx(psoc, NULL);
-
-end:
-	qdf_mem_free(params);
-	return ret;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 #ifdef WLAN_CHIPSET_STATS
 void
@@ -5049,3 +3215,4 @@ os_if_cstats_log_disable_nan_disc_evt(struct wlan_objmgr_pdev *pdev,
 			       &stat);
 }
 #endif /* WLAN_CHIPSET_STATS */
+

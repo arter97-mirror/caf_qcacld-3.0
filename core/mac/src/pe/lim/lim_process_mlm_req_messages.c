@@ -41,7 +41,6 @@
 #include "wlan_reg_services_api.h"
 #include "lim_process_fils.h"
 #include "wlan_mlme_public_struct.h"
-#include "wlan_scan_utils_api.h"
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_pmo_ucfg_api.h"
 #include "wlan_cp_stats_utils_api.h"
@@ -175,7 +174,7 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
 	enum wlan_status_code proto_status_code;
 
 	session = pe_find_session_by_session_id(mac_ctx,
-			mac_ctx->lim.lim_timers.external_auth_timer.sessionId);
+			mac_ctx->lim.lim_timers.sae_auth_timer.sessionId);
 	if (!session) {
 		pe_err("Session does not exist for given session id");
 		return;
@@ -186,7 +185,7 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
 		session->limSmeState);
 
 	switch (session->limMlmState) {
-	case eLIM_MLM_WT_EXTERNAL_AUTH_STATE:
+	case eLIM_MLM_WT_SAE_AUTH_STATE:
 		lim_fill_status_code(SIR_MAC_MGMT_AUTH,
 				     mac_ctx->auth_ack_status,
 				     &proto_status_code);
@@ -273,9 +272,6 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_ASSOC_FAIL_TIMEOUT:
 		lim_process_assoc_failure_timeout(mac_ctx, msg->bodyval);
 		break;
-	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
-		lim_send_deauth_cnf(mac_ctx, msg->bodyval);
-		break;
 	case SIR_LIM_FT_PREAUTH_RSP_TIMEOUT:
 		lim_process_ft_preauth_rsp_timeout(mac_ctx);
 		break;
@@ -303,12 +299,7 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 static void update_rmfEnabled(struct bss_params *addbss_param,
 			      struct pe_session *session)
 {
-	if (wlan_crypto_vdev_is_pmf_enabled(session->vdev, 0) ||
-	    wlan_crypto_vdev_is_pmf_enabled(session->vdev, RSNO_GEN_WIFI6) ||
-	    wlan_crypto_vdev_is_pmf_enabled(session->vdev, RSNO_GEN_WIFI7)) {
-		pe_debug("Enable rmf");
-		addbss_param->rmfEnabled = true;
-	}
+	addbss_param->rmfEnabled = session->limRmfEnabled;
 }
 
 /**
@@ -355,15 +346,6 @@ lim_mlm_add_bss(struct mac_context *mac_ctx,
 				  &mlme_obj->proto.eht_ops_info.eht_ops,
 				  session);
 		lim_update_usr_eht_cap(mac_ctx, session);
-	}
-#endif
-
-#ifdef WLAN_FEATURE_11BN_TEST_SAP
-	if (lim_is_session_uhr_capable(session)) {
-		lim_decide_uhr_op(mac_ctx,
-				  &mlme_obj->proto.uhr_ops_info.uhr_ops,
-				  session);
-		lim_update_usr_uhr_cap(mac_ctx, session);
 	}
 #endif
 
@@ -463,28 +445,6 @@ end:
 		lim_send_start_bss_confirm(mac_ctx, &mlm_start_cnf);
 }
 
-QDF_STATUS
-lim_continue_bss_peer_create(struct cm_peer_create_req *req)
-{
-	uint8_t *peer_mld_addr = NULL;
-	bool is_assoc_peer = false;
-	QDF_STATUS status;
-
-	if (!req)
-		return QDF_STATUS_E_INVAL;
-
-	lim_get_mld_info_sta(req, &peer_mld_addr, &is_assoc_peer);
-	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes, true,
-				      peer_mld_addr, is_assoc_peer);
-	/*
-	 * Deletion of randing peer is successful, so free the request
-	 * here
-	 */
-	qdf_mem_free(req);
-
-	return status;
-}
-
 #if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 void
 lim_pasn_peer_del_all_resp_vdev_delete_resume(struct mac_context *mac,
@@ -577,16 +537,19 @@ lim_process_mlm_post_join_suspend_link(struct mac_context *mac_ctx,
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req)
 {
+	uint8_t sessionid;
 	struct pe_session *session;
 
-	session = pe_find_session_by_session_id(mac_ctx,
-						mlm_join_req->sessionId);
-	if (session)
-		lim_process_mlm_post_join_suspend_link(mac_ctx, session);
-	else
-		pe_err("SessionId:%d does not exist", mlm_join_req->sessionId);
+	sessionid = mlm_join_req->sessionId;
 
-	qdf_mem_free(mlm_join_req);
+	session = pe_find_session_by_session_id(mac_ctx, sessionid);
+	if (!session) {
+		pe_err("SessionId:%d does not exist", sessionid);
+		return;
+	}
+
+	session->pLimMlmJoinReq = mlm_join_req;
+	lim_process_mlm_post_join_suspend_link(mac_ctx, session);
 }
 
 /**
@@ -689,7 +652,7 @@ QDF_STATUS lim_trigger_auth_req_sae(struct mac_context *mac_ctx,
 				    struct qdf_mac_addr *peer_bssid)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	struct external_auth_info *sae_info;
+	struct sir_sae_info *sae_info;
 	struct scheduler_msg msg = {0};
 	uint32_t keymgmt;
 
@@ -752,18 +715,18 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		return qdf_status;
 
-	session->limMlmState = eLIM_MLM_WT_EXTERNAL_AUTH_STATE;
+	session->limMlmState = eLIM_MLM_WT_SAE_AUTH_STATE;
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
 		       session->limMlmState));
 
-	mac_ctx->lim.lim_timers.external_auth_timer.sessionId =
+	mac_ctx->lim.lim_timers.sae_auth_timer.sessionId =
 					session->peSessionId;
 
 	/* Activate SAE auth timer */
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
-			 session->peSessionId, eLIM_EXTERNAL_AUTH_TIMER));
-	if (tx_timer_activate(&mac_ctx->lim.lim_timers.external_auth_timer)
+			 session->peSessionId, eLIM_AUTH_SAE_TIMER));
+	if (tx_timer_activate(&mac_ctx->lim.lim_timers.sae_auth_timer)
 		    != TX_SUCCESS) {
 		pe_err("could not start Auth SAE timer");
 	}
@@ -778,144 +741,6 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static
-QDF_STATUS lim_initiate_external_auth_req(struct mac_context *mac_ctx,
-					  struct pe_session *session,
-					  struct qdf_mac_addr *peer_bssid)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct external_auth_info *ext_auth;
-	struct scheduler_msg msg = {0};
-	uint32_t keymgmt;
-
-	ext_auth = qdf_mem_malloc(sizeof(*ext_auth));
-	if (!ext_auth)
-		return QDF_STATUS_E_NOMEM;
-
-	ext_auth->msg_type = WNI_SME_TRIGGER_EXTERNAL_AUTH;
-	ext_auth->msg_len = sizeof(*ext_auth);
-	ext_auth->vdev_id = session->vdev_id;
-
-	keymgmt = wlan_crypto_get_param(session->vdev,
-					WLAN_CRYPTO_PARAM_KEY_MGMT);
-	ext_auth->akm = keymgmt;
-	ext_auth->auth_algo = mac_ctx->lim.gpLimMlmAuthReq->authType;
-	ext_auth->pairwise_cipher =
-		wlan_crypto_get_param(session->vdev,
-				      WLAN_CRYPTO_PARAM_UCAST_CIPHER);
-	ext_auth->group_cipher =
-		wlan_crypto_get_param(session->vdev,
-				      WLAN_CRYPTO_PARAM_MCAST_CIPHER);
-	ext_auth->group_mgmt_cipher =
-		wlan_crypto_get_param(session->vdev,
-				      WLAN_CRYPTO_PARAM_MGMT_CIPHER);
-	ext_auth->peer_mac_addr = *peer_bssid;
-	ext_auth->ssid.length = session->ssId.length;
-	qdf_mem_copy(ext_auth->ssid.ssId, session->ssId.ssId,
-		     ext_auth->ssid.length);
-
-	status = wlan_vdev_get_bss_peer_mld_mac(session->vdev,
-						&ext_auth->peer_mld_addr);
-	if (QDF_IS_STATUS_ERROR(status))
-		pe_err("Failed to fetch peer mld address");
-
-	if (session->lim_join_req) {
-		uint8_t *rsnxe_ie;
-
-		rsnxe_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(
-				WLAN_ELEMID_RSNXE,
-				session->lim_join_req->addIEAssoc.addIEdata,
-				session->lim_join_req->addIEAssoc.length);
-		if (rsnxe_ie) {
-			ext_auth->rsnxe_len = rsnxe_ie[1] +
-					      SIR_MAC_IE_TYPE_LEN_SIZE;
-			qdf_mem_copy(ext_auth->rsnxe_data, rsnxe_ie,
-				     ext_auth->rsnxe_len);
-			pe_debug("RSNXE len:%d", ext_auth->rsnxe_len);
-		}
-	}
-
-	if (session->lim_join_req && session->lim_join_req->rsnIE.length) {
-		QDF_STATUS cap_status;
-
-		cap_status = util_scan_get_rsn_cap(
-				session->lim_join_req->rsnIE.rsnIEdata,
-				session->lim_join_req->rsnIE.length,
-				&ext_auth->rsn_capab);
-		if (QDF_IS_STATUS_ERROR(cap_status))
-			pe_debug("vdev_id %d Failed to extract RSN cap",
-				 session->vdev_id);
-	}
-
-	pe_debug("vdev_id %d ssid " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " akm:0x%x algo:%d pairwise:0x%x grp:0x%x grp_mgmt:0x%x rsn_capab:0x%x",
-		 ext_auth->vdev_id,
-		 QDF_SSID_REF(ext_auth->ssid.length, ext_auth->ssid.ssId),
-		 QDF_MAC_ADDR_REF(ext_auth->peer_mac_addr.bytes),
-		 ext_auth->akm, ext_auth->auth_algo,
-		 ext_auth->pairwise_cipher, ext_auth->group_cipher,
-		 ext_auth->group_mgmt_cipher, ext_auth->rsn_capab);
-
-	msg.type = WNI_SME_TRIGGER_EXTERNAL_AUTH;
-	msg.bodyptr = ext_auth;
-	msg.bodyval = 0;
-
-	status = mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		pe_err("Failed to initiate external authentication");
-		qdf_mem_free(ext_auth);
-		return status;
-	}
-
-	return status;
-}
-
-/**
- * lim_process_mlm_external_auth_req() - Handle external authentication for
- * suitable AKMs
- * @mac_ctx: global MAC context
- * @session: PE session entry
- *
- * This function is called by lim_process_mlm_auth_req to initiate external
- * authentication.
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-lim_process_mlm_external_auth_req(struct mac_context *mac_ctx,
-				  struct pe_session *session)
-{
-	QDF_STATUS qdf_status;
-	tLimTimers *lim_timers = &mac_ctx->lim.lim_timers;
-
-	qdf_status = lim_initiate_external_auth_req(mac_ctx, session,
-						    (struct qdf_mac_addr *)session->bssId);
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		return qdf_status;
-
-	session->limMlmState = eLIM_MLM_WT_EXTERNAL_AUTH_STATE;
-
-	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
-			 session->limMlmState));
-
-	lim_timers->external_auth_timer.sessionId = session->peSessionId;
-
-	/* Activate External auth timer */
-	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
-			 session->peSessionId, eLIM_EXTERNAL_AUTH_TIMER));
-	if (tx_timer_activate(&lim_timers->external_auth_timer) != TX_SUCCESS)
-		pe_err("could not start External Auth timer");
-
-	return qdf_status;
-}
-#else
-static QDF_STATUS
-lim_process_mlm_external_auth_req(struct mac_context *mac_ctx,
-				  struct pe_session *session)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
 
 /**
  * lim_process_mlm_auth_req() - process lim auth request
@@ -953,7 +778,7 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 	}
 
 	pe_debug("vdev %d Systemrole %d mlmstate %d from: " QDF_MAC_ADDR_FMT "with authtype %d",
-		 session->vdev_id, GET_LIM_BSS_TYPE(session),
+		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->limMlmState,
 		 QDF_MAC_ADDR_REF(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr),
 		 mac_ctx->lim.gpLimMlmAuthReq->authType);
@@ -1011,62 +836,34 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 	}
 
 	if ((mac_ctx->lim.gpLimMlmAuthReq->authType == eSIR_AUTH_TYPE_SAE) &&
-	    !session->sae_pmk_cached) {
+	     !session->sae_pmk_cached) {
 		if (lim_process_mlm_auth_req_sae(mac_ctx, session) !=
-		    QDF_STATUS_SUCCESS) {
+					QDF_STATUS_SUCCESS) {
 			mlm_auth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			qdf_mem_free(auth_frame_body);
 			goto end;
-		}
-		pe_debug("lim_process_mlm_auth_req_sae is successful");
-		auth_frame_body->authAlgoNumber = eSIR_AUTH_TYPE_SAE;
-		auth_frame_body->authTransactionSeqNumber =
-						SIR_MAC_AUTH_FRAME_1;
-		auth_frame_body->authStatusCode = 0;
-		host_log_wlan_auth_info(auth_frame_body->authAlgoNumber,
-					auth_frame_body->authTransactionSeqNumber,
-					auth_frame_body->authStatusCode);
+		} else {
+			pe_debug("lim_process_mlm_auth_req_sae is successful");
+			auth_frame_body->authAlgoNumber = eSIR_AUTH_TYPE_SAE;
+			auth_frame_body->authTransactionSeqNumber =
+							SIR_MAC_AUTH_FRAME_1;
+			auth_frame_body->authStatusCode = 0;
+			host_log_wlan_auth_info(auth_frame_body->authAlgoNumber,
+				auth_frame_body->authTransactionSeqNumber,
+				auth_frame_body->authStatusCode);
 
-		qdf_mem_free(auth_frame_body);
-		return;
-	} else if (mac_ctx->lim.gpLimMlmAuthReq->authType ==
-		   eSIR_AUTH_TYPE_EPPKE ||
-		   mac_ctx->lim.gpLimMlmAuthReq->authType ==
-		   eSIR_AUTH_TYPE_8021X_IN_AUTH) {
-		QDF_STATUS status;
-
-		status = lim_process_mlm_external_auth_req(mac_ctx, session);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("vdev:%d EPPKE External Authentication request failed",
-			       session->vdev_id);
-			mlm_auth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			qdf_mem_free(auth_frame_body);
-			goto end;
+			return;
 		}
-
-		pe_debug("vdev:%d EPPKE External Authentication request is successful",
-			 session->vdev_id);
-		auth_frame_body->authAlgoNumber =
-				mac_ctx->lim.gpLimMlmAuthReq->authType;
-		auth_frame_body->authTransactionSeqNumber =
-						SIR_MAC_AUTH_FRAME_1;
-		auth_frame_body->authStatusCode = 0;
-		host_log_wlan_auth_info(auth_frame_body->authAlgoNumber,
-					auth_frame_body->authTransactionSeqNumber,
-					auth_frame_body->authStatusCode);
-
-		qdf_mem_free(auth_frame_body);
-
-		return;
-	}
-	session->limMlmState = eLIM_MLM_WT_AUTH_FRAME2_STATE;
+	} else
+		session->limMlmState = eLIM_MLM_WT_AUTH_FRAME2_STATE;
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
-			 session->limMlmState));
+		       session->limMlmState));
 
 	/* Mark auth algo as open when auth type is SAE and PMK is cached */
 	if ((mac_ctx->lim.gpLimMlmAuthReq->authType == eSIR_AUTH_TYPE_SAE) &&
-	    session->sae_pmk_cached) {
+	   session->sae_pmk_cached) {
 		auth_frame_body->authAlgoNumber = eSIR_OPEN_SYSTEM;
 	} else {
 		auth_frame_body->authAlgoNumber =
@@ -1193,7 +990,7 @@ static void lim_process_mlm_assoc_req(struct mac_context *mac_ctx, uint32_t *msg
 		 */
 		pe_warn("received unexpected MLM_ASSOC_CNF in state %X for role=%d, MAC addr= "
 			   QDF_MAC_ADDR_FMT, session_entry->limMlmState,
-			GET_LIM_BSS_TYPE(session_entry),
+			GET_LIM_SYSTEM_ROLE(session_entry),
 			QDF_MAC_ADDR_REF(mlm_assoc_req->peerMacAddr));
 		lim_print_mlm_state(mac_ctx, LOGW, session_entry->limMlmState);
 		mlm_assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
@@ -1280,8 +1077,8 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(curr_bssid.bytes, session->bssId, QDF_MAC_ADDR_SIZE);
 
-	switch (GET_LIM_BSS_TYPE(session)) {
-	case eSIR_INFRASTRUCTURE_MODE:
+	switch (GET_LIM_SYSTEM_ROLE(session)) {
+	case eLIM_STA_ROLE:
 		if (!qdf_is_macaddr_equal(&mlm_disassocreq->peer_macaddr,
 				     &curr_bssid)) {
 			pe_warn("received MLM_DISASSOC_REQ with invalid BSS: "QDF_MAC_ADDR_FMT,
@@ -1323,7 +1120,7 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 		break;
 	default:
 		break;
-	} /* end switch (GET_LIM_BSS_TYPE(session)) */
+	} /* end switch (GET_LIM_SYSTEM_ROLE(session)) */
 
 	/*
 	 * Check if there exists a context for the peer entity
@@ -1431,7 +1228,7 @@ end:
  * @mac_ctx - global MAC context
  * @sta_mac - station MAC
  *
- * This function checks if disassociation or deauthentication is pending for
+ * This function checks if diassociation or deauthentication is pending for
  * given station MAC address.
  *
  * Return: true if pending and false otherwise.
@@ -1474,7 +1271,6 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac_ctx,
 {
 	tLimMlmDisassocReq *mlm_disassoc_req;
 	tLimMlmDeauthReq *mlm_deauth_req;
-	struct pe_session *session;
 
 	mlm_disassoc_req = mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDisassocReq;
 	if (mlm_disassoc_req &&
@@ -1501,13 +1297,8 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac_ctx,
 			     (uint8_t *) &mlm_deauth_req->peer_macaddr.bytes,
 			     QDF_MAC_ADDR_SIZE))) {
 		if (clean_rx_path) {
-			session = pe_find_session_by_session_id
-						(mac_ctx,
-						 mlm_deauth_req->sessionId);
-			if (!session)
-				return;
-
-			lim_send_deauth_cnf(mac_ctx, session->vdev_id);
+			lim_process_deauth_ack_timeout(mac_ctx,
+						       mlm_deauth_req->sessionId);
 		} else {
 			if (tx_timer_running(
 				&mac_ctx->lim.lim_timers.gLimDeauthAckTimer)) {
@@ -1602,8 +1393,8 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 	}
 	sir_copy_mac_addr(curr_bssId, session->bssId);
 
-	switch (GET_LIM_BSS_TYPE(session)) {
-	case eSIR_INFRASTRUCTURE_MODE:
+	switch (GET_LIM_SYSTEM_ROLE(session)) {
+	case eLIM_STA_ROLE:
 		switch (session->limMlmState) {
 		case eLIM_MLM_IDLE_STATE:
 			/*
@@ -1690,7 +1481,7 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 		break;
 	default:
 		break;
-	} /* end switch (GET_LIM_BSS_TYPE(session)) */
+	} /* end switch (GET_LIM_SYSTEM_ROLE(session)) */
 
 	/*
 	 * Check if there exists a context for the peer entity
@@ -1818,28 +1609,22 @@ end:
 }
 
 /*
- * lim_process_deauth_ack_timeout() - This function posts request for
- * processing deauth Ack timeout to the serializer
+ * lim_process_deauth_ack_timeout() - wrapper function around
+ * lim_send_deauth_cnf
  *
  * @pMacGlobal:     mac_ctx
  * @vdev_id:        vdev id
  *
- * Posts message to the Serializer in PE queue for processing deauth ack
- * timeout of type SIR_LIM_DEAUTH_ACK_TIMEOUT
+ * wrapper function around lim_send_deauth_cnf
  *
  * Return: void
  */
 void lim_process_deauth_ack_timeout(void *pMacGlobal, uint32_t vdev_id)
 {
 	struct mac_context *mac_ctx = (struct mac_context *)pMacGlobal;
-	struct scheduler_msg msg = {0};
 
 	pe_debug("Deauth Ack timeout for vdev id %d", vdev_id);
-
-	msg.type = SIR_LIM_DEAUTH_ACK_TIMEOUT;
-	msg.bodyval = (uint32_t)vdev_id;
-	msg.bodyptr = NULL;
-	lim_post_msg_api(mac_ctx, &msg);
+	lim_send_deauth_cnf(mac_ctx, vdev_id);
 }
 
 /*
@@ -1920,6 +1705,11 @@ void lim_process_join_failure_timeout(struct mac_context *mac_ctx)
 				 session->peSessionId, session->limMlmState));
 		/* Update PE session Id */
 		mlm_join_cnf.sessionId = session->peSessionId;
+		/* Freeup buffer allocated to join request */
+		if (session->pLimMlmJoinReq) {
+			qdf_mem_free(session->pLimMlmJoinReq);
+			session->pLimMlmJoinReq = NULL;
+		}
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				     (uint32_t *) &mlm_join_cnf);
 		return;
@@ -1944,6 +1734,8 @@ void lim_process_join_failure_timeout(struct mac_context *mac_ctx)
 static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ctx)
 {
 	struct pe_session *session;
+	tSirMacSSid ssid;
+	tSirMacAddr bssid;
 
 	session = pe_find_session_by_session_id(mac_ctx,
 	      mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId);
@@ -1957,7 +1749,15 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 	if ((true ==
 	    tx_timer_running(&mac_ctx->lim.lim_timers.gLimJoinFailureTimer))
 		&& (session->limMlmState == eLIM_MLM_WT_JOIN_BEACON_STATE)) {
-		lim_send_probe_req_mgmt_frame(mac_ctx, session,
+		qdf_mem_copy(ssid.ssId, session->ssId.ssId,
+			     session->ssId.length);
+		ssid.length = session->ssId.length;
+		sir_copy_mac_addr(bssid,
+				  session->pLimMlmJoinReq->bssDescription.bssId);
+
+		lim_send_probe_req_mgmt_frame(mac_ctx, &ssid, bssid,
+					      session->curr_op_freq,
+			session->self_mac_addr, session->dot11mode,
 			&session->lim_join_req->addIEScan.length,
 			session->lim_join_req->addIEScan.addIEdata);
 		lim_deactivate_and_change_timer(mac_ctx,
@@ -2319,7 +2119,7 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 		 */
 		pe_warn("received unexpected REASSOC failure timeout in state %X for role %d",
 			session->limMlmState,
-			GET_LIM_BSS_TYPE(session));
+			GET_LIM_SYSTEM_ROLE(session));
 		lim_print_mlm_state(mac_ctx, LOGW, session->limMlmState);
 		return;
 	}
@@ -2333,6 +2133,14 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 		/* Change timer for future activations */
 		lim_deactivate_and_change_timer(mac_ctx, eLIM_ASSOC_FAIL_TIMER);
 		lim_stop_pmfcomeback_timer(session);
+		/*
+		 * Free up buffer allocated for JoinReq held by
+		 * MLM state machine
+		 */
+		if (session->pLimMlmJoinReq) {
+			qdf_mem_free(session->pLimMlmJoinReq);
+			session->pLimMlmJoinReq = NULL;
+		}
 		/* To remove the preauth node in case of fail to associate */
 		if (lim_search_pre_auth_list(mac_ctx, session->bssId)) {
 			pe_debug("delete pre auth node for "QDF_MAC_ADDR_FMT,

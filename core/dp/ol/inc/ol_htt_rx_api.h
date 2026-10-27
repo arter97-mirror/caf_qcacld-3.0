@@ -67,7 +67,7 @@
  * @rs_tstamp: Received timestamp
  * @rs_full_chan: Detail channel structure of recv frame.
  *                It could be NULL if not available
- * @rs_isaggr: Is Aggregated?
+ * @rs_isaggr: Is Aggreggated?
  * @rs_isapsd: Is APSD?
  * @rs_noisefloor: Noise floor
  * @rs_channel: Channel

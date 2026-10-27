@@ -102,6 +102,7 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define QOS_MAP_LEN_MIN (QOS_MAP_RANGE_NUM * 2)
 #define QOS_MAP_LEN_MAX \
 	(QOS_MAP_LEN_MIN + 2 * QOS_MAP_MAX_EX)
+#define NUM_CHAINS_MAX  2
 
 /* Maximum number of realms present in fils indication element */
 #define SIR_MAX_REALM_COUNT 7
@@ -474,17 +475,17 @@ const char *lim_bss_type_to_string(const uint16_t bss_type);
  *                      This value is derived from "Supported MCS Set field"
  *                      inside the HT capability element.
  * @vhtRxMCSMap: Indicates the Maximum MCS(VHT) that can be received for each
- *                number of spatial streams
+ *                number of spacial streams
  * @vhtRxHighestDataRate: Indicate the highest VHT data rate that the STA is
  *                         able to receive
  * @vhtTxMCSMap: Indicates the Maximum MCS(VHT) that can be transmitted for
- *                each number of spatial streams
+ *                each number of spacial streams
  * @vhtTxHighestDataRate: Indicate the highest VHT data rate that the STA is
  *                         able to transmit
  * @he_rx_mcs: Indicates the Maximum MCS(HE) that can be received for each
- *              number of spatial streams
+ *              number of spacial streams
  * @he_tx_mcs: Indicates the Maximum MCS(HE) that can be transmitted for each
- *              number of spatial streams
+ *              number of spacial streams
  * @bw_20_rx_max_nss_for_mcs_0_to_7: Indicates MAX RX NSS for MCS from 0 to 7
  * @bw_20_tx_max_nss_for_mcs_0_to_7: Indicates MAX TX NSS for MCS from 0 to 7
  * @bw_20_rx_max_nss_for_mcs_8_and_9: Indicates MAX RX NSS for MCS from 8 9
@@ -660,7 +661,9 @@ struct sme_ready_req {
 	uint16_t messageType;   /* eWNI_SME_SYS_READY_IND */
 	uint16_t length;
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
-						    struct auth_offload_event *auth_event);
+						    uint8_t vdev_id,
+						    struct qdf_mac_addr bssid,
+						    uint32_t akm);
 	pe_roam_synch_fn_t pe_roam_synch_cb;
 	stop_roaming_fn_t stop_roaming_cb;
 	QDF_STATUS (*sme_msg_cb)(struct mac_context *mac,
@@ -725,20 +728,19 @@ struct sir_set_antenna_mode {
 
 /**
  * enum bss_type - Enum for BSS type used in scanning/joining etc.
- * @eSIR_UNKNOWN_MODE: Un-initialized mode
+ *
  * @eSIR_INFRASTRUCTURE_MODE: Infrastructure station
  * @eSIR_INFRA_AP_MODE: softAP mode
+ * @eSIR_AUTO_MODE: Auto role
  * @eSIR_MONITOR_MODE: Monitor mode
  * @eSIR_NDI_MODE: NAN datapath mode
- * @eSIR_PASSTHRU_MODE: Passthrough mode
  */
 enum bss_type {
-	eSIR_UNKNOWN_MODE,
 	eSIR_INFRASTRUCTURE_MODE,
 	eSIR_INFRA_AP_MODE,
+	eSIR_AUTO_MODE,
 	eSIR_MONITOR_MODE,
 	eSIR_NDI_MODE,
-	eSIR_PASSTHRU_MODE,
 	eSIR_DONOT_USE_BSS_TYPE = SIR_MAX_ENUM_SIZE
 };
 
@@ -816,17 +818,18 @@ struct bss_description {
 	uint8_t mdiePresent;
 	/* MDIE for 11r, picked from the beacons */
 	uint8_t mdie[SIR_MDIE_SIZE];
+	/* whether it is from a probe rsp */
+	uint8_t fProbeRsp;
 	struct scan_mbssid_info mbssid_info;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_ind_elements fils_info_element;
 #endif
+	uint32_t adaptive_11r_ap;
+	uint32_t mbo_oce_enabled_ap;
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-	bool is_single_pmk;
+	uint32_t is_single_pmk;
 #endif
-	uint8_t adaptive_11r_ap : 1,
-		mbo_oce_enabled_ap : 1,
-		is_ml_ap : 1;
-	tDot11fBeaconIEs bcn_ies;
+	uint32_t is_ml_ap;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	QDF_FLEX_ARRAY(uint32_t, ieFields);
 };
@@ -1068,7 +1071,7 @@ struct assoc_ind {
 	bool sgi_enable;
 	bool tx_stbc;
 	bool rx_stbc;
-	enum phy_ch_width ch_width;
+	tSirMacHTChannelWidth ch_width;
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
@@ -1284,20 +1287,17 @@ struct stop_bss_rsp {
 	tSirResultCodes status_code;
 };
 
-/**
- * struct switch_channel_ind - Channel Switch indication for station
- * @messageType: msg type eWNI_SME_SWITCH_CHL_IND
- * @length: length of the msg
- * @vdev_id: STA vdev id
- * @freq: new freq
- * @chan_params: Channel params
- */
+/* / Definition for Channel Switch indication for station */
+/* / MAC ---> */
 struct switch_channel_ind {
 	uint16_t messageType;   /* eWNI_SME_SWITCH_CHL_IND */
 	uint16_t length;
-	uint8_t vdev_id;
+	uint8_t sessionId;
 	uint32_t freq;
 	struct ch_params chan_params;
+	struct qdf_mac_addr bssid;      /* BSSID */
+	QDF_STATUS status;
+	enum wlan_phymode ch_phymode;
 };
 
 /* / Definition for MIC failure indication */
@@ -2115,7 +2115,6 @@ typedef struct sSirScanOffloadEvent {
  * @half_rate: is the channel operating at 10MHz
  * @quarter_rate: is the channel operating at 5MHz
  * @nan_disabled: is NAN disabled on @freq
- * @is_passive: is indoor frequency
  */
 typedef struct sSirUpdateChanParam {
 	uint32_t freq;
@@ -2124,7 +2123,6 @@ typedef struct sSirUpdateChanParam {
 	bool half_rate;
 	bool quarter_rate;
 	bool nan_disabled;
-	bool is_passive;
 } tSirUpdateChanParam, *tpSirUpdateChanParam;
 
 typedef struct sSirUpdateChan {
@@ -2134,7 +2132,6 @@ typedef struct sSirUpdateChan {
 	uint8_t vht_24_en;
 	bool he_en;
 	bool eht_en;
-	bool uhr_en;
 	QDF_FLEX_ARRAY(tSirUpdateChanParam, chanParam);
 } tSirUpdateChanList, *tpSirUpdateChanList;
 
@@ -3096,56 +3093,6 @@ struct wifi_peer_info {
 };
 
 /**
- * struct wifi_host_link_stats - host side per link statistics
- * @valid: indicates whether the stats are valid.
- * @msdu_tx_retry: The number of MSDUs sent by the driver that were
- *  retransmitted and eventually transmitted successfully.
- * @msdu_tx_succ: The number of MSDUs that were successfully transmitted by the
- *  driver, including those that were retransmitted and eventually succeeded.
- * @msdu_tx_fw_drop: The number of MSDUs that were handed off by the driver for
- *  transmission but were ultimately dropped by the firmware.
- * @msdu_tx_driver_drop: The number of MSDUs that were intended for transmission
- *  but were dropped by the driver before being handed off to the firmware.
- * @msdu_rx_driver_rcvd: The number of MSDUs received from REO path
- * @mpdu_rx_driver_rcvd: The number of MPDUs received from REO path
- */
-struct wifi_host_link_stats {
-	bool valid;
-	uint32_t msdu_tx_retry;
-	uint32_t msdu_tx_succ;
-	uint32_t msdu_tx_fw_drop;
-	uint32_t msdu_tx_driver_drop;
-	uint32_t msdu_rx_driver_rcvd;
-	uint32_t mpdu_rx_driver_rcvd;
-};
-
-/* Maximum number of IPI SNR histogram bins supported */
-#define WLAN_SNR_STATS_MAX_BINS  32
-
-/**
- * struct wifi_snr_stats - IPI SNR distribution statistics
- * @valid: true if IPI TLV was present in WMI event
- * @meas_dur_us: measurement duration in microseconds
- * @snr_lower_bound: lower bound of SNR range in dB (snr_config bits[7:0])
- * @snr_upper_bound: upper bound of SNR range in dB (snr_config bits[15:8])
- * @snr_step: step size in dB per bin (snr_config bits[23:16])
- * @num_bins: total number of bins (snr_config bits[31:24])
- * @bin_data: SNR sample counts per bin; num_bins elements valid.
- *            bin_data[0]: samples with SNR < snr_lower_bound;
- *            bin_data[1..num_bins-2]: samples in each step-sized range;
- *            bin_data[num_bins-1]: samples with SNR >= snr_upper_bound
- */
-struct wifi_snr_stats {
-	bool valid;
-	uint32_t meas_dur_us;
-	uint32_t snr_lower_bound;
-	uint32_t snr_upper_bound;
-	uint32_t snr_step;
-	uint32_t num_bins;
-	uint32_t bin_data[WLAN_SNR_STATS_MAX_BINS];
-};
-
-/**
  * struct wifi_interface_stats - Interface statistics
  * @info: struct containing the current state of the interface
  * @rts_succ_cnt: number of RTS/CTS sequence success
@@ -3158,8 +3105,6 @@ struct wifi_snr_stats {
  * @offload_stats: per-offload statistics
  * @powersave_stats: powersave statistics
  * @vdev_id: vdev id
- * @host_link_stats: host side per link statistics
- * @snr_stats: IPI SNR distribution statistics
  *
  * Statistics corresponding to 2nd most LSB in wifi statistics bitmap
  * for getting statistics
@@ -3176,10 +3121,6 @@ struct wifi_interface_stats {
 	wmi_iface_offload_stats offload_stats[WMI_OFFLOAD_STATS_TYPE_MAX];
 	wmi_iface_powersave_stats powersave_stats;
 	uint8_t vdev_id;
-	struct wifi_host_link_stats host_link_stats;
-#ifdef FEATURE_SNR_STATS
-	struct wifi_snr_stats snr_stats;
-#endif /* FEATURE_SNR_STATS */
 };
 
 /**
@@ -3605,7 +3546,7 @@ struct sir_rx_threshold {
  * struct sir_wifi_ll_ext_stats_threshold - Threshold for stats update
  * @period: MAC counter indication period (unit in ms)
  * @enable: if threshold mechanism is enabled or disabled
- * @enable_bitmap: whether dedicated threshold is enabled.
+ * @enable_bitmap: whether dedicated threshold is enabed.
  *     Every MAC counter has a dedicated threshold. If the dedicated
  *     threshold is not set in the bitmap, global threshold will take
  *     effect.
@@ -3891,8 +3832,6 @@ struct sir_sap_ch_width_update {
  * @REASON_CHANNEL_SWITCH: channel switch
  * @REASON_MLO_IE_UPDATE: mlo ie update
  * @REASON_RNR_UPDATE: SAP is changed, notify co-located SAP
- * @REASON_CH_WIDTH_UPDATE: Update due to change in operating channel width
- * @REASON_HW_MODE_CHANGE: Update due to change in current HW mode
  */
 enum sir_bcn_update_reason {
 	REASON_DEFAULT = 0,
@@ -3904,7 +3843,6 @@ enum sir_bcn_update_reason {
 	REASON_MLO_IE_UPDATE = 6,
 	REASON_RNR_UPDATE = 7,
 	REASON_CH_WIDTH_UPDATE = 8,
-	REASON_HW_MODE_CHANGE = 9,
 };
 
 /**
@@ -4376,13 +4314,13 @@ QDF_STATUS umac_send_mb_message_to_mac(void *msg);
 
 /**
  * struct scan_chan_info - channel info
- * @freq: radio frequency
+ * @freq: radio frequence
  * @cmd flag: cmd flag
  * @noise_floor: noise floor
  * @cycle_count: cycle count
  * @rx_clear_count: rx clear count
  * @tx_frame_count: TX frame count
- * @clock_freq: clock frequency MHZ
+ * @clock_freq: clock frequence MHZ
  * @cca_busy_subband_info: CCA busy for each possible 20Mhz subbands
  * of the wideband scan channel
  */
@@ -4441,141 +4379,25 @@ struct wow_enable_params {
 	enum wow_resume_trigger resume_trigger;
 };
 
-#define VHT_MCS_0_7 0x0
-#define VHT_MCS_0_8 0x1U
-#define VHT_MCS_0_9 0x2U
-#define VHT_MCS_DISABLE 0x3U
-#define VHT_1x1_MCS_MASK 0x3U
-#define VHT_NUM_BITS_PER_NSS 0x2U
-#define VHT_DISABLE_ALL_MCS_NSS 0xFFFFU
-#define VHT_MCS_NSS_SHIFT(_nss) ((_nss - 1) * VHT_NUM_BITS_PER_NSS)
-#define VHT_GET_MCS_FOR_NSS(_mcsmap, _nss) \
-	QDF_GET_BITS((_mcsmap), VHT_MCS_NSS_SHIFT(_nss), VHT_NUM_BITS_PER_NSS)
-#define VHT_SET_MCS_FOR_NSS(_mcsmap, _mcs, _nss) \
-	QDF_SET_BITS((_mcsmap), VHT_MCS_NSS_SHIFT(_nss), VHT_NUM_BITS_PER_NSS, \
-		     (_mcs))
-#define VHT_CLEAR_MCS_FOR_NSS(_mcsmap, _nss) \
-	VHT_SET_MCS_FOR_NSS((_mcsmap), VHT_MCS_DISABLE, (_nss))
-#define VHT_MCS_IS_NSS_ENABLED(_mcs, _nss) \
-	(VHT_GET_MCS_FOR_NSS((_mcs), (_nss)) != VHT_MCS_DISABLE)
-#define VHT_DISABLE_MCS_OVER_NSS(_nss) \
-	(VHT_DISABLE_ALL_MCS_NSS ^ (BIT((_nss) * VHT_NUM_BITS_PER_NSS) - 1))
-
-/*
- * Following formula has been arrived at using karnaugh map and unit tested
- * with sample code. Take MCS for each NSS as 2 bit value first and solve for
- * 2 bit intersection of NSS. Use following table/Matrix as guide for solving
- * K-Maps
- * MCS 1\MCS 2    00         01         10         11
- *    00          00         00         00         11
- *    01          00         01         01         11
- *    10          00         01         10         11
- *    11          11         11         11         11
- * if output MCS is o1o0, then as per K-map reduction:
- * o0 = m1.m0 | n1.n0 | (~m1).m0.(n1^n0) | (~n1).n0.(m1^m0)
- * o1 = m1.m0 | n1.n0 | m1.(~m0).n1.(~n0)
- *
- * Please note: Calculating MCS intersection is 80211 protocol specific and
- * should be implemented in PE. WMA can use this macro rather than calling any
- * lim API to do the intersection.
- */
-#define VHT_INTERSECT_MCS_BITS_PER_NSS(m1, m0, n1, n0)                \
-	(((m1 & m0) | (n1 & n0) | (((~m1) & m0) & (n1 ^ n0))  |      \
-	  (((~n1) & n0) & (m1 ^ m0))) | \
-	 (((m1 & m0) | (n1 & n0) | (m1 & ~m0 & n1 & ~n0)) << 1))
-
-/* following takes MCS as 2 bits */
-#define VHT_INTERSECT_MCS_PER_NSS(mcs_1, mcs_2)                       \
-	VHT_INTERSECT_MCS_BITS_PER_NSS((mcs_1 >> 1), (mcs_1 & 1),     \
-				       (mcs_2 >> 1), (mcs_2 & 1))
-
-/* following takes MCS as 16 bits */
-#define VHT_INTERSECT_MCS(mcs_1, mcs_2)                             ( \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 1),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 1)) << VHT_MCS_NSS_SHIFT(1) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 2),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 2)) << VHT_MCS_NSS_SHIFT(2) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 3),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 3)) << VHT_MCS_NSS_SHIFT(3) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 4),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 4)) << VHT_MCS_NSS_SHIFT(4) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 5),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 5)) << VHT_MCS_NSS_SHIFT(5) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 6),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 6)) << VHT_MCS_NSS_SHIFT(6) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 7),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 7)) << VHT_MCS_NSS_SHIFT(7) | \
-	VHT_INTERSECT_MCS_PER_NSS(VHT_GET_MCS_FOR_NSS(mcs_1, 8),         \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 8)) << VHT_MCS_NSS_SHIFT(8))
-
-/*
- * Following formula has been arrived at using karnaugh map and unit tested
- * with sample code. Take MCS for each NSS as 2 bit value first and solve for
- * 2 bit intersection of NSS. Use following table/Matrix as guide for solving
- * K-Maps
- * m1m0\n1n0
- * MCS 1\MCS 2    00         01         10         11
- *    00          00         01         10         00
- *    01          01         01         10         01
- *    10          10         10         10         10
- *    11          00         01         10         11
- * if output MCS is o1o0, then as per K-map reduction:
- * o0 = m0.n0 | (~m1).m0.(~n1) | (~m1).(~n1).n0
- * 01 = m1.(~m0) | n1.(~n0) | m1.n1
- *
- * Please note: Calculating MCS intersection is 80211 protocol specific and
- * should be implemented in PE. WMA can use this macro rather than calling any
- * lim API to do the intersection.
- */
-#define VHT_INTERSECT_MCS_BITS_PER_NSS_MAX_ENAB(m1, m0, n1, n0)     \
-	(((m0 & n0) | ((~m1) & m0 & (~n1)) | ((~m1) & (~n1) & n0)) | \
-	 ((m1 & (~m0)) | (n1 & (~n0)) | (m1 & n1)) << 1)
-
-/* following takes MCS as 2 bits */
-#define VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(mcs_1, mcs_2)                  \
-	VHT_INTERSECT_MCS_BITS_PER_NSS_MAX_ENAB((mcs_1 >> 1), (mcs_1 & 1),\
-				      (mcs_2 >> 1), (mcs_2 & 1))
-
-/* following takes MCS as 16 bits */
-#define VHT_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2)                      ( \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 1),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 1)) << VHT_MCS_NSS_SHIFT(1) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 2),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 2)) << VHT_MCS_NSS_SHIFT(2) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 3),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 3)) << VHT_MCS_NSS_SHIFT(3) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 4),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 4)) << VHT_MCS_NSS_SHIFT(4) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 5),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 5)) << VHT_MCS_NSS_SHIFT(5) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 6),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 6)) << VHT_MCS_NSS_SHIFT(6) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 7),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 7)) << VHT_MCS_NSS_SHIFT(7) |   \
-	VHT_INTERSECT_MCS_PER_NSS_MAX_ENAB(VHT_GET_MCS_FOR_NSS(mcs_1, 8),  \
-		VHT_GET_MCS_FOR_NSS(mcs_2, 8)) << VHT_MCS_NSS_SHIFT(8))
-
 #define HE_LTF_1X	0
 #define HE_LTF_2X	1
 #define HE_LTF_4X	2
+
 #define HE_LTF_ALL	0x7
+#define HE_SGI_MASK	0xFF00
 
 #define AUTO_RATE_GI_400NS	8
 #define AUTO_RATE_GI_800NS	9
 #define AUTO_RATE_GI_1600NS	10
 #define AUTO_RATE_GI_3200NS	11
 
-#define HE_LTF_INDEX	0
-#define HE_LTF_NUM_BITS	3
+#define AUTO_RATE_LDPC_DIS_BIT	16
 
-#define HE_SGI_INDEX	8
-#define HE_SGI_NUM_BITS	8
+#define SET_AUTO_RATE_SGI_VAL(set_val, bit_mask) \
+	(set_val = (set_val & HE_LTF_ALL) | bit_mask)
 
-#define AUTO_RATE_LDPC_DIS_BIT		16
-#define AUTO_RATE_LDPC_DIS_NUM_BITS	1
-
-#define AUTO_RATE_STBC_DIS_BIT		17
-#define AUTO_RATE_STBC_DIS_NUM_BITS	1
+#define SET_AUTO_RATE_HE_LTF_VAL(set_val, bit_mask) \
+	(set_val = (set_val & HE_SGI_MASK) | bit_mask)
 
 #define MSCS_OUI_TYPE "\x58"
 #define MSCS_OUI_SIZE 1
@@ -4623,16 +4445,23 @@ struct ppet_hdr {
  * | 15-14 | 13-12 | 11-10 | 9-8 | 7-6 | 5-4 | 3-2 | 1-0 |
  * +-----------------------------------------------------+
  */
-#define HE_MCS_ALL_DISABLED          VHT_DISABLE_ALL_MCS_NSS
-#define HE_DISABLE_MCS_OVER_NSS      VHT_DISABLE_MCS_OVER_NSS
-#define HE_GET_MCS_FOR_NSS           VHT_GET_MCS_FOR_NSS
-#define HE_SET_MCS_FOR_NSS           VHT_SET_MCS_FOR_NSS
-#define HE_MCS_IS_NSS_ENABLED        VHT_MCS_IS_NSS_ENABLED
+#define HE_MCS_NSS_SHIFT(nss)                 (((nss) - 1) << 1)
+#define HE_MCS_MSK_4_NSS(nss)                 (3 << HE_MCS_NSS_SHIFT(nss))
+#define HE_MCS_INV_MSK_4_NSS(nss)             (~HE_MCS_MSK_4_NSS(nss))
+#define HE_GET_MCS_4_NSS(mcs_set, nss)             \
+	(((mcs_set) >> HE_MCS_NSS_SHIFT(nss)) & 3)
+#define HE_SET_MCS_4_NSS(mcs_set, mcs, nss)        \
+	(((mcs_set) & HE_MCS_INV_MSK_4_NSS(nss)) | \
+	((mcs) << HE_MCS_NSS_SHIFT(nss)))
+#define HE_MCS_IS_NSS_ENABLED(mcs_set, nss)        \
+	((HE_MCS_MSK_4_NSS(nss) & (mcs_set)) != HE_MCS_MSK_4_NSS(nss))
+
+#define HE_MCS_ALL_DISABLED                   0xFFFF
 
 #define HE_MCS_0_7     0x0
 #define HE_MCS_0_9     0x1
 #define HE_MCS_0_11    0x2
-#define HE_MCS_DISABLE VHT_MCS_DISABLE
+#define HE_MCS_DISABLE 0x3
 
 #define HE_6G_MIN_MPDU_START_SAPCE_BIT_POS 0
 #define HE_6G_MAX_AMPDU_LEN_EXP_BIT_POS 3
@@ -4642,8 +4471,52 @@ struct ppet_hdr {
 #define HE_6G_RX_ANT_PATTERN_BIT_POS 12
 #define HE_6G_TX_ANT_PATTERN_BIT_POS 13
 
-#define HE_INTERSECT_MCS                VHT_INTERSECT_MCS
-#define HE_INTERSECT_MCS_MAX_ENAB       VHT_INTERSECT_MCS_MAX_ENAB
+/*
+ * Following formuala has been arrived at using karnaugh map and unit tested
+ * with sample code. Take MCS for each NSS as 2 bit value first and solve for
+ * 2 bit intersection of NSS. Use following table/Matrix as guide for solving
+ * K-Maps
+ * MCS 1\MCS 2    00         01         10         11
+ *    00          00         00         00         11
+ *    01          00         01         01         11
+ *    10          00         01         10         11
+ *    11          11         11         11         11
+ * if output MCS is o1o0, then as per K-map reduction:
+ * o0 = m1.m0 | n1.n0 | (~m1).m0.(n1^n0) | (~n1).n0.(m1^m0)
+ * o1 = m1.m0 | n1.n0 | m1.(~m0).n1.(~n0)
+ *
+ * Please note: Calculating MCS intersection is 80211 protocol specific and
+ * should be implemented in PE. WMA can use this macro rather than calling any
+ * lim API to do the intersection.
+ */
+#define HE_INTERSECT_MCS_BITS_PER_NSS(m1, m0, n1, n0)                \
+	(((m1 & m0) | (n1 & n0) | (((~m1) & m0) & (n1 ^ n0))  |      \
+	(((~n1) & n0) & (m1 ^ m0))) | (((m1 & m0) | (n1 & n0) |      \
+	(m1 & ~m0 & n1 & ~n0)) << 1))
+
+/* following takes MCS as 2 bits */
+#define HE_INTERSECT_MCS_PER_NSS(mcs_1, mcs_2)                       \
+	HE_INTERSECT_MCS_BITS_PER_NSS((mcs_1 >> 1), (mcs_1 & 1),     \
+				      (mcs_2 >> 1), (mcs_2 & 1))
+
+/* following takes MCS as 16 bits */
+#define HE_INTERSECT_MCS(mcs_1, mcs_2)                             ( \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 1),         \
+		HE_GET_MCS_4_NSS(mcs_2, 1)) << HE_MCS_NSS_SHIFT(1) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 2),         \
+		HE_GET_MCS_4_NSS(mcs_2, 2)) << HE_MCS_NSS_SHIFT(2) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 3),         \
+		HE_GET_MCS_4_NSS(mcs_2, 3)) << HE_MCS_NSS_SHIFT(3) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 4),         \
+		HE_GET_MCS_4_NSS(mcs_2, 4)) << HE_MCS_NSS_SHIFT(4) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 5),         \
+		HE_GET_MCS_4_NSS(mcs_2, 5)) << HE_MCS_NSS_SHIFT(5) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 6),         \
+		HE_GET_MCS_4_NSS(mcs_2, 6)) << HE_MCS_NSS_SHIFT(6) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 7),         \
+		HE_GET_MCS_4_NSS(mcs_2, 7)) << HE_MCS_NSS_SHIFT(7) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 8),         \
+		HE_GET_MCS_4_NSS(mcs_2, 8)) << HE_MCS_NSS_SHIFT(8))
 
 /**
  * struct he_capability - to store 11ax HE capabilities
@@ -4658,17 +4531,14 @@ struct he_capability {
 	uint32_t mcs;
 	struct wlan_psoc_host_ppe_threshold ppet;
 };
-#else
-#define HE_MCS_IS_NSS_ENABLED(mcs_set, nss) (false)
 #endif
 
-#ifdef WLAN_FEATURE_11BN
-#define UHR_OP_OUI_TYPE "\x97"
-#define UHR_OP_OUI_SIZE 1
-
-#define UHR_CAP_OUI_TYPE "\x98"
-#define UHR_CAP_OUI_SIZE 1
-#endif
+#define HE_GET_NSS(mcs, nss)                                         \
+	do {                                                         \
+		(nss) = 0;                                           \
+		while ((((mcs) >> ((nss)*2)) & 3) != 3 && nss < 8)   \
+			(nss)++;                                     \
+	} while (0)
 
 #ifdef WLAN_FEATURE_11BE
 #define EHT_MAX_PHY_CAP_SIZE 3
@@ -4862,22 +4732,13 @@ struct sir_rssi_disallow_lst {
  * @chain_rssi: chain rssi result as dBm unit
  * @chain_evm: error vector magnitude
  * @ant_id: antenna id
- * @ant_cnt: switch count on each antenna attached to each chain
- * @ant_duration: stay duration on each antenna attached to each
- * chain (units: ms)
- * @ant_rssi: RSSI on each antenna attached to each chain in dbm
  */
 #define CHAIN_MAX_NUM 8
-#define ANT_MAX_TYPE  4
 struct chain_rssi_result {
 	uint32_t num_chains_valid;
-	uint32_t num_antennas_valid;
 	uint32_t chain_rssi[CHAIN_MAX_NUM];
 	int32_t chain_evm[CHAIN_MAX_NUM];
 	uint32_t ant_id[CHAIN_MAX_NUM];
-	uint32_t ant_cnt[CHAIN_MAX_NUM][ANT_MAX_TYPE];
-	uint32_t ant_duration[CHAIN_MAX_NUM][ANT_MAX_TYPE];
-	int32_t ant_rssi[CHAIN_MAX_NUM][ANT_MAX_TYPE];
 };
 
 /**
@@ -4922,37 +4783,21 @@ struct sir_roam_scan_stats {
 };
 
 /**
- * struct external_auth_info - SAE info used for commit/confirm messages
+ * struct sae_info - SAE info used for commit/confirm messages
  * @msg_type: Message type
  * @msg_len: length of message
  * @vdev_id: vdev id
  * @peer_mac_addr: peer MAC address
- * @peer_mld_addr: MLD address of the peer
  * @ssid: SSID
- * @auth_algo: authentication algorithm used
  * @akm: key mgmt suite used
- * @pairwise_cipher: pairwise cipher used
- * @group_cipher: group cipher used
- * @group_mgmt_cipher: group management cipher used
- * @rsn_capab: RSN capabilities
- * @rsnxe_len: length of RSNXE data
- * @rsnxe_data: RSNXE data payload
  */
-struct external_auth_info {
+struct sir_sae_info {
 	uint16_t msg_type;
 	uint16_t msg_len;
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_mac_addr;
-	struct qdf_mac_addr peer_mld_addr;
 	tSirMacSSid ssid;
-	uint8_t  auth_algo;
 	uint32_t akm;
-	uint32_t pairwise_cipher;
-	uint32_t group_cipher;
-	uint32_t group_mgmt_cipher;
-	uint16_t rsn_capab;
-	uint8_t rsnxe_len;
-	uint8_t rsnxe_data[WLAN_MAX_IE_LEN + 2];
 };
 
 /**
@@ -4978,21 +4823,6 @@ struct sir_sae_msg {
 	uint8_t sae_status;
 	tSirMacAddr peer_mac_addr;
 	tSirResultCodes result_code;
-};
-
-/**
- * struct sir_fils_hlp_msg - FILS HLP message structure
- * @length: Total length of the message structure
- * @vdev_id: vdev id for the SAP interface
- * @hlp_data_len: Length of the HLP data payload in bytes
- * @hlp_data: Pointer to the HLP data buffer containing the
- *            hlp packets that are part of FILS authentication
- */
-struct sir_fils_hlp_msg {
-	uint16_t length;
-	uint16_t vdev_id;
-	uint16_t hlp_data_len;
-	uint8_t *hlp_data;
 };
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
@@ -5137,211 +4967,6 @@ struct start_bss_config {
 	uint32_t dfs_regdomain;
 	struct ssirrnrie rnrie;
 	uint8_t curr_conn_count;
-};
-
-/**
- * struct wlan_passthru_htcap - HT Capabilities element body (IEEE 802.11n)
- * @cap_info:      HT capability info (2 bytes)
- * @ampdu_params:  A-MPDU parameters (1 byte)
- * @mcs_set:       Supported MCS set (16 bytes)
- * @ext_cap:       Extended HT capability info (2 bytes)
- * @txbf_cap:      Transmit beamforming capabilities (4 bytes)
- * @antenna:       Antenna selection capabilities (1 byte)
- *
- * Byte-identical to struct ieee80211_ht_cap (26 bytes packed).
- * HDD fills this via qdf_mem_copy from sta_info.ht_capa in peer_assoc().
- */
-struct wlan_passthru_htcap {
-	uint16_t cap_info;
-	uint8_t  ampdu_params;
-	uint8_t  mcs_set[16];
-	uint16_t ext_cap;
-	uint32_t txbf_cap;
-	uint8_t  antenna;
-} qdf_packed;
-
-/**
- * struct wlan_passthru_vhtcap - VHT Capabilities element body (IEEE 802.11ac)
- * @cap_info:      VHT capability info (4 bytes)
- * @rx_mcs_map:    RX MCS map (2 bytes)
- * @rx_highest:    Max RX data rate (2 bytes)
- * @tx_mcs_map:    TX MCS map (2 bytes)
- * @tx_highest:    Max TX data rate (2 bytes)
- *
- * Byte-identical to struct ieee80211_vht_cap (12 bytes packed).
- * HDD fills this via qdf_mem_copy from sta_info.vht_capa in peer_assoc().
- */
-struct wlan_passthru_vhtcap {
-	uint32_t cap_info;
-	uint16_t rx_mcs_map;
-	uint16_t rx_highest;
-	uint16_t tx_mcs_map;
-	uint16_t tx_highest;
-} qdf_packed;
-
-/**
- * struct wlan_passthru_hecap - HE Capabilities element body (IEEE 802.11ax)
- * @mac_cap_info: MAC capability info (6 bytes)
- * @phycap_info:  PHY capability info (11 bytes)
- *
- * Byte-identical to struct ieee80211_he_cap_elem (17 bytes packed).
- * Contains MAC/PHY capability fields but no MCS/NSS maps.
- */
-struct wlan_passthru_hecap {
-	uint8_t mac_cap_info[6];
-	uint8_t phycap_info[11];
-} qdf_packed;
-
-/**
- * struct sir_passthru_peer_setup_msg - msg for passthru peer setup/update
- * @message_type: WNI_SME_PASSTHRU_PEER_SETUP
- * @vdev_id: vdev id of the passthru interface
- * @peer_mac_addr: peer MAC address
- * @peer_aid: AID provided by WONDER in set_station_info NEW; used as the
- *            DPH and WMI peer_associd for this peer (NEW only)
- * @ch_width: channel width (derived from peer caps in HDD for UPDATE;
- *            from tx_rate_cfg for NEW)
- * @dot11mode: 802.11 mode (derived from peer capability_mask in HDD for
- *             UPDATE; from tx_rate_cfg for NEW)
- * @gi_val: guard interval value from tx_rate_cfg
- * @nss: number of spatial streams from tx_rate_cfg
- * @max_mcs: max MCS index
- * @create_only: 1 = NEW (WMI_PEER_CREATE only); 0 = UPDATE (WMI_PEER_ASSOC)
- * @htcap_present: 1 if peer_ht_cap is valid (UPDATE only)
- * @peer_ht_cap: peer HT caps; byte-copy of sta_info.ht_capa in HDD
- * @vhtcap_present: 1 if peer_vht_cap is valid (UPDATE only)
- * @peer_vht_cap: peer VHT caps; byte-copy of sta_info.vht_capa in HDD
- * @hecap_present: 1 if peer_he_cap is valid (UPDATE only)
- * @peer_he_cap: peer HE MAC/PHY caps; byte-copy of sta_info.he_capa in HDD.
- *               MCS/NSS maps are absent (ieee80211_he_cap_elem carries none);
- *               LIM uses self caps for MCS maps, peer caps for MAC/PHY
- */
-struct sir_passthru_peer_setup_msg {
-	uint16_t                    message_type;
-	uint16_t                    vdev_id;
-	uint16_t                    peer_aid;
-	struct qdf_mac_addr         peer_mac_addr;
-	enum phy_ch_width           ch_width;
-	uint32_t                    dot11mode;
-	uint8_t                     gi_val;
-	uint8_t                     nss;
-	uint8_t                     max_mcs;
-	uint8_t                     create_only;
-	uint8_t                     htcap_present;
-	struct wlan_passthru_htcap  peer_ht_cap;
-	uint8_t                     vhtcap_present;
-	struct wlan_passthru_vhtcap peer_vht_cap;
-	uint8_t                     hecap_present;
-	struct wlan_passthru_hecap  peer_he_cap;
-};
-
-/**
- * struct sir_passthru_peer_del_msg - msg for passthru peer deletion
- * @message_type: WNI_SME_PASSTHRU_PEER_DEL
- * @vdev_id: vdev id of the passthru interface
- * @peer_mac_addr: MAC address of the peer to delete
- */
-struct sir_passthru_peer_del_msg {
-	uint16_t            message_type;
-	uint16_t            vdev_id;
-	struct qdf_mac_addr peer_mac_addr;
-};
-
-/**
- * struct sap_cac_chan_switch_params - channel switch parameters for CAC
- * @vdev_id: vdev id of the SAP session
- * @target_freq: target channel frequency in MHz
- * @primary_channel: primary channel number
- * @ch_width: channel width
- * @sec_ch_offset: secondary channel offset
- *
- * Passed via SIR_LIM_SET_CAC_CHAN_SWITCH_INFO message from SAP to PE so
- * that PE can update gLimChannelSwitch without direct cross-layer access.
- */
-struct sap_cac_chan_switch_params {
-	uint8_t vdev_id;
-	qdf_freq_t target_freq;
-	uint8_t primary_channel;
-	enum phy_ch_width ch_width;
-	uint8_t sec_ch_offset;
-};
-
-/*
- * enum mlo_link_force_state - State machine for MLO link force operations
- *                             during DFS CAC
- * @MLO_LINK_FORCE_STATE_UNKNOWN: Initial or unset state; no force operation
- *                                in progress
- * @MLO_LINK_FORCE_DO_CSA: Link must perform a Channel Switch Announcement
- *                         to vacate the current DFS channel
- * @MLO_LINK_FORCE_WAIT_CAC_DONE: Link has been force-inactivated toward FW
- *                                and is waiting for the partner SAP's CAC
- *                                to complete
- * @MLO_LINK_FORCE_CAC_COMPLETE: CAC on the partner link has finished; the
- *                               force-inactive restriction can be lifted
- * @MLO_LINK_FORCE_SW2_NON_DFS: Link is being switched to a non-DFS channel
- *                              as part of DFS avoidance after CAC failure or
- *                              radar detection
- */
-enum mlo_link_force_state {
-	MLO_LINK_FORCE_STATE_UNKNOWN = 0,
-	MLO_LINK_FORCE_DO_CSA = 1,
-	MLO_LINK_FORCE_WAIT_CAC_DONE = 2,
-	MLO_LINK_FORCE_CAC_COMPLETE = 3,
-	MLO_LINK_FORCE_SW2_NON_DFS = 4,
-};
-
-/**
- * struct mlo_cac_info - MLO CAC information
- * @mlo_link_in_cac: indicate STA partner link in cac.
- *  MLO STA connect two links during MLO SAP in CAC.
- *  STA will disallow TX by set force_inactive mode
- *  to fw to follow DFS specification
- * @cac_link_id: Link ID of the link in CAC
- * @link_state: link state
- */
-struct mlo_cac_info {
-	bool mlo_link_in_cac;
-	uint8_t cac_link_id;
-	enum mlo_link_force_state link_state;
-};
-
-/**
- * enum wfa_capa_qos_mgmt_features - WFA QoS management features capabilities
- * @WFA_CAPA_QOS_MGMT_DSCP_POLICY: Indicates support for DSCP policy management.
- * @WFA_CAPA_QOS_MGMT_UNSOLICITED_DSCP: Indicates support for unsolicited DSCP.
- * @WFA_CAPA_QOS_MGMT_SCS_TRAFFIC: Indicates support for SCS traffic.
- * @WFA_CAPA_5GHZ_QOS_TO_WFI_QOS_MAPPING: Indicates support for 5GHz QoS to WFI
- *                                         QoS mapping.
- * @WFA_CAPA_DATA_PLANE_STATS: Indicates support for data plane statistics.
- * @WFA_CAPA_RADIO_COUNTER_STATS: Indicates support for radio counter
- *				  statistics.
- * @WFA_CAPA_CONTROL_PLANE_STATS: Indicates support for control plane
- *				  statistics.
- * @WFA_CAPA_UNSOLICITED_STATS: Indicates support for unsolicited statistics.
- */
-enum wfa_capa_qos_mgmt_features {
-	WFA_CAPA_QOS_MGMT_DSCP_POLICY = 0x1,
-	WFA_CAPA_QOS_MGMT_UNSOLICITED_DSCP = 0x2,
-	WFA_CAPA_QOS_MGMT_SCS_TRAFFIC = 0x4,
-	WFA_CAPA_5GHZ_QOS_TO_WFI_QOS_MAPPING = 0x8,
-	WFA_CAPA_DATA_PLANE_STATS = 0x10,
-	WFA_CAPA_RADIO_COUNTER_STATS = 0x20,
-	WFA_CAPA_CONTROL_PLANE_STATS = 0x40,
-	WFA_CAPA_UNSOLICITED_STATS = 0x80,
-};
-
-/**
- * struct gvp_ctrl_params - structure to hold GVP control parameters
- * @ez_enter: EZ enter or exit indication
- * @avoid_start_freq: channel start frequency to avoid in EZ (Exclusion Zone)
- * @avoid_end_freq: channel end frequency to avoid in EZ (Exclusion Zone)
- * @gvp_tx_power: GVP tx power level in EZ
- */
-struct gvp_ctrl_params {
-	uint8_t ez_enter;
-	uint32_t avoid_start_freq;
-	uint32_t avoid_end_freq;
-	uint8_t gvp_tx_power;
 };
 
 #endif /* __SIR_API_H */

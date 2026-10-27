@@ -45,8 +45,6 @@ static policy_mgr_next_action_two_connection_table_type
 	[PM_SAP_24_2x2] = {PM_NOP, PM_DBS2},
 	[PM_SAP_5_1x1] = {PM_DBS2, PM_NOP},
 	[PM_SAP_5_2x2] = {PM_DBS2_DOWNGRADE, PM_NOP},
-	[PM_PASSTHRU_24_1x1_2x2] = {PM_NOP,        PM_DBS2},
-	[PM_PASSTHRU_5_1x1_2x2] = {PM_DBS2,        PM_NOP},
 };
 
 /*

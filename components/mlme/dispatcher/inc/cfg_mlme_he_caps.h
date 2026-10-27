@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -528,7 +528,7 @@
 				"he_rx_mcs_map_lt_80", \
 				0, \
 				0xFFFF, \
-				0xFFAA, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map Lt 80")
 
@@ -538,7 +538,7 @@
  * he_tx_mcs_map_lt_80 - configure Tx HE-MCS Map for ≤ 80 MHz
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0xFFAA
+ * @Default: 0xFFFA
  *
  * This ini is used to configure Tx HE-MCS Map for ≤ 80 MHz
  * 0:1 Max HE-MCS For 1 SS
@@ -567,7 +567,7 @@
 				"he_tx_mcs_map_lt_80", \
 				0, \
 				0xFFFF, \
-				0xFFAA, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Tx Mcs Map Lt 80")
 /* 11AX related INI configuration */
@@ -576,7 +576,7 @@
  * he_rx_mcs_map_160 - configure Rx HE-MCS Map for 160 MHz
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0xFFAA
+ * @Default: 0xFFFA
  *
  * This ini is used to configure Rx HE-MCS Map for 160 MHz
  * 0:1 Max HE-MCS For 1 SS
@@ -605,47 +605,9 @@
 				"he_rx_mcs_map_160", \
 				0, \
 				0xFFFF, \
-				0xFFAA, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map 160")
-
-/*
- * <ini>
- * sap_he_rx_mcs_map_160 - configure SAP Rx HE-MCS Map for 160 MHz
- * @Min: 0
- * @Max: 0xFFFF
- * @Default: 0xFFAA
- *
- * This ini is used to configure SAP Rx HE-MCS Map for 160 MHz
- * 0:1 Max HE-MCS For 1 SS
- * 2:3 Max HE-MCS For 2 SS
- * 4:5 Max HE-MCS For 3 SS
- * 6:7 Max HE-MCS For 4 SS
- * 8:9 Max HE-MCS For 5 SS
- * 10:11 Max HE-MCS For 6 SS
- * 12:13 Max HE-MCS For 7 SS
- * 14:15 Max HE-MCS For 8 SS
- *
- * 0 indicates support for HE-MCS 0-7 for n spatial streams
- * 1 indicates support for HE-MCS 0-9 for n spatial streams
- * 2 indicates support for HE-MCS 0-11 for n spatial streams
- * 3 indicates that n spatial streams is not supported for HE PPDUs
- *
- * Related: he_rx_mcs_map_160
- *
- * Supported Feature: 11AX
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_SAP_HE_RX_MCS_MAP_160 CFG_INI_UINT( \
-				"sap_he_rx_mcs_map_160", \
-				0, \
-				0xFFFF, \
-				0xFFAA, \
-				CFG_VALUE_OR_DEFAULT, \
-				"SAP He Rx Mcs Map 160")
 
 /* 11AX related INI configuration */
 /*
@@ -653,7 +615,7 @@
  * he_tx_mcs_map_160 - configure Tx HE-MCS Map for 160 MHz
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0xFFAA
+ * @Default: 0xFFFA
  *
  * This ini is used to configure Tx HE-MCS Map for 160 MHz
  * 0:1 Max HE-MCS For 1 SS
@@ -682,7 +644,7 @@
 				"he_tx_mcs_map_160", \
 				0, \
 				0xFFFF, \
-				0xFFAA, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Tx Mcs Map 160")
 
@@ -690,7 +652,7 @@
 				"he_rx_mcs_map_80_80", \
 				0, \
 				0xFFFF, \
-				0xFF00, \
+				0xFFF0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map 80 80")
 
@@ -698,7 +660,7 @@
 				"he_tx_mcs_map_80_80", \
 				0, \
 				0xFFFF, \
-				0xFF00, \
+				0xFFF0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He tx Mcs Map 80 80")
 
@@ -998,7 +960,6 @@
 	CFG(CFG_HE_RX_MCS_MAP_LT_80) \
 	CFG(CFG_HE_TX_MCS_MAP_LT_80) \
 	CFG(CFG_HE_RX_MCS_MAP_160) \
-	CFG(CFG_SAP_HE_RX_MCS_MAP_160) \
 	CFG(CFG_HE_TX_MCS_MAP_160) \
 	CFG(CFG_HE_RX_MCS_MAP_80_80) \
 	CFG(CFG_HE_TX_MCS_MAP_80_80) \

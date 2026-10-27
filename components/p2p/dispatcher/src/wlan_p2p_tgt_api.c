@@ -494,7 +494,7 @@ QDF_STATUS  tgt_p2p_noa_event_cb(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 				   struct p2p_usd_attr_params *param)
 {
@@ -505,21 +505,7 @@ bool tgt_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 {
 	return target_if_p2p_is_fw_support_usd(psoc);
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
-bool tgt_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_p2p_is_fw_support_wfd_r2(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-bool tgt_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_p2p_is_fw_support_pcc(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 QDF_STATUS
 tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
@@ -558,9 +544,4 @@ tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return status;
-}
-
-bool tgt_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_p2p_is_fw_cancel_one_shot_noa_supported(psoc);
 }

@@ -58,7 +58,6 @@
 #include <cfg_ucfg_api.h>
 #include <wlan_twt_ucfg_ext_api.h>
 #include "wlan_hdd_stats.h"
-#include "wlan_hdd_son.h"
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -211,8 +210,6 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 				&adapter->deflink->hdd_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
 	QDF_STATUS status;
-	struct cdp_tx_exception_metadata tx_exc_param = {0};
-	bool exception;
 
 	osif_dp_mark_pkt_type(skb);
 	hdd_tx_latency_record_ingress_ts(adapter, skb);
@@ -221,14 +218,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 	++stats->per_cpu[cpu].tx_classified_ac[ac];
 
-	exception = ucfg_dp_softap_init_tx_exc_metadata(adapter->deflink->vdev,
-							(qdf_nbuf_t)skb,
-							&tx_exc_param);
-
 	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb,
-					   adapter->deflink->vdev,
-					   &tx_exc_param,
-					   exception);
+					   adapter->deflink->vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		++stats->per_cpu[cpu].tx_dropped_ac[ac];
 
@@ -254,72 +245,6 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	else
 		return QDF_STATUS_E_FAILURE;
 }
-
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-netdev_tx_t hdd_softap_wds_ext_start_xmit(struct sk_buff *skb,
-					  struct net_device *net_dev)
-{
-	struct cdp_tx_exception_metadata tem_param;
-	struct net_device *parent_dev;
-	struct hdd_tx_rx_stats *stats;
-	struct hdd_adapter *adapter;
-	struct hdd_wds_ext *wds_ext;
-	sme_ac_enum_type ac;
-	QDF_STATUS status;
-	qdf_nbuf_t nbuf;
-	bool exception;
-	int cpu;
-
-	osif_dp_mark_pkt_type(skb);
-
-	cpu = qdf_get_smp_processor_id();
-	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
-	++stats->per_cpu[cpu].tx_classified_ac[ac];
-
-	wds_ext = netdev_priv(net_dev);
-
-	parent_dev = wds_ext->parent_netdev;
-	adapter = netdev_priv(parent_netdev);
-
-	nbuf = (qdf_nbuf_t)skb;
-
-	exception = ucfg_dp_softap_init_tx_exc_metadata(adapter->deflink->vdev,
-							nbuf, &tem_param);
-
-	if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) || QDF_NBUF_CB_GET_IS_MCAST(nbuf)) {
-		tem_param.peer_id = wds_ext->peer_id;
-		tem_param.is_wds_extended_mc_bc = 1;
-		exception = true;
-	}
-
-	status = ucfg_dp_softap_start_xmit(nbuf, adapter->deflink->vdev,
-					   &tem_param, exception);
-	if (QDF_IS_STATUS_ERROR(status))
-		++stats->per_cpu[cpu].tx_dropped_ac[ac];
-
-	netif_trans_update(net_dev);
-
-	return NETDEV_TX_OK;
-}
-
-QDF_STATUS hdd_softap_wds_ext_rx_handler(void *osif_dev, qdf_nbuf_t rxbuf)
-{
-	struct net_device *parent_dev;
-	struct hdd_adapter *adapter;
-	struct hdd_wds_ext *wds_ext;
-	struct net_device *dev;
-
-	wds_ext = (struct hdd_wds_ext *)osif_dev;
-
-	parent_dev = wds_ext->parent_netdev;
-	adapter = netdev_priv(parent_dev);
-
-	dev = wds_ext->netdev; /* points to the wds_ext interface */
-
-	return ucfg_dp_softap_wds_ext_rx_handler(adapter->deflink->vdev, dev,
-						 rxbuf);
-}
-#endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 static void __hdd_softap_tx_timeout(struct net_device *dev)
 {
@@ -352,7 +277,7 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 
 	TX_TIMEOUT_TRACE(dev, QDF_MODULE_ID_HDD_SAP_DATA);
 
-	for (i = 0; i < dev->num_tx_queues; i++) {
+	for (i = 0; i < NUM_TX_QUEUES; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
 			  QDF_TRACE_LEVEL_DEBUG,
@@ -417,7 +342,7 @@ hdd_reset_sta_info_during_reattach(struct hdd_station_info *sta_info)
 	sta_info->sgi_enable = 0;
 	sta_info->tx_stbc = 0;
 	sta_info->rx_stbc = 0;
-	sta_info->ch_width = CH_WIDTH_20MHZ;
+	sta_info->ch_width = 0;
 	sta_info->mode = 0;
 	sta_info->max_supp_idx = 0;
 	sta_info->max_ext_idx = 0;
@@ -578,9 +503,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	if (ucfg_ipa_is_enabled()) {
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				      adapter->device_mode,
-				      sta->link_info ?
-				      sta->link_info->vdev_id :
-				      adapter->deflink->vdev_id, false,
+				      adapter->deflink->vdev_id,
 				      WLAN_IPA_CLIENT_DISCONNECT,
 				      mac_addr->bytes,
 				      false) != QDF_STATUS_SUCCESS)
@@ -777,13 +700,12 @@ hdd_softap_register_bc_sta(struct wlan_hdd_link_info *link_info,
 	return qdf_status;
 }
 
-QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info)
+QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t indoor_chnl_marking = 0;
 	struct hdd_context *hdd_ctx;
 	struct hdd_station_info *sta_info, *tmp = NULL;
-	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
@@ -798,10 +720,6 @@ QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info)
 
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
 				  STA_INFO_SOFTAP_STOP_BSS) {
-		if (wlan_hdd_link_removal_is_in_progress(adapter)) {
-			hdd_debug("bypass free all sta info when link removal");
-			break;
-		}
 		status = hdd_softap_deregister_sta(adapter, &sta_info);
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 				     STA_INFO_SOFTAP_STOP_BSS);
@@ -821,7 +739,7 @@ QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info)
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 				      adapter->dev,
 				      adapter->device_mode,
-				      link_info->vdev_id, false,
+				      adapter->deflink->vdev_id,
 				      WLAN_IPA_AP_DISCONNECT,
 				      adapter->dev->dev_addr,
 				      false) != QDF_STATUS_SUCCESS)
@@ -892,8 +810,6 @@ hdd_softap_change_per_sta_state(struct wlan_hdd_link_info *link_info,
 	} else {
 		hdd_err("vdev is NULL");
 	}
-
-	hdd_son_deliver_peer_authorize_event(link_info, sta_mac->bytes);
 
 put_ref:
 	hdd_put_sta_info_ref(&link_info->adapter->sta_info_list,

@@ -47,39 +47,6 @@
 
 #include "wma_types.h"
 #include "wlan_utility.h"
-#include "wlan_vdev_mgr_utils_api.h"
-
-#define LIM_RSNXE_SMD_IE_LEN 7
-#define LIM_RSNXE_SMD_CAP_OCTETS 5
-#define LIM_RSNXE_SMD_CAP_OCTET_OFFSET 6
-#define LIM_RSNXE_SMD_CAP_BIT BIT(5)
-
-#ifdef WLAN_FEATURE_11BN_SMD
-static void lim_set_smd_rsnxe_raw(struct pe_session *pe_session,
-				  uint8_t *rsnxe, uint16_t rsnxe_len,
-				  const char *frame_type)
-{
-	if (!pe_session || !pe_session->vdev ||
-	    !wlan_vdev_is_smd_enabled(pe_session->vdev) ||
-	    !lim_security_profile_has_smd_cap(pe_session) || !rsnxe ||
-	    rsnxe_len < LIM_RSNXE_SMD_IE_LEN)
-		return;
-
-	rsnxe[SIR_MAC_IE_TYPE_OFFSET] = WLAN_ELEMID_RSNXE;
-	rsnxe[SIR_MAC_IE_LEN_OFFSET] = LIM_RSNXE_SMD_CAP_OCTETS;
-	rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] =
-		(rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] & 0xF0) |
-		(LIM_RSNXE_SMD_CAP_OCTETS - 1);
-	rsnxe[LIM_RSNXE_SMD_CAP_OCTET_OFFSET] |= LIM_RSNXE_SMD_CAP_BIT;
-	pe_debug("%s: set SMD RSNXE bit 37", frame_type);
-}
-#else
-static inline void lim_set_smd_rsnxe_raw(struct pe_session *pe_session,
-					 uint8_t *rsnxe, uint16_t rsnxe_len,
-					 const char *frame_type)
-{
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
 
 /**
  * lim_send_reassoc_req_with_ft_ies_mgmt_frame() - Send Reassoc Req with FTIEs.
@@ -111,7 +78,6 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t add_ie_len;
 	uint8_t *add_ie;
 	const uint8_t *wps_ie = NULL, *rsnxe_ptr = NULL;
-	bool smd_rsnxe_required = false;
 	uint8_t tx_flag = 0;
 	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
@@ -364,7 +330,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		vht_enabled = true;
 		populate_dot11f_ext_cap(mac_ctx, vht_enabled, &frm->ExtCap,
-					vdev_id);
+			pe_session);
 	}
 	if (!vht_enabled &&
 			pe_session->is_vendor_specific_vhtcaps) {
@@ -380,9 +346,8 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
-		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
-					pe_session->curr_op_freq,
-					pe_session->ch_width, &frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, pe_session,
+					&frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}
@@ -421,34 +386,20 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		 * the bits for TWT are unique to STA and AP and cannot be
 		 * intersected.
 		 */
-		populate_dot11f_twt_extended_caps(mac_ctx, vdev_id,
+		populate_dot11f_twt_extended_caps(mac_ctx, pe_session,
 						  &frm->ExtCap);
 	}
 
 	rsnxe_ptr = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie,
 					     add_ie_len);
-	smd_rsnxe_required = pe_session->vdev &&
-			     wlan_vdev_is_smd_enabled(pe_session->vdev) &&
-			     lim_security_profile_has_smd_cap(pe_session);
-	if (smd_rsnxe_required || rsnxe_ptr) {
-		if (rsnxe_ptr) {
-			rsnxe_len = rsnxe_ptr[1] + 2;
-			if (smd_rsnxe_required &&
-			    rsnxe_len < LIM_RSNXE_SMD_IE_LEN)
-				rsnxe_len = LIM_RSNXE_SMD_IE_LEN;
-		} else {
-			rsnxe_len = LIM_RSNXE_SMD_IE_LEN;
-		}
+	if (add_ie_len && rsnxe_ptr) {
+		rsnxe_len = rsnxe_ptr[1] + 2;
 
 		rsnxe = qdf_mem_malloc(rsnxe_len);
 		if (!rsnxe)
 			goto end;
 
-		qdf_mem_zero(rsnxe, rsnxe_len);
-		if (rsnxe_ptr)
-			qdf_mem_copy(rsnxe, rsnxe_ptr, rsnxe_ptr[1] + 2);
-		lim_set_smd_rsnxe_raw(pe_session, rsnxe, rsnxe_len,
-				      "FT Reassoc Request");
+		qdf_mem_copy(rsnxe, rsnxe_ptr, rsnxe_len);
 	}
 
 	/*
@@ -591,8 +542,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 end:
-	if (rsnxe)
-		qdf_mem_free(rsnxe);
+	qdf_mem_free(rsnxe);
 	qdf_mem_free(frm);
 err:
 	/* Free up buffer allocated for mlmAssocReq */
@@ -856,14 +806,12 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 		populate_dot11f_vht_caps(mac, pe_session, &frm->VHTCaps);
 		isVHTEnabled = true;
 	}
-	populate_dot11f_ext_cap(mac, isVHTEnabled, &frm->ExtCap,
-				pe_session->vdev_id);
+	populate_dot11f_ext_cap(mac, isVHTEnabled, &frm->ExtCap, pe_session);
 
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
-		populate_dot11f_he_caps(mac, pe_session, pe_session->opmode,
-					pe_session->curr_op_freq,
-					pe_session->ch_width, &frm->he_cap);
+		populate_dot11f_he_caps(mac, pe_session,
+					&frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}
@@ -907,7 +855,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 		 * the bits for TWT are unique to STA and AP and cannot be
 		 * intersected.
 		 */
-		populate_dot11f_twt_extended_caps(mac, pe_session->vdev_id,
+		populate_dot11f_twt_extended_caps(mac, pe_session,
 						  &frm->ExtCap);
 	}
 
@@ -1061,6 +1009,9 @@ void lim_process_rx_scan_handler(struct wlan_objmgr_vdev *vdev,
 	case SIR_SCAN_EVENT_STARTED:
 		break;
 	case SIR_SCAN_EVENT_COMPLETED:
+		pe_debug("No.of beacons and probe response received per scan %d",
+			 mac_ctx->lim.beacon_probe_rsp_cnt_per_scan);
+		fallthrough;
 	case SIR_SCAN_EVENT_FOREIGN_CHANNEL:
 	case SIR_SCAN_EVENT_START_FAILED:
 		if ((mac_ctx->lim.req_id | PREAUTH_REQUESTOR_ID) ==

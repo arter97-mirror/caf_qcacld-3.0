@@ -118,6 +118,14 @@ enum dp_fpm_status fpm_policy_flow_match(struct wlan_dp_intf *dp_intf,
 					 uint32_t *policy_id);
 
 /*
+ * dp_fpm_display_policy() - Display configured FPM flows
+ * @dp_intf: Interface level dp private structure
+ *
+ * Return: void
+ */
+void dp_fpm_display_policy(struct wlan_dp_intf *dp_intf);
+
+/*
  * fpm_policy_add() - FPM policy add
  * @fpm: FPM context
  * @policy: Flow Policy

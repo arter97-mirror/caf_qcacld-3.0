@@ -125,7 +125,6 @@ static inline void hdd_tsf_auto_report_init(struct hdd_adapter *adapter)
  * @cur_target_global_tsf_time: Global Fw TSF time.
  * @last_target_global_tsf_time: Last reported global Fw TSF time.
  * @host_capture_req_timer: Host timer to capture TSF time.
- * @tsf_capture_initialized: Capture initialized.
  * @tsf_id: TSF id as obtained from FW report.
  * @tsf_mac_id: mac_id as obtained from FW report.
  * @tsf_details_valid: flag indicating whether tsf details are valid.
@@ -152,7 +151,6 @@ struct hdd_vdev_tsf {
 	uint64_t cur_target_global_tsf_time;
 	uint64_t last_target_global_tsf_time;
 	qdf_mc_timer_t host_capture_req_timer;
-	bool tsf_capture_initialized;
 #ifdef QCA_GET_TSF_VIA_REG
 	int tsf_id;
 	int tsf_mac_id;
@@ -271,7 +269,7 @@ static inline QDF_STATUS hdd_add_uplink_jitter(struct hdd_adapter *adapter,
 }
 #endif /* WLAN_FEATURE_UL_JITTER */
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#ifdef WLAN_FEATURE_TSF
 /**
  * wlan_hdd_tsf_init() - set gpio and callbacks for
  *     capturing tsf and init tsf_plus
@@ -339,6 +337,55 @@ int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 
 int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf);
 
+extern const struct nla_policy tsf_policy[QCA_WLAN_VENDOR_ATTR_TSF_MAX + 1];
+
+#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS \
+{ \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID, \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TSF, \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV | \
+		WIPHY_VENDOR_CMD_NEED_NETDEV | \
+		WIPHY_VENDOR_CMD_NEED_RUNNING, \
+	.doit = wlan_hdd_cfg80211_handle_tsf_cmd, \
+	vendor_command_policy(tsf_policy, QCA_WLAN_VENDOR_ATTR_TSF_MAX)\
+},
+#else
+static inline void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline int hdd_indicate_tsf(struct hdd_adapter *adapter,
+				   struct hdd_tsf_op_response *tsf_op_resp)
+{
+	return -ENOTSUPP;
+}
+
+static inline int
+hdd_capture_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len)
+{
+	return -ENOTSUPP;
+}
+
+static inline int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	return -ENOTSUPP;
+}
+static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
+{
+	return -ENOTSUPP;
+}
+
+#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS
+#endif
+
+#if defined(WLAN_FEATURE_TSF_PLUS) && defined(WLAN_FEATURE_TSF)
 /**
  * hdd_tsf_is_tx_set() - check ini configuration
  * @hdd: pointer to hdd context
@@ -378,24 +425,14 @@ bool hdd_tsf_is_raw_set(struct hdd_context *hdd);
 bool hdd_tsf_is_dbg_fs_set(struct hdd_context *hdd);
 
 /**
- * hdd_setup_tsf_sync() - start tsf sync
+ * hdd_start_tsf_sync() - start tsf sync
  * @adapter: pointer to adapter
  *
  * This function initialize and start TSF synchronization
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_setup_tsf_sync(struct hdd_adapter *adapter);
-
-/**
- * hdd_reset_tsf_sync() - stop tsf sync
- * @adapter: pointer to adapter
- *
- * This function stop and de-initialize TSF synchronization
- *
- * Return: Describe the execute result of this routine
- */
-int hdd_reset_tsf_sync(struct hdd_adapter *adapter);
+int hdd_start_tsf_sync(struct hdd_adapter *adapter);
 
 /**
  * hdd_restart_tsf_sync_post_wlan_resume() - restart host TSF sync
@@ -406,6 +443,16 @@ int hdd_reset_tsf_sync(struct hdd_adapter *adapter);
  * Return: none
  */
 void hdd_restart_tsf_sync_post_wlan_resume(struct hdd_adapter *adapter);
+
+/**
+ * hdd_stop_tsf_sync() - stop tsf sync
+ * @adapter: pointer to adapter
+ *
+ * This function stop and de-initialize TSF synchronization
+ *
+ * Return: Describe the execute result of this routine
+ */
+int hdd_stop_tsf_sync(struct hdd_adapter *adapter);
 
 /**
  * hdd_capture_req_timer_expired_handler() - capture req timer handler
@@ -462,78 +509,25 @@ int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
 #endif
 
 /**
- * hdd_get_tsftime_from_qtime()
+ * hdd_get_tsf_time() - get tsf time for system time
  *
- * @adapter: Adapter pointer
- * @qtime: current qtime, us
- * @tsf_time: current tsf time(qtime), us
+ * @adapter_ctx: adapter context
+ * @input_time: input system time
+ * @tsf_time: tsf time for system time
  *
- * This function determines current tsf time
- * using current qtime
- *
- * Return: 0 for success or non-zero negative failure code
+ * Return: qdf status
  */
-int32_t
-hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
-			   uint64_t *tsf_time);
-
-#ifdef WLAN_FEATURE_TSF_PTP
-/**
- * wlan_get_ts_info() - return ts info to uplayer
- * @dev: pointer to net_device
- * @info: pointer to ethtool_ts_info
- *
- * Return: Describe the execute result of this routine
- */
-int wlan_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info);
-#endif
-
-extern const struct nla_policy tsf_policy[QCA_WLAN_VENDOR_ATTR_TSF_MAX + 1];
-
-#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS \
-{ \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID, \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TSF, \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV | \
-		WIPHY_VENDOR_CMD_NEED_NETDEV | \
-		WIPHY_VENDOR_CMD_NEED_RUNNING, \
-	.doit = wlan_hdd_cfg80211_handle_tsf_cmd, \
-	vendor_command_policy(tsf_policy, QCA_WLAN_VENDOR_ATTR_TSF_MAX)\
-},
+QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
+			    uint64_t *tsf_time);
 #else
-static inline void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
+static inline int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 {
+	return -ENOTSUPP;
 }
 
-static inline void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
+static inline int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
 {
-}
-
-static inline int hdd_indicate_tsf(struct hdd_adapter *adapter,
-				   struct hdd_tsf_op_response *tsf_op_resp)
-{
-	return -EOPNOTSUPP;
-}
-
-static inline int
-hdd_capture_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len)
-{
-	return -EOPNOTSUPP;
-}
-
-static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
-{
-	return -EOPNOTSUPP;
-}
-
-static inline int hdd_setup_tsf_sync(struct hdd_adapter *adapter)
-{
-	return -EOPNOTSUPP;
-}
-
-static inline int hdd_reset_tsf_sync(struct hdd_adapter *adapter)
-{
-	return -EOPNOTSUPP;
+	return -ENOTSUPP;
 }
 
 static inline
@@ -563,15 +557,24 @@ void hdd_restart_tsf_sync_post_wlan_resume(struct hdd_adapter *adapter)
 {
 }
 
-static inline int32_t
-hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
-			   uint64_t *tsf_time)
+static inline
+QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
+			    uint64_t *tsf_time)
 {
 	*tsf_time = 0;
-	return -EOPNOTSUPP;
+	return QDF_STATUS_E_NOSUPPORT;
 }
-
-#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS
 #endif
 
+#ifdef WLAN_FEATURE_TSF_PTP
+/**
+ * wlan_get_ts_info() - return ts info to uplayer
+ * @dev: pointer to net_device
+ * @info: pointer to ethtool_ts_info
+ *
+ * Return: Describe the execute result of this routine
+ */
+int wlan_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info);
+
+#endif
 #endif

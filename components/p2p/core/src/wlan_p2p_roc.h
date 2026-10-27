@@ -84,8 +84,6 @@ enum roc_state {
  * @chan_freq:   Chan frequency for which this RoC has been requested
  * @phy_mode:    PHY mode
  * @duration:    Duration for the RoC
- * @zero_wait:   True if this RoC was created for an off channel tx MGMT
- *               request with wait_time of 0
  * @roc_type:    RoC type  User requested or internal
  * @roc_timer:   RoC timer
  * @roc_state:   Roc state
@@ -105,7 +103,6 @@ struct p2p_roc_context {
 	qdf_freq_t chan_freq;
 	uint8_t phy_mode;
 	uint32_t duration;
-	bool zero_wait;
 	enum roc_type roc_type;
 	qdf_mc_timer_t roc_timer;
 	enum roc_state roc_state;

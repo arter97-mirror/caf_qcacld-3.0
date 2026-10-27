@@ -110,34 +110,4 @@ int target_if_nan_rsp_handler(ol_scn_t scn, uint8_t *data, uint32_t len);
 void target_if_nan_set_vdev_feature_config(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id);
 
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-/**
- * target_if_nan_is_fw_support_standard_mode() - return NAN standard mode
- * capability from FW.
- * @psoc: pointer to PSOC object
- *
- * Return: true if NAN standard mode supported by FW otherwise false
- */
-bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
-
-/**
- * target_if_nan_is_fw_support_ap_assisted_dfs() - return NAN AP-assisted
- * DFS operation capability from FW.
- * @psoc: pointer to PSOC object
- *
- * Return: true if NAN AP-assisted DFS operation supported by FW else false
- */
-bool target_if_nan_is_fw_support_ap_assisted_dfs(
-					struct wlan_objmgr_psoc *psoc);
-
-/**
- * target_if_nan_set_device_caps() - set NAN capabilities from firmware
- * @psoc: pointer to PSOC object
- * @caps: NAN capabilities to be filled
- *
- * Return: QDF status
- */
-QDF_STATUS target_if_nan_set_device_caps(struct wlan_objmgr_psoc *psoc,
-					 struct nan_capabilities *caps);
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE  && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_TGT_IF_H_ */

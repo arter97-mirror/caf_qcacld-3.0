@@ -39,7 +39,6 @@
 #endif
 #include <pktlog_ac_fmt.h>
 #include <wlan_mlme_api.h>
-#include <cfg_mlme_vht_caps.h>
 
 #ifdef DEBUG_DMA_DONE
 #define MAX_DONE_BIT_CHECK_ITER 5
@@ -531,7 +530,7 @@ static int htt_rx_ring_size(struct htt_pdev_t *pdev)
 	int size;
 	QDF_STATUS status;
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	uint8_t enable_mimo = WLAN_MIMO_CAP_MAX;
+	bool enable_2x2 = true;
 
 	/*
 	 * It is expected that the host CPU will typically be able to service
@@ -569,11 +568,11 @@ static int htt_rx_ring_size(struct htt_pdev_t *pdev)
 		return size;
 	}
 
-	status = wlan_mlme_get_vht_mimo_cap((void *)soc->psoc, &enable_mimo);
+	status = wlan_mlme_get_vht_enable2x2((void *)soc->psoc, &enable_2x2);
 	if (QDF_IS_STATUS_SUCCESS(status))
-		size = enable_mimo ? size : QDF_MIN(size, HTT_RX_RING_SIZE_1x1);
+		size = (enable_2x2) ? size : QDF_MIN(size, HTT_RX_RING_SIZE_1x1);
 	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO_LOW,
-		  "HTT RX refill ring size:%u selected for %s mode", size, enable_mimo ? "2x2" : "1x1");
+		  "HTT RX refill ring size:%u selected for %s mode", size, enable_2x2 ? "2x2" : "1x1");
 
 	return size;
 }
@@ -969,16 +968,6 @@ htt_rx_offload_msdu_pop_ll(htt_pdev_handle pdev,
 	*fw_desc = HTT_RX_OFFLOAD_DELIVER_IND_MSDU_DESC_GET(*msdu_hdr);
 
 	qdf_nbuf_pull_head(buf, HTT_RX_OFFLOAD_DELIVER_IND_MSDU_HDR_BYTES);
-
-	if (qdf_unlikely(msdu_len > qdf_nbuf_len(buf))) {
-		__QDF_TRACE_RL(QDF_TRACE_LEVEL_ERROR, QDF_MODULE_ID_HTT,
-			       "%s: drop frame with invalid msdu len %u %zu",
-			       __func__, msdu_len, qdf_nbuf_len(buf));
-		htt_rx_desc_frame_free(pdev, buf);
-		*head_buf = *tail_buf = NULL;
-		return 1;
-	}
-
 	qdf_nbuf_set_pktlen(buf, msdu_len);
 	return 0;
 }
@@ -1031,16 +1020,6 @@ htt_rx_offload_paddr_msdu_pop_ll(htt_pdev_handle pdev,
 	*fw_desc = HTT_RX_OFFLOAD_DELIVER_IND_MSDU_DESC_GET(*msdu_hdr);
 
 	qdf_nbuf_pull_head(buf, HTT_RX_OFFLOAD_DELIVER_IND_MSDU_HDR_BYTES);
-
-	if (qdf_unlikely(msdu_len > qdf_nbuf_len(buf))) {
-		__QDF_TRACE_RL(QDF_TRACE_LEVEL_ERROR, QDF_MODULE_ID_HTT,
-			       "%s: drop frame with invalid msdu len %u %zu",
-			       __func__, msdu_len, qdf_nbuf_len(buf));
-		htt_rx_desc_frame_free(pdev, buf);
-		*head_buf = *tail_buf = NULL;
-		return 1;
-	}
-
 	qdf_nbuf_set_pktlen(buf, msdu_len);
 	return 0;
 }
@@ -1667,7 +1646,7 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 				     QDF_DP_TRACE_RX_HTT_PACKET_PTR_RECORD,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
 				     qdf_nbuf_data_addr(msdu),
-				     qdf_nbuf_len(msdu), QDF_RX));
+				     sizeof(qdf_nbuf_data(msdu)), QDF_RX));
 
 		qdf_nbuf_trim_tail(msdu,
 				   HTT_RX_BUF_SIZE -

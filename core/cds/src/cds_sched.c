@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,6 +37,7 @@
 #ifdef RX_PERFORMANCE
 #include <linux/sched/types.h>
 #endif
+#include <uapi/linux/sched/types.h>
 #include "wlan_dp_ucfg_api.h"
 
 /*
@@ -726,14 +727,19 @@ static int cds_ol_rx_thread(void *arg)
 	bool shutdown = false;
 	int status;
 
-#ifdef RX_THREAD_PRIORITY
 	struct sched_param scheduler_params = {0};
 
-	scheduler_params.sched_priority = 1;
+#if 0
+	scheduler_params.sched_priority = 99;
 	sched_setscheduler(current, SCHED_FIFO, &scheduler_params);
-#else
-	set_user_nice(current, -1);
 #endif
+	struct sched_attr attr = {
+		.size			= sizeof(struct sched_attr),
+		.sched_policy	= SCHED_FIFO,
+		.sched_priority = 1,
+	};
+	sched_setattr_nocheck(current, &attr);
+
 
 	qdf_set_wake_up_idle(true);
 

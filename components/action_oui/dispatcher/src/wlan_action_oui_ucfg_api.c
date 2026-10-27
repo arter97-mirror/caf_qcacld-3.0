@@ -80,10 +80,9 @@ void ucfg_action_oui_deinit(void)
 	ACTION_OUI_EXIT();
 }
 
-QDF_STATUS ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-				       bool load_default_config)
+void ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
-	return action_oui_psoc_enable(psoc, load_default_config);
+	action_oui_psoc_enable(psoc);
 }
 
 void ucfg_action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc)
@@ -115,7 +114,7 @@ ucfg_action_oui_get_config(struct wlan_objmgr_psoc *psoc,
 		action_oui_err("psoc priv is NULL");
 		return "";
 	}
-	if (!wlan_action_oui_id_valid(action_id)) {
+	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		return "";
 	}
@@ -141,7 +140,7 @@ ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 
 	ACTION_OUI_ENTER();
 
-	if (!wlan_action_oui_id_valid(action_id)) {
+	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		goto exit;
 	}
@@ -181,10 +180,8 @@ QDF_STATUS ucfg_action_oui_send(struct wlan_objmgr_psoc *psoc)
 	}
 
 	for (id = 0; id < ACTION_OUI_MAXIMUM_ID; id++) {
-		if (!wlan_action_oui_id_valid(id))
-			continue;
 		if (id >= ACTION_OUI_HOST_ONLY)
-			break;
+			continue;
 		status = action_oui_send(psoc_priv, id);
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			action_oui_debug("Failed to send: %u", id);
@@ -228,60 +225,9 @@ exit:
 	return status;
 }
 
-QDF_STATUS
-ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
-					 enum action_oui_id action_id)
-{
-	QDF_STATUS status;
-	struct action_oui_psoc_priv *psoc_priv;
-
-	ACTION_OUI_ENTER();
-
-	if (!psoc) {
-		action_oui_err("psoc is NULL");
-		status = QDF_STATUS_E_INVAL;
-		goto exit;
-	}
-
-	/* Get psoc private structure */
-	psoc_priv = action_oui_psoc_get_priv(psoc);
-	if (!psoc_priv) {
-		action_oui_err("psoc priv is NULL");
-		status = QDF_STATUS_E_INVAL;
-		goto exit;
-	}
-
-	/* Call core API to restore default and send */
-	status = wlan_action_oui_restore_default_and_send(psoc_priv, action_id);
-	if (QDF_IS_STATUS_ERROR(status))
-		action_oui_err("Failed to restore default and send action_oui id: %u",
-			       action_id);
-
-exit:
-	ACTION_OUI_EXIT();
-	return status;
-}
-
 bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 			    struct action_oui_search_attr *attr,
 			    enum action_oui_id action_id)
 {
 	return wlan_action_oui_search(psoc, attr, action_id);
-}
-
-bool ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
-				struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_is_nss_allowlist_denylist_config_supported(psoc);
-}
-
-bool ucfg_action_oui_is_ul_tx_beamformer_config_supported(
-				struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_is_ul_tx_beamformer_config_supported(psoc);
-}
-
-bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id)
-{
-	return wlan_action_oui_is_dynamic(action_id);
 }

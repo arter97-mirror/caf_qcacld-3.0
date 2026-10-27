@@ -1,6 +1,0 @@
-include $(WLAN_ROOT)/configs/art_consolidate_fig-v2_defconfig
-
-# Not applicable on iq9075
-CONFIG_DP_RX_MSDU_DONE_FAILURE_DEBUG=n
-CONFIG_QDF_TEST=n
-

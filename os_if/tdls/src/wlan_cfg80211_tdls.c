@@ -24,7 +24,6 @@
 #include <qdf_list.h>
 #include <qdf_status.h>
 #include <linux/wireless.h>
-#include <linux/version.h>
 #include <linux/netdevice.h>
 #include <net/cfg80211.h>
 #include <wlan_cfg80211.h>
@@ -345,7 +344,7 @@ tdls_calc_channels_from_staparams(struct wlan_objmgr_vdev *vdev,
 		osif_debug(" %d,", dest_freq[i]);
 
 	req_info->supported_channels_len = num_unique_freq;
-	osif_debug("After removing duplicates supported_channels_len: %d",
+	osif_debug("After removing duplcates supported_channels_len: %d",
 		   req_info->supported_channels_len);
 }
 
@@ -450,12 +449,6 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 }
 #endif
 
-#if (KERNEL_VERSION(7, 0, 0) <= LINUX_VERSION_CODE)
-#define TDLS_GET_EPP_PEER(params) ((params)->epp_peer)
-#else
-#define TDLS_GET_EPP_PEER(params) (false)
-#endif
-
 #ifdef WLAN_FEATURE_11BE
 #ifdef WLAN_LINK_STA_PARAMS_PRESENT
 static void
@@ -472,7 +465,6 @@ wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 	} else {
 		req_info->ehtcap_present = 0;
 	}
-	req_info->epp_peer = TDLS_GET_EPP_PEER(params);
 }
 #elif defined(WLAN_EHT_CAPABILITY_PRESENT)
 static void
@@ -488,7 +480,6 @@ wlan_cfg80211_tdls_extract_eht_params(struct tdls_update_peer_params *req_info,
 	} else {
 		req_info->ehtcap_present = 0;
 	}
-	req_info->epp_peer = TDLS_GET_EPP_PEER(params);
 }
 #else
 static inline void
@@ -1390,9 +1381,6 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 							   WLAN_OSIF_TDLS_ID);
 				continue;
 			}
-
-			osif_debug("ML vdev:%d link_id:%d token:%d transmit TDLS discovery request",
-				   wlan_vdev_get_id(mlo_vdev), link_id, dialog_token);
 
 			ret = wlan_cfg80211_tdls_mgmt(mlo_vdev, peer,
 						      action_code,

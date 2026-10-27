@@ -34,10 +34,8 @@
 #include "wlan_pmo_gtk_public_struct.h"
 #include "wlan_pmo_wow_public_struct.h"
 #include "wlan_pmo_mc_addr_filtering_public_struct.h"
-#include "wlan_pmo_obj_mgmt_public_struct.h"
 
 #define PMO_PS_DATA_INACTIVITY_TIMEOUT (200)
-#define PMO_PS_DATA_OPM_LEVEL (1)
 #define PMO_PS_DATA_SPEC_WAKE (0)
 
 /**
@@ -58,7 +56,6 @@
  * @get_dtim_period: register callback to get dtim period from mlme
  * @get_beacon_interval: register callback to get beacon interval from mlme
  * @lock: spin lock for pmo psoc
- * @wow_deferred_wakeup_cb: callback to log deferred WOW wakeup reason
  */
 struct pmo_psoc_priv_obj {
 	struct pmo_psoc_cfg psoc_cfg;
@@ -75,7 +72,6 @@ struct pmo_psoc_priv_obj {
 	pmo_is_device_in_low_pwr_mode is_device_in_low_pwr_mode;
 	pmo_get_dtim_period get_dtim_period;
 	pmo_get_beacon_interval get_beacon_interval;
-	pmo_wow_deferred_wakeup_cb wow_deferred_wakeup_cb;
 	qdf_spinlock_t lock;
 };
 
@@ -129,7 +125,6 @@ struct wlan_pmo_ctx {
  * @dyn_arp_ns_offload_rt_lock: wake lock which prevent runtime pm happen if
  *                              arp/ns offload is disable
  * @bridgeaddr: Bridge MAC address
- * @vdev_igmp_req: cached IGMP offload request for wow optimization
  */
 struct pmo_vdev_priv_obj {
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx;
@@ -160,7 +155,6 @@ struct pmo_vdev_priv_obj {
 	qdf_runtime_lock_t dyn_arp_ns_offload_rt_lock;
 #endif
 	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
-	struct pmo_igmp_offload_req vdev_igmp_req;
 };
 
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */

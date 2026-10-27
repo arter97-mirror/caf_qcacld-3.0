@@ -45,23 +45,14 @@
 		"twt_requestor", \
 		1, \
 		"TWT requestor")
-
-#define CFG_TWT_RESPONDER_BIT_SAP       0
-#define CFG_TWT_RESPONDER_BIT_LL_LT_SAP 1
-#define CFG_TWT_RESPONDER_BIT_P2P_GO    2
 /*
  * <ini>
- * twt_responder - TWT responder enable/disable per VDEV
+ * twt_responder - twt responder.
  * @Min: 0
- * @Max: 0xFF
- * @Default: 0x06
+ * @Max: 1
+ * @Default: false
  *
- * This cfg is used to configure the TWT responder.
- * Bitmap for enabling the TWT responder per VDEV
- * BIT 0: SAP
- * BIT 1: LL_LT_SAP
- * BIT 2: P2P GO
- * BIT 3-31: Reserved
+ * This cfg is used to store twt responder config.
  *
  * Related: NA
  *
@@ -71,12 +62,9 @@
  *
  * </ini>
  */
-#define CFG_TWT_RESPONDER CFG_INI_UINT( \
+#define CFG_TWT_RESPONDER CFG_INI_BOOL( \
 		"twt_responder", \
-		0, \
-		0xFF, \
-		0x07, \
-		CFG_VALUE_OR_DEFAULT, \
+		true, \
 		"TWT responder")
 
 /*
@@ -129,36 +117,6 @@
 		100, \
 		CFG_VALUE_OR_DEFAULT, \
 		"twt congestion timeout")
-
-/*
- * <ini>
- * voip_pkt_ul_delay_ms - Uplink packet offset (UPO) for VOIP traffic.
- * @Min: 0
- * @Max: 100
- * @Default: 2
- *
- * This ini configures the delay, in units of milliseconds, from when a VOIP
- * RTP packet is queued until it is received by the WLAN target. The value is
- * passed to the firmware as part of the TWT enable command and is used to
- * align the TWT service period with VOIP uplink traffic (TxRef alignment).
- *
- * This parameter is applicable to STA interfaces only.
- *
- * Related: NA
- *
- * Supported Feature: 11AX
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_TWT_VOIP_PKT_UL_DELAY CFG_INI_UINT( \
-		"voip_pkt_ul_delay_ms", \
-		0, \
-		100, \
-		2, \
-		CFG_VALUE_OR_DEFAULT, \
-		"twt voip pkt ul delay ms")
 /*
  * <ini>
  * twt_bcast_req_resp_config - To enable broadcast twt requestor and responder.
@@ -192,7 +150,7 @@
 		"twt_bcast_req_resp_config", \
 		0, \
 		3, \
-		3, \
+		1, \
 		CFG_VALUE_OR_DEFAULT, \
 		"BROADCAST TWT CAPABILITY")
 
@@ -276,29 +234,6 @@
 		"enable_twt_24ghz", \
 		true, \
 		"enable twt in 2.4Ghz band")
-
-/*
- * <ini>
- * disable_twt_on_scan - Disable target Wake Time during scan
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to enable/disable the TWT during scan
- *
- * Related: NA
- *
- * Supported Feature: 11AX
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DISABLE_TWT_ON_SCAN CFG_INI_BOOL( \
-		"disable_twt_on_scan", \
-		false, \
-		"disable twt on scan")
-
 /*
  * <ini>
  * twt_disable_info - Enable/Disable TWT info frame.
@@ -320,32 +255,6 @@
 		"twt_disable_info", \
 		false, \
 		"disable twt info frame")
-
-/*
- * <ini>
- * twt_setup_defer_on_scan - Defer TWT setup when scan or ROC is in progress.
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * When enabled, a TWT setup request that arrives while a scan or ROC is
- * active is deferred to a driver worker thread and retried automatically
- * once the busy condition clears.  When disabled (default), the request
- * fails immediately with -EOPNOTSUPP so the caller is responsible for
- * retrying at an appropriate time.
- *
- * Related: NA
- *
- * Supported Feature: 11AX
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_TWT_SETUP_DEFER_ON_SCAN CFG_INI_BOOL( \
-		"twt_setup_defer_on_scan", \
-		true, \
-		"defer TWT setup when scan/ROC in progress")
 
 #define CFG_HE_FLEX_TWT_SCHED CFG_BOOL( \
 				"he_flex_twt_sched", \
@@ -403,14 +312,11 @@
 	CFG(CFG_TWT_REQUESTOR) \
 	CFG(CFG_TWT_RESPONDER) \
 	CFG(CFG_TWT_CONGESTION_TIMEOUT) \
-	CFG(CFG_TWT_VOIP_PKT_UL_DELAY) \
 	CFG(CFG_BCAST_TWT_REQ_RESP) \
 	CFG(CFG_ENABLE_TWT_24GHZ) \
-	CFG(CFG_DISABLE_TWT_ON_SCAN) \
 	CFG(CFG_DISABLE_TWT_INFO_FRAME) \
 	CFG(CFG_RTWT_REQ_RESP) \
-	CFG(CFG_TWT_REQ_RESP_HT_VHT) \
-	CFG(CFG_TWT_SETUP_DEFER_ON_SCAN)
+	CFG(CFG_TWT_REQ_RESP_HT_VHT)
 #elif !defined(WLAN_SUPPORT_TWT) && !defined(WLAN_TWT_CONV_SUPPORTED)
 #define CFG_TWT_ALL
 #endif

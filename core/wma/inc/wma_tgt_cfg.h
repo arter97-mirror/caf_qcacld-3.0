@@ -22,7 +22,6 @@
 
 #include "wma_sar_public_structs.h"
 #include "nan_public_structs.h"
-#include "wlan_cmn_ieee80211.h"
 
 /**
  * struct wma_tgt_services - target services
@@ -40,11 +39,9 @@
  * @en_tdls_uapsd_buf_sta: enable sta tdls uapsd buf
  * @en_tdls_uapsd_sleep_sta: enable sta tdls uapsd sleep
  * @en_tdls_wideband_support: Get TDLS wideband support
- * @en_tdls_stats_info: Get TDLS Stats Info support
  * @en_tdls_11ax_support: Get TDLS ax support
  * @en_tdls_6g_support: Get TDLS 6g fw capability
  * @en_tdls_mlo_support: Get TDLS mlo fw support
- * @en_tdls_nss_confirm_support: Get TDLS TDLS NSS operation fw support
  * @en_n_link_mlo_support: Get N-Link mlo fw support
  * @en_roam_offload: enable roam offload
  * @en_11ax: enable 11ax
@@ -63,10 +60,6 @@
  *                                supported or not
  * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  * @en_mlo_tid_to_link_support: Get tid to link fw support
- * @en_11bn: enable 11bn
- * @is_passthru_chan_hop_supported: passthru channel hop capability
- * @is_passthru_ampdu_ra_supported: passthru ampdu and ra capability
- * @dar_stats_support: DAR(Dynamic Analytics Report) stats support by fw
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -87,7 +80,6 @@ struct wma_tgt_services {
 	bool en_tdls_uapsd_buf_sta;
 	bool en_tdls_uapsd_sleep_sta;
 	bool en_tdls_wideband_support;
-	bool en_tdls_stats_info;
 #ifdef WLAN_FEATURE_11AX
 	bool en_tdls_11ax_support;
 	bool en_tdls_6g_support;
@@ -95,9 +87,6 @@ struct wma_tgt_services {
 #ifdef WLAN_FEATURE_11BE
 	bool en_tdls_mlo_support;
 	bool en_n_link_mlo_support;
-#endif
-#ifdef WLAN_FEATURE_TDLS_NSS_4_4
-	bool en_tdls_nss_confirm_support;
 #endif
 #endif /* FEATURE_WLAN_TDLS */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -114,7 +103,6 @@ struct wma_tgt_services {
 	bool bcn_reception_stats;
 	bool is_roam_scan_ch_to_host;
 	bool ll_stats_per_chan_rx_tx_time;
-	bool enhanced_stats_support;
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 	bool is_get_station_clubbed_in_ll_stats_req;
 #endif
@@ -132,12 +120,6 @@ struct wma_tgt_services {
 #ifdef WLAN_FEATURE_11BE
 	bool en_mlo_tid_to_link_support;
 #endif
-	bool en_11bn;
-#ifdef DRIVER_PASSTHRU_MODE
-	bool is_passthru_chan_hop_supported;
-	bool is_passthru_ampdu_ra_supported;
-#endif
-	bool dar_stats_support;
 };
 
 /**
@@ -148,6 +130,7 @@ struct wma_tgt_services {
  * @ht_rx_ldpc: ht rx ldpc
  * @ht_sgi_20: ht sgi 20
  * @ht_sgi_40: ht sgi 40
+ * @num_rf_chains: num of rf chains
  * @dynamic_smps: Dynamic MIMO powersave
  */
 struct wma_tgt_ht_cap {
@@ -157,6 +140,7 @@ struct wma_tgt_ht_cap {
 	bool ht_rx_ldpc;
 	bool ht_sgi_20;
 	bool ht_sgi_40;
+	uint32_t num_rf_chains;
 	bool dynamic_smps;
 };
 
@@ -164,7 +148,6 @@ struct wma_tgt_ht_cap {
  * struct wma_tgt_vht_cap - vht capabalities
  * @vht_max_mpdu: vht max mpdu
  * @supp_chan_width: supported channel width
- * @vht_supp_mcs: Supported MCS-NSS mapping
  * @vht_rx_ldpc: vht rx ldpc
  * @vht_short_gi_80: vht short gi 80
  * @vht_short_gi_160: vht short gi 160
@@ -181,7 +164,6 @@ struct wma_tgt_ht_cap {
 struct wma_tgt_vht_cap {
 	uint32_t vht_max_mpdu;
 	uint32_t supp_chan_width;
-	uint32_t vht_supp_mcs;
 	uint32_t vht_rx_ldpc;
 	uint32_t vht_short_gi_80;
 	uint32_t vht_short_gi_160;
@@ -237,8 +219,6 @@ struct board_info {
  * @eeprom_rd_ext: eeprom rd ext
  * @hw_macaddr: hw mcast addr
  * @services: struct wma_tgt_services
- * @max_tx_chains: Max Tx chains supported by target
- * @max_rx_chains: Max Rx chains supported by target
  * @ht_cap: struct wma_tgt_ht_cap
  * @vht_cap: struct wma_tgt_vht_cap
  * @max_intf_count: max interface count
@@ -261,10 +241,7 @@ struct board_info {
  * @twt_nudge_enabled: twt nudge enable
  * @all_twt_enabled: all twt enabled
  * @twt_stats_enabled: twt stats enabled
- * @tx_powerboost: tx powerboost enabled
- * @uhr_cap: is UHR capability
- * @uhr_cap_2g: 2.4 GHz UHR capability
- * @uhr_cap_5g: 5 GHz UHR capability
+ *
  */
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;
@@ -274,8 +251,6 @@ struct wma_tgt_cfg {
 	uint32_t eeprom_rd_ext;
 	struct qdf_mac_addr hw_macaddr;
 	struct wma_tgt_services services;
-	uint8_t max_tx_chains;
-	uint8_t max_rx_chains;
 	struct wma_tgt_ht_cap ht_cap;
 	struct wma_tgt_vht_cap vht_cap;
 	uint8_t max_intf_count;
@@ -324,13 +299,5 @@ struct wma_tgt_cfg {
 	tDot11fIEeht_cap eht_cap_5g;
 #endif
 	struct wma_tgt_aux_dev_caps wma_aux0_dev_caps[WMI_HOST_HW_MODE_MAX];
-#ifdef FEATURE_WLAN_TX_POWERBOOST
-	bool tx_powerboost;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	struct wlan_uhr_cap_info uhr_cap;
-	struct wlan_uhr_cap_info uhr_cap_2g;
-	struct wlan_uhr_cap_info uhr_cap_5g;
-#endif
 };
 #endif /* WMA_TGT_CFG_H */

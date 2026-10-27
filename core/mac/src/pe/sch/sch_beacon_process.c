@@ -51,10 +51,8 @@
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlo_mgr_sta.h"
-#include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlme_main.h"
 #include <wlan_mlo_mgr_link_switch.h>
-#include "wlan_mlo_mgr_roam.h"
 
 static void
 ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
@@ -287,17 +285,9 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 
 	/*
 	 * Ignore bcn as channel switch IE present and csa offload is enabled,
-	 * as in CSA offload enabled case FW will send Event to switch channel.
-	 * Exception: for a 5G MLO STA link, still run the MCST IE / self-link
-	 * CSA state machine in lim_process_beacon_eht() before returning, so
-	 * that path isn't skipped along with the rest of this function; the
-	 * eCSA action frame path is unaffected by this.
+	 * as in CSA offload enabled case FW will send Event to switch channel
 	 */
 	if (bcn->channelSwitchPresent && wma_is_csa_offload_enabled()) {
-		if (mlo_is_mld_sta(session->vdev) &&
-		    wlan_reg_is_5ghz_ch_freq(bcn->chan_freq))
-			lim_process_beacon_eht(mac_ctx, session, bcn,
-					       rx_pkt_info);
 		pe_err_rl("Ignore bcn as channel switch IE present and csa offload is enabled");
 		return false;
 	}
@@ -307,12 +297,10 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	qdf_mem_copy((uint8_t *) &session->lastBeaconTimeStamp,
 			(uint8_t *) bcn->timeStamp, sizeof(uint64_t));
 	session->currentBssBeaconCnt++;
-	if (bcn->timPresent &&
-	    session->bcon_dtim_period != bcn->tim.dtimPeriod) {
+	if (session->bcon_dtim_period != bcn->tim.dtimPeriod) {
 		session->bcon_dtim_period = bcn->tim.dtimPeriod;
 		lim_send_set_dtim_period(mac_ctx, bcn->tim.dtimPeriod,
 				session);
-		lim_update_vdev_bss_param_dtim(session, bcn->tim.dtimPeriod);
 	}
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_RX_MGMT_TSF,
 	       session->peSessionId, bcn->timeStamp[0]));
@@ -358,8 +346,6 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 		else
 			lim_enable_short_preamble(mac_ctx, true,
 						  beaconParams, session);
-		lim_update_vdev_bss_param_use_prot(session,
-						   bcn->erpIEInfo.useProtection);
 	}
 	lim_update_short_slot(mac_ctx, bcn, beaconParams, session);
 
@@ -459,6 +445,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			     tpSirMacMgmtHdr mac_hdr)
 {
 	enum phy_ch_width ch_bw;
+	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEVHTOperation *vht_op = NULL;
 	uint8_t bcn_vht_chwidth = 0;
@@ -487,19 +474,20 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
+	if (bcn->OperatingMode.present) {
+		lim_update_nss(mac_ctx, sta_ds, bcn->OperatingMode.rxNSS,
+			       session);
+		ch_width = lim_get_omn_channel_width(&bcn->OperatingMode);
+		pe_debug("OMN IE present in bcn/probe rsp, ie width: %d ch_width: %d",
+			 bcn->OperatingMode.chanWidth, ch_width);
+		lim_update_omn_ie_ch_width(session->vdev, ch_width);
+
+	}
+
 	bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
 					       &bcn->HTInfo,
 					       &bcn->HTCaps,
 					       &bcn->OperatingMode);
-	/*
-	 * STA doesn't support 80 + 80 operation.
-	 * In lim_set_session_channel_params() the session->ch_width
-	 * is restrictd to 80 MHz if AP advertises 80 + 80.
-	 * Add similar logic here.
-	 */
-	if (bcn_vht_chwidth == CH_WIDTH_80P80MHZ)
-		bcn_vht_chwidth = CH_WIDTH_80MHZ;
-
 	lim_update_channel_width(mac_ctx, sta_ds, session,
 				 bcn_vht_chwidth, &ch_bw);
 }
@@ -524,13 +512,24 @@ static void lim_detect_change_in_srp(struct mac_context *mac_ctx,
 				     struct pe_session *session,
 				     tpSchBeaconStruct bcn)
 {
-	if ((sta->srp_ie.present || bcn->srp_ie.present) &&
-	    qdf_mem_cmp(&sta->srp_ie, &bcn->srp_ie,
-			sizeof(tDot11fIEspatial_reuse))) {
-		/* If SRP IE has changes, update the new params. */
-		sta->srp_ie = bcn->srp_ie;
-		lim_update_vdev_sr_elements(session, sta);
-		lim_handle_sr_cap(session->vdev, SR_REASON_CODE_BCN_IE_CHANGE);
+	tDot11fIEspatial_reuse sr_ie;
+	int32_t ret = 0;
+
+	sr_ie = sta->parsed_ies.srp_ie;
+	if (sr_ie.present || bcn->srp_ie.present) {
+		ret = qdf_mem_cmp(&sr_ie, &bcn->srp_ie,
+				  sizeof(tDot11fIEspatial_reuse));
+
+		if (ret) {
+			/*
+			 * If SRP IE has changes, update the new params.
+			 */
+			sta->parsed_ies.srp_ie = bcn->srp_ie;
+			lim_update_vdev_sr_elements(session, sta);
+
+			lim_handle_sr_cap(session->vdev,
+					  SR_REASON_CODE_BCN_IE_CHANGE);
+		}
 	}
 }
 #else
@@ -550,9 +549,8 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 			    tUpdateBeaconParams *beaconParams,
 			    uint8_t *sendProbeReq, tpSirMacMgmtHdr pMh)
 {
-	tpDphHashNode sta;
+	tpDphHashNode sta = NULL;
 	uint16_t aid;
-	struct sir_dot11f_nss_info nss_ies;
 
 	/* check for VHT capability */
 	sta = dph_lookup_hash_entry(mac_ctx, pMh->sa, &aid,
@@ -562,10 +560,6 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 	sch_bcn_update_opmode_change(mac_ctx, sta, session, bcn, pMh);
 	sch_bcn_update_he_ies(mac_ctx, sta, session, bcn, pMh);
 	lim_detect_change_in_srp(mac_ctx, sta, session, bcn);
-
-	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, bcn, session->dot11mode);
-	lim_update_nss(mac_ctx, sta, nss_ies.op_rx_nss, session);
-
 	return;
 }
 
@@ -610,6 +604,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	int8_t local_constraint = 0;
 	uint32_t chan_freq = 0;
 	struct vdev_mlme_obj *mlme_obj;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	bool ap_constraint_change = false, tpe_change = false;
 	bool allow_tpc = false;
 	int8_t regMax = 0, maxTxPower = 0;
@@ -619,16 +614,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	bool is_power_constraint_abs = false;
-	bool change_in_sta_pwr_type = false;
-	uint8_t *frame = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
-	uint16_t frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+	int8_t rf_mode_force_pwr_type;
 
 	if (mlo_is_mld_sta(session->vdev)) {
-		if (!mlo_check_if_all_vdev_up(session->vdev)) {
-			pe_debug_rl("Ignore beacon processing, not all VDEVs are UP");
-			return;
-		}
-
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(bcn, &bpcc);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -638,15 +626,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						       bpcc);
 		}
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
-		lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn);
 	}
-
-	if (lim_is_session_uhr_capable(session))
-		lim_check_and_process_ecu_in_beacon(session, bcn,
-						    frame, frame_len);
-
-	if (lim_is_session_eht_capable(session))
-		lim_process_beacon_eht_op(session, bcn);
 
 	if (!cu_flag)
 		return;
@@ -707,21 +687,20 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						REG_CURRENT_MAX_AP_TYPE;
 		}
 
-		if (session->ap_defined_power_type_6g == REG_VERY_LOW_POWER_AP &&
-		    wlan_reg_is_indoor_ap_detected(mac_ctx->pdev))
-			session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
+		status = wlan_mlme_get_rf_mode_force_pwr_type(
+						mac_ctx->psoc,
+						&rf_mode_force_pwr_type);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Failed to get RF test mode for power type value");
+			return;
+		}
 
-		status = lim_get_6g_power_type_with_bw(
-						mac_ctx,
-						session,
-						bcn->chan_freq,
-						&pwr_type_6g,
-						false);
+		status = wlan_reg_get_best_6g_power_type(
+				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
+				session->ap_defined_power_type_6g,
+				bcn->chan_freq, rf_mode_force_pwr_type);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
-
-		if (session->best_6g_power_type != pwr_type_6g)
-			change_in_sta_pwr_type = true;
 
 		session->best_6g_power_type = pwr_type_6g;
 		mlme_set_best_6g_power_type(session->vdev, pwr_type_6g);
@@ -734,6 +713,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	 */
 	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
 	    !session->sta_follows_sap_power) {
+		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
 		lim_parse_tpe_ie(mac_ctx, session, bcn->transmit_power_env,
 				 bcn->num_transmit_power_env, &bcn->he_op,
@@ -763,13 +743,14 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		}
 
 		if (ap_constraint_change || (tpe_change && !skip_tpe) ||
-		    session->cal_tpc_post_csa || change_in_sta_pwr_type) {
-			if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) &&
-			    session->best_6g_power_type == REG_INDOOR_ENABLED_AP)
-				lim_set_tpc_power(mac_ctx, session, NULL,
-						  true, 0);
-			lim_set_tpc_power(mac_ctx, session, NULL, false, 0);
+		    session->cal_tpc_post_csa) {
+			lim_calculate_tpc(mac_ctx, session);
 			session->cal_tpc_post_csa = false;
+
+			if (tx_ops->set_tpc_power)
+				tx_ops->set_tpc_power(mac_ctx->psoc,
+						      session->vdev_id,
+						      &mlme_obj->reg_tpc_obj);
 		}
 	} else if (!session->sta_follows_sap_power) {
 		/* Obtain the Max Tx power for the current regulatory  */
@@ -825,7 +806,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	 * include addIE.
 	 */
 	if (sendProbeReq)
-		lim_send_probe_req_mgmt_frame(mac_ctx, session, NULL, NULL);
+		lim_send_probe_req_mgmt_frame(mac_ctx, &session->ssId,
+			session->bssId, session->curr_op_freq,
+			session->self_mac_addr, session->dot11mode, NULL, NULL);
 
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
 	    && beaconParams.paramChangeBitmap) {
@@ -846,7 +829,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			lim_send_channel_usage_req_notif_cap_action_frame(session->vdev_id);
 	}
 
-	lim_process_beacon_eht(mac_ctx, session, bcn, rx_pkt_info);
+	lim_process_beacon_eht(mac_ctx, session, bcn);
+	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn);
 }
 
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
@@ -1064,7 +1048,7 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 {
 	static tSchBeaconStruct bcn;
 
-	if (!session || !LIM_IS_STA_ROLE(session))
+	if (!session)
 		return;
 
 	/*
@@ -1074,13 +1058,11 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	 * 1. vdev is not in connected state: vdev might be transitioning
 	 * 2. Link switch is in progress: Current link or one of the partner
 	 *                                links are getting replaced.
-	 * 3. Beacon with same bssid but different ssid.
-	 * 4. Beacon with same bssid and ssid but different mld addr.
-	 * 5. Not all active link peers are authenticated for MLO connection.
 	 *
 	 * New beacons/probe rsps can be considered once post these operations.
 	 */
-	if ((!wlan_cm_is_vdev_connected(session->vdev) ||
+	if (LIM_IS_STA_ROLE(session) &&
+	    (!wlan_cm_is_vdev_connected(session->vdev) ||
 	     mlo_mgr_is_link_switch_in_progress(session->vdev))) {
 		pe_debug_rl("vdev %d, drop beacon", session->vdev_id);
 		return;
@@ -1092,22 +1074,6 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		pe_err_rl("beacon parsing failed");
 		return;
 	}
-
-	if (bcn.ssId.length && lim_cmp_ssid(&bcn.ssId, session)) {
-		pe_debug_rl("ssid mismatch, current " QDF_SSID_FMT "Rcvd "
-			    QDF_SSID_FMT " from " QDF_MAC_ADDR_FMT,
-			    QDF_SSID_REF(session->ssId.length, session->ssId.ssId),
-			    QDF_SSID_REF(bcn.ssId.length, bcn.ssId.ssId),
-			    QDF_MAC_ADDR_REF(session->bssId));
-		return;
-	}
-
-	if (!lim_is_same_mld_addr(mac_ctx, session, &bcn))
-		return;
-
-	if (mlo_is_mld_sta(session->vdev) &&
-	    !mlo_check_if_all_peer_authenticated(session->vdev))
-		return;
 
 	session->dtimPeriod = bcn.tim.dtimPeriod;
 

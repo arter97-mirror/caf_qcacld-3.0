@@ -187,36 +187,6 @@ QDF_STATUS dp_svc_get_app_ind_special_dscp_by_id(uint8_t svc_id,
 }
 
 /**
- * dp_svc_get_twt_end_indication_by_id() - Get TWT end indication value of svc
- * @svc_id: service class id
- * @twt_end_indication_en: buffer to store TWT end indication enable
- *
- * Returns: QDF_STATUS
- */
-static inline
-QDF_STATUS dp_svc_get_twt_end_indication_by_id(uint8_t svc_id,
-					       bool *twt_end_indication_en)
-{
-	struct dp_svc_ctx *svc_ctx = dp_get_svc_ctx();
-	struct dp_svc_data *svc_data;
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
-
-	qdf_rcu_read_lock_bh();
-	if (svc_ctx && svc_id < DP_SVC_ARRAY_SIZE) {
-		svc_data = qdf_rcu_dereference(svc_ctx->svc_table[svc_id]);
-		if (svc_data &&
-		    svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END) {
-			*twt_end_indication_en =
-			    svc_data->en_twt_end_indication;
-			status = QDF_STATUS_SUCCESS;
-		}
-	}
-	qdf_rcu_read_unlock_bh();
-
-	return status;
-}
-
-/**
  * dp_svc_inc_policy_ref_cnt_by_id() - Increment reference on service class
  * @svc_id: service class id
  *
@@ -297,25 +267,6 @@ QDF_STATUS wlan_dp_svc_init(struct wlan_dp_psoc_context *dp_ctx)
 static inline
 void wlan_dp_svc_deinit(struct wlan_dp_psoc_context *dp_ctx)
 {
-}
-
-static inline
-QDF_STATUS dp_svc_get_meta_data_by_id(uint8_t svc_id, qdf_nbuf_t nbuf,
-				      uint32_t *metadata)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS dp_svc_inc_policy_ref_cnt_by_id(uint8_t svc_id)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS dp_svc_dec_policy_ref_cnt_by_id(uint8_t svc_id)
-{
-	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 

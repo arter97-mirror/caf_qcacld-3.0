@@ -103,42 +103,12 @@ send_big_data_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
 }
 #endif
 
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-static void
-tgt_cp_stats_register_power_datapath_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
-{
-	rx_ops->cp_stats_rx_ops.process_power_datapath_stats_event =
-			tgt_mc_cp_stats_process_power_datapath_stats_event;
-}
-#else
-static void
-tgt_cp_stats_register_power_datapath_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_QSH_SCAN
-static void
-tgt_cp_stats_register_qsh_scan_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
-{
-	rx_ops->cp_stats_rx_ops.process_scan_stats_event =
-			tgt_mc_cp_stats_process_qsh_scan_stats;
-}
-#else
-static void
-tgt_cp_stats_register_qsh_scan_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
-{
-}
-#endif
-
 void tgt_cp_stats_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 {
 	rx_ops->cp_stats_rx_ops.process_stats_event =
 					tgt_mc_cp_stats_process_stats_event;
 	tgt_cp_stats_register_infra_cp_stats_rx_ops(rx_ops);
 	tgt_cp_stats_register_big_data_rx_ops(rx_ops);
-	tgt_cp_stats_register_power_datapath_rx_ops(rx_ops);
-	tgt_cp_stats_register_qsh_scan_rx_ops(rx_ops);
 }
 
 static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
@@ -720,27 +690,6 @@ tgt_mc_infra_cp_stats_extract_twt_stats(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
-static void
-tgt_mc_infra_cp_stats_extract_enhanced_stats(struct wlan_objmgr_psoc *psoc,
-					     struct infra_cp_stats_event *ev)
-{
-	QDF_STATUS status;
-	get_infra_cp_stats_cb resp_cb = NULL;
-	void *context = NULL;
-
-	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &context);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("ucfg_get_infra_cp_stats_context failed");
-		return;
-	}
-
-	cp_stats_debug("num_vdev_beacon_stats: %d num_vdev_congestion_stats: %d  num_vdev_data_stats: %d action %d",
-		       ev->num_vdev_beacon_stats, ev->num_vdev_congestion_stats,
-		       ev->num_vdev_data_stats, ev->action);
-
-	if (resp_cb)
-		resp_cb(ev, context);
-}
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
 #ifdef WLAN_FEATURE_MEDIUM_ASSESS
@@ -937,8 +886,10 @@ static void tgt_mc_cp_stats_extract_vdev_summary_stats(
 			break;
 	}
 
-	if (i == ev->num_summary_stats)
+	if (i == ev->num_summary_stats) {
+		cp_stats_debug("vdev_id %d not found", vdev_id);
 		return;
+	}
 
 	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
 		cp_stats_err("invalid vdev id %d", vdev_id);
@@ -1034,7 +985,7 @@ static void tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(
 
 		wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
 		vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
-		for (j = 0; j < WLAN_MAX_VDEV_CHAINS; j++) {
+		for (j = 0; j < MAX_NUM_CHAINS; j++) {
 			vdev_mc_stats->chain_rssi[j] =
 					ev->vdev_chain_rssi[i].chain_rssi[j];
 		}
@@ -1091,131 +1042,6 @@ tgt_mc_cp_stats_extract_vdev_extd_stats(struct wlan_objmgr_psoc *psoc,
 		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
 	}
-}
-
-/**
- * tgt_mc_cp_stats_reset_num_recv_bcn_stats() - Reset beacon statistics for a
- * vdev
- * @psoc: pointer to psoc object
- * @last_req: pointer to the last request info
- *
- * This function resets the beacon statistics counter and invalidates all
- * stored beacon statistics entries by setting their vdev_id to
- * WLAN_INVALID_VDEV_ID which marks them as available for new data.
- *
- * Return: void
- */
-static void
-tgt_mc_cp_stats_reset_num_recv_bcn_stats(struct wlan_objmgr_psoc *psoc,
-					 struct request_info *last_req)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct vdev_mc_cp_stats *vdev_mc_stats;
-	struct vdev_cp_stats *vdev_cp_stats_priv;
-	uint8_t i;
-
-	if (!last_req)
-		return;
-
-	if (!wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
-		return;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req->vdev_id,
-						    WLAN_CP_STATS_ID);
-	if (!vdev) {
-		cp_stats_err("vdev object is null");
-		return;
-	}
-
-	vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
-	if (!vdev_cp_stats_priv) {
-		cp_stats_err("vdev cp stats object is null");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-		return;
-	}
-
-	wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
-	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
-	vdev_mc_stats->num_recv_bcn_stats = 0;
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++)
-		vdev_mc_stats->bcn_stats[i].vdev_id = WLAN_INVALID_VDEV_ID;
-
-	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-}
-
-/**
- * tgt_mc_cp_stats_send_recv_bcn_stats() - Send beacon statistics information
- * @psoc: pointer to psoc object
- * @ev: pointer to the stats event info
- *
- * This function saves the beacon statistics information in bcn_stats of
- * stats_event structure and send it to upper layer.
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-tgt_mc_cp_stats_send_recv_bcn_stats(struct wlan_objmgr_psoc *psoc,
-				    struct stats_event *ev)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct vdev_mc_cp_stats *vdev_mc_stats;
-	struct vdev_cp_stats *vdev_cp_stats_priv;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct request_info last_req = {0};
-	uint8_t i;
-
-	if (!wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
-		return status;
-
-	status = ucfg_mc_cp_stats_get_pending_req(psoc,
-						  TYPE_STATION_STATS,
-						  &last_req);
-	if (QDF_IS_STATUS_ERROR(status))
-		return QDF_STATUS_E_FAILURE;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req.vdev_id,
-						    WLAN_CP_STATS_ID);
-	if (!vdev) {
-		cp_stats_err("vdev object is null");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
-	if (!vdev_cp_stats_priv) {
-		cp_stats_err("vdev cp stats object is null");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
-	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
-	if (!vdev_mc_stats || !vdev_mc_stats->num_recv_bcn_stats)
-		goto end;
-
-	ev->bcn_stats = qdf_mem_malloc(
-			sizeof(*ev->bcn_stats) *
-			vdev_mc_stats->num_recv_bcn_stats);
-	if (!ev->bcn_stats) {
-		status = QDF_STATUS_E_NOMEM;
-		cp_stats_err("Error:%d bcn_stats memory allocation failed",
-			     status);
-		goto end;
-	}
-
-	ev->num_recv_bcn_stats = 0;
-	for (i = 0; i < vdev_mc_stats->num_recv_bcn_stats; i++) {
-		ev->bcn_stats[i].vdev_id = vdev_mc_stats->bcn_stats[i].vdev_id;
-		qdf_mem_copy(&ev->bcn_stats[i].bcn_history,
-			     &vdev_mc_stats->bcn_stats[i].bcn_history,
-			     sizeof(vdev_mc_stats->bcn_stats[i].bcn_history));
-		ev->num_recv_bcn_stats++;
-	}
-end:
-	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-
-	return status;
 }
 
 static QDF_STATUS
@@ -1329,12 +1155,6 @@ tgt_send_pdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 	if (!ev || !last_req)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	if (policy_mgr_vdev_is_force_inactive(psoc, last_req->vdev_id)) {
-		cp_stats_debug("Ignore pdev stats on inactive link vdev %d",
-			       last_req->vdev_id);
-		return QDF_STATUS_SUCCESS;
-	}
-
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req->vdev_id,
 						    WLAN_CP_STATS_ID);
 	if (!vdev) {
@@ -1421,7 +1241,7 @@ tgt_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev, int *dbm)
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc,
 					vdev->vdev_objmgr.vdev_id);
 	if (mac_id >= MAX_MAC) {
-		cp_stats_rl_err("invalid mac_id %d", mac_id);
+		cp_stats_err("invalid mac_id %d", mac_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1536,9 +1356,6 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 		cp_stats_err("tgt_send_pdev_mc_cp_stats failed");
 		goto end;
 	}
-
-	status = tgt_mc_cp_stats_send_recv_bcn_stats(psoc, &info);
-
 end:
 	get_station_stats_cb(&info, last_req->cookie);
 
@@ -1578,74 +1395,6 @@ tgt_mc_cp_stats_prepare_n_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-static void
-tgt_mc_cp_stats_extract_vdev_bcn_rssi_history(struct wlan_objmgr_psoc *psoc,
-					      struct stats_event *ev)
-{
-	QDF_STATUS status;
-	struct request_info last_req = {0};
-	struct wlan_objmgr_vdev *vdev;
-	struct vdev_mc_cp_stats *vdev_mc_stats;
-	struct vdev_cp_stats *vdev_cp_stats_priv;
-	uint8_t i, j, ev_vdev_id, existing_vdev_id;
-
-	status = ucfg_mc_cp_stats_get_pending_req(psoc,
-						  TYPE_STATION_STATS,
-						  &last_req);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
-
-	if (!ev->bcn_stats || !ev->num_recv_bcn_stats)
-		return;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req.vdev_id,
-						    WLAN_CP_STATS_ID);
-	if (!vdev) {
-		cp_stats_err("vdev is null");
-		return;
-	}
-
-	vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
-	if (!vdev_cp_stats_priv) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-		return;
-	}
-
-	wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
-	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
-	if (!vdev_mc_stats)
-		goto end;
-
-	for (i = 0; i < ev->num_recv_bcn_stats; i++) {
-		ev_vdev_id = ev->bcn_stats[i].vdev_id;
-
-		for (j = 0; j < WLAN_UMAC_MLO_MAX_VDEVS; j++) {
-			existing_vdev_id =
-				vdev_mc_stats->bcn_stats[j].vdev_id;
-
-			if (existing_vdev_id == ev_vdev_id ||
-			    existing_vdev_id == WLAN_INVALID_VDEV_ID) {
-				if (existing_vdev_id == WLAN_INVALID_VDEV_ID &&
-				    vdev_mc_stats->num_recv_bcn_stats <
-				    WLAN_UMAC_MLO_MAX_VDEVS)
-					vdev_mc_stats->num_recv_bcn_stats++;
-
-				vdev_mc_stats->bcn_stats[j].vdev_id =
-								ev_vdev_id;
-				qdf_mem_copy(&vdev_mc_stats->bcn_stats[j].bcn_history,
-					     &ev->bcn_stats[i].bcn_history,
-					     sizeof(struct bcn_his_info) *
-					     WMI_MAX_BCN_HISTORY);
-				break;
-			}
-		}
-	}
-
-end:
-	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-}
-
 static void tgt_mc_cp_stats_extract_station_stats(
 				struct wlan_objmgr_psoc *psoc,
 				struct stats_event *ev)
@@ -1668,7 +1417,6 @@ static void tgt_mc_cp_stats_extract_station_stats(
 	tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(psoc, ev);
 	tgt_mc_cp_stats_extract_pmf_bcn_stats(psoc, ev);
 	tgt_mc_cp_stats_extract_vdev_extd_stats(psoc, ev);
-	tgt_mc_cp_stats_extract_vdev_bcn_rssi_history(psoc, ev);
 
 	/*
 	 * PEER stats are the last stats sent for get_station statistics.
@@ -1678,12 +1426,9 @@ static void tgt_mc_cp_stats_extract_station_stats(
 		ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_STATION_STATS,
 						   &last_req,
 						   &pending);
-		if (pending && last_req.u.get_station_stats_cb) {
+		if (pending && last_req.u.get_station_stats_cb)
 			tgt_mc_cp_stats_prepare_n_send_raw_station_stats(
 							psoc, &last_req);
-			tgt_mc_cp_stats_reset_num_recv_bcn_stats(psoc,
-								 &last_req);
-		}
 	}
 }
 
@@ -1697,45 +1442,6 @@ static void tgt_mc_cp_send_lost_link_stats(struct wlan_objmgr_psoc *psoc,
 		psoc_cp_stats_priv->legacy_stats_cb(ev);
 }
 
-#ifdef WLAN_FEATURE_QSH_SCAN
-QDF_STATUS
-tgt_mc_cp_stats_process_qsh_scan_stats(struct wlan_objmgr_psoc *psoc,
-				       struct qsh_stats_event *ev)
-{
-	QDF_STATUS status;
-	struct request_info last_req = {0};
-	bool pending = false;
-
-	if (!ev) {
-		cp_stats_err("Scan stats event is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = ucfg_mc_cp_stats_get_pending_req(psoc,
-						  TYPE_QSH_SCAN_STATS,
-						  &last_req);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("ucfg_mc_cp_stats_get_pending_req failed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	cp_stats_debug("QSH scan stats: scan_count=%u", ev->scan_count);
-
-	ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_QSH_SCAN_STATS,
-					   &last_req, &pending);
-
-	if (!last_req.u.get_qsh_stats_cb || !pending) {
-		cp_stats_err("QSH stats fetch failed: pending : %d", pending);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	last_req.u.get_qsh_stats_cb(ev, last_req.cookie);
-	last_req.u.get_qsh_stats_cb = NULL;
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_QSH_SCAN */
-
 #ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
 QDF_STATUS tgt_mc_cp_stats_process_infra_stats_event(
 				struct wlan_objmgr_psoc *psoc,
@@ -1744,10 +1450,7 @@ QDF_STATUS tgt_mc_cp_stats_process_infra_stats_event(
 	if (!infra_event)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	if (infra_event->request_id == ENHANCED_REQUEST_ID)
-		tgt_mc_infra_cp_stats_extract_enhanced_stats(psoc, infra_event);
-	else
-		tgt_mc_infra_cp_stats_extract_twt_stats(psoc, infra_event);
+	tgt_mc_infra_cp_stats_extract_twt_stats(psoc, infra_event);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1817,273 +1520,6 @@ tgt_mc_cp_stats_process_big_data_stats_event(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-static QDF_STATUS
-send_power_datapath_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
-			      struct wlan_objmgr_psoc *psoc,
-			      struct request_info *req)
-{
-	if (!tx_ops->send_req_power_datapath_stats) {
-		cp_stats_err("could not get send_req_power_datapath_stats");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return tx_ops->send_req_power_datapath_stats(psoc, req);
-}
-#else
-static QDF_STATUS
-send_power_datapath_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
-			      struct wlan_objmgr_psoc *psoc,
-			      struct request_info *req)
-{
-	cp_stats_err("Power datapath stats feature not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
-#ifdef WLAN_FEATURE_QSH_SCAN
-static QDF_STATUS
-send_qsh_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
-		   struct wlan_objmgr_psoc *psoc,
-		   struct request_info *req)
-{
-	if (!tx_ops->send_req_qsh_stats) {
-		cp_stats_err("could not get send_req_qsh_stats");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return tx_ops->send_req_qsh_stats(psoc, req);
-}
-#else
-static QDF_STATUS
-send_qsh_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
-		   struct wlan_objmgr_psoc *psoc,
-		   struct request_info *req)
-{
-	cp_stats_err("QSH scan stats feature not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-/**
- * tgt_mc_cp_stats_store_power_stats_in_pdev() - Store power datapath stats
- * in pdev CP stats object (for sysfs access)
- * @psoc: psoc object
- * @event: power datapath stats event from WMI
- * @pdev_id: pdev ID to store stats in
- *
- * Return: QDF_STATUS_SUCCESS on success, error code on failure
- */
-static QDF_STATUS
-tgt_mc_cp_stats_store_power_stats_in_pdev(
-	struct wlan_objmgr_psoc *psoc,
-	struct cp_stats_power_datapath_info *event,
-	uint32_t pdev_id)
-{
-	struct wlan_objmgr_pdev *pdev;
-	struct pdev_cp_stats *pdev_cp_stats_priv;
-	struct pdev_mc_cp_stats *pdev_mc_stats;
-	uint32_t i;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_CP_STATS_ID);
-	if (!pdev) {
-		cp_stats_err("Failed to get pdev object for pdev_id %u",
-			     pdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
-	if (!pdev_cp_stats_priv) {
-		cp_stats_err("Failed to get pdev cp stats object");
-		status = QDF_STATUS_E_FAILURE;
-		goto release_pdev_ref;
-	}
-
-	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
-
-	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
-	if (!pdev_mc_stats) {
-		cp_stats_err("pdev mc stats is null");
-		status = QDF_STATUS_E_FAILURE;
-		goto unlock_pdev;
-	}
-
-	/* Free existing arrays if allocated */
-	if (pdev_mc_stats->power_datapath_stats.power_stats) {
-		qdf_mem_free(pdev_mc_stats->power_datapath_stats.power_stats);
-		pdev_mc_stats->power_datapath_stats.power_stats = NULL;
-	}
-	if (pdev_mc_stats->power_datapath_stats.tx_rate_stats) {
-		qdf_mem_free(pdev_mc_stats->power_datapath_stats.tx_rate_stats);
-		pdev_mc_stats->power_datapath_stats.tx_rate_stats = NULL;
-	}
-
-	/* Update basic fields */
-	pdev_mc_stats->power_datapath_stats.status = event->status;
-	pdev_mc_stats->power_datapath_stats.stats_type_bitmap =
-		event->stats_type_bitmap;
-	pdev_mc_stats->power_datapath_stats.num_power_stats =
-		event->num_power_stats;
-	pdev_mc_stats->power_datapath_stats.num_tx_rate_stats =
-		event->num_tx_rate_stats;
-
-	if (event->num_power_stats > MAX_POWER_STATS_ENTRIES) {
-		cp_stats_err("Invalid num_power_stats: %u (max: %u)",
-			     event->num_power_stats, MAX_POWER_STATS_ENTRIES);
-		status = QDF_STATUS_E_INVAL;
-		goto free_power_stats;
-	}
-
-	if (event->num_tx_rate_stats > MAX_TX_RATE_STATS_ENTRIES) {
-		cp_stats_err("Invalid num_tx_rate_stats: %u (max: %u)",
-			     event->num_tx_rate_stats,
-			     MAX_TX_RATE_STATS_ENTRIES);
-		status = QDF_STATUS_E_INVAL;
-		goto free_power_stats;
-	}
-
-	/* Allocate and copy power stats */
-	if (event->power_stats && event->num_power_stats > 0) {
-		size_t power_size;
-
-		power_size = sizeof(struct cp_stats_power_info) *
-			     event->num_power_stats;
-		pdev_mc_stats->power_datapath_stats.power_stats =
-			qdf_mem_malloc(power_size);
-
-		if (!pdev_mc_stats->power_datapath_stats.power_stats) {
-			cp_stats_err("Failed to allocate memory for power stats");
-			status = QDF_STATUS_E_NOMEM;
-			goto free_power_stats;
-		}
-
-		for (i = 0; i < event->num_power_stats; i++)
-			pdev_mc_stats->power_datapath_stats.power_stats[i] =
-				event->power_stats[i];
-
-		pdev_mc_stats->power_datapath_stats.power_stats_valid = true;
-	}
-
-	/* Allocate and copy TX rate stats */
-	if (event->tx_rate_stats && event->num_tx_rate_stats > 0) {
-		size_t tx_rate_size;
-
-		tx_rate_size = sizeof(struct cp_stats_tx_rate_info) *
-			       event->num_tx_rate_stats;
-		pdev_mc_stats->power_datapath_stats.tx_rate_stats =
-			qdf_mem_malloc(tx_rate_size);
-
-		if (!pdev_mc_stats->power_datapath_stats.tx_rate_stats) {
-			cp_stats_err("Failed to allocate memory for TX rate stats");
-			status = QDF_STATUS_E_NOMEM;
-			goto free_rate_stats;
-		}
-
-		for (i = 0; i < event->num_tx_rate_stats; i++)
-			pdev_mc_stats->power_datapath_stats.tx_rate_stats[i] =
-				event->tx_rate_stats[i];
-
-		pdev_mc_stats->power_datapath_stats.tx_rate_stats_valid = true;
-	}
-	pdev_mc_stats->power_datapath_stats_valid = true;
-
-	cp_stats_debug("Stored power datapath stats in pdev_id %u: %u power cores, %u tx rates",
-		       pdev_id, event->num_power_stats,
-		       event->num_tx_rate_stats);
-
-	goto unlock_pdev;
-
-free_rate_stats:
-	if (pdev_mc_stats->power_datapath_stats.power_stats) {
-		qdf_mem_free(pdev_mc_stats->power_datapath_stats.power_stats);
-		pdev_mc_stats->power_datapath_stats.power_stats = NULL;
-	}
-free_power_stats:
-	pdev_mc_stats->power_datapath_stats.num_power_stats = 0;
-	pdev_mc_stats->power_datapath_stats.num_tx_rate_stats = 0;
-	pdev_mc_stats->power_datapath_stats.power_stats_valid = false;
-	pdev_mc_stats->power_datapath_stats.tx_rate_stats_valid = false;
-	pdev_mc_stats->power_datapath_stats_valid = false;
-unlock_pdev:
-	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
-release_pdev_ref:
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_CP_STATS_ID);
-	return status;
-}
-
-/**
- * tgt_mc_cp_stats_process_power_datapath_stats_event() - Process power
- * datapath stats event
- * @psoc: psoc object
- * @event: power datapath stats event from WMI
- *
- * Stores stats in pdev (for sysfs) and dispatches to the registered
- * callback via the osif_request cookie pattern.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code on failure
- */
-QDF_STATUS
-tgt_mc_cp_stats_process_power_datapath_stats_event(
-	struct wlan_objmgr_psoc *psoc,
-	struct cp_stats_power_datapath_info *event)
-{
-	struct psoc_mc_cp_stats *psoc_mc_stats;
-	struct psoc_cp_stats *psoc_cp_stats_priv;
-	struct request_info pending_req = {0};
-	bool pending = false;
-	uint32_t pdev_id;
-	QDF_STATUS status;
-
-	if (!psoc || !event) {
-		cp_stats_err("Invalid input: psoc=%pK, event=%pK", psoc, event);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc_cp_stats_priv = wlan_cp_stats_get_psoc_stats_obj(psoc);
-	if (!psoc_cp_stats_priv) {
-		cp_stats_err("Failed to get psoc cp stats object");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	wlan_cp_stats_psoc_obj_lock(psoc_cp_stats_priv);
-	psoc_mc_stats = psoc_cp_stats_priv->obj_stats;
-
-	if (!psoc_mc_stats) {
-		cp_stats_err("psoc mc stats is null");
-		wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!(psoc_mc_stats->pending.type_map &
-	      (1 << TYPE_POWER_DATAPATH_STATS))) {
-		cp_stats_err("No pending request for power datapath stats");
-		wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	pending_req = psoc_mc_stats->pending.req[TYPE_POWER_DATAPATH_STATS];
-	pdev_id = pending_req.pdev_id;
-
-	wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
-
-	/* Store stats in pdev for sysfs access */
-	status = tgt_mc_cp_stats_store_power_stats_in_pdev(psoc, event,
-							   pdev_id);
-	if (QDF_IS_STATUS_ERROR(status))
-		cp_stats_err("Failed to store power stats in pdev: %d", status);
-
-	/* Dispatch to registered callback (osif_request pattern) */
-	if (pending_req.u.get_power_stats_cb)
-		pending_req.u.get_power_stats_cb(event, pending_req.cookie);
-
-	ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_POWER_DATAPATH_STATS,
-					   &pending_req, &pending);
-	return status;
-}
-#endif
-
 QDF_STATUS tgt_mc_cp_stats_inc_wake_lock_stats(struct wlan_objmgr_psoc *psoc,
 					       uint32_t reason,
 					       struct wake_lock_stats *stats,
@@ -2099,59 +1535,6 @@ QDF_STATUS tgt_mc_cp_stats_inc_wake_lock_stats(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#ifdef WLAN_FEATURE_CTAS
-bool
-tgt_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
-
-	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
-	if (!tx_ops || !tx_ops->is_ctas_plim_indication_supported)
-		return false;
-
-	return tx_ops->is_ctas_plim_indication_supported(psoc);
-}
-
-QDF_STATUS
-tgt_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-			   enum host_tas_direction direction)
-{
-	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
-
-	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
-	if (!tx_ops || !tx_ops->send_tas_mode)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	return tx_ops->send_tas_mode(psoc, direction);
-}
-
-QDF_STATUS
-tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
-				   uint32_t dsi_id)
-{
-	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
-
-	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
-	if (!tx_ops || !tx_ops->send_get_avg_tx_power)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	return tx_ops->send_get_avg_tx_power(psoc, dsi_id);
-}
-
-QDF_STATUS
-tgt_cp_stats_send_get_tx_power_calling(struct wlan_objmgr_psoc *psoc,
-				       uint32_t dsi_id)
-{
-	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
-
-	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
-	if (!tx_ops || !tx_ops->send_get_tx_power_calling)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	return tx_ops->send_get_tx_power_calling(psoc, dsi_id);
-}
-#endif /* WLAN_FEATURE_CTAS */
 
 QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    enum stats_req_type type,
@@ -2176,19 +1559,6 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 		break;
 	case TYPE_BIG_DATA_STATS:
 		status = send_big_data_stats_req(tx_ops, psoc, req);
-		break;
-	case TYPE_POWER_DATAPATH_STATS:
-		status = send_power_datapath_stats_req(tx_ops, psoc, req);
-		break;
-	case TYPE_QSH_SCAN_STATS:
-		status = send_qsh_stats_req(tx_ops, psoc, req);
-		break;
-	case TYPE_COEX_STATS:
-		if (!tx_ops->send_req_coex_stats) {
-			cp_stats_err("could not get send_req_coex_stats");
-			return QDF_STATUS_E_NULL_VALUE;
-		}
-		status = tx_ops->send_req_coex_stats(psoc);
 		break;
 	default:
 		if (!tx_ops->send_req_stats) {
@@ -2216,3 +1586,4 @@ QDF_STATUS tgt_set_pdev_stats_update_period(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+

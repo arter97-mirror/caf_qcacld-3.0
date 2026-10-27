@@ -99,8 +99,6 @@ static void pld_pcie_remove(struct pci_dev *pdev)
 	int errno;
 	struct osif_psoc_sync *psoc_sync = NULL;
 
-	cds_set_driver_loaded(false);
-	cds_set_unload_in_progress(true);
 	if (!cds_is_pcie_link_resume_fail()) {
 		errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
 		if (errno)
@@ -288,8 +286,7 @@ static void pld_pcie_notify_handler(struct pci_dev *pdev, int state)
  *
  * Return: void
  */
-static void pld_pcie_uevent(struct pci_dev *pdev,
-			    enum cnss_driver_status status)
+static void pld_pcie_uevent(struct pci_dev *pdev, uint32_t status)
 {
 	struct pld_context *pld_context;
 	struct pld_uevent_data data = {0};
@@ -304,9 +301,6 @@ static void pld_pcie_uevent(struct pci_dev *pdev,
 		break;
 	case CNSS_FW_DOWN:
 		data.uevent = PLD_FW_DOWN;
-		break;
-	case CNSS_BUS_EVENT:
-		data.uevent = PLD_BUS_EVENT;
 		break;
 	default:
 		goto out;
@@ -372,48 +366,6 @@ enum pld_bus_event pld_bus_event_type_convert(enum cnss_bus_event_type etype)
 }
 
 /**
- * pld_pcie_handle_extra_uevent() - Handle cnss_driver_status values not
- *				    known to every cnss2.h
- * @uevent_data: driver uevent data
- * @data: pld_uevent_data to fill in on a recognized status
- *
- * uevent_data->status values that only exist in a cnss2.h built with
- * a specific platform feature (e.g. CNSS_UPDATE_DMA_DEV, only defined
- * when the companion cnss2 carries IO coherency support) must never
- * appear as a bare case label in pld_pcie_update_event(), since this
- * file may be compiled against an older cnss2.h that does not define
- * that enum value at all. Route them through this helper instead,
- * which is gated at file scope and gets a no-op stub when the
- * feature is unavailable.
- *
- * Return: negative error code, 0 if uevent_data->status is not
- *	   recognized, positive if data was filled in and the caller
- *	   should proceed to invoke pld_context->ops->uevent()
- */
-#ifdef CONFIG_CNSS_IO_COHERENCY
-static int pld_pcie_handle_extra_uevent(struct cnss_uevent_data *uevent_data,
-					struct pld_uevent_data *data)
-{
-	switch (uevent_data->status) {
-	case CNSS_UPDATE_DMA_DEV:
-		if (!uevent_data->data)
-			return -EINVAL;
-		data->uevent = PLD_UPDATE_DMA_DEV;
-		data->dma_dev = (struct device *)uevent_data->data;
-		return 1;
-	default:
-		return 0;
-	}
-}
-#else
-static int pld_pcie_handle_extra_uevent(struct cnss_uevent_data *uevent_data,
-					struct pld_uevent_data *data)
-{
-	return 0;
-}
-#endif
-
-/**
  * pld_pcie_update_event() - update wlan driver status callback function
  * @pdev: PCIE device
  * @uevent_data: driver uevent data
@@ -461,13 +413,7 @@ static int pld_pcie_update_event(struct pci_dev *pdev,
 		break;
 	}
 	default:
-	{
-		int ret = pld_pcie_handle_extra_uevent(uevent_data, &data);
-
-		if (ret <= 0)
-			return ret;
-		break;
-	}
+		return 0;
 	}
 
 	if (pld_context->ops->uevent)
@@ -755,9 +701,7 @@ static struct pci_device_id pld_pcie_id_table[] = {
 #elif defined(QCA_WIFI_QCA6490)
 	{ 0x17cb, 0x1103, PCI_ANY_ID, PCI_ANY_ID },
 #elif defined(QCA_WIFI_KIWI)
-#if defined(QCA_WIFI_FIG)
-	{ 0x17cb, 0x1111, PCI_ANY_ID, PCI_ANY_ID },
-#elif defined(QCA_WIFI_PEACH)
+#if defined(QCA_WIFI_PEACH)
 	{ 0x17cb, 0x110E, PCI_ANY_ID, PCI_ANY_ID },
 #elif defined(QCA_WIFI_MANGO)
 	{ 0x17cb, 0x110A, PCI_ANY_ID, PCI_ANY_ID },
@@ -942,32 +886,6 @@ int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode)
 	return cnss_wlan_disable(dev, CNSS_OFF);
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
-int pld_pcie_register_tsf_sync_time(struct device *dev,
-				    wlan_tsf_handler_t handler,
-				    void *context)
-{
-	return cnss_register_tsf_captured_handler(dev, handler, context);
-}
-
-int pld_pcie_unregister_tsf_sync_time(struct device *dev, void *context)
-{
-	return cnss_unregister_tsf_captured_handler(dev, context);
-}
-#else
-int pld_pcie_register_tsf_sync_time(struct device *dev,
-				    void (*handler)(void *, uint64_t),
-				    void *context)
-{
-	return -EINVAL;
-}
-
-int pld_pcie_unregister_tsf_sync_time(struct device *dev, void *context)
-{
-	return -EINVAL;
-}
-#endif
-
 int pld_pcie_get_fw_files_for_target(struct device *dev,
 				     struct pld_fw_files *pfw_files,
 				     u32 target_type, u32 target_version)
@@ -1067,9 +985,6 @@ void pld_pcie_schedule_recovery_work(struct device *dev,
 	case PLD_REASON_LINK_DOWN:
 		cnss_reason = CNSS_REASON_LINK_DOWN;
 		break;
-	case PLD_REASON_FW_ASSERTION_FAIL:
-		cnss_reason = CNSS_REASON_FW_ASSERTION_FAIL;
-		break;
 	default:
 		cnss_reason = CNSS_REASON_DEFAULT;
 		break;
@@ -1092,17 +1007,6 @@ void pld_pcie_device_self_recovery(struct device *dev,
 	}
 	cnss_self_recovery(dev, cnss_reason);
 }
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0))
-int pld_pcie_set_host_param(struct device *dev, const char *chip_name)
-{
-	struct cnss_wlan_host_param param;
-
-	param.chip_name = chip_name;
-
-	return cnss_set_host_param(dev, &param);
-}
-#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 int pld_pcie_set_wfc_mode(struct device *dev,

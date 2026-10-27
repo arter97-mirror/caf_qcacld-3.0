@@ -30,31 +30,6 @@ struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 struct ieee80211_channel;
 struct hdd_adapter;
-struct wireless_dev;
-
-/**
- * struct osif_p2p_legacy_ops - P2P legacy callbacks
- * @osif_get_pd_wdev_by_mac_addr_cb: Callback to get PD wdev by MAC address
- */
-struct osif_p2p_legacy_ops {
-	struct wireless_dev *
-		(*osif_get_pd_wdev_by_mac_addr_cb)(const uint8_t *mac_addr);
-};
-
-/**
- * osif_p2p_set_legacy_cb() - Sets legacy callbacks to osif
- * @osif_legacy_ops: Function pointer to legacy ops structure
- *
- * Return: void
- */
-void osif_p2p_set_legacy_cb(struct osif_p2p_legacy_ops *osif_legacy_ops);
-
-/**
- * osif_p2p_reset_legacy_cb() - Resets legacy callbacks to osif
- *
- * Return: void
- */
-void osif_p2p_reset_legacy_cb(void);
 
 /**
  * p2p_psoc_enable() - psoc API to enable p2p component
@@ -145,7 +120,7 @@ int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,
 int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 				 uint64_t cookie, enum QDF_OPMODE opmode);
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * osif_p2p_send_usd_params() - This function parse USD vendor command and
  * send the USD params to P2P module.
@@ -202,30 +177,5 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 
 #else
 #define FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
-#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-/**
- * osif_p2p_noa_cancel - Handle P2P NoA cancellation commands
- * @adapter: pointer to adapter object
- * @data: pointer to data
- * @data_len: data length
- *
- * Return: 0 on success, -ENOENT if no cancellation attributes present,
- *         negative errno on error
- */
-int osif_p2p_noa_cancel(struct hdd_adapter *adapter, const void *data,
-			int data_len);
-
-/**
- * osif_p2p_parse_noa_params - This function parse P2P NOA params
- * @adapter: pointer to adapter object
- * @noa: pointer to power save configure
- * @data: pointer to data
- * @data_len: data length
- *
- * Return: 0 on success, negative errno if error
- */
-int osif_p2p_parse_noa_params(struct hdd_adapter *adapter,
-			      struct p2p_ps_config *noa, const void *data,
-			      int data_len);
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _WLAN_CFG80211_P2P_H_ */

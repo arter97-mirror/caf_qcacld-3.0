@@ -224,7 +224,7 @@ typedef struct sLimMlmAssocInd {
 	bool sgi_enable;
 	bool tx_stbc;
 	bool rx_stbc;
-	enum phy_ch_width ch_width;
+	tSirMacHTChannelWidth ch_width;
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
@@ -245,40 +245,6 @@ typedef struct sLimMlmAssocInd {
 	tSirMacAddr peer_mld_addr;
 #endif
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
-
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * struct lim_intersected_link_caps - Intersected capabilities for SMD link
- * @valid: Whether this structure contains valid data
- * @ext_cap: Extended capabilities (intersected)
- * @ht_caps: HT capabilities (intersected)
- * @vht_caps: VHT capabilities (intersected)
- * @he_caps: HE capabilities (intersected)
- * @he_6ghz_band_cap: HE 6GHz band capabilities (intersected)
- * @eht_caps: EHT capabilities (intersected)
- * @supp_rates: Supported rates
- * @ext_supp_rates: Extended supported rates
- * @wmm_info: WMM info
- * @wmm_caps: WMM capabilities
- * @cap_tx_nss: Capability TX NSS
- * @cap_rx_nss: Capability RX NSS
- */
-struct lim_intersected_link_caps {
-	bool valid;
-	tDot11fIEExtCap ext_cap;
-	tDot11fIEHTCaps ht_caps;
-	tDot11fIEVHTCaps vht_caps;
-	tDot11fIEhe_cap he_caps;
-	tDot11fIEhe_6ghz_band_cap he_6ghz_band_cap;
-	tDot11fIEeht_cap eht_caps;
-	tDot11fIESuppRates supp_rates;
-	tDot11fIEExtSuppRates ext_supp_rates;
-	tDot11fIEWMMInfoStation wmm_info;
-	tDot11fIEWMMCaps wmm_caps;
-	uint8_t cap_tx_nss;
-	uint8_t cap_rx_nss;
-};
-#endif
 
 typedef struct sLimMlmReassocReq {
 	tSirMacAddr peerMacAddr;
@@ -394,7 +360,7 @@ void lim_process_mlm_start_cnf(struct mac_context *mac_ctx, uint32_t *msg_buf);
 
 void lim_get_random_bssid(struct mac_context *mac, uint8_t *data);
 
-/* Function to handle HT and HT IE CFG parameter initializations */
+/* Function to handle HT and HT IE CFG parameter intializations */
 void handle_ht_capabilityand_ht_info(struct mac_context *mac,
 				     struct pe_session *pe_session);
 
@@ -459,14 +425,12 @@ void lim_cleanup_mlm(struct mac_context *);
  * @mac_ctx: global mac context
  * @session: pe session
  * @bcn_ptr: pointer to tSchBeaconStruct
- * @rx_pkt_info: pointer to RX packet info structure
  *
  * Return none
  */
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tSchBeaconStruct *bcn_ptr,
-			    uint8_t *rx_pkt_info);
+			    tSchBeaconStruct *bcn_ptr);
 
 /**
  * lim_process_beacon_eht_op() - process beacon 11be eht op IE
@@ -481,8 +445,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 static inline
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tSchBeaconStruct *bcn_ptr,
-			    uint8_t *rx_pkt_info)
+			    tSchBeaconStruct *bcn_ptr)
 {
 }
 
@@ -534,10 +497,6 @@ void
 lim_process_ml_reconfig(struct mac_context *mac_ctx,
 			struct pe_session *session,
 			uint8_t *rx_pkt_info);
-
-bool lim_is_same_mld_addr(struct mac_context *mac_ctx,
-			  struct pe_session *session,
-			  struct sSirProbeRespBeacon *bcn_ptr);
 #else
 static inline
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
@@ -558,40 +517,6 @@ lim_process_ml_reconfig(struct mac_context *mac_ctx,
 			struct pe_session *session,
 			uint8_t *rx_pkt_info)
 {
-}
-
-static inline
-bool lim_is_same_mld_addr(struct mac_context *mac_ctx,
-			  struct pe_session *session,
-			  struct sSirProbeRespBeacon *bcn_ptr)
-{
-	return true;
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * lim_update_link_to_mld_address() - Update SA/DA in auth frame header
- * to MLD addresses for MLO peers.
- * @mac_ctx: Pointer to mac context
- * @vdev: vdev
- * @mac_hdr: Pointer to MAC management header
- * @is_tx: true for TX frame, false for RX frame
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
-					  struct wlan_objmgr_vdev *vdev,
-					  tpSirMacMgmtHdr mac_hdr,
-					  bool is_tx);
-#else
-static inline
-QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
-					  struct wlan_objmgr_vdev *vdev,
-					  tpSirMacMgmtHdr mac_hdr,
-					  bool is_tx)
-{
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -734,12 +659,11 @@ QDF_STATUS lim_send_mlm_assoc_ind(struct mac_context *mac,
  * pe_roam_synch_callback() upon Re/Association Response frame reception or
  * roam synch indication with reassociation response frame is received.
  *
- * Return: QDF_STATUS
+ * Return: None
  */
-QDF_STATUS
-lim_process_assoc_rsp_frame(struct mac_context *mac, uint8_t *rx_pkt_info,
-			    uint32_t reassoc_frame_len, uint8_t subtype,
-			    struct pe_session *pe_session);
+void lim_process_assoc_rsp_frame(struct mac_context *mac, uint8_t *rx_pkt_info,
+				 uint32_t reassoc_frame_len, uint8_t subtype,
+				 struct pe_session *pe_session);
 
 void lim_process_disassoc_frame(struct mac_context *, uint8_t *, struct pe_session *);
 
@@ -801,31 +725,9 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pRxMe
 
 void lim_populate_mac_header(struct mac_context *, uint8_t *, uint8_t, uint8_t,
 				      tSirMacAddr, tSirMacAddr);
-
-/**
- * lim_send_probe_req_mgmt_frame() - send probe request management frame
- * @mac_ctx: Pointer to Global MAC structure
- * @pesession: Pointer to session
- * @additional_ielen: if non-zero, include additional_ie in the Probe Request
- *                   frame
- * @additional_ie: if additional_ielen is non zero, include this field in the
- *                Probe Request frame
- *
- * This function is called by various LIM modules to send Probe Request frame
- * during active scan/learn phase.
- * Probe request is sent out in the following scenarios:
- * --heartbeat failure:  session needed
- * --join req:           session needed
- * --foreground scan:    no session
- * --background scan:    no session
- * --sch_beacon_processing:  to get EDCA parameters:  session needed
- *
- * Return: QDF_STATUS (QDF_STATUS_SUCCESS on success and error codes otherwise)
- */
-QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
-					 struct pe_session *pesession,
-					 uint16_t *additional_ielen,
-					 uint8_t *additional_ie);
+QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *, tSirMacSSid *,
+					 tSirMacAddr, qdf_freq_t, tSirMacAddr,
+					 uint32_t, uint16_t *, uint8_t *);
 
 /**
  * lim_send_probe_rsp_mgmt_frame() - Send probe response
@@ -1064,9 +966,7 @@ QDF_STATUS lim_send_channel_switch_mgmt_frame(struct mac_context *, tSirMacAddr,
 
 QDF_STATUS lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	tSirMacAddr peer, uint8_t mode, uint8_t new_op_class,
-	uint8_t new_channel, uint8_t count, struct pe_session *session_entry,
-	uint16_t new_channel_freq);
-
+	uint8_t new_channel, uint8_t count, struct pe_session *session_entry);
 QDF_STATUS lim_p2p_oper_chan_change_confirm_action_frame(
 	struct mac_context *mac_ctx, tSirMacAddr peer,
 	struct pe_session *session_entry);
@@ -1221,23 +1121,6 @@ static inline void lim_update_tdls_set_state_for_fw(struct pe_session
 static inline void lim_update_tdls_2g_bw(struct pe_session *session)
 {
 }
-
-static inline QDF_STATUS lim_process_tdls_add_sta_rsp(struct mac_context *mac,
-						      void *msg,
-						      struct pe_session *pe_session)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS lim_send_sme_tdls_add_sta_rsp(struct mac_context *mac,
-						       uint8_t vdev_id,
-						       tSirMacAddr peer_mac,
-						       uint8_t update,
-						       tDphHashNode *sta,
-						       uint8_t status)
-{
-	return QDF_STATUS_SUCCESS;
-}
 #endif
 
 /* Algorithms & Link Monitoring related functions */
@@ -1291,25 +1174,7 @@ void lim_process_mlm_add_sta_rsp(struct mac_context *mac,
 				 struct pe_session *pe_session);
 void lim_process_mlm_del_sta_rsp(struct mac_context *mac,
 				 struct scheduler_msg *limMsgQ);
-#ifdef DRIVER_PASSTHRU_MODE
-/**
- * lim_passthru_add_sta_rsp() - Process add sta response in passthru mode
- * @mac_ctx: Pointer to Global MAC structure
- * @session: pointer to pe_session
- * @add_sta_rsp: pointer to add sta response
- *
- * Return: None
- */
-void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
-			      struct pe_session *session,
-			      tAddStaParams *add_sta_rsp);
-#else
-static inline
-void lim_passthru_add_sta_rsp(struct mac_context *mac_ctx,
-			      struct pe_session *session,
-			      tAddStaParams *add_sta_rsp)
-{}
-#endif
+
 QDF_STATUS
 lim_process_mlm_del_all_sta_rsp(struct vdev_mlme_obj *vdev_mlme,
 				struct peer_delete_all_response *rsp);
@@ -1492,6 +1357,34 @@ lim_post_mlm_message(struct mac_context *mac, uint32_t msgType,
 } /*** end lim_post_mlm_message() ***/
 
 /**
+ * lim_get_ielen_from_bss_description()
+ *
+ ***FUNCTION:
+ * This function is called in various places to get IE length
+ * from struct bss_description structure
+ * number being scanned.
+ *
+ ***PARAMS:
+ *
+ ***LOGIC:
+ *
+ ***ASSUMPTIONS:
+ * NA
+ *
+ ***NOTE:
+ * NA
+ *
+ * @param     pBssDescr
+ * @return    Total IE length
+ */
+
+static inline uint16_t
+lim_get_ielen_from_bss_description(struct bss_description *pBssDescr)
+{
+	return wlan_get_ielen_from_bss_description(pBssDescr);
+} /*** end lim_get_ielen_from_bss_description() ***/
+
+/**
  * lim_send_beacon_ind() - send the beacon indication
  * @mac_ctx: pointer to mac structure
  * @session: pe session
@@ -1619,9 +1512,6 @@ typedef enum sHalBitVal         /* For Bit operations */
  * @is_wep: protected bit in fc
  * @calc_buff_size: Calculated buf size from peer and self capabilities
  * @bssid: peer BSSID
- * @req_dialog_token: dialog token from the received ADDBA request, echoed
- *  back when no local peer entry exists to source it from (e.g. PASSTHRU
- *  vdev peer beyond the max supported peer count)
  *
  * This function is called when ADDBA request is successful. ADDBA response is
  * setup by calling addba_response_setup API and frame is then sent out OTA.
@@ -1634,8 +1524,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 uint8_t addba_extn_present,
 					 uint8_t amsdu_support, uint8_t is_wep,
 					 uint16_t calc_buff_size,
-					 tSirMacAddr bssid,
-					 uint8_t req_dialog_token);
+					 tSirMacAddr bssid);
 
 /**
  * lim_send_delba_action_frame() - Send delba to peer
@@ -1792,34 +1681,6 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * lim_send_uhr_link_recfg_st_prep_req_frame() - Send UHR Link Reconfig ST Prep Request
- * @vdev_id: VDEV ID
- * @target_ap_mac: Target AP MLD MAC address
- * @args: Action frame arguments
- * @req: Link reconfiguration request structure
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-lim_send_uhr_link_recfg_st_prep_req_frame(
-	uint8_t vdev_id,
-	uint8_t *target_ap_mac,
-	struct wlan_action_frame_args *args,
-	struct mlo_link_recfg_state_req *req);
-#else
-static inline QDF_STATUS
-lim_send_uhr_link_recfg_st_prep_req_frame(
-	uint8_t vdev_id,
-	uint8_t *target_ap_mac,
-	struct wlan_action_frame_args *args,
-	struct mlo_link_recfg_state_req *req)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -2003,15 +1864,6 @@ lim_pasn_peer_del_all_resp_vdev_delete_resume(struct mac_context *mac,
 #endif
 
 /**
- * lim_continue_bss_peer_create() - Continue bss peer create after
- * deleting the existing ranging peer.
- * @req: Peer create request pointer
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS lim_continue_bss_peer_create(struct cm_peer_create_req *req);
-
-/**
  * lim_send_peer_create_resp() -  Send peer create response
  * @mac:     Pointer to MAC context
  * @vdev_id: vdev id
@@ -2047,29 +1899,6 @@ void lim_process_mlm_deauth_req(struct mac_context *mac_ctx, uint32_t *msg_buf);
  */
 QDF_STATUS lim_sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
 					    uint16_t data_len, void *data);
-
-/**
- * lim_convert_assoc_req_frame_to_struct() - Convert assoc req frame to struct
- * @mac_ctx: Pointer to Global MAC structure
- * @frame_buf: Pointer to the association request frame
- * @frame_len: Length of the association request frame
- * @sub_type: Indicates whether it is Association Request(=0) or Reassociation
- *            Request(=1) frame
- * @freq: Operating frequency
- * @assoc_req: Pointer to the structure to be filled
- *
- * This function parses the Association/Reassociation Request frame and fills
- * the relevant fields in the tpSirAssocReq structure. It also extracts and
- * decodes the EHT capabilities from the frame if present.
- *
- * Return: STATUS_SUCCESS if parsing is successful, appropriate error code
- *         otherwise
- */
-enum wlan_status_code
-lim_convert_assoc_req_frame_to_struct(struct mac_context *mac_ctx,
-				      uint8_t *frame_buf, uint16_t frame_len,
-				      uint8_t sub_type, qdf_freq_t freq,
-				      tpSirAssocReq assoc_req);
 
 /**
  * lim_process_assoc_cleanup() - frees up resources used in function
@@ -2145,40 +1974,12 @@ void
 lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				  struct pe_session *session);
 
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 /**
- *lim_send_link_removal_req() - send link removal request
- *@mac_ctx:  Pointer to mac context
- *@vdev_id: vdev id
+ *lim_convert_channel_width_enum() - map between two channel width enums
+ *@ch_width: channel width of enum type phy_ch_width
  *
- *Return: None
+ *Return: channel width of enum type tSirMacHTChannelWidth
  */
-void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id);
-#else
-static inline
-void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id)
-{
-}
-#endif
-
-/**
- * lim_process_qos_null_req() - Process QoS null frame request in LIM context
- * @msg: Scheduler message containing sme qos null req
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS lim_process_qos_null_req(struct scheduler_msg *msg);
-
-/**
- * lim_process_qos_null_tx_completion() - Process QoS NULL TX completion
- * @mac_ctx: MAC context
- * @desc_id: Descriptor ID from completion event
- * @vdev_id: Output parameter to return vdev_id
- *
- * Return: QDF_STATUS_SUCCESS on success, error code on failure
- */
-QDF_STATUS lim_process_qos_null_tx_completion(struct mac_context *mac_ctx,
-					      uint32_t desc_id,
-					      uint8_t *vdev_id);
-
+tSirMacHTChannelWidth
+lim_convert_channel_width_enum(enum phy_ch_width ch_width);
 #endif /* __LIM_TYPES_H */

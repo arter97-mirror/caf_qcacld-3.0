@@ -149,63 +149,6 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 					       enum stats_req_type type,
 					       struct request_info *info);
 
-#ifdef WLAN_FEATURE_CTAS
-/**
- * ucfg_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
- * supports C-TAS power indication and power limit enquiring
- * @psoc: pointer to psoc object
- *
- * Return: true if FW supports the capability, false otherwise
- */
-bool ucfg_cp_stats_is_ctas_plim_indication_supported(
-					struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_cp_stats_send_tas_mode() - Send TAS mode to firmware via cp_stats
- * @psoc: pointer to psoc object
- * @direction: TAS direction as enum host_tas_direction; WMI layer converts
- *             to wmi_plim_direction_type before sending to firmware
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS ucfg_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-				       enum host_tas_direction direction);
-
-/**
- * ucfg_mc_cp_stats_send_get_avg_tx_power() - Query avg TX power from FW
- * @psoc: pointer to psoc object
- * @dsi_id: active Device State Index
- * @cb: callback invoked on WMI_AVG_TX_POWER_EVENTID with per-chain data
- * @cookie: opaque cookie passed back to @cb
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS
-ucfg_mc_cp_stats_send_get_avg_tx_power(
-		struct wlan_objmgr_psoc *psoc,
-		uint32_t dsi_id,
-		void (*cb)(struct wlan_tas_metrics_event *ev, void *cookie),
-		void *cookie);
-
-/**
- * ucfg_mc_cp_stats_send_get_tx_power_calling() - Query effective per-chain
- *                                                TX power limits from FW
- * @psoc: pointer to psoc object
- * @dsi_id: DSI index for which power limits are requested
- * @cb: callback invoked on wlan_tas_plimit_event with per-chain data
- * @cookie: opaque cookie passed back to @cb
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS
-ucfg_mc_cp_stats_send_get_tx_power_calling(
-		struct wlan_objmgr_psoc *psoc,
-		uint32_t dsi_id,
-		void (*cb)(struct wlan_tas_plimit_event *ev, void *cookie),
-		void *cookie);
-
-#endif /* WLAN_FEATURE_CTAS */
-
 /**
  * wlan_cfg80211_mc_twt_clear_infra_cp_stats() - send request to reset
  * control path statistics
@@ -235,18 +178,6 @@ wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 					uint32_t dialog_id,
 					uint8_t twt_peer_mac[QDF_MAC_ADDR_SIZE],
 					int *errno);
-
-/**
- * wlan_cfg80211_enhance_cp_stats() - send enhance CP stats request
- * @psoc: pointer to psoc object
- * @vdev: pointer to vdev object
- * @skb: nbuf
- */
-QDF_STATUS
-wlan_cfg80211_enhance_cp_stats(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_objmgr_vdev *vdev,
-			       struct sk_buff *skb);
-
 /**
  * ucfg_mc_cp_stats_get_tx_power() - API to fetch tx_power
  * @vdev: pointer to vdev object
@@ -426,19 +357,6 @@ ucfg_mc_cp_get_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
-/**
- * ucfg_send_power_datapath_stats_request() - API to send power datapath stats
- * request
- * @vdev: pointer to vdev object
- * @type: request type
- * @info: request info
- *
- * Return: status of operation
- */
-QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
-						  enum stats_req_type type,
-						  struct request_info *info);
-
 #ifdef CONFIG_WLAN_BMISS
 /**
  * wlan_cfg80211_mc_bmiss_get_infra_cp_stats() - API to get bmiss stats
@@ -505,7 +423,6 @@ void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev);
 struct channel_status *
 ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 				    uint32_t chan_freq);
-
 #else /* QCA_SUPPORT_CP_STATS */
 
 void static inline ucfg_mc_cp_stats_register_pmo_handler(void) { };
@@ -618,21 +535,5 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 {
 	return NULL;
 }
-
 #endif /* QCA_SUPPORT_CP_STATS */
-
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-/**
- * ucfg_cp_stats_get_power_datapath_stats() - Get power and datapath statistics
- * @pdev: Pointer to pdev object
- * @stats: Pointer to output buffer to store statistics
- *
- * Return: QDF_STATUS_SUCCESS on statistics successfully retrieved
- */
-QDF_STATUS
-ucfg_cp_stats_get_power_datapath_stats(struct wlan_objmgr_pdev *pdev,
-				       struct cp_stats_power_datapath_info *stats);
-
-#endif /* WLAN_FEATURE_POWER_STATISTICS */
-
 #endif /* __WLAN_CP_STATS_MC_UCFG_API_H__ */

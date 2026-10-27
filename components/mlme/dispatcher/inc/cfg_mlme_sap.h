@@ -548,7 +548,7 @@
 
 /*
  * <ini>
- * gEnableApRandomBssid - Create random BSSID
+ * gEnableApRandomBssid - Create ramdom BSSID
  * @Min: 0
  * @Max: 1
  * @Default: 0
@@ -567,7 +567,7 @@
 #define CFG_AP_ENABLE_RANDOM_BSSID CFG_INI_BOOL( \
 	"gEnableApRandomBssid", \
 	0, \
-	"Create random BSSID")
+	"Create ramdom BSSID")
 
 /*
  * <ini>
@@ -820,63 +820,8 @@
 				"supported mlo sap link number")
 
 #define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG CFG(CFG_MLO_SAP_SUPPORT_LINK_NUM)
-/*
- * <ini>
- * mlo_sap_mcst_ie_support - Enable MLO SAP MCST IE support
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This INI enables MLO SAP to include Maximum Channel Switch Time IE
- * in the ML IE of beacon/probe response during CAC phase, so that
- * MLO STA can detect the CAC state and handle accordingly.
- *
- * Related: None
- *
- * Supported Feature: MLO DFS CAC
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_MLO_SAP_MCST_IE_SUPPORT CFG_INI_BOOL( \
-				"mlo_sap_mcst_ie_support", \
-				true, \
-				"Enable MLO SAP MCST IE support")
-
-#define CFG_MLO_SAP_MCST_IE_SUPPORT_CFG CFG(CFG_MLO_SAP_MCST_IE_SUPPORT)
 #else
 #define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
-#define CFG_MLO_SAP_MCST_IE_SUPPORT_CFG
-#endif
-
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/*
- * <ini>
- * enable_wds_ext - Enable/Disable SAP WDS extended functionality
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable WDS (Wireless Distribution System)
- * extended functionality for SAP mode. When enabled, it allows the SAP
- * to support extended WDS features for bridging wireless networks.
- *
- * Related: None
- *
- * Supported Feature: SAP
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_SAP_ENABLE_WDS_EXT CFG_INI_BOOL( \
-				"enable_wds_ext", \
-				true, \
-				"Enable/Disable SAP wds extended")
-#define CFG_SAP_ENABLE_WDS_EXT_CFG CFG(CFG_SAP_ENABLE_WDS_EXT)
-#else
-#define CFG_SAP_ENABLE_WDS_EXT_CFG
 #endif
 
 #define CFG_SAP_ALL \
@@ -916,8 +861,6 @@
 	CFG(CFG_DISABLE_MCS13_SUPPORT) \
 	CFG(CFG_DISABLE_SAP_BCN_PROT) \
 	CFG(CFG_SAP_PS_WITH_TWT) \
-	CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG \
-	CFG_MLO_SAP_MCST_IE_SUPPORT_CFG \
-	CFG_SAP_ENABLE_WDS_EXT_CFG
+	CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
 
 #endif /* __CFG_MLME_SAP_H */

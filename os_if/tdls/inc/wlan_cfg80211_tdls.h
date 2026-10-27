@@ -136,7 +136,7 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_cfg80211_tdls_configure_mode() - configure tdls mode
  * @vdev: vdev obj manager
- * @trigger_mode: tdls trigger mode
+ * @trigger_mode: tdls trgger mode
  *
  * Return: 0 for success; negative errno otherwise
  */

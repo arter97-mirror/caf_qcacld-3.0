@@ -628,7 +628,7 @@ dlm_handle_avoid_list(struct dlm_reject_ap *entry,
 	/* Clear the monitor list bit if the AP was present in monitor list */
 	entry->driver_monitorlist = false;
 
-	/* Increment bad bssid counter as NUD failure happened with this ap */
+	/* Increment bad bssid counter as NUD failure happenend with this ap */
 	entry->bad_bssid_counter++;
 
 	/* If bad bssid counter has reached threshold, move it to denylist */
@@ -1876,7 +1876,7 @@ dlm_get_link_action(struct wlan_objmgr_vdev *vdev,
 			return WLAN_HOST_AVOID_ASSOC_LINK;
 		}
 		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-			link_info = vdev->mlo_dev_ctx->sta_ctx->links_info[i];
+			link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
 
 			if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
 				break;

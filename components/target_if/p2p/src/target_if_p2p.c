@@ -605,7 +605,7 @@ void target_if_p2p_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	target_if_p2p_register_ap_assist_dfs_tx_ops(p2p_tx_ops);
 }
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 					 struct p2p_usd_attr_params *param)
 {
@@ -630,44 +630,4 @@ bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 
 	return wmi_service_enabled(wmi_handle, wmi_service_usd_support);
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
-bool target_if_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
-{
-	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
-
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return wmi_service_enabled(wmi_handle, wmi_service_wfd_r2);
-}
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-bool  target_if_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
-{
-	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
-
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return wmi_service_enabled(wmi_handle, wmi_service_pcc_mode);
-}
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
-
-bool target_if_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
-{
-	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
-
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return false;
-	}
-
-	return wmi_service_enabled(wmi_handle, wmi_service_p2p_cancel_one_shot_noa_support);
-}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

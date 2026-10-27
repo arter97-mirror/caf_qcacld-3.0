@@ -41,34 +41,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 				      unsigned char name_assign_type,
 				      uint8_t *name);
 
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/**
- * hdd_create_wds_ext_dev() - Create WDS extended device
- * @wiphy: Pointer to wiphy structure
- * @name: Interface name for the WDS extension device
- * @name_assign_type: Name assignment type for the network device
- * @type: Interface type (must be NL80211_IFTYPE_AP_VLAN)
- *
- * This function creates and registers a WDS extended device. It allocates
- * the network device, sets up the device operations, and registers it with
- * the kernel networking subsystem.
- *
- * Return: Pointer to wireless_dev on success, ERR_PTR on failure
- */
-struct wireless_dev *hdd_create_wds_ext_dev(struct wiphy *wiphy,
-					    const char *name,
-					    unsigned char name_assign_type,
-					    enum nl80211_iftype type);
-#else
-static inline struct wireless_dev *
-hdd_create_wds_ext_dev(struct wiphy *wiphy, const char *name,
-		       unsigned char name_assign_type,
-		       enum nl80211_iftype type)
-{
-	return ERR_PTR(-EINVAL);
-}
-#endif
-
 enum csr_akm_type
 hdd_translate_rsn_to_csr_auth_type(uint8_t auth_suite[4]);
 
@@ -100,7 +72,6 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  * Disabled Subchannel Bitmap in 802.11be EHT-OP IE
  * @forced: Force to switch channel, ignore SCC/MCC check
  * @allow_blocking: the calling thread allows be blocked
- * @csa_params: CSA user configurations
  *
  * Return: 0 for success, non zero for failure
  */
@@ -109,8 +80,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				  enum phy_ch_width target_bw,
 				  uint32_t punct_bitmap,
 				  bool forced,
-				  bool allow_blocking,
-				  struct cfg80211_csa_settings *csa_params);
+				  bool allow_blocking);
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.
@@ -203,7 +173,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
  *
  * Return: QDF_STATUS_SUCCESS if successful
  */
-QDF_STATUS
+uint32_t
 wlan_get_sap_acs_band(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		      uint32_t *acs_band);
 
@@ -226,19 +196,6 @@ wlan_get_ap_prefer_conc_ch_params(
 		struct wlan_objmgr_psoc *psoc,
 		uint8_t vdev_id, uint32_t chan_freq,
 		struct ch_params *ch_params);
-
-/**
- * hdd_chan_change_started_notify() - Notify channel switch started to
- * userspace
- * @link_info: pointer to link_info
- * @freq: channel frequency
- * @ch_params: channel params
- *
- * Return: None
- */
-void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
-				    qdf_freq_t freq,
-				    struct ch_params *ch_params);
 
 /**
  * hdd_get_ap_6ghz_capable() - Get ap vdev 6ghz capable flags
@@ -359,6 +316,18 @@ bool hdd_sap_create_ctx(struct wlan_hdd_link_info *link_info);
  * Return: true or false based on overall success or failure
  */
 bool hdd_sap_destroy_ctx(struct wlan_hdd_link_info *link_info);
+/**
+ * hdd_sap_destroy_ctx_all() - Wrapper API to destroy all SAP context
+ * @hdd_ctx: pointer to HDD context
+ * @is_ssr: true if SSR is in progress
+ *
+ * This wrapper API can be called to destroy all the sap context.
+ * if is_ssr is true, it will return as sap_ctx will be used when
+ * restart sap.
+ *
+ * Return: none
+ */
+void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr);
 
 /**
  * hdd_hostapd_stop_no_trans() - hdd stop function for hostapd interface
@@ -416,20 +385,11 @@ static inline QDF_STATUS hdd_get_sap_ht2040_mode(
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to netdev
  * @link_id: Link id for which this stop_ap is received.
- * @settings: (CONFIG_ML_RECONFIG_SINGLE_WIPHY only) AP settings for the
- *            reconfigure link removal path — unused by qcacld but present
- *            to match cfg80211_ops.stop_ap slot signature.
  *
  * Return: zero for success non-zero for failure
  */
-#ifdef CONFIG_ML_RECONFIG_SINGLE_WIPHY
-int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
-			      unsigned int link_id,
-			      struct cfg80211_ap_settings *settings);
-#else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 			      unsigned int link_id);
-#endif
 #else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			      struct net_device *dev);
@@ -558,14 +518,12 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx,
  * @hdd_ctx: Pointer to hdd context
  * @twt_responder: twt responder configure value
  * @vdev_id: Vdev id
- * @sap_hw_mode: sap hardware mode
  *
  * Return: none
  */
 void
 wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				 bool twt_responder, uint8_t vdev_id,
-				 eCsrPhyMode sap_hw_mode);
+				 bool twt_responder, uint8_t vdev_id);
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /**
@@ -578,38 +536,6 @@ wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
  */
 QDF_STATUS hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
 					  unsigned int link_id);
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
-/**
- * wlan_hdd_validate_mlo_link_removal_request() - check link removal request
- * @link_info: link info structure
- * @config_tbtt: tbtt count from use space
- *
- * This API use to check if link removal is allow for current state and active
- * link number
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
-					   uint32_t config_tbtt);
-
-/**
- * wlan_hdd_process_mlo_link_removal_cmd() - send link removal request to FW
- * @link_info: link info structure
- * @psoc: PSOC object information
- * @params: link removal params
- *
- * This API use to send link removal request with WMI_MLO_LINK_REMOVAL_CMDID
- * to FW.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_hdd_process_mlo_link_removal_cmd(struct wlan_hdd_link_info *link_info,
-				      struct wlan_objmgr_psoc *psoc,
-				      const struct  cfg80211_link_reconfig_removal_params *params);
-
-#endif
 #else
 static inline QDF_STATUS
 hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
@@ -631,26 +557,6 @@ static inline void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* end WLAN_FEATURE_11BE_MLO */
-
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
-/**
- * wlan_hdd_mlo_sap_link_removal_cap() - get mlo sap link removal support
- * @hdd_ctx: Pointer to hdd context
- *
- * Get link removal support from fw wmi service, if support set wiphy flag of
- * NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD which hostapd/kernel will
- * check when link removal request from user space.
- *
- * Return: true if support,false if not support
- */
-bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx);
-#else
-static inline
-bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx)
-{
-	return false;
-}
-#endif
 
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 /**
@@ -676,20 +582,6 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
  * Return: true if not exceed max support num.
  */
 bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter);
-
-/**
- * hdd_mlosap_check_support_multi_link() - check if support multi-link
- * @hdd_ctx: @hdd_ctx: Pointer to hdd context
- *
- * Return: true if support multi link.
- */
-bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx);
-#else
-static inline
-bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx)
-{
-	return false;
-}
 #endif
 
 #ifdef WLAN_CHIPSET_STATS
@@ -808,21 +700,6 @@ static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
 	INIT_WORK(&hdd_ctx->hlp_processing_work,
 		  hdd_hlp_work_queue);
 }
-
-/**
- * hdd_send_hlp_data() - Send FILS HLP data to network stack
- * @vdev_id: vdev id
- * @hlp_data: Pointer to HLP data buffer
- * @hlp_data_len: Length of HLP data
- * @src_mac: Source MAC address
- * @dst_mac: Destination MAC address
- *
- * Return: None
- */
-void hdd_send_hlp_data(uint8_t vdev_id, uint8_t *hlp_data,
-		       uint16_t hlp_data_len, struct qdf_mac_addr *src_mac,
-		       struct qdf_mac_addr *dst_mac);
-
 #else
 static inline void hdd_fils_hlp_init(struct hdd_context *hdd_ctx)
 {}
@@ -835,12 +712,6 @@ static inline void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx,
 {}
 
 static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
-{}
-
-static inline void hdd_send_hlp_data(uint8_t vdev_id, uint8_t *hlp_data,
-				     uint16_t hlp_data_len,
-				     struct qdf_mac_addr *src_mac,
-				     struct qdf_mac_addr *dst_mac)
 {}
 #endif
 

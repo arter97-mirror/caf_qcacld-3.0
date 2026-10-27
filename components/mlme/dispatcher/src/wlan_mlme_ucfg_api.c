@@ -332,25 +332,6 @@ ucfg_mlme_set_fine_time_meas_cap(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS
-ucfg_mlme_is_rtt_bw_downgrade_enabled(struct wlan_objmgr_psoc *psoc,
-				      bool *is_rtt_bw_downgrade_enabled)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*is_rtt_bw_downgrade_enabled =
-			cfg_default(CFG_ENABLE_RTT_BW_DOWNGRADE);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*is_rtt_bw_downgrade_enabled =
-		mlme_obj->cfg.wifi_pos_cfg.is_rtt_bw_downgrade_enabled;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 static QDF_STATUS
 ucfg_mlme_set_vdev_traffic_type(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev, bool set,
@@ -1900,22 +1881,6 @@ bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-ucfg_mlme_get_channel_bonding_override(struct wlan_objmgr_psoc *psoc,
-				       bool *val)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*val = cfg_default(CFG_CHANNEL_BONDING_MODE_OVERRIDE);
-		return QDF_STATUS_E_INVAL;
-	}
-	*val = mlme_obj->cfg.feature_flags.cb_mode_override;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
 ucfg_mlme_get_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *val)
 {
@@ -2162,7 +2127,8 @@ ucfg_mlme_get_vdev_phy_mode(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		phymode = WLAN_PHYMODE_AUTO;
 		goto done;
 	}
-	phymode = wlan_cm_fw_to_host_phymode(mlme_obj->mgmt.generic.phy_mode);
+	phymode = mlme_obj->mgmt.generic.phy_mode;
+
 done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
@@ -2260,55 +2226,3 @@ ucfg_mlme_get_mrsno_support(struct wlan_objmgr_psoc *psoc, bool *val)
 
 	return QDF_STATUS_SUCCESS;
 }
-
-QDF_STATUS
-ucfg_mlme_get_enable_social_channels_on_2g_disable(
-		struct wlan_objmgr_psoc *psoc, bool *value)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*value = cfg_default(CFG_ENABLE_SOCIAL_CHANNELS_ON_2G_DISABLE);
-		mlme_legacy_err("Failed to get MLME Obj");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*value = mlme_obj->cfg.reg.enable_social_channels_on_2g_disable;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-#ifdef WLAN_FEATURE_SECURITY_PROFILE
-QDF_STATUS
-ucfg_mlme_set_security_profile_support(struct wlan_objmgr_psoc *psoc,
-				       bool val)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
-		return QDF_STATUS_E_INVAL;
-
-	mlme_obj->cfg.lfr.security_profile_support = val;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-ucfg_mlme_get_security_profile_support(struct wlan_objmgr_psoc *psoc,
-				       bool *val)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*val = false;
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = mlme_obj->cfg.lfr.security_profile_support;
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_SECURITY_PROFILE */

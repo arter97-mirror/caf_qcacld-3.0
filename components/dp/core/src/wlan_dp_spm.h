@@ -10,30 +10,20 @@
 #include <qdf_nbuf.h>
 #include "wlan_dp_main.h"
 
-/* SPM Log mask bit definitions */
-#define WLAN_DP_SPM_LOGMASK_FLOW_ADD       BIT(0)
-#define WLAN_DP_SPM_LOGMASK_FLOW_RETIRE    BIT(1)
-
-#define dp_spm_debug(logmask, mask, params...)                  \
-	do {                                                        \
-		if (unlikely((logmask) & (mask)))                       \
-			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,          \
-				       QDF_MODULE_ID_DP, ## params);        \
-	} while (0)
-
-#define WLAN_DP_SPM_FLOW_REC_TBL_MAX 256
-#define WLAN_DP_SPM_HASH_TBL_MAX 64
-
-#define SAWFISH_FLOW_ID_MAX 0x3F
-#define SAWFISH_INVALID_FLOW_ID 0xFFFF
-
+#define WLAN_DP_SPM_FLOW_REC_TBL_MAX 64
+#define WLAN_DP_SPM_INVALID_FLOW_ID 0xFF
 #define WLAN_DP_SPM_MAX_SERVICE_CLASS_SUPPORT 32
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
-#define WLAN_DP_SPM_NUM_FLOW_ENTRIES_MASK 0xFF
-#define WLAN_DP_SPM_SKID_MAX 8
+#define WLAN_DP_SPM_S_TBL_SIZE 256
+#define WLAN_DP_SPM_S_TBL_IDX_MASK 0xFF
+#define WLAN_DP_SPM_S_TBL_RETIRE_TIME_DELTA_NS (200 * QDF_NSEC_PER_MSEC)
+#define WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT 0
 
+/* No packets received for this flow in last 2 seconds, window did not move*/
+#define WLAN_DP_SPM_MAX_LAST_WIN_START_NS (2 * QDF_NSEC_PER_SEC)
 /* voice call tx pkt rate is very low */
+#define WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC 10
 #define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 5
 
 /**
@@ -83,70 +73,100 @@ struct wlan_dp_spm_flow_tbl_stats {
 
 /**
  * struct wlan_dp_spm_flow_info - Record of flow which will be tracked
+ * @node: List node
+ * @id: Flow ID
+ * @is_populated: Is flow valid
+ * @info: Flow details
+ * @is_ipv4: Is flow IPV4
+ * @guid: Global unique identifier
+ * @peer_id: Peer ID
+ * @vdev_id: Vdev ID
+ * @svc_id: Service ID
+ * @svc_metadata: Service metadata
+ * @cookie: sock address or skb hash
+ * @flags: flow flags
+ * @flow_add_ts: Flow add timestamp
  * @active_ts: last active timestamp
  * @num_pkts: Num of packets for this flow
- * @hash: hash of the flow
- * @guid: Global unique identifier
- * @flags: flow flags
- * @id: Flow ID
- * @peer_id: Peer ID
- * @is_populated: Is flow valid
- * @is_ipv4: Is flow IPV4
- * @vdev_id: Vdev ID
- * @svc_metadata: Service metadata
- * @track_flow_stats: is stats tracking enabled for flow
- * @classified: Classification done
  * @c_flow_id: STC classification table ID
+ * @track_flow_stats: is stats tracking enabled for flow
  * @selected_to_sample: Selected for classification stats collection
- * @ul_tid: Uplink TID id for the flow
- * @svc_id: Service ID
- * @cookie: sock address or skb hash
- * @flow_add_ts: Flow add timestamp
+ * @classified: Classification done
+ * @reserved: unused
  * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
- * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
- * @info: Flow details
- * @node: List node
+ * @win_start_ts: winidow start timestamp
+ * @win_start_num_pkts: Total number of pkts of this flow at win_start_ts
+ * @last_win_pkts: Packets in previous window
  */
 struct wlan_dp_spm_flow_info {
+	qdf_list_node_t node;
+	uint16_t id;
+	bool is_populated;
+	struct flow_info info;
+	bool is_ipv4;
+	uint64_t guid;
+	uint16_t peer_id;
+	uint8_t vdev_id;
+	uint16_t svc_id;
+	uint8_t svc_metadata;
+	uint64_t cookie;
+	uint32_t flags;
+	uint64_t flow_add_ts;
 	uint64_t active_ts;
 	uint64_t num_pkts;
-	uint32_t hash;
-	uint32_t guid;
-	uint32_t flags;
-	uint16_t id;
-	uint16_t peer_id;
-	uint8_t is_populated;
-	uint8_t is_ipv4;
-	uint8_t vdev_id;
-	uint8_t svc_metadata;
 #ifdef WLAN_DP_FEATURE_STC
-	uint8_t track_flow_stats;
-	uint8_t classified;
 	uint8_t c_flow_id;
+	uint8_t track_flow_stats;
 	uint8_t selected_to_sample;
-	uint8_t ul_tid;
-#endif
-	uint16_t svc_id;
-	uint64_t cookie;
-	uint64_t flow_add_ts;
-#ifdef WLAN_DP_FEATURE_STC
+	uint8_t classified;
 	uint64_t flow_tuple_hash;
-	uint64_t inactivity_timeout;
 #endif
-	struct flow_info info;
-#ifdef WLAN_FEATURE_SAWFISH
-	qdf_list_node_t node;
-#endif
+	uint64_t win_start_ts;
+	uint64_t win_start_num_pkts;
+	uint64_t last_win_pkts;
+};
+
+/**
+ * struct wlan_dp_spm_screening_entry - Entry of screening table
+ * @flags: Entry flags. This member should always be placed first as memory
+ *         ops will be done to avoid this member.
+ * @skb_hash: Socket buffer hash
+ * @num_pkts: Number of packets
+ * @init_ts: Initialisation timestamp
+ */
+struct wlan_dp_spm_screening_entry {
+	unsigned long flags;
+	uint32_t skb_hash;
+	uint32_t num_pkts;
+	uint64_t init_ts;
+};
+
+/**
+ * struct wlan_dp_spm_screening_ctx - Flow screening context
+ * @s_tbl: Screening flow table
+ * @s_flows_active: Number of flows being screened
+ */
+struct wlan_dp_spm_screening_ctx {
+	struct wlan_dp_spm_screening_entry s_tbl[WLAN_DP_SPM_S_TBL_SIZE];
+	uint32_t s_flows_active;
 };
 
 /**
  * struct wlan_dp_spm_intf_context - SPM context per dp interface
- * @origin_aft_hlist: Active flow table for originating traffic
+ * @origin_aft: Active flow table for originating traffic
+ * @flow_rec_base: Flow records base address
+ * @o_flow_rec_freelist: Flow records freelist
+ * @flow_list_lock: Flow list operation lock
  * @o_stats: Flow table stats for originating traffic
+ * @screen_flow_ctx: Flow screening context
  */
 struct wlan_dp_spm_intf_context {
-	struct hlist_head origin_aft_hlist[WLAN_DP_SPM_HASH_TBL_MAX];
+	struct wlan_dp_spm_flow_info *origin_aft[WLAN_DP_SPM_FLOW_REC_TBL_MAX];
+	struct wlan_dp_spm_flow_info *flow_rec_base;
+	qdf_list_t o_flow_rec_freelist;
+	qdf_spinlock_t flow_list_lock;
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
+	struct wlan_dp_spm_screening_ctx screen_flow_ctx;
 };
 
 /**
@@ -413,63 +433,42 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf);
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf);
 
 /**
- * dp_spm_get_tx_flow_id() - Get TX flow ID using hash-based lookup
- * @dp_intf: DP interface context
- * @nbuf: Network buffer containing the packet
- * @flow_info: Flow information extracted from the packet
+ * wlan_dp_spm_flow_screening(): Check if flow has valid packet rate for
+ *                               tracking.
  *
- * This function performs hash-based lookup to find an existing TX flow
- * that matches the given flow information. It uses the packet hash and
- * SKID (collision resolution) mechanism to efficiently locate flows
- * without relying on socket cookies.
+ * @dp_intf: DP interface
+ * @skb: Pointer to sk_buff
  *
- * The function calculates a hash index from the packet and searches
- * through potential collision slots (SKID) to find a matching flow
- * based on exact flow tuple comparison.
- *
- * Return: Valid flow ID if found, SAWFISH_INVALID_FLOW_ID if not found
+ * Return: True if flow tracking rate is met, else false.
  */
-uint16_t dp_spm_get_tx_flow_id(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
-			       struct flow_info *flow_info);
+bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
+				qdf_nbuf_t skb);
 
 /**
- * dp_spm_add_tx_flow() - Add new TX flow using hash-based approach
- * @dp_intf: DP interface context
- * @nbuf: Network buffer containing the packet
- * @tx_flow_id: Pointer to store the allocated flow ID
- * @flow_info: Flow information to be stored
- * @peer_id: Peer ID associated with this flow
+ * wlan_dp_spm_get_flow_id_origin() - Get flow ID for a new flow
+ * @dp_intf: DP interface
+ * @flow_id: ID place holder.
+ * @flow_info: Flow related information
+ * @cookie_sk: Sock structure pointer to be used as cookie
+ * @peer_id: Peer ID
  *
- * This function adds a new TX flow entry using hash-based placement
- * strategy. It addresses the socket reuse ambiguity problem where
- * multiple flows sharing the same socket can degrade classification
- * accuracy.
- *
- * Return: QDF_STATUS_SUCCESS on success,
- *         QDF_STATUS_E_EMPTY if no flow entry available,
+ * Return: Success if flow is successfully added to flow table
  */
-QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
-			      uint16_t *tx_flow_id, struct flow_info *flow_info,
-			      uint16_t peer_id);
+QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
+					  uint16_t *flow_id,
+					  struct flow_info *flow_info,
+					  uint64_t cookie_sk, uint16_t peer_id);
 
 /**
- * wlan_dp_spm_get_logmask() - Get SPM log mask
- * @dp_ctx: DP context
- *
- * Return: Current SPM logmask value
- */
-uint32_t wlan_dp_spm_get_logmask(struct wlan_dp_psoc_context *dp_ctx);
-
-/**
- * wlan_dp_spm_set_logmask() - Update SPM log mask
- * @dp_ctx: DP context
- * @mask: New logmask value
+ * wlan_dp_spm_set_flow_active(): Set active ts for a flow
+ * @spm_intf: SPM interface
+ * @flow_id: Flow ID
+ * @flow_guid: Flow Unique ID
  *
  * Return: None
  */
-void wlan_dp_spm_set_logmask(struct wlan_dp_psoc_context *dp_ctx,
-			     uint32_t mask);
-
+void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
+				 uint16_t flow_id, uint64_t flow_guid);
 #else
 static inline void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 {
@@ -497,29 +496,31 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 }
 
 static inline
-uint16_t dp_spm_get_tx_flow_id(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
-			       struct flow_info *flow_info)
+bool wlan_dp_spm_flow_pkt_rate_valid(struct wlan_dp_intf *dp_intf,
+				     qdf_nbuf_t skb)
 {
-	return SAWFISH_INVALID_FLOW_ID;
+	return false;
 }
 
 static inline
-QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
-			      uint16_t *tx_flow_id, struct flow_info *flow,
-			      uint16_t peer_id)
+bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
+				qdf_nbuf_t skb)
 {
-	return QDF_STATUS_E_NOSUPPORT;
+	return false;
 }
 
 static inline
-uint32_t wlan_dp_spm_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
+QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
+					  uint16_t *flow_id,
+					  struct flow_info *flow_info,
+					  uint64_t cookie_sk, uint16_t peer_id)
 {
-	return QDF_STATUS_E_NOSUPPORT;
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
-void wlan_dp_spm_set_logmask(struct wlan_dp_psoc_context *dp_ctx,
-			     uint32_t mask)
+void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
+				 uint16_t flow_id, uint64_t flow_guid)
 {
 }
 #endif

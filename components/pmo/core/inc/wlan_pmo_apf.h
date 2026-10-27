@@ -37,35 +37,6 @@
  */
 uint32_t pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc);
 
-/**
- * pmo_get_apf_mode() - get the current APF mode
- * @psoc: the psoc to query
- *
- * Return: APF mode
- */
-uint32_t pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc);
-
-/**
- * pmo_set_apf_mode - set the current APF mode
- * @psoc: the psoc to query
- * @apf_mode: apf mode
- * @vdev_id: vdev id
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
-			    uint32_t apf_mode,
-			    uint32_t vdev_id);
-
-/**
- * pmo_store_apf_mode - store the APF mode
- * @psoc: the psoc to query
- * @apf_mode: apf mode
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
-			      uint32_t apf_mode);
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #endif /* __WLAN_PMO_APF_H */

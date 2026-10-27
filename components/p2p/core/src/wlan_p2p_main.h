@@ -163,7 +163,7 @@ struct p2p_noa_event {
 };
 
 /**
- * struct p2p_mac_filter_rsp - p2p set mac filter response
+ * struct p2p_mac_filter_rsp - p2p set mac filter respone
  * @p2p_soc_obj: p2p soc private object
  * @vdev_id: vdev id
  * @status: successfully(1) or not (0)
@@ -297,13 +297,10 @@ struct p2p_soc_priv_obj {
  * struct action_frame_cookie - Action frame cookie item in cookie list
  * @cookie_node: qdf_list_node
  * @cookie: Cookie value
- * @skip_timeout_clear: Skip clearing the FW mac addr filter on
- *  clear_timer expiry while this cookie is still present in the list
  */
 struct action_frame_cookie {
 	qdf_list_node_t cookie_node;
 	uint64_t cookie;
-	bool skip_timeout_clear;
 };
 
 /**
@@ -704,7 +701,7 @@ p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 
 /**
  * p2p_parse_assoc_ie_for_device_info() - This function finds P2P interface
- * address from association IE
+ * address from assocaition IE
  * @assoc_ie: Association request IE
  * @assoc_ie_len: Association IE length
  *
@@ -712,8 +709,7 @@ p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
  */
 const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 						  uint32_t assoc_ie_len);
-
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * p2p_send_usd_params() - Sent USD parameters to target
  * @psoc: pointer to PSOC object
@@ -731,9 +727,7 @@ QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  * Return: true if USD is supported by FW else false
  */
 bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * p2p_is_vdev_wfd_r2_mode() - Returns true if current mode of VDEV operation
  * is WFD-R2.
@@ -742,32 +736,12 @@ bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
  * Return: bool
  */
 bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev);
-
-/**
- * p2p_is_fw_support_wfd_r2() - wrapper API for API
- * tgt_p2p_is_fw_support_wfd_r2()
- * @psoc: pointer to PSOC object
- *
- * Return: true if WFD R2 is supported by FW else false
- */
-bool p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-/**
- * p2p_is_fw_support_pcc() - wrapper API of
- * tgt_p2p_is_fw_support_pcc()
- * @psoc: pointer to PSOC object
- *
- * Return: true if PCC is supported by FW else false
- */
-bool p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
  * p2p_extract_ap_assist_dfs_params() - Extract P2P2 IE for assisted AP

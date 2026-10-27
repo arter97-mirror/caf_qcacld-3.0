@@ -34,9 +34,6 @@
 
 #include "../src/nan_main_i.h"
 
-/* don't allow FW to send NAN event */
-#define NAN_INVALID_DW_TIME 0
-
 struct wlan_objmgr_psoc;
 
 /**
@@ -235,50 +232,23 @@ bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_nan_is_beamforming_supported- Get support for beamforing
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if beamforming is supported, false if not.
+ */
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_is_nan_allowed_on_freq() - Check if NAN is allowed on given freq
  * @pdev: pdev context
  * @freq: Frequency to be checked
- * @allow_sta_peer_scc: Allow NAN on an indoor channel occupied by STA
  *
  * Check if NAN/NDP can be enabled on given frequency.
  *
  * Return: True if NAN is allowed on the given frequency
  */
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev,
-				 uint32_t freq,
-				 bool allow_sta_peer_scc);
-
-/**
- * wlan_get_disable_6g_nan() - Check if NAN is disabled on 6Ghz
- * @psoc: psoc context
- *
- * Return: True if NAN is disabled on 6Ghz, else false.
- */
-
-bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc);
-
-/**
- * nan_set_ndi_state() - Set NDI state
- * @vdev: vdev context
- * @state: state
- * @func: caller function address
- *
- * Return:  SUCCESS if state is set, else failure.
- */
-
-QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
-			     enum nan_datapath_state state,
-			     const char *func);
-
-/**
- * nan_set_active_peers: set active ndi peer
- * @vdev: pointer to vdev object
- * @val: value to set
- *
- * Return: status of operation
- */
-QDF_STATUS nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
-				uint32_t val);
+bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 
 /**
  * nan_handle_emlsr_concurrency()- Handle NAN+eMLSR concurrency
@@ -319,23 +289,6 @@ qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
  */
 bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc);
 
-/**
- * wlan_get_nan_config: NAN capability configuration
- * @psoc: Pointer to PSOC object
- *
- * Return: NAN capability bitmap
- */
-static inline uint32_t wlan_get_nan_config(struct wlan_objmgr_psoc *psoc)
-{
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj) {
-		nan_err("nan psoc priv object is NULL");
-		return 0;
-	}
-
-	return nan_obj->cfg_param.nan_config;
-}
 #else /* WLAN_FEATURE_NAN */
 static inline QDF_STATUS nan_init(void)
 {
@@ -395,30 +348,15 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev,
-				 uint32_t freq,
-				 bool allow_sta_peer_scc)
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
 
 static inline
-bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
+bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 {
 	return false;
-}
-
-static inline QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
-					   enum nan_datapath_state state,
-					   const char *func)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
-					      uint32_t val)
-{
-	return QDF_STATUS_SUCCESS;
 }
 
 static inline void
@@ -443,11 +381,6 @@ static inline
 bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
-}
-
-static inline uint32_t wlan_get_nan_config(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
 }
 #endif /* WLAN_FEATURE_NAN */
 
@@ -503,150 +436,4 @@ nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
 {
 }
 #endif /* WLAN_FEATURE_NAN && WLAN_CHIPSET_STATS */
-
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-struct wma_tgt_cfg;
-
-/**
- * nan_get_device_caps() - This API get NAN capabilities from firmware
- * @psoc: pointer to PSOC object
- * @caps: NAN capabilities
- *
- * Return: QDF STATUS
- */
-QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
-			       struct nan_capabilities *caps);
-
-/**
- * nan_populate_phy_caps() - Compute and cache NAN HT/VHT/HE PHY capability
- * intersection
- * @psoc: pointer to PSOC object
- * @cfg: effective target config (FW intersected with host)
- * @num_rf_chains: number of RF chains supported by the host
- * @enable_2g: whether NAN is enabled on 2.4 GHz band
- * @enable_5g: whether NAN is enabled on 5 GHz band
- * @enable_6g: whether NAN is enabled on 6 GHz band
- *
- * Intersects @cfg with NAN band enablement policy and caches the OS-agnostic
- * result for retrieval via nan_get_phy_caps().
- *
- * Return: None
- */
-void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
-			   struct wma_tgt_cfg *cfg, uint8_t num_rf_chains,
-			   bool enable_2g, bool enable_5g, bool enable_6g);
-
-/**
- * nan_get_phy_caps() - Retrieve cached NAN HT/VHT/HE PHY capability
- * intersection result
- * @psoc: pointer to PSOC object
- * @caps: output NAN PHY capability struct
- *
- * Return: None
- */
-void nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
-		      struct nan_phy_caps *caps);
-/**
- * wlan_get_nan_init_dw_time() - get nan init dw time
- *
- * @psoc: PSOC object
- *
- * Return: NAN DW time
- */
-static inline uint8_t
-wlan_get_nan_init_dw_time(struct wlan_objmgr_psoc *psoc)
-{
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj) {
-		return NAN_INVALID_DW_TIME;
-	}
-
-	return nan_obj->cfg_param.nan_dw_time;
-}
-
-/**
- * nan_set_local_schedule() - Set NAN local schedule
- * @params: Pointer to NAN local schedule parameters
- *
- * This function is the core implementation for setting NAN local schedule.
- * It posts a message to the scheduler which will be processed by the NAN
- * component.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-QDF_STATUS nan_set_local_schedule(struct nan_local_sched_params *params);
-
-/**
- * nan_set_ndp_peer_create_ctx() - cache the NDI peer create request cookie
- * @psoc: pointer to PSOC object
- * @ctx: osif_request cookie to cache, or NULL to clear it
- *
- * Return: None
- */
-static inline void
-nan_set_ndp_peer_create_ctx(struct wlan_objmgr_psoc *psoc, void *ctx)
-{
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj)
-		return;
-
-	nan_obj->ndp_peer_create_ctx = ctx;
-}
-
-/**
- * nan_get_ndp_peer_create_ctx() - retrieve the cached NDI peer create
- * request cookie
- * @psoc: pointer to PSOC object
- *
- * Return: cached osif_request cookie, or NULL
- */
-static inline void *
-nan_get_ndp_peer_create_ctx(struct wlan_objmgr_psoc *psoc)
-{
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj)
-		return NULL;
-
-	return nan_obj->ndp_peer_create_ctx;
-}
-
-/**
- * nan_set_ndp_peer_delete_ctx() - cache the NDI peer delete request cookie
- * @psoc: pointer to PSOC object
- * @ctx: osif_request cookie to cache, or NULL to clear it
- *
- * Return: None
- */
-static inline void
-nan_set_ndp_peer_delete_ctx(struct wlan_objmgr_psoc *psoc, void *ctx)
-{
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj)
-		return;
-
-	nan_obj->ndp_peer_delete_ctx = ctx;
-}
-
-/**
- * nan_get_ndp_peer_delete_ctx() - retrieve the cached NDI peer delete
- * request cookie
- * @psoc: pointer to PSOC object
- *
- * Return: cached osif_request cookie, or NULL
- */
-static inline void *
-nan_get_ndp_peer_delete_ctx(struct wlan_objmgr_psoc *psoc)
-{
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj)
-		return NULL;
-
-	return nan_obj->ndp_peer_delete_ctx;
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_API_H_ */

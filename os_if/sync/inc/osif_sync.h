@@ -26,7 +26,7 @@
  * synchronization primitives and behavior.
  *
  * While DSC is great at doing the required synchronization, it (by design) does
- * not address the gap between receiving a callback and involving the appropriate
+ * not address the gap between receiving a callback and involing the appropriate
  * DSC protections. For example, given an input net_device pointer from the
  * kernel, how does one safely acquire the appropriate DSC context? osif_sync
  * implements this logic via wrapping DSC APIs with a registration mechanism.
@@ -63,3 +63,4 @@ void osif_sync_init(void);
 void osif_sync_deinit(void);
 
 #endif /* __OSIF_SYNC_H */
+

@@ -23,7 +23,6 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_twt_public_structs.h>
 #include <include/wlan_mlme_cmn.h>
-#include <wlan_twt_ext_defs.h>
 
 /* dialog_id used to get all peer's twt session parameters */
 #define TWT_GET_ALL_PEER_PARAMS_DIALOG_ID (0xFF)
@@ -81,19 +80,6 @@ QDF_STATUS ucfg_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_twt_teardown_req(struct wlan_objmgr_psoc *psoc,
 				 struct twt_del_dialog_param *params,
 				 void *context);
-
-/**
- * ucfg_twt_early_terminate_ind() - Early TWT end indication
- * @vdev: Pointer to vdev object
- * @params: twt_early_terminate_param
- * @context: twt context
- *
- * Return: QDF_STATUS_SUCCESS
- */
-QDF_STATUS
-ucfg_twt_early_terminate_ind(struct wlan_objmgr_vdev *vdev,
-			     struct twt_early_terminate_param *params,
-			     void *context);
 
 /**
  * ucfg_twt_pause_req() - Process TWT pause req
@@ -348,39 +334,6 @@ void ucfg_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 			      uint32_t *next_action);
 
 /**
- * ucfg_twt_set_setup_work_params() - Cache TWT add dialog params for a
- * deferred setup retry scheduled on the TWT worker queue
- * @vdev: vdev pointer
- * @params: TWT add dialog params to cache
- *
- * Return: None
- */
-void ucfg_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
-				    struct twt_add_dialog_param *params);
-
-/**
- * ucfg_twt_get_setup_work_params() - Get cached TWT add dialog params for a
- * deferred setup retry
- * @vdev: vdev pointer
- * @params: pointer to receive cached TWT add dialog params
- * @next_action: pointer to receive TWT worker next action
- *
- * Return: None
- */
-void ucfg_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
-				    struct twt_add_dialog_param *params,
-				    uint32_t *next_action);
-
-/**
- * ucfg_twt_inc_retry_count() - Increment and return the TWT deferred work
- *   retry count
- * @vdev: vdev pointer
- *
- * Return: new retry count, or UINT_MAX on error
- */
-uint32_t ucfg_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev);
-
-/**
  * ucfg_twt_cfg_set_requestor() - Set TWT requestor capability
  * @psoc: Pointer to global PSOC object
  * @val: pointer to value to be set
@@ -397,108 +350,7 @@ ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val);
-
-/**
- * ucfg_twt_cfg_get_congestion_timeout_per_mac() - Get congestion timeout
- * for specific MAC
- * @psoc: Pointer to global PSOC object
- * @mac_id: MAC ID (0 or 1)
- * @val: pointer to output variable
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_get_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
-					    uint8_t mac_id,
-					    uint32_t *val);
-
-/**
- * ucfg_twt_cfg_set_congestion_timeout_per_mac() - Set congestion timeout
- * for specific MAC
- * @psoc: Pointer to global PSOC object
- * @mac_id: MAC ID (0 or 1)
- * @val: value to be set
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_set_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
-					    uint8_t mac_id,
-					    uint32_t val);
-
-/**
- * ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini() - Reset congestion
- * timeout for specific MAC to INI configured value
- * @psoc: Pointer to global PSOC object
- * @mac_id: MAC ID (0 or 1)
- *
- * This function resets the twt_congestion_timeout parameter for the specified
- * MAC to the value configured in INI (CFG_TWT_CONGESTION_TIMEOUT).
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
-					struct wlan_objmgr_psoc *psoc,
-					uint8_t mac_id);
-
-/**
- * ucfg_twt_tgt_caps_get_req_en_dis_vdev_support() - Get FW capability for
- * per-vdev TWT enable/disable command support for TWT requestor role
- * @psoc: Pointer to global PSOC object
- * @val: pointer to output variable; set to true if supported
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
-					      bool *val);
-
-/**
- * ucfg_twt_cfg_get_vdev_congestion_timeout() - Get per-vdev congestion timeout
- * @psoc: Pointer to global PSOC object
- * @vdev_id: VDEV ID
- * @val: pointer to output variable
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint32_t *val);
-
-/**
- * ucfg_twt_cfg_set_vdev_congestion_timeout() - Set per-vdev congestion timeout
- * @psoc: Pointer to global PSOC object
- * @vdev_id: VDEV ID
- * @val: value to set (0 = TWT active; INI value = TWT inactive)
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint32_t val);
-
-/**
- * ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini() - Reset per-vdev
- * congestion timeout to INI configured value
- * @psoc: Pointer to global PSOC object
- * @vdev_id: VDEV ID
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
-						  uint8_t vdev_id);
-
-/**
- * ucfg_twt_cfg_reset_responder() - Reset cfg responder
- * @psoc: psoc
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val);
 
 /**
  * ucfg_twt_get_responder_support_for_ht_vht_mode() - Get twt_responder support
@@ -540,71 +392,6 @@ ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 
-/**
- * ucfg_twt_resp_check_bit() - check TWT responder INI bit for provided mode.
- *
- * @psoc: Pointer to psoc object
- * @vdev_id: VDEV ID
- * @mode: device mode
- * @twt_resp_cfg: TWT responder INI parameter
- *
- * Return: true if TWT responder INI bit is set for provided device mode,
- * otherwise false
- */
-bool ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			     enum QDF_OPMODE mode, uint8_t twt_resp_cfg);
-
-/**
- * ucfg_twt_send_responder_disable_per_vdev() - This API is wrapper for
- * function "wlan_twt_send_responder_disable_per_vdev"
- * @psoc: Pointer to psoc object
- * @vdev_id: VDEV ID
- *
- * Return: QDF status
- */
-QDF_STATUS
-ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id);
-
-#if defined(WLAN_FEATURE_NAN) && \
-    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
-     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
-/**
- * ucfg_twt_cfg_set_allow_btwt_id0() - This API is wrapper for
- * function "wlan_twt_cfg_set_allow_btwt_id0"
- * @vdev: Pointer to vdev object
- * @val: Value to set
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val);
-
-/**
- * ucfg_twt_cfg_set_twt_concurrency_enable() - This API is wrapper for
- * function "wlan_twt_cfg_set_twt_concurrency_enable"
- * @vdev: Pointer to vdev object
- * @val: value
- *
- * Return: QDF status
- */
-QDF_STATUS
-ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev, bool val);
-#else
-static inline
-QDF_STATUS
-ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS
-ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev, bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /*NAN STD MODE */
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -713,39 +500,14 @@ ucfg_twt_get_work_params(
 {
 }
 
-static inline void
-ucfg_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
-			       struct twt_add_dialog_param *params)
-{
-}
-
-static inline void
-ucfg_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
-			       struct twt_add_dialog_param *params,
-			       uint32_t *next_action)
-{
-}
-
-static inline uint32_t
-ucfg_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev)
-{
-	return UINT_MAX;
-}
-
 static inline
 QDF_STATUS ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline QDF_STATUS
-ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline
-QDF_STATUS ucfg_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -780,55 +542,6 @@ ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 static inline void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 {
-}
-
-static inline bool
-ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
-{
-	return false;
-}
-
-static inline QDF_STATUS
-ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-ucfg_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint32_t *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint32_t val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
-						  uint8_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-QDF_STATUS
-ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS
-ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev, bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif

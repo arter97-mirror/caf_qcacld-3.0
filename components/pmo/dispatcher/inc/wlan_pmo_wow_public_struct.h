@@ -237,14 +237,12 @@ enum pmo_wow_state {
  * @target_resume: target resume event
  * @wow_nack: wow negative ack flag
  * @reason_code : wow status reason code
- * @is_tbtt_nack: set when wow was nacked due to proximity to a TBTT
- *		  event on a STA vdev with beacon interval >= 100 ms
  * @wow_initial_wake_up: target initial wake up is received
  * @wow_wake_lock: wow wake lock
  * @lphb_cache: lphb cache
  * @lphb_cb_ctx: callback context for lphb, kept as void* as
  *                        osif structures are opaque to pmo.
- * @lphb_cb: registered os if callback function
+ * @lphb_cb: registered os if calllback function
  * @ptrn_id_def: default pattern id counter for legacy firmware
  * @ptrn_id_usr: user pattern id counter for legacy firmware
  * @txrx_suspended: flag to determine if TX/RX is suspended
@@ -262,7 +260,6 @@ struct pmo_wow {
 	qdf_event_t target_resume;
 	bool wow_nack;
 	uint16_t reason_code;
-	bool is_tbtt_nack;
 	atomic_t wow_initial_wake_up;
 	qdf_wake_lock_t wow_wake_lock;
 	/*

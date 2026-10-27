@@ -40,13 +40,6 @@
 #include "wlan_osif_features.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_mgr_public_api.h"
-#include <wlan_cfg80211.h>
-#include <nan_ucfg_api.h>
-#include "wlan_policy_mgr_api.h"
-#include "wlan_mlme_cmn.h"
-#include "osif_link_reconfig.h"
-#include "wlan_mlo_mgr_sta.h"
-#include "wlan_hdd_object_manager.h"
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -368,10 +361,6 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 		ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl(hdd_ctx->psoc);
 	config_vars->p2p_indoor_ch_support =
 		ucfg_p2p_get_indoor_ch_support(hdd_ctx->psoc);
-
-	ucfg_mlme_get_enable_social_channels_on_2g_disable(hdd_ctx->psoc,
-							   &value);
-	config_vars->enable_social_channels_on_2g_disable = value;
 }
 
 /**
@@ -931,19 +920,6 @@ uint32_t hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(uint8_t qca_setband)
 	case (QCA_SETBAND_2G | QCA_SETBAND_5G):
 		band_bitmap |= (BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
 		break;
-	case QCA_SETBAND_6G:
-		band_bitmap |= BIT(REG_BAND_6G);
-		break;
-	case QCA_SETBAND_6G | QCA_SETBAND_2G:
-		band_bitmap |= (BIT(REG_BAND_6G) | BIT(REG_BAND_2G));
-		break;
-	case QCA_SETBAND_6G | QCA_SETBAND_5G:
-		band_bitmap |= (BIT(REG_BAND_6G) | BIT(REG_BAND_5G));
-		break;
-	case QCA_SETBAND_6G | QCA_SETBAND_5G | QCA_SETBAND_2G:
-		band_bitmap |= (BIT(REG_BAND_6G) | BIT(REG_BAND_5G) |
-				BIT(REG_BAND_2G));
-		break;
 	default:
 		hdd_err("Invalid band value %u", qca_setband);
 		return 0;
@@ -967,13 +943,6 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 	}
 
 	hdd_debug("change band to %u", band_bitmap);
-
-	if (!(band_bitmap & BIT(REG_BAND_2G)) &&
-	    ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
-		hdd_err("NAN is enabled. Failed to set the band bitmap value to %u",
-			band_bitmap);
-		return -EINVAL;
-	}
 
 	if (ucfg_reg_get_band(hdd_ctx->pdev, &current_band) !=
 	    QDF_STATUS_SUCCESS) {
@@ -999,9 +968,7 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		status = policy_mgr_wait_chan_switch_complete_evt(hdd_ctx->psoc);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("qdf wait for csa event failed");
-			if (hdd_is_chan_switch_in_progress())
-				return QDF_STATUS_E_FAILURE;
-			hdd_debug("channel switch not in progress, continue");
+			return QDF_STATUS_E_FAILURE;
 		}
 	}
 
@@ -1371,7 +1338,6 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 	uint16_t local_unsafe_list_count;
 	uint32_t restriction_mask;
 	uint8_t i;
-	QDF_STATUS status;
 
 	/* Basic sanity */
 	if (!hdd_ctxt) {
@@ -1438,20 +1404,15 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 	wlan_hdd_send_avoid_freq_event(hdd_ctxt, avoid_freq_list);
 
 	if (!hdd_ctxt->unsafe_channel_count) {
-		hdd_debug("no unsafe channel");
+		hdd_debug("no unsafe channels - not restarting SAP");
 		qdf_mem_free(local_unsafe_list);
-		hdd_ch_avoid_safe_ch_sap_update(hdd_ctxt, true);
 		return;
 	}
 	if (hdd_local_unsafe_channel_updated(hdd_ctxt,
 					    local_unsafe_list,
 					    local_unsafe_list_count,
-					    restriction_mask)) {
-		status = hdd_unsafe_channel_restart_sap(hdd_ctxt);
-		hdd_ch_avoid_safe_ch_sap_update(
-				hdd_ctxt,
-				status != QDF_STATUS_E_PENDING);
-	}
+					    restriction_mask))
+		hdd_unsafe_channel_restart_sap(hdd_ctxt);
 	qdf_mem_free(local_unsafe_list);
 
 }
@@ -1599,9 +1560,9 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
 	}
 
 	if (send_sync_event && hdd_hold_rtnl_lock()) {
-		osif_wiphy_lock(hdd_ctx->wiphy, NULL);
+		hdd_wiphy_lock(hdd_ctx->wiphy, NULL);
 		hdd_regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
-		osif_wiphy_unlock(hdd_ctx->wiphy, NULL);
+		hdd_wiphy_unlock(hdd_ctx->wiphy, NULL);
 		hdd_release_rtnl_lock();
 	} else {
 		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
@@ -1747,341 +1708,8 @@ hdd_is_phy_mode_changed(struct wlan_objmgr_psoc *psoc,
 	return true;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
 /**
- * hdd_get_sta_link_count() - count active MLO links
- * @adapter: HDD adapter pointer
- *
- * Return: number of active MLO links
- */
-static uint8_t hdd_get_sta_link_count(struct hdd_adapter *adapter)
-{
-	struct wlan_hdd_link_info *link_info;
-	struct hdd_station_ctx *sta_ctx;
-	uint8_t num_links = 0;
-
-	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		if (sta_ctx &&
-		    sta_ctx->conn_info.ieee_link_id != WLAN_INVALID_LINK_ID)
-			num_links++;
-	}
-
-	return num_links;
-}
-
-/**
- * hdd_mlo_link_disabled_on_reg_change() - handle standby MLO link freq disabled
- * @link_info: link info for the standby link whose operating freq was disabled
- * @def_vdev: deflink vdev already held by the caller (WLAN_OSIF_ID)
- *
- * Sends a force-inactive command via the deflink vdev and notifies cfg80211.
- * Only called for standby links (link_info->vdev is NULL).
- * Caller must hold a reference to @def_vdev for the duration of this call.
- *
- * Return: none
- */
-static void
-hdd_mlo_link_disabled_on_reg_change(struct wlan_hdd_link_info *link_info,
-				    struct wlan_objmgr_vdev *def_vdev)
-{
-	struct hdd_station_ctx *sta_ctx;
-	uint8_t link_id;
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	if (!sta_ctx) {
-		hdd_debug("NULL sta_ctx");
-		return;
-	}
-	link_id = sta_ctx->conn_info.ieee_link_id;
-
-	if (!hdd_is_vdev_in_conn_state(link_info->adapter->deflink)) {
-		hdd_debug("deflink not connected, skip standby link %d",
-			  link_id);
-		return;
-	}
-
-	hdd_debug("MLO standby link_id %d freq disabled, force inactive",
-		  link_id);
-
-	policy_mgr_handle_link_removal_on_standby_host(def_vdev, BIT(link_id));
-	osif_standby_link_reconfig_notify(def_vdev, link_id);
-}
-
-/**
- * hdd_country_change_handle_standby_link() - handle country change for a
- * standby MLO link
- * @hdd_ctx: Global HDD context
- * @adapter: HDD adapter
- * @link_info: link info for the standby link (vdev_id == WLAN_INVALID_VDEV_ID)
- *
- * A standby link has no active vdev so hdd_get_link_info_home_channel()
- * returns 0.  Retrieves the channel via mlo_mgr_get_per_link_chan_info().
- * If the frequency is disabled, calls hdd_mlo_link_disabled_on_reg_change().
- *
- * Return: true if the link's operating frequency is not disabled (standby can
- *         be promoted); false if disabled, invalid, or channel info unavailable
- */
-static bool
-hdd_country_change_handle_standby_link(struct hdd_context *hdd_ctx,
-				       struct hdd_adapter *adapter,
-				       struct wlan_hdd_link_info *link_info)
-{
-	struct hdd_station_ctx *sta_ctx;
-	struct wlan_objmgr_vdev *def_vdev;
-	struct wlan_channel standby_chan = {0};
-	qdf_freq_t oper_freq;
-	uint8_t link_id;
-	bool standby_link_active = false;
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	if (!sta_ctx) {
-		hdd_debug("NULL sta_ctx");
-		return false;
-	}
-
-	link_id = sta_ctx->conn_info.ieee_link_id;
-	if (link_id == WLAN_INVALID_LINK_ID)
-		return false;
-
-	def_vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
-	if (!def_vdev) {
-		hdd_debug("vdev NULL for standby link %d", link_id);
-		return false;
-	}
-
-	if (mlo_mgr_get_per_link_chan_info(def_vdev, link_id, &standby_chan)) {
-		hdd_debug("failed to get chan info for link %d", link_id);
-		goto release_vdev;
-	}
-
-	oper_freq = standby_chan.ch_freq;
-	if (!oper_freq)
-		goto release_vdev;
-	if (!wlan_reg_is_disable_for_pwrmode(hdd_ctx->pdev, oper_freq,
-					     REG_CURRENT_PWR_MODE)) {
-		standby_link_active = true;
-		goto release_vdev;
-	}
-	hdd_debug("standby link %d freq %d disabled", link_id, oper_freq);
-	hdd_mlo_link_disabled_on_reg_change(link_info, def_vdev);
-
-release_vdev:
-	hdd_objmgr_put_vdev_by_user(def_vdev, WLAN_OSIF_ID);
-
-	return standby_link_active;
-}
-
-/**
- * hdd_sta_link_is_mlo() - check if a link_info belongs to an MLO connection
- * @link_info: link info pointer
- *
- * Return: true if the link carries a valid IEEE link ID (MLO), false otherwise
- */
-static bool hdd_sta_link_is_mlo(struct wlan_hdd_link_info *link_info)
-{
-	struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-
-	if (!sta_ctx) {
-		hdd_debug("NULL sta_ctx");
-		return false;
-	}
-
-	return sta_ctx->conn_info.ieee_link_id != WLAN_INVALID_LINK_ID;
-}
-
-/**
- * hdd_mlo_remove_link_on_vdev() - trigger policy manager link removal for vdev
- * @link_info: link info for the active link being removed
- *
- * Return: none
- */
-static void hdd_mlo_remove_link_on_vdev(struct wlan_hdd_link_info *link_info)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	policy_mgr_handle_link_removal_on_vdev(vdev);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-}
-
-/**
- * hdd_mlo_notify_link_reconfig() - notify kernel that an MLO link is removed
- * @link_info: link info for the removed link
- *
- * Return: none
- */
-static void hdd_mlo_notify_link_reconfig(struct wlan_hdd_link_info *link_info)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	mlme_cm_osif_link_reconfig_notify(vdev);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-}
-
-#else /* WLAN_FEATURE_11BE_MLO */
-
-static inline uint8_t
-hdd_get_sta_link_count(struct hdd_adapter *adapter)
-{
-	return 0;
-}
-
-static inline bool
-hdd_country_change_handle_standby_link(struct hdd_context *hdd_ctx,
-				       struct hdd_adapter *adapter,
-				       struct wlan_hdd_link_info *link_info)
-{
-	return false;
-}
-
-static inline bool
-hdd_sta_link_is_mlo(struct wlan_hdd_link_info *link_info)
-{
-	return false;
-}
-
-static inline void
-hdd_mlo_remove_link_on_vdev(struct wlan_hdd_link_info *link_info)
-{
-}
-
-static inline void
-hdd_mlo_notify_link_reconfig(struct wlan_hdd_link_info *link_info)
-{
-}
-
-#endif /* WLAN_FEATURE_11BE_MLO */
-
-/**
- * hdd_country_change_process_sta_link() - process country change for one
- * STA/P2P_CLIENT active link
- * @hdd_ctx: Global HDD context
- * @adapter: HDD adapter
- * @link_info: active link info to process (vdev_id is valid)
- * @num_links: total active MLO link count for this adapter
- * @num_disable_links: running count of disabled active links (updated in place)
- * @has_enabled_standby: true if a standby link on an enabled freq was found
- *
- * Handles frequency, PHY mode, and bandwidth change detection for a single
- * active MLO link.  When the link is disabled and a partner active link remains
- * or @has_enabled_standby is true, notifies the kernel and calls
- * policy_mgr_handle_link_removal_on_vdev() to send the FW command and activate
- * a standby link if available.  Falls through to full disconnect only when all
- * active links are disabled and no usable standby was found.
- *
- * Return: none
- */
-static void
-hdd_country_change_process_sta_link(struct hdd_context *hdd_ctx,
-				    struct hdd_adapter *adapter,
-				    struct wlan_hdd_link_info *link_info,
-				    uint8_t num_links,
-				    uint8_t *num_disable_links,
-				    bool has_enabled_standby)
-{
-	struct hdd_station_ctx *sta_ctx;
-	struct wlan_objmgr_pdev *pdev;
-	struct wlan_objmgr_vdev *vdev;
-	uint32_t new_phy_mode;
-	bool freq_changed, phy_changed, width_changed;
-	bool sync_sta_disconnect;
-	qdf_freq_t oper_freq;
-	QDF_STATUS status;
-	enum qca_wlan_vendor_phy_mode vendor_phy_mode =
-						QCA_WLAN_VENDOR_PHY_MODE_AUTO;
-
-	pdev = hdd_ctx->pdev;
-
-	oper_freq = hdd_get_link_info_home_channel(link_info);
-	freq_changed = oper_freq ?
-		wlan_reg_is_disable_for_pwrmode(pdev, oper_freq,
-						REG_CURRENT_PWR_MODE) : false;
-
-	hdd_debug("Update vdev %d CAP IE", link_info->vdev_id);
-	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, link_info->vdev_id,
-				  QDF_STA_MODE);
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	if (!sta_ctx) {
-		hdd_debug("NULL sta_ctx");
-		return;
-	}
-	new_phy_mode = wlan_reg_get_max_phymode(pdev, REG_PHYMODE_MAX,
-						oper_freq);
-	width_changed = hdd_country_change_bw_check(link_info, oper_freq);
-
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_set_vdev_phy_mode(adapter, vendor_phy_mode);
-		return;
-	}
-
-	phy_changed = hdd_is_phy_mode_changed(hdd_ctx->psoc, sta_ctx,
-					      new_phy_mode);
-	sync_sta_disconnect = false;
-	if (freq_changed &&
-	    !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-	    policy_mgr_is_sta_sap_scc(hdd_ctx->psoc, oper_freq, false)) {
-		hdd_debug("disconnect STA synchronously");
-		sync_sta_disconnect = true;
-	}
-
-	if (!(phy_changed || freq_changed || width_changed)) {
-		hdd_debug("Remain on current channel but update tx power");
-		wlan_reg_update_tx_power_on_ctry_change(pdev,
-							link_info->vdev_id);
-		return;
-	}
-
-	hdd_debug("changed: phy %d, freq %d, width %d",
-		  phy_changed, freq_changed, width_changed);
-
-	if (hdd_sta_link_is_mlo(link_info)) {
-		(*num_disable_links)++;
-		hdd_debug("MLO links %d disable %d",
-			  num_links, *num_disable_links);
-		if (num_links > *num_disable_links || has_enabled_standby) {
-			/*
-			 * A partner active link (or a promotable standby) is
-			 * still available.  Notify the kernel and let
-			 * policy_mgr_handle_link_removal_on_vdev() send the FW
-			 * command and activate the standby if possible.
-			 */
-			hdd_mlo_notify_link_reconfig(link_info);
-			hdd_mlo_remove_link_on_vdev(link_info);
-			hdd_set_vdev_phy_mode(adapter, vendor_phy_mode);
-			sta_ctx->reg_phymode = new_phy_mode;
-			return;
-		}
-		/* All active links disabled, no usable standby: disconnect */
-		hdd_debug("all %d links disabled, disconnect", num_links);
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	status = wlan_mlo_mgr_link_switch_defer_disconnect_req(
-			vdev, CM_OSIF_DISCONNECT,
-			REASON_UNSPEC_FAILURE);
-	if (status != QDF_STATUS_E_ALREADY && QDF_IS_STATUS_ERROR(status))
-		wlan_hdd_cm_issue_disconnect(link_info, REASON_UNSPEC_FAILURE,
-					     sync_sta_disconnect);
-	hdd_set_vdev_phy_mode(adapter, vendor_phy_mode);
-	sta_ctx->reg_phymode = new_phy_mode;
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-}
-
-/**
- * hdd_country_change_update_sta() - handle country code change for STA (MLO)
+ * hdd_country_change_update_sta() - handle country code change for STA
  * @hdd_ctx: Global HDD context
  *
  * This function handles the stop/start/restart of STA/P2P_CLI adapters when
@@ -2092,51 +1720,100 @@ hdd_country_change_process_sta_link(struct hdd_context *hdd_ctx,
 static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
+	struct hdd_station_ctx *sta_ctx = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	uint32_t new_phy_mode;
+	bool freq_changed, phy_changed, width_changed;
+	qdf_freq_t oper_freq;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
 	struct wlan_hdd_link_info *link_info;
-	uint8_t num_links;
-	uint8_t num_disable_links;
-	bool has_enabled_standby;
+	enum qca_wlan_vendor_phy_mode vendor_phy_mode =
+						QCA_WLAN_VENDOR_PHY_MODE_AUTO;
+	QDF_STATUS status;
+
+	pdev = hdd_ctx->pdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->device_mode != QDF_STA_MODE &&
-		    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			width_changed = false;
+			phy_changed = false;
+			oper_freq = hdd_get_link_info_home_channel(link_info);
+			if (oper_freq)
+				freq_changed = wlan_reg_is_disable_for_pwrmode(
+							pdev, oper_freq,
+							REG_CURRENT_PWR_MODE);
+			else
+				freq_changed = false;
 
-		num_links = hdd_get_sta_link_count(adapter);
-		num_disable_links = 0;
-		has_enabled_standby = false;
+			switch (adapter->device_mode) {
+			case QDF_P2P_CLIENT_MODE:
+				/*
+				 * P2P client is the same as STA
+				 * continue to next statement
+				 */
+			case QDF_STA_MODE:
+				hdd_debug("Update vdev %d CAP IE", link_info->vdev_id);
+				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+							  link_info->vdev_id,
+							  QDF_STA_MODE);
 
-		/* Process standby links */
-		if (num_links > 1) {
-			hdd_adapter_for_each_link_info(adapter, link_info) {
-				if (link_info->vdev_id == WLAN_INVALID_VDEV_ID &&
-				    hdd_country_change_handle_standby_link(
-						hdd_ctx, adapter, link_info))
-					has_enabled_standby = true;
+				sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+				new_phy_mode = wlan_reg_get_max_phymode(pdev,
+								REG_PHYMODE_MAX,
+								oper_freq);
+
+				width_changed =
+					hdd_country_change_bw_check(link_info,
+								    oper_freq);
+
+				if (!hdd_is_vdev_in_conn_state(link_info)) {
+					hdd_set_vdev_phy_mode(adapter,
+							      vendor_phy_mode);
+					continue;
+				}
+
+				if (hdd_is_phy_mode_changed(hdd_ctx->psoc,
+							    sta_ctx,
+							    new_phy_mode))
+					phy_changed = true;
+
+				if (phy_changed || freq_changed ||
+				    width_changed) {
+					hdd_debug("changed: phy %d, freq %d, width %d",
+						  phy_changed, freq_changed,
+						  width_changed);
+					status = wlan_mlo_mgr_link_switch_defer_disconnect_req(
+							link_info->vdev,
+							CM_OSIF_DISCONNECT,
+							REASON_UNSPEC_FAILURE);
+					if (status != QDF_STATUS_E_ALREADY && QDF_IS_STATUS_ERROR(status))
+						wlan_hdd_cm_issue_disconnect(
+								link_info,
+								REASON_UNSPEC_FAILURE,
+								false);
+					hdd_set_vdev_phy_mode(adapter,
+							      vendor_phy_mode);
+					sta_ctx->reg_phymode = new_phy_mode;
+				} else {
+					hdd_debug("Remain on current channel but update tx power");
+					wlan_reg_update_tx_power_on_ctry_change(
+							    pdev,
+							    link_info->vdev_id);
+				}
+				break;
+			default:
+				break;
 			}
 		}
-
-		/* Process active links */
-		hdd_adapter_for_each_active_link_info(adapter, link_info)
-			hdd_country_change_process_sta_link(
-				hdd_ctx, adapter, link_info, num_links,
-				&num_disable_links, has_enabled_standby);
-
-		hdd_debug("links %d disable %d standby %d",
-			  num_links, num_disable_links, has_enabled_standby);
-
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 }
 
 /**
- * hdd_restart_sap_with_new_phymode() - restart the SAP with the new
- * phymode
+ * hdd_restart_sap_with_new_phymode() - restart the SAP with the new phymode
  * @link_info: Link info pointer in HDD adapter.
  * @sap_config: sap configuration pointer
  * @csr_phy_mode: phymode to restart SAP with
@@ -2161,7 +1838,7 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -2208,33 +1885,6 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	mutex_unlock(&hdd_ctx->sap_lock);
 }
 
-static bool
-hdd_is_sap_with_new_chan_width_needed(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_pdev *pdev,
-				      struct sap_config *sap_config,
-				      qdf_freq_t oper_freq,
-				      struct wlan_hdd_link_info *link_info)
-{
-	enum phy_ch_width new_ch_width;
-	struct sap_context *sap_ctx;
-
-	new_ch_width = sap_config->ch_params.ch_width;
-
-	/* Force SAP to 20MHz if INI is enabled, country is Indonesia
-	 * and device mode is SAP
-	 */
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
-	if (sap_config->ch_params.ch_width != CH_WIDTH_20MHZ &&
-	    sap_ctx && link_info->vdev &&
-	    policy_mgr_get_sap_force_20mhz_for_country_id(
-			psoc, link_info->vdev, oper_freq)) {
-		hdd_debug("Force SAP to 20MHz due to INI and country code ID");
-		new_ch_width = CH_WIDTH_20MHZ;
-	}
-
-	return (new_ch_width != sap_config->ch_params.ch_width);
-}
-
 /**
  * hdd_country_change_update_sap() - handle country code change for SAP
  * @hdd_ctx: Global HDD context
@@ -2251,7 +1901,6 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 	struct wlan_objmgr_pdev *pdev = NULL;
 	uint32_t reg_phy_mode, new_phy_mode;
 	bool phy_changed;
-	bool chan_width_changed;
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_SAP;
@@ -2270,9 +1919,8 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 							     link_info->vdev_id);
 				break;
 			case QDF_SAP_MODE:
-				if (!qdf_atomic_test_bit(
-						SOFTAP_INIT_DONE,
-						link_info->link_flags)) {
+				if (!test_bit(SOFTAP_INIT_DONE,
+					      &link_info->link_flags)) {
 					hdd_info("AP is not started yet");
 					break;
 				}
@@ -2288,37 +1936,14 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 				phy_changed =
 					(csr_phy_mode != sap_config->SapHw_mode);
 
-				chan_width_changed =
-					hdd_is_sap_with_new_chan_width_needed(
-							hdd_ctx->psoc,
-							pdev,
-							sap_config,
-							oper_freq,
-							link_info);
-
-				hdd_debug("phy_changes: %d, chan_width_changed: %d",
-					  phy_changed, chan_width_changed);
-
-				if (phy_changed) {
-					hdd_restart_sap_with_new_phymode(
-								link_info,
-								sap_config,
-								csr_phy_mode);
-				} else if (chan_width_changed &&
-					   QDF_IS_STATUS_SUCCESS(
-						   policy_mgr_change_sap_channel_with_csa(
-							   hdd_ctx->psoc,
-							   link_info->vdev_id,
-							   oper_freq,
-							   CH_WIDTH_20MHZ,
-							   true))) {
-					hdd_debug("SAP CSA due to chan width changed BW 20 MHz");
-				} else {
+				if (phy_changed)
+					hdd_restart_sap_with_new_phymode(link_info,
+									 sap_config,
+									 csr_phy_mode);
+				else
 					policy_mgr_check_sap_restart(
 							hdd_ctx->psoc,
 							link_info->vdev_id);
-				}
-
 				hdd_debug("Update tx power due to ctry change");
 				wlan_reg_update_tx_power_on_ctry_change(
 						    pdev, link_info->vdev_id);
@@ -2427,10 +2052,6 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 	bool reg_flag;
 
 	pdev_priv = wlan_pdev_get_ospriv(pdev);
-	if (!pdev_priv) {
-		hdd_err("pdev_priv null");
-		return;
-	}
 	wiphy = pdev_priv->wiphy;
 	hdd_ctx = wiphy_priv(wiphy);
 

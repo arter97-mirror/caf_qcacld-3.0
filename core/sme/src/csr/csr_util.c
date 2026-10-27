@@ -72,7 +72,6 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_SAE_COMPUTE);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_INFO_EVENT_IND);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND);
-		CASE_RETURN_STR(eCSR_ROAM_DFS_NOL_REMOVE);
 	default:
 		return "unknown";
 	}
@@ -153,14 +152,15 @@ void csr_purge_pdev_all_ser_cmd_list(struct mac_context *mac_ctx)
 	wlan_serialization_purge_all_pdev_cmd(mac_ctx->pdev);
 }
 
-tListElem *csr_sme_umac_ser_active_ll_peek_head(struct mac_context *mac_ctx)
+tListElem *csr_nonscan_active_ll_peek_head(struct mac_context *mac_ctx,
+					   bool inter_locked)
 {
 	struct wlan_serialization_command *cmd;
 	tSmeCmd *sme_cmd;
 
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac_ctx->psoc,
 								 false);
-	if (!csr_is_sme_umac_ser_cmd_type(cmd))
+	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
 		return NULL;
 
 	sme_cmd = cmd->umac_cmd;
@@ -168,7 +168,8 @@ tListElem *csr_sme_umac_ser_active_ll_peek_head(struct mac_context *mac_ctx)
 	return &sme_cmd->Link;
 }
 
-tListElem *csr_sme_umac_ser_pending_ll_peek_head(struct mac_context *mac_ctx)
+tListElem *csr_nonscan_pending_ll_peek_head(struct mac_context *mac_ctx,
+					    bool inter_locked)
 {
 	struct wlan_serialization_command *cmd;
 	tSmeCmd *sme_cmd;
@@ -176,7 +177,7 @@ tListElem *csr_sme_umac_ser_pending_ll_peek_head(struct mac_context *mac_ctx)
 	cmd = wlan_serialization_peek_head_pending_cmd_using_psoc(mac_ctx->psoc,
 								  false);
 	while (cmd) {
-		if (csr_is_sme_umac_ser_cmd_type(cmd)) {
+		if (cmd->source == WLAN_UMAC_COMP_MLME) {
 			sme_cmd = cmd->umac_cmd;
 			return &sme_cmd->Link;
 		}
@@ -187,20 +188,20 @@ tListElem *csr_sme_umac_ser_pending_ll_peek_head(struct mac_context *mac_ctx)
 	return NULL;
 }
 
-bool csr_sme_umac_ser_active_ll_remove_entry(struct mac_context *mac_ctx,
-					tListElem *entry)
+bool csr_nonscan_active_ll_remove_entry(struct mac_context *mac_ctx,
+					tListElem *entry, bool inter_locked)
 {
 	tListElem *head;
 
-	head = csr_sme_umac_ser_active_ll_peek_head(mac_ctx);
+	head = csr_nonscan_active_ll_peek_head(mac_ctx, inter_locked);
 	if (head == entry)
 	return true;
 
 	return false;
 }
 
-tListElem *csr_sme_umac_ser_pending_ll_next(struct mac_context *mac_ctx,
-					   tListElem *entry)
+tListElem *csr_nonscan_pending_ll_next(struct mac_context *mac_ctx,
+				       tListElem *entry, bool inter_locked)
 {
 	tSmeCmd *sme_cmd;
 	struct wlan_serialization_command cmd, *tcmd;
@@ -218,7 +219,7 @@ tListElem *csr_sme_umac_ser_pending_ll_next(struct mac_context *mac_ctx,
 	if (cmd.vdev)
 		wlan_objmgr_vdev_release_ref(cmd.vdev, WLAN_LEGACY_SME_ID);
 	while (tcmd) {
-		if (csr_is_sme_umac_ser_cmd_type(tcmd)) {
+		if (tcmd->source == WLAN_UMAC_COMP_MLME) {
 			sme_cmd = tcmd->umac_cmd;
 			return &sme_cmd->Link;
 		}
@@ -584,7 +585,6 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	bool ml_sap_vdev = false;
 	uint8_t conc_sta1_vdev_id = WLAN_INVALID_VDEV_ID;
 	uint8_t conc_sta2_vdev_id = WLAN_INVALID_VDEV_ID;
-	struct wlan_objmgr_vdev *vdev = NULL;
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
@@ -658,23 +658,6 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					  session->vdev_id);
 				continue;
 			}
-			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-							mac_ctx->psoc,
-							session->vdev_id,
-							WLAN_LEGACY_SME_ID);
-			if (vdev &&
-			    wlan_vdev_mlme_is_sap_go_move_before_sta(vdev)) {
-				wlan_objmgr_vdev_release_ref(
-							vdev,
-							WLAN_LEGACY_SME_ID);
-				sme_debug("Skip STA vdev:%d which received CSA",
-					  session->vdev_id);
-				continue;
-			} else if (vdev) {
-				wlan_objmgr_vdev_release_ref(
-							vdev,
-							WLAN_LEGACY_SME_ID);
-			}
 			wlan_get_op_chan_freq_info_vdev_id(mac_ctx->pdev,
 					   session->vdev_id,
 					   &intf_ch_freq, &intf_cfreq,
@@ -739,17 +722,13 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 							      intf_ch_freq,
 							      sap_ch_freq))
 				break;
-			if (intf_ch_freq && intf_ch_freq != sap_ch_freq &&
-			    policy_mgr_2_freq_always_on_same_mac(
-					mac_ctx->psoc,
-					intf_ch_freq, sap_ch_freq))
-				break;
 		} else if (intf_ch_freq &&
 			   policy_mgr_2_freq_always_on_same_mac(mac_ctx->psoc,
 								intf_ch_freq,
 								sap_ch_freq)) {
 			break;
 		}
+
 		if (ml_sap_vdev)
 			intf_ch_freq = 0;
 	}
@@ -788,8 +767,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	 * the concurrent ML SAP link vdev. This is to ensure
 	 * ML SAP vdev links comes up on 2 different frequency bands.
 	 */
-		if (policy_mgr_is_sta_sap_scc(mac_ctx->psoc, conc_sap_freq,
-					      false) &&
+		if (policy_mgr_is_sta_sap_scc(mac_ctx->psoc, conc_sap_freq) &&
 		    conc_sta1_freq && conc_sta2_freq) {
 			if (conc_sap_freq != conc_sta1_freq)
 				intf_ch_freq = conc_sta1_freq;
@@ -826,8 +804,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					     sap_ch_freq, vdev_id,
 					     cc_switch_mode);
 	} else if ((intf_ch_freq == sap_ch_freq) && (cc_switch_mode ==
-				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) &&
-		    policy_mgr_is_hw_dbs_capable(mac_ctx->psoc)) {
+				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)) {
 		status = policy_mgr_handle_go_sap_fav_channel(
 					mac_ctx->psoc, vdev_id,
 					sap_ch_freq, &intf_ch_freq);
@@ -899,6 +876,18 @@ bool csr_is_wmm_supported(struct mac_context *mac)
 		return true;
 }
 
+/* This function will allocate memory for the parsed IEs to the caller.
+ * Caller must free the memory after it is done with the data only if
+ * this function succeeds
+ */
+QDF_STATUS csr_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
+					      struct bss_description *bss_desc,
+					      tDot11fBeaconIEs **ppIEStruct)
+{
+	return wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
+						   ppIEStruct);
+}
+
 uint32_t csr_get_frag_thresh(struct mac_context *mac_ctx)
 {
 	return mac_ctx->mlme_cfg->threshold.frag_threshold;
@@ -916,11 +905,6 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 
 	switch (csrDot11Mode) {
 	case eCSR_CFG_DOT11_MODE_AUTO:
-#ifdef WLAN_FEATURE_11BN
-		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
-			ret = MLME_DOT11_MODE_11BN;
-		else
-#endif
 #ifdef WLAN_FEATURE_11BE
 		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			ret = MLME_DOT11_MODE_11BE;
@@ -1001,32 +985,6 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 			ret = MLME_DOT11_MODE_11N;
 		break;
 #endif
-#ifdef WLAN_FEATURE_11BN
-	case eCSR_CFG_DOT11_MODE_11BN_ONLY:
-		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
-			ret = MLME_DOT11_MODE_11BN_ONLY;
-		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
-			ret = MLME_DOT11_MODE_11BE_ONLY;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
-			ret = MLME_DOT11_MODE_11AX_ONLY;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
-			ret = MLME_DOT11_MODE_11AC;
-		else
-			ret = MLME_DOT11_MODE_11N;
-		break;
-	case eCSR_CFG_DOT11_MODE_11BN:
-		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
-			ret = MLME_DOT11_MODE_11BN;
-		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
-			ret = MLME_DOT11_MODE_11BE;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
-			ret = MLME_DOT11_MODE_11AX;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
-			ret = MLME_DOT11_MODE_11AC;
-		else
-			ret = MLME_DOT11_MODE_11N;
-		break;
-#endif
 	case eCSR_CFG_DOT11_MODE_ABG:
 		ret = MLME_DOT11_MODE_ABG;
 		break;
@@ -1048,11 +1006,6 @@ enum reg_phymode csr_convert_to_reg_phy_mode(eCsrPhyMode csr_phy_mode,
 	else if (CSR_IS_DOT11_PHY_MODE_11BE(csr_phy_mode) ||
 		 CSR_IS_DOT11_PHY_MODE_11BE_ONLY(csr_phy_mode))
 		return REG_PHYMODE_11BE;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	else if (CSR_IS_DOT11_PHY_MODE_11BN(csr_phy_mode) ||
-		 CSR_IS_DOT11_PHY_MODE_11BN_ONLY(csr_phy_mode))
-		return REG_PHYMODE_11BN;
 #endif
 	else if (csr_phy_mode == eCSR_DOT11_MODE_11ax ||
 		 csr_phy_mode == eCSR_DOT11_MODE_11ax_ONLY)
@@ -1102,10 +1055,6 @@ eCsrPhyMode csr_convert_from_reg_phy_mode(enum reg_phymode phymode)
 #ifdef WLAN_FEATURE_11BE
 	case REG_PHYMODE_11BE:
 		return eCSR_DOT11_MODE_11be;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	case REG_PHYMODE_11BN:
-		return eCSR_DOT11_MODE_11bn;
 #endif
 	case REG_PHYMODE_MAX:
 		return eCSR_DOT11_MODE_AUTO;
@@ -1275,32 +1224,6 @@ csr_get_cfg_dot11_mode_from_csr_phy_mode(bool is_ap, eCsrPhyMode phyMode)
 		break;
 	case eCSR_DOT11_MODE_11be_ONLY:
 		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE_ONLY;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX_ONLY;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AC;
-		else
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
-		break;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	case eCSR_DOT11_MODE_11bn:
-		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BN;
-		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX;
-		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AC;
-		else
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
-		break;
-	case eCSR_DOT11_MODE_11bn_ONLY:
-		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
-			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BN_ONLY;
-		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE_ONLY;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX_ONLY;
@@ -1489,19 +1412,6 @@ enum csr_cfgdot11mode csr_phy_mode_to_dot11mode(enum wlan_phymode phy_mode)
 	case WLAN_PHYMODE_11BEA_EHT160:
 	case WLAN_PHYMODE_11BEA_EHT320:
 		return eCSR_CFG_DOT11_MODE_11BE;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	case WLAN_PHYMODE_11BNA_UHR20:
-	case WLAN_PHYMODE_11BNG_UHR20:
-	case WLAN_PHYMODE_11BNA_UHR40:
-	case WLAN_PHYMODE_11BNG_UHR40PLUS:
-	case WLAN_PHYMODE_11BNG_UHR40MINUS:
-	case WLAN_PHYMODE_11BNG_UHR40:
-	case WLAN_PHYMODE_11BNA_UHR80:
-	case WLAN_PHYMODE_11BNG_UHR80:
-	case WLAN_PHYMODE_11BNA_UHR160:
-	case WLAN_PHYMODE_11BNA_UHR320:
-		return eCSR_CFG_DOT11_MODE_11BN;
 #endif
 	default:
 		sme_err("invalid phy mode %d", phy_mode);

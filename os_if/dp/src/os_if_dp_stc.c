@@ -19,32 +19,12 @@
 #include <wlan_osif_priv.h>
 #include "qdf_trace.h"
 #include "wlan_dp_ucfg_api.h"
-#include "cdp_txrx_ctrl.h"
-#include "cdp_txrx_host_stats.h"
-#include "wlan_cm_roam_api.h"
 
 /* Short names for QCA vendor attributes */
 #define FLOW_CLASSIFY_RESULT_FLOW_TUPLE		\
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_FLOW_TUPLE
 #define FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE	\
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE
-#define FLOW_CLASSIFY_RESULT_UL_TID		\
-		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_UL_TID
-#define FLOW_CLASSIFY_RESULT_INSIGHTS		\
-		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_INSIGHTS
-
-#define PREDICTIVE_ROAM_OPERATION_TYPE		\
-		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_OPERATION_TYPE
-#define PREDICTIVE_ROAM_TX_RETRIES		\
-		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_TX_RETRIES
-#define PREDICTIVE_ROAM_BW_PKT_COUNT		\
-		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_BW_PKT_COUNT
-#define PREDICTIVE_ROAM_UL_DELAY		\
-		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX_AVG_UL_DELAY
-#define PREDICTIVE_ROAM_TX_PHY_RATE_AVERAGE	\
-		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_TX_PHY_RATE_AVERAGE
-#define PREDICTIVE_ROAM_MAX			\
-		QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_MAX
 
 const struct nla_policy
 flow_tuple_policy[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1] = {
@@ -60,426 +40,23 @@ flow_tuple_policy[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1] = {
 };
 
 const struct nla_policy
-classify_insight_results_policy[
-	QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABLE_TRAFFIC_TYPE] = {
-		.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABILITY] = {
-		.type = NLA_U8},
-};
-
-const struct nla_policy
 flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1] = {
 	[FLOW_CLASSIFY_RESULT_FLOW_TUPLE] = {.type = NLA_NESTED },
 	[FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE] = {.type = NLA_U8},
-	[FLOW_CLASSIFY_RESULT_UL_TID] = {.type = NLA_U8},
-	[FLOW_CLASSIFY_RESULT_INSIGHTS] = {.type = NLA_NESTED},
 };
-
-#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
-const struct nla_policy
-predictive_roam_stats_policy[PREDICTIVE_ROAM_MAX  + 1] = {
-	[PREDICTIVE_ROAM_OPERATION_TYPE] = {.type = NLA_U8},
-};
-#endif
 
 #define NS_PER_MS 1000000
 #define NS_PER_US 1000
 
 #define NS_TO_MS(t) ((t) / NS_PER_MS)
 #define NS_TO_US(t) ((t) / NS_PER_US)
-#define BUF_LEN_MAX 256
-
-static QDF_STATUS
-os_if_dp_parse_classify_insights(struct nlattr *tb_attr,
-				 struct wlan_dp_stc_flow_classify_result *result)
-{
-	struct nlattr *tb_sample_attr;
-	uint8_t insight_count = 0;
-	int rem, ret;
-
-	/* Parse each nested sample attribute */
-	nla_for_each_nested(tb_sample_attr, tb_attr, rem) {
-		struct nlattr *sample_attrs[
-			QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_MAX + 1];
-		uint32_t prob_type_attr, prob_attr;
-
-		/* It is used to avoid out of bound access */
-		if (insight_count >= DP_STC_TXRX_SAMPLES_MAX)
-			break;
-
-		ret = wlan_cfg80211_nla_parse_nested(sample_attrs,
-						     QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_MAX,
-						     tb_sample_attr,
-						     classify_insight_results_policy);
-
-		if (ret) {
-			osif_err("STC: Sample %d parsing failed",
-				 insight_count);
-			continue;
-		}
-
-		prob_type_attr = QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABLE_TRAFFIC_TYPE;
-		if (sample_attrs[prob_type_attr]) {
-			result->probable_types[insight_count] =
-				nla_get_u8(sample_attrs[prob_type_attr]);
-		}
-
-		prob_attr =
-			QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABILITY;
-		if (sample_attrs[prob_attr]) {
-			result->probabilities[insight_count] =
-				nla_get_u8(sample_attrs[prob_attr]);
-		}
-
-		insight_count++;
-	}
-
-	result->insight_count = insight_count;
-
-	if (insight_count > 0) {
-		char samples_str[BUF_LEN_MAX];
-		uint16_t len = 0;
-		int i;
-
-		/* Build samples string */
-		for (i = 0; i < insight_count; i++) {
-			len += scnprintf(samples_str + len,
-					 sizeof(samples_str) - len,
-					 " [%d: Type=%d Prob=%d%%]", i,
-					 result->probable_types[i],
-					 result->probabilities[i]);
-		}
-
-		osif_nofl_debug("STC: Classify Results - Count: %d %s",
-				insight_count, samples_str);
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
-
-#define TX_RX_VENDOR_SIZE 3
-#define TX_CNT_IDX 0
-
-/**
- * cdp_peer_bw_to_phy_ch_width() - Map cdp_peer_bw to phy_ch_width
- * @peer_bw: peer bandwidth of type enum cdp_peer_bw
- *
- * Return: corresponding enum phy_ch_width value,
- *         CH_WIDTH_INVALID if no valid mapping exists
- */
-static enum phy_ch_width cdp_peer_bw_to_phy_ch_width(enum cdp_peer_bw peer_bw)
-{
-	switch (peer_bw) {
-	case CDP_PEER_BW_20MHZ:
-		return CH_WIDTH_20MHZ;
-	case CDP_PEER_BW_40MHZ:
-		return CH_WIDTH_40MHZ;
-	case CDP_PEER_BW_80MHZ:
-		return CH_WIDTH_80MHZ;
-	case CDP_PEER_BW_160MHZ:
-		return CH_WIDTH_160MHZ;
-	case CDP_PEER_BW_320MHZ:
-		return CH_WIDTH_320MHZ;
-	case CDP_PEER_BW_MAX:
-	default:
-		return CH_WIDTH_INVALID;
-	}
-}
-
-static uint32_t os_if_get_predictive_roam_stats_nla_len(void)
-{
-	uint32_t nl_buf_len = NLMSG_HDRLEN;
-
-	/* Tx Retries */
-	nl_buf_len += nla_total_size(sizeof(uint32_t));
-
-	/* Add length for QCA_WLAN_VENDOR_ATTR_PREDICTIVE_ROAM_BW_PKT_COUNT */
-	nl_buf_len += NLA_HDRLEN * CDP_PEER_BW_MAX;
-	nl_buf_len += nla_total_size(0) +
-		      CDP_PEER_BW_MAX * (nla_total_size(sizeof(uint8_t)) +
-				      nla_total_size(sizeof(uint64_t)));
-
-	/* UL delay */
-	nl_buf_len += nla_total_size(sizeof(uint32_t));
-
-	/* Tx PHY rate average (u32) */
-	nl_buf_len += nla_total_size(sizeof(uint32_t));
-
-	return nl_buf_len;
-}
-
-static QDF_STATUS os_if_fill_tx_bw_stats(void *soc,
-					 uint8_t vdev_id,
-					 struct sk_buff *skb)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t **bw_stats;
-	struct nlattr *bw_nest, *bw;
-	int nestid, i;
-	enum nl80211_chan_width nl_chwidth;
-	enum phy_ch_width phy_ch_width;
-
-	bw_stats = qdf_mem_malloc(CDP_PEER_BW_MAX * sizeof(uint32_t *));
-	if (!bw_stats) {
-		osif_err("failed to allocate bw_stats");
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	for (i = 0; i < CDP_PEER_BW_MAX; i++) {
-		bw_stats[i] = qdf_mem_malloc(TX_RX_VENDOR_SIZE *
-					      sizeof(uint32_t));
-		if (!bw_stats[i]) {
-			osif_err("failed to allocate bw_stats column");
-			status = QDF_STATUS_E_NOMEM;
-			goto free_mem;
-		}
-	}
-
-	status = cdp_get_txrx_bw(soc, vdev_id, bw_stats);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Get stats failed, vdev_id: %d status: %d",
-			   vdev_id, status);
-		goto free_mem;
-	}
-
-	nestid = PREDICTIVE_ROAM_BW_PKT_COUNT;
-	bw_nest = nla_nest_start(skb, nestid);
-	if (!bw_nest) {
-		osif_err("nla_nest_start failed");
-		status = QDF_STATUS_E_FAILURE;
-		goto free_mem;
-	}
-
-	for (i = 0; i < CDP_PEER_BW_MAX; i++) {
-		bw = nla_nest_start(skb, i + 1);
-		if (!bw) {
-			osif_err("nla_nest_start failed");
-			status = QDF_STATUS_E_FAILURE;
-			goto free_mem;
-		}
-
-		phy_ch_width = cdp_peer_bw_to_phy_ch_width(i);
-		nl_chwidth = wlan_cfg80211_get_nl80211_chwidth(phy_ch_width);
-		if (nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_BW_PKT_BW_CHAN_WIDTH,
-			       nl_chwidth)) {
-			osif_err("nla_put_u8 BW_CHAN_WIDTH failed");
-			status = QDF_STATUS_E_FAILURE;
-			goto free_mem;
-		}
-		if (wlan_cfg80211_nla_put_u64_64bit(skb,
-				QCA_WLAN_VENDOR_ATTR_BW_PKT_TX_MSDU_COUNT,
-				(u64)bw_stats[i][TX_CNT_IDX],
-				QCA_WLAN_VENDOR_ATTR_BW_PKT_PAD)) {
-			osif_err("nla_put_u64 TX_PACKET_COUNT failed");
-			status = QDF_STATUS_E_FAILURE;
-			goto free_mem;
-		}
-		nla_nest_end(skb, bw);
-	}
-
-	nla_nest_end(skb, bw_nest);
-
-free_mem:
-	for (i = 0; i < CDP_PEER_BW_MAX; i++) {
-		if (!bw_stats[i])
-			break;
-
-		qdf_mem_free(bw_stats[i]);
-	}
-
-	qdf_mem_free(bw_stats);
-
-	return status;
-}
-
-static QDF_STATUS os_if_fill_tx_phy_rate_stats(struct wlan_objmgr_vdev *vdev,
-					       struct sk_buff *skb)
-{
-	uint32_t phy_rate_avg;
-
-	phy_rate_avg = ucfg_dp_conn_info_get_tx_phy_rate_avg(vdev);
-	if (nla_put_u32(skb,
-			PREDICTIVE_ROAM_TX_PHY_RATE_AVERAGE,
-			phy_rate_avg)) {
-		osif_err("tx_phy_rate_avg pack error");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS
-os_if_dp_handle_predictive_roam_get_stats(struct wiphy *wiphy,
-						  struct wlan_objmgr_vdev *vdev,
-						  struct nlattr **tb)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint8_t vdev_id;
-	uint32_t nl_buf_len, ul_delay, tx_retries;
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-	struct sk_buff *skb;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	int ret;
-	struct wlan_objmgr_pdev *pdev;
-
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_DP_ID);
-	if (!pdev) {
-		osif_err("pdev is null");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	vdev_id = wlan_vdev_get_id(vdev);
-	if (!cdp_is_vdev_predictive_roaming_stats_enabled(soc, vdev_id)) {
-		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-		osif_warn("Predictive roaming stats not enabled for vdev %u",
-			  vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (wlan_cm_roaming_in_progress(pdev, vdev_id)) {
-		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-		osif_warn("Roaming is in progress, Retry later");
-		return QDF_STATUS_E_FAILURE;
-	}
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-
-	nl_buf_len = os_if_get_predictive_roam_stats_nla_len();
-	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
-						       nl_buf_len);
-	if (!skb) {
-		osif_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ul_delay = ucfg_dp_conn_info_get_ul_delay_max(vdev);
-	if (nla_put_u32(skb,
-			PREDICTIVE_ROAM_UL_DELAY,
-			ul_delay)) {
-		osif_err("ul_delay pack error");
-		status = QDF_STATUS_E_FAILURE;
-		goto free_skb;
-	}
-
-	status = os_if_fill_tx_bw_stats(soc, vdev_id, skb);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("os_if_fill_tx_bw_stats error");
-		goto free_skb;
-	}
-
-	status = cdp_get_tx_retries(soc, vdev_id, &tx_retries);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("cdp_get_tx_retries error");
-		goto free_skb;
-	}
-
-	if (nla_put_u32(skb,
-			PREDICTIVE_ROAM_TX_RETRIES,
-			tx_retries)) {
-		osif_err("tx_retries pack error");
-		status = QDF_STATUS_E_FAILURE;
-		goto free_skb;
-	}
-
-	status = os_if_fill_tx_phy_rate_stats(vdev, skb);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto free_skb;
-
-	ret = wlan_cfg80211_vendor_cmd_reply(skb);
-	if (ret) {
-		osif_err("wlan_cfg80211_vendor_cmd_reply failed, ret: %d", ret);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-
-free_skb:
-	wlan_cfg80211_vendor_free_skb(skb);
-	return status;
-}
-
-static QDF_STATUS
-os_if_dp_set_feature_predictive_roam_stats(struct wlan_objmgr_vdev *vdev,
-					  uint8_t operation_type)
-{
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	uint8_t enable;
-
-	if (!soc) {
-		osif_err("Predictive roam: SOC context is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	enable = operation_type == QCA_PREDICTIVE_ROAM_ENABLE;
-
-	osif_info("Predictive roam stats %s for vdev_id: %u",
-		  enable ? "enable" : "disable", vdev_id);
-
-	cdp_set_vdev_predictive_roaming_stats(soc, vdev_id, enable);
-	cdp_enable_ul_delay(soc, vdev_id, enable);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS os_if_dp_process_predictive_roam_req(struct wiphy *wiphy,
-						struct wlan_objmgr_vdev *vdev,
-						const void *data, int data_len)
-{
-	struct nlattr *tb[PREDICTIVE_ROAM_MAX + 1];
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-	uint8_t operation_type;
-
-	if (!ucfg_dp_cfg_is_stc_enabled()) {
-		osif_warn("STC not enabled, predictive roaming not supported");
-		return QDF_STATUS_E_NOSUPPORT;
-	}
-
-	if (!ucfg_dp_stc_predictive_roaming_enabled(psoc)) {
-		osif_warn("Predictive roaming not enabled");
-		return QDF_STATUS_E_NOSUPPORT;
-	}
-
-	if (wlan_cfg80211_nla_parse(tb, PREDICTIVE_ROAM_MAX,
-				    data, data_len, predictive_roam_stats_policy)) {
-		osif_err("Invalid attr");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!tb[PREDICTIVE_ROAM_OPERATION_TYPE]) {
-		osif_err("Predictive roam operation type is not filled");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	operation_type = nla_get_u8(tb[PREDICTIVE_ROAM_OPERATION_TYPE]);
-
-	switch (operation_type) {
-	case QCA_PREDICTIVE_ROAM_GET_STATS:
-		return os_if_dp_handle_predictive_roam_get_stats(wiphy, vdev,
-								 tb);
-	case QCA_PREDICTIVE_ROAM_ENABLE:
-	case QCA_PREDICTIVE_ROAM_DISABLE:
-		osif_info("Predictive roam operation received: %u",
-			  operation_type);
-		return os_if_dp_set_feature_predictive_roam_stats(vdev,
-								   operation_type);
-	default:
-		osif_err("Unsupported predictive roam operation type: %u",
-			 operation_type);
-		return QDF_STATUS_E_INVAL;
-	}
-}
-#endif
 
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 					 int data_len)
 {
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX + 1];
 	struct nlattr *flow_tuple_tb[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1];
-	struct wlan_dp_stc_flow_classify_result flow_classify_result = {0};
+	struct wlan_dp_stc_flow_classify_result flow_classify_result;
 	uint32_t ipv4_src_attr = QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_IPV4_SRC_ADDR;
 	uint32_t ipv4_dst_attr = QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_IPV4_DST_ADDR;
 	uint32_t ipv6_src_attr = QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_IPV6_SRC_ADDR;
@@ -567,23 +144,6 @@ QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 		return QDF_STATUS_E_INVAL;
 	}
 	flow_classify_result.traffic_type = nla_get_u8(tb[attr_id]);
-
-	attr_id = FLOW_CLASSIFY_RESULT_UL_TID;
-	if (tb[attr_id]) {
-		flow_classify_result.ul_tid = nla_get_u8(tb[attr_id]);
-		if (flow_classify_result.ul_tid > DP_MAX_TIDS)
-			flow_classify_result.ul_tid =
-						WLAN_DP_STC_UL_TID_INVALID;
-	} else {
-		flow_classify_result.ul_tid = WLAN_DP_STC_UL_TID_INVALID;
-	}
-
-	/* Parse classify results insights if present (optional) */
-	attr_id = FLOW_CLASSIFY_RESULT_INSIGHTS;
-	if (tb[attr_id])
-		os_if_dp_parse_classify_insights(tb[attr_id], &flow_classify_result);
-	else
-		flow_classify_result.insight_count = 0;
 
 	ucfg_dp_flow_classify_result(&flow_classify_result);
 
@@ -875,12 +435,10 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 	struct wlan_dp_stc_burst_samples *burst_sample;
 	struct wlan_dp_stc_txrx_samples *txrx_samples;
 
-	burst_sample =
-	   &flow_samples->burst_sample[flow_samples->curr_stats_stage - 1];
+	burst_sample = &flow_samples->burst_sample;
 	txrx_samples = &burst_sample->txrx_samples;
 
 	osif_nofl_debug("STC: Burst TxRx Stats:");
-	osif_nofl_debug("STC: Window duration: %u", txrx_samples->win_size);
 	osif_nofl_debug("STC: %20s %15s %15s", "", "UL", "DL");
 
 	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
@@ -919,7 +477,7 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 			"burst_duration_sum: ",
 			burst_sample->tx.burst_duration_sum,
 			burst_sample->rx.burst_duration_sum);
-	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+	osif_nofl_debug("STC: %20s %15u\t\t\t15%d",
 			"burst_size_min: ",
 			burst_sample->tx.burst_size_min,
 			burst_sample->rx.burst_size_min);
@@ -944,17 +502,14 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 
 static inline int
 os_if_dp_fill_flow_tuple(struct sk_buff *flow_sample_event,
-			 struct flow_info *flow_tuple, bool is_flow_status)
+			 struct flow_info *flow_tuple)
 {
 	struct nlattr *nla_attr;
 	int len = 0;
 	uint32_t attr_id;
 
 	if (flow_sample_event) {
-		if (is_flow_status)
-			attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATUS_TUPLE;
-		else
-			attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATS_FLOW_TUPLE;
+		attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATS_FLOW_TUPLE;
 		nla_attr = nla_nest_start(flow_sample_event, attr_id);
 		if (!nla_attr) {
 			osif_err("STC: Flow tuple nest start failed");
@@ -1370,8 +925,7 @@ os_if_dp_fill_burst_samples(struct sk_buff *flow_sample_event,
 	int len = 0, ret;
 	uint32_t attr_id;
 
-	burst_sample =
-	   &flow_samples->burst_sample[flow_samples->curr_stats_stage - 1];
+	burst_sample = &flow_samples->burst_sample;
 	txrx_samples = &burst_sample->txrx_samples;
 
 	if (flow_sample_event) {
@@ -1458,7 +1012,7 @@ os_if_dp_flow_stats_update_or_get_len(struct sk_buff *flow_sample_event,
 	int ret;
 
 	ret = os_if_dp_fill_flow_tuple(flow_sample_event,
-				       &flow_samples->flow_tuple, false);
+				       &flow_samples->flow_tuple);
 	if (ret < 0)
 		goto fail;
 	len += ret;
@@ -1589,98 +1143,8 @@ os_if_dp_send_flow_report_event(struct wlan_objmgr_psoc *psoc,
 	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
 }
 
-static int
-os_if_dp_send_flow_status_event(struct wlan_objmgr_psoc *psoc,
-				struct wlan_dp_stc_flow_status *status,
-				uint32_t flags)
-{
-	enum qca_nl80211_vendor_subcmds_index index =
-			QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_STATUS_INDEX;
-	struct sk_buff *flow_status_event;
-	struct wlan_objmgr_pdev *pdev;
-	struct pdev_osif_priv *os_priv;
-	uint32_t event_len = 0;
-	int ret;
-
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_DP_ID);
-	if (!pdev)
-		return -EINVAL;
-
-	os_priv = wlan_pdev_get_ospriv(pdev);
-	if (!os_priv) {
-		osif_err("PDEV OS private structure is NULL");
-		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-		return -EINVAL;
-	}
-
-	/* length for flow tuple */
-	event_len = os_if_dp_fill_flow_tuple(NULL, &status->flow_tuple, true);
-	/* length for traffic type*/
-	event_len += nla_total_size(sizeof(u8));
-	/* length for status type*/
-	event_len += nla_total_size(sizeof(u8));
-
-	flow_status_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy,
-							     NULL, event_len,
-							     index, GFP_KERNEL);
-	if (!flow_status_event) {
-		osif_err("STC: vendor event alloc failed for flow sample");
-		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-		return -EINVAL;
-	}
-
-	if (flags & WLAN_DP_LOG_ENABLE) {
-		os_if_dp_print_tuple(&status->flow_tuple);
-		osif_nofl_debug("STC: traffic type: %u status: %u",
-				status->traffic_type,
-				status->status);
-	}
-
-	ret = os_if_dp_fill_flow_tuple(flow_status_event,
-				       &status->flow_tuple, true);
-	if (ret < 0)
-		goto fail;
-
-	if (nla_put_u8(flow_status_event,
-		       QCA_WLAN_VENDOR_ATTR_FLOW_STATUS_TRAFFIC_TYPE,
-		       status->traffic_type)) {
-		osif_err("STC: traffic type put failed");
-		goto fail;
-	}
-
-	if (nla_put_u8(flow_status_event,
-		       QCA_WLAN_VENDOR_ATTR_FLOW_STATUS_UPDATE_TYPE,
-		       status->status)) {
-		osif_err("STC: traffic type put failed");
-		goto fail;
-	}
-
-	wlan_cfg80211_vendor_event(flow_status_event, GFP_KERNEL);
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-	return event_len;
-
-fail:
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
-	osif_err("STC: flow status nla_put api failed");
-	wlan_cfg80211_vendor_free_skb(flow_status_event);
-	return -EINVAL;
-}
-
 void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 {
 	cb_obj->send_flow_stats_event = os_if_dp_send_flow_stats_event;
 	cb_obj->send_flow_report_event = os_if_dp_send_flow_report_event;
-	cb_obj->send_flow_status_event = os_if_dp_send_flow_status_event;
 }
-
-#undef FLOW_CLASSIFY_RESULT_FLOW_TUPLE
-#undef FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE
-#undef FLOW_CLASSIFY_RESULT_UL_TID
-#undef FLOW_CLASSIFY_RESULT_INSIGHTS
-
-#undef PREDICTIVE_ROAM_OPERATION_TYPE
-#undef PREDICTIVE_ROAM_TX_RETRIES
-#undef PREDICTIVE_ROAM_BW_PKT_COUNT
-#undef PREDICTIVE_ROAM_UL_DELAY
-#undef PREDICTIVE_ROAM_TX_PHY_RATE_AVERAGE
-#undef PREDICTIVE_ROAM_MAX

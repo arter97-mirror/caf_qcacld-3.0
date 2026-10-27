@@ -53,6 +53,14 @@ struct osif_dp_lpass_ssr_nb_params {
 #endif
 
 /**
+ * osif_dp_classify_pkt() - classify packet
+ * @skb: sk buff
+ *
+ * Return: None
+ */
+void osif_dp_classify_pkt(struct sk_buff *skb);
+
+/**
  * osif_dp_mark_pkt_type() - Mark pkt type in CB
  * @skb: sk buff
  *
@@ -151,17 +159,4 @@ int osif_dp_get_nud_stats(struct wiphy *wiphy, struct wlan_objmgr_vdev *vdev,
  */
 int osif_dp_set_nud_stats(struct wiphy *wiphy, struct wlan_objmgr_vdev *vdev,
 			  const void *data, int data_len);
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-static inline void osif_dp_ndp_set_peer_bw(qdf_nbuf_t nbuf)
-{
-	QDF_NBUF_CB_TX_PEER_BW(nbuf) =
-		(sk_tx_queue_get(nbuf->sk) & NDP_TX_QUEUE_INDEX_PEER_BW_MASK) >>
-		NDP_TX_QUEUE_INDEX_PEER_BW_SHIFT;
-}
-#else
-static inline void osif_dp_ndp_set_peer_bw(qdf_nbuf_t nbuf)
-{
-}
-#endif
 #endif /* __OSIF_DP_H__ */

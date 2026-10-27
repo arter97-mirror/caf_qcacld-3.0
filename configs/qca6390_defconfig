@@ -212,6 +212,7 @@ CONFIG_FEATURE_EPPING := y
 CONFIG_WLAN_OFFLOAD_PACKETS := y
 
 #enable TSF get feature
+CONFIG_WLAN_SYNC_TSF := y
 #Enable DSRC feature
 ifeq ($(CONFIG_QCA_WIFI_SDIO), y)
 	#Enable DSRC feature
@@ -863,10 +864,6 @@ endif
 
 ifeq ($(CONFIG_CNSS_UTILS), m)
 CONFIG_CNSS_UTILS_MODULE := y
-endif
-
-ifeq ($(CONFIG_WCNSS_MEM_PRE_ALLOC), m)
-CONFIG_WCNSS_MEM_PRE_ALLOC_MODULE := y
 endif
 
 CONFIG_WLAN_CUSTOM_DSCP_UP_MAP := y

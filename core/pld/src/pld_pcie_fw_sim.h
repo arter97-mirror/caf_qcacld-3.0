@@ -56,12 +56,6 @@ static inline int pld_pcie_fw_sim_is_fw_down(struct device *dev)
 	return 0;
 }
 
-static inline bool
-pld_pcie_fw_sim_is_direct_refill_supported(struct device *dev)
-{
-	return 0;
-}
-
 static inline int pld_pcie_fw_sim_get_platform_cap(struct device *dev,
 						   struct pld_platform_cap *cap)
 {
@@ -100,14 +94,6 @@ static inline int pld_pcie_fw_sim_request_irq(struct device *dev, int irq,
 					      unsigned long irqflags,
 					      const char *devname,
 					      void *dev_data)
-{
-	return 0;
-}
-
-static inline
-int pld_pcie_fw_sim_register_tsf_sync_time(struct device *dev,
-					   wlan_tsf_handler_t handler,
-					   void *context)
 {
 	return 0;
 }
@@ -172,11 +158,6 @@ static inline int pld_pcie_fw_sim_get_irq(struct device *dev, int ce_id)
 {
 	return 0;
 }
-
-static inline int pld_pcie_fw_sim_is_device_awake(struct device *dev)
-{
-	return 1;
-}
 #else
 #include <net/cnss2.h>
 
@@ -189,10 +170,8 @@ int pld_pcie_fw_sim_register_driver(void);
 void pld_pcie_fw_sim_unregister_driver(void);
 int pld_pcie_fw_sim_get_platform_cap(struct device *dev,
 				     struct pld_platform_cap *cap);
-bool pld_pcie_fw_sim_is_direct_refill_supported(struct device *dev);
 int pld_pcie_fw_sim_get_soc_info(struct device *dev, struct pld_soc_info *info);
 int pld_pcie_fw_sim_get_irq(struct device *dev, int ce_id);
-int pld_pcie_fw_sim_is_device_awake(struct device *dev);
 
 static inline int pld_pcie_fw_sim_get_user_msi_assignment(struct device *dev,
 							  char *user_name,
@@ -225,14 +204,6 @@ static inline int pld_pcie_fw_sim_request_irq(struct device *dev, int irq,
 {
 	return cnss_fw_sim_request_irq(dev, irq, handler,
 				       irqflags, devname, dev_data);
-}
-
-static inline
-int pld_pcie_fw_sim_register_tsf_sync_time(struct device *dev,
-					   wlan_tsf_handler_t handler,
-					   void *context)
-{
-	return cnss_fw_sim_request_gpio_irq(dev, handler, context);
 }
 
 static inline int pld_pcie_fw_sim_read_config_word(struct device *dev,

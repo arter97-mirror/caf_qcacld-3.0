@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,7 +26,6 @@
 #include "nan_ucfg_api.h"
 #include "target_if_nan.h"
 #include "wlan_nan_api.h"
-#include "wmi_unified_nan_api.h"
 #include "target_if.h"
 #include "wmi_unified_api.h"
 #include "scheduler_api.h"
@@ -101,15 +100,6 @@ static QDF_STATUS target_if_ndp_event_flush_cb(struct scheduler_msg *msg)
 	case NDP_HOST_UPDATE:
 		vdev = ((struct nan_datapath_host_event *)ptr)->vdev;
 		break;
-	case NAN_LOCAL_SCHEDULE_RSP:
-		/* vdev_id in response; retrieved in dispatcher */
-		break;
-	case NAN_PEER_SCHEDULE_RSP:
-		/* vdev_id in response, retrieved in dispatcher */
-		break;
-	case NAN_PEER_PARAMS_RSP:
-		/* vdev_id in response, retrieved in dispatcher */
-		break;
 	default:
 		break;
 	}
@@ -121,119 +111,6 @@ static QDF_STATUS target_if_ndp_event_flush_cb(struct scheduler_msg *msg)
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-static QDF_STATUS target_if_nan_local_schedule_event_dispatcher(
-					struct scheduler_msg *msg)
-{
-	QDF_STATUS status;
-	struct wlan_nan_rx_ops *nan_rx_ops;
-	struct nan_local_sched_rsp *rsp = msg->bodyptr;
-	struct wlan_objmgr_psoc *psoc = rsp->psoc;
-
-	if (!psoc) {
-		target_if_err("psoc is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto free_res;
-	}
-
-	nan_rx_ops = nan_psoc_get_rx_ops(psoc);
-	if (!nan_rx_ops) {
-		target_if_err("nan_rx_ops is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto free_res;
-	}
-
-	status = nan_rx_ops->nan_datapath_event_rx(msg);
-
-free_res:
-	qdf_mem_free(msg->bodyptr);
-	msg->bodyptr = NULL;
-	return status;
-}
-
-static QDF_STATUS target_if_nan_peer_schedule_event_dispatcher(
-					struct scheduler_msg *msg)
-{
-	QDF_STATUS status;
-	struct wlan_nan_rx_ops *nan_rx_ops;
-	struct nan_peer_sched_rsp *rsp = msg->bodyptr;
-	struct wlan_objmgr_psoc *psoc = rsp->psoc;
-
-	if (!psoc) {
-		target_if_err("psoc is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto free_res;
-	}
-
-	nan_rx_ops = nan_psoc_get_rx_ops(psoc);
-	if (!nan_rx_ops) {
-		target_if_err("nan_rx_ops is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto free_res;
-	}
-
-	status = nan_rx_ops->nan_datapath_event_rx(msg);
-
-free_res:
-	qdf_mem_free(msg->bodyptr);
-	msg->bodyptr = NULL;
-	return status;
-}
-
-static QDF_STATUS target_if_nan_peer_params_event_dispatcher(
-					struct scheduler_msg *msg)
-{
-	QDF_STATUS status;
-	struct wlan_nan_rx_ops *nan_rx_ops;
-	struct nan_peer_params_rsp *rsp = msg->bodyptr;
-	struct wlan_objmgr_psoc *psoc = rsp->psoc;
-
-	if (!psoc) {
-		target_if_err("psoc is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto free_res;
-	}
-
-	nan_rx_ops = nan_psoc_get_rx_ops(psoc);
-	if (!nan_rx_ops) {
-		target_if_err("nan_rx_ops is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto free_res;
-	}
-
-	status = nan_rx_ops->nan_datapath_event_rx(msg);
-
-free_res:
-	qdf_mem_free(msg->bodyptr);
-	msg->bodyptr = NULL;
-	return status;
-}
-#else
-static inline QDF_STATUS target_if_nan_local_schedule_event_dispatcher(
-					struct scheduler_msg *msg)
-{
-	qdf_mem_free(msg->bodyptr);
-	msg->bodyptr = NULL;
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS target_if_nan_peer_schedule_event_dispatcher(
-					struct scheduler_msg *msg)
-{
-	qdf_mem_free(msg->bodyptr);
-	msg->bodyptr = NULL;
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS target_if_nan_peer_params_event_dispatcher(
-					struct scheduler_msg *msg)
-{
-	qdf_mem_free(msg->bodyptr);
-	msg->bodyptr = NULL;
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 static QDF_STATUS target_if_ndp_event_dispatcher(struct scheduler_msg *msg)
 {
@@ -268,15 +145,6 @@ static QDF_STATUS target_if_ndp_event_dispatcher(struct scheduler_msg *msg)
 	case NDP_HOST_UPDATE:
 		vdev = ((struct nan_datapath_host_event *)ptr)->vdev;
 		break;
-	case NAN_LOCAL_SCHEDULE_RSP:
-		/* Use dedicated dispatcher for local schedule response */
-		return target_if_nan_local_schedule_event_dispatcher(msg);
-	case NAN_PEER_SCHEDULE_RSP:
-		/* Use dedicated dispatcher for peer schedule response */
-		return target_if_nan_peer_schedule_event_dispatcher(msg);
-	case NAN_PEER_PARAMS_RSP:
-		/* Use dedicated dispatcher for peer params response */
-		return target_if_nan_peer_params_event_dispatcher(msg);
 	default:
 		target_if_err("invalid msg type %d", msg->type);
 		status = QDF_STATUS_E_INVAL;
@@ -397,220 +265,6 @@ static int target_if_nan_dmesg_handler(ol_scn_t scn, uint8_t *data,
 	return 0;
 }
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * target_if_nan_disable_rsp_handler() - Handler for NAN disable response event
- * @scn: scn handle
- * @data: Event data buffer from firmware
- * @len: Length of event data
- *
- * This function handles the WMI_NAN_DISABLE_RSP_EVENTID event from firmware.
- * It extracts the NAN disable response parameters, allocates memory for the
- * event structure, obtains a PSOC reference, and posts the event to the
- * scheduler for processing by the NAN discovery event dispatcher.
- *
- * Return: 0 on success, negative error code on failure
- */
-static int target_if_nan_disable_rsp_handler(ol_scn_t scn, uint8_t *data,
-					     uint32_t len)
-{
-	struct nan_event_params *nan_rsp, temp_evt_params = {0};
-	struct scheduler_msg msg = {0};
-	struct wmi_unified *wmi_handle;
-	struct wlan_objmgr_psoc *psoc;
-	QDF_STATUS status;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	status = wmi_extract_nan_disable_rsp_event(wmi_handle, data,
-						   &temp_evt_params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("parsing of event failed, %d", status);
-		return -EINVAL;
-	}
-
-	nan_rsp = qdf_mem_malloc(sizeof(*nan_rsp) + temp_evt_params.buf_len);
-	if (!nan_rsp)
-		return -ENOMEM;
-
-	qdf_mem_copy(nan_rsp, &temp_evt_params, sizeof(*nan_rsp));
-	if (temp_evt_params.buf_len)
-		qdf_mem_copy(nan_rsp->buf, temp_evt_params.buf,
-			     temp_evt_params.buf_len);
-
-	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_NAN_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to obtain psoc ref");
-		qdf_mem_free(nan_rsp);
-		return -EACCES;
-	}
-
-	nan_rsp->psoc = psoc;
-
-	msg.bodyptr = nan_rsp;
-	msg.type = nan_rsp->evt_type;
-	msg.callback = target_if_nan_event_dispatcher;
-	msg.flush_callback = target_if_nan_event_flush_cb;
-	target_if_debug("NAN Event sent: %d", msg.type);
-	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("failed to post msg, status: %d", status);
-		target_if_nan_event_flush_cb(&msg);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
- * target_if_nan_disable_ind_handler() - Handler for NAN disable indication event
- * @scn: scn handle
- * @data: Event data buffer from firmware
- * @len: Length of event data
- *
- * This function handles the WMI_NAN_DISABLE_IND_EVENTID event from firmware.
- * It extracts the NAN disable indication parameters, allocates memory for the
- * event structure, obtains a PSOC reference, and posts the event to the
- * scheduler for processing by the NAN discovery event dispatcher. This
- * indication is sent by firmware when NAN is disabled autonomously.
- *
- * Return: 0 on success, negative error code on failure
- */
-static int target_if_nan_disable_ind_handler(ol_scn_t scn, uint8_t *data,
-					     uint32_t len)
-{
-	struct nan_event_params *nan_rsp, temp_evt_params = {0};
-	struct scheduler_msg msg = {0};
-	struct wmi_unified *wmi_handle;
-	struct wlan_objmgr_psoc *psoc;
-	QDF_STATUS status;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	status = wmi_extract_nan_disable_ind_event(wmi_handle, data,
-						   &temp_evt_params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("parsing of event failed, %d", status);
-		return -EINVAL;
-	}
-
-	nan_rsp = qdf_mem_malloc(sizeof(*nan_rsp) + temp_evt_params.buf_len);
-	if (!nan_rsp)
-		return -ENOMEM;
-
-	qdf_mem_copy(nan_rsp, &temp_evt_params, sizeof(*nan_rsp));
-	if (temp_evt_params.buf_len)
-		qdf_mem_copy(nan_rsp->buf, temp_evt_params.buf,
-			     temp_evt_params.buf_len);
-
-	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_NAN_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to obtain psoc ref");
-		qdf_mem_free(nan_rsp);
-		return -EACCES;
-	}
-	nan_rsp->psoc = psoc;
-
-	msg.bodyptr = nan_rsp;
-	msg.type = nan_rsp->evt_type;
-	msg.callback = target_if_nan_event_dispatcher;
-	msg.flush_callback = target_if_nan_event_flush_cb;
-	target_if_debug("NAN Event sent: %d", msg.type);
-	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("failed to post msg, status: %d", status);
-		target_if_nan_event_flush_cb(&msg);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int target_if_nan_enable_rsp_handler(ol_scn_t scn, uint8_t *data,
-					    uint32_t len)
-{
-	struct nan_event_params *nan_rsp;
-	struct nan_enable_rsp_params fw_evt_params = {0};
-	struct scheduler_msg msg = {0};
-	struct wmi_unified *wmi_handle;
-	struct wlan_objmgr_psoc *psoc;
-	QDF_STATUS status;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	status = wmi_extract_nan_enable_rsp_event(wmi_handle, data,
-						  &fw_evt_params);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("parsing of event failed, %d", status);
-		return -EINVAL;
-	}
-	nan_rsp = qdf_mem_malloc(sizeof(*nan_rsp));
-	if (!nan_rsp)
-		return -ENOMEM;
-
-	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_NAN_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to obtain psoc ref");
-		qdf_mem_free(nan_rsp);
-		return -EACCES;
-	}
-	nan_rsp->evt_type = nan_event_id_enable_rsp;
-	nan_rsp->is_nan_enable_success = (fw_evt_params.status == 0);
-	nan_rsp->vdev_id = fw_evt_params.vdev_id;
-	nan_rsp->mac_id = fw_evt_params.mac_id;
-	nan_rsp->psoc = psoc;
-	msg.bodyptr = nan_rsp;
-	msg.type = nan_rsp->evt_type;
-	msg.callback = target_if_nan_event_dispatcher;
-	msg.flush_callback = target_if_nan_event_flush_cb;
-	target_if_debug("NAN Event sent: %d", msg.type);
-	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("failed to post msg, status: %d", status);
-		target_if_nan_event_flush_cb(&msg);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-#endif
 static int target_if_ndp_initiator_rsp_handler(ol_scn_t scn, uint8_t *data,
 						uint32_t len)
 {
@@ -715,7 +369,6 @@ static int target_if_ndp_confirm_handler(ol_scn_t scn, uint8_t *data,
 	struct wmi_unified *wmi_handle;
 	struct scheduler_msg msg = {0};
 	struct nan_datapath_confirm_event *rsp;
-	uint8_t i;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -739,10 +392,6 @@ static int target_if_ndp_confirm_handler(ol_scn_t scn, uint8_t *data,
 		qdf_mem_free(rsp);
 		return -EINVAL;
 	}
-
-	for (i = 0; i < rsp->num_channels; i++)
-		rsp->ch[i].ch_width =
-		  target_if_wmi_chan_width_to_phy_ch_width(rsp->ch[i].ch_width);
 
 	msg.bodyptr = rsp;
 	msg.type = NDP_CONFIRM;
@@ -954,39 +603,6 @@ static int target_if_ndp_end_rsp_handler(ol_scn_t scn, uint8_t *data,
 	return 0;
 }
 
-static QDF_STATUS target_if_nan_ndp_update_config(
-				struct nan_datapath_update_config *config)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct wmi_unified *wmi_handle;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!config) {
-		target_if_err("Invalid config.");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	vdev = config->vdev;
-	if (!vdev) {
-		target_if_err("vdev object is NULL!");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		target_if_err("psoc is null.");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null.");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return wmi_unified_ndp_update_config_cmd_send(wmi_handle, config);
-}
-
 static int target_if_ndp_end_ind_handler(ol_scn_t scn, uint8_t *data,
 					 uint32_t data_len)
 {
@@ -1046,7 +662,6 @@ static int target_if_ndp_sch_update_handler(ol_scn_t scn, uint8_t *data,
 	struct wmi_unified *wmi_handle;
 	struct scheduler_msg msg = {0};
 	struct nan_datapath_sch_update_event *rsp;
-	uint8_t i;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -1070,10 +685,6 @@ static int target_if_ndp_sch_update_handler(ol_scn_t scn, uint8_t *data,
 		qdf_mem_free(rsp);
 		return -EINVAL;
 	}
-
-	for (i = 0; i < rsp->num_channels; i++)
-		rsp->ch[i].ch_width =
-		  target_if_wmi_chan_width_to_phy_ch_width(rsp->ch[i].ch_width);
 
 	msg.bodyptr = rsp;
 	msg.type = NDP_SCHEDULE_UPDATE;
@@ -1175,250 +786,6 @@ static int target_if_ndp_host_event_handler(ol_scn_t scn, uint8_t *data,
 	return 0;
 }
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-static int target_if_nan_local_schedule_cnf_handler(ol_scn_t scn,
-						    uint8_t *data,
-						    uint32_t data_len)
-{
-	QDF_STATUS status;
-	struct wlan_objmgr_psoc *psoc;
-	struct wmi_unified *wmi_handle;
-	struct scheduler_msg msg = {0};
-	struct nan_local_sched_rsp *rsp;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return -ENOMEM;
-
-	status = wmi_extract_nan_local_schedule_cnf(wmi_handle, data, rsp);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("parsing of event failed, %d", status);
-		qdf_mem_free(rsp);
-		return -EINVAL;
-	}
-
-	/* Populate psoc field */
-	rsp->psoc = psoc;
-
-	msg.bodyptr = rsp;
-	msg.type = NAN_LOCAL_SCHEDULE_RSP;
-	msg.callback = target_if_ndp_event_dispatcher;
-	msg.flush_callback = target_if_ndp_event_flush_cb;
-	target_if_debug("NAN_LOCAL_SCHEDULE_RSP sent: %d", msg.type);
-	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("failed to post msg, status: %d", status);
-		target_if_ndp_event_flush_cb(&msg);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int target_if_nan_peer_schedule_cnf_handler(ol_scn_t scn,
-						   uint8_t *data,
-						   uint32_t data_len)
-{
-	QDF_STATUS status;
-	struct wlan_objmgr_psoc *psoc;
-	struct wmi_unified *wmi_handle;
-	struct scheduler_msg msg = {0};
-	struct nan_peer_sched_rsp *rsp;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return -ENOMEM;
-
-	status = wmi_extract_nan_peer_schedule_cnf(wmi_handle, data, rsp);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("parsing of event failed, %d", status);
-		qdf_mem_free(rsp);
-		return -EINVAL;
-	}
-
-	/* Populate psoc field */
-	rsp->psoc = psoc;
-
-	msg.bodyptr = rsp;
-	msg.type = NAN_PEER_SCHEDULE_RSP;
-	msg.callback = target_if_ndp_event_dispatcher;
-	msg.flush_callback = target_if_ndp_event_flush_cb;
-	target_if_debug("NAN_PEER_SCHEDULE_RSP sent: %d", msg.type);
-	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("failed to post msg, status: %d", status);
-		target_if_ndp_event_flush_cb(&msg);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int target_if_nan_peer_params_cnf_handler(ol_scn_t scn,
-						 uint8_t *data,
-						 uint32_t data_len)
-{
-	QDF_STATUS status;
-	struct wlan_objmgr_psoc *psoc;
-	struct wmi_unified *wmi_handle;
-	struct scheduler_msg msg = {0};
-	struct nan_peer_params_rsp *rsp;
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return -ENOMEM;
-
-	status = wmi_extract_nan_peer_params_cnf(wmi_handle, data, rsp);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("parsing of event failed, %d", status);
-		qdf_mem_free(rsp);
-		return -EINVAL;
-	}
-
-	/* Populate psoc field */
-	rsp->psoc = psoc;
-
-	msg.bodyptr = rsp;
-	msg.type = NAN_PEER_PARAMS_RSP;
-	msg.callback = target_if_ndp_event_dispatcher;
-	msg.flush_callback = target_if_ndp_event_flush_cb;
-	target_if_debug("NAN_PEER_PARAMS_RSP sent: %d", msg.type);
-	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF,
-					QDF_MODULE_ID_TARGET_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("failed to post msg, status: %d", status);
-		target_if_ndp_event_flush_cb(&msg);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static QDF_STATUS target_if_nan_local_schedule_req(void *req)
-{
-	struct nan_local_sched_params *sched_req = req;
-	struct wlan_objmgr_psoc *psoc;
-	struct wmi_unified *wmi_handle;
-
-	if (!sched_req || !sched_req->psoc) {
-		target_if_err("Invalid req or psoc");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = sched_req->psoc;
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return wmi_unified_nan_local_schedule_cmd_send(wmi_handle, sched_req);
-}
-
-static QDF_STATUS target_if_nan_peer_schedule_req(
-				struct nan_peer_sched_params *req)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wmi_unified *wmi_handle;
-
-	if (!req || !req->psoc) {
-		target_if_err("Invalid req or psoc");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = req->psoc;
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return wmi_unified_nan_peer_schedule_cmd_send(wmi_handle, req);
-}
-
-static QDF_STATUS target_if_nan_peer_params_req(
-				struct nan_peer_params_req *req)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wmi_unified *wmi_handle;
-
-	if (!req || !req->psoc) {
-		target_if_err("Invalid req or psoc");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = req->psoc;
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return wmi_unified_nan_peer_params_cmd_send(wmi_handle, req);
-}
-#else
-static inline QDF_STATUS target_if_nan_local_schedule_req(void *req)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS target_if_nan_peer_schedule_req(
-				struct nan_peer_sched_params *req)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS target_if_nan_peer_params_req(
-				struct nan_peer_params_req *req)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-
 static QDF_STATUS target_if_nan_datapath_req(void *req, uint32_t req_type)
 {
 	/* send cmd to fw */
@@ -1434,18 +801,6 @@ static QDF_STATUS target_if_nan_datapath_req(void *req, uint32_t req_type)
 		break;
 	case NDP_END_ALL:
 		target_if_nan_end_all_ndps_req(req);
-		break;
-	case NDP_UPDATE_CONFIG:
-		target_if_nan_ndp_update_config(req);
-		break;
-	case NAN_LOCAL_SCHEDULE_REQ:
-		target_if_nan_local_schedule_req(req);
-		break;
-	case NAN_PEER_SCHEDULE_REQ:
-		target_if_nan_peer_schedule_req(req);
-		break;
-	case NAN_PEER_PARAMS_REQ:
-		target_if_nan_peer_params_req(req);
 		break;
 	default:
 		target_if_err("invalid req type");
@@ -1474,73 +829,9 @@ static QDF_STATUS target_if_nan_generic_req(struct wlan_objmgr_psoc *psoc,
 		target_if_err("wmi_handle is null.");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
 	return wmi_unified_nan_req_cmd(wmi_handle, nan_req);
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-static QDF_STATUS target_if_nan_standard_req(struct wlan_objmgr_psoc *psoc,
-					     void *nan_req)
-{
-	struct wmi_unified *wmi_handle;
-
-	if (!psoc) {
-		target_if_err("psoc is null.");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-	if (!nan_req) {
-		target_if_err("Invalid req.");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null.");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-	return wmi_unified_nan_start_req(wmi_handle, nan_req);
-}
-
-static QDF_STATUS
-target_if_nan_change_conf_req(struct nan_change_conf_req *nan_req)
-{
-	struct wmi_unified *wmi_handle;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!nan_req) {
-		target_if_err("Invalid req.");
-		return QDF_STATUS_E_INVAL;
-	}
-	psoc = nan_req->psoc;
-
-	if (!psoc) {
-		target_if_err("psoc is null.");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null.");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (ucfg_nan_is_fw_support_standard_mode(psoc))
-		return wmi_unified_nan_change_conf_req(wmi_handle, nan_req);
-	else
-		return QDF_STATUS_E_INVAL;
-}
-#else
-static QDF_STATUS target_if_nan_standard_req(struct wlan_objmgr_psoc *psoc,
-					     void *nan_req)
-{
-	return QDF_STATUS_E_INVAL;
-}
-
-static QDF_STATUS
-target_if_nan_change_conf_req(struct nan_change_conf_req *nan_req)
-{
-	return QDF_STATUS_E_INVAL;
-}
-#endif
 
 static QDF_STATUS target_if_nan_disable_req(struct nan_disable_req *nan_req)
 {
@@ -1564,10 +855,7 @@ static QDF_STATUS target_if_nan_disable_req(struct nan_disable_req *nan_req)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (ucfg_nan_is_fw_support_standard_mode(psoc))
-		return wmi_unified_nan_stop_req_cmd(wmi_handle, nan_req);
-	else
-		return wmi_unified_nan_disable_req_cmd(wmi_handle, nan_req);
+	return wmi_unified_nan_disable_req_cmd(wmi_handle, nan_req);
 }
 
 static QDF_STATUS target_if_nan_discovery_req(void *req, uint32_t req_type)
@@ -1592,19 +880,11 @@ static QDF_STATUS target_if_nan_discovery_req(void *req, uint32_t req_type)
 		}
 	case NAN_ENABLE_REQ: {
 			struct nan_enable_req *nan_req = req;
-			if (ucfg_nan_is_fw_support_standard_mode(nan_req->psoc))
-				status = target_if_nan_standard_req(
-								nan_req->psoc,
-								nan_req);
-			else
-				status = target_if_nan_generic_req(
-							nan_req->psoc,
-							&nan_req->params);
+
+			status = target_if_nan_generic_req(nan_req->psoc,
+							   &nan_req->params);
 			break;
 		}
-	case NAN_CHANGE_CONF_REQ:
-		status = target_if_nan_change_conf_req(req);
-		break;
 	default:
 		target_if_err("Invalid NAN req type");
 		status = QDF_STATUS_E_INVAL;
@@ -1648,7 +928,7 @@ int target_if_nan_rsp_handler(ol_scn_t scn, uint8_t *data, uint32_t len)
 	}
 
 	status = wmi_extract_nan_event_rsp(wmi_handle, data, &temp_evt_params,
-					   &buf_ptr, wlan_get_nan_config(psoc));
+					   &buf_ptr);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("parsing of event failed, %d", status);
 		return -EINVAL;
@@ -1685,541 +965,6 @@ int target_if_nan_rsp_handler(ol_scn_t scn, uint8_t *data, uint32_t len)
 
 	return 0;
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * target_if_nan_join_cluster_event_handler() - Handler for NAN cluster events
- * @scn: scn handle
- * @data: event data buffer
- * @datalen: length of event data
- *
- * This function handles both WMI_NAN_JOINED_CLUSTER_EVENTID and
- * WMI_NAN_STARTED_CLUSTER_EVENTID events from firmware.
- *
- * Return: 0 on success, negative error code on failure
- */
-static
-int target_if_nan_join_cluster_event_handler(ol_scn_t scn, uint8_t *data,
-					     uint32_t datalen)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_cluster_event cluster_event;
-	struct nan_psoc_priv_obj *nan_psoc_obj;
-	wmi_unified_t wmi_handle;
-	QDF_STATUS status;
-
-	if (!scn || !data) {
-		target_if_err("Invalid parameters");
-		return -EINVAL;
-	}
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-
-	nan_psoc_obj = nan_get_psoc_priv_obj(psoc);
-	if (!nan_psoc_obj) {
-		target_if_err("nan PSOC is NULL");
-		return -EINVAL;
-	}
-
-	if (!nan_psoc_obj->cb_obj.os_if_nan_process_cluster_event) {
-		target_if_err("function handler is null");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	cluster_event.event_type = NAN_CLUSTER_EVENT_JOINED;
-	/* Extract cluster event information from WMI buffer */
-	status = wmi_extract_nan_cluster_event(wmi_handle, data,
-					       &cluster_event);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to extract cluster event: %d", status);
-		return -EINVAL;
-	}
-
-	/* Get vdev object */
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    cluster_event.vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		target_if_err("vdev is null for vdev_id: %d",
-			      cluster_event.vdev_id);
-		return -EINVAL;
-	}
-
-	nan_psoc_obj->cb_obj.os_if_nan_process_cluster_event(vdev,
-							     &cluster_event);
-
-	/* Release vdev reference */
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-	return qdf_status_to_os_return(status);
-}
-
-/**
- * target_if_nan_start_cluster_event_handler() - Handler for NAN cluster events
- * @scn: scn handle
- * @data: event data buffer
- * @datalen: length of event data
- *
- * This function handles both WMI_NAN_JOINED_CLUSTER_EVENTID and
- * WMI_NAN_STARTED_CLUSTER_EVENTID events from firmware.
- *
- * Return: 0 on success, negative error code on failure
- */
-static
-int target_if_nan_start_cluster_event_handler(ol_scn_t scn, uint8_t *data,
-                                              uint32_t datalen)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_cluster_event cluster_event;
-	struct nan_psoc_priv_obj *nan_psoc_obj;
-	wmi_unified_t wmi_handle;
-	QDF_STATUS status;
-
-	if (!scn || !data) {
-		target_if_err("Invalid parameters");
-		return -EINVAL;
-	}
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-
-	nan_psoc_obj = nan_get_psoc_priv_obj(psoc);
-	if (!nan_psoc_obj) {
-		target_if_err("nan PSOC is NULL");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return -EINVAL;
-	}
-
-	cluster_event.event_type = NAN_CLUSTER_EVENT_STARTED;
-	/* Extract cluster event information from WMI buffer */
-	status = wmi_extract_nan_cluster_event(wmi_handle,
-					       data, &cluster_event);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to extract cluster event: %d", status);
-		return -EINVAL;
-	}
-
-	/* Get vdev object */
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    cluster_event.vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		target_if_err("vdev is null for vdev_id: %d",
-			      cluster_event.vdev_id);
-		return -EINVAL;
-	}
-
-	if (!nan_psoc_obj->cb_obj.os_if_nan_process_cluster_event) {
-		target_if_err("function handler is null");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-		return -EINVAL;
-	}
-	nan_psoc_obj->cb_obj.os_if_nan_process_cluster_event(vdev,
-							     &cluster_event);
-
-	/* Release vdev reference */
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-	return qdf_status_to_os_return(status);
-}
-
-/**
- * target_if_nan_next_dw_info_event_handler() - Handler for NAN next DW info event
- * @scn: Opaque SOC handle
- * @data: Event data from firmware
- * @datalen: Length of event data
- *
- * This function handles the WMI_NAN_NEXT_DW_INFO_EVENTID event from firmware
- * and forwards it to the UMAC layer for further processing.
- *
- * Return: 0 on success, negative error code on failure
- */
-static int target_if_nan_next_dw_info_event_handler(ol_scn_t scn, uint8_t *data,
-						    uint32_t datalen)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_next_dw_info_event event;
-	QDF_STATUS status;
-	wmi_unified_t wmi_handle;
-	struct nan_psoc_priv_obj *nan_psoc_obj;
-
-	if (!scn || !data) {
-		target_if_err("Invalid parameters");
-		return -EINVAL;
-	}
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-
-	nan_psoc_obj = nan_get_psoc_priv_obj(psoc);
-	if (!nan_psoc_obj) {
-		target_if_err("nan PSOC is NULL");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("WMI handle is NULL");
-		return -EINVAL;
-	}
-
-	/* Extract event parameters from WMI */
-	qdf_mem_zero(&event, sizeof(event));
-	status = wmi_extract_nan_next_dw_info(wmi_handle, data, &event);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to extract NAN next DW info: %d", status);
-		return -EINVAL;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, event.vdev_id,
-                                                    WLAN_NAN_ID);
-	if (!vdev) {
-		target_if_err("vdev is null");
-		return -EINVAL;
-        }
-
-	if (!nan_psoc_obj->cb_obj.os_if_nan_next_dw_notif_handler) {
-		target_if_err("function handler is null");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-		return -EINVAL;
-	}
-
-	nan_psoc_obj->cb_obj.os_if_nan_next_dw_notif_handler(vdev, &event);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-	return qdf_status_to_os_return(status);
-}
-
-/**
- * target_if_nan_dfs_channel_availability_event_handler() - Handler for NAN
- *     DFS channel availability indication event
- * @scn: Opaque SOC handle
- * @data: Event data from firmware
- * @datalen: Length of event data
- *
- * This function handles the WMI_NAN_DFS_CHANNEL_AVAILABILITY_IND_EVENTID
- * event from firmware and forwards it to the OS-IF layer.
- *
- * Return: 0 on success, negative error code on failure
- */
-static int
-target_if_nan_dfs_channel_availability_event_handler(ol_scn_t scn,
-						     uint8_t *data,
-						     uint32_t datalen)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_dfs_channel_availability_ind event;
-	QDF_STATUS status;
-	wmi_unified_t wmi_handle;
-	struct nan_psoc_priv_obj *nan_psoc_obj;
-
-	if (!scn || !data) {
-		target_if_err("Invalid parameters");
-		return -EINVAL;
-	}
-
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
-	if (!psoc) {
-		target_if_err("psoc is NULL");
-		return -EINVAL;
-	}
-
-	nan_psoc_obj = nan_get_psoc_priv_obj(psoc);
-	if (!nan_psoc_obj) {
-		target_if_err("nan PSOC priv obj is NULL");
-		return -EINVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("WMI handle is NULL");
-		return -EINVAL;
-	}
-
-	qdf_mem_zero(&event, sizeof(event));
-	status = wmi_extract_nan_dfs_channel_availability_ind(wmi_handle,
-							      data, &event);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		target_if_err("Failed to extract NAN DFS channel availability ind: %d",
-			      status);
-		return -EINVAL;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, event.vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		target_if_err("vdev is null for vdev_id %u", event.vdev_id);
-		return -EINVAL;
-	}
-
-	if (!nan_psoc_obj->cb_obj.os_if_nan_dfs_channel_availability_handler) {
-		target_if_err("os_if_nan_dfs_channel_availability_handler is null");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-		return -EINVAL;
-	}
-
-	nan_psoc_obj->cb_obj.os_if_nan_dfs_channel_availability_handler(
-							vdev, &event);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-
-	return qdf_status_to_os_return(status);
-}
-
-/**
- * target_if_deregister_nan_std_mode_event_handler() - Deregister NAN std mode
- *						       events
- * @psoc: psoc pointer
- *
- * This function deregisters nan std mode events.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_* on failure
- */
-static QDF_STATUS
-target_if_deregister_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
-{
-	QDF_STATUS ret, status = QDF_STATUS_SUCCESS;
-	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
-
-	if (!handle) {
-		target_if_err("handle is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-						handle,
-						wmi_nan_next_dw_info_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_joined_cluster_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(handle,
-					     wmi_nan_started_cluster_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-				handle,
-				wmi_nan_dfs_channel_availability_ind_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_disable_rsp_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_disable_ind_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(handle,
-						   wmi_nan_enable_rsp_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_local_schedule_cnf_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_peer_schedule_cnf_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	ret = wmi_unified_unregister_event_handler(
-					handle,
-					wmi_nan_peer_params_cnf_event_id);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
-
-	return status;
-}
-
-
-/**
- * target_if_register_nan_std_mode_event_handler() - Register NAN std mode
- *						     events
- * @psoc: psoc pointer
- *
- * This function registers nan std mode events.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_* on failure
- */
-static QDF_STATUS
-target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
-{
-	QDF_STATUS ret;
-	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
-
-	if (!handle) {
-		target_if_err("handle is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle, wmi_nan_next_dw_info_event_id,
-				target_if_nan_next_dw_info_event_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle, wmi_nan_joined_cluster_event_id,
-				target_if_nan_join_cluster_event_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle, wmi_nan_started_cluster_event_id,
-				target_if_nan_start_cluster_event_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-					handle,
-					wmi_nan_disable_rsp_event_id,
-					target_if_nan_disable_rsp_handler,
-					WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-					handle,
-					wmi_nan_disable_ind_event_id,
-					target_if_nan_disable_ind_handler,
-					WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-					handle,
-					wmi_nan_enable_rsp_event_id,
-					target_if_nan_enable_rsp_handler,
-					WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle,
-				wmi_nan_local_schedule_cnf_event_id,
-				target_if_nan_local_schedule_cnf_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-			handle, wmi_nan_dfs_channel_availability_ind_event_id,
-			target_if_nan_dfs_channel_availability_event_handler,
-			WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle,
-				wmi_nan_peer_schedule_cnf_event_id,
-				target_if_nan_peer_schedule_cnf_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_register_event_handler(
-				handle,
-				wmi_nan_peer_params_cnf_event_id,
-				target_if_nan_peer_params_cnf_handler,
-				WMI_RX_UMAC_CTX);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("wmi event registration failed, ret: %d", ret);
-		target_if_nan_deregister_events(psoc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-#else
-static inline QDF_STATUS
-target_if_register_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-target_if_deregister_nan_std_mode_event_handler(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 QDF_STATUS target_if_nan_register_events(struct wlan_objmgr_psoc *psoc)
 {
@@ -2327,12 +1072,6 @@ QDF_STATUS target_if_nan_register_events(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ret = target_if_register_nan_std_mode_event_handler(psoc);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("NAN standard mode event registration failed, ret: %d", ret);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2406,11 +1145,6 @@ QDF_STATUS target_if_nan_deregister_events(struct wlan_objmgr_psoc *psoc)
 		target_if_err("wmi event deregistration failed, ret: %d", ret);
 		status = ret;
 	}
-	ret = target_if_deregister_nan_std_mode_event_handler(psoc);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		target_if_err("NAN standard mode event deregistration failed, ret: %d", ret);
-		status = ret;
-	}
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
@@ -2450,74 +1184,3 @@ void target_if_nan_set_vdev_feature_config(struct wlan_objmgr_psoc *psoc,
 		target_if_err("failed to set NAN_CONFIG_FEATURES(status = %d)",
 			      status);
 }
-
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
-
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return false;
-	}
-
-	return wmi_service_enabled(wmi_handle,
-				   wmi_service_nan_standard_mode_support);
-}
-
-bool target_if_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
-{
-	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
-
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		return false;
-	}
-
-	return wmi_service_enabled(
-			wmi_handle,
-			wmi_service_nan_ap_assisted_dfs_operation_support);
-}
-
-QDF_STATUS target_if_nan_set_device_caps(struct wlan_objmgr_psoc *psoc,
-					 struct nan_capabilities *caps)
-{
-	struct device_nan_capabilities *device_caps;
-	struct target_psoc_info *tgt_hdl;
-
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
-	if (!tgt_hdl) {
-		target_if_err("tgt_hdl is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	device_caps = &tgt_hdl->info.service_ext2_param.nan_caps;
-
-	QDF_SET_BITS(caps->flags, NAN_FLAGS_CONFIGURABLE_SYNC_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, NAN_SET_CONFIGURATION_FLAG);
-	QDF_SET_BITS(caps->flags, NAN_FLAGS_USERSPACE_DE_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, NAN_SET_CONFIGURATION_FLAG);
-
-	QDF_SET_BITS(caps->op_mode, NAN_VHT_OPMODE_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, device_caps->vht_phy_mode);
-	QDF_SET_BITS(caps->op_mode, NAN_HE_OPMODE_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, device_caps->he_phy_mode);
-	QDF_SET_BITS(caps->op_mode, NAN_HE_VHT_80_80_OPMODE_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, device_caps->he_vht_80_80);
-	QDF_SET_BITS(caps->op_mode, NAN_HE_VHT_160_OPMODE_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, device_caps->he_vht_160);
-
-	QDF_SET_BITS(caps->n_antennas, NAN_TX_ANT_BIT,
-		     NAN_CONFIGURATION_BIT_ANTENNA_NUM,
-		     device_caps->num_tx_ant);
-	QDF_SET_BITS(caps->n_antennas, NAN_RX_ANT_BIT,
-		     NAN_CONFIGURATION_BIT_ANTENNA_NUM,
-		     device_caps->num_rx_ant);
-
-	caps->max_channel_switch_time = device_caps->max_chan_switch_time;
-	QDF_SET_BITS(caps->dev_capabilities, NAN_S3_SUPPORT_BIT,
-		     NAN_CONFIGURATION_BIT_NUM, device_caps->s3_support);
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

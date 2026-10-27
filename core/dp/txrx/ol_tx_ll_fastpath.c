@@ -131,7 +131,7 @@ ol_tx_tso_adjust_pkt_dnld_len(qdf_nbuf_t msdu,
 /**
  * ol_tx_prepare_ll_fast() Alloc and prepare Tx descriptor
  *
- * Allocate and prepare Tx descriptor with msdu and fragment descriptor
+ * Allocate and prepare Tx descriptor with msdu and fragment descritor
  * information.
  *
  * @pdev: pointer to ol pdev handle
@@ -549,7 +549,7 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 				QDF_DP_TRACE_TXRX_FAST_PACKET_PTR_RECORD,
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(msdu),
-				sizeof(uint8_t *), tx_desc->id,
+				sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
 				vdev->vdev_id, 0, vdev->qdf_opmode));
 
 			ol_tx_trace_pkt(msdu, tx_desc->id, vdev->vdev_id,

@@ -110,15 +110,6 @@ void hdd_configure_sar_sleep_index(struct hdd_context *hdd_ctx);
  */
 void hdd_configure_sar_resume_index(struct hdd_context *hdd_ctx);
 
-/**
- * wlan_hdd_sar_timers_stop() - stop SAR timers
- * @hdd_ctx: Pointer to HDD context
- *
- * This function stop sar timers.
- * Return: None
- */
-void wlan_hdd_sar_timers_stop(struct hdd_context *hdd_ctx);
-
 #else
 static inline void wlan_hdd_sar_unsolicited_timer_start(
 						struct hdd_context *hdd_ctx)
@@ -154,9 +145,6 @@ static inline void hdd_configure_sar_resume_index(struct hdd_context *hdd_ctx)
 {
 }
 
-static inline void wlan_hdd_sar_timers_stop(struct hdd_context *hdd_ctx)
-{
-}
 #endif
 
 #ifdef FEATURE_SAR_LIMITS
@@ -249,7 +237,8 @@ wlan_hdd_sar_limits_policy[QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX + 1];
 {                                                                       \
 	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
 	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_SET_SAR_LIMITS,        \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV,                            \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,                         \
 	.doit = wlan_hdd_cfg80211_set_sar_power_limits,                 \
 	vendor_command_policy(wlan_hdd_sar_limits_policy,               \
 			      QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX)      \
@@ -257,117 +246,13 @@ wlan_hdd_sar_limits_policy[QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX + 1];
 {                                                                       \
 	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
 	.info.subcmd =  QCA_NL80211_VENDOR_SUBCMD_GET_SAR_CAPABILITY,   \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV,                            \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
+		WIPHY_VENDOR_CMD_NEED_RUNNING,                          \
 	.doit = wlan_hdd_cfg80211_get_sar_capability,                   \
 	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)                   \
 },
-
-#ifdef WLAN_FEATURE_CTAS
-#define HDD_TAS_METRICS_MAX_CHAINS WLAN_TAS_MAX_CHAINS
-#define HDD_TAS_PLIMIT_MAX_CHAINS HDD_TAS_METRICS_MAX_CHAINS
-
-/**
- * struct hdd_tas_metrics_chain - TAS per-antenna chain metrics
- * (average TX power region)
- * @chain_no: chain number
- * @chain_operating_band: chain operating band
- * @chain_power_region: chain power region
- */
-struct hdd_tas_metrics_chain {
-	uint32_t chain_no;
-	uint32_t chain_operating_band;
-	uint32_t chain_power_region;
-};
-
-/**
- * struct hdd_tas_metrics_priv - TAS metrics container used by callbacks and
- * replies
- * @fw_status: firmware status
- * @time_window_in_sec: time window in second
- * @num_chains: number of chains
- * @chains: hdd_tas_metrics_chain array
- */
-struct hdd_tas_metrics_priv {
-	uint32_t fw_status;
-	uint32_t time_window_in_sec;
-	uint32_t num_chains;
-	struct hdd_tas_metrics_chain chains[HDD_TAS_METRICS_MAX_CHAINS];
-};
-
-/**
- * struct hdd_tas_plimit_chain - TAS per-antenna chain power info
- * (0.25 dBm units)
- * @chain_no: chain number
- * @chain_operating_band: chain operating band
- * @power: power value
- */
-struct hdd_tas_plimit_chain {
-	uint32_t chain_no;
-	uint32_t chain_operating_band;
-	int32_t  power; /* 0.25 dBm units */
-};
-
-/**
- * struct hdd_tas_plimit_priv: TAS per-chain power limit container used by
- * callbacks
- * @fw_status: firmware status
- * @num_chains: number chains
- * @chains: hdd_tas_plimit_chain array
- */
-struct hdd_tas_plimit_priv {
-	uint32_t fw_status;
-	uint32_t num_chains;
-	struct hdd_tas_plimit_chain chains[HDD_TAS_PLIMIT_MAX_CHAINS];
-};
-
-/**
- * struct hdd_tas_chain_info - generic per-chain descriptor for NL band-entry
- * helper
- * @chain_no: chain number
- * @chain_operating_band: chain operating band
- * @tx_value: value to report inside tx_power_level_info (power_region or raw
- *            power bits)
- */
-struct hdd_tas_chain_info {
-	uint32_t chain_no;
-	uint32_t chain_operating_band;
-	uint32_t tx_value;
-};
-
-/**
- * wlan_hdd_cfg80211_tas() - Handle QCA_NL80211_VENDOR_SUBCMD_TAS
- * @wiphy: Pointer to wireless phy
- * @wdev: Pointer to wireless device
- * @data: Pointer to data
- * @data_len: Length of @data
- *
- * Wrapper function of __wlan_hdd_cfg80211_tas()
- *
- * Return: 0 on success, negative errno on failure
- */
-int wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
-			  struct wireless_dev *wdev,
-			  const void *data, int data_len);
-
-extern const struct nla_policy
-wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1];
-
-#define FEATURE_TAS_VENDOR_COMMANDS                                     \
-{                                                                       \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TAS,                   \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
-		 WIPHY_VENDOR_CMD_NEED_RUNNING,                         \
-	.doit = wlan_hdd_cfg80211_tas,                                  \
-	vendor_command_policy(wlan_hdd_tas_policy,                      \
-			      QCA_WLAN_VENDOR_ATTR_TAS_MAX)             \
-},
-#else /* WLAN_FEATURE_CTAS */
-#define FEATURE_TAS_VENDOR_COMMANDS
-#endif /* WLAN_FEATURE_CTAS */
 #else /* FEATURE_SAR_LIMITS */
 #define FEATURE_SAR_LIMITS_VENDOR_COMMANDS
-#define FEATURE_TAS_VENDOR_COMMANDS
 static inline
 void hdd_store_sar_config(struct hdd_context *hdd_ctx,
 			  struct sar_limit_cmd_params *sar_limit_cmd)

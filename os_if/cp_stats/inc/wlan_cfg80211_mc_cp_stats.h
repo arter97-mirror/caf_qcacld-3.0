@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ *
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -53,19 +54,6 @@ int wlan_cfg80211_mc_cp_stats_get_wakelock_stats(struct wlan_objmgr_psoc *psoc,
  */
 int wlan_cfg80211_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 					   int *dbm);
-
-#ifdef WLAN_FEATURE_QSH_SCAN
-/**
- * wlan_cfg80211_mc_cp_stats_get_qsh_stats() - API to fetch QSH scan stats
- * @vdev:        Pointer to vdev
- * @scan_count:  Pointer to scan count
- *
- * Return: 0 on success, negative value on failure
- */
-int wlan_cfg80211_mc_cp_stats_get_qsh_stats(struct wlan_objmgr_vdev *vdev,
-					    uint32_t *scan_count);
-#endif
-
 #ifdef WLAN_FEATURE_MIB_STATS
 /**
  * wlan_cfg80211_mc_cp_stats_get_mib_stats() - API to get mib stats
@@ -134,20 +122,6 @@ struct stats_event *
 wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 					 const uint8_t *mac_addr,
 					 int *errno);
-
-/**
- * wlan_cfg80211_mc_cp_stats_get_peer_stats_ext() - API to get peer ext
- * statistics from firmware
- * @vdev:    Pointer to vdev
- * @mac_addr: mac address
- *
- * Call of this API must call wlan_cfg80211_mc_cp_stats_free_stats_event
- * API when done with information provided by info.
- * Return: stats buffer on success, Null on failure
- */
-struct stats_event *
-wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
-					     const uint8_t *mac_addr);
 #else
 static inline int wlan_cfg80211_mc_cp_stats_get_tx_power(
 				struct wlan_objmgr_vdev *vdev,
@@ -185,13 +159,6 @@ static inline struct stats_event *
 wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 					 const uint8_t *mac_addr,
 					 int *errno)
-{
-	return NULL;
-}
-
-static inline struct stats_event *
-wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
-					     const uint8_t *mac_addr)
 {
 	return NULL;
 }

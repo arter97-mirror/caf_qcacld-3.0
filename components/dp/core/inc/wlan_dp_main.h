@@ -169,132 +169,6 @@ struct wlan_dp_intf*
 dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 		       struct qdf_mac_addr *addr);
 
-#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-
-/*
- * +----------------+----------------+----------------+-------------+----------+
- * | Bit Range      |  31 ... 24     |  23 ... 16     |  15 ... 8   |  7 ... 0 |
- * +----------------+----------------+----------------+-------------+----------+
- * | Affinity Type  | NAPI Thread    | DP Rx Thread   | TX Compl IRQ| RX IRQ   |
- * +----------------+----------------+----------------+-------------+----------+
- * | Field bits     | [0-7]          | [0-7]          | [0-7]       | [0-7]    |
- * | Cluster Config | [2:0]          | [2:0]          | [2:0]       | [2:0]    |
- * | CPU Mask       | [7:3]          | [7:3]          | [7:3]       | [7:3]    |
- * +----------------+----------------+----------------+-------------+----------+
- *
- * Legend:
- * - Each 8-bit field encodes affinity.
- * - Bits [2:0] (3 bits): Cluster config (values 0–7).
- * - Bits [7:3] (5 bits): CPU mask within selected cluster (values 0–31).
- */
-
-/* Macros for extracting affinity fields from 32 bit affinity mask*/
-#define AFFINITY_BIT_MASK	 0xFF
-#define CLUSTER_CONFIG_SHIFT     0
-#define CLUSTER_CONFIG_MASK      0x07
-#define CPU_CONFIG_SHIFT         3
-#define CPU_CONFIG_MASK          0x1F
-
-#define GET_AFFINITY(mask, shift) \
-	(((mask) >> (shift)) & AFFINITY_BIT_MASK)
-#define GET_CLUSTER_CONFIG(affinity) \
-	(((affinity) >> CLUSTER_CONFIG_SHIFT) & CLUSTER_CONFIG_MASK)
-#define GET_CPU_CONFIG(affinity) \
-	(((affinity) >> CPU_CONFIG_SHIFT) & CPU_CONFIG_MASK)
-
-/**
- * wlan_dp_affn_override_handler() - Function to set affinities according to
- * DP affinity override threshold levels
- * @dp_ctx: handle to DP context
- * @total_packets: Total Tx and Rx packets
- *
- * The function sets the affinities according to throughput level
- * and next vote level.
- *
- * Return: None
- */
-void wlan_dp_affn_override_handler(
-	struct wlan_dp_psoc_context *dp_ctx,
-	uint64_t total_packets);
-
-/**
- * wlan_dp_cfg_is_affn_override_enabled() - Get DP affn override enabled flag
- * @dp_cfg: soc configuration context
- *
- * Return: true if enabled, false otherwise.
- */
-static inline
-bool wlan_dp_cfg_is_affn_override_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return dp_cfg->dp_affn_override_enabled;
-}
-
-/**
- * dp_affn_override_init() - Function to initialize dp affinity override
- * parameters based on ini for various thresholds
- * @psoc: psoc context
- *
- * Return: None
- */
-void dp_affn_override_init(struct wlan_objmgr_psoc *psoc);
-#else
-static inline
-bool wlan_dp_cfg_is_affn_override_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return false;
-}
-
-static inline void wlan_dp_affn_override_handler(
-	struct wlan_dp_psoc_context *dp_ctx,
-	uint64_t total_packets)
-{}
-
-static inline void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
-{}
-#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
-
-/**
- * wlan_dp_static_irq_affinity_set() - Pin REO and TX-comp ring IRQs to
- * fixed CPUs.  Called unconditionally at driver open regardless of whether
- * WLAN_DP_LOAD_BALANCE_SUPPORT is enabled.
- *
- * When load-balance is enabled the LB flow-balance sub-system migrates
- * flows between REO rings (FST steering) but deliberately skips the IRQ
- * rebalance step, so the static CPU pinning set here is never overwritten
- * by the periodic load-balance handler.
- *
- * @psoc: psoc handle
- *
- * Return: None
- */
-#ifdef FEATURE_STATIC_IRQ_AFFINITY
-void wlan_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc);
-
-static inline bool
-wlan_dp_cfg_is_static_irq_affinity_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return dp_cfg->dp_tx_comp_intr_cpumask || dp_cfg->dp_rx_intr_cpumask;
-}
-
-void dp_static_irq_affinity_cfg_init(struct wlan_dp_psoc_cfg *config,
-				     struct wlan_objmgr_psoc *psoc);
-#else
-static inline void
-wlan_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc)
-{}
-
-static inline bool
-wlan_dp_cfg_is_static_irq_affinity_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
-{
-	return false;
-}
-
-static inline void
-dp_static_irq_affinity_cfg_init(struct wlan_dp_psoc_cfg *config,
-				struct wlan_objmgr_psoc *psoc)
-{}
-#endif /* FEATURE_STATIC_IRQ_AFFINITY */
-
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 /**
  * dp_get_hlp_by_peeraddr() - API to Get HLP node from MAC address
@@ -322,13 +196,12 @@ QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
  * dp_softap_handle_hlp() - API to handle HLP msg received from upper layer
  * @dp_intf: DP interface
  * @addr: MAC address of Peer
- * @nbuf: nbuf pointer
  *
  * Return: QDF_STATUS status in case of success else return error
  */
 
 QDF_STATUS dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
-				struct qdf_mac_addr *addr, qdf_nbuf_t nbuf);
+				struct qdf_mac_addr *addr);
 
 /**
  * dp_softap_hlp_init() - API to initialise context for hlp
@@ -359,9 +232,7 @@ dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf, struct qdf_mac_addr *addr)
 }
 
 static inline QDF_STATUS
-dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
-		     struct qdf_mac_addr *addr,
-		     qdf_nbuf_t nbuf)
+dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf, struct qdf_mac_addr *addr)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -514,15 +385,6 @@ QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
  * Return: QDF_STATUS
  */
 QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
-
-/**
- * __wlan_dp_fisa_suspend() - FISA suspend DP handler
- * @soc: CDP SoC handle
- * @pdev_id: DP PDEV ID
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS __wlan_dp_fisa_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
 
 /**
  * __wlan_dp_bus_resume() - BUS resume DP handler
@@ -1041,6 +903,15 @@ QDF_STATUS dp_get_arp_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 
 void dp_trace_init(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * dp_set_dump_dp_trace() - set DP trace dump level
+ * @cmd_type : command type
+ * @count: count
+ *
+ * Return: None
+ */
+void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count);
+
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #define DP_BUS_BW_CFG(bus_bw_cfg)	bus_bw_cfg
 #define DP_BUS_BW_GET_RX_LVL(dp_ctx)	(dp_ctx)->cur_rx_level
@@ -1063,9 +934,8 @@ dp_is_low_tput_gro_enable(struct wlan_dp_psoc_context *dp_ctx)
 #define DP_HOST_STA_TX_TIMEOUT    BIT(16)
 #define DP_HOST_SAP_TX_TIMEOUT    BIT(17)
 #define DP_HOST_NUD_FAILURE       BIT(18)
-#define DP_MAC_PHY_RESET          BIT(30)
 #define DP_TIMEOUT_WLM_MODE       BIT(31)
-#define FW_DATA_STALL_EVT_MASK     0xC000FFFF
+#define FW_DATA_STALL_EVT_MASK     0x8000FFFF
 
 /**
  * dp_is_data_stall_event_enabled() - Check if data stall detection is enabled
@@ -1358,19 +1228,6 @@ wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
 }
 #endif
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-/**
- * wlan_dp_dump_periodic_custom_stats_enable_req() - Enable/disable dump
- *						     periodic custom stats
- * @dp_link: DP link handle
- * @enable: Enable/disable dump periodic custom stats
- *
- * Return: None
- */
-void wlan_dp_dump_periodic_custom_stats_enable_req(struct wlan_dp_link *dp_link,
-						   bool enable);
-#endif
-
 #ifdef IPA_OFFLOAD
 static inline bool
 wlan_dp_check_is_ring_ipa_rx(ol_txrx_soc_handle soc, uint8_t ring_id)
@@ -1429,108 +1286,5 @@ static inline bool wlan_dp_link_check_cdp_vdev(struct wlan_dp_link *dp_link,
 
 	return false;
 }
-
-#ifndef WLAN_SUPPORT_FLOW_PRIORTIZATION
-/* Change in the below macros, will need to updated in wlan_dp_fim.h as well */
-#define FLOW_INFO_PRESENT_PROTO			BIT(0)
-#define FLOW_INFO_PRESENT_SRC_PORT		BIT(1)
-#define FLOW_INFO_PRESENT_DST_PORT		BIT(2)
-#define FLOW_INFO_PRESENT_IPV4_SRC_IP		BIT(3)
-#define FLOW_INFO_PRESENT_IPV4_DST_IP		BIT(4)
-#define FLOW_INFO_PRESENT_IPV6_SRC_IP		BIT(5)
-#define FLOW_INFO_PRESENT_IPV6_DST_IP		BIT(6)
-#define FLOW_INFO_PRESENT_IP_FRAGMENT		BIT(7)
-#define FLOW_INFO_IPV4_PARSE_SUCCESS		(FLOW_INFO_PRESENT_PROTO |\
-						FLOW_INFO_PRESENT_SRC_PORT |\
-						FLOW_INFO_PRESENT_DST_PORT |\
-						FLOW_INFO_PRESENT_IPV4_SRC_IP |\
-						FLOW_INFO_PRESENT_IPV4_DST_IP)
-#define FLOW_INFO_IPV6_PARSE_SUCCESS		(FLOW_INFO_PRESENT_PROTO |\
-						FLOW_INFO_PRESENT_SRC_PORT |\
-						FLOW_INFO_PRESENT_DST_PORT |\
-						FLOW_INFO_PRESENT_IPV6_SRC_IP |\
-						FLOW_INFO_PRESENT_IPV6_DST_IP)
-#endif
-
-static inline
-bool dp_flow_info_exact_match(struct flow_info *fi, struct flow_info *flow)
-{
-	if (fi->flags & FLOW_INFO_IPV4_PARSE_SUCCESS) {
-		if (flow->src_ip.ipv4_addr == fi->src_ip.ipv4_addr &&
-		    flow->dst_ip.ipv4_addr == fi->dst_ip.ipv4_addr &&
-		    flow->src_port == fi->src_port &&
-		    flow->dst_port == fi->dst_port &&
-		    flow->proto == fi->proto) {
-			return true;
-		}
-	} else if (fi->flags & FLOW_INFO_IPV6_PARSE_SUCCESS) {
-		if (qdf_mem_cmp(&flow->dst_ip.ipv6_addr, &fi->dst_ip.ipv6_addr,
-				sizeof(struct in6_addr)) == 0 &&
-		    qdf_mem_cmp(&flow->dst_ip.ipv6_addr, &fi->dst_ip.ipv6_addr,
-				sizeof(struct in6_addr)) == 0 &&
-		    flow->flow_label == fi->flow_label) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-#if defined(WLAN_SUPPORT_RX_FISA) && defined(WLAN_DP_FEATURE_STC)
-static inline struct dp_fisa_rx_sw_ft *
-wlan_dp_get_rx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
-{
-	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
-
-	return (&(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[flow_id]));
-}
-
-static inline struct dp_fisa_rx_sw_ft *
-wlan_dp_find_dl_flow(struct wlan_dp_psoc_context *dp_ctx,
-		     uint32_t tx_flow_tuple_hash)
-{
-	struct dp_rx_fst *fst = dp_ctx->rx_fst;
-	uint16_t flow_id;
-
-	for (flow_id = 0; flow_id < fst->max_entries; flow_id++) {
-		struct dp_fisa_rx_sw_ft *rx_flow;
-
-		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, flow_id);
-		if (!rx_flow->is_populated)
-			continue;
-
-		if (rx_flow->flow_tuple_hash != tx_flow_tuple_hash)
-			continue;
-
-		return rx_flow;
-	}
-
-	return NULL;
-}
-#else
-static inline struct dp_fisa_rx_sw_ft *
-wlan_dp_find_dl_flow(struct wlan_dp_psoc_context *dp_ctx,
-		     uint32_t flow_tuple_hash)
-{
-	return NULL;
-}
-#endif
-
-#ifdef DP_FEATURE_DIRECT_REFILL
-static inline bool dp_direct_refill_adjust_dyn_rsc_mgmt(qdf_device_t qdf_ctx,
-							bool dyn_rx_buf_alloc)
-{
-	if (dyn_rx_buf_alloc && pld_is_direct_refill_supported(qdf_ctx->dev))
-		return true;
-
-	return false;
-}
-#else
-static inline bool dp_direct_refill_adjust_dyn_rsc_mgmt(qdf_device_t qdf_ctx,
-							bool dyn_rx_buf_alloc)
-{
-	return dyn_rx_buf_alloc;
-}
-#endif
 
 #endif

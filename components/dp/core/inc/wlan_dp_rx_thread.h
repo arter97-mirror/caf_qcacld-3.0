@@ -34,15 +34,8 @@
 
 /* Maximum number of REO rings supported (for stats tracking) */
 #define DP_RX_TM_MAX_REO_RINGS WLAN_CFG_NUM_REO_DEST_RING
-#ifdef FEATURE_DAL_DP_SUPPORT
-/* Number of DAL DP RX threads */
-#define DAL_DP_RX_THREADS 4
-/* Number of DP RX threads supported */
-#define DP_MAX_RX_THREADS (WLAN_CFG_NUM_REO_DEST_RING + DAL_DP_RX_THREADS)
-#else
 /* Number of DP RX threads supported */
 #define DP_MAX_RX_THREADS WLAN_CFG_NUM_REO_DEST_RING
-#endif
 
 /*
  * struct dp_rx_tm_handle_cmn - Opaque handle for rx_threads to store
@@ -72,7 +65,6 @@ struct dp_rx_tm_handle_cmn;
  * @rx_nbufq_loop_yield: rx loop yield counter
  * @num_ndev_hold: number of netdevice references hold
  * @num_ndev_release: number of netdevice references released
- * @nbuf_per_cpu: packets processed in the thread per CPU core
  */
 struct dp_rx_thread_stats {
 	unsigned int nbuf_queued[DP_RX_TM_MAX_REO_RINGS];
@@ -91,7 +83,6 @@ struct dp_rx_thread_stats {
 	unsigned int rx_nbufq_loop_yield;
 	unsigned int num_ndev_hold;
 	unsigned int num_ndev_release;
-	unsigned int nbuf_per_cpu[QDF_MAX_AVAILABLE_CPU];
 };
 
 /**
@@ -124,7 +115,7 @@ enum dp_rx_refill_thread_state {
  * @vdev_del_event_flag: vdev bit map for per vdev delete event flags
  * @nbuf_queue:nbuf queue used to store RX packets
  * @nbufq_len: length of the nbuf queue
- * @aff_mask: current affinity mask of the DP Rx thread
+ * @aff_mask: cuurent affinity mask of the DP Rx thread
  * @stats: per thread stats
  * @rtm_handle_cmn: abstract RX TM handle. This allows access to the dp_rx_tm
  *		    structures via APIs.
@@ -150,11 +141,7 @@ struct dp_rx_thread {
 	struct dp_rx_tm_handle_cmn *rtm_handle_cmn;
 	qdf_napi_struct napi;
 	qdf_wait_queue_head_t wait_q;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
-	qdf_dummy_netdev_t *netdev;
-#else
 	qdf_dummy_netdev_t netdev;
-#endif
 	qdf_netdev_t net_dev[WLAN_PDEV_MAX_VDEVS];
 };
 
@@ -206,8 +193,6 @@ enum dp_rx_thread_state {
  * @state: state of the rx_threads. All of them should be in the same state.
  * @rx_thread: array of pointers of type struct dp_rx_thread
  * @allow_dropping: flag to indicate frame dropping is enabled
- * @dal_dp_rx_thread_start_id: thread id from which DAL threads start
- * @dal_dp_enabled: dal data path feature enabled
  */
 struct dp_rx_tm_handle {
 	uint8_t num_dp_rx_threads;
@@ -215,10 +200,6 @@ struct dp_rx_tm_handle {
 	enum dp_rx_thread_state state;
 	struct dp_rx_thread **rx_thread;
 	qdf_atomic_t allow_dropping;
-#ifdef FEATURE_DAL_DP_SUPPORT
-	uint8_t dal_dp_rx_thread_start_id;
-	bool dal_dp_enabled;
-#endif
 };
 
 /**
@@ -383,14 +364,15 @@ dp_rx_thread_get_txrx_handle(struct dp_rx_tm_handle_cmn *rx_tm_handle_cmn)
 
 /**
  * dp_rx_tm_get_napi_context() - get NAPI context for a RX CTX ID
+ * @rx_ctx_id: RX context ID (RX thread ID) corresponding to which NAPI is
+ *             needed
  * @rx_tm_hdl: dp_rx_tm_handle containing the overall thread
  *             infrastructure
- * @nbuf: buffer pointer
  *
  * Return: NULL on failure, else pointer to NAPI corresponding to rx_ctx_id
  */
 qdf_napi_struct *dp_rx_tm_get_napi_context(struct dp_rx_tm_handle *rx_tm_hdl,
-					   qdf_nbuf_t nbuf);
+					   uint8_t rx_ctx_id);
 
 /**
  * dp_rx_tm_set_cpu_mask() - set CPU mask for RX threads
@@ -659,13 +641,14 @@ static inline QDF_STATUS dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 /**
  * dp_rx_get_napi_context() - get NAPI context for a RX CTX ID
  * @soc: ol_txrx_soc_handle object
- * @nbuf: nbuf pointer
+ * @rx_ctx_id: RX context ID (RX thread ID) corresponding to which NAPI is
+ *             needed
  *
  * Return: NULL on failure, else pointer to NAPI corresponding to rx_ctx_id
  */
 static inline
 qdf_napi_struct *dp_rx_get_napi_context(ol_txrx_soc_handle soc,
-					qdf_nbuf_t nbuf)
+					uint8_t rx_ctx_id)
 {
 	struct dp_txrx_handle *dp_ext_hdl;
 
@@ -680,7 +663,7 @@ qdf_napi_struct *dp_rx_get_napi_context(ol_txrx_soc_handle soc,
 		return NULL;
 	}
 
-	return dp_rx_tm_get_napi_context(&dp_ext_hdl->rx_tm_hdl, nbuf);
+	return dp_rx_tm_get_napi_context(&dp_ext_hdl->rx_tm_hdl, rx_ctx_id);
 }
 
 /**
@@ -764,7 +747,7 @@ static inline QDF_STATUS dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 
 static inline
 qdf_napi_struct *dp_rx_get_napi_context(ol_txrx_soc_handle soc,
-					qdf_nbuf_t nbuf)
+					uint8_t rx_ctx_id)
 {
 	return NULL;
 }
@@ -784,68 +767,5 @@ QDF_STATUS dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc, qdf_cpu_mask *new_mask)
  *
  * Return: number of frames
  */
-#ifdef FEATURE_WLAN_DP_RX_THREADS
 int dp_rx_tm_get_pending(ol_txrx_soc_handle soc);
-#else
-static inline int dp_rx_tm_get_pending(ol_txrx_soc_handle soc)
-{
-	return 0;
-}
-#endif
-
-#ifdef FEATURE_DAL_DP_SUPPORT
-static inline uint8_t
-dp_get_dal_rx_threads_num(struct dp_rx_tm_handle *rx_tm_hdl)
-{
-	if (!rx_tm_hdl->dal_dp_enabled)
-		return 0;
-
-	return DAL_DP_RX_THREADS;
-}
-
-static inline void dp_rx_tm_set_dal_start_id(struct dp_rx_tm_handle *hdl,
-					     uint8_t start_id)
-{
-	hdl->dal_dp_rx_thread_start_id = start_id;
-}
-
-void dp_rx_tm_gro_flush_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
-				    enum dp_rx_gro_flush_code flush_code);
-
-static inline void
-dp_rx_gro_flush_dal_threads(ol_txrx_soc_handle soc,
-			    enum dp_rx_gro_flush_code flush_code)
-{
-	struct dp_txrx_handle *dp_ext_hdl;
-
-	if (!soc) {
-		dp_err("invalid input param soc %pK", soc);
-		return;
-	}
-
-	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(soc);
-	if (!dp_ext_hdl)
-		return;
-
-	dp_rx_tm_gro_flush_dal_threads(&dp_ext_hdl->rx_tm_hdl,
-				       flush_code);
-}
-#else
-static inline void
-dp_rx_gro_flush_dal_threads(ol_txrx_soc_handle soc,
-			    enum dp_rx_gro_flush_code flush_code)
-{
-}
-
-static inline uint8_t
-dp_get_dal_rx_threads_num(struct dp_rx_tm_handle *rx_tm_hdl)
-{
-	return 0;
-}
-
-static inline void dp_rx_tm_set_dal_start_id(struct dp_rx_tm_handle *hdl,
-					     uint8_t start_id)
-{
-}
-#endif
 #endif /* __WLAN_DP_RX_THREAD_H */

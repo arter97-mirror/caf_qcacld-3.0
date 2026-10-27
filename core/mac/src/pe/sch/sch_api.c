@@ -268,13 +268,13 @@ static void lim_populate_fd_capability(struct pe_session *pe_session,
 	}
 
 	/* Max Num of Spatial Steam */
-	switch (pe_session->cap_tx_nss) {
+	switch (pe_session->nss) {
 	case WLAN_FD_CAP_NSS_MODE_1:
 	case WLAN_FD_CAP_NSS_MODE_2:
+		fd_cap[0] |= ((pe_session->nss - 1) << WLAN_FD_CAP_NSS_S);
+		break;
 	case WLAN_FD_CAP_NSS_MODE_3:
 	case WLAN_FD_CAP_NSS_MODE_4:
-		fd_cap[0] |= (pe_session->cap_tx_nss - 1) << WLAN_FD_CAP_NSS_S;
-		break;
 	case WLAN_FD_CAP_NSS_MODE_5:
 	case WLAN_FD_CAP_NSS_MODE_6:
 	case WLAN_FD_CAP_NSS_MODE_7:
@@ -282,8 +282,7 @@ static void lim_populate_fd_capability(struct pe_session *pe_session,
 		fd_cap[0] |= (WLAN_FD_CAP_NSS_GTE_5 << WLAN_FD_CAP_NSS_S);
 		break;
 	default:
-		pe_err("NSS value: %d is not supported",
-		       pe_session->cap_tx_nss);
+		pe_err("NSS value: %d is not supported", pe_session->nss);
 		break;
 	}
 
@@ -357,7 +356,6 @@ static QDF_STATUS lim_populate_fd_tmpl_frame(struct mac_context *mac,
 	uint8_t i, idx;
 	tSirMacMgmtHdr *mac_hdr;
 	struct qdf_mac_addr broadcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
-	bool set_gvp_tx_power = false;
 
 	pe_debug("FD TMPL freq: %d chWidth: %d", cur_chan_freq, chwidth);
 
@@ -460,12 +458,8 @@ static QDF_STATUS lim_populate_fd_tmpl_frame(struct mac_context *mac,
 	/* Add TPE IE */
 	if ((wlan_reg_is_6ghz_chan_freq(cur_chan_freq)) ||
 	    (pe_session->vhtCapability)) {
-		if (wlan_mlme_get_gvp_op_control(mac->psoc) &&
-		    wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq))
-			set_gvp_tx_power = true;
 		populate_dot11f_tx_power_env(mac, pe_session, &tpe[0], chwidth,
-					     cur_chan_freq, &tpe_num, false,
-					     set_gvp_tx_power);
+					     cur_chan_freq, &tpe_num, false);
 		if (tpe_num > WLAN_MAX_NUM_TPE_IE) {
 			pe_err("tpe_num  %d greater than max size", tpe_num);
 			return QDF_STATUS_E_FAILURE;
@@ -681,11 +675,9 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 
 	MTRACE(mac_trace_msg_tx(mac, pe_session->peSessionId, msgQ.type));
 	retCode = wma_post_ctrl_msg(mac, &msgQ);
-	if (QDF_STATUS_SUCCESS != retCode) {
+	if (QDF_STATUS_SUCCESS != retCode)
 		pe_err("Posting SEND_BEACON_REQ to HAL failed, reason=%X",
 			retCode);
-		qdf_mem_free(beaconParams);
-	}
 
 	if (QDF_IS_STATUS_SUCCESS(retCode)) {
 		if (wlan_vdev_mlme_is_mlo_ap(pe_session->vdev))
@@ -820,7 +812,6 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	uint16_t next_tpe_offset, next_tpe_ie_len_rem;
 	uint16_t addn_ielen = 0, mlo_ie_len, cur_ie_len;
 	uint16_t prb_rsp_ie_len, prb_rsp_ie_max_len;
-	uint16_t uhr_op_ie_len = 0, uhr_cap_ie_len = 0;
 
 	/* Check if probe response IE is present or not */
 	addnIEPresent = (pe_session->add_ie_params.probeRespDataLen != 0);
@@ -885,15 +876,6 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 					true);
 		populate_dot11f_bcn_prot_extcaps(mac, pe_session,
 						 &prb_rsp_frm->ExtCap);
-
-		/*
-		 * TWT extended capabilities should be populated after the
-		 * intersection of beacon caps and self caps is done because
-		 * the bits for TWT are unique to STA and AP and cannot be
-		 * intersected.
-		 */
-		populate_dot11f_twt_extended_caps(mac, pe_session->vdev_id,
-						  &prb_rsp_frm->ExtCap);
 	}
 
 	nStatus = dot11f_get_packed_probe_response_size(mac,
@@ -946,16 +928,8 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	}
 
 	mlo_ie_len = lim_get_frame_mlo_ie_len(pe_session);
-
-	if (lim_is_session_uhr_capable(pe_session)) {
-		uhr_op_ie_len =
-			populate_dot11f_assoc_probe_rsp_uhr_op_ie(mac,
-								  pe_session);
-		uhr_cap_ie_len = populate_dot11f_uhr_caps(mac, pe_session);
-	}
-
 	nBytes += nPayload + sizeof(tSirMacMgmtHdr) +
-		  mlo_ie_len + tpe_ie_buf_cons + uhr_op_ie_len + uhr_cap_ie_len;
+		  mlo_ie_len + tpe_ie_buf_cons;
 
 	if (addnIEPresent) {
 		if ((nBytes + addn_ielen) <= SIR_MAX_PROBE_RESP_SIZE)
@@ -1037,30 +1011,6 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 
 	qdf_mem_free(tpe_ie_buf);
 
-	if (uhr_op_ie_len &&
-	    ((prb_rsp_ie_len + uhr_op_ie_len) <= prb_rsp_ie_max_len)) {
-		status = lim_fill_complete_uhr_op_ie(
-				pe_session, uhr_op_ie_len,
-				prb_rsp_ie_ptr + prb_rsp_ie_len);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("assemble uhr op ie error");
-			uhr_op_ie_len = 0;
-		}
-		prb_rsp_ie_len += uhr_op_ie_len;
-	}
-
-	if (uhr_cap_ie_len &&
-	    ((prb_rsp_ie_len + uhr_cap_ie_len) <= prb_rsp_ie_max_len)) {
-		status = lim_fill_complete_uhr_cap_ie(
-				pe_session, uhr_cap_ie_len,
-				prb_rsp_ie_ptr + prb_rsp_ie_len);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("assemble uhr cap ie error");
-			uhr_cap_ie_len = 0;
-		}
-		prb_rsp_ie_len += uhr_cap_ie_len;
-	}
-
 	if (addnIEPresent &&
 	    ((prb_rsp_ie_len + addn_ielen) <= prb_rsp_ie_max_len)) {
 		qdf_mem_copy(prb_rsp_ie_ptr + prb_rsp_ie_len,
@@ -1074,11 +1024,6 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 
 	nBytes = sizeof(tSirMacMgmtHdr) + WLAN_PROBE_RESP_IES_OFFSET +
 		 prb_rsp_ie_len;
-
-	if (nBytes > SIR_MAX_PROBE_RESP_SIZE) {
-		pe_err("nBytes %d greater than max size after IE fill", nBytes);
-		return retCode;
-	}
 
 	pprobeRespParams = qdf_mem_malloc(sizeof(tSendProbeRespParams));
 	if (!pprobeRespParams) {

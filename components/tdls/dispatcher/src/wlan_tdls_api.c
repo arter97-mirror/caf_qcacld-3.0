@@ -30,12 +30,8 @@
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_objmgr_cmn.h>
 #include "wlan_tdls_cfg_api.h"
-#include "wlan_tdls_stats_api.h"
-#include "../../core/src/wlan_tdls_stats.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
-#include <wlan_mlo_mgr_link_switch.h>
-#include "wlan_mlme_main.h"
 
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
 				      struct tdls_callbacks *cbs)
@@ -156,7 +152,7 @@ release_ref:
 void  wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 					      struct wlan_objmgr_vdev *vdev)
 {
-	uint32_t sta_count;
+	uint8_t sta_count;
 	enum QDF_OPMODE opmode;
 	bool tgt_tdls_concurrency_supported;
 
@@ -164,25 +160,15 @@ void  wlan_tdls_check_and_teardown_links_sync(struct wlan_objmgr_psoc *psoc,
 		wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					      WLAN_TDLS_CONCURRENCIES_SUPPORT);
 	/* Don't initiate teardown in case of STA + P2P Client concurreny */
-	sta_count =
-		policy_mgr_mode_specific_connection_count_with_mlo(psoc,
-								   PM_STA_MODE);
+	sta_count = policy_mgr_mode_specific_connection_count(psoc,
+							      PM_STA_MODE,
+							      NULL);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	if (tgt_tdls_concurrency_supported && opmode == QDF_P2P_CLIENT_MODE &&
 	    sta_count) {
 		tdls_debug("Don't teardown tdls for existing STA vdev");
 		return;
 	}
-
-	/*
-	 * Record concurrency teardown stats for all connected TDLS peers
-	 * before initiating the synchronous teardown.
-	 */
-	wlan_tdls_stats_record_peers_teardown(
-		psoc, WLAN_UMAC_VDEV_ID_MAX,
-		policy_mgr_is_mcc_on_any_sta_vdev(psoc) ?
-			TDLS_STATS_REASON_CONC_DIFF_BAND :
-			TDLS_STATS_REASON_CONC_SAME_BAND);
 
 	wlan_tdls_teardown_links_sync(psoc, vdev);
 }
@@ -231,15 +217,6 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 	 * other vdev.
 	 */
 	if (!tdls_check_is_tdls_allowed(tdls_vdev)) {
-		/*
-		 * Record teardown stats for all connected TDLS peers before
-		 * tearing down the links due to BSS channel switch (CSA).
-		 */
-		wlan_tdls_stats_record_peers_teardown(
-					wlan_vdev_get_psoc(tdls_vdev),
-					wlan_vdev_get_id(tdls_vdev),
-					TDLS_STATS_REASON_BSS_CHANNEL_SWITCH);
-
 		tdls_disable_offchan_and_teardown_links(tdls_vdev);
 		tdls_debug("vdev %d disable the tdls in FW after CSA",
 			   wlan_vdev_get_id(tdls_vdev));
@@ -249,10 +226,7 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 								true);
 		else
 			tdls_process_enable_for_vdev(tdls_vdev);
-
-		if (tdls_check_if_offchannel_allowed(tdls_vdev))
-			tdls_set_tdls_offchannelmode(tdls_vdev,
-						     ENABLE_CHANSWITCH);
+		tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
 	}
 
 exit:
@@ -448,24 +422,10 @@ void wlan_tdls_notify_sta_disconnect(uint8_t vdev_id,
 				     struct wlan_objmgr_vdev *vdev)
 {
 	struct tdls_sta_notify_params notify_info = {0};
-	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
 	if (!vdev) {
 		tdls_err("vdev is NULL");
-		return;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		tdls_err("psoc not found");
-		return;
-	}
-
-	if (mlo_mgr_is_link_switch_in_progress(vdev) &&
-	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(psoc)) {
-		tdls_debug("Link Switch is in progress for vdev id %d, skipping tdls notification",
-			   vdev_id);
 		return;
 	}
 
@@ -599,9 +559,9 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	peer = tdls_find_peer(tdls_vdev_obj, peer_addr);
+	peer = tdls_get_peer(tdls_vdev_obj, peer_addr);
 	if (!peer) {
-		tdls_err("vdev_id:%d tdls_peer is NULL", vdev_id);
+		tdls_err("tdls_peer is NULL");
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
 		return;
 	}
@@ -617,102 +577,6 @@ struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 				      const uint8_t *macaddr)
 {
 	return tdls_find_peer(vdev_obj, macaddr);
-}
-
-void wlan_tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
-					  struct wlan_objmgr_psoc *psoc)
-{
-	tdls_stats_entry_fill_vdev_info(entry, psoc);
-}
-
-void wlan_tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
-					  struct wlan_objmgr_psoc *psoc)
-{
-	tdls_stats_entry_find_vdev_info(entry, psoc);
-}
-
-void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
-				       uint8_t vdev_id,
-				       const uint8_t *peer_mac,
-				       uint8_t type,
-				       uint8_t subtype,
-				       bool success,
-				       uint8_t reason_code)
-{
-	struct tdls_soc_priv_obj *soc_obj;
-	struct wlan_objmgr_vdev *vdev;
-	struct tdls_vdev_priv_obj *tdls_vdev_obj;
-	struct tdls_peer *peer = NULL;
-	struct tdls_stats_entry entry = {0};
-
-	if (!psoc || !peer_mac)
-		return;
-
-	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
-	if (!soc_obj || !soc_obj->stats_ctx)
-		return;
-
-	entry.ts_ms       = qdf_get_time_of_the_day_ms();
-	qdf_mem_copy(entry.peer_mac, peer_mac, QDF_MAC_ADDR_SIZE);
-	entry.success     = success ? 0 : 1;
-	entry.is_sender   = true;
-	entry.reason_code = reason_code;
-	entry.session_id  = vdev_id;
-	entry.type        = type;
-	entry.subtype     = subtype;
-
-	/* Set channel and attempt peer lookup on the frame-submission vdev. */
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						     WLAN_TDLS_NB_ID);
-	if (vdev) {
-		entry.channel = wlan_get_operation_chan_freq(vdev);
-		tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
-		if (tdls_vdev_obj)
-			peer = tdls_find_peer(tdls_vdev_obj, peer_mac);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
-	}
-
-	/*
-	 * For MLO, tdls_frm_session_id may point to the default DP link vdev
-	 * while the TDLS peer is registered on a different link's vdev.
-	 * Fall back to a psoc-wide search to populate RSSI; channel is only
-	 * taken from the peer's vdev if it was not already set from the
-	 * frame-submission vdev above.
-	 */
-	if (!peer)
-		peer = tdls_find_all_peer(soc_obj, peer_mac);
-
-	if (peer) {
-		/*
-		 * For teardown frames, avoid a duplicate stats entry when
-		 * the host-driven decision path i.e
-		 * tdls_stats_record_peer_teardown has already recorded this
-		 * same teardown cycle for the peer.
-		 */
-		if (type == TDLS_STATS_TEARDOWN) {
-			if (peer->teardown_stats_recorded) {
-				tdls_debug("TDLS stats: mgmt_tx_complete teardown already recorded, skip peer "
-					  QDF_MAC_ADDR_FMT,
-					  QDF_MAC_ADDR_REF(peer_mac));
-				return;
-			}
-			peer->teardown_stats_recorded = true;
-			tdls_debug("TDLS stats: mgmt_tx_complete set teardown_stats_recorded for peer "
-				  QDF_MAC_ADDR_FMT,
-				  QDF_MAC_ADDR_REF(peer_mac));
-		}
-		entry.rssi = peer->rssi;
-		if (!entry.channel && peer->vdev_priv)
-			entry.channel =
-				wlan_get_operation_chan_freq(
-						peer->vdev_priv->vdev);
-	}
-
-	wlan_tdls_stats_entry_fill_vdev_info(&entry, psoc);
-
-	wlan_tdls_stats_sm_deliver_event(soc_obj->stats_ctx,
-					 TDLS_STATS_EV_NEW_EVENT,
-					 sizeof(entry), &entry);
 }
 
 #define WLAN_MLO_SINGLE_LINK 1
@@ -789,101 +653,4 @@ QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 					       uint8_t *macaddr)
 {
 	return tdls_update_peer_kickout_count(vdev, macaddr);
-}
-
-static bool
-tdls_peer_key_install_allowed(struct tdls_vdev_priv_obj *vdev_obj,
-			      struct qdf_mac_addr *mac_addr)
-{
-	struct tdls_peer *curr_peer;
-
-	if (!vdev_obj)
-		return false;
-
-	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
-	if (!curr_peer)
-		return false;
-
-	return curr_peer->valid_entry &&
-	       (curr_peer->link_status == TDLS_LINK_CONNECTING ||
-		curr_peer->link_status == TDLS_LINK_CONNECTED);
-}
-
-#ifdef WLAN_FEATURE_11BE_MLO
-static bool
-tdls_is_key_install_allowed_ml_vdev(struct wlan_objmgr_vdev *vdev,
-				    struct qdf_mac_addr *mac_addr)
-{
-	struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
-	uint16_t num_links = 0, i;
-	bool allowed = false;
-
-	mlo_get_ml_vdev_list(vdev, &num_links, vdev_list);
-
-	for (i = 0; i < num_links; i++) {
-		if (vdev_list[i] != vdev &&
-		    tdls_peer_key_install_allowed(
-				wlan_vdev_get_tdls_vdev_obj(vdev_list[i]),
-				mac_addr))
-			allowed = true;
-		mlo_release_vdev_ref(vdev_list[i]);
-	}
-
-	return allowed;
-}
-#else
-static inline bool
-tdls_is_key_install_allowed_ml_vdev(struct wlan_objmgr_vdev *vdev,
-				    struct qdf_mac_addr *mac_addr)
-{
-	return false;
-}
-#endif
-
-bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
-				      struct qdf_mac_addr *mac_addr)
-{
-	if (tdls_peer_key_install_allowed(wlan_vdev_get_tdls_vdev_obj(vdev),
-					  mac_addr))
-		return true;
-
-	return tdls_is_key_install_allowed_ml_vdev(vdev, mac_addr);
-}
-
-void wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_objmgr_vdev *vdev)
-{
-	struct tdls_soc_priv_obj *soc_obj;
-
-	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
-							WLAN_UMAC_COMP_TDLS);
-	if (!soc_obj) {
-		tdls_err("Failed to get tdls psoc component");
-		return;
-	}
-
-	/*
-	 * Offchannel is allowed only when TDLS is connected with one peer.
-	 * If more than one peer is connected then Offchannel is disabled by
-	 * WMI_TDLS_SET_OFFCHAN_MODE_CMDID with DISABLE_CHANSWITCH.
-	 * Hence, re-enable offchannel when only one connected peer is left.
-	 */
-	if (soc_obj->connected_peer_count == 1)
-		tdls_set_tdls_offchannelmode(vdev, ENABLE_CHANSWITCH);
-}
-
-/**
- * wlan_tdls_process_cmd() - Dispatcher wrapper for the TDLS command processor.
- * @msg: Scheduler message containing the TDLS command type and body pointer.
- *
- * Public dispatcher-layer entry point for TDLS scheduler messages posted
- * from external components (e.g. the DP layer via wlan_dp_rx_tdls_packet()).
- * Registered as msg.callback in scheduler_post_message() calls and simply
- * forwards to the core handler tdls_process_cmd().
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_tdls_process_cmd(struct scheduler_msg *msg)
-{
-	return tdls_process_cmd(msg);
 }

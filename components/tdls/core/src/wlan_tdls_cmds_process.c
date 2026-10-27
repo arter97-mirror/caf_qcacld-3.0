@@ -36,7 +36,6 @@
 #include "wlan_tdls_mgmt.h"
 #include "wlan_tdls_cmds_process.h"
 #include "wlan_tdls_tgt_api.h"
-#include "wlan_tdls_stats.h"
 #include "wlan_policy_mgr_api.h"
 #include "nan_ucfg_api.h"
 #include "wlan_mlme_main.h"
@@ -91,9 +90,6 @@ void tdls_set_mlme_ch_power(struct wlan_objmgr_vdev *vdev,
 	if (REG_VERY_LOW_POWER_AP == reg_power_info->power_type_6g)
 		tx_power = tdls_get_6g_pwr_for_power_type(vdev, freq,
 							  REG_CLI_DEF_VLP);
-	else if (REG_INDOOR_ENABLED_AP == reg_power_info->power_type_6g)
-		tx_power = tdls_get_6g_pwr_for_power_type(vdev, freq,
-							  REG_CLI_DEF_C2C);
 	else
 		tx_power = tdls_soc_obj->bss_sta_power;
 
@@ -156,24 +152,18 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (enable_link) {
-		tdls_soc_obj->bss_sta_power_type =
-					mlme_obj->reg_tpc_obj.power_type_6g;
-
+		tdls_soc_obj->bss_sta_power_type = REG_VERY_LOW_POWER_AP;
 		/*
 		 * No need to update power if BSS-STA link is already configured
-		 * as VLP or indoor enabled AP power
+		 * as VLP
 		 */
-		if (tdls_soc_obj->bss_sta_power_type == REG_VERY_LOW_POWER_AP ||
-		    tdls_soc_obj->bss_sta_power_type == REG_INDOOR_ENABLED_AP)
+		if (tdls_soc_obj->bss_sta_power_type ==
+		    mlme_obj->reg_tpc_obj.power_type_6g)
 			return;
 
-
-		if (wlan_reg_is_indoor_ap_detected(pdev))
-			mlme_obj->reg_tpc_obj.power_type_6g =
-						REG_INDOOR_ENABLED_AP;
-		else
-			mlme_obj->reg_tpc_obj.power_type_6g =
-						REG_VERY_LOW_POWER_AP;
+		tdls_soc_obj->bss_sta_power_type =
+					mlme_obj->reg_tpc_obj.power_type_6g;
+		mlme_obj->reg_tpc_obj.power_type_6g = REG_VERY_LOW_POWER_AP;
 		tdls_soc_obj->bss_sta_power = tdls_get_mlme_ch_power(mlme_obj,
 								     freq);
 		tdls_debug("Updated power_type from %d to %d bss link power %d",
@@ -181,8 +171,7 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 			   mlme_obj->reg_tpc_obj.power_type_6g,
 			   tdls_soc_obj->bss_sta_power);
 	} else {
-		if (tdls_soc_obj->bss_sta_power_type == REG_VERY_LOW_POWER_AP ||
-		    tdls_soc_obj->bss_sta_power_type == REG_INDOOR_ENABLED_AP)
+		if (REG_VERY_LOW_POWER_AP == tdls_soc_obj->bss_sta_power_type)
 			return;
 
 		tdls_debug("Updated power_type_6g from %d to %d",
@@ -194,9 +183,6 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	tdls_set_mlme_ch_power(vdev, mlme_obj, tdls_soc_obj, freq);
 
 	tx_ops = wlan_reg_get_tx_ops(psoc);
-	if (!tx_ops)
-		return;
-
 	if (tx_ops->set_tpc_power)
 		tx_ops->set_tpc_power(psoc,
 				      wlan_vdev_get_id(vdev),
@@ -850,41 +836,6 @@ int tdls_set_cap(struct tdls_vdev_priv_obj *tdls_vdev, const uint8_t *mac,
 	return 0;
 }
 
-/**
- * tdls_validate_discovery_request() - validate TDLS discovery request
- * @tdls_vdev: tdls vdev object
- * @peer_mac: peer MAC address
- *
- * This function validates if discovery request should be allowed based on
- * discovery attempt counter. It checks if the peer has exceeded the maximum
- * allowed discovery attempts (unless it's a forced peer).
- *
- * Return: 0 if discovery is allowed, -EPERM if discovery attempts exceeded
- */
-static int tdls_validate_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev,
-					   const uint8_t *peer_mac)
-{
-	struct tdls_peer *curr_peer;
-
-	curr_peer = tdls_find_peer(tdls_vdev, peer_mac);
-	if (!curr_peer)
-		return 0;
-
-	/* Allow discovery for forced peers or if attempts not exceeded */
-	if (curr_peer->is_forced_peer ||
-	    curr_peer->discovery_attempt <
-	    tdls_vdev->threshold_config.discovery_tries_n)
-		return 0;
-
-	tdls_err("Discovery attempts exceeded for peer " QDF_MAC_ADDR_FMT
-		 " attempts:%d threshold:%d",
-		 QDF_MAC_ADDR_REF(peer_mac),
-		 curr_peer->discovery_attempt,
-		 tdls_vdev->threshold_config.discovery_tries_n);
-
-	return -EPERM;
-}
-
 static int tdls_validate_setup_frames(struct tdls_soc_priv_obj *tdls_soc,
 				struct tdls_validate_action_req *tdls_validate)
 {
@@ -1071,12 +1022,6 @@ int tdls_validate_mgmt_request(struct tdls_action_frame_request *tdls_mgmt_req)
 			tdls_set_cap(tdls_vdev, tdls_validate->peer_mac,
 					      TDLS_CAP_SUPPORTED);
 	}
-
-	/* Validate discovery counter for TDLS_DISCOVERY_REQUEST */
-	if (TDLS_DISCOVERY_REQUEST == tdls_validate->action_code)
-		return tdls_validate_discovery_request(tdls_vdev,
-						       tdls_validate->peer_mac);
-
 	return 0;
 }
 
@@ -1318,18 +1263,6 @@ QDF_STATUS tdls_process_update_peer(struct tdls_update_peer_request *req)
 	}
 
 	vdev = req->vdev;
-	if (!tdls_check_is_tdls_allowed(vdev)) {
-		tdls_err("TDLS not allowed, reject update station for vdev: %d",
-			 wlan_vdev_get_id(vdev));
-		goto error;
-	}
-
-	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
-		tdls_err("Link Switch in progress, reject update sta for vdev: %d",
-			 wlan_vdev_get_id(vdev));
-		goto error;
-	}
-
 	cmd.cmd_type = WLAN_SER_CMD_TDLS_ADD_PEER;
 	cmd.cmd_id = 0;
 	cmd.cmd_cb = tdls_update_peer_serialize_callback;
@@ -1851,9 +1784,8 @@ QDF_STATUS tdls_process_del_peer_rsp(struct tdls_del_sta_rsp *rsp)
 		 * To avoid that set the tdls_support as not supported for that
 		 * peer
 		 */
-		if (curr_peer &&
-		    curr_peer->sta_kickout_count >=
-					WLAN_TDLS_STA_KICKOUT_THRESHOLD) {
+		if (curr_peer->sta_kickout_count >=
+				WLAN_TDLS_STA_KICKOUT_THRESHOLD) {
 			curr_peer->tdls_support = TDLS_CAP_NOT_SUPPORTED;
 			tdls_debug("Sta Kickout Threshold reached, set cap to unsupported");
 		}
@@ -1923,68 +1855,6 @@ tdls_wma_update_peer_state(struct tdls_soc_priv_obj *soc_obj,
 	}
 
 	return status;
-}
-
-static QDF_STATUS
-tdls_wma_update_off_chan_mode(struct wlan_objmgr_vdev *vdev)
-{
-	struct tdls_channel_switch_params *chan_switch_params;
-	struct tdls_vdev_priv_obj *tdls_vdev;
-	struct tdls_soc_priv_obj *tdls_soc;
-	struct tdls_peer *conn_peer = NULL;
-	struct scheduler_msg msg = {0,};
-	QDF_STATUS status;
-
-	status = tdls_get_vdev_objects(vdev, &tdls_vdev, &tdls_soc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		tdls_err("vdev:%d Unable to fetch vdev objects",
-			 wlan_vdev_get_id(vdev));
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	conn_peer = tdls_find_first_connected_peer(tdls_vdev);
-	if (!conn_peer) {
-		tdls_debug("vdev:%d No TDLS Connected Peer",
-			   wlan_vdev_get_id(vdev));
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	chan_switch_params = qdf_mem_malloc(sizeof(*chan_switch_params));
-	if (!chan_switch_params)
-		return QDF_STATUS_E_FAILURE;
-
-	qdf_mem_zero(chan_switch_params, sizeof(*chan_switch_params));
-	chan_switch_params->vdev_id = tdls_vdev->session_id;
-	chan_switch_params->tdls_sw_mode = DISABLE_ACTIVE_CHANSWITCH;
-	chan_switch_params->is_responder = conn_peer->is_responder;
-	qdf_mem_copy(&chan_switch_params->peer_mac_addr,
-		     &conn_peer->peer_mac.bytes, QDF_MAC_ADDR_SIZE);
-
-	tdls_notice("Peer " QDF_MAC_ADDR_FMT " vdevId: %d, off channel: %d, offset: %d, num_allowed_off_chan:%d mode:%d, is_responder: %d",
-		    QDF_MAC_ADDR_REF(chan_switch_params->peer_mac_addr),
-		    chan_switch_params->vdev_id,
-		    chan_switch_params->tdls_off_ch,
-		    chan_switch_params->tdls_off_ch_bw_offset,
-		    chan_switch_params->num_off_channels,
-		    chan_switch_params->tdls_sw_mode,
-		    chan_switch_params->is_responder);
-
-	tdls_soc->tdls_fw_off_chan_mode = DISABLE_ACTIVE_CHANSWITCH;
-
-	msg.type = tdls_soc->tdls_update_offchan_mode;
-	msg.reserved = 0;
-	msg.bodyptr = chan_switch_params;
-
-	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
-					QDF_MODULE_ID_WMA,
-					QDF_MODULE_ID_WMA, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_free(chan_switch_params);
-		tdls_err("scheduler_post_msg failed");
-		status = QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS tdls_process_enable_link(struct tdls_oper_request *req)
@@ -2078,10 +1948,6 @@ QDF_STATUS tdls_process_enable_link(struct tdls_oper_request *req)
 
 	tdls_update_6g_power(vdev, soc_obj, true);
 	tdls_increment_peer_count(soc_obj);
-
-	if (!tdls_check_if_offchannel_allowed(vdev))
-		tdls_wma_update_off_chan_mode(vdev);
-
 	/* Need to update osif params when first peer gets connected */
 	if (soc_obj->connected_peer_count == 1 &&
 	    soc_obj->tdls_osif_update_cb.tdls_osif_conn_update)
@@ -2350,6 +2216,13 @@ QDF_STATUS tdls_process_remove_force_peer(struct tdls_oper_request *req)
 		tdls_set_peer_link_status(peer, TDLS_LINK_TEARING,
 					  TDLS_LINK_UNSPECIFIED);
 
+	if (soc_obj->tdls_dp_vdev_update)
+		soc_obj->tdls_dp_vdev_update(
+				&soc_obj->soc,
+				wlan_vdev_get_id(vdev),
+				soc_obj->tdls_update_dp_vdev_flags,
+				false);
+
 	if (soc_obj->tdls_event_cb) {
 		qdf_mem_copy(ind.peer_mac, macaddr, QDF_MAC_ADDR_SIZE);
 		ind.vdev = vdev;
@@ -2511,16 +2384,6 @@ QDF_STATUS tdls_process_should_teardown(struct wlan_objmgr_vdev *vdev,
 		else
 			reason = TDLS_TEARDOWN_PEER_UNSPEC_REASON;
 
-		/*
-		 * Record teardown stats before indicating to supplicant.
-		 * Map the 802.11 reason code to the TDLS stats reason code.
-		 */
-		tdls_stats_record_peer_teardown(
-			soc_obj, vdev, curr_peer->peer_mac.bytes,
-			(reason == TDLS_TEARDOWN_PEER_UNREACHABLE) ?
-			TDLS_STATS_REASON_PEER_UNREACHABLE :
-			TDLS_STATS_REASON_TEARDOWN_UNSPECIFIED);
-
 		tdls_indicate_teardown(vdev_obj, curr_peer, reason);
 	} else {
 		tdls_err("TDLS link is not connected, ignore %s",
@@ -2657,14 +2520,6 @@ static int tdls_teardown_links(struct tdls_soc_priv_obj *soc_obj, uint32_t mode)
 		tdls_debug("Indicate TDLS teardown peer bssid "
 			   QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(
 			   curr_peer->peer_mac.bytes));
-		/*
-		 * Record teardown stats before indicating to supplicant.
-		 * This is an antenna switch-driven teardown.
-		 */
-		tdls_stats_record_peer_teardown(
-			soc_obj, curr_peer->vdev_priv->vdev,
-			curr_peer->peer_mac.bytes,
-			TDLS_STATS_REASON_GENERAL);
 		status = tdls_indicate_teardown(curr_peer->vdev_priv,
 						curr_peer,
 						TDLS_TEARDOWN_PEER_UNSPEC_REASON);

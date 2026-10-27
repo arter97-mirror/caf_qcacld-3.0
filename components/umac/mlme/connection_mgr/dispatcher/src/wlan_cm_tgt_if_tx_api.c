@@ -32,6 +32,7 @@
 #include "wlan_cm_roam_api.h"
 #include "target_if.h"
 
+static inline
 struct wlan_cm_roam_tx_ops *wlan_cm_roam_get_tx_ops_from_vdev(
 				struct wlan_objmgr_vdev *vdev)
 {
@@ -353,6 +354,7 @@ wlan_cm_tgt_send_roam_scan_offload_rssi_params(
 	if (!roam_tx_ops || !roam_tx_ops->send_roam_scan_offload_rssi_params) {
 		mlme_err("vdev %d send_roam_scan_offload_rssi_params is NULL",
 			 vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -711,47 +713,6 @@ release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 	return status;
 }
-
-QDF_STATUS
-wlan_cm_tgt_send_disconnect_roam_params(struct wlan_objmgr_psoc *psoc,
-					uint8_t vdev_id,
-					struct  wlan_roam_disconnect_params *params)
-{
-	struct wlan_cm_roam_tx_ops *roam_tx_ops;
-	struct wlan_objmgr_vdev *vdev;
-	struct wmi_unified *wmi_handle;
-	QDF_STATUS status;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	roam_tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-	if (!roam_tx_ops || !roam_tx_ops->send_roam_disconnect_params) {
-		mlme_err("CM_RSO: vdev %d send_roam_disconnect_params is NULL",
-			 vdev_id);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		mlme_debug("Invalid WMI handle");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	status = roam_tx_ops->send_roam_disconnect_params(wmi_handle,
-							  0,
-							  params);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_err("CM_RSO: vdev %d failed to send disconnect params",
-			 vdev_id);
-
-	return status;
-}
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -779,39 +740,6 @@ QDF_STATUS wlan_cm_tgt_send_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 	status = roam_tx_ops->send_roam_mlo_config(vdev, req);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("CM_RSO: vdev %d fail to send roam mlo config",
-			 vdev_id);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-
-	return status;
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BN_SMD
-QDF_STATUS wlan_cm_tgt_send_roam_smd_config(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id,
-					    struct wlan_roam_smd_config *req)
-{
-	QDF_STATUS status;
-	struct wlan_cm_roam_tx_ops *roam_tx_ops;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	roam_tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
-	if (!roam_tx_ops || !roam_tx_ops->send_roam_smd_config) {
-		mlme_err("CM_RSO: vdev %d send_roam_smd_config is NULL",
-			 vdev_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	status = roam_tx_ops->send_roam_smd_config(vdev, req);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_err("CM_RSO: vdev %d fail to send roam smd config",
 			 vdev_id);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
@@ -886,14 +814,14 @@ wlan_cm_tgt_send_roam_invoke_req(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 wlan_cm_tgt_send_roam_sync_complete_cmd(struct wlan_objmgr_psoc *psoc,
-				struct wlan_roam_synch_complete_params *params)
+					uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	struct wlan_cm_roam_tx_ops *roam_tx_ops;
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    params->vdev_id,
+						    vdev_id,
 						    WLAN_MLME_NB_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
@@ -902,45 +830,17 @@ wlan_cm_tgt_send_roam_sync_complete_cmd(struct wlan_objmgr_psoc *psoc,
 
 	if (!roam_tx_ops || !roam_tx_ops->send_roam_sync_complete_cmd) {
 		mlme_err("CM_RSO: vdev %d send_roam_sync_complete_cmd is NULL",
-			 params->vdev_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	status = roam_tx_ops->send_roam_sync_complete_cmd(vdev, params);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_debug("CM_RSO: vdev %d fail to send roam sync complete cmd",
-			   params->vdev_id);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-
-	return status;
-}
-
-QDF_STATUS
-wlan_cm_tgt_allow_pm_after_roam_sync(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id)
-{
-	struct wlan_cm_roam_tx_ops *roam_tx_ops;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	roam_tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
-
-	if (!roam_tx_ops || !roam_tx_ops->allow_pm_after_roam) {
-		mlme_err("CM_RSO: vdev %d allow_pm_after_roam_sync is NULL",
 			 vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	roam_tx_ops->allow_pm_after_roam(psoc);
+	status = roam_tx_ops->send_roam_sync_complete_cmd(vdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_debug("CM_RSO: vdev %d fail to send roam sync complete cmd",
+			   vdev_id);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,83 +27,12 @@
  */
 
 struct hdd_context;
-struct wma_tgt_cfg;
 
 #ifdef WLAN_FEATURE_NAN
 struct wiphy;
 struct wireless_dev;
 
 bool wlan_hdd_nan_is_supported(struct hdd_context *hdd_ctx);
-
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-struct wiphy_nan_capa;
-
-/**
- * hdd_nan_fill_wiphy_caps() - Fill wiphy NAN capabilities
- * @hdd_ctx: Pointer to HDD context
- * @nan_capa: pointer to wiphy NAN capabilities structure
- *
- * Copies cached NAN PHY capabilities to the wiphy structure.
- *
- * Return: None
- */
-void hdd_nan_fill_wiphy_caps(struct hdd_context *hdd_ctx,
-			     struct wiphy_nan_capa *nan_capa);
-
-/**
- * hdd_populate_nan_phy_caps() - Populate/calculate NAN PHY caps (HT/VHT/HE)
- * from effective target configuration (FW ∩ host) and cache them for use
- * when advertising via cfg80211/mac80211.
- * @hdd_ctx: HDD context
- * @cfg: pointer to effective target config (struct wma_tgt_cfg)
- */
-void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
-			       struct wma_tgt_cfg *cfg);
-
-/**
- * wlan_hdd_cfg80211_nan_set_local_sched() - Set NAN local schedule
- * @wiphy: Wireless hardware description
- * @wdev: Wireless device
- * @sched: NAN local schedule configuration
- *
- * Return: 0 on success, negative errno on failure
- */
-int wlan_hdd_cfg80211_nan_set_local_sched(struct wiphy *wiphy,
-					  struct wireless_dev *wdev,
-					  struct cfg80211_nan_local_sched
-					  *sched);
-
-/**
- * wlan_hdd_cfg80211_nan_set_peer_sched() - Set NAN peer schedule
- * @wiphy: Wireless hardware description
- * @wdev: Wireless device
- * @sched: NAN peer schedule configuration
- *
- * Return: 0 on success, negative errno on failure
- */
-int wlan_hdd_cfg80211_nan_set_peer_sched(struct wiphy *wiphy,
-					 struct wireless_dev *wdev,
-					 struct cfg80211_nan_peer_sched *sched);
-
-/**
- * wlan_hdd_cfg80211_nan_peer_params() - Set NAN peer params
- * @wiphy: Wireless hardware description
- * @wdev: Wireless device
- * @params: NAN peer params configuration
- * @mac_addr: NDI/peer MAC address associated with the request
- *
- * Return: 0 on success, negative errno on failure
- */
-int wlan_hdd_cfg80211_nan_peer_params(struct wiphy *wiphy,
-				      struct wireless_dev *wdev,
-				      struct station_parameters *params,
-				      struct qdf_mac_addr *mac_addr);
-#else
-static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
-					     struct wma_tgt_cfg *cfg)
-{
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**
  * wlan_hdd_cfg80211_nan_ext_request() - handle NAN Extended request
@@ -131,20 +60,6 @@ int wlan_hdd_cfg80211_nan_ext_request(struct wiphy *wiphy,
  */
 void hdd_nan_sr_concurrency_update(struct nan_event_params *nan_evt);
 #endif
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-/**
- * hdd_ndp_update_peer_bw() - Update NDP peer bandwidth
- * @vdev_id: vdev id
- * @peer_mac: NDP peer mac address
- * @peer_bw: NDP peer max bandwidth
- *
- * Return: None
- */
-void hdd_ndp_update_peer_bw(uint8_t vdev_id, struct qdf_mac_addr *peer_mac,
-			    enum phy_ch_width peer_bw);
-#endif
-
 #define FEATURE_NAN_VENDOR_COMMANDS					\
 	{                                                               \
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,                \
@@ -174,11 +89,6 @@ static inline bool wlan_hdd_nan_is_supported(struct hdd_context *hdd_ctx)
 {
 	return false;
 }
-
-static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
-					     struct wma_tgt_cfg *cfg)
-{
-}
 #endif /* WLAN_FEATURE_NAN */
 
 /**
@@ -188,13 +98,4 @@ static inline void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
  */
 void hdd_nan_concurrency_update(void);
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * hdd_nan_vdev_destroy() - NAN vdev delete
- * @psoc: psoc
- *
- * Return: None
- */
-void hdd_nan_vdev_destroy(struct wlan_objmgr_psoc *psoc);
-#endif
 #endif /* __WLAN_HDD_NAN_H */

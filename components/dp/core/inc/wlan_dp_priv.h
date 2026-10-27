@@ -41,9 +41,6 @@
 #include "wlan_dp_wfds.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_resource_mgr.h"
-#include <linux/cpufreq.h>
-#include <linux/pm_qos.h>
-
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -51,66 +48,16 @@
 
 #define NUM_TX_RX_HISTOGRAM_MASK (NUM_TX_RX_HISTOGRAM - 1)
 
-#ifdef WLAN_DP_FEATURE_STC
-#define WLAN_DP_POLICY_SPM_TPUT_THRESH TPUT_LEVEL_HIGH
-#define WLAN_DP_POLICY_SPM_DISABLE_BIT 1
-#endif
-
 #if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
 /**
  * struct dp_rtpm_tput_policy_context - RTPM throughput policy context
- * @rtpm_lock: lock use for QDF runtime PM prevent/allow APIs
+ * @rtpm_lock: lock use for QDF rutime PM prevent/allow APIs
  * @high_tput_vote: atomic variable to keep track of voting
  */
 struct dp_rtpm_tput_policy_context {
 	qdf_runtime_lock_t rtpm_lock;
 	unsigned long high_tput_vote;
 };
-#endif
-
-#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-/*Define sample count for affinity override */
-#define DP_AFFN_OVERRIDE_SAMPLE_COUNT		5
-/* Define window count (number of window periods for final decision) */
-#define AFFN_OVERRIDE_WINDOW_COUNT	3
-
-/**
- * enum dp_affn_override_tput_level - DP affn override throughput levels
- * @DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE : dp affinity Idle throughput level
- * @DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW: dp affinity low throughput level
- * @DP_AFFN_OVERRIDE_TPUT_LEVEL_MID: dp affinity mid throughput level
- * @DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH: dp affinity high throughput level
- * @DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS: max throughput levels
- */
-enum dp_affn_override_tput_level {
-	DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE,
-	DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW,
-	DP_AFFN_OVERRIDE_TPUT_LEVEL_MID,
-	DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH,
-	DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS,
-};
-
-/**
- * struct dp_affn_override_params - DP affinity override parameters
- * @dp_affn_override_rx_intr_mask: Cpu mask parameters for dp rx interrupts
- * @dp_affn_override_tx_comp_mask: Cpu mask parameters for dp tx completion
- * interrupts
- * @dp_affn_override_rx_thread_mask: Cpu mask parameters for dp rx
- * threads
- * @dp_affn_override_napi_rx_thread_mask: Cpu mask parameters for napi
- * rx threads
- */
-struct dp_affn_override_params {
-	uint32_t dp_affn_override_rx_intr_mask[
-					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
-	uint32_t dp_affn_override_tx_comp_mask[
-					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
-	uint32_t dp_affn_override_rx_thread_mask[
-					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
-	uint32_t dp_affn_override_napi_rx_thread_mask[
-					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
-};
-
 #endif
 
 #define FISA_FLOW_MAX_AGGR_COUNT        16 /* max flow aggregate count */
@@ -126,8 +73,6 @@ struct dp_affn_override_params {
  * @periodic_stats_timer_interval: Print selective stats on this specified
  * interval
  * @periodic_stats_timer_duration: duration for which periodic timer should run
- * @bus_bw_super_fast_threshold: bus bandwidth super fast threshold
- * @bus_bw_fast_threshold: bus bandwidth fast threshold
  * @bus_bw_super_high_threshold: bus bandwidth super high threshold
  * @bus_bw_ultra_high_threshold: bus bandwidth ultra high threshold
  * @bus_bw_very_high_threshold: bus bandwidth very high threshold
@@ -152,18 +97,6 @@ struct dp_affn_override_params {
  * @enable_tcp_param_update: enable tcp parameter update
  * @bus_low_cnt_threshold: Threshold count to trigger low Tput GRO flush skip
  * @enable_latency_crit_clients: Enable the handling of latency critical clients
- * @dp_affn_override_enabled: Flag to check if DP affinity override is enabled
- * @dp_affn_override_low_threshold: Low throughput threshold for affinity
- * override
- * @dp_affn_override_mid_threshold: Mid throughput threshold for affinity
- * @dp_affn_override_high_threshold: High throughput threshold for affinity
- * override
- * @dp_affn_override_low_tput_mask: DP affinity low throughput level affinity
- * mask
- * @dp_affn_override_mid_tput_mask: DP affinity mid throughput level affinity
- * mask
- * @dp_affn_override_high_tput_mask: DP affinity high throughput level affinity
- * mask
  * * @del_ack_enable: enable Dynamic Configuration of Tcp Delayed Ack
  * @del_ack_threshold_high: High Threshold inorder to trigger TCP delay ack
  * @del_ack_threshold_low: Low Threshold inorder to trigger TCP delay ack
@@ -190,23 +123,12 @@ struct dp_affn_override_params {
  * @lro_enable: Enable/Disable lro
  * @gro_enable: Enable/Disable gro
  * @is_rx_fisa_enabled: flag to enable/disable FISA Rx
- * @is_fisa_aggr_enabled: flag to check FISA aggregation enable/disable
  * @is_rx_fisa_lru_del_enabled: flag to enable/disable FST entry delete
  * @is_direct_link_enabled: indicates whether direct link is enabled or not
  * @wlm_rx_aggr_control: Control Rx aggregation based on WLM state
  * @is_load_balance_enabled: indicates whether load balance is enabled or not
- * @lb_cpumask_override: load balance CPU mask override bitmask
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
- * @stc_enable: STC enable bitmask (bit0=feature enable, bit7=skip prealloc)
- * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
- * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
- * @dp_rx_intr_cpumask: CPU mask for static RX interrupt affinity
- * @dp_tx_comp_intr_cpumask: CPU mask for static TX completion interrupt
- * affinity
- * @dp_rx_thread_affinity_mask: DP rx thread affinity mask (o for disable)
- * @is_ndp_bw_flow_ctrl_enabled: Indicates whether NDP bw flow ctrl is enabled
- * @haps_config: Store the HAPS power save config
- *  or not
+ * @stc_enable: indicates whether STC feature is enabled or not
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -221,8 +143,6 @@ struct wlan_dp_psoc_cfg {
 	uint32_t periodic_stats_timer_duration;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
-	uint32_t bus_bw_super_fast_threshold;
-	uint32_t bus_bw_fast_threshold;
 	uint32_t bus_bw_super_high_threshold;
 	uint32_t bus_bw_ultra_high_threshold;
 	uint32_t bus_bw_very_high_threshold;
@@ -243,15 +163,6 @@ struct wlan_dp_psoc_cfg {
 	bool     enable_tcp_param_update;
 	uint32_t bus_low_cnt_threshold;
 	bool enable_latency_crit_clients;
-#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-	bool dp_affn_override_enabled;
-	uint32_t dp_affn_override_low_threshold;
-	uint32_t dp_affn_override_mid_threshold;
-	uint32_t dp_affn_override_high_threshold;
-	uint32_t dp_affn_override_low_tput_mask;
-	uint32_t dp_affn_override_mid_tput_mask;
-	uint32_t dp_affn_override_high_tput_mask;
-#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
 #ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
@@ -280,6 +191,7 @@ struct wlan_dp_psoc_cfg {
 	uint16_t pkt_bundle_size;
 #endif
 	uint32_t dp_proto_event_bitmap;
+	uint32_t fisa_enable;
 
 	int icmp_req_to_fw_mark_interval;
 
@@ -287,7 +199,6 @@ struct wlan_dp_psoc_cfg {
 	bool gro_enable;
 #ifdef WLAN_SUPPORT_RX_FISA
 	bool is_rx_fisa_enabled;
-	bool is_fisa_aggr_enabled;
 	bool is_rx_fisa_lru_del_enabled;
 #endif
 #ifdef FEATURE_DIRECT_LINK
@@ -296,27 +207,12 @@ struct wlan_dp_psoc_cfg {
 	bool wlm_rx_aggr_control;
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
 	bool is_load_balance_enabled;
-	uint32_t lb_cpumask_override;
 #endif
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 	bool is_flow_balance_enabled;
 #endif
 #ifdef WLAN_DP_FEATURE_STC
-	uint8_t stc_enable;
-	bool stc_rtpm_control;
-#endif
-	uint32_t dp_irq_affinity_mask;
-#ifdef FEATURE_STATIC_IRQ_AFFINITY
-	uint32_t dp_rx_intr_cpumask;
-	uint32_t dp_tx_comp_intr_cpumask;
-#endif
-	uint32_t dp_rx_thread_affinity_mask;
-#ifdef NDP_TX_BW_FLOW_CTRL
-	bool is_ndp_bw_flow_ctrl_enabled;
-#endif
-
-#ifdef WLAN_HAPS_ENABLE
-	uint32_t haps_config;
+	bool stc_enable;
 #endif
 };
 
@@ -418,22 +314,11 @@ struct wlan_dp_sta_info {
 	enum dhcp_nego_status dhcp_nego_status;
 };
 
-#define WLAN_DP_UL_DELAY_WINDOW_SIZE 10
-#define WLAN_DP_TX_PHY_RATE_WINDOW_SIZE 10
-
 struct wlan_dp_conn_info {
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
 	uint8_t proxy_arp_service;
 	uint8_t is_authenticated;
-	uint32_t ul_delay_win[WLAN_DP_UL_DELAY_WINDOW_SIZE];
-	uint8_t ul_delay_win_idx;
-	uint8_t ul_delay_win_filled;
-	uint32_t tx_phy_rate_win[WLAN_DP_TX_PHY_RATE_WINDOW_SIZE];
-	uint8_t tx_phy_rate_win_idx;
-	uint8_t tx_phy_rate_win_filled;
-	uint64_t prev_phy_rate_sum;
-	uint64_t prev_phy_rate_cnt;
 };
 
 /**
@@ -486,26 +371,12 @@ struct dp_fisa_reo_mismatch_stats {
  * @reo_mismatch: REO ID mismatch
  * @incorrect_rdi: Incorrect REO dest indication in TLV
  *		   (typically used for RDI = 0)
- * @flush_vdev_ref_fail: Failed to get vdev ref while flushing UDP flow
- * @udp_flush_linear_osif_rx_fail: udp_flush_linear_osif_rx_fail
- * @udp_flush_sanity_len_mismatch_drop: udp_flush_sanity_len_mismatch_drop
- * @udp_flush_nonlinear_osif_rx_fail: udp_flush_nonlinear_osif_rx_fail
- * @udp_aggr_append_fail: udp_aggr_append_fail
- * @osif_rx_fail: Packets freed because osif_rx is NULL or returned failure
- * @flow_migration: Number of RX flows migrated across NAPI/REO rings
  */
 struct dp_fisa_stats {
 	uint32_t invalid_flow_index;
 	uint32_t update_deferred;
 	struct dp_fisa_reo_mismatch_stats reo_mismatch;
 	uint32_t incorrect_rdi;
-	uint32_t flush_vdev_ref_fail;
-	uint32_t udp_flush_linear_osif_rx_fail;
-	uint32_t udp_flush_sanity_len_mismatch_drop;
-	uint32_t udp_flush_nonlinear_osif_rx_fail;
-	uint32_t udp_aggr_append_fail;
-	uint32_t osif_rx_fail;
-	uint32_t flow_migration;
 };
 
 /**
@@ -539,7 +410,6 @@ struct fisa_pkt_hist {
  * @flow_id_toeplitz: toeplitz hash value
  * @flow_id: Flow index, equivalent to hash value truncated to FST size
  * @stats: Stats tracking for this flow
- * @peer_id: Peer ID
  * @is_ipv4_addr_entry: Flag indicating whether flow is IPv4 address tuple
  * @is_valid: Flag indicating whether flow is valid
  * @is_populated: Flag indicating whether flow is populated
@@ -549,7 +419,7 @@ struct fisa_pkt_hist {
  * @cumulative_l4_checksum: Cumulative L4 checksum
  * @adjusted_cumulative_ip_length: Cumulative IP length
  * @cur_aggr: Current aggregate length of flow
- * @napi_flush_cumulative_l4_checksum: Cumulative L4 checksum for current
+ * @napi_flush_cumulative_l4_checksum: Cumulative L4 chekcsum for current
  *				       NAPI flush
  * @napi_flush_cumulative_ip_length: Cumulative IP length
  * @last_skb: The last skb aggregated in the FISA flow
@@ -581,10 +451,6 @@ struct fisa_pkt_hist {
  * @last_accessed_ts: Timestamp when the flow was last accessed
  * @pkt_hist: FISA aggreagtion packets history
  * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
- * @flush_head_vdev_ref_fail: head vdev ref null
- * @flush_flow_vdev_ref_fail: flow vdev ref null
- * @flush_vdev_ptr_mismatch: vdev pointer mismatch
- * @flush_mld_mismatch_drop: flush_mld_mismatch_drop
  * @add_timestamp: FISA entry created timestamp
  * @num_pkts: number of packets received on this flow
  * @num_pkts_prev: number of packets received on this flow previously
@@ -595,8 +461,8 @@ struct fisa_pkt_hist {
  * @track_flow_stats: flag to indicate if this flow is to be tracked
  * @selected_to_sample: flag to indicate flow has been selected to sample
  * @classified: flag to indicate flow has been classified
+ * @peer_id: Peer ID
  * @c_flow_id: STC classified flow table ID
- * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -604,7 +470,6 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t flow_id_toeplitz;
 	uint32_t flow_id;
 	struct cdp_flow_stats stats;
-	uint16_t peer_id;
 	uint8_t is_ipv4_addr_entry;
 	uint8_t is_valid;
 	uint8_t is_populated;
@@ -644,16 +509,12 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t cmem_offset;
 	uint32_t metadata;
 	uint32_t reo_dest_indication;
-	uint64_t flow_init_ts;
-	uint64_t last_accessed_ts;
+	qdf_time_t flow_init_ts;
+	qdf_time_t last_accessed_ts;
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 	struct fisa_pkt_hist pkt_hist;
 #endif
 	uint64_t same_mld_vdev_mismatch;
-	uint32_t flush_head_vdev_ref_fail;
-	uint32_t flush_flow_vdev_ref_fail;
-	uint32_t flush_vdev_ptr_mismatch;
-	uint32_t flush_mld_mismatch_drop;
 	uint64_t add_timestamp;
 	uint64_t num_pkts;
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
@@ -666,8 +527,8 @@ struct dp_fisa_rx_sw_ft {
 	uint8_t track_flow_stats;
 	uint8_t selected_to_sample;
 	uint8_t classified;
+	uint16_t peer_id;
 	uint16_t c_flow_id;
-	uint64_t inactivity_timeout;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
@@ -707,8 +568,6 @@ struct fse_cache_flush_history {
  * @fst_update_work: FST CMEM update work
  * @fst_update_wq: FST CMEM update workqueue
  * @fst_update_list: List to post event to CMEM update work
- * @last_update_time_ns: last update time in nanoseconds
- * @update_count: counter used to limit the number of fst updates per second
  * @meta_counter:
  * @cmem_ba:
  * @dp_rx_sw_ft_lock: SW FST lock
@@ -721,9 +580,6 @@ struct fse_cache_flush_history {
  * @rx_toeplitz_hash_key: hash key
  * @rx_pkt_tlv_size: RX packet TLV size
  * @add_tcp_flow_to_fst: Add tcp flow to the FST table
- * @fisa_initialized: flag to check FISA initialization status
- * @is_fisa_aggr_enabled: flag to check FISA aggregation enable/disable
- * @rr_ring_id: Round-robin REO ring cursor for new flow assignment
  */
 struct dp_rx_fst {
 	uint8_t *base;
@@ -749,8 +605,6 @@ struct dp_rx_fst {
 	qdf_work_t fst_update_work;
 	qdf_workqueue_t *fst_update_wq;
 	qdf_list_t fst_update_list;
-	uint64_t last_update_time_ns;
-	uint32_t update_count;
 	uint32_t meta_counter;
 	uint32_t cmem_ba;
 	qdf_spinlock_t dp_rx_sw_ft_lock[MAX_REO_DEST_RINGS];
@@ -763,9 +617,6 @@ struct dp_rx_fst {
 	uint8_t *rx_toeplitz_hash_key;
 	uint16_t rx_pkt_tlv_size;
 	bool add_tcp_flow_to_fst;
-	bool fisa_initialized;
-	bool is_fisa_aggr_enabled;
-	uint8_t rr_ring_id;
 };
 
 /**
@@ -830,14 +681,9 @@ struct dp_rx_fst {
  * @hlp_list_lock: Lock to protect hlp link_list operation
  * @hlp_list: List of HLP peers for HLP response handling
  * @disable_rx_aggr: Disable Rx aggregation
- * @dump_periodic_custom_stats: Flag to indicate if the DP internal stats
- *				should be dumped periodically.
  * @spm_intf_ctx: SPM interface context
  * @opm_stats_work: OPM stats work
  * @ipv4_addr: IPv4 address
- * @haps_ctx: HAPS context
- * @tdls_link_up: Is tdls link up
- * @dhcp_ltxid: Last DHCP tx packet transaction id
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -903,6 +749,7 @@ struct wlan_dp_intf {
 	bool runtime_disable_rx_thread;
 
 	qdf_event_t qdf_sta_eap_frm_done_event;
+	struct dp_traffic_end_indication traffic_end_ind;
 #ifdef FEATURE_DIRECT_LINK
 	struct direct_link_info direct_link_config;
 #endif
@@ -921,9 +768,6 @@ struct wlan_dp_intf {
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
 #endif
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-	bool dump_periodic_custom_stats;
-#endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_intf_context *spm_intf_ctx;
 #endif
@@ -931,11 +775,6 @@ struct wlan_dp_intf {
 	struct qdf_periodic_work opm_stats_work;
 #endif
 	uint8_t ipv4_addr[QDF_IPV4_ADDR_SIZE];
-#ifdef WLAN_HAPS_ENABLE
-	struct dp_haps haps_ctx;
-#endif
-	int tdls_link_up;
-	uint32_t dhcp_ltxid;
 };
 
 #define WLAN_DP_LINK_MAGIC 0x5F44505F4C494E4B	/* "_DP_LINK" in ASCII */
@@ -1004,54 +843,6 @@ struct dp_direct_link_context {
 
 #ifdef WLAN_DP_FEATURE_STC
 struct wlan_dp_stc;
-
-/**
- * enum wlan_dp_stc_state - STC runtime state machine states
- * @DP_STC_STATE_STOPPED:  STC fully stopped; pdev up, waiting for START cmd
- * @DP_STC_STATE_STARTED:  STC fully running
- * @DP_STC_STATE_STARTING: Start work is scheduled or executing
- * @DP_STC_STATE_STOPPING: Stop work is scheduled or executing
- */
-enum wlan_dp_stc_state {
-	DP_STC_STATE_STOPPED  = 0,
-	DP_STC_STATE_STARTED  = 1,
-	DP_STC_STATE_STARTING = 2,
-	DP_STC_STATE_STOPPING = 3,
-};
-
-/**
- * struct wlan_dp_stc_ctx - STC runtime context, always present in dp_ctx
- * @state: atomic state machine, see enum wlan_dp_stc_state
- * @stc_allowed: 2-bit vote field; bit0=known caller vote,
- *               bit1=other caller vote.
- *               STC runs only when both bits are set.
- *               Initialised with bit1 set at psoc create (other caller
- *               pre-approved). Preserved across pdev detach and SSR.
- * @stc_state_work: deferred work item for start/stop operations
- * @dp_stc: STC module context; NULL when STC is stopped
- */
-struct wlan_dp_stc_ctx {
-	qdf_atomic_t state;
-	uint8_t stc_allowed;
-	qdf_work_t stc_state_work;
-	struct wlan_dp_stc *dp_stc;
-};
-#endif
-
-#ifdef FEATURE_WIFI_TRANSPORT
-/**
- * struct wifi_transport_link_state - driver-lifetime link state
- * @lpass_ep_id: HTC endpoint ID obtained at register time
- * @rx_refill_ring: LPASS RXDMA refill SRNG created at register time
- * @link_mask: bitmask of completed link-init steps
- * @rx_drop_no_session: CE5 RX callbacks dropped with no active session
- */
-struct wifi_transport_link_state {
-	int                          lpass_ep_id;
-	struct dp_srng              *rx_refill_ring;
-	uint32_t                     link_mask;
-	uint32_t                     rx_drop_no_session;
-};
 #endif
 
 /**
@@ -1107,20 +898,10 @@ struct wifi_transport_link_state {
  * @dp_agg_param.tc_based_dyn_gro:
  * @dp_agg_param.tc_ingress_prio:
  * @rtpm_tput_policy_ctx: Runtime Tput policy context
- * @dp_affn_override_params: DP affinity override parameters
- * @dp_affn_pkt_count_samples: packet count per sample
- * @dp_affn_sample_count: sample count for applying affinity
- * @dp_affn_sample_winners: decision window winner throughput level
- * @dp_affn_decision_sample_idx: decision sample index
- * @dp_affn_override_curr_tput_level: DP affinity override throughput level
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
  * @dp_direct_link_lock: Direct link mutex lock
  * @dp_direct_link_ctx: DP Direct Link context
- * @wifi_transport_link: WiFi transport Link context
- * @wifi_transport_host_ctx: WiFi transport context
- * @wifi_transport_host_ctx_lock: WiFi transport context lock
- * @wifi_transport_active_path: WiFi transport context path active
  * @arp_connectivity_map: ARP connectivity map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
@@ -1139,16 +920,11 @@ struct wifi_transport_link_state {
  * @svc_ctx: service class context
  * @lb_data: wlan load balance data structure
  * @cpuhp_event_handle: event handle for cpu hotplug
- * @stc_ctx: STC runtime state context
+ * @dp_stc: STC context
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
- * @o_flow_rec_freelist: Flow records freelist
- * @flow_list_lock: Flow list operation lock
  * @rsrc_mgr_ctx: DP resource manager context reference
  * @monitor_flag: Monitor interface flags configured when add Mon interface
- * @rx_thread_cpu_mask: current affinity mask for RX threads
- * @cpufreq_pol: Array of CPU frequency policy pointers for all CPUs
- * @freq_qos_max_req: Array of frequency QoS request structures for all CPUs
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1200,14 +976,6 @@ struct wlan_dp_psoc_context {
 #ifdef FEATURE_RUNTIME_PM
 	struct dp_rtpm_tput_policy_context rtpm_tput_policy_ctx;
 #endif
-#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-	int dp_affn_override_curr_tput_level;
-	struct dp_affn_override_params dp_affn_override_params;
-	uint64_t dp_affn_pkt_count_samples[DP_AFFN_OVERRIDE_SAMPLE_COUNT];
-	uint64_t dp_affn_sample_count;
-	uint8_t dp_affn_sample_winners[AFFN_OVERRIDE_WINDOW_COUNT];
-	uint8_t dp_affn_decision_sample_idx;
-#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 	qdf_atomic_t disable_rx_ol_in_concurrency;
 	qdf_atomic_t disable_rx_ol_in_low_tput;
@@ -1239,17 +1007,11 @@ struct wlan_dp_psoc_context {
 	qdf_mutex_t dp_direct_link_lock;
 	struct dp_direct_link_context *dp_direct_link_ctx;
 #endif
-#ifdef FEATURE_WIFI_TRANSPORT
-	struct wifi_transport_link_state wifi_transport_link;
-	struct wifi_transport_host_context *wifi_transport_host_ctx;
-	qdf_spinlock_t wifi_transport_host_ctx_lock;
-	qdf_atomic_t wifi_transport_active_path;
-#endif
-
 #ifdef WLAN_SUPPORT_RX_FISA
 	struct dp_rx_fst *rx_fst;
 	uint64_t fst_cmem_base;
 	bool fst_in_cmem;
+	uint8_t fisa_enable;
 	uint8_t fisa_lru_del_enable;
 	bool fisa_dynamic_aggr_size_support;
 	/*
@@ -1277,21 +1039,14 @@ struct wlan_dp_psoc_context {
 	struct qdf_cpuhp_handler *cpuhp_event_handle;
 #endif
 #ifdef WLAN_DP_FEATURE_STC
-	struct wlan_dp_stc_ctx stc_ctx;
+	struct wlan_dp_stc *dp_stc;
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_context *spm_ctx;
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
-	qdf_list_t o_flow_rec_freelist;
-	qdf_spinlock_t flow_list_lock;
-	uint32_t spm_logmask;
 #endif
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 	uint32_t monitor_flag;
-	qdf_cpu_mask rx_thread_cpu_mask;
-
-	struct cpufreq_policy *cpufreq_pol[QDF_MAX_AVAILABLE_CPU];
-	struct freq_qos_request freq_qos_max_req[QDF_MAX_AVAILABLE_CPU];
 };
 
 /**

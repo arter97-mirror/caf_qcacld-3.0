@@ -38,9 +38,6 @@
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
-#include "wlan_smd_roam.h"
-#include "wlan_crypto_global_api.h"
-#include "ani_system_defs.h"
 
 static QDF_STATUS
 cm_fw_roam_ser_cb(struct wlan_serialization_command *cmd,
@@ -134,7 +131,7 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 	cmd.cmd_cb = cm_fw_roam_ser_cb;
 	cmd.source = WLAN_UMAC_COMP_MLME;
 	cmd.is_high_priority = true;
-	cmd.cmd_timeout_duration = cm_get_roam_sync_timeout(cm_ctx->vdev);
+	cmd.cmd_timeout_duration = FW_ROAM_SYNC_TIMEOUT;
 	cmd.vdev = cm_ctx->vdev;
 	cmd.is_blocking = cm_ser_get_blocking_cmd();
 
@@ -156,80 +153,9 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_11BN_SMD
-QDF_STATUS
-cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
-		    struct roam_offload_roam_event *roam_event)
-{
-	struct wlan_objmgr_vdev *vdev = NULL;
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct mlo_link_recfg_context *recfg_ctx;
-
-	if (!cm_ctx || !cm_ctx->vdev)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	vdev = cm_ctx->vdev;
-	if (!vdev->mlo_dev_ctx)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	mlo_dev_ctx = vdev->mlo_dev_ctx;
-	if (!mlo_dev_ctx->link_recfg_ctx)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
-
-	/*
-	 * If SMD roaming is in progress and link recfg SM is active, but this
-	 * new ROAM_START is for legacy roam (CM_ROAM_NOTIF_ROAM_START), abort
-	 * the link recfg SM so it does not stall.
-	 */
-	if (roam_event &&
-	    roam_event->notif == CM_ROAM_NOTIF_ROAM_START &&
-	    smd_roam_in_progress(recfg_ctx) &&
-	    mlo_is_link_recfg_in_progress(vdev)) {
-		mlo_err("SMD roam in progress, legacy ROAM_START received, aborting link recfg SM");
-		mlo_link_recfg_sm_deliver_event(mlo_dev_ctx,
-						WLAN_LINK_RECFG_SM_EV_DISCONNECT_IND,
-						0, NULL);
-		return QDF_STATUS_SUCCESS;
-	}
-
-	if (roam_event) {
-		recfg_ctx->num_vdev_repurpose_req = roam_event->num_vdev_repurpose_req;
-		recfg_ctx->tgt_ap_link_bitmap = roam_event->notif_params1;
-
-		if (recfg_ctx->num_vdev_repurpose_req > 0) {
-			qdf_mem_copy(&recfg_ctx->vdev_repurpose_req,
-				     &roam_event->vdev_repurpose_req,
-				     sizeof(struct smd_vdev_repurpose_req) *
-				     recfg_ctx->num_vdev_repurpose_req);
-			recfg_ctx->smd_roam_in_progress = true;
-		}
-		if (roam_event->smd_transition_ie) {
-			recfg_ctx->smd_transition_ie.ie_len = roam_event->smd_transition_ie->ie_len;
-			if (recfg_ctx->smd_transition_ie.ie_len > 0) {
-				qdf_mem_copy(&recfg_ctx->smd_transition_ie.ie_data,
-					     &roam_event->smd_transition_ie->ie_data,
-					     recfg_ctx->smd_transition_ie.ie_len);
-			}
-		}
-	}
-	return QDF_STATUS_SUCCESS;
-}
-
-#else
-QDF_STATUS
-cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
-		    struct roam_offload_roam_event *roam_event)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
 QDF_STATUS cm_prepare_roam_cmd(struct cnx_mgr *cm_ctx,
 			       struct cm_req **roam_req,
-			       enum wlan_cm_source source,
-			       struct roam_offload_roam_event *roam_event)
+			       enum wlan_cm_source source)
 {
 	struct cm_req *req;
 
@@ -239,7 +165,6 @@ QDF_STATUS cm_prepare_roam_cmd(struct cnx_mgr *cm_ctx,
 
 	req = *roam_req;
 	req->roam_req.req.source = source;
-	cm_prepare_smd_roam(cm_ctx, roam_event);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -282,19 +207,10 @@ QDF_STATUS cm_add_fw_roam_cmd_to_list_n_ser(struct cnx_mgr *cm_ctx,
 	return status;
 }
 
-QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc,
-				struct roam_offload_roam_event *roam_event)
+QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
-	uint8_t vdev_id;
-
-	if (!roam_event) {
-		mlme_err("roam_event is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev_id = roam_event->vdev_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -304,11 +220,8 @@ QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	wlan_cm_set_cross_vdev_roam(vdev);
-	wlan_cm_roam_set_ipa_sw_routing(psoc, vdev, NULL, vdev_id, true);
-
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_START,
-				     sizeof(*roam_event), roam_event);
+				     0, NULL);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("EV ROAM START not handled");
@@ -363,9 +276,6 @@ QDF_STATUS cm_fw_roam_start(struct cnx_mgr *cm_ctx)
 		goto error;
 
 	mlme_cm_osif_roam_start_ind(cm_ctx->vdev);
-
-	smd_fw_roam_start(cm_ctx->vdev);
-
 	/*
 	 * For emergency deauth roaming, firmware sends ROAM start
 	 * instead of ROAM scan start notification as data path queues
@@ -398,9 +308,7 @@ error:
 	return status;
 }
 
-QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id,
-				struct roam_offload_roam_event *roam_event)
+QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
@@ -416,7 +324,6 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	wlan_cm_clear_cross_vdev_roam(vdev);
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		mlme_err("Failed to find pdev for vdev id %d",
@@ -445,6 +352,10 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc,
 	    MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
 		status = wlan_cm_roam_state_change(pdev, vdev_id,
 						   WLAN_ROAM_RSO_ENABLED,
+						   REASON_ROAM_ABORT);
+	else if (MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
+		status = wlan_cm_roam_state_change(pdev, vdev_id,
+						   WLAN_ROAM_DEINIT,
 						   REASON_ROAM_ABORT);
 
 	cm_abort_fw_roam(cm_ctx, cm_id);
@@ -504,9 +415,8 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 
 	roam_synch_frame_ind = &rso_cfg->roam_sync_frame_ind;
 
-	if (!cm_is_vdev_active(vdev)) {
-		mlme_err("vdev:%d Ignoring sync frame event, vdev not active, roam state:%d",
-			 vdev_id, mlme_get_roam_state(psoc, vdev_id));
+	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
+		mlme_err("Ignoring this event as it is unexpected");
 		wlan_cm_free_roam_synch_frame_ind(rso_cfg);
 		status = QDF_STATUS_E_FAILURE;
 		goto complete;
@@ -587,51 +497,24 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_crypto_key_entry *keys,
 					  uint8_t num_keys)
 {
-	return wlan_crypto_key_event_handler(psoc, keys, num_keys);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t i;
+
+	for (i = 0; i < num_keys; i++) {
+		status = wlan_crypto_add_key_entry(psoc, &keys[i]);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("Failed to add key entry for link:%d",
+				 keys[i].link_id);
+			wlan_crypto_free_key(&keys[i].keys);
+			qdf_mem_zero(&keys[i],
+				     sizeof(struct wlan_crypto_key_entry));
+			qdf_mem_free(&keys[i]);
+		}
+	}
+
+	return status;
 }
 #endif
-
-/**
- * cm_roam_sync_refresh_authmode() - Refresh vdev authmodeset with the auth
- * algo negotiated with the new AP on FW roam-sync, before any peer
- * create/assoc WMI command consumes the (otherwise stale) authmodeset.
- * @vdev: vdev on which roam-sync is being processed
- * @sync_ind: FW roam synch indication carrying the negotiated auth_algo
- *
- * vdev->crypto_params.authmodeset is set only during the host CONNECT flow
- * and is never refreshed on a FW-offloaded roam. For an EPPKE/8021X_IN_AUTH
- * AP, this leaves authmodeset stale (missing the EPPKE/8021X_IN_AUTH bit),
- * which is read by wma_create_peer()/wma_handle_peer_assoc_send() further
- * down cm_roam_update_vdev() to build the PEER_CREATE/PEER_ASSOC WMI
- * commands. Merge in the correct bit (read-modify-write, since
- * wlan_crypto_set_authmode() does a full replace) before that happens.
- *
- * Return: None
- */
-static void
-cm_roam_sync_refresh_authmode(struct wlan_objmgr_vdev *vdev,
-			      struct roam_offload_synch_ind *sync_ind)
-{
-	int32_t authmode;
-	uint32_t new_bit;
-
-	if (sync_ind->auth_algo == eSIR_AUTH_TYPE_EPPKE)
-		new_bit = WLAN_CRYPTO_AUTH_EPPKE;
-	else if (sync_ind->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)
-		new_bit = WLAN_CRYPTO_AUTH_8021X_IN_AUTH;
-	else
-		return;
-
-	authmode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
-	if (authmode < 0)
-		authmode = 0;
-
-	if (authmode & (1 << new_bit))
-		return;
-
-	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE,
-				   (uint32_t)authmode | (1 << new_bit));
-}
 
 QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 					 uint8_t *event,
@@ -643,7 +526,6 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	struct rso_config *rso_cfg;
 	uint16_t ie_len = 0;
 	uint8_t vdev_id;
-	bool new_link_session = false;
 
 	sync_ind = (struct roam_offload_synch_ind *)event;
 	if (!sync_ind) {
@@ -730,18 +612,15 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = cm_roam_pe_sync_callback(sync_ind, vdev_id, ie_len,
-					  &new_link_session);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	if (QDF_IS_STATUS_ERROR(cm_roam_pe_sync_callback(sync_ind, vdev_id,
+							 ie_len))) {
 		mlme_err("LFR3: vdev:%d PE roam synch cb failed", vdev_id);
-		goto err;
+		return QDF_STATUS_E_BUSY;
 	}
-
-	cm_roam_sync_refresh_authmode(vdev, sync_ind);
 
 	status = cm_roam_update_vdev(vdev, sync_ind);
 	if (QDF_IS_STATUS_ERROR(status))
-		goto err;
+		return status;
 
 	/*
 	 * update phy_mode in wma to avoid mismatch in phymode between host and
@@ -756,10 +635,6 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	status = cm_fw_roam_sync_propagation(psoc,
 					     vdev_id,
 					     sync_ind);
-err:
-	/* delete newly added pe session in case of failure */
-	if (new_link_session && QDF_IS_STATUS_ERROR(status))
-		cm_roam_delete_session_for_sl_to_ml_failure(vdev_id);
 
 	return status;
 }
@@ -796,10 +671,6 @@ QDF_STATUS cm_roam_abort_event(struct wlan_objmgr_vdev *vdev)
 		wlan_cm_disable_rso(pdev, vdev_id, rso_stop_req_bitmap,
 				    REASON_DRIVER_DISABLED);
 	}
-
-	mlme_cm_osif_reset_scan_reject_params(vdev);
-
-	smd_roam_link_recfg_abort(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -78,6 +78,9 @@ void csr_release_command_wm_status_change(struct mac_context *mac,
 QDF_STATUS csr_scan_open(struct mac_context *mac);
 QDF_STATUS csr_scan_close(struct mac_context *mac);
 
+void csr_free_scan_result_entry(struct mac_context *mac, struct tag_csrscan_result
+				*pResult);
+
 QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t vdev_id,
 				  struct csr_roam_info *roam_info,
 				  eRoamCmdStatus u1, eCsrRoamResult u2);
@@ -497,26 +500,6 @@ void csr_update_session_eht_cap(struct mac_context *mac_ctx,
 #else
 static inline void csr_update_session_eht_cap(struct mac_context *mac_ctx,
 					      struct csr_roam_session *session)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BN
-/**
- * csr_update_session_uhr_cap() - update sme session uhr capabilities
- * @mac_ctx: pointer to mac
- * @session: sme session pointer
- * @vdev: vdev object pointer
- *
- * Return: None
- */
-void csr_update_session_uhr_cap(struct mac_context *mac_ctx,
-				struct csr_roam_session *session,
-				struct wlan_objmgr_vdev *vdev);
-#else
-static inline void csr_update_session_uhr_cap(struct mac_context *mac_ctx,
-					      struct csr_roam_session *session,
-					      struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif

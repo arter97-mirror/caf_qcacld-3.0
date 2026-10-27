@@ -63,7 +63,6 @@
 #include "wlan_dcs_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_link_recfg.h"
-#include "wlan_nan_api_i.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -301,7 +300,6 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	tpDphHashNode sta_ptr;
 	uint16_t aid;
 	enum phy_ch_width ch_bw = 0;
-	enum phy_ch_width omn_ch_width = CH_WIDTH_INVALID;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -342,23 +340,14 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	}
 
 	lim_update_nss(mac_ctx, sta_ptr,
-		       operating_mode_frm->OperatingMode.rxNSS + 1, session);
+		       operating_mode_frm->OperatingMode.rxNSS, session);
 
-
-	omn_ch_width = operating_mode_frm->OperatingMode.chanWidth;
-	/*
-	 * STA doesn't support 80 + 80 operation.
-	 * In lim_set_session_channel_params() the session->ch_width
-	 * is restrictd to 80 MHz if AP advertises 80 + 80.
-	 * Add similar logic here.
-	 */
-	if (omn_ch_width == CH_WIDTH_80P80MHZ)
-		omn_ch_width = CH_WIDTH_80MHZ;
-
-	if (lim_update_channel_width(mac_ctx, sta_ptr, session, omn_ch_width,
-				     &ch_bw))
-		wlan_son_deliver_opmode(session->vdev, ch_bw,
-					sta_ptr->op_tx_nss,
+	if (lim_update_channel_width(mac_ctx, sta_ptr, session,
+				   operating_mode_frm->OperatingMode.chanWidth,
+				   &ch_bw))
+		wlan_son_deliver_opmode(session->vdev,
+					ch_bw,
+					sta_ptr->vhtSupportedRxNss,
 					mac_hdr->sa);
 
 end:
@@ -1550,19 +1539,15 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 				 frame_len - SA_QUERY_IE_OFFSET)) {
 		/*
 		 * In case of channel switch, last ocv frequency will be
-		 * different from current frequency.
+		 * different from current frquency.
 		 * If there is channel switch and OCI is invalid in sa_query,
 		 * deauth STA on new channel.
-		 * Reset post csa sa query flag in case that post csa sa query
-		 * timer handler is handling station deauth.
 		 */
 		if (sta_ds && sta_ds->ocv_enabled &&
-		    sta_ds->last_ocv_done_freq != pe_session->curr_op_freq) {
-			sta_ds->post_csa_sa_query = 0;
+		    sta_ds->last_ocv_done_freq != pe_session->curr_op_freq)
 			lim_send_deauth_mgmt_frame(mac, REASON_OCI_MISMATCH,
 						   mac_header->sa, pe_session,
 						   false);
-		}
 		return;
 	}
 
@@ -1570,10 +1555,8 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	 * Update the last ocv done freq when OCI is valid.
 	 * To support above algo, if it is moved to the current freq.
 	 */
-	if (sta_ds && sta_ds->ocv_enabled) {
-		sta_ds->post_csa_sa_query = 0;
+	if (sta_ds && sta_ds->ocv_enabled)
 		sta_ds->last_ocv_done_freq = pe_session->curr_op_freq;
-	}
 
 	/* Send 11w SA query response action frame */
 	if (lim_send_sa_query_response_frame(mac,
@@ -1717,8 +1700,8 @@ lim_drop_unprotected_action_frame(struct mac_context *mac, struct pe_session *pe
 		rmfConnection = true;
 
 	if (rmfConnection && (pHdr->fc.wep == 0)) {
-		pe_err_rl("vdev %d: Dropping unprotected Action category: %d frame since RMF is enabled",
-			  pe_session->vdev_id, category);
+		pe_err("Dropping unprotected Action category: %d frame since RMF is enabled",
+			category);
 		return true;
 	}
 
@@ -1752,7 +1735,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	struct wlan_mlme_qos *qos_aggr;
 
 	if (mlo_is_any_link_disconnecting(session->vdev)) {
-		pe_err("Ignore ADDBA, vdev:%d is in not in connected state",
+		pe_err("Ignore ADDBA, vdev:%d is in not in conncted state",
 		       wlan_vdev_get_id(session->vdev));
 		return;
 	}
@@ -1839,30 +1822,6 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 		 addba_req->addba_param_set.buff_size, buff_size,
 		 addba_req->ba_start_seq_ctrl.ssn, extd_buff_size);
 
-	if (!sta_ds && LIM_IS_PASSTHRU_ROLE(session)) {
-		/*
-		 * No local peer entry for this PASSTHRU vdev peer (e.g. peer
-		 * count beyond the max supported passthru peers). There is no
-		 * DP peer to run cdp_addba_requestprocess() against either, so
-		 * decline directly instead of silently dropping the request,
-		 * which would make the peer keep retrying ADDBA and repeatedly
-		 * stall Rx.
-		 */
-		qdf_status =
-		lim_send_addba_response_frame(mac_ctx,
-					      mac_hdr->sa,
-					      addba_req->addba_param_set.tid,
-					      session,
-					      addba_req->addba_extn_element.present,
-					      addba_req->addba_param_set.amsdu_supp,
-					      mac_hdr->fc.wep, buff_size,
-					      mac_hdr->bssId,
-					      addba_req->DialogToken.token);
-		if (qdf_status != QDF_STATUS_SUCCESS)
-			pe_err("Failed to send addba decline response frame");
-		goto error;
-	}
-
 	qdf_status = cdp_addba_requestprocess(
 					soc, mac_hdr->sa,
 					session->vdev_id,
@@ -1879,8 +1838,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			session,
 			addba_req->addba_extn_element.present,
 			addba_req->addba_param_set.amsdu_supp,
-			mac_hdr->fc.wep, buff_size, mac_hdr->bssId,
-			addba_req->DialogToken.token);
+			mac_hdr->fc.wep, buff_size, mac_hdr->bssId);
 		if (qdf_status != QDF_STATUS_SUCCESS) {
 			pe_err("Failed to send addba response frame");
 			cdp_addba_resp_tx_completion(
@@ -1991,36 +1949,6 @@ lim_prepare_n_send_ttlm_action_rsp_frame(struct wlan_objmgr_peer *peer,
 {
 }
 #endif
-
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * lim_process_protected_uhr_action_frame() - Process Protected UHR action
- * @session: PE session
- * @action_hdr: Pointer to action frame header
- * @rx_pkt_info: Pointer to RX packet info
- *
- * Return: none
- */
-static void
-lim_process_protected_uhr_action_frame(struct pe_session *session,
-				       tpSirMacActionFrameHdr action_hdr,
-				       uint8_t *rx_pkt_info)
-{
-	if (action_hdr->actionID == UHR_LINK_RECONFIG_RESPONSE) {
-		mlo_debug("Received UHR Link Reconfig Response");
-		mlo_uhr_link_recfg_rx_rsp(session->vdev,
-					  WLAN_LINK_RECFG_SM_EV_RX_RSP,
-					  rx_pkt_info);
-	}
-}
-#else
-static inline void
-lim_process_protected_uhr_action_frame(struct pe_session *session,
-				       tpSirMacActionFrameHdr action_hdr,
-				       uint8_t *rx_pkt_info)
-{
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
 
 /**
  * lim_process_action_frame() - to process action frames
@@ -2327,7 +2255,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 				RXMGMT_FLAG_NONE);
 		} else {
 			pe_debug("Dropping the vendor specific action frame SelfSta address system role: %d",
-				 GET_LIM_BSS_TYPE(session));
+				 GET_LIM_SYSTEM_ROLE(session));
 		}
 	break;
 	case ACTION_CATEGORY_PUBLIC:
@@ -2569,16 +2497,12 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		case EHT_LINK_RECONFIG_RESPONSE:
 			mlo_link_recfg_rx_rsp(session->vdev,
 					      WLAN_LINK_RECFG_SM_EV_RX_RSP,
-					      rx_pkt_info);
+					      (void *)body_ptr, frame_len);
 			break;
 		default:
 			pe_err("Unhandled T2LM/EPCS/Link recfg rsp action frame");
 			break;
 		}
-		break;
-	case ACTION_CATEGORY_PROTECTED_UHR:
-		lim_process_protected_uhr_action_frame(session, action_hdr,
-						       rx_pkt_info);
 		break;
 	default:
 		pe_debug_rl("Action category: %d not handled",
@@ -2616,7 +2540,6 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 	uint8_t *pBody = WMA_GET_RX_MPDU_DATA(pBd);
 	tpSirMacActionFrameHdr action_hdr = (tpSirMacActionFrameHdr) pBody;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
-	uint8_t vdev_id;
 
 	pe_debug("Received an action frame category: %d action_id: %d",
 		 action_hdr->category, (action_hdr->category ==
@@ -2659,13 +2582,6 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 			}
 		}
 
-		vdev_id = wlan_nan_get_vdev_id_from_bssid(mac->pdev,
-							  mac_hdr->bssId,
-							  WLAN_ACTION_OUI_ID);
-
-		if (vdev_id == INVALID_VDEV_ID)
-			vdev_id = 0;
-
 		/*
 		 * Forward all public action frame with no session to
 		 * wpa_supplicant
@@ -2673,7 +2589,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 		lim_send_sme_mgmt_frame_ind(mac, mac_hdr->fc.subType,
 					    (uint8_t *)mac_hdr,
 					    frame_len + sizeof(tSirMacMgmtHdr),
-					    vdev_id, WMA_GET_RX_FREQ(pBd),
+					    0, WMA_GET_RX_FREQ(pBd),
 					    WMA_GET_RX_RSSI_NORMALIZED(pBd),
 					    RXMGMT_FLAG_NONE);
 

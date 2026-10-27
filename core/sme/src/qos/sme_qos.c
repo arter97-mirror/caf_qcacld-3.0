@@ -405,9 +405,8 @@ static void sme_qos_state_transition(uint8_t sessionId,
 static QDF_STATUS sme_qos_buffer_cmd(struct sme_qos_cmdinfo *pcmd, bool
 					insert_head);
 static QDF_STATUS sme_qos_process_buffered_cmd(uint8_t sessionId);
-static QDF_STATUS sme_qos_save_assoc_info(struct mac_context *mac,
-					  struct sme_qos_sessioninfo *pSession,
-					  sme_QosAssocInfo *pAssoc_info);
+static QDF_STATUS sme_qos_save_assoc_info(struct sme_qos_sessioninfo *pSession,
+				   sme_QosAssocInfo *pAssoc_info);
 static QDF_STATUS sme_qos_setup_fnp(struct mac_context *mac, tListElem *pEntry);
 static QDF_STATUS sme_qos_modification_notify_fnp(struct mac_context *mac,
 					   tListElem *pEntry);
@@ -824,27 +823,29 @@ QDF_STATUS sme_qos_msg_processor(struct mac_context *mac_ctx,
 	/* switch on the msg type & make the state transition accordingly */
 	switch (msg_type) {
 	case eWNI_SME_ADDTS_RSP:
-		entry = csr_sme_umac_ser_active_ll_peek_head(mac_ctx);
+		entry = csr_nonscan_active_ll_peek_head(mac_ctx,
+				LL_ACCESS_LOCK);
 		if (!entry)
 			break;
 		command = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if (eSmeCommandAddTs == command->command) {
 			status = sme_qos_process_add_ts_rsp(mac_ctx, msg);
-			if (csr_sme_umac_ser_active_ll_remove_entry(mac_ctx,
-								    entry)) {
+			if (csr_nonscan_active_ll_remove_entry(mac_ctx, entry,
+					LL_ACCESS_LOCK)) {
 				qos_release_command(mac_ctx, command);
 			}
 		}
 		break;
 	case eWNI_SME_DELTS_RSP:
-		entry = csr_sme_umac_ser_active_ll_peek_head(mac_ctx);
+		entry = csr_nonscan_active_ll_peek_head(mac_ctx,
+				LL_ACCESS_LOCK);
 		if (!entry)
 			break;
 		command = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if (eSmeCommandDelTs == command->command) {
 			status = sme_qos_process_del_ts_rsp(mac_ctx, msg);
-			if (csr_sme_umac_ser_active_ll_remove_entry(mac_ctx,
-								    entry)) {
+			if (csr_nonscan_active_ll_remove_entry(mac_ctx, entry,
+					LL_ACCESS_LOCK)) {
 				qos_release_command(mac_ctx, command);
 			}
 		}
@@ -2060,7 +2061,7 @@ static enum sme_qos_statustype sme_qos_internal_release_req(struct mac_context *
 						 * Please note that the
 						 * (aggregated) tspec for
 						 * upstream flows is sent out by
-						 * the subsequent logic.
+						 * the susequent logic.
 						 */
 						cmd.command =
 							SME_QOS_RESEND_REQ;
@@ -2483,8 +2484,8 @@ static enum sme_qos_statustype sme_qos_setup(struct mac_context *mac,
 {
 	struct sme_qos_sessioninfo *pSession;
 	struct sme_qos_acinfo *pACInfo;
-	tDot11fBeaconIEs *pIes;
 	enum sme_qos_statustype status = SME_QOS_STATUS_SETUP_FAILURE_RSP;
+	tDot11fBeaconIEs *pIes = NULL;
 	tCsrRoamModifyProfileFields modifyProfileFields;
 	QDF_STATUS hstatus;
 
@@ -2501,10 +2502,19 @@ static enum sme_qos_statustype sme_qos_setup(struct mac_context *mac,
 		sme_err("Session %d has an Invalid BSS Descriptor", sessionId);
 		return status;
 	}
+	hstatus = csr_get_parsed_bss_description_ies(mac,
+						   pSession->assocInfo.bss_desc,
+						      &pIes);
+	if (!QDF_IS_STATUS_SUCCESS(hstatus)) {
+		sme_err("On session %d unable to parse BSS IEs", sessionId);
+		return status;
+	}
 
-	pIes = &pSession->assocInfo.bss_desc->bcn_ies;
+	/* success so pIes was allocated */
+
 	if (!CSR_IS_QOS_BSS(pIes)) {
 		sme_err("On session %d AP doesn't support QoS", sessionId);
+		qdf_mem_free(pIes);
 		/* notify HDD through the synchronous status msg */
 		return SME_QOS_STATUS_SETUP_NOT_QOS_AP_RSP;
 	}
@@ -2644,6 +2654,7 @@ static enum sme_qos_statustype sme_qos_setup(struct mac_context *mac,
 		}
 	} while (0);
 
+	qdf_mem_free(pIes);
 	return status;
 }
 
@@ -2931,8 +2942,7 @@ static
 QDF_STATUS sme_qos_create_tspec_ricie(struct mac_context *mac,
 				      struct sme_qos_wmmtspecinfo *tspec_info,
 				      uint8_t *ric_buffer, uint32_t *ric_length,
-				      uint8_t *ric_identifier,
-				      uint32_t buffer_size)
+				      uint8_t *ric_identifier)
 {
 	tDot11fIERICDataDesc *ric_ie;
 	uint32_t status;
@@ -2942,12 +2952,6 @@ QDF_STATUS sme_qos_create_tspec_ricie(struct mac_context *mac,
 		sme_err("RIC data is NULL, %pK, %pK, %pK",
 			ric_buffer, ric_identifier, ric_length);
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (buffer_size < sizeof(tDot11fIERICDataDesc)) {
-		sme_err("Insufficient buffer size %d, need at least %zu",
-			buffer_size, sizeof(tDot11fIERICDataDesc));
-		return QDF_STATUS_E_NOMEM;
 	}
 
 	ric_ie = qdf_mem_malloc(sizeof(*ric_ie));
@@ -2992,7 +2996,7 @@ QDF_STATUS sme_qos_create_tspec_ricie(struct mac_context *mac,
 	*ric_identifier = ric_ie->RICData.Identifier;
 
 	status = dot11f_pack_ie_ric_data_desc(mac, ric_ie, ric_buffer,
-					      buffer_size, ric_length);
+					      sizeof(*ric_ie), ric_length);
 	if (DOT11F_FAILED(status)) {
 		sme_err("Packing of RIC Data of length %d failed with status %d",
 			*ric_length, status);
@@ -3033,7 +3037,7 @@ QDF_STATUS sme_qos_create_tspec_ricie(struct mac_context *mac,
 	ric_ie->WMMTSPEC.access_policy = SME_QOS_ACCESS_POLICY_EDCA;
 
 	status = dot11f_pack_ie_ric_data_desc(mac, ric_ie, ric_buffer,
-					      buffer_size, ric_length);
+					      sizeof(*ric_ie), ric_length);
 	if (DOT11F_FAILED(status)) {
 		sme_err("Packing of RIC Data of length %d failed with status %d",
 			*ric_length, status);
@@ -4043,8 +4047,7 @@ static QDF_STATUS sme_qos_process_assoc_complete_ev(struct mac_context *mac, uin
 					pEvent_info)->bss_desc->bssId)))) {
 			sme_err("assoc with the same BSS, no update needed");
 		} else
-			status = sme_qos_save_assoc_info(mac, pSession,
-							 pEvent_info);
+			status = sme_qos_save_assoc_info(pSession, pEvent_info);
 	} else {
 		sme_err("wrong state: BE %d, BK %d, VI %d, VO %d",
 			pSession->ac_info[QCA_WLAN_AC_BE].curr_state,
@@ -4109,8 +4112,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		    (pSession->ac_info[1].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[2].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[3].curr_state != SME_QOS_HANDOFF)) {
-			sme_debug("curr_state is not HANDOFF, session %d",
-				  sessionId);
+			sme_err("curr_state is not HANDOFF, session %d",
+				sessionId);
 			return QDF_STATUS_E_FAILURE;
 		}
 		sme_qos_process_ft_reassoc_req_ev(sessionId);
@@ -4124,8 +4127,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		    (pSession->ac_info[1].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[2].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[3].curr_state != SME_QOS_HANDOFF)) {
-			sme_debug("curr_state is not HANDOFF, session %d",
-				  sessionId);
+			sme_err("curr_state is not HANDOFF, session %d",
+				sessionId);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -4168,8 +4171,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		    (pSession->ac_info[1].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[2].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[3].curr_state != SME_QOS_HANDOFF)) {
-			sme_debug("curr_state is not HANDOFF, session %d",
-				  sessionId);
+			sme_err("curr_state is not HANDOFF, session %d",
+				sessionId);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -4194,8 +4197,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		case SME_QOS_CLOSED:
 		case SME_QOS_INIT:
 		default:
-			sme_debug("On session %d AC %d is in wrong state %d",
-				  sessionId, ac, pACInfo->curr_state);
+			sme_err("On session %d AC %d is in wrong state %d",
+				sessionId, ac, pACInfo->curr_state);
 			break;
 		}
 	}
@@ -4309,8 +4312,7 @@ QDF_STATUS sme_qos_handle_handoff_state(struct mac_context *mac_ctx,
  * Return: QDF_STATUS
  */
 static QDF_STATUS sme_qos_process_reassoc_success_ev(struct mac_context *mac_ctx,
-						     uint8_t sessionid,
-						     void *event_info)
+				uint8_t sessionid, void *event_info)
 {
 
 	struct csr_roam_session *csr_roam_session = NULL;
@@ -4338,7 +4340,7 @@ static QDF_STATUS sme_qos_process_reassoc_success_ev(struct mac_context *mac_ctx
 		sme_err("bss_desc is NULL");
 		return status;
 	}
-	status = sme_qos_save_assoc_info(mac_ctx, qos_session, event_info);
+	status = sme_qos_save_assoc_info(qos_session, event_info);
 	if (status)
 		sme_err("sme_qos_save_assoc_info() failed");
 
@@ -4398,8 +4400,8 @@ static QDF_STATUS sme_qos_process_reassoc_success_ev(struct mac_context *mac_ctx
 		case SME_QOS_REQUESTED:
 		case SME_QOS_QOS_ON:
 		default:
-			sme_debug("session %d AC %d is in wrong state %d",
-				  sessionid, ac, ac_info->curr_state);
+			sme_err("session %d AC %d is in wrong state %d",
+				sessionid, ac, ac_info->curr_state);
 			break;
 		}
 	}
@@ -4550,8 +4552,8 @@ static QDF_STATUS sme_qos_process_handoff_assoc_req_ev(struct mac_context *mac,
 		case SME_QOS_CLOSED:
 		case SME_QOS_INIT:
 		default:
-			sme_debug("On session %d AC %d is in wrong state %d",
-				  sessionId, ac, pACInfo->curr_state);
+			sme_err("On session %d AC %d is in wrong state %d",
+				sessionId, ac, pACInfo->curr_state);
 			break;
 		}
 	}
@@ -4619,8 +4621,8 @@ static QDF_STATUS sme_qos_process_handoff_success_ev(struct mac_context *mac,
  */
 			if (pSession->ftHandoffInProgress)
 				break;
-			sme_debug("On session %d AC %d is in wrong state %d",
-				  sessionId, ac, pACInfo->curr_state);
+			sme_err("On session %d AC %d is in wrong state %d",
+				sessionId, ac, pACInfo->curr_state);
 			break;
 		}
 	}
@@ -4828,16 +4830,6 @@ static QDF_STATUS sme_qos_process_preauth_success_ind(struct mac_context *mac_ct
 				goto add_next_ric;
 
 			/*
-			 * Check if adding another TSPEC would exceed
-			 * buffer size.
-			 */
-			if (ric_offset >= MAX_FTIE_SIZE) {
-				sme_err("RIC offset %u exceeds or equals max FTIE size %u, skipping remaining TSPECs",
-					ric_offset, MAX_FTIE_SIZE);
-				break;
-			}
-
-			/*
 			 * If a tspec status is pending, take requested_QoSInfo
 			 * for RIC request, else use curr_QoSInfo for the
 			 * RIC request
@@ -4846,18 +4838,16 @@ static QDF_STATUS sme_qos_process_preauth_success_ind(struct mac_context *mac_ct
 				status = sme_qos_create_tspec_ricie(mac_ctx,
 					&ac_info->requested_QoSInfo[tspec_idx],
 					ric_ie + ric_offset, &ric_ielen,
-					&ac_info->ricIdentifier[tspec_idx],
-					MAX_FTIE_SIZE - ric_offset);
+					&ac_info->ricIdentifier[tspec_idx]);
 			} else {
 				status = sme_qos_create_tspec_ricie(mac_ctx,
 					&ac_info->curr_QoSInfo[tspec_idx],
 					ric_ie + ric_offset, &ric_ielen,
-					&ac_info->ricIdentifier[tspec_idx],
-					MAX_FTIE_SIZE - ric_offset);
+					&ac_info->ricIdentifier[tspec_idx]);
 			}
 add_next_ric:
 			ric_offset += ric_ielen;
-			mlme_priv->connect_info.ft_info.ric_ies_length += ric_ielen;
+			mlme_priv->connect_info.ft_info.ric_ies_length = ric_ielen;
 			tspec_mask_status >>= 1;
 			tspec_pending_status >>= 1;
 			tspec_idx++;
@@ -5683,7 +5673,23 @@ sme_qos_is_acm(struct mac_context *mac, struct bss_description *pSirBssDesc,
 	       enum qca_wlan_ac_type ac, tDot11fBeaconIEs *pIes)
 {
 	bool ret_val = false;
-	tDot11fBeaconIEs *pIesLocal = pIes ? pIes : &pSirBssDesc->bcn_ies;
+	tDot11fBeaconIEs *pIesLocal;
+
+	if (pIes)
+		/* IEs were provided so use them locally */
+		pIesLocal = pIes;
+	else {
+		/* IEs were not provided so parse them ourselves */
+		if (!QDF_IS_STATUS_SUCCESS
+			    (csr_get_parsed_bss_description_ies
+				    (mac, pSirBssDesc, &pIesLocal))) {
+			/* err msg */
+			sme_err("csr_get_parsed_bss_description_ies() failed");
+			return false;
+		}
+
+		/* if success then pIesLocal was allocated */
+	}
 
 	if (CSR_IS_QOS_BSS(pIesLocal)) {
 		switch (ac) {
@@ -5708,6 +5714,9 @@ sme_qos_is_acm(struct mac_context *mac, struct bss_description *pSirBssDesc,
 			break;
 		}
 	} /* IS_QOS_BSS */
+	if (!pIes)
+		/* IEs were allocated locally so free them */
+		qdf_mem_free(pIesLocal);
 
 	return ret_val;
 }
@@ -6022,7 +6031,6 @@ static QDF_STATUS sme_qos_delete_buffered_requests(struct mac_context *mac,
 
 /**
  * sme_qos_save_assoc_info() - save assoc info.
- * @mac: Global mac context
  * @pSession: pointer to QOS session
  * @pAssoc_info: pointer to the assoc structure to store the BSS descriptor
  *               of the AP, the profile that HDD sent down with the
@@ -6034,12 +6042,11 @@ static QDF_STATUS sme_qos_delete_buffered_requests(struct mac_context *mac,
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS sme_qos_save_assoc_info(struct mac_context *mac,
-					  struct sme_qos_sessioninfo *pSession,
-					  sme_QosAssocInfo *pAssoc_info)
+static QDF_STATUS sme_qos_save_assoc_info(struct sme_qos_sessioninfo *pSession,
+				   sme_QosAssocInfo *pAssoc_info)
 {
-	uint32_t bssLen = 0;
 	struct bss_description *bss_desc = NULL;
+	uint32_t bssLen = 0;
 
 	if (!pAssoc_info) {
 		sme_err("pAssoc_info is NULL");
@@ -6058,8 +6065,8 @@ static QDF_STATUS sme_qos_save_assoc_info(struct mac_context *mac,
 		return QDF_STATUS_E_NOMEM;
 
 	qdf_mem_copy(bss_desc, pAssoc_info->bss_desc, bssLen);
-
 	pSession->assocInfo.bss_desc = bss_desc;
+	/* save the apsd info from assoc */
 	pSession->apsdMask |= pAssoc_info->uapsd_mask;
 
 	/* [TODO] Do we need to update the global APSD bitmap? */
@@ -6242,7 +6249,7 @@ static QDF_STATUS sme_qos_del_ts_ind_fnp(struct mac_context *mac, tListElem *pEn
  * the success for the requested flow & notify all the other flows
  * running on the same AC that QoS params got modified
  *
- * Return:  QDF_STATUS enumeration
+ * Return:  QDF_STATUS enumaration
  */
 static QDF_STATUS
 sme_qos_reassoc_success_ev_fnp(struct mac_context *mac_ctx,
@@ -6796,8 +6803,9 @@ bool sme_qos_is_ts_info_ack_policy_valid(mac_handle_t mac_handle,
 					 struct sme_qos_wmmtspecinfo *pQoSInfo,
 					 uint8_t sessionId)
 {
-	tDot11fBeaconIEs *pIes;
+	tDot11fBeaconIEs *pIes = NULL;
 	struct sme_qos_sessioninfo *pSession;
+	QDF_STATUS hstatus;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
@@ -6806,6 +6814,7 @@ bool sme_qos_is_ts_info_ack_policy_valid(mac_handle_t mac_handle,
 	}
 
 	pSession = &sme_qos_cb.sessionInfo[sessionId];
+
 	if (!pSession->sessionActive) {
 		sme_err("Session %d is inactive", sessionId);
 		return false;
@@ -6816,15 +6825,27 @@ bool sme_qos_is_ts_info_ack_policy_valid(mac_handle_t mac_handle,
 		return false;
 	}
 
-	pIes = &pSession->assocInfo.bss_desc->bcn_ies;
+	hstatus = csr_get_parsed_bss_description_ies(mac,
+						   pSession->assocInfo.bss_desc,
+						      &pIes);
+	if (!QDF_IS_STATUS_SUCCESS(hstatus)) {
+		sme_err("On session %d unable to parse BSS IEs", sessionId);
+		return false;
+	}
+
+	/* success means pIes was allocated */
+
 	if (!pIes->HTCaps.present &&
 	    pQoSInfo->ts_info.ack_policy ==
 	    SME_QOS_WMM_TS_ACK_POLICY_HT_IMMEDIATE_BLOCK_ACK) {
 		sme_err("On session %d HT Caps aren't present but application set ack policy to HT ",
 			sessionId);
+
+		qdf_mem_free(pIes);
 		return false;
 	}
 
+	qdf_mem_free(pIes);
 	return true;
 }
 
@@ -7072,7 +7093,7 @@ static QDF_STATUS sme_qos_request_reassoc(struct mac_context *mac,
 	wlan_mlme_get_bssid_vdev_id(mac->pdev, sessionId, &bssid);
 	ch_freq = wlan_get_operation_chan_freq_vdev_id(mac->pdev, sessionId);
 	status = wlan_cm_roam_invoke(mac->pdev, sessionId, &bssid, ch_freq,
-			     0, NULL, CM_ROAMING_HOST);
+				     CM_ROAMING_HOST);
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		/* Update the state to Handoff so subsequent requests are

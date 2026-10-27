@@ -410,7 +410,7 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 			    qdf_nbuf_t tail_msdu,
 			    int num_mpdu_ranges,
 			    int num_mpdus,
-			    bool *rx_ind_release)
+			    bool rx_ind_release)
 {
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 	enum htt_rx_status mpdu_status;
@@ -470,7 +470,7 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 		 * The MPDU was not stored in the rx reorder array, so
 		 * there's nothing to release.
 		 */
-		*rx_ind_release = false;
+		rx_ind_release = false;
 	} else {
 		ol_rx_reorder_store(pdev, peer, tid,
 				    reorder_idx, head_msdu, tail_msdu);
@@ -685,7 +685,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 							head_msdu, tail_msdu,
 							num_mpdu_ranges,
 							num_mpdus,
-							&rx_ind_release);
+							rx_ind_release);
 				}
 
 			}
@@ -801,13 +801,6 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 {
 	struct ol_txrx_peer_t *peer;
 	int sec_index, i;
-
-	if (sec_type >= htt_num_sec_types) {
-		ol_txrx_err(
-			"Invalid sec_type %d from FW for peer ID %d - skipping security inits",
-			sec_type, peer_id);
-		return;
-	}
 
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (!peer) {
@@ -1514,7 +1507,6 @@ void ol_rx_peer_init(struct ol_txrx_pdev_t *pdev, struct ol_txrx_peer_t *peer)
 
 	for (tid = 0; tid < OL_TXRX_NUM_EXT_TIDS; tid++) {
 		ol_rx_reorder_init(&peer->tids_rx_reorder[tid], tid);
-		qdf_spinlock_create(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 
 		/* invalid sequence number */
 		peer->tids_last_seq[tid] = IEEE80211_SEQ_MAX;
@@ -1541,16 +1533,11 @@ void ol_rx_peer_init(struct ol_txrx_pdev_t *pdev, struct ol_txrx_peer_t *peer)
 void
 ol_rx_peer_cleanup(struct ol_txrx_vdev_t *vdev, struct ol_txrx_peer_t *peer)
 {
-	uint8_t tid;
-
 	peer->keyinstalled = 0;
 	peer->last_assoc_rcvd = 0;
 	peer->last_disassoc_rcvd = 0;
 	peer->last_deauth_rcvd = 0;
 	ol_rx_reorder_peer_cleanup(vdev, peer);
-
-	for (tid = 0; tid < OL_TXRX_NUM_EXT_TIDS; tid++)
-		qdf_spinlock_destroy(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 }
 
 /*
@@ -1568,18 +1555,6 @@ void ol_rx_frames_free(htt_pdev_handle htt_pdev, qdf_nbuf_t frames)
 }
 
 #ifdef WLAN_FULL_REORDER_OFFLOAD
-void
-ol_rx_per_ce_stats_update(ol_txrx_pdev_handle pdev, uint8_t ce_id,
-			  uint32_t msdu_count)
-{
-	int cpu_id = qdf_get_cpu();
-
-	if (qdf_unlikely(ce_id >= OL_TXRX_CE_COUNT_MAX))
-		return;
-
-	pdev->stats.priv.rx.ce_packets[cpu_id][ce_id] += msdu_count;
-}
-
 void
 ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 				  qdf_nbuf_t rx_ind_msg,
@@ -1805,7 +1780,7 @@ ol_rx_in_order_deliver(struct ol_txrx_vdev_t *vdev,
 			QDF_DP_TRACE_RX_TXRX_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(msdu),
-			qdf_nbuf_len(msdu), QDF_RX));
+			sizeof(qdf_nbuf_data(msdu)), QDF_RX));
 
 		OL_RX_PEER_STATS_UPDATE(peer, msdu);
 		OL_RX_ERR_STATISTICS_1(vdev->pdev, vdev, peer, rx_desc,
@@ -1859,12 +1834,12 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 			qdf_dp_trace_log_pkt(peer->vdev->vdev_id,
 				head_buf, QDF_RX,
 				QDF_TRACE_DEFAULT_PDEV_ID,
-				peer->vdev->qdf_opmode, 0);
+				peer->vdev->qdf_opmode);
 			DPTRACE(qdf_dp_trace(head_buf,
 				QDF_DP_TRACE_RX_OFFLOAD_HTT_PACKET_PTR_RECORD,
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(head_buf),
-				qdf_nbuf_len(head_buf), QDF_RX));
+				sizeof(qdf_nbuf_data(head_buf)), QDF_RX));
 			ol_rx_data_process(peer, head_buf);
 		} else {
 			buf = head_buf;

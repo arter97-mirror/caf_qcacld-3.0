@@ -28,7 +28,6 @@
 #include "qdf_str.h"
 #include <wlan_hdd_includes.h>
 #include <wlan_hdd_wowl.h>
-#include <linux/hex.h>
 #include <wlan_pmo_wow_public_struct.h>
 #include "wlan_hdd_object_manager.h"
 
@@ -149,7 +148,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 					hdd_err("WoWL pattern '%s' already configured for vdev %d",
 						g_hdd_wowl_ptrns[vdev_id][i], vdev_id);
 					ptrn += len;
-					goto release_vdev_ref;
+					goto next_ptrn;
 				}
 			}
 		}
@@ -157,7 +156,6 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 		/* Maximum number of patterns have been configured already */
 		if (empty_slot == -1 || g_hdd_wowl_ptrns_count >= num_filters) {
 			hdd_err("Max WoW patterns (%u) reached", num_filters);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 			return false;
 		}
 
@@ -167,7 +165,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 			hdd_err("Malformed pattern string. Skip!");
 			invalid_ptrn = true;
 			ptrn += len;
-			goto release_vdev_ref;
+			goto next_ptrn;
 		}
 
 		/* Extract the pattern size */
@@ -184,7 +182,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 			hdd_err("Invalid length specified. Skip!");
 			invalid_ptrn = true;
 			ptrn += len;
-			goto release_vdev_ref;
+			goto next_ptrn;
 		}
 
 		/* compute the offset of tokenizer after the pattern */
@@ -194,7 +192,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 			hdd_err("Malformed pattern string..skip!");
 			invalid_ptrn = true;
 			ptrn += len;
-			goto release_vdev_ref;
+			goto next_ptrn;
 		}
 
 		/* compute the end of pattern string */
@@ -204,7 +202,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 			hdd_err("Malformed pattern string...skip!");
 			invalid_ptrn = true;
 			ptrn += len;
-			goto release_vdev_ref;
+			goto next_ptrn;
 		}
 
 		temp = ptrn;
@@ -233,10 +231,8 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 
 		/* All is good. Store the pattern locally */
 		g_hdd_wowl_ptrns[vdev_id][empty_slot] = qdf_mem_malloc(len + 1);
-		if (!g_hdd_wowl_ptrns[vdev_id][empty_slot]) {
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+		if (!g_hdd_wowl_ptrns[vdev_id][empty_slot])
 			return false;
-		}
 
 		memcpy(g_hdd_wowl_ptrns[vdev_id][empty_slot], temp, len);
 		g_hdd_wowl_ptrns[vdev_id][empty_slot][len] = '\0';
@@ -254,10 +250,10 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 			g_hdd_wowl_ptrns[vdev_id][empty_slot] = NULL;
 			g_hdd_wowl_ptrns_count--;
 		}
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		dump_hdd_wowl_ptrn(&wow_pattern);
 
-release_vdev_ref:
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+next_ptrn:
 		if (*ptrn == WOWL_INTER_PTRN_TOKENIZER) {
 			/* move past the tokenizer */
 			ptrn += 1;
@@ -313,10 +309,8 @@ bool hdd_del_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	}
 
 	/* If pattern present, remove it from downstream */
-	if (!patternFound) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	if (!patternFound)
 		return false;
-	}
 
 	status = ucfg_pmo_del_wow_user_pattern(vdev, id);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);

@@ -60,7 +60,7 @@
  *  2) Unicast Pattern
  *
  * However note that WoWL will not be enabled by default by HDD. WoWL
- * needs to enabled explicitly by exercising the iwpriv command.
+ * needs to enabled explcitly by exercising the iwpriv command.
  *
  * HDD will expose an API that accepts patterns as Hex string in the
  * following format:

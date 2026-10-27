@@ -65,36 +65,6 @@ QDF_STATUS ucfg_pmo_psoc_close(struct wlan_objmgr_psoc *psoc);
 uint32_t ucfg_pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_pmo_store_apf_mode() - store the APF mode
- * @psoc: pointer to psoc object
- * @apf_mode: apf mode
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
-				   uint32_t apf_mode);
-
-/**
- * ucfg_pmo_set_apf_mode() - set the APF mode
- * @psoc: pointer to psoc object
- * @apf_mode: apf mode
- * @vdev_id: vdev id
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
-				 uint32_t apf_mode,
-				 uint32_t vdev_id);
-
-/**
- * ucfg_pmo_get_apf_mode() - get the APF mode
- * @psoc: pointer to psoc object
- *
- * Return: QDF_STATUS
- */
-uint32_t ucfg_pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc);
-
-/**
  * ucfg_pmo_get_num_wow_filters() - get the supported number of WoW filters
  * @psoc: the psoc to query
  *
@@ -155,7 +125,7 @@ QDF_STATUS ucfg_pmo_update_psoc_config(struct wlan_objmgr_psoc *psoc,
 /**
  * ucfg_pmo_psoc_set_caps() - overwrite configured device capability flags
  * @psoc: the psoc for which the capabilities apply
- * @caps: the capability information to configure
+ * @caps: the cabability information to configure
  *
  * Return: QDF_STATUS
  */
@@ -203,6 +173,15 @@ ucfg_pmo_set_igmp_offload_enabled(struct wlan_objmgr_psoc *psoc,
 void
 ucfg_pmo_set_arp_offload_enabled(struct wlan_objmgr_psoc *psoc,
 				 bool val);
+
+/**
+ * ucfg_pmo_is_ssdp_enabled() - Get ssdp enable or not
+ * @psoc: pointer to psoc object
+ *
+ * Return: enable/disable ssdp
+ */
+bool
+ucfg_pmo_is_ssdp_enabled(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_pmo_is_ns_offloaded() - Get ns offload support or not
@@ -562,15 +541,6 @@ QDF_STATUS ucfg_pmo_disable_hw_filter_in_fwr(struct wlan_objmgr_vdev *vdev);
 uint8_t ucfg_pmo_max_mc_addr_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_pmo_rate_limit_needed() -  check allow or not to set mc addr list
- * wmi cmd to fw based on pending cmds
- * @psoc: objmgr psoc
- *
- * Return: bool
- */
-bool ucfg_pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc);
-
-/**
  * ucfg_pmo_cache_mc_addr_list(): API to cache mc addr list in pmo vdev priv obj
  * @mc_list_config: list configuration
  *
@@ -612,15 +582,6 @@ ucfg_pmo_enhanced_mc_filter_disable(struct wlan_objmgr_vdev *vdev)
 {
 	return pmo_core_enhanced_mc_filter_disable(vdev);
 }
-
-/**
- * ucfg_pmo_tgt_psoc_get_runtime_pm_in_progress() - get runtime status
- * @psoc: objmgr psoc
- *
- * Return: true if runtime pm is in progress else false
- */
-bool
-ucfg_pmo_tgt_psoc_get_runtime_pm_in_progress(struct wlan_objmgr_psoc *psoc);
 
 #ifdef FEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
 /**
@@ -1109,18 +1070,6 @@ QDF_STATUS ucfg_pmo_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS ucfg_pmo_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 					    pmo_pld_auto_resume_cb pld_cb);
-
-/**
- * ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(): arm RTPM TBTT-nack delay
- * @psoc: objmgr psoc
- *
- * Call only after ucfg_pmo_psoc_bus_runtime_suspend() has returned, so
- * the shortened delay it may arm is not immediately reset by that same
- * suspend attempt's own WMI traffic.
- *
- * Return: none
- */
-void ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc);
 #endif
 
 /**
@@ -1410,22 +1359,6 @@ bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc);
  */
 bool ucfg_pmo_is_configure_apf_per_screen_state(
 					struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_pmo_get_apfv6_offload_bitmap() - to get APFv6 offload bitmap
- * @psoc: objmgr psoc handle
- *
- * Return: Offload bitmap in APFv6 mode
- */
-uint32_t ucfg_pmo_get_apfv6_offload_bitmap(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_pmo_is_apf_mode_enabled() - to get apf mode configuration
- * @psoc: objmgr psoc handle
- *
- * Return: true if enabled in ini
- */
-bool ucfg_pmo_is_apf_mode_enabled(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
 {
@@ -1434,17 +1367,6 @@ static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
 
 static inline bool ucfg_pmo_is_configure_apf_per_screen_state(
 					struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline uint32_t ucfg_pmo_get_apfv6_offload_bitmap(
-					struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
-static inline bool ucfg_pmo_is_apf_mode_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -1610,27 +1532,6 @@ static inline uint32_t
 ucfg_pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
-}
-
-static inline uint32_t
-ucfg_pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
-static inline QDF_STATUS
-ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
-		      uint32_t apf_mode,
-		      uint32_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
-			uint32_t apf_mode)
-{
-	return QDF_STATUS_SUCCESS;
 }
 
 static inline uint8_t
@@ -1805,11 +1706,6 @@ ucfg_pmo_cache_mc_addr_list(
 		struct pmo_mc_addr_list_params *mc_list_config)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-bool ucfg_pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
 }
 
 static inline QDF_STATUS
@@ -2029,11 +1925,6 @@ ucfg_pmo_psoc_bus_runtime_resume(
 {
 	return QDF_STATUS_SUCCESS;
 }
-
-static inline void
-ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
-{
-}
 #endif
 
 static inline QDF_STATUS
@@ -2207,6 +2098,11 @@ ucfg_pmo_get_auto_power_fail_mode(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool ucfg_pmo_is_ssdp_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -2652,57 +2548,4 @@ QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
  * Return: true if FW debug is enable otherwise false
  */
 bool ucfg_pmo_is_fw_debug_enable(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_pmo_get_ns_offload_enable_dynamic() - get NS offload dynamic enable
- * @vdev: vdev objmgr handle
- *
- * Return: true is NS offload is dynamically disabled else false
- */
-bool
-ucfg_pmo_get_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_pmo_set_ns_offload_enable_dynamic() - Set NS offload dynamic enable
- * @vdev: vdev objmgr handle
- * @trigger: pmo trigger
- * @ns_offload_enable_dyn: NS offload enable dynamic
- *
- * Return: None
- */
-void
-ucfg_pmo_set_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev,
-				       enum pmo_offload_trigger trigger,
-				       bool ns_offload_enable_dyn);
-
-/**
- * ucfg_pmo_is_wow_optimization_enabled() - Check if WoW optimization is enabled
- * @psoc: psoc objmgr handle
- *
- * Return: true if WoW timeline optimization is supported, false otherwise
- */
-bool ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_pmo_send_vdev_sta_ps_param() - Send STA power save parameter to firmware
- * @vdev: vdev objmgr handle
- * @ps_param: power save parameter type
- * @param_value: parameter value
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_pmo_send_vdev_sta_ps_param(struct wlan_objmgr_vdev *vdev,
-				enum pmo_sta_powersave_param ps_param,
-				uint32_t param_value);
-
-/**
- * ucfg_pmo_get_beacon_lio_update_on_screen_on_off() - Get beacon LIO screen
- * state update configuration
- * @psoc: objmgr psoc handle
- *
- * Return: true if enabled, false otherwise
- */
-bool
-ucfg_pmo_get_beacon_lio_update_on_screen_on_off(struct wlan_objmgr_psoc *psoc);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

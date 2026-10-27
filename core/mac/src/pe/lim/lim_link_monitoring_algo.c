@@ -48,7 +48,6 @@
 #include "wlan_dlm_api.h"
 #include <lim_mlo.h>
 #include "wlan_tdls_api.h"
-#include "lim_security_utils.h"
 
 /**
  * lim_delete_sta_util - utility function for deleting station context
@@ -73,7 +72,7 @@ static void lim_delete_sta_util(struct mac_context *mac_ctx, tpDeleteStaContext 
 
 	if (!stads) {
 		pe_err("Invalid STA limSystemRole: %d",
-		       GET_LIM_BSS_TYPE(session_entry));
+			GET_LIM_SYSTEM_ROLE(session_entry));
 		return;
 	}
 	stads->del_sta_ctx_rssi = msg->rssi;
@@ -232,11 +231,6 @@ void lim_delete_sta_context(struct mac_context *mac_ctx,
 				qdf_mem_free(msg);
 				return;
 			}
-
-			if (qdf_is_macaddr_zero((struct qdf_mac_addr *)&msg->addr2))
-				qdf_mem_copy(msg->addr2, session_entry->bssId,
-					     QDF_MAC_ADDR_SIZE);
-
 			lim_send_deauth_mgmt_frame(mac_ctx,
 				REASON_DISASSOC_DUE_TO_INACTIVITY,
 				msg->addr2, session_entry, false);
@@ -333,8 +327,6 @@ lim_trigger_sta_deletion(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	}
 	sta_ds->sta_deletion_in_progress = true;
 
-	lim_delete_pre_auth_node(mac_ctx, sta_ds->staAddr);
-
 	sta_ds->mlmStaContext.disassocReason =
 		REASON_DISASSOC_DUE_TO_INACTIVITY;
 	sta_ds->mlmStaContext.cleanupTrigger = eLIM_LINK_MONITORING_DISASSOC;
@@ -348,10 +340,43 @@ lim_trigger_sta_deletion(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	mlm_disassoc_ind.sessionId = session_entry->peSessionId;
 	lim_post_sme_message(mac_ctx, LIM_MLM_DISASSOC_IND,
 			(uint32_t *) &mlm_disassoc_ind);
-
+	if (mac_ctx->mlme_cfg->gen.fatal_event_trigger)
+		cds_flush_logs(WLAN_LOG_TYPE_FATAL,
+				WLAN_LOG_INDICATOR_HOST_DRIVER,
+				WLAN_LOG_REASON_HB_FAILURE,
+				false, false);
 	/* Issue Disassoc Indication to SME */
 	lim_send_sme_disassoc_ind(mac_ctx, sta_ds, session_entry);
 } /*** end lim_trigger_st_adeletion() ***/
+
+static void
+lim_connectivity_bmiss_disconn_event(tpDphHashNode sta,
+				     struct wlan_objmgr_psoc *psoc,
+				     enum wlan_reason_code reason_code,
+				     uint32_t vdev_id)
+{
+	if (!(reason_code == REASON_BEACON_MISSED))
+		return;
+
+	/*
+	 * Firmware sends final bmiss indication as part of roam scan stats
+	 * event. Disconn log is sent as part of the final bmiss indication
+	 * from  roam scan stats event with specific reason. But if RSO stop
+	 * or RSO deinit happens after first bmiss due to concurrent interface
+	 * connection, then firmware doesn't send the final bmiss indication
+	 * to driver since roam scan will be disabled. But final bmiss
+	 * heartbeat failure will be indicated as part of WMI_ROAM_EVENTID with
+	 * reason as BMISS. So generate DISCONN log in this case from host based
+	 * on RSO state and final bmiss HB failure teardown.
+	 */
+	if (!(MLME_IS_ROAM_STATE_STOPPED(psoc, vdev_id) ||
+	      MLME_IS_ROAM_STATE_DEINIT(psoc, vdev_id)))
+		return;
+
+	cm_roam_beacon_loss_disconnect_event(psoc,
+					     *(struct qdf_mac_addr *)sta->staAddr,
+					     vdev_id);
+}
 
 void
 lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
@@ -370,9 +395,9 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 		return;
 	}
 
-	pe_debug("Session %d Vdev %d reason code %d trigger %d",
-		 pe_session->peSessionId, pe_session->vdev_id, reasonCode,
-		 trigger);
+	pe_info("Session %d Vdev %d reason code %d trigger %d",
+		pe_session->peSessionId, pe_session->vdev_id, reasonCode,
+		trigger);
 
 	/* Add the check here in case caller missed the check */
 	if (!lim_is_sb_disconnect_allowed(pe_session))
@@ -444,6 +469,9 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 
 	if (LIM_IS_STA_ROLE(pe_session)) {
 		lim_mlo_sta_notify_peer_disconn(pe_session);
+
+		lim_connectivity_bmiss_disconn_event(sta, mac->psoc, reasonCode,
+						     pe_session->vdev_id);
 
 		lim_post_sme_message(mac, LIM_MLM_DEAUTH_IND,
 				     (uint32_t *)&mlmDeauthInd);
@@ -545,6 +573,8 @@ void lim_rx_invalid_peer_process(struct mac_context *mac_ctx,
 			(struct ol_rx_inv_peer_params *)lim_msg->bodyptr;
 	struct pe_session *session_entry;
 	uint16_t reason_code = REASON_CLASS3_FRAME_FROM_NON_ASSOC_STA;
+	uint16_t aid;
+	tpDphHashNode sta_ds;
 
 	if (!msg) {
 		pe_err("Invalid body pointer in message");
@@ -559,29 +589,32 @@ void lim_rx_invalid_peer_process(struct mac_context *mac_ctx,
 	}
 
 	/* only if SAP mode */
-	if (!LIM_IS_AP_ROLE(session_entry)) {
-		pe_debug("unsupported BSS Type %d", session_entry->bssType);
-		goto end;
+	if (session_entry->bssType == eSIR_INFRA_AP_MODE) {
+		sta_ds = dph_lookup_hash_entry(mac_ctx, msg->ta, &aid,
+					       &session_entry->dph.dphHashTable);
+		if (sta_ds && sta_ds->is_key_installed) {
+			/*
+			 * Skip deauth for an associated STA.
+			 *
+			 * The deauth sent for invalid peer indication will
+			 * not cleanup the SM if this is an associated STA.
+			 * Therefore, the deauth for associated STA creates
+			 * stale entries even after STA gets disconnected.
+			 */
+			pe_err_rl("Received Invalid rx peer indication for an associated STA "
+			       QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(msg->ta));
+			qdf_mem_free(msg);
+			lim_msg->bodyptr = NULL;
+			return;
+		}
+		pe_debug("send deauth frame to non-assoc STA");
+		lim_send_deauth_mgmt_frame(mac_ctx,
+					   reason_code,
+					   msg->ta,
+					   session_entry,
+					   false);
 	}
 
-	if (wlan_peer_is_key_installed(mac_ctx->psoc, msg->ta)) {
-		/*
-		 * Skip deauth for an associated STA.
-		 * The deauth sent for invalid peer indication will
-		 * not cleanup the SM if this is an associated STA.
-		 * Therefore, the deauth for associated STA creates
-		 * stale entries even after STA gets disconnected.
-		 */
-		pe_err_rl("Received Invalid rx peer indication for an associated STA "
-			  QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(msg->ta));
-		goto end;
-	}
-
-	pe_debug("send deauth frame to non-assoc STA");
-	lim_send_deauth_mgmt_frame(mac_ctx, reason_code, msg->ta, session_entry,
-				   false);
-
-end:
 	qdf_mem_free(msg);
 	lim_msg->bodyptr = NULL;
 }

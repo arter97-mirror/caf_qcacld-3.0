@@ -203,18 +203,17 @@ ol_tx_send(struct ol_txrx_pdev_t *pdev,
 	int msdu_credit_consumed;
 	uint16_t id;
 	int failed;
-	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
 
 	msdu_credit_consumed = ol_tx_send_base(pdev, tx_desc, msdu);
 	id = ol_tx_desc_id(pdev, tx_desc);
 	QDF_NBUF_UPDATE_TX_PKT_COUNT(msdu, QDF_NBUF_TX_PKT_TXRX);
-	if (qdf_likely(tx_desc->vdev))
-		opmode = tx_desc->vdev->qdf_opmode;
 	DPTRACE(qdf_dp_trace_ptr(msdu, QDF_DP_TRACE_TXRX_PACKET_PTR_RECORD,
-				 QDF_TRACE_DEFAULT_PDEV_ID,
-				 qdf_nbuf_data_addr(msdu),
-				 sizeof(uint8_t *), tx_desc->id,
-				 vdev_id, 0, opmode));
+				QDF_TRACE_DEFAULT_PDEV_ID,
+				qdf_nbuf_data_addr(msdu),
+				sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
+				vdev_id, 0,
+				tx_desc->vdev->qdf_opmode
+				));
 	failed = htt_tx_send_std(pdev->htt_pdev, msdu, id);
 	if (qdf_unlikely(failed)) {
 		ol_tx_target_credit_incr_int(pdev, msdu_credit_consumed);
@@ -341,19 +340,17 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 	struct ol_tx_desc_t *tx_desc;
 	bool is_frame_freed;
 	uint8_t dp_status;
-	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
 
 	tx_desc = ol_tx_desc_find(pdev, msdu_id);
 	qdf_assert(tx_desc);
 	dp_status = qdf_dp_get_status_from_a_status(status);
-	if (qdf_likely(tx_desc->vdev))
-		opmode = tx_desc->vdev->qdf_opmode;
 	DPTRACE(qdf_dp_trace_ptr(msdu,
 				 QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(msdu),
-				 sizeof(uint8_t *), tx_desc->id,
-				 dp_status, 0, opmode
+				 sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
+				 dp_status, 0,
+				 tx_desc->vdev->qdf_opmode
 				 ));
 
 	is_frame_freed = ol_tx_download_done_base(pdev, status, msdu, msdu_id);
@@ -1049,7 +1046,6 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 	uint64_t tx_tsf64;
 	uint8_t tid;
 	uint8_t dp_status;
-	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
 
 	TAILQ_INIT(&tx_descs);
 
@@ -1121,14 +1117,14 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 				  QDF_TX_DATA_PKT);
 
 		dp_status = ol_tx_comp_hw_to_qdf_status(status);
-		if (qdf_likely(tx_desc->vdev))
-			opmode = tx_desc->vdev->qdf_opmode;
+
 		DPTRACE(qdf_dp_trace_ptr(netbuf,
 			QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(netbuf),
-			sizeof(uint8_t *), tx_desc->id, status,
-			dp_status, opmode));
+			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, status,
+			dp_status,
+			tx_desc->vdev->qdf_opmode));
 
 		/*
 		 * If credits are reported through credit_update_ind then do not

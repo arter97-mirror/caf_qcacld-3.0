@@ -130,7 +130,13 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	if (cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT))
 		cfg->sta_sap_scc_on_indoor_channel = true;
 
-	if (!cfg_get(psoc, CFG_ENABLE_DFS_MASTER_CAPABILITY))
+	/*
+	 * Force set sta_sap_scc_on_dfs_chnl on Non-DBS HW so that standalone
+	 * SAP is not allowed on DFS channel on non-DBS HW, Also, force SCC in
+	 * case of STA+SAP
+	 */
+	if (cfg->sta_sap_scc_on_dfs_chnl == 2 &&
+	    !cfg_get(psoc, CFG_ENABLE_DFS_MASTER_CAPABILITY))
 		cfg->sta_sap_scc_on_dfs_chnl = 0;
 	cfg->nan_sap_scc_on_lte_coex_chnl =
 		cfg_get(psoc, CFG_NAN_SAP_SCC_ON_LTE_COEX_CHAN);
@@ -138,8 +144,6 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN);
 	cfg->sap_mandatory_chnl_enable =
 		cfg_get(psoc, CFG_ENABLE_SAP_MANDATORY_CHAN_LIST);
-	cfg->force_sap_20mhz_cc_id =
-		cfg_get(psoc, CFG_FORCE_SAP_20MHZ_CC_ID_ENABLE);
 	cfg->mark_indoor_chnl_disable =
 		cfg_get(psoc, CFG_MARK_INDOOR_AS_DISABLE_FEATURE);
 	cfg->go_force_scc = cfg_get(psoc, CFG_P2P_GO_ENABLE_FORCE_SCC);
@@ -150,8 +154,6 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_SAP_DEFAULT_BW_FOR_RESTART);
 	cfg->move_sap_go_1st_on_dfs_sta_csa =
 		cfg_get(psoc, CFG_MOVE_SAP_GO_1ST_ON_DFS_STA_CSA);
-	cfg->cfg_sta_indoor_ch_peer_scc = 0;
-	cfg->cfg_sta_dfs_ch_peer_scc = false;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -313,6 +315,13 @@ ucfg_policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 						      sta_sap_scc_on_dfs_chnl);
 }
 
+bool
+ucfg_policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id)
+{
+	return policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id);
+}
+
 QDF_STATUS
 ucfg_policy_mgr_get_sta_sap_scc_lte_coex_chnl(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *sta_sap_scc_lte_coex)
@@ -333,14 +342,6 @@ QDF_STATUS ucfg_policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *sap_mandt_chnl)
 {
 	return policy_mgr_get_sap_mandt_chnl(psoc, sap_mandt_chnl);
-}
-
-bool ucfg_policy_mgr_get_sap_force_20mhz_for_country_id(
-						struct wlan_objmgr_psoc *psoc,
-						struct wlan_objmgr_vdev *vdev,
-						qdf_freq_t freq)
-{
-	return policy_mgr_get_sap_force_20mhz_for_country_id(psoc, vdev, freq);
 }
 
 QDF_STATUS

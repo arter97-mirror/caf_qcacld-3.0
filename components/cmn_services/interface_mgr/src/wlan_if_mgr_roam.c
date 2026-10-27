@@ -41,7 +41,6 @@
 #include <wlan_action_oui_main.h>
 #include <wlan_p2p_api.h>
 #include <wlan_t2lm_api.h>
-#include <wlan_scan_utils_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 bool if_mgr_is_assoc_link_of_vdev(struct wlan_objmgr_pdev *pdev,
@@ -94,26 +93,17 @@ static void if_mgr_enable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 	    if_mgr_is_assoc_link_of_vdev(pdev, vdev, curr_vdev_id))
 		return;
 
-	if (curr_vdev_id == vdev_id ||
-	    vdev->vdev_mlme.mlme_state != WLAN_VDEV_S_UP)
-		return;
-
-	ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
-		    vdev_id, roam_arg->requestor);
-
-	mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
-						roam_arg->requestor, true);
-	/*
-	 * When link switch is in progress, don't send RSO Enable before
-	 * vdev is up. Just reset the requestor bit and RSO Enable will
-	 * be sent as part of install keys once link switch connect
-	 * sequence is complete.
-	 */
-	if (mlo_mgr_is_link_switch_in_progress(vdev))
-		return;
-
-	wlan_cm_enable_rso(pdev, vdev_id, roam_arg->requestor,
-			   REASON_DRIVER_ENABLED);
+	if (curr_vdev_id != vdev_id &&
+	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
+		ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
+			    vdev_id, roam_arg->requestor);
+		mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
+							roam_arg->requestor,
+							true);
+		wlan_cm_enable_rso(pdev, vdev_id,
+				   roam_arg->requestor,
+				   REASON_DRIVER_ENABLED);
+	}
 }
 
 QDF_STATUS if_mgr_enable_roaming(struct wlan_objmgr_pdev *pdev,
@@ -159,17 +149,16 @@ static void if_mgr_disable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 
 	/*
 	 * Host can't send RSO_STOP when roaming(ROAM_START/ROAM_SYNC) is in
-	 * progress or link recfg is in progress as it might cause HO_FAIL.
-	 * The requestor operation(e.g. SAP start) waits till ROAM cmd is
-	 * dequeued from SER queue. The requestor operation starts once the
-	 * current roaming is done and ROAM cmd is dequeued.
+	 * progress as it might cause HO_FAIL. The requestor operation(e.g. SAP
+	 * start) waits till ROAM cmd is dequeued from SER queue. The requestor
+	 * operation starts once the current roaming is done and ROAM cmd is
+	 * dequeued.
 	 * The requestor(e.g. SAP start) operation and next roaming can't run
 	 * in parallel in firmware, which means the request to disable roaming
 	 * can't be dropped. So, cache the request and send RSO_STOP to fw when
-	 * current roaming or link reconfg is done.
+	 * current roaming is done.
 	 */
-	if (wlan_cm_is_vdev_roaming(vdev) ||
-	    mlo_is_link_recfg_in_progress(vdev)) {
+	if (wlan_cm_is_vdev_roaming(vdev)) {
 		mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
 							roam_arg->requestor,
 							false);
@@ -874,6 +863,8 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 {
 	struct scan_cache_entry *scan_entry = candidate_info->scan_entry;
 	struct action_oui_search_attr attr = {0};
+	int8_t i, allowed_partner_links = 0;
+	uint8_t mlo_support_link_num;
 
 	if (!(scan_entry->ie_list.multi_link_bv || scan_entry->ie_list.ehtcap ||
 	      scan_entry->ie_list.ehtop))
@@ -893,6 +884,30 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 		candidate_info->is_mlo = false;
 		return;
 	}
+
+	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
+
+	if (mlo_support_link_num <= WLAN_MAX_ML_DEFAULT_LINK)
+		return;
+
+	if (!wlan_action_oui_search(psoc, &attr,
+				    ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
+		return;
+
+	for (i = 0; i < scan_entry->ml_info.num_links; i++) {
+		if (i < WLAN_MAX_ML_DEFAULT_LINK - 1) {
+			allowed_partner_links++;
+			continue;
+		}
+
+		scan_entry->ml_info.link_info[i].is_valid_link = false;
+	}
+
+	if (allowed_partner_links != scan_entry->ml_info.num_links)
+		ifmgr_nofl_debug("Downgrade " QDF_MAC_ADDR_FMT " partner links from %d to %d",
+				 QDF_MAC_ADDR_REF(scan_entry->ml_info.mld_mac_addr.bytes),
+				 scan_entry->ml_info.num_links,
+				 allowed_partner_links);
 }
 #else
 static inline QDF_STATUS
@@ -974,29 +989,6 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 				    chan_freq,
 				    wlan_reg_is_freq_indoor(pdev, chan_freq));
 			return QDF_STATUS_E_INVAL;
-		}
-
-		/*
-		 * 6 GHz connection-time security validation
-		 * Mode 2: Connect Validation (check_6ghz_security_on_connect=1)
-		 * This validation happens here in if_mgr_validate_candidate
-		 * instead of cm_if_mgr_validate_candidate to ensure it's
-		 * applied consistently across all connection paths.
-		 */
-		if (wlan_cm_get_check_6ghz_security(psoc) &&
-		    wlan_cm_get_check_6ghz_security_on_connect(psoc) &&
-		    wlan_reg_is_6ghz_chan_freq(chan_freq)) {
-			status = scm_validate_6ghz_security_and_policy(
-					psoc, candidate_info->scan_entry, true);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				ifmgr_info("6GHz candidate " QDF_MAC_ADDR_FMT " at freq %d rejected due to security validation",
-					   QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
-					   chan_freq);
-				return QDF_STATUS_E_INVAL;
-			}
-			ifmgr_debug("6 GHz candidate " QDF_MAC_ADDR_FMT " at freq %d passed security validation",
-				    QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
-				    chan_freq);
 		}
 	}
 
@@ -1087,8 +1079,7 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 
 	if (op_mode == QDF_P2P_CLIENT_MODE &&
 	    wlan_reg_is_dfs_for_freq(pdev, chan_freq) &&
-	    wlan_p2p_is_vdev_wfd_r2_mode(vdev) &&
-	    wlan_p2p_fw_support_ap_assist_dfs_group(psoc)) {
+	    wlan_p2p_is_vdev_wfd_r2_mode(vdev)) {
 		const uint8_t *ie;
 		uint16_t ie_len;
 		bool is_dfs_owner = false, is_valid_ap_assist = false;
@@ -1102,6 +1093,11 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 						  NULL, NULL, NULL, NULL);
 		if (is_dfs_owner)
 			goto end;
+
+		if (!wlan_p2p_fw_support_ap_assist_dfs_group(psoc)) {
+			ifmgr_debug("FW doesn't support assisted AP for P2P");
+			return QDF_STATUS_E_INVAL;
+		}
 
 		if (!is_valid_ap_assist) {
 			ifmgr_debug("Invalid AP assist params");

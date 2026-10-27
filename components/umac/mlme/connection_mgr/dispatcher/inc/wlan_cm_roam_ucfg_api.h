@@ -1,7 +1,6 @@
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -322,25 +321,6 @@ QDF_STATUS
 ucfg_wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			 struct qdf_mac_addr *bssid, qdf_freq_t ch_freq,
 			 enum wlan_cm_source source);
-
-/**
- * ucfg_wlan_cm_ooq_roam_invoke() - Invokes OOQ Roam request with channel list
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- * @num_chan: number of channels to scan
- * @chan_freq_list: list of channel frequencies to scan
- * @source: source of roam
- *
- * Unlike FASTREASSOC, no specific BSSID is provided.
- * Firmware will scan the provided channels and roam to
- * the best AP based on its scoring algorithm.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_wlan_cm_ooq_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-			     u8 num_chan, qdf_freq_t *chan_freq_list,
-			     enum wlan_cm_source source);
 
 /**
  * ucfg_cm_roam_get_roam_score_algo() - get value of INI

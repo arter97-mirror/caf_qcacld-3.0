@@ -25,7 +25,6 @@
 #include "wlan_nan_api_i.h"
 #include "cfg_nan_api.h"
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
-#include "target_if_nan.h"
 
 inline enum nan_datapath_state wlan_nan_get_ndi_state(
 					struct wlan_objmgr_vdev *vdev)
@@ -55,11 +54,6 @@ uint8_t wlan_nan_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
 bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc)
 {
 	return nan_is_disc_active(psoc);
-}
-
-bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return nan_is_beamforming_supported(psoc);
 }
 
 bool wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc)
@@ -142,20 +136,3 @@ qdf_freq_t wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 	return freq;
 }
 
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_nan_is_fw_support_standard_mode(psoc);
-}
-
-void wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
-				       const struct qdf_mac_addr *peer_mac)
-{
-	nan_handle_ndi_peer_departed(vdev, peer_mac);
-}
-
-bool tgt_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_nan_is_fw_support_ap_assisted_dfs(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

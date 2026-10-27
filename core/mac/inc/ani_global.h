@@ -42,7 +42,6 @@
 #include <lim_ft_defs.h>
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_mlme_public_struct.h"
-#include "wlan_cmn_ieee80211.h"
 
 /**
  * MAC_CONTEXT() - Convert an opaque mac handle into a mac context
@@ -157,7 +156,6 @@ enum log_event_indicator {
  * @WLAN_LOG_REASON_ROAM_HO_FAILURE: Handover failed during LFR3 roaming
  * @WLAN_LOG_REASON_DISCONNECT: Disconnect because of some failure
  * @WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT: vdev delete rsp time out
- * @WLAN_LOG_REASON_DUMP_IN_PROGRESS: dump in progress
  */
 enum log_event_host_reason_code {
 	WLAN_LOG_REASON_CODE_UNUSED,
@@ -175,8 +173,7 @@ enum log_event_host_reason_code {
 	WLAN_LOG_REASON_HB_FAILURE,
 	WLAN_LOG_REASON_ROAM_HO_FAILURE,
 	WLAN_LOG_REASON_DISCONNECT,
-	WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT,
-	WLAN_LOG_REASON_DUMP_IN_PROGRESS
+	WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT
 };
 
 
@@ -254,7 +251,7 @@ typedef struct sDialogueToken {
 
 typedef struct sLimTimers {
 	/* TIMERS IN LIM ARE NOT SUPPOSED TO BE ZEROED OUT DURING RESET. */
-	/* DURING lim_initialize DO NOT ZERO THEM OUT. */
+	/* DURING lim_initialize DONOT ZERO THEM OUT. */
 
 /* STA SPECIFIC TIMERS */
 
@@ -286,7 +283,7 @@ typedef struct sLimTimers {
 	TX_TIMER g_lim_periodic_auth_retry_timer;
 
 	/* SAE authentication related timer */
-	TX_TIMER external_auth_timer;
+	TX_TIMER sae_auth_timer;
 
 	/* RRM sta stats response related timer */
 	TX_TIMER rrm_sta_stats_resp_timer;
@@ -362,6 +359,8 @@ struct lim_context {
 
 	/* / SME State visible across all Sirius modules */
 	tLimSmeStates gLimSmeState;
+	/* / This indicates whether we're an AP, STA in BSS/IBSS */
+	tLimSystemRole gLimSystemRole;
 
 	/* Number of STAs that do not support short preamble */
 	tLimNoShortParams gLimNoShortParams;
@@ -582,6 +581,7 @@ struct lim_context {
 		(struct mac_context *mac, struct scheduler_msg *msg);
 	stop_roaming_fn_t stop_roaming_callback;
 	uint8_t retry_packet_cnt;
+	uint8_t beacon_probe_rsp_cnt_per_scan;
 	wlan_scan_requester req_id;
 	QDF_STATUS (*sme_bcn_rcv_callback)(hdd_handle_t hdd_handle,
 				struct wlan_beacon_report *beacon_report);
@@ -675,6 +675,7 @@ struct ani_level_params {
  */
 struct mac_context {
 	enum qdf_driver_type gDriverType;
+	struct wlan_mlme_chain_cfg fw_chain_cfg;
 	struct wlan_mlme_cfg *mlme_cfg;
 	struct lim_context lim;
 	struct sch_context sch;
@@ -759,20 +760,6 @@ struct mac_context {
 #endif
 #ifdef WLAN_FEATURE_CAL_FAILURE_TRIGGER
 	void (*cal_failure_event_cb)(uint8_t cal_type, uint8_t reason);
-#endif
-#ifdef WLAN_FEATURE_11BN
-	struct wlan_uhr_cap_info uhr_cap_2g;
-	struct wlan_uhr_cap_info uhr_cap_5g;
-	struct wlan_uhr_cap_info uhr_cap_2g_orig;
-	struct wlan_uhr_cap_info uhr_cap_5g_orig;
-#endif
-
-#ifdef WLAN_FEATURE_FILS_SK_SAP
-	void (*hlp_frame_ind_cb)(uint8_t vdev_id,
-				 uint8_t *hlp_data,
-				 uint16_t hlp_data_len,
-				 struct qdf_mac_addr *src_mac,
-				 struct qdf_mac_addr *dst_mac);
 #endif
 };
 

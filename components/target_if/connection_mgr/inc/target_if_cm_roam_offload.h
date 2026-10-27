@@ -75,24 +75,4 @@ target_if_cm_send_rso_stop_failure_rsp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
-
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * target_if_cm_send_smd_roam_start_status_cmd() - Send SMD roam start status
- * @psoc: psoc object
- * @params: SMD start status parameters
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-target_if_cm_send_smd_roam_start_status_cmd(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_roam_smd_start_status_params *params);
-#else
-static inline QDF_STATUS
-target_if_cm_send_smd_roam_start_status_cmd(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_roam_smd_start_status_params *params)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
 #endif

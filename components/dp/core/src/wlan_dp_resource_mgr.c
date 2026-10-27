@@ -15,188 +15,102 @@
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_ctrl.h>
 #include "cfg_ucfg_api.h"
-#include <wlan_dp_api.h>
 
-#define WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS 2
-
-/*DP resource MAP used in resource level selection - Extended to 5 levels*/
+/*DP resource MAP used in resource level selection*/
 static struct wlan_dp_resource_map dp_resource_map[] = {
 	{RESOURCE_LVL_1, RESOURCE_LVL_1_TPUT_MBPS, RESOURCE_LVL_1_RX_BUFFERS},
 	{RESOURCE_LVL_2, RESOURCE_LVL_2_TPUT_MBPS, RESOURCE_LVL_2_RX_BUFFERS},
-#if defined(CONFIG_BORON) && defined(DP_FEATURE_DIRECT_REFILL)
-	{RESOURCE_LVL_3, RESOURCE_LVL_3_TPUT_MBPS, RESOURCE_LVL_3_RX_BUFFERS},
-	{RESOURCE_LVL_4, RESOURCE_LVL_4_TPUT_MBPS, RESOURCE_LVL_4_RX_BUFFERS},
-	{RESOURCE_LVL_5, RESOURCE_LVL_5_TPUT_MBPS, RESOURCE_LVL_5_RX_BUFFERS},
-#endif
 };
 
 static uint64_t
-wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode,
-				     uint8_t op_rx_nss)
+wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode)
 {
-	uint64_t tput = 0;
-
 	switch (phymode) {
 	case WLAN_PHYMODE_11A:
-		tput = WLAN_PHYMODE_11A_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11A_TPUT_MBPS;
 	case WLAN_PHYMODE_11B:
-		tput = WLAN_PHYMODE_11B_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11B_TPUT_MBPS;
 	case WLAN_PHYMODE_11G:
-		tput = WLAN_PHYMODE_11G_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11G_TPUT_MBPS;
 	case WLAN_PHYMODE_11G_ONLY:
-		tput = WLAN_PHYMODE_11G_ONLY_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11G_ONLY_TPUT_MBPS;
 	case WLAN_PHYMODE_11NA_HT20:
-		tput = WLAN_PHYMODE_11NA_HT20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11NA_HT20_TPUT_MBPS;
 	case WLAN_PHYMODE_11NG_HT20:
-		tput = WLAN_PHYMODE_11NG_HT20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11NG_HT20_TPUT_MBPS;
 	case WLAN_PHYMODE_11NA_HT40:
-		tput = WLAN_PHYMODE_11NA_HT40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11NA_HT40_TPUT_MBPS;
 	case WLAN_PHYMODE_11NG_HT40PLUS:
-		tput = WLAN_PHYMODE_11NG_HT40PLUS_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11NG_HT40PLUS_TPUT_MBPS;
 	case WLAN_PHYMODE_11NG_HT40MINUS:
-		tput = WLAN_PHYMODE_11NG_HT40MINUS_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11NG_HT40MINUS_TPUT_MBPS;
 	case WLAN_PHYMODE_11NG_HT40:
-		tput = WLAN_PHYMODE_11NG_HT40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11NG_HT40_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT20:
-		tput = WLAN_PHYMODE_11AC_VHT20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT20_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT20_2G:
-		tput = WLAN_PHYMODE_11AC_VHT20_2G_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT20_2G_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT40:
-		tput = WLAN_PHYMODE_11AC_VHT40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT40_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
-		tput = WLAN_PHYMODE_11AC_VHT40PLUS_2G_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT40PLUS_2G_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
-		tput = WLAN_PHYMODE_11AC_VHT40MINUS_2G_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT40MINUS_2G_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT40_2G:
-		tput = WLAN_PHYMODE_11AC_VHT40_2G_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT40_2G_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT80:
-		tput = WLAN_PHYMODE_11AC_VHT80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT80_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT80_2G:
-		tput = WLAN_PHYMODE_11AC_VHT80_2G_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT80_2G_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT160:
-		tput = WLAN_PHYMODE_11AC_VHT160_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT160_TPUT_MBPS;
 	case WLAN_PHYMODE_11AC_VHT80_80:
-		tput = WLAN_PHYMODE_11AC_VHT80_80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AC_VHT80_80_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXA_HE20:
-		tput = WLAN_PHYMODE_11AXA_HE20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXA_HE20_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXG_HE20:
-		tput = WLAN_PHYMODE_11AXG_HE20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXG_HE20_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXA_HE40:
-		tput = WLAN_PHYMODE_11AXA_HE40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXA_HE40_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXG_HE40PLUS:
-		tput = WLAN_PHYMODE_11AXG_HE40PLUS_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXG_HE40PLUS_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXG_HE40MINUS:
-		tput = WLAN_PHYMODE_11AXG_HE40MINUS_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXG_HE40MINUS_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXG_HE40:
-		tput = WLAN_PHYMODE_11AXG_HE40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXG_HE40_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXA_HE80:
-		tput = WLAN_PHYMODE_11AXA_HE80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXA_HE80_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXG_HE80:
-		tput = WLAN_PHYMODE_11AXG_HE80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXG_HE80_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXA_HE160:
-		tput = WLAN_PHYMODE_11AXA_HE160_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXA_HE160_TPUT_MBPS;
 	case WLAN_PHYMODE_11AXA_HE80_80:
-		tput = WLAN_PHYMODE_11AXA_HE80_80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11AXA_HE80_80_TPUT_MBPS;
 #ifdef WLAN_FEATURE_11BE
 	case WLAN_PHYMODE_11BEA_EHT20:
-		tput = WLAN_PHYMODE_11BEA_EHT20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEA_EHT20_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEG_EHT20:
-		tput = WLAN_PHYMODE_11BEG_EHT20_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEG_EHT20_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEA_EHT40:
-		tput = WLAN_PHYMODE_11BEA_EHT40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEA_EHT40_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEG_EHT40PLUS:
-		tput = WLAN_PHYMODE_11BEG_EHT40PLUS_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEG_EHT40PLUS_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEG_EHT40MINUS:
-		tput = WLAN_PHYMODE_11BEG_EHT40MINUS_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEG_EHT40MINUS_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEG_EHT40:
-		tput = WLAN_PHYMODE_11BEG_EHT40_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEG_EHT40_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEA_EHT80:
-		tput = WLAN_PHYMODE_11BEA_EHT80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEA_EHT80_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEG_EHT80:
-		tput = WLAN_PHYMODE_11BEG_EHT80_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEG_EHT80_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEA_EHT160:
-		tput = WLAN_PHYMODE_11BEA_EHT160_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEA_EHT160_TPUT_MBPS;
 	case WLAN_PHYMODE_11BEA_EHT320:
-		tput = WLAN_PHYMODE_11BEA_EHT320_TPUT_MBPS;
-		break;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	case WLAN_PHYMODE_11BNA_UHR20:
-		tput = WLAN_PHYMODE_11BNA_UHR20_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNG_UHR20:
-		tput = WLAN_PHYMODE_11BNG_UHR20_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNA_UHR40:
-		tput = WLAN_PHYMODE_11BNA_UHR40_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNG_UHR40PLUS:
-		tput = WLAN_PHYMODE_11BNG_UHR40PLUS_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNG_UHR40MINUS:
-		tput = WLAN_PHYMODE_11BNG_UHR40MINUS_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNG_UHR40:
-		tput = WLAN_PHYMODE_11BNG_UHR40_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNA_UHR80:
-		tput = WLAN_PHYMODE_11BNA_UHR80_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNG_UHR80:
-		tput = WLAN_PHYMODE_11BNG_UHR80_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNA_UHR160:
-		tput = WLAN_PHYMODE_11BNA_UHR160_TPUT_MBPS;
-		break;
-	case WLAN_PHYMODE_11BNA_UHR320:
-		tput = WLAN_PHYMODE_11BNA_UHR320_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_11BEA_EHT320_TPUT_MBPS;
 #endif
 	default:
-		tput = WLAN_PHYMODE_DEFAULT_TPUT_MBPS;
-		break;
+		return WLAN_PHYMODE_DEFAULT_TPUT_MBPS;
 	}
-
-	return op_rx_nss * tput;
 }
 
 static void
@@ -319,7 +233,7 @@ void wlan_dp_resource_mgr_downscale_resources(void)
 
 	rsrc_level = rsrc_ctx->cur_resource_level;
 	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
-	dp_rsrc_mgr_debug("rsrc_level:%u cur:%llu in_use:%llu req:%llu",
+	dp_rsrc_mgr_debug("rsrc_level:%u cur:%u in_use:%u req:%u",
 			  rsrc_level, cur_req_rx_buff_descs,
 			  in_use_rx_buff_descs, req_rx_buff_descs);
 
@@ -344,7 +258,6 @@ void wlan_dp_resource_mgr_upscale_resources(
 	uint64_t in_use_rx_buff_descs;
 	uint64_t additional_rx_buffers = 0, batch_count = 0;
 	uint32_t num_alloc_buff;
-	uint32_t retry_count = 0;
 	QDF_STATUS status;
 
 	if (!rsrc_ctx)
@@ -379,51 +292,27 @@ void wlan_dp_resource_mgr_upscale_resources(
 			additional_rx_buffers);
 	}
 
-	dp_rsrc_mgr_debug("cur:%llu req:%llu in_use:%llu additional_req:%llu",
+	dp_rsrc_mgr_debug("cur:%u req:%u in_use:%u additional_req:%u",
 			  cur_req_rx_buff_descs, req_rx_buff_descs,
 			  in_use_rx_buff_descs, additional_rx_buffers);
-
-	/* Adaptive batch sizing based on allocation requirement */
-	if (additional_rx_buffers >= UPSCALE_AGGRESSIVE_THRESHOLD)
-		batch_count = RX_RESOURCE_ALLOC_LARGE_BATCH_COUNT;
-	else if (additional_rx_buffers >= RX_RESOURCE_ALLOC_BATCH_COUNT)
-		batch_count = RX_RESOURCE_ALLOC_BATCH_COUNT;
-	else
-		batch_count = RX_RESOURCE_ALLOC_SMALL_BATCH_COUNT;
-
+	batch_count = RX_RESOURCE_ALLOC_BATCH_COUNT;
 	while (additional_rx_buffers) {
-		if (additional_rx_buffers < batch_count)
+		if (additional_rx_buffers < RX_RESOURCE_ALLOC_BATCH_COUNT)
 			batch_count = additional_rx_buffers;
-
 		num_alloc_buff = cdp_buffers_replenish_on_demand(cdp_soc,
 							 batch_count, 0);
 		if (!num_alloc_buff) {
-			/* Intelligent retry with reduced batch size */
-			if (retry_count < 3 &&
-			    batch_count > RX_RESOURCE_ALLOC_SMALL_BATCH_COUNT) {
-				batch_count = batch_count / 2;
-				retry_count++;
-				dp_rsrc_mgr_debug("Retry alloc batch:%llu retry:%u",
-						  batch_count, retry_count);
-				continue;
-			}
-			dp_err("Failed to allocate rx buffers after retries, count:%llu",
+			dp_err("failed to allocate rx buffers, count:%llu",
 			       batch_count);
 			break;
 		}
-
-		/* Reset retry count on successful allocation */
-		retry_count = 0;
-
-		/* Check for downscale interrupt */
 		if (qdf_atomic_test_and_clear_bit(
 					RX_RESOURCE_DOWNSCALE_EVENT,
 					&refill_thread->event_flag)) {
-			dp_info("DOWNSCALE request posted, stopping upscale");
+			dp_info("DOWNSCALE request posted, stopping uspcale");
 			wlan_dp_resource_mgr_downscale_resources();
 			break;
 		}
-
 		additional_rx_buffers -= num_alloc_buff;
 	}
 
@@ -644,120 +533,6 @@ wlan_dp_resource_mgr_sort_phymodes(struct wlan_dp_resource_vote_node **phymodes,
 	}
 }
 
-#if defined(CONFIG_BORON) && defined(DP_FEATURE_DIRECT_REFILL)
-static uint32_t
-wlan_dp_resource_mgr_phymode_ba_min_bufs(enum wlan_phymode phymode)
-{
-	switch (phymode) {
-	case WLAN_PHYMODE_11AXA_HE20:
-	case WLAN_PHYMODE_11AXG_HE20:
-	case WLAN_PHYMODE_11AXA_HE40:
-	case WLAN_PHYMODE_11AXG_HE40PLUS:
-	case WLAN_PHYMODE_11AXG_HE40MINUS:
-	case WLAN_PHYMODE_11AXG_HE40:
-	case WLAN_PHYMODE_11AXA_HE80:
-	case WLAN_PHYMODE_11AXG_HE80:
-	case WLAN_PHYMODE_11AXA_HE160:
-	case WLAN_PHYMODE_11AXA_HE80_80:
-		return WLAN_DP_11AX_BA_WINDOW_MIN_BUFS;
-#ifdef WLAN_FEATURE_11BE
-	case WLAN_PHYMODE_11BEA_EHT20:
-	case WLAN_PHYMODE_11BEG_EHT20:
-	case WLAN_PHYMODE_11BEA_EHT40:
-	case WLAN_PHYMODE_11BEG_EHT40PLUS:
-	case WLAN_PHYMODE_11BEG_EHT40MINUS:
-	case WLAN_PHYMODE_11BEG_EHT40:
-	case WLAN_PHYMODE_11BEA_EHT80:
-	case WLAN_PHYMODE_11BEG_EHT80:
-	case WLAN_PHYMODE_11BEA_EHT160:
-	case WLAN_PHYMODE_11BEA_EHT320:
-		return WLAN_DP_11BE_BA_WINDOW_MIN_BUFS;
-#endif
-	default:
-		return 0;
-	}
-}
-
-static enum wlan_dp_resource_level
-wlan_dp_resource_mgr_adjust_level_for_ba_window(
-			struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
-			enum wlan_dp_resource_level level)
-{
-	struct wlan_dp_resource_vote_node *vote_node;
-	struct wlan_mlo_peer_context *counted[MAX_MAC_RESOURCES];
-	enum wlan_dp_resource_level ba_level;
-	uint32_t ba_min_total = 0;
-	int i, j, n_counted = 0;
-	uint32_t node_ba_min;
-
-	for (i = 0; i < rsrc_ctx->mac_count; i++) {
-		vote_node = rsrc_ctx->max_phymode_nodes[i];
-		if (!vote_node)
-			continue;
-
-		node_ba_min =
-			wlan_dp_resource_mgr_phymode_ba_min_bufs(
-						vote_node->phymode);
-		if (!node_ba_min)
-			continue;
-
-		/*
-		 * MLO STA: all links share one BA window. Skip this node
-		 * if another link of the same MLO connection (same
-		 * mlo_peer_ctx) was already counted in this round.
-		 * A node with no mlo_peer_ctx (non-MLO, or SAP) is always
-		 * counted independently.
-		 */
-		if (vote_node->mlo_peer_ctx) {
-			struct wlan_mlo_peer_context *ml_ctx =
-					vote_node->mlo_peer_ctx;
-			bool already_counted = false;
-
-			for (j = 0; j < n_counted; j++) {
-				if (counted[j] == ml_ctx) {
-					already_counted = true;
-					break;
-				}
-			}
-			if (already_counted)
-				continue;
-			if (n_counted < MAX_MAC_RESOURCES)
-				counted[n_counted++] = ml_ctx;
-		}
-		ba_min_total += node_ba_min;
-	}
-
-	if (!ba_min_total)
-		return level;
-
-	/* cur_rsrc_map[] entries must have ascending num_rx_buffers for
-	 * this walk to find the lowest level satisfying the floor.
-	 */
-	for (ba_level = RESOURCE_LVL_1; ba_level < RESOURCE_LVL_MAX;
-	     ba_level++)
-		if (rsrc_ctx->cur_rsrc_map[ba_level].num_rx_buffers >=
-		    ba_min_total)
-			break;
-	if (ba_level >= RESOURCE_LVL_MAX)
-		ba_level = RESOURCE_LVL_MAX - 1;
-	if (ba_level > level) {
-		dp_info("BA floor lvl:%u tput lvl:%u ba_min:%u",
-			ba_level, level, ba_min_total);
-		level = ba_level;
-	}
-
-	return level;
-}
-#else
-static inline enum wlan_dp_resource_level
-wlan_dp_resource_mgr_adjust_level_for_ba_window(
-			struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
-			enum wlan_dp_resource_level level)
-{
-	return level;
-}
-#endif /* CONFIG_BORON && DP_FEATURE_DIRECT_REFILL */
-
 static void
 wlan_dp_resource_mgr_select_resource_level(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
@@ -765,8 +540,6 @@ wlan_dp_resource_mgr_select_resource_level(
 	struct wlan_dp_resource_vote_node *vote_node;
 	uint64_t total_tput = 0;
 	enum wlan_dp_resource_level prev_level;
-	enum wlan_dp_resource_level new_level;
-	bool aggressive_upscale = false;
 	int i;
 
 	dp_rsrc_mgr_debug("Select resource level called");
@@ -788,29 +561,16 @@ wlan_dp_resource_mgr_select_resource_level(
 	if (i >= RESOURCE_LVL_MAX)
 		i = (RESOURCE_LVL_MAX - 1);
 
-	new_level = i;
-	new_level = wlan_dp_resource_mgr_adjust_level_for_ba_window(rsrc_ctx,
-								    new_level);
 	prev_level = rsrc_ctx->cur_resource_level;
-	/* Check for aggressive upscale (jumping 2+ levels) */
-	if (new_level > prev_level &&
-	    (new_level - prev_level) >= RESOURCE_LEVEL_JUMP_THRESHOLD)
-		aggressive_upscale = true;
-
-	rsrc_ctx->cur_resource_level = new_level;
+	rsrc_ctx->cur_resource_level = i;
 	rsrc_ctx->cur_max_tput = total_tput;
-
-	if (prev_level < rsrc_ctx->cur_resource_level) {
-		if (aggressive_upscale)
-			dp_info("Aggressive upscale detected: level %u -> %u",
-				prev_level, rsrc_ctx->cur_resource_level);
+	if (prev_level < rsrc_ctx->cur_resource_level)
 		wlan_dp_resource_mgr_post_upscale_resource_req(rsrc_ctx);
-	} else if (prev_level > rsrc_ctx->cur_resource_level) {
+	else if (prev_level > rsrc_ctx->cur_resource_level)
 		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
 								 true);
-	} else {
+	else
 		dp_info("Resource level change not required");
-	}
 
 	dp_info("Resource level:%u selected for tput:%llu req_tput:%llu",
 		rsrc_ctx->cur_resource_level, rsrc_ctx->cur_max_tput,
@@ -928,8 +688,7 @@ static struct wlan_dp_resource_vote_node *
 wlan_dp_resource_mgr_add_vote_node(struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 				   struct wlan_objmgr_peer *peer,
 				   enum wlan_phymode phymode,
-				   enum QDF_OPMODE opmode,
-				   uint8_t nss_cnt)
+				   enum QDF_OPMODE opmode)
 {
 	struct wlan_dp_resource_vote_node *vote_node;
 	qdf_list_t *mac_list;
@@ -942,16 +701,13 @@ wlan_dp_resource_mgr_add_vote_node(struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 	}
 
 	vote_node->phymode = phymode;
-	vote_node->tput = wlan_dp_resource_mgr_phymode_to_tput(
-						phymode, nss_cnt);
+	vote_node->tput = wlan_dp_resource_mgr_phymode_to_tput(phymode);
 	mac_id = wlan_dp_resource_mgr_get_mac_id(wlan_peer_get_vdev(peer));
 	if (mac_id > MAX_MAC_RESOURCES) {
 		dp_err("MAC id is not valid");
 		QDF_BUG(0);
 	}
 	vote_node->mac_id = mac_id;
-	/* Store mlo_peer_ctx for BA window dedup, pointer comparison only */
-	vote_node->mlo_peer_ctx = peer->mlo_peer_ctx;
 	mac_list = &rsrc_ctx->mac_list[mac_id];
 	wlan_dp_resource_mgr_list_insert_vote_node(mac_list, vote_node, opmode);
 	dp_info("New vote node added to list mac_id:%u len:%u phymode:%u",
@@ -970,72 +726,35 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 {
 	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_resource_vote_node *vote_node;
-	struct  wlan_objmgr_vdev *vdev;
-	enum QDF_OPMODE opmode;
+	enum QDF_OPMODE opmode = QDF_NDI_MODE;
 	enum wlan_phymode mac0_phymode = 0, mac1_phymode = 0;
 	uint64_t mac0_tput = 0, mac1_tput = 0;
 	enum wlan_phymode host_phymode;
 	int i;
-	uint8_t cap_tx_nss;
-	uint8_t cap_rx_nss;
-	uint8_t op_tx_nss;
-	uint8_t op_rx_nss;
-	QDF_STATUS status;
 
 	if (!rsrc_ctx)
 		return;
 
-	vdev = wlan_peer_get_vdev(peer);
-	if (!vdev) {
-		dp_err("unable to get vdev ref from peer");
-		return;
-	}
-
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode != QDF_NDI_MODE) {
-		/*NDP_CONFIRM came on peer but vdev maps to different opmode*/
-		dp_err("NDP channel notify came for peer/vdev opmode not proper");
-		QDF_BUG(0);
-		return;
-	}
-
-	status = wlan_vdev_mlme_get_bss_nss_params(vdev, &cap_tx_nss,
-						   &cap_rx_nss, &op_tx_nss,
-						   &op_rx_nss);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_info("Get NSS failed for %d with %d",
-			wlan_vdev_get_id(vdev), status);
-		op_rx_nss = WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS;
-	}
-
-	dp_rsrc_mgr_debug("NDP notify channel info called, nss value - %u",
-			  op_rx_nss);
+	dp_rsrc_mgr_debug("NDP notify channel info called");
 	for (i = 0; i < num_channels; i++) {
 		host_phymode = wma_fw_to_host_phymode(ch_info->phymode);
 		if (!ch_info->mac_id &&
-		    (wlan_dp_resource_mgr_phymode_to_tput(
-			host_phymode, op_rx_nss) > mac0_tput)) {
+		    (wlan_dp_resource_mgr_phymode_to_tput(host_phymode) >
+		     mac0_tput)) {
 			mac0_phymode = host_phymode;
 			mac0_tput =
-			wlan_dp_resource_mgr_phymode_to_tput(mac0_phymode,
-							     op_rx_nss);
+			wlan_dp_resource_mgr_phymode_to_tput(mac0_phymode);
 		} else if (ch_info->mac_id &&
-			   (wlan_dp_resource_mgr_phymode_to_tput(
-				host_phymode, op_rx_nss) > mac1_tput)) {
+			   (wlan_dp_resource_mgr_phymode_to_tput(host_phymode) >
+			    mac1_tput)) {
 			mac1_phymode = host_phymode;
-			mac1_tput = wlan_dp_resource_mgr_phymode_to_tput(
-					mac1_phymode, op_rx_nss);
+			mac1_tput = wlan_dp_resource_mgr_phymode_to_tput(mac1_phymode);
 		}
 		ch_info++;
 	}
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
 	priv_ctx = dp_get_peer_priv_obj(peer);
-	if (!priv_ctx) {
-		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-		dp_err("DP peer priv ctx not present");
-		return;
-	}
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
 		if (vote_node->phymode0 == mac0_phymode &&
@@ -1075,7 +794,6 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 	vote_node->tput0 = mac0_tput;
 	vote_node->phymode1 = mac1_phymode;
 	vote_node->tput1 = mac1_tput;
-	vote_node->nan_vote = true;
 	wlan_dp_resource_mgr_list_insert_vote_node(&rsrc_ctx->nan_list,
 						   vote_node, opmode);
 	dp_info("NDP new node phymode0:%u tput0:%llu phymode1:%u tput1:%llu list_len:%u",
@@ -1100,27 +818,11 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 	struct wlan_channel *desc_chan;
 	enum QDF_OPMODE opmode;
 	uint64_t prev_tput;
-	uint8_t cap_tx_nss;
-	uint8_t cap_rx_nss;
-	uint8_t op_tx_nss;
-	uint8_t op_rx_nss;
-	QDF_STATUS status;
-
 
 	vdev = wlan_peer_get_vdev(peer);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	status = wlan_vdev_mlme_get_bss_nss_params(vdev, &cap_tx_nss,
-						   &cap_rx_nss, &op_tx_nss,
-						   &op_rx_nss);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_info("Get NSS failed for %d with %d,",
-			wlan_vdev_get_id(vdev), status);
-		op_rx_nss = WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS;
-	}
 
-
-	dp_info("update phymode called for opmode:%u, op_rx_nss:%d",
-		opmode, op_rx_nss);
+	dp_info("update phymode called for opmode:%u", opmode);
 
 	/*NAN peers handled by NDP events*/
 	if (opmode == QDF_NDI_MODE)
@@ -1142,12 +844,6 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
 	priv_ctx = dp_get_peer_priv_obj(vote_peer);
-	if (!priv_ctx) {
-		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-		dp_err("DP peer priv ctx not present");
-		return;
-	}
-
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
 		if (vote_node->phymode == vote_phymode) {
@@ -1159,8 +855,7 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 		prev_tput = vote_node->tput;
 		vote_node->phymode = vote_phymode;
 		vote_node->tput =
-			wlan_dp_resource_mgr_phymode_to_tput(vote_phymode,
-							     op_rx_nss);
+			wlan_dp_resource_mgr_phymode_to_tput(vote_phymode);
 
 		/*
 		 * Removing from the sorted list, since phymode changed.
@@ -1190,7 +885,7 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 	priv_ctx->vote_node =
 		wlan_dp_resource_mgr_add_vote_node(rsrc_ctx,
 						   vote_peer, vote_phymode,
-						   opmode, op_rx_nss);
+						   opmode);
 select_max_phymodes:
 	wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
 	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
@@ -1228,17 +923,8 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
 	priv_ctx = dp_get_peer_priv_obj(vote_peer);
-	if (!priv_ctx) {
-		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-		dp_err("DP peer priv ctx not present");
-		return;
-	}
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
-		if (opmode != QDF_NDI_MODE && vote_node->nan_vote) {
-			dp_err("opmode not proper for nan vote resource");
-			QDF_BUG(0);
-		}
 		if (opmode == QDF_NDI_MODE)
 			qdf_list_remove_node(&rsrc_ctx->nan_list,
 					     &vote_node->node);
@@ -1247,10 +933,9 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 				&rsrc_ctx->mac_list[vote_node->mac_id],
 				&vote_node->node);
 
-		dp_info("vote node freed on vdev_id:%u mac_id:%u list_len:%u nan_vote:%u",
+		dp_info("vote node freed on vdev_id:%u mac_id:%u list_len:%u",
 			wlan_vdev_get_id(vdev), vote_node->mac_id,
-			qdf_list_size(&rsrc_ctx->mac_list[vote_node->mac_id]),
-			vote_node->nan_vote);
+			qdf_list_size(&rsrc_ctx->mac_list[vote_node->mac_id]));
 		qdf_mem_free(vote_node);
 		priv_ctx->vote_node = NULL;
 		wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
@@ -1268,7 +953,7 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
 	struct wlan_dp_resource_vote_node *vote_node;
 	struct wlan_dp_peer_priv_context *priv_ctx;
-	struct wlan_objmgr_peer *peer, *next;
+	struct wlan_objmgr_peer *peer;
 	bool list_update = false;
 
 	if (!rsrc_ctx)
@@ -1279,11 +964,11 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 		return;
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
-	wlan_objmgr_for_each_vdev_peer(vdev, peer, next) {
+	wlan_objmgr_for_each_vdev_peer(vdev, peer) {
 		wlan_objmgr_peer_get_ref(peer, WLAN_DP_ID);
 		/*If vote node is present then no active connection*/
 		priv_ctx = dp_get_peer_priv_obj(peer);
-		if (priv_ctx && priv_ctx->vote_node) {
+		if (priv_ctx->vote_node) {
 			dp_info("vote_node found for vdev_id:%u migration prev:%u new:%u",
 				wlan_vdev_get_id(vdev), old_mac_id, new_mac_id);
 			vote_node = priv_ctx->vote_node;
@@ -1309,19 +994,8 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 	}
 
-	if (list_update) {
+	if (list_update)
 		wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
-		/*
-		 * Two back-to-back migrations (one per vdev) can each see
-		 * the other vdev's node still in the old slot, causing a
-		 * transient level:0. The second migration call corrects
-		 * this immediately via aggressive upscale. Log the final
-		 * level to make such transients visible in field logs.
-		 */
-		dp_rsrc_mgr_debug("MAC migration done prev:%u new:%u lvl:%u",
-				  old_mac_id, new_mac_id,
-				  rsrc_ctx->cur_resource_level);
-	}
 
 	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
@@ -1425,22 +1099,7 @@ wlan_dp_resource_mgr_set_req_resources(
 		wlan_dp_resource_mgr_detach(rsrc_ctx->dp_ctx);
 		dp_err("Unable to set req DP rx desc");
 	}
-	dp_rsrc_mgr_debug("req_rx_buffer_desc:%llu set", req_rx_buff_descs);
-}
-
-uint16_t dp_rx_pool_get_dynamic_size(uint32_t rsrc_level)
-{
-	if (rsrc_level >= RESOURCE_LVL_MAX) {
-		dp_info("Incorrect rsrc_level %d", rsrc_level);
-		return 0;
-	}
-
-	/* For rsrc_level = 0, consider prev_num_rx_buffers = 0 */
-	if (rsrc_level == 0)
-		return dp_resource_map[rsrc_level].num_rx_buffers;
-
-	return dp_resource_map[rsrc_level].num_rx_buffers -
-			dp_resource_map[rsrc_level - 1].num_rx_buffers;
+	dp_rsrc_mgr_debug("req_rx_buffer_desc:%u set", req_rx_buff_descs);
 }
 
 void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
@@ -1450,21 +1109,10 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 	cdp_config_param_type val = {0};
 	cdp_config_param_type set_val = {0};
 	QDF_STATUS status;
-	bool dyn_rsc_mgr_allowed = false;
 	int i;
 
-	dyn_rsc_mgr_allowed = cfg_get(dp_ctx->psoc,
-				      CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE);
-	if (!dyn_rsc_mgr_allowed) {
+	if (!cfg_get(dp_ctx->psoc, CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE)) {
 		dp_info("DP dynamic resourec mgmt cfg disabled");
-		return;
-	}
-
-	dyn_rsc_mgr_allowed =
-		dp_direct_refill_adjust_dyn_rsc_mgmt(dp_ctx->qdf_dev,
-						     dyn_rsc_mgr_allowed);
-	if (!dyn_rsc_mgr_allowed) {
-		dp_info("Disabling dynamic rsc mgmt since direct refill is disabled");
 		return;
 	}
 
@@ -1477,7 +1125,7 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 		     (sizeof(struct wlan_dp_resource_map) * RESOURCE_LVL_MAX));
 
 	status = cdp_txrx_get_psoc_param(cdp_soc,
-					 CDP_CFG_REPLENISH_RING_SIZE, &val);
+					 CDP_CFG_RXDMA_REFILL_RING_SIZE, &val);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("Failed to fetch Refill ring config status:%u", status);
 		goto attach_err;
@@ -1490,18 +1138,18 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 	 * If config value greater than default resources, than
 	 * use that value for max reource level selection.
 	 */
-	if (val.cdp_replenish_ring_size <=
+	if (val.cdp_rxdma_refill_ring_size <=
 	    dp_resource_map[RESOURCE_LVL_1].num_rx_buffers) {
 		dp_info("Unsupported RX buffers config:%u, disabling rsrc mgr",
-			val.cdp_replenish_ring_size);
+			val.cdp_rxdma_refill_ring_size);
 		goto attach_err;
-	} else if ((val.cdp_replenish_ring_size - 1) !=
-		   dp_resource_map[RESOURCE_LVL_MAX - 1].num_rx_buffers) {
-		dp_info("Adjusting Resource lvl_5 rx buffers map_val:%u cfg_val:%u",
-			dp_resource_map[RESOURCE_LVL_MAX - 1].num_rx_buffers,
-			val.cdp_replenish_ring_size);
-		rsrc_ctx->cur_rsrc_map[RESOURCE_LVL_MAX - 1].num_rx_buffers =
-			(val.cdp_replenish_ring_size - 1);
+	} else if ((val.cdp_rxdma_refill_ring_size - 1) !=
+		   dp_resource_map[RESOURCE_LVL_2].num_rx_buffers) {
+		dp_info("Adjusting Resource lvl_2 rx buffers map_val:%u cfg_val:%u",
+			dp_resource_map[RESOURCE_LVL_2].num_rx_buffers,
+			val.cdp_rxdma_refill_ring_size);
+		rsrc_ctx->cur_rsrc_map[RESOURCE_LVL_2].num_rx_buffers =
+			(val.cdp_rxdma_refill_ring_size - 1);
 	}
 
 	for (i = 0; i < RESOURCE_LVL_MAX; i++) {

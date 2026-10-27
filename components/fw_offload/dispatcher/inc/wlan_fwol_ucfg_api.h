@@ -166,19 +166,6 @@ QDF_STATUS
 ucfg_fwol_get_thermal_temp(struct wlan_objmgr_psoc *psoc,
 			   struct wlan_fwol_thermal_temp *thermal_temp);
 
-#ifdef WLAN_DDR_BW_MITIGATION
-/**
- * ucfg_fwol_get_ddr_bwm_config() - Get bw mitigation config params
- * @psoc: Pointer to psoc object
- * @ddr_bwm_info: Pointer to struct wlan_fwol_bwm_params
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_fwol_get_ddr_bwm_config(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_fwol_bwm_params *ddr_bwm_info);
-#endif
-
 /**
  * ucfg_fwol_is_neighbor_report_req_supported() - Get neighbor report request
  *                                                supported bit
@@ -323,25 +310,6 @@ QDF_STATUS ucfg_get_enable_dtim_1chrx(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
 					    bool *dynamic_bw_switch);
 
-/**
- * ucfg_set_dynamic_bw_switch_value() - Sets dynamic_bw_switch value
- * @psoc: pointer to the psoc object
- * @dynamic_bw_switch: dynamic_bw_switch value to set
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_set_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
-					    bool dynamic_bw_switch);
-
-/**
- * ucfg_get_dynamic_mode_switch_value() - Assigns dynamic_mode_switch value
- * @psoc: pointer to the psoc object
- * @dynamic_mode_switch: pointer to return dynamic_mode_switch value
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_get_dynamic_mode_switch_value(struct wlan_objmgr_psoc *psoc,
-					      bool *dynamic_mode_switch);
 /**
  * ucfg_get_alternative_chainmask_enabled() - Assigns alt chainmask_enabled
  *                                            value
@@ -806,7 +774,7 @@ QDF_STATUS ucfg_fwol_send_get_thermal_stats_cmd(struct wlan_objmgr_psoc *psoc,
  * @pdev: pointer to pdev object
  *
  * Used to configure global firmware params. This is invoked from hdd during
- * boot-up.
+ * bootup.
  *
  * Return: QDF Status
  */

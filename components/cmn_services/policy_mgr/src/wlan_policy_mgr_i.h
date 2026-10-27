@@ -297,20 +297,11 @@ extern enum policy_mgr_conc_next_action
  * @sbs_enable: To enable/disable SBS
  * @multi_sap_allowed_on_same_band: Enable/Disable multi sap started
  *                                  on same band
- * @min_tx_chains: Min number of Tx chains supported across all the HW modes
- * @min_rx_chains: Min number of Rx chains supported across all the HW modes
- * @max_tx_chains: Max number of Tx chains supported across all the HW modes
- * @max_rx_chains: Max number of Rx chains supported across all the HW modes
  * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
  * @use_sap_original_bw: Enable/Disable sap original BW as default
  *                       BW when do restart
  * @move_sap_go_1st_on_dfs_sta_csa: Enable/Disable SAP / GO's movement
  *				    to non-DFS channel before STA
- * @force_sap_20mhz_cc_id: Force SAP on 20Mhz for country ID
- * @cfg_sta_indoor_ch_peer_scc: Enable/disable STA connected indoor channel for
- * peer-to-peer connections and from SCC.
- * @cfg_sta_dfs_ch_peer_scc: Enable/disable STA connected DFS channel for
- * peer-to-peer connections and from SCC. (Currently only for P2P).
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -336,18 +327,11 @@ struct policy_mgr_cfg {
 	enum policy_mgr_pcl_band_priority pcl_band_priority;
 	bool sbs_enable;
 	bool multi_sap_allowed_on_same_band;
-	uint8_t min_tx_chains;
-	uint8_t min_rx_chains;
-	uint8_t max_tx_chains;
-	uint8_t max_rx_chains;
 #ifdef WLAN_FEATURE_SR
 	bool sr_in_same_mac_conc;
 #endif
 	bool use_sap_original_bw;
 	bool move_sap_go_1st_on_dfs_sta_csa;
-	bool force_sap_20mhz_cc_id;
-	uint8_t cfg_sta_indoor_ch_peer_scc;
-	bool cfg_sta_dfs_ch_peer_scc;
 };
 
 /**
@@ -375,6 +359,13 @@ struct policy_mgr_cfg {
  * interaction with Policy Manager
  * @conc_cbacks: callbacks to be registered by lim for
  * interaction with Policy Manager
+ * @sap_mandatory_channels: The user preferred master list on
+ *                        which SAP can be brought up. This
+ *                        mandatory channel freq list would be as per
+ *                        OEMs preference & conforming to the
+ *                        regulatory/other considerations
+ * @sap_mandatory_channels_len: Length of the SAP mandatory
+ *                            channel list
  * @do_sap_unsafe_ch_check: whether need check sap unsafe channel
  * @last_disconn_sta_freq: last disconnected sta channel freq
  * @concurrency_mode: active concurrency combination
@@ -434,6 +425,8 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_cdp_cbacks cdp_cbacks;
 	struct policy_mgr_dp_cbacks dp_cbacks;
 	struct policy_mgr_conc_cbacks conc_cbacks;
+	uint32_t sap_mandatory_channels[NUM_CHANNELS];
+	uint32_t sap_mandatory_channels_len;
 	qdf_freq_t last_disconn_sta_freq;
 	uint32_t concurrency_mode;
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
@@ -475,16 +468,6 @@ struct policy_mgr_psoc_priv_obj {
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	uint32_t restriction_mask;
 #endif
-};
-
-/**
- * enum chain_calc_type_t - Chain calculation type
- * @CHAIN_CALC_MIN: Calculate minimum chains
- * @CHAIN_CALC_MAX: Calculate maximum chains
- */
-enum chain_calc_type_t {
-	CHAIN_CALC_MIN,
-	CHAIN_CALC_MAX
 };
 
 /**
@@ -580,16 +563,6 @@ QDF_STATUS policy_mgr_get_updated_fw_mode_config(
  */
 bool policy_mgr_is_dual_mac_disabled_in_ini(
 		struct wlan_objmgr_psoc *psoc);
-
-/**
- * policy_mgr_find_if_hwlist_has_smm() - Find if hw list has SMM modes or not
- * @psoc: PSOC object information
- *
- * Find if hw list has SMM modes or not
- *
- * Return: true or false
- */
-bool policy_mgr_find_if_hwlist_has_smm(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_find_if_hwlist_has_dbs() - Find if hw list has DBS modes or not
@@ -865,28 +838,8 @@ policy_mgr_allow_non_force_link_bitmap(
 		uint16_t no_forced_bitmap,
 		uint16_t force_inactive_bitmap);
 
-/*
- * policy_mgr_get_ml_sta_info() - Get number of ML STA vdev ids and freq list
- * @pm_ctx: pm_ctx ctx
- * @num_ml_sta: Return number of ML STA present
- * @num_disabled_ml_sta: Return number of disabled ML STA links
- * @ml_vdev_lst: Return ML STA vdev id list
- * @ml_freq_lst: Return ML STA freq list
- * @num_non_ml: Return number of non-ML STA present
- * @non_ml_vdev_lst: Return non-ML STA vdev id list
- * @non_ml_freq_lst: Return non-ML STA freq list
- *
- * Return: void
- */
 void
-policy_mgr_get_ml_sta_info(struct policy_mgr_psoc_priv_obj *pm_ctx,
-			   uint8_t *num_ml_sta,
-			   uint8_t *num_disabled_ml_sta,
-			   uint8_t *ml_vdev_lst,
-			   qdf_freq_t *ml_freq_lst,
-			   uint8_t *num_non_ml,
-			   uint8_t *non_ml_vdev_lst,
-			   qdf_freq_t *non_ml_freq_lst);
+policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
 
 /**
  * policy_mgr_link_switch_notifier_cb() - link switch notifier callback
@@ -903,6 +856,9 @@ QDF_STATUS
 policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_mlo_link_switch_req *req,
 				   enum wlan_mlo_link_switch_notify_reason notify_reason);
+#else
+static inline void
+policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
 #endif
 
 /**
@@ -1293,11 +1249,11 @@ policy_mgr_set_freq_restriction_mask(struct policy_mgr_psoc_priv_obj *pm_ctx,
 
 /**
  * policy_mgr_dump_sap_mandatory() - Dump mandatory freq list
- * @vdev: vdev_ctx
+ * @pm_ctx: pm_ctx
  *
  * Return: None
  */
-void policy_mgr_dump_sap_mandatory(struct wlan_objmgr_vdev *vdev);
+void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx);
 
 /**
  * policy_mgr_get_connection_max_channel_width() - Get max channel width
@@ -1311,41 +1267,4 @@ void policy_mgr_dump_sap_mandatory(struct wlan_objmgr_vdev *vdev);
 enum hw_mode_bandwidth
 policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc);
 
-/**
- * policy_mgr_get_vdev_present_with_freq() - Check if any other  vdev present
- * with the given freq.
- * @pm_ctx: pointer to pm_ctx
- * @freq: given freq
- * @vdev_id: current vdev id.
- *
- * Return: vdev id of the scc vdev
- */
-uint8_t
-policy_mgr_get_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
-				      qdf_freq_t freq, uint8_t vdev_id);
-
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * policy_mgr_get_inact_vdev_present_with_freq() - Get inactive VDEV ID present
- * with frequency
- * @pm_ctx: pm_ctx object information
- * @freq: Frequency to check
- * @vdev_id: VDEV ID to check
- *
- * This function checks if there is an inactive VDEV ID present with the given
- * frequency.
- *
- * Return: VDEV ID if found, WLAN_UMAC_VDEV_ID_MAX otherwise
- */
-uint8_t
-policy_mgr_get_inact_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
-					    qdf_freq_t freq, uint8_t vdev_id);
-#else
-static inline uint8_t
-policy_mgr_get_inact_vdev_present_with_freq(struct policy_mgr_psoc_priv_obj *pm_ctx,
-					    qdf_freq_t freq, uint8_t vdev_id)
-{
-	return WLAN_UMAC_VDEV_ID_MAX;
-}
-#endif
 #endif

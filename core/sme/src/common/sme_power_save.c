@@ -251,7 +251,7 @@ static QDF_STATUS sme_ps_disable_uapsd_req_params(struct mac_context *mac_ctx,
 
 	sme_get_ps_state(mac_ctx, session_id, &ps_state);
 	if (ps_state != UAPSD_MODE) {
-		sme_debug("UAPSD is already disabled");
+		sme_err("UAPSD is already disabled");
 		return QDF_STATUS_SUCCESS;
 	}
 	disable_uapsd_req_params =
@@ -313,27 +313,6 @@ QDF_STATUS sme_ps_process_command(struct mac_context *mac_ctx, uint32_t session_
 	return status;
 }
 
-#ifdef QCA_WIFI_EMULATION
-static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
-					   enum sme_ps_cmd command,
-					   uint32_t session_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#else
-static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
-					   enum sme_ps_cmd command,
-					   uint32_t session_id)
-{
-	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
-		sme_debug("vdev:%d Cannot initiate PS. PS is disabled by usr(ioctl)",
-			  session_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * sme_enable_sta_ps_check(): Checks if it is ok to enable power save or not.
  * @mac_ctx: global mac context
@@ -360,9 +339,11 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 	}
 
 	usr_cfg_ps_enable = mlme_get_user_ps(mac_ctx->psoc, vdev_id);
-	if (sme_ps_enable_user_check(usr_cfg_ps_enable, command, vdev_id)
-	    != QDF_STATUS_SUCCESS)
+	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
+		sme_debug("vdev:%d power save mode is disabled by usr(ioctl)",
+			  vdev_id);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	/*
 	 * If command is power save disable there is not need to check for

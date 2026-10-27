@@ -31,7 +31,6 @@
 #if defined(FEATURE_DENYLIST_MGR) && defined(WLAN_FEATURE_11BE_MLO)
 #include "wlan_dlm_api.h"
 #endif
-#include "wlan_connectivity_logging.h"
 
 #define WMI_MAC_TO_PDEV_MAP(x) ((x) + (1))
 #define WMI_PDEV_TO_MAC_MAP(x) ((x) - (1))
@@ -220,10 +219,6 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 	/* fill in threshold values */
 	rssi_threshold_fp->vdev_id = roam_req->vdev_id;
 	rssi_threshold_fp->roam_scan_rssi_thresh = roam_req->rssi_thresh;
-	rssi_threshold_fp->roam_scan_rssi_thresh_5ghz =
-			roam_req->rssi_thresh_5ghz;
-	rssi_threshold_fp->roam_scan_rssi_thresh_6ghz =
-			roam_req->rssi_thresh_6ghz;
 	rssi_threshold_fp->roam_rssi_thresh_diff = roam_req->rssi_thresh_diff;
 	rssi_threshold_fp->hirssi_scan_max_count =
 			roam_req->hi_rssi_scan_max_count;
@@ -233,14 +228,6 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 	rssi_threshold_fp->rssi_thresh_offset_5g =
 		roam_req->rssi_thresh_offset_5g;
 	rssi_threshold_fp->flags = roam_req->flags;
-	rssi_threshold_fp->hbr_periodic_roam_scan_enable =
-			roam_req->hbr_periodic_scan_enable;
-	rssi_threshold_fp->hbr_periodic_rssi_delta =
-			roam_req->hbr_periodic_rssi_delta;
-	rssi_threshold_fp->hbr_periodic_2g_scan_interval_sec =
-			roam_req->hbr_periodic_2g_scan_interval;
-	rssi_threshold_fp->hbr_periodic_5g_scan_interval_sec =
-			roam_req->hbr_periodic_5g_scan_interval;
 
 	buf_ptr += sizeof(wmi_roam_scan_rssi_threshold_fixed_param);
 	WMITLV_SET_HDR(buf_ptr,
@@ -311,7 +298,7 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 		roam_req->roam_bad_rssi_thresh_offset_2g;
 
 	bg_scan_params->flags = 0;
-	if (roam_req->bg_roam_scan_flag)
+	if (roam_req->roam_bad_rssi_thresh_offset_2g)
 		bg_scan_params->flags |= WMI_ROAM_BG_SCAN_FLAGS_2G_TO_5G_ONLY;
 	WMITLV_SET_HDR(&bg_scan_params->tlv_header,
 		       WMITLV_TAG_STRUC_wmi_roam_bg_scan_roaming_param,
@@ -397,14 +384,11 @@ send_roam_scan_offload_scan_period_cmd_tlv(
 	 * Convert it to msec and send to firmware
 	 */
 	scan_period_fp->roam_full_scan_period = param->full_scan_period * 1000;
-	scan_period_fp->roam_periodic_scan_interval =
-			param->roam_periodic_scan_interval;
 
-	wmi_debug("roam_scan_period=%d, roam_scan_age=%d, full_scan_period= %u, roam periodic scan interval= %u",
+	wmi_debug("roam_scan_period=%d, roam_scan_age=%d, full_scan_period= %u",
 		  scan_period_fp->roam_scan_period,
 		  scan_period_fp->roam_scan_age,
-		  scan_period_fp->roam_full_scan_period,
-		  scan_period_fp->roam_periodic_scan_interval);
+		  scan_period_fp->roam_full_scan_period);
 
 	wmi_debug("inactiviy time:%d inactive cnt:%d",
 		  scan_period_fp->inactivity_time_period,
@@ -795,35 +779,6 @@ void wmi_ese_attach_tlv(wmi_unified_t wmi_handle)
 }
 #endif /* FEATURE_WLAN_ESE */
 
-enum wlan_roam_frame_tx_status
-wmi_get_host_roam_frame_tx_status(WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS tx_status)
-{
-	switch (tx_status) {
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
-		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG;
-	default:
-		break;
-	}
-
-	return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_INVALID;
-}
-
 /**
  * convert_roam_trigger_reason() - Function to convert unified Roam trigger
  * enum to TLV specific WMI_ROAM_TRIGGER_REASON_ID
@@ -972,8 +927,6 @@ wmi_convert_fw_notif_to_cm_notif(uint32_t fw_notif)
 		return CM_ROAM_NOTIF_HO_FAIL;
 	case WMI_ROAM_NOTIF_SCAN_END:
 		return CM_ROAM_NOTIF_SCAN_END;
-	case WMI_ROAM_NOTIF_ROAM_SMD_START:
-		return CM_ROAM_NOTIF_ROAM_SMD_START;
 	default:
 		return CM_ROAM_NOTIF_INVALID;
 	}
@@ -1060,277 +1013,6 @@ wmi_extract_pdev_hw_mode_trans_ind(
 	}
 }
 
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * wmi_extract_vdev_repurpose_tlvs() - Extract VDEV repurpose TLVs
- * @wmi_handle: WMI handle
- * @req_tlv: Pointer to vdev repurpose request TLV array
- * @num_tlvs: Number of TLVs
- * @vdev_repurpose_req: Output array to populate
- * @num_vdev_repurpose_req: Output count
- *
- * This function extracts wmi_vdev_repurpose_request_tlv_param TLVs and
- * populates the vdev_repurpose_req array. Up to 3 TLVs can be present
- * (for MLO scenarios). This is a common helper used by both roam event
- * and roam sync event handlers.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-static QDF_STATUS
-wmi_extract_vdev_repurpose_tlvs(wmi_unified_t wmi_handle,
-				wmi_vdev_repurpose_request_tlv_param *req_tlv,
-				uint32_t num_tlvs,
-				struct smd_vdev_repurpose_req *vdev_repurpose_req,
-				uint8_t *num_vdev_repurpose_req)
-{
-	uint32_t i;
-
-	if (!wmi_handle || !vdev_repurpose_req || !num_vdev_repurpose_req) {
-		wmi_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Initialize output */
-	*num_vdev_repurpose_req = 0;
-	qdf_mem_zero(vdev_repurpose_req,
-		     WLAN_MAX_ML_BSS_LINKS * sizeof(struct smd_vdev_repurpose_req));
-
-	/* TLVs are optional, return success if not present */
-	if (!req_tlv || !num_tlvs) {
-		wmi_debug("No VDEV repurpose request TLVs present");
-		return QDF_STATUS_SUCCESS;
-	}
-
-	/* Validate TLV count */
-	if (num_tlvs > WLAN_MAX_ML_BSS_LINKS) {
-		wmi_err("Too many VDEV repurpose TLVs: %u, max: %u",
-			num_tlvs, WLAN_MAX_ML_BSS_LINKS);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Extract each TLV */
-	for (i = 0; i < num_tlvs; i++) {
-		struct smd_vdev_repurpose_req *req = &vdev_repurpose_req[i];
-
-		/* Extract vdev_id */
-		req->vdev_id = req_tlv[i].repurpose_vdev_id;
-
-		/* Parse flag bits using WMI macros */
-		req->inactive_link_pre_stop =
-			WMI_VDEV_REPURPOSE_REQ_TLV_FLAGS_GET_REQUEST_INACTIVE(req_tlv[i].flags);
-		req->cleanup_vdev =
-			WMI_VDEV_REPURPOSE_REQ_TLV_FLAGS_GET_REQUEST_DISCONNECT(req_tlv[i].flags);
-		req->bringup_vdev =
-			WMI_VDEV_REPURPOSE_REQ_TLV_FLAGS_GET_REQUEST_CONNECT(req_tlv[i].flags);
-
-		/* Copy MAC addresses */
-		WMI_MAC_ADDR_TO_CHAR_ARRAY(&req_tlv[i].bssid, req->bssid.bytes);
-		WMI_MAC_ADDR_TO_CHAR_ARRAY(&req_tlv[i].mld_addr, req->mld_addr.bytes);
-		WMI_MAC_ADDR_TO_CHAR_ARRAY(&req_tlv[i].smd_addr, req->smd_addr.bytes);
-
-		/* Mark as valid */
-		req->is_valid = true;
-
-		wmi_debug("VDEV Repurpose TLV[%u]: vdev_id=%u flags=0x%x inactive=%u cleanup=%u bringup=%u",
-			  i, req->vdev_id, req_tlv[i].flags,
-			  req->inactive_link_pre_stop,
-			  req->cleanup_vdev,
-			  req->bringup_vdev);
-		wmi_debug("  BSSID: " QDF_MAC_ADDR_FMT " MLD: " QDF_MAC_ADDR_FMT " SMD: " QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(req->bssid.bytes),
-			  QDF_MAC_ADDR_REF(req->mld_addr.bytes),
-			  QDF_MAC_ADDR_REF(req->smd_addr.bytes));
-	}
-
-	*num_vdev_repurpose_req = num_tlvs;
-	wmi_info("Extracted %u VDEV repurpose request TLVs", num_tlvs);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wmi_extract_smd_transition_ie() - Extract SMD Transition IE
- * @wmi_handle: WMI handle
- * @evt_buf: Event buffer
- * @smd_ie_info: Output SMD IE structure to fill
- *
- * This function extracts the SMD Transition IE from the roam event.
- * FW populates its capabilities (B0 and B1 set to '0').
- * Host will later append its capabilities (Listen Interval, SCS List).
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-static QDF_STATUS
-wmi_extract_smd_transition_ie(wmi_unified_t wmi_handle,
-			      void *evt_buf,
-			      struct smd_transition_ie_info *smd_ie_info)
-{
-	WMI_ROAM_EVENTID_param_tlvs *param_buf;
-	uint8_t *smd_ie;
-	uint32_t ie_len;
-
-	if (!wmi_handle || !evt_buf || !smd_ie_info) {
-		wmi_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	param_buf = (WMI_ROAM_EVENTID_param_tlvs *)evt_buf;
-	smd_ie = param_buf->smd_transition_ie;
-	ie_len = param_buf->num_smd_transition_ie;
-
-	/* Initialize output */
-	qdf_mem_zero(smd_ie_info, sizeof(*smd_ie_info));
-
-	/* IE is optional, return success if not present */
-	if (!smd_ie || !ie_len) {
-		wmi_debug("SMD Transition IE not present");
-		return QDF_STATUS_SUCCESS;
-	}
-
-	/* Validate IE length */
-	if (ie_len > sizeof(smd_ie_info->ie_data)) {
-		wmi_err("SMD IE too large: %u, max: %zu",
-			ie_len, sizeof(smd_ie_info->ie_data));
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Copy IE data */
-	smd_ie_info->ie_len = ie_len;
-	qdf_mem_copy(smd_ie_info->ie_data, smd_ie, ie_len);
-
-	wmi_debug("Extracted SMD Transition IE: len=%u", ie_len);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS
-wmi_fill_smd_roam_info(wmi_unified_t wmi_handle,
-		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
-		       struct roam_offload_synch_ind *roam_sync_ind)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	wmi_roam_synch_event_fixed_param *synch_event = NULL;
-
-	if (!param_buf) {
-		wmi_debug("received null buf from target");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	synch_event = param_buf->fixed_param;
-	if (!synch_event) {
-		wmi_debug("received null event data from target");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Extract vdev repurpose request TLV if SMD BSS transition (bit 16 set) */
-	if (WMI_GET_ROAM_SMD_BSS_TRANSITION(synch_event->roam_reason)) {
-		status = wmi_extract_vdev_repurpose_tlvs(
-				wmi_handle,
-				param_buf->vdev_repurpose_request_tlv,
-				param_buf->num_vdev_repurpose_request_tlv,
-				roam_sync_ind->vdev_repurpose_req,
-				&roam_sync_ind->num_vdev_repurpose_req);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wmi_err("Failed to extract vdev repurpose TLVs: %d",
-				status);
-			/* Log error but continue - TLVs are optional */
-		} else if (roam_sync_ind->num_vdev_repurpose_req > 0) {
-			wmi_info("SMD BSS Transition: Extracted %u vdev repurpose TLVs",
-				 roam_sync_ind->num_vdev_repurpose_req);
-		}
-	}
-	return status;
-}
-
-static QDF_STATUS
-wmi_fill_smd_roam_ies(wmi_unified_t wmi_handle,
-		      WMI_ROAM_EVENTID_param_tlvs *param_buf,
-		      struct roam_offload_roam_event *roam_event)
-{
-	struct smd_transition_ie_info *smd_transition_ie = NULL;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!param_buf) {
-		wmi_debug("received null buf from target");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Extract VDEV repurpose TLVs (up to 3) if present for SMD roaming events */
-	if (roam_event->notif == CM_ROAM_NOTIF_ROAM_SMD_START ||
-	    roam_event->notif == CM_ROAM_NOTIF_ROAM_ABORT) {
-		status = wmi_extract_vdev_repurpose_tlvs(wmi_handle,
-							 param_buf->vdev_repurpose_request_tlv,
-							 param_buf->num_vdev_repurpose_request_tlv,
-							 roam_event->vdev_repurpose_req,
-							 &roam_event->num_vdev_repurpose_req);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wmi_err("Failed to extract VDEV repurpose TLVs: %d", status);
-			goto end;
-		} else if (roam_event->num_vdev_repurpose_req > 0) {
-			if (roam_event->notif == CM_ROAM_NOTIF_ROAM_SMD_START) {
-				wmi_debug("SMD Roaming Started: Extracted %u vdev repurpose TLVs",
-					 roam_event->num_vdev_repurpose_req);
-			} else {
-				wmi_debug("Roam Abort: Extracted %u vdev repurpose TLVs to restore old AP",
-					 roam_event->num_vdev_repurpose_req);
-			}
-		}
-	}
-
-	if (param_buf->smd_transition_ie) {
-		smd_transition_ie = qdf_mem_malloc(sizeof(*smd_transition_ie));
-		if (!smd_transition_ie) {
-			status = QDF_STATUS_E_NOMEM;
-			goto end;
-		}
-		status = wmi_extract_smd_transition_ie(wmi_handle, param_buf, smd_transition_ie);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wmi_err("Failed to extract SMD transition IE %d", status);
-			qdf_mem_free(smd_transition_ie);
-			goto end;
-		}
-		roam_event->smd_transition_ie = smd_transition_ie;
-	}
-
-end:
-	return status;
-}
-
-#else
-static inline QDF_STATUS
-wmi_extract_vdev_repurpose_tlvs(wmi_unified_t wmi_handle,
-				wmi_vdev_repurpose_request_tlv_param *req_tlv,
-				uint32_t num_tlvs,
-				struct smd_vdev_repurpose_req *vdev_repurpose_req,
-				uint8_t *num_vdev_repurpose_req)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-wmi_extract_smd_transition_ie(wmi_unified_t wmi_handle,
-			      void *evt_buf,
-			      struct smd_transition_ie_info *smd_ie_info)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-wmi_fill_smd_roam_info(wmi_unified_t wmi_handle,
-		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
-		       struct roam_offload_synch_ind *roam_sync_ind)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wmi_fill_smd_roam_ies(wmi_unified_t wmi_handle,
-		      WMI_ROAM_EVENTID_param_tlvs *param_buf,
-		      struct roam_offload_roam_event *roam_event)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 /**
  * extract_roam_event_tlv() - Extract the roam event
  * @wmi_handle: wmi handle
@@ -1386,28 +1068,10 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 
 	roam_event->reason =
 			wmi_convert_fw_reason_to_cm_reason(wmi_event->reason);
-	if (!wmi_service_enabled(wmi_handle, wmi_service_hw_db2dbm_support))
-		roam_event->rssi = wmi_event->rssi +
-				   WMI_NOISE_FLOOR_DBM_DEFAULT;
-	else
-		roam_event->rssi = wmi_event->rssi;
+	roam_event->rssi = wmi_event->rssi;
 	roam_event->notif = wmi_convert_fw_notif_to_cm_notif(wmi_event->notif);
 	roam_event->notif_params = wmi_event->notif_params;
 	roam_event->notif_params1 = wmi_event->notif_params1;
-
-	if (wmi_event->notif_params1 &&
-	    roam_event->reason == ROAM_REASON_DEAUTH) {
-		if (wmi_event->notif_params1 >
-		    param_buf->num_deauth_disassoc_frame) {
-			wmi_err("deauth frame len %u > TLV len %u, vdev %u",
-				wmi_event->notif_params1,
-				param_buf->num_deauth_disassoc_frame,
-				roam_event->vdev_id);
-			return QDF_STATUS_E_FAILURE;
-		}
-		roam_event->deauth_disassoc_frame =
-			param_buf->deauth_disassoc_frame;
-	}
 
 	wlan_roam_debug_log(roam_event->vdev_id, DEBUG_ROAM_EVENT,
 			    DEBUG_INVALID_PEER_ID, NULL, NULL,
@@ -1441,11 +1105,9 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 		roam_event->hw_mode_trans_ind = hw_mode_trans_ind;
 	}
 
-	status = wmi_fill_smd_roam_ies(wmi_handle, param_buf, roam_event);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wmi_err("Failed to extract SMD Roam IEs: %d", status);
-		goto end;
-	}
+	if (wmi_event->notif_params1)
+		roam_event->deauth_disassoc_frame =
+			param_buf->deauth_disassoc_frame;
 end:
 	return status;
 }
@@ -1549,8 +1211,6 @@ static QDF_STATUS send_set_ric_req_cmd_tlv(wmi_unified_t wmi_handle,
  * fw.
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
- * @num_vdev_repurpose_resp: number of vdev repurpose response entries
- * @vdev_repurpose_resp: array of vdev repurpose response TLV params
  *
  * This function sends roam synch complete event to fw.
  *
@@ -1558,22 +1218,13 @@ static QDF_STATUS send_set_ric_req_cmd_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_process_roam_synch_complete_cmd_tlv(wmi_unified_t wmi_handle,
-				uint8_t vdev_id,
-				uint8_t num_vdev_repurpose_resp,
-				wmi_vdev_repurpose_response_tlv_param
-						*vdev_repurpose_resp)
+					 uint8_t vdev_id)
 {
 	wmi_roam_synch_complete_fixed_param *cmd;
-	wmi_vdev_repurpose_response_tlv_param *repurpose_tlv;
 	wmi_buf_t wmi_buf;
 	uint8_t *buf_ptr;
 	uint16_t len;
-	uint8_t i;
-
-	len = sizeof(wmi_roam_synch_complete_fixed_param) +
-	      WMI_TLV_HDR_SIZE +
-	      num_vdev_repurpose_resp *
-			sizeof(wmi_vdev_repurpose_response_tlv_param);
+	len = sizeof(wmi_roam_synch_complete_fixed_param);
 
 	wmi_buf = wmi_buf_alloc(wmi_handle, len);
 	if (!wmi_buf)
@@ -1586,24 +1237,6 @@ send_process_roam_synch_complete_cmd_tlv(wmi_unified_t wmi_handle,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_roam_synch_complete_fixed_param));
 	cmd->vdev_id = vdev_id;
-	buf_ptr += sizeof(*cmd);
-
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       num_vdev_repurpose_resp *
-		       sizeof(wmi_vdev_repurpose_response_tlv_param));
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	repurpose_tlv = (wmi_vdev_repurpose_response_tlv_param *)buf_ptr;
-	for (i = 0; i < num_vdev_repurpose_resp; i++) {
-		WMITLV_SET_HDR(
-		    &repurpose_tlv[i].tlv_header,
-		    WMITLV_TAG_STRUC_wmi_vdev_repurpose_response_tlv_param,
-		    WMITLV_GET_STRUCT_TLVLEN(
-				wmi_vdev_repurpose_response_tlv_param));
-		repurpose_tlv[i].repurpose_vdev_id =
-				vdev_repurpose_resp[i].repurpose_vdev_id;
-		repurpose_tlv[i].status = vdev_repurpose_resp[i].status;
-	}
-
 	wmi_mtrace(WMI_ROAM_SYNCH_COMPLETE, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
 				 WMI_ROAM_SYNCH_COMPLETE)) {
@@ -1635,12 +1268,7 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_mac_addr *bssid_list;
 	wmi_tlv_buf_len_param *buf_len_tlv;
 
-	/* for OOQROAM num_chan channels, for FASTREASSOC single channel */
-	u8 num_chan_tlv = roaminvoke->num_chan ? roaminvoke->num_chan : 1;
-	u8 i;
-
-	args_tlv_len = (4 * WMI_TLV_HDR_SIZE) +
-			(num_chan_tlv * sizeof(uint32_t)) +
+	args_tlv_len = (4 * WMI_TLV_HDR_SIZE) + sizeof(uint32_t) +
 			sizeof(wmi_mac_addr) + sizeof(wmi_tlv_buf_len_param) +
 			roundup(roaminvoke->frame_len, sizeof(uint32_t));
 	len = sizeof(wmi_roam_invoke_cmd_fixed_param) + args_tlv_len;
@@ -1679,30 +1307,12 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 		cmd->flags |=
 			(1 << WMI_ROAM_INVOKE_FLAG_FULL_SCAN_IF_NO_CANDIDATE);
 		cmd->reason = ROAM_INVOKE_REASON_NUD_FAILURE;
-	} else if (roaminvoke->num_chan && roaminvoke->chan_freq_list[0]) {
-		/*
-		 * OOQROAM path - scan given channel list
-		 * no specific BSSID, firmware picks best AP
-		 * from given channels based on scoring algorithm
-		 */
-		cmd->num_chan = roaminvoke->num_chan;
-		cmd->num_bssid = 0;
-		cmd->roam_scan_mode = WMI_ROAM_INVOKE_SCAN_MODE_FIXED_CH;
-		cmd->flags |=
-			(1 << WMI_ROAM_INVOKE_FLAG_FULL_SCAN_IF_NO_CANDIDATE) |
-			(1 <<
-			 WMI_ROAM_INVOKE_FLAG_SELECT_CANDIDATE_CONSIDER_SCORE);
-		cmd->reason = ROAM_INVOKE_REASON_PREDICTIVE;
-		wmi_debug("[WMI][OOQROAM] vdev:%d num_chan:%d scan mode:%d",
-			  cmd->vdev_id, cmd->num_chan, cmd->roam_scan_mode);
 	} else if (qdf_is_macaddr_broadcast(&roaminvoke->target_bssid)) {
 		cmd->num_chan = 0;
 		cmd->num_bssid = 0;
 		cmd->roam_scan_mode = WMI_ROAM_INVOKE_SCAN_MODE_CACHE_MAP;
-		if (!roaminvoke->skip_full_scan)
-			cmd->flags |=
-				(1 << WMI_ROAM_INVOKE_FLAG_FULL_SCAN_IF_NO_CANDIDATE);
 		cmd->flags |=
+			(1 << WMI_ROAM_INVOKE_FLAG_FULL_SCAN_IF_NO_CANDIDATE) |
 			(1 << WMI_ROAM_INVOKE_FLAG_SELECT_CANDIDATE_CONSIDER_SCORE);
 		cmd->reason = ROAM_INVOKE_REASON_USER_SPACE;
 	} else {
@@ -1710,30 +1320,11 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 	}
 
 	buf_ptr += sizeof(wmi_roam_invoke_cmd_fixed_param);
-
-	if (roaminvoke->num_chan && roaminvoke->chan_freq_list[0]) {
-		/*
-		 * OOQROAM path - fill all channel freqs into TLV
-		 */
-
-		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
-			       (roaminvoke->num_chan * sizeof(uint32_t)));
-		channel_list = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-		for (i = 0; i < roaminvoke->num_chan; i++) {
-			channel_list[i] = roaminvoke->chan_freq_list[i];
-			wmi_debug("[WMI][OOQROAM] chan_freq_list[%d] = %d",
-				  i, channel_list[i]);
-		}
-		buf_ptr += (roaminvoke->num_chan * sizeof(uint32_t)) +
-			    WMI_TLV_HDR_SIZE;
-	} else {
-		/* FASTREASSOC path - single channel */
-		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
-			       (sizeof(u_int32_t)));
-		channel_list = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-		*channel_list = roaminvoke->ch_freq;
-		buf_ptr += sizeof(uint32_t) + WMI_TLV_HDR_SIZE;
-	}
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+		       (sizeof(u_int32_t)));
+	channel_list = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
+	*channel_list = roaminvoke->ch_freq;
+	buf_ptr += sizeof(uint32_t) + WMI_TLV_HDR_SIZE;
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
 		       (sizeof(wmi_mac_addr)));
 	bssid_list = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
@@ -1761,11 +1352,11 @@ static QDF_STATUS send_roam_invoke_cmd_tlv(wmi_unified_t wmi_handle,
 		     roaminvoke->frame_buf,
 		     roaminvoke->frame_len);
 
-	wmi_debug("flag:%d, MODE:%d, ap:%d, dly:%d, n_ch:%d, n_bssid:%d, ch_freq:%d, is_same_bss:%d reason:%d",
+	wmi_debug("flag:%d, MODE:%d, ap:%d, dly:%d, n_ch:%d, n_bssid:%d, ch_freq:%d, is_same_bss:%d",
 		  cmd->flags, cmd->roam_scan_mode,
 		  cmd->roam_ap_sel_mode, cmd->roam_delay,
 		  cmd->num_chan, cmd->num_bssid, roaminvoke->ch_freq,
-		  roaminvoke->is_same_bssid, cmd->reason);
+		  roaminvoke->is_same_bssid);
 
 	wmi_mtrace(WMI_ROAM_INVOKE_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
@@ -1895,8 +1486,6 @@ convert_roam_trigger_scan_mode(enum roam_scan_freq_scheme scan_freq_scheme)
 		return ROAM_TRIGGER_SCAN_MODE_PARTIAL;
 	case ROAM_SCAN_FREQ_SCHEME_FULL_SCAN:
 		return ROAM_TRIGGER_SCAN_MODE_FULL;
-	case ROAM_SCAN_FREQ_SCHEME_NEIGHBOR_REPORT:
-		return ROAM_TRIGGER_SCAN_MODE_PARTIAL;
 	default:
 		return ROAM_TRIGGER_SCAN_MODE_NONE;
 	}
@@ -2021,15 +1610,12 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 		wmi_fill_default_roam_trigger_parameters(&trigger_parameters[i],
 							 i);
 
-	/* Fill vendor BTM roam trigger parameters */
 	roam_trigger_parameters =
 		&trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM];
 	roam_trigger_parameters->trigger_reason =
-				WMI_ROAM_TRIGGER_REASON_WTC_BTM;
-	if (triggers->vendor_btm_param.user_roam_reason !=
-			VENDOR_BTM_REASON_NOT_SUPPORTED)
+			WMI_ROAM_TRIGGER_REASON_WTC_BTM;
+	if (triggers->vendor_btm_param.user_roam_reason == 0)
 		roam_trigger_parameters->enable = 1;
-
 	roam_trigger_parameters->scan_mode =
 		convert_roam_trigger_scan_mode(triggers->vendor_btm_param.scan_freq_scheme);
 	roam_trigger_parameters->trigger_rssi_threshold =
@@ -2044,15 +1630,6 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 			triggers->roam_score_delta;
 	roam_trigger_parameters->reason_code =
 			triggers->vendor_btm_param.user_roam_reason;
-	wmi_debug("VENDOR_BTM: enable:%d scan_mode:%d rssi_thres:%d cand_min_rssi_thres:%d cand_ap_min_rssi_thres: 2.4 Ghz[%d] 5 Ghz[%d], 6 Ghz[%d] reason_code:%d",
-		  roam_trigger_parameters->enable,
-		  roam_trigger_parameters->scan_mode,
-		  roam_trigger_parameters->trigger_rssi_threshold,
-		  roam_trigger_parameters->cand_ap_min_rssi_threshold,
-		  roam_trigger_parameters->cand_ap_min_rssi_threshold_5g,
-		  roam_trigger_parameters->cand_ap_min_rssi_threshold_6g,
-		  roam_trigger_parameters->roam_score_delta_percentage,
-		  roam_trigger_parameters->reason_code);
 
 	if (wmi_service_enabled(wmi_handle,
 			wmi_service_configure_roam_trigger_param_support)) {
@@ -2065,45 +1642,67 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 				continue;
 
 			wmi_fill_score_delta_params(roam_trigger_parameters,
-						    triggers, i);
+						    triggers,
+						    i);
 			if (i == ROAM_TRIGGER_REASON_IDLE &&
-			    (QDF_HAS_PARAM(trigger_reason_bitmask,
-					   WMI_ROAM_TRIGGER_REASON_IDLE)))
+			    (trigger_reason_bitmask &
+			     BIT(WMI_ROAM_TRIGGER_REASON_IDLE)))
 				roam_trigger_parameters->enable = 1;
 			else
 				roam_trigger_parameters->enable = 0;
 		}
 
-		if (QDF_HAS_PARAM(trigger_reason_bitmask,
-				  ROAM_TRIGGER_REASON_DEAUTH))
-			wmi_fill_min_rssi_params(trigger_parameters, triggers,
-						 DEAUTH_MIN_RSSI);
-
-		if (QDF_HAS_PARAM(trigger_reason_bitmask,
-				  ROAM_TRIGGER_REASON_BMISS))
-			wmi_fill_min_rssi_params(trigger_parameters, triggers,
-						 BMISS_MIN_RSSI);
-
-		if (QDF_HAS_PARAM(trigger_reason_bitmask,
-				  ROAM_TRIGGER_REASON_HIGH_RSSI))
-			wmi_fill_min_rssi_params(trigger_parameters, triggers,
-						 MIN_RSSI_2G_TO_5G_ROAM);
+		wmi_fill_min_rssi_params(&trigger_parameters[WMI_ROAM_TRIGGER_REASON_NONE],
+					 triggers,
+					 DEAUTH_MIN_RSSI);
+		wmi_fill_min_rssi_params(&trigger_parameters[WMI_ROAM_TRIGGER_REASON_NONE],
+					 triggers,
+					 BMISS_MIN_RSSI);
+		wmi_fill_min_rssi_params(&trigger_parameters[WMI_ROAM_TRIGGER_REASON_NONE],
+					 triggers,
+					 MIN_RSSI_2G_TO_5G_ROAM);
 	}
 
-	trigger_parameters[WMI_ROAM_TRIGGER_REASON_PMK_TIMEOUT].enable =
-			QDF_HAS_PARAM(trigger_reason_bitmask,
-				      WMI_ROAM_TRIGGER_REASON_PMK_TIMEOUT);
+	if (trigger_reason_bitmask &
+	    BIT(WMI_ROAM_TRIGGER_REASON_PMK_TIMEOUT))
+		trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM].enable = 1;
+	else
+		trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM].enable = 0;
 
-	for (i = 0; i < WMI_ROAM_TRIGGER_EXT_REASON_MAX; i++) {
-		if (!(QDF_HAS_PARAM(roam_scan_scheme_bitmap, i)))
-			continue;
+	if (BIT(ROAM_TRIGGER_REASON_PER) & roam_scan_scheme_bitmap) {
+		trigger_parameters[ROAM_TRIGGER_REASON_PER].scan_mode =
+			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+		trigger_parameters[ROAM_TRIGGER_REASON_PER].enable = 1;
+	}
 
-		if (!QDF_HAS_PARAM(trigger_reason_bitmask, i))
-			continue;
+	if (BIT(ROAM_TRIGGER_REASON_BTC) & roam_scan_scheme_bitmap) {
+		trigger_parameters[ROAM_TRIGGER_REASON_BTC].scan_mode =
+			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+		trigger_parameters[ROAM_TRIGGER_REASON_BTC].enable = 1;
+	}
 
-		trigger_parameters[i].enable = true;
-		trigger_parameters[i].scan_mode =
-				ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+	if (BIT(ROAM_TRIGGER_REASON_BMISS) & roam_scan_scheme_bitmap) {
+		trigger_parameters[ROAM_TRIGGER_REASON_BMISS].scan_mode =
+			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+		trigger_parameters[ROAM_TRIGGER_REASON_BMISS].enable = 1;
+	}
+
+	if (BIT(ROAM_TRIGGER_REASON_LOW_RSSI) & roam_scan_scheme_bitmap) {
+		trigger_parameters[ROAM_TRIGGER_REASON_LOW_RSSI].scan_mode =
+			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+		trigger_parameters[ROAM_TRIGGER_REASON_LOW_RSSI].enable = 1;
+	}
+
+	if (BIT(ROAM_TRIGGER_REASON_BTM) & roam_scan_scheme_bitmap) {
+		trigger_parameters[ROAM_TRIGGER_REASON_BTM].scan_mode =
+			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+		trigger_parameters[ROAM_TRIGGER_REASON_BTM].enable = 1;
+	}
+
+	if (BIT(ROAM_TRIGGER_REASON_BSS_LOAD) & roam_scan_scheme_bitmap) {
+		trigger_parameters[ROAM_TRIGGER_REASON_BSS_LOAD].scan_mode =
+			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
+		trigger_parameters[ROAM_TRIGGER_REASON_BSS_LOAD].enable = 1;
 	}
 
 	for (i = 0; i < WMI_ROAM_TRIGGER_EXT_REASON_MAX; i++) {
@@ -2112,7 +1711,7 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 	}
 
 	total_tlv_len += num_triggers_enabled *
-			 sizeof(wmi_configure_roam_trigger_parameters);
+			sizeof(wmi_configure_roam_trigger_parameters);
 	len += WMI_TLV_HDR_SIZE + total_tlv_len;
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -2129,10 +1728,11 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 
 	cmd->vdev_id = triggers->vdev_id;
 	cmd->trigger_reason_bitmask = trigger_reason_bitmask;
+	wmi_debug("RSO_CFG: Received trigger bitmap: 0x%x converted trigger_bitmap: 0x%x",
+		  triggers->trigger_bitmap, cmd->trigger_reason_bitmask);
 	cmd->trigger_reason_bitmask |= get_internal_mandatory_roam_triggers();
-	wmi_debug("RSO_CFG: vdev:%d input_trigger_bmap:0x%x final_trigger_bmap: 0x%x roam_scan_scheme:0x%x num_triggers:%d",
-		  cmd->vdev_id, triggers->trigger_bitmap,
-		  cmd->trigger_reason_bitmask,
+	wmi_debug("RSO_CFG: vdev id: %d final trigger_bitmap: 0x%x roam_scan_scheme:0x%x num_triggers_enabled:%d",
+		  cmd->vdev_id, cmd->trigger_reason_bitmask,
 		  roam_scan_scheme_bitmap, num_triggers_enabled);
 
 	buf_ptr += sizeof(wmi_roam_enable_disable_trigger_reason_fixed_param);
@@ -2143,12 +1743,12 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 	roam_trigger_parameters =
 		(wmi_configure_roam_trigger_parameters *)buf_ptr;
 	for (i = 0; i < WMI_ROAM_TRIGGER_EXT_REASON_MAX; i++) {
-		if (!trigger_parameters[i].enable)
-			continue;
-
-		qdf_mem_copy(roam_trigger_parameters, &trigger_parameters[i],
-			     sizeof(wmi_configure_roam_trigger_parameters));
-		roam_trigger_parameters++;
+		if (trigger_parameters[i].enable) {
+			qdf_mem_copy(roam_trigger_parameters,
+				     &trigger_parameters[i],
+				     sizeof(wmi_configure_roam_trigger_parameters));
+			roam_trigger_parameters++;
+		}
 	}
 
 	wmi_mtrace(WMI_ROAM_ENABLE_DISABLE_TRIGGER_REASON_CMDID,
@@ -2302,12 +1902,7 @@ extract_roam_initial_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 	dst->present = true;
 	dst->roam_full_scan_count = src_data->roam_full_scan_count;
-
-	if (!wmi_service_enabled(wmi_handle, wmi_service_hw_db2dbm_support))
-		dst->rssi_th = src_data->rssi_th + WMI_NOISE_FLOOR_DBM_DEFAULT;
-	else
-		dst->rssi_th = src_data->rssi_th;
-
+	dst->rssi_th = src_data->rssi_th;
 	dst->cu_th = src_data->cu_th;
 	dst->fw_cancel_timer_bitmap = src_data->timer_canceled;
 
@@ -2364,19 +1959,29 @@ wmi_get_converted_roam_eapol_subtype(
 		return ROAM_FRAME_SUBTYPE_GTK_M1;
 	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_SUBTYPE_GTK_M2:
 		return ROAM_FRAME_SUBTYPE_GTK_M2;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_SUBTYPE_ST_PREP_REQ:
-		return ROAM_FRAME_SUBTYPE_ST_PREP_REQ;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_SUBTYPE_ST_PREP_RESP:
-		return ROAM_FRAME_SUBTYPE_ST_PREP_RESP;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_SUBTYPE_ST_EXEC_REQ:
-		return ROAM_FRAME_SUBTYPE_ST_EXEC_REQ;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_SUBTYPE_ST_EXEC_RESP:
-		return ROAM_FRAME_SUBTYPE_ST_EXEC_RESP;
 	default:
 		break;
 	}
 
 	return 0;
+}
+
+static enum qdf_dp_tx_rx_status
+wmi_get_converted_tx_status(
+		WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS roam_tx_status)
+{
+	switch (roam_tx_status) {
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
+		return QDF_TX_RX_STATUS_OK;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
+		return QDF_TX_RX_STATUS_NO_ACK;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL:
+		return QDF_TX_RX_STATUS_DROP;
+	default:
+		break;
+	}
+
+	return QDF_TX_RX_STATUS_INVALID;
 }
 
 #define WLAN_FC0_SUBTYPE_SHIFT              4
@@ -2385,9 +1990,6 @@ wmi_get_converted_roam_eapol_subtype(
 #define WLAN_FRAME_INFO_RESP_OFFSET         6
 #define WLAN_FRAME_INFO_AUTH_ALG_OFFSET     7
 #define WLAN_FRAME_INFO_SEQ_NUM_OFFSET      16
-
-#define DISCONNECT_TX_STATUS_OFFSET   0
-#define DISCONNECT_REASON_CODE_OFFSET 16
 
 /**
  * extract_roam_frame_info_tlv() - Extract the frame exchanges during roaming
@@ -2407,7 +2009,6 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	wmi_roam_frame_info *src_data = NULL;
 	struct roam_frame_info *dst_buf;
 	uint8_t i, subtype, idx;
-	bool db2dbm_enable;
 
 	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
 
@@ -2426,10 +2027,6 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 	dst->num_frame = num_frames;
 	dst_buf = dst->frame_info;
-
-	db2dbm_enable = wmi_service_enabled(wmi_handle,
-					    wmi_service_hw_db2dbm_support);
-
 	for (i = 0; i < num_frames; i++) {
 		dst_buf->timestamp = src_data->timestamp;
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_data->bssid,
@@ -2473,39 +2070,13 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		    dst_buf->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
 		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
 		    dst_buf->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
-			dst_buf->tx_status = wmi_get_host_roam_frame_tx_status(
+			dst_buf->tx_status = wmi_get_converted_tx_status(
 							src_data->status_code);
 			dst_buf->status_code = 0;
 		}
 
-		/*
-		 * For Deauth/disassoc TX frames the reason code & TX status
-		 * is filled by firmware as below:
-		 * status_code =  (reason << 16) | (TX completion_status)
-		 * Tx completion status - Lower 16 bytes
-		 * Reason - Higher 16 bytes
-		 */
-		if (!dst_buf->is_rsp &&
-		    (dst_buf->subtype == MGMT_SUBTYPE_DEAUTH ||
-		     dst_buf->subtype == MGMT_SUBTYPE_DISASSOC)) {
-			uint16_t tx_status =
-				WMI_GET_BITS(src_data->status_code,
-					     DISCONNECT_TX_STATUS_OFFSET, 16);
-
-			dst_buf->tx_status =
-				wmi_get_host_roam_frame_tx_status(tx_status);
-			dst_buf->status_code =
-				WMI_GET_BITS(src_data->status_code,
-					     DISCONNECT_REASON_CODE_OFFSET, 16);
-		}
-
 		dst_buf->retry_count = src_data->retry_count;
-		if (!db2dbm_enable)
-			dst_buf->rssi = src_data->rssi_dbm_abs +
-					WMI_NOISE_FLOOR_DBM_DEFAULT;
-		else
-			dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
-
+		dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
 		dst_buf->assoc_id =
 			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
@@ -2525,42 +2096,6 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wmi_roam_synch_strip_ccmp() - Strip CCMP header and MIC from an 11bi
- * encrypted (re)assoc frame in the roam synch blob.
- * @frame: pointer to the start of the frame (MAC header)
- * @frame_len: in/out - caller's stored length field, updated on strip
- *
- * For 11bi/EPPKE, FW delivers the (re)assoc frame body CCMP-encrypted:
- *   [MAC_HDR(24)] [CCMP_HDR(8)] [encrypted body] [MIC(8)]
- * Shift the body left to close the CCMP header gap, trim the MIC from the
- * logical length, and clear the Protected Frame bit so all downstream
- * consumers (lim_process_assoc_rsp_frame, lim_roam_fill_bss_descr, etc.)
- * see a clean [MAC_HDR][plaintext body] without any per-site adjustments.
- */
-static void
-wmi_roam_synch_strip_ccmp(uint8_t *frame, uint16_t *frame_len)
-{
-	struct wlan_frame_hdr *hdr = (struct wlan_frame_hdr *)frame;
-	uint16_t hdr_len = sizeof(*hdr);
-	uint16_t body_len;
-
-	if (*frame_len < hdr_len + IEEE80211_CCMP_HEADERLEN +
-			 IEEE80211_CCMP_MICLEN)
-		return;
-
-	if (!(hdr->i_fc[1] & IEEE80211_FC1_WEP))
-		return;
-
-	body_len = *frame_len - hdr_len - IEEE80211_CCMP_HEADERLEN -
-		   IEEE80211_CCMP_MICLEN;
-	qdf_mem_move(frame + hdr_len,
-		     frame + hdr_len + IEEE80211_CCMP_HEADERLEN,
-		     body_len);
-	*frame_len -= (IEEE80211_CCMP_HEADERLEN + IEEE80211_CCMP_MICLEN);
-	hdr->i_fc[1] &= ~IEEE80211_FC1_WEP;
 }
 
 /**
@@ -2629,8 +2164,6 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 		     roam_sync_ind->reassoc_resp_length);
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.reassoc_rsp);
 	rso_cfg->roam_sync_frame_ind.reassoc_rsp = NULL;
-	wmi_roam_synch_strip_ccmp(reassoc_rsp_ptr,
-				  &roam_sync_ind->reassoc_resp_length);
 
 	/* ReAssoc Req data */
 	roam_sync_ind->reassoc_req_offset =
@@ -2647,8 +2180,6 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 		     roam_sync_ind->reassoc_req_length);
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.reassoc_req);
 	rso_cfg->roam_sync_frame_ind.reassoc_req = NULL;
-	wmi_roam_synch_strip_ccmp(reassoc_req_ptr,
-				  &roam_sync_ind->reassoc_req_length);
 }
 
 /**
@@ -2698,8 +2229,6 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 	qdf_mem_copy(reassoc_rsp_ptr,
 		     param_buf->reassoc_rsp_frame,
 		     roam_sync_ind->reassoc_resp_length);
-	wmi_roam_synch_strip_ccmp(reassoc_rsp_ptr,
-				  &roam_sync_ind->reassoc_resp_length);
 
 	/* ReAssoc Req data */
 	roam_sync_ind->reassoc_req_offset =
@@ -2711,8 +2240,6 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 			  roam_sync_ind->reassoc_req_offset;
 	qdf_mem_copy(reassoc_req_ptr, param_buf->reassoc_req_frame,
 		     roam_sync_ind->reassoc_req_length);
-	wmi_roam_synch_strip_ccmp(reassoc_req_ptr,
-				  &roam_sync_ind->reassoc_req_length);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -2745,11 +2272,6 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 
 		for (i = 0; i < roam_sync_ind->num_setup_links; i++) {
 			link = &roam_sync_ind->ml_link[i];
-			if (setup_links->link_id >= MAX_MLO_LINK_ID) {
-				wmi_err("Invalid setup link ID %u",
-					setup_links->link_id);
-				return QDF_STATUS_E_INVAL;
-			}
 			link->link_id = setup_links->link_id;
 
 			/*
@@ -2814,95 +2336,6 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
-/**
- * wmi_fill_kde_and_auth_algo() - Copy KDE data and set auth algorithm
- * @roam_sync_ind: roam sync indication to populate
- * @synch_event: WMI roam sync event fixed params (FW-supplied, untrusted)
- * @param_buf: WMI TLV parameter buffer
- * @vdev: vdev object
- *
- * Copies the KDE TLV from the roam sync event into @roam_sync_ind and
- * updates the vdev auth algorithm from the event's auth_algo field.
- * If KDE data is absent, malformed, or oversized the KDE is skipped
- * and roam sync continues unaffected; auth_algo is always updated.
- */
-static void
-wmi_fill_kde_and_auth_algo(struct roam_offload_synch_ind *roam_sync_ind,
-			   wmi_roam_synch_event_fixed_param *synch_event,
-			   WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
-			   struct wlan_objmgr_vdev *vdev)
-{
-	roam_sync_ind->kde_data_len = 0;
-
-	if (!synch_event->kde_length)
-		goto set_auth_algo;
-
-	if (!param_buf->kde_data || !param_buf->num_kde_data) {
-		wmi_err("KDE length %d but TLV absent (kde_data %pK num %u)",
-			synch_event->kde_length,
-			param_buf->kde_data, param_buf->num_kde_data);
-		goto set_auth_algo;
-	}
-
-	if (synch_event->kde_length > MAX_KDE_DATA_LEN) {
-		wmi_err("KDE length %d exceeds max %d, skipping KDE",
-			synch_event->kde_length, MAX_KDE_DATA_LEN);
-		goto set_auth_algo;
-	}
-
-	if (synch_event->kde_length > param_buf->num_kde_data) {
-		wmi_err("KDE length %d > TLV bytes %u, skipping KDE",
-			synch_event->kde_length, param_buf->num_kde_data);
-		goto set_auth_algo;
-	}
-
-	roam_sync_ind->kde_data_len = synch_event->kde_length;
-	qdf_mem_copy(roam_sync_ind->kde_data, param_buf->kde_data,
-		     synch_event->kde_length);
-	wmi_debug("KDE data parsed, length: %d", roam_sync_ind->kde_data_len);
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
-			   roam_sync_ind->kde_data,
-			   roam_sync_ind->kde_data_len);
-
-set_auth_algo:
-	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_AUTH_ALGO,
-				   synch_event->auth_algo);
-}
-#else
-static inline void
-wmi_fill_kde_and_auth_algo(struct roam_offload_synch_ind *roam_sync_ind,
-			   wmi_roam_synch_event_fixed_param *synch_event,
-			   WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
-			   struct wlan_objmgr_vdev *vdev)
-{}
-#endif /* WLAN_FEATURE_11BI_SECURITY */
-
-#ifdef WLAN_FEATURE_11BN_SMD
-static void
-wmi_fill_roam_sync_smd_kdk(struct roam_offload_synch_ind *roam_sync_ind,
-			   wmi_key_material_ext *key_ext)
-{
-	uint32_t smd_kdk_len = key_ext->smd_kdk_len;
-
-	if (smd_kdk_len > 0 && smd_kdk_len <= WMI_MAX_SMD_KDK_LEN) {
-		roam_sync_ind->smd_kdk_len = smd_kdk_len;
-		qdf_mem_copy(roam_sync_ind->smd_kdk,
-			     key_ext->smd_kdk_buffer,
-			     smd_kdk_len);
-		wmi_debug("ROAM_SYNC: Extracted SMD_KDK len=%d", smd_kdk_len);
-	} else {
-		roam_sync_ind->smd_kdk_len = 0;
-	}
-}
-#else
-static inline void
-wmi_fill_roam_sync_smd_kdk(struct roam_offload_synch_ind *roam_sync_ind,
-			   wmi_key_material_ext *key_ext)
-{
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
-
 static QDF_STATUS
 wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 			  struct wlan_objmgr_vdev *vdev,
@@ -2925,28 +2358,18 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	synch_event = param_buf->fixed_param;
 	roam_sync_ind->roamed_vdev_id = synch_event->vdev_id;
 	roam_sync_ind->auth_status = synch_event->auth_status;
-	roam_sync_ind->auth_algo = synch_event->auth_algo;
 	roam_sync_ind->roam_reason = synch_event->roam_reason;
 	roam_sync_ind->rssi = -1 * synch_event->rssi;
 	roam_sync_ind->is_beacon = synch_event->is_beacon;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&synch_event->bssid,
 				   roam_sync_ind->bssid.bytes);
-	if (qdf_is_macaddr_group(&roam_sync_ind->bssid) ||
-	    qdf_is_macaddr_zero(&roam_sync_ind->bssid)) {
-		wmi_err("Invalid bssid " QDF_MAC_ADDR_FMT " in roam sync event vdev %d",
-			QDF_MAC_ADDR_REF(roam_sync_ind->bssid.bytes),
-			synch_event->vdev_id);
-		wlan_cm_free_roam_synch_frame_ind(rso_cfg);
-		return status;
-	}
-	wmi_debug("roamed_vdev_id %d auth_status %d roam_reason %d rssi %d is_beacon %d auth_algo %d",
+	wmi_debug("roamed_vdev_id %d auth_status %d roam_reason %d rssi %d is_beacon %d",
 		  roam_sync_ind->roamed_vdev_id,
 		  roam_sync_ind->auth_status,
 		  roam_sync_ind->roam_reason,
 		  roam_sync_ind->rssi,
-		  roam_sync_ind->is_beacon,
-		  roam_sync_ind->auth_algo);
+		  roam_sync_ind->is_beacon);
 
 	cdp_update_roaming_peer_in_vdev(soc, synch_event->vdev_id,
 					roam_sync_ind->bssid.bytes,
@@ -2998,7 +2421,6 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		roam_sync_ind->phy_mode =
 			wlan_cm_fw_to_host_phymode(WMI_GET_CHANNEL_MODE(chan));
 		roam_sync_ind->chan = *chan;
-		wmi_debug("BSS phymode: %d", roam_sync_ind->phy_mode);
 	} else {
 		roam_sync_ind->phy_mode = WLAN_PHYMODE_AUTO;
 	}
@@ -3019,14 +2441,6 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		 * key_ext carries key materials whose size
 		 * is greater than conventional 16bytes.
 		 */
-		if (key_ext->kck_len > MAX_KCK_LEN ||
-		    key_ext->kek_len > MAX_KEK_LENGTH) {
-			wmi_err("Invalid kck_len %d or kek_len %d",
-				key_ext->kck_len, key_ext->kek_len);
-			wlan_cm_free_roam_synch_frame_ind(rso_cfg);
-			return status;
-		}
-
 		kck_len = key_ext->kck_len ?
 				key_ext->kck_len : KCK_192BIT_KEY_LEN;
 		kek_len = key_ext->kek_len ?
@@ -3044,8 +2458,6 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		qdf_mem_copy(roam_sync_ind->replay_ctr,
 			     (key_ext->key_buffer + kek_len + kck_len),
 			     REPLAY_CTR_LEN);
-
-		wmi_fill_roam_sync_smd_kdk(roam_sync_ind, key_ext);
 	}
 
 	wmi_debug("ROAM_SYNC kek_len %d kck_len %d",
@@ -3113,65 +2525,12 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 			     pmk_cache_info->pmkid, PMKID_LEN);
 	}
 
-	/* Parse KDE data TLV if present */
-	wmi_fill_kde_and_auth_algo(roam_sync_ind, synch_event, param_buf, vdev);
-
 	status = wmi_fill_roam_mlo_info(wmi_handle, param_buf, roam_sync_ind);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wmi_err("Failed to fill roam mlo info");
 		return status;
 	}
-
-	status = wmi_fill_smd_roam_info(wmi_handle, param_buf, roam_sync_ind);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wmi_err("Failed to fill SMD Roam info");
-		return status;
-	}
-
 	wlan_cm_free_roam_synch_frame_ind(rso_cfg);
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline bool wmi_is_roam_sync_frame_invalid(uint32_t len)
-{
-	return (len && len < sizeof(struct wlan_frame_hdr));
-}
-
-static QDF_STATUS wmi_is_roam_sync_frame_len_valid(
-				WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf)
-{
-	wmi_roam_synch_event_fixed_param *synch_event = param_buf->fixed_param;
-
-	if (synch_event->bcn_probe_rsp_len >
-	    param_buf->num_bcn_probe_rsp_frame ||
-	    wmi_is_roam_sync_frame_invalid(synch_event->bcn_probe_rsp_len)) {
-		wmi_debug("Invalid bcn payload len: bcn:%d num_bcn_probe_rsp_len %d vdev:%d",
-			  synch_event->bcn_probe_rsp_len,
-			  param_buf->num_bcn_probe_rsp_frame,
-			  synch_event->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (synch_event->reassoc_req_len >
-	    param_buf->num_reassoc_req_frame ||
-	    wmi_is_roam_sync_frame_invalid(synch_event->reassoc_req_len)) {
-		wmi_debug("Invalid req payload len: req:%d num_reassoc_req_len %d vdev:%d",
-			  synch_event->reassoc_req_len,
-			  param_buf->num_reassoc_req_frame,
-			  synch_event->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (synch_event->reassoc_rsp_len >
-	    param_buf->num_reassoc_rsp_frame ||
-	    wmi_is_roam_sync_frame_invalid(synch_event->reassoc_rsp_len)) {
-		wmi_debug("Invalid rsp payload len: rsp:%d num_reassoc_rsp_len %d vdev:%d",
-			  synch_event->reassoc_rsp_len,
-			  param_buf->num_reassoc_rsp_frame,
-			  synch_event->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -3241,10 +2600,20 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = wmi_is_roam_sync_frame_len_valid(param_buf);
-
-	if (QDF_IS_STATUS_ERROR(status))
+	if (synch_event->bcn_probe_rsp_len >
+		param_buf->num_bcn_probe_rsp_frame ||
+		synch_event->reassoc_req_len >
+		param_buf->num_reassoc_req_frame ||
+		synch_event->reassoc_rsp_len >
+		param_buf->num_reassoc_rsp_frame) {
+		wmi_debug("Invalid sync payload: LEN bcn:%d, req:%d, rsp:%d, vdev:%d",
+			  synch_event->bcn_probe_rsp_len,
+			  synch_event->reassoc_req_len,
+			  synch_event->reassoc_rsp_len,
+			  synch_event->vdev_id);
+		status = QDF_STATUS_E_FAILURE;
 		goto abort_roam;
+	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (!rso_cfg) {
@@ -3320,14 +2689,6 @@ abort_roam:
 	return status;
 }
 
-/*
- * RSSI=0 indicates best RSSI AP and userspace might get confused.
- * So mark it as -80 to indicate as bad RSSI so that userspace
- * doesn't prefer this link over associated link for roaming. There is
- * no concern even if current frame is from assoc link.
- */
-#define UNKNOWN_RSSI_OF_LINK (-80)
-
 /**
  * extract_roam_sync_frame_event_tlv() - Extract the roam sync frame event
  * from the wmi_roam_synch_event_id
@@ -3393,17 +2754,12 @@ extract_roam_sync_frame_event_tlv(wmi_unified_t wmi_handle, void *event,
 
 	frame_ind = frame_ptr;
 	frame_ind->vdev_id = frame_evt->vdev_id;
-	frame_ind->rssi = frame_evt->bcn_probe_resp_rssi;
-	if (!frame_ind->rssi)
-		frame_ind->rssi = UNKNOWN_RSSI_OF_LINK;
 
-	wmi_debug("synch frame payload: vdev %d LEN %s bcn:%d, req:%d, rsp:%d RSSI: %d",
-		  frame_evt->vdev_id,
+	wmi_debug("synch frame payload: LEN %s bcn:%d, req:%d, rsp:%d",
 		  frame_evt->reassoc_rsp_len ? "Assoc" : "Link",
 		  frame_evt->bcn_probe_rsp_len,
 		  frame_evt->reassoc_req_len,
-		  frame_evt->reassoc_rsp_len,
-		  frame_evt->bcn_probe_resp_rssi);
+		  frame_evt->reassoc_rsp_len);
 
 	if (frame_evt->bcn_probe_rsp_len &&
 	    frame_evt->reassoc_rsp_len) {
@@ -3593,15 +2949,6 @@ extract_btm_denylist_event(wmi_unified_t wmi_handle,
 		roam_denylist->reject_reason =
 				wmi_get_reject_reason(src_list->reason);
 		roam_denylist->source = src_list->source;
-		if (src_list->ml_failed_link_combo_count >
-		    WMI_MAX_FAILED_LINK_COMBO_COUNT) {
-			wmi_err("link_count size %d exceeds max combo_count size %d",
-				src_list->ml_failed_link_combo_count,
-				WMI_MAX_FAILED_LINK_COMBO_COUNT);
-			qdf_mem_free(dst_list);
-
-			return QDF_STATUS_E_INVAL;
-		}
 		roam_update_mlo_bl_info(roam_denylist, src_list);
 		roam_denylist++;
 		src_list++;
@@ -3680,7 +3027,7 @@ extract_roam_scan_chan_list_tlv(wmi_unified_t wmi_handle,
 	data->chan_list = (uint32_t *)(data + 1);
 	data->vdev_id = fixed_param->vdev_id;
 	data->command_resp = fixed_param->command_response;
-	data->num_channels = num_ch;
+	data->num_channels = param_buf->num_channel_list;
 
 	for (i = 0; i < num_ch; i++)
 		data->chan_list[i] = param_buf->channel_list[i];
@@ -3699,25 +3046,23 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	status = wmi_unified_extract_roam_scan_stats(
 			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam scan stats not present in this event vdev %d",
-			  vdev_id);
+		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
 	status = wmi_unified_extract_roam_11kv_stats(
 			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam 11kv stats not present in this event vdev %d",
-			  vdev_id);
+		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
 	status = wmi_unified_extract_roam_trigger_stats(
 			wmi_handle, evt_buf, &stats_info->trigger[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roamtrigger stats not present in this event vdev %d",
+		wmi_debug("Extract roamtrigger stats failed vdev %d",
 			  vdev_id);
 
 	status = wmi_unified_extract_roam_btm_response(
 			wmi_handle, evt_buf, &stats_info->btm_rsp[0], 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam btm rsp stats not present in this event vdev %d",
+		wmi_debug("Roam btm rsp stats extract fail vdev %d",
 			  vdev_id);
 
 	return QDF_STATUS_SUCCESS;
@@ -4011,13 +3356,8 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 {
 	wmi_roam_preauth_start_event_fixed_param *rso_auth_start_ev;
 	WMI_ROAM_PREAUTH_START_EVENTID_param_tlvs *param_buf;
-	uint32_t rsn_sel;
 
-	param_buf = (WMI_ROAM_PREAUTH_START_EVENTID_param_tlvs *)event;
-	if (!param_buf) {
-		wmi_debug("received null buf from target");
-		return QDF_STATUS_E_INVAL;
-	}
+	param_buf = (WMI_ROAM_PREAUTH_START_EVENTID_param_tlvs *) event;
 
 	rso_auth_start_ev = param_buf->fixed_param;
 	if (!rso_auth_start_ev) {
@@ -4032,44 +3372,7 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 	}
 
 	auth_event->vdev_id = rso_auth_start_ev->vdev_id;
-	auth_event->akm = WLAN_RSN_SEL(rso_auth_start_ev->akm_suite_type);
-
-	auth_event->auth_algo = rso_auth_start_ev->auth_algo;
-	/*
-	 * The FW sends the IEEE cipher suite type (e.g. WLAN_CSE_CCMP), whereas
-	 * wlan_crypto_rsn_suite_to_cipher() parses a 4-byte RSN suite selector
-	 * via LE_READ_4(). Build the selector with WLAN_RSN_SEL() and pass its
-	 * address, the same way akm is handled above.
-	 */
-	rsn_sel = WLAN_RSN_SEL(rso_auth_start_ev->pairwise_cipher);
-	auth_event->pairwise_cipher =
-		wlan_crypto_rsn_suite_to_cipher((const uint8_t *)&rsn_sel);
-
-	if (auth_event->pairwise_cipher >= WLAN_CRYPTO_CIPHER_INVALID) {
-		wmi_debug("Invalid pairwise cipher %u",
-			  auth_event->pairwise_cipher);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	rsn_sel = WLAN_RSN_SEL(rso_auth_start_ev->group_cipher);
-	auth_event->group_cipher =
-		wlan_crypto_rsn_suite_to_cipher((const uint8_t *)&rsn_sel);
-
-	if (auth_event->group_cipher >= WLAN_CRYPTO_CIPHER_INVALID) {
-		wmi_debug("Invalid group cipher %u",
-			  auth_event->group_cipher);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	rsn_sel = WLAN_RSN_SEL(rso_auth_start_ev->group_mgmt_cipher);
-	auth_event->group_mgmt_cipher =
-		wlan_crypto_rsn_suite_to_cipher((const uint8_t *)&rsn_sel);
-
-	if (auth_event->group_mgmt_cipher >= WLAN_CRYPTO_CIPHER_INVALID) {
-		wmi_debug("Invalid group mgmt cipher %u",
-			  auth_event->group_mgmt_cipher);
-		return QDF_STATUS_E_INVAL;
-	}
+	auth_event->akm = rso_auth_start_ev->akm_suite_type;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->candidate_ap_bssid,
 				   auth_event->ap_bssid.bytes);
@@ -4082,37 +3385,11 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 		return -EINVAL;
 	}
 
-	if (param_buf->rsn_ie && param_buf->num_rsn_ie) {
-		if (param_buf->num_rsn_ie <= WLAN_MAX_IE_LEN + 2) {
-			auth_event->rsn_ie_len = (uint8_t)param_buf->num_rsn_ie;
-			qdf_mem_copy(auth_event->rsn_ie, param_buf->rsn_ie,
-				     auth_event->rsn_ie_len);
-		} else {
-			wmi_debug("rsn_ie length %d exceeds max",
-				  param_buf->num_rsn_ie);
-		}
-	}
-
-	if (param_buf->rsnxe_ie && param_buf->num_rsnxe_ie) {
-		if (param_buf->num_rsnxe_ie <= WLAN_MAX_IE_LEN + 2) {
-			auth_event->rsnxe_ie_len =
-				(uint8_t)param_buf->num_rsnxe_ie;
-			qdf_mem_copy(auth_event->rsnxe_ie, param_buf->rsnxe_ie,
-				     auth_event->rsnxe_ie_len);
-		} else {
-			wmi_debug("rsnxe_ie length %d exceeds max",
-				  param_buf->num_rsnxe_ie);
-		}
-	}
-
 	wmi_debug("Received Roam auth offload event for bss:"
-		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d akm: %d auth_algo:%u pairwise_cipher:0x%x group_cipher:0x%x group_mgmt_cipher:0x%x rsn_ie_len:%d rsnxe_ie_len:%d",
+		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d akm: %d",
 		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes),
 		  QDF_MAC_ADDR_REF(auth_event->ta.bytes),
-		  auth_event->vdev_id, auth_event->akm,
-		  auth_event->auth_algo, auth_event->pairwise_cipher,
-		  auth_event->group_cipher, auth_event->group_mgmt_cipher,
-		  auth_event->rsn_ie_len, auth_event->rsnxe_ie_len);
+		  auth_event->vdev_id, auth_event->akm);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4241,13 +3518,11 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	}
 
 	data->vdev_id = frame_params->vdev_id;
-	data->rssi = frame_params->rssi;
 	data->frame_length = frame_params->frame_length;
 	data->frame = (uint8_t *)param_buf->frame;
 	data->roam_offload_candidate_frm = true;
-	wmi_debug("Frame: vdev %d, rssi: %d, frame_length: %d", data->vdev_id,
-		  data->rssi, data->frame_length);
-	mgmt_txrx_frame_hex_dump(data->frame, data->frame_length, false);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   data->frame, data->frame_length);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4407,12 +3682,6 @@ extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
 
 	if (len < (sizeof(*fixed_param) + (num_entries * sizeof(*src_list)))) {
 		wmi_err("Invalid length: %d", len);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (num_entries > MAX_VENDOR_CONTROL_PARAMS) {
-		wmi_err("Too many vendor control params: %u (max allowed: %u)",
-			num_entries, MAX_VENDOR_CONTROL_PARAMS);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -4914,7 +4183,6 @@ free_entries:
 	qdf_mem_zero(*entries,
 		     WLAN_MAX_ML_BSS_LINKS * sizeof(**entries));
 	qdf_mem_free(*entries);
-	*entries = NULL;
 
 free_keys:
 	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
@@ -4991,12 +4259,6 @@ extract_roam_ml_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			src_link_info++;
 			parsed_tlv_count++;
 			continue;
-		}
-
-		if (dst->num_links >= WLAN_MAX_ML_BSS_LINKS) {
-			wmi_err("num_links %d exceeded max %d, dropping link",
-				dst->num_links, WLAN_MAX_ML_BSS_LINKS);
-			break;
 		}
 
 		dst->present = true;
@@ -5353,18 +4615,6 @@ wmi_fill_sae_single_pmk_param(struct wlan_rso_11i_params *src_11i,
 			1 << WMI_ROAM_OFFLOAD_FLAG_SAE_SAME_PMKID;
 }
 
-static inline void
-wmi_fill_user_okc_cache_support(struct wlan_rso_11i_params *src_11i,
-				wmi_roam_11i_offload_tlv_param *roam_offload_11i)
-{
-	if (src_11i->user_okc_cache_support) {
-		WMI_SET_ROAM_OFFLOAD_USER_OKC_CACHE_SUPPORT(
-						roam_offload_11i->flags);
-		wmi_debug("User OKC cache support set in RSO 11i flags:0x%x",
-			  roam_offload_11i->flags);
-	}
-}
-
 static uint8_t *wmi_fill_sae_single_pmk_tlv(
 	struct wlan_roam_scan_offload_params *roam_req, uint8_t *buf_ptr)
 {
@@ -5394,11 +4644,6 @@ static uint8_t *wmi_fill_sae_single_pmk_tlv(
 static inline void
 wmi_fill_sae_single_pmk_param(struct wlan_rso_11i_params *src_11i,
 			      wmi_roam_11i_offload_tlv_param *roam_offload_11i)
-{}
-
-static inline void
-wmi_fill_user_okc_cache_support(struct wlan_rso_11i_params *src_11i,
-				wmi_roam_11i_offload_tlv_param *roam_offload_11i)
 {}
 
 static inline uint8_t *wmi_fill_sae_single_pmk_tlv(
@@ -5635,8 +4880,6 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 
 			wmi_fill_sae_single_pmk_param(src_11i_info,
 						      roam_offload_11i);
-			wmi_fill_user_okc_cache_support(src_11i_info,
-							roam_offload_11i);
 
 			roam_offload_11i->pmk_len =
 				src_11i_info->pmk_len > ROAM_OFFLOAD_PMK_BYTES ?
@@ -5936,24 +5179,6 @@ send_roam_scan_mode_cmd:
 	return status;
 }
 
-#ifdef WLAN_FEATURE_11BN
-static void
-send_update_uhr_roam_params(wmi_roam_cnd_scoring_param *score_param,
-			    struct ap_profile_params *ap_profile)
-{
-	score_param->uhr_weightage_pcnt =
-				ap_profile->param.uhr_caps_weightage;
-	wmi_debug("11bn score params weightage: UHR %d",
-		  score_param->uhr_weightage_pcnt);
-}
-#else
-static void
-send_update_uhr_roam_params(wmi_roam_cnd_scoring_param *score_param,
-			    struct ap_profile_params *ap_profile)
-{
-}
-#endif
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
 send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
@@ -6077,131 +5302,11 @@ send_roam_mlo_config_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * send_smd_roam_start_status_cmd_tlv() - Send SMD roam start status to FW
- * @wmi_handle: wmi handle
- * @params: SMD roam start status parameters
- *
- * This function sends the WMI_ROAM_SMD_START_STATUS_CMDID command to fw.
- *
- * Return: QDF status
- */
-#ifdef WLAN_FEATURE_11BN_SMD
-static QDF_STATUS
-send_smd_roam_start_status_cmd_tlv(wmi_unified_t wmi_handle,
-				   struct wlan_roam_smd_start_status_params *params)
-{
-	wmi_roam_smd_start_status_cmd_fixed_param *cmd;
-	wmi_vdev_repurpose_response_tlv_param *repurpose_resp;
-	wmi_prep_resp_status_list *status_list;
-	wmi_buf_t buf;
-	uint32_t len;
-	uint8_t i;
-	uint8_t *buf_ptr;
-
-	len = sizeof(*cmd) +
-	      WMI_TLV_HDR_SIZE +
-	      params->num_vdev_repurpose_resp *
-			sizeof(wmi_vdev_repurpose_response_tlv_param) +
-	      WMI_TLV_HDR_SIZE +
-	      qdf_roundup(params->smd_transition_ie_len, sizeof(uint32_t)) +
-	      WMI_TLV_HDR_SIZE +
-	      params->num_prep_status * sizeof(wmi_prep_resp_status_list) +
-	      WMI_TLV_HDR_SIZE +
-	      qdf_roundup(params->kck_len, sizeof(uint32_t));
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf)
-		return QDF_STATUS_E_NOMEM;
-
-	buf_ptr = (uint8_t *)wmi_buf_data(buf);
-	cmd = (wmi_roam_smd_start_status_cmd_fixed_param *)buf_ptr;
-	WMITLV_SET_HDR(
-	    &cmd->tlv_header,
-	    WMITLV_TAG_STRUC_wmi_roam_smd_start_status_cmd_fixed_param,
-	    WMITLV_GET_STRUCT_TLVLEN(wmi_roam_smd_start_status_cmd_fixed_param));
-
-	cmd->vdev_id = params->vdev_id;
-	cmd->status = params->status;
-	cmd->kck_len = params->kck_len;
-
-	wmi_debug("Send SMD ROAM STATUS command to FW: vdev_id:%d status:%d",
-		  cmd->vdev_id, cmd->status);
-
-	buf_ptr += sizeof(*cmd);
-
-	/* vdev repurpose response struct array */
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       params->num_vdev_repurpose_resp *
-		       sizeof(wmi_vdev_repurpose_response_tlv_param));
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	repurpose_resp = (wmi_vdev_repurpose_response_tlv_param *)buf_ptr;
-	for (i = 0; i < params->num_vdev_repurpose_resp; i++) {
-		WMITLV_SET_HDR(
-		    &repurpose_resp[i].tlv_header,
-		    WMITLV_TAG_STRUC_wmi_vdev_repurpose_response_tlv_param,
-		    WMITLV_GET_STRUCT_TLVLEN(
-				wmi_vdev_repurpose_response_tlv_param));
-		repurpose_resp[i].repurpose_vdev_id =
-				params->vdev_repurpose_resp[i].vdev_id;
-		repurpose_resp[i].status =
-				params->vdev_repurpose_resp[i].status;
-	}
-	buf_ptr += params->num_vdev_repurpose_resp *
-		   sizeof(wmi_vdev_repurpose_response_tlv_param);
-
-	/* smd_transition_ie byte array */
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,
-		       qdf_roundup(params->smd_transition_ie_len,
-				   sizeof(uint32_t)));
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	if (params->smd_transition_ie_len && params->smd_transition_ie)
-		qdf_mem_copy(buf_ptr, params->smd_transition_ie,
-			     params->smd_transition_ie_len);
-	buf_ptr += qdf_roundup(params->smd_transition_ie_len, sizeof(uint32_t));
-
-	/* prep_resp_status_list struct array */
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       params->num_prep_status *
-		       sizeof(wmi_prep_resp_status_list));
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	status_list = (wmi_prep_resp_status_list *)buf_ptr;
-	for (i = 0; i < params->num_prep_status; i++) {
-		WMITLV_SET_HDR(&status_list[i].tlv_header,
-			       WMITLV_TAG_STRUC_wmi_prep_resp_status_list,
-			       WMITLV_GET_STRUCT_TLVLEN(wmi_prep_resp_status_list));
-		status_list[i].ieee_link_id =
-				params->prep_status_list[i].ieee_link_id;
-		status_list[i].status_code = params->prep_status_list[i].status;
-	}
-	buf_ptr += params->num_prep_status * sizeof(wmi_prep_resp_status_list);
-
-	/* kck byte array */
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,
-		       qdf_roundup(params->kck_len, sizeof(uint32_t)));
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	if (params->kck_len && params->kck)
-		qdf_mem_copy(buf_ptr, params->kck, params->kck_len);
-
-	wmi_mtrace(WMI_ROAM_SMD_START_STATUS_CMDID, cmd->vdev_id, 0);
-	if (wmi_unified_cmd_send(wmi_handle, buf, len,
-				 WMI_ROAM_SMD_START_STATUS_CMDID)) {
-		wmi_err("Failed to send WMI_ROAM_SMD_START_STATUS_CMDID");
-		wmi_buf_free(buf);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
-
 static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
 
 	ops->send_roam_mlo_config = send_roam_mlo_config_tlv;
-#ifdef WLAN_FEATURE_11BN_SMD
-	ops->send_smd_roam_start_status_cmd = send_smd_roam_start_status_cmd_tlv;
-#endif
 }
 
 #else
@@ -6212,33 +5317,6 @@ send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 }
 
 static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * send_update_smd_roam_params() - Update SMD roam scoring params
- * @score_param: pointer to wmi_roam_cnd_scoring_param to be filled
- * @ap_profile: pointer to ap_profile_params containing host config
- *
- * Populate uhr_weightage_pcnt and smd_weightage_pcnt fields in the WMI
- * scoring param TLV from the corresponding host-side ap_profile parameters.
- *
- * Return: None
- */
-static void
-send_update_smd_roam_params(wmi_roam_cnd_scoring_param *score_param,
-			    struct ap_profile_params *ap_profile)
-{
-	score_param->smd_weightage_pcnt = ap_profile->param.smd_weightage;
-	wmi_debug("SMD score params weightage: SMD %d",
-		  score_param->smd_weightage_pcnt);
-}
-#else
-static void
-send_update_smd_roam_params(wmi_roam_cnd_scoring_param *score_param,
-			    struct ap_profile_params *ap_profile)
 {
 }
 #endif
@@ -6271,8 +5349,6 @@ void update_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
-#define BAND_IDX_MAX 0xFFFFFFFF
-
 /**
  * send_roam_scan_offload_ap_profile_cmd_tlv() - set roam ap profile in fw
  * @wmi_handle: wmi handle
@@ -6296,7 +5372,6 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_roam_score_delta_param *score_delta_param;
 	wmi_roam_cnd_min_rssi_param *min_rssi_param;
 	wmi_owe_ap_profile *owe_ap_profile;
-	wmi_roam_cnd_vendor_scoring_param *vendor_score_param;
 	enum roam_trigger_reason trig_reason;
 	uint32_t *authmode_list;
 	int8_t mlo_prefer_percentage = 0;
@@ -6321,9 +5396,6 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	} else {
 		len += 2 * WMI_TLV_HDR_SIZE;
 	}
-
-	if (ap_profile->param.vendor_roam_score_algorithm)
-		len += sizeof(*vendor_score_param);
 
 	if (ap_profile->owe_ap_profile.is_owe_transition_conn) {
 		len += WMI_TLV_HDR_SIZE;
@@ -6420,8 +5492,6 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	score_param->mcc_score_factor_pcnt =
 			ap_profile->param.sta_sap_mcc_weightage;
 	send_update_mlo_roam_params(score_param, ap_profile);
-	send_update_uhr_roam_params(score_param, ap_profile);
-	send_update_smd_roam_params(score_param, ap_profile);
 	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d sta_sap_mcc_pcnt %d",
 		  score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		  score_param->ht_weightage_pcnt,
@@ -6607,34 +5677,10 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		buf_ptr += WMI_TLV_HDR_SIZE;
 	}
 
-	if (ap_profile->param.vendor_roam_score_algorithm) {
-		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-			       sizeof(*vendor_score_param));
-		buf_ptr += WMI_TLV_HDR_SIZE;
-
-		vendor_score_param = (wmi_roam_cnd_vendor_scoring_param *)buf_ptr;
-		WMITLV_SET_HDR(&vendor_score_param->tlv_header,
-			       WMITLV_TAG_STRUC_wmi_roam_cnd_vendor_scoring_param,
-			       WMITLV_GET_STRUCT_TLVLEN(wmi_roam_cnd_vendor_scoring_param));
-		vendor_score_param->band_idx = BAND_IDX_MAX;
-		vendor_score_param->band_weight_2GHz =
-			ap_profile->param.band_2g_weightage;
-		vendor_score_param->band_weight_5GHz =
-			ap_profile->param.band_5g_weightage;
-		vendor_score_param->band_weight_6GHz =
-			ap_profile->param.band_6g_weightage;
-
-		wmi_debug("Band weight 2 GHz:%d Band weight 5 GHz:%d, Band weight 6 GHz:%d",
-			  vendor_score_param->band_weight_2GHz,
-			  vendor_score_param->band_weight_5GHz,
-			  vendor_score_param->band_weight_6GHz);
-		buf_ptr += sizeof(*vendor_score_param);
-	} else {
-		/* set zero TLV's for roam_cnd_vendor_scoring_param */
-		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-			       WMITLV_GET_STRUCT_TLVLEN(0));
-		buf_ptr += WMI_TLV_HDR_SIZE;
-	}
+	/* set zero TLV's for roam_cnd_vendor_scoring_param */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       WMITLV_GET_STRUCT_TLVLEN(0));
+	buf_ptr += WMI_TLV_HDR_SIZE;
 
 	if (ap_profile->owe_ap_profile.is_owe_transition_conn) {
 		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
@@ -6784,21 +5830,14 @@ static QDF_STATUS send_roam_scan_offload_chan_list_cmd_tlv(
 			       (wmi_roam_chan_list_fixed_param));
 	chan_list_fp->vdev_id = rso_ch_info->vdev_id;
 	chan_list_fp->num_chan = chan_count;
-
-	if (rso_ch_info->chan_cache_type == WMI_CHANNEL_LIST_NEIGHBOR_REPORT) {
-		/* Use neighbor report channel list type */
-		chan_list_fp->chan_list_type =
-			WMI_ROAM_SCAN_CHAN_LIST_TYPE_NEIGHBOR_REPORT;
-		wmi_debug("Using NEIGHBOUR_REPORT channel list type");
-	} else if (rso_ch_info->chan_cache_type == WMI_CHANNEL_LIST_STATIC) {
+	if (rso_ch_info->chan_cache_type == WMI_CHANNEL_LIST_STATIC)
 		/* external app is controlling channel list */
 		chan_list_fp->chan_list_type =
 			WMI_ROAM_SCAN_CHAN_LIST_TYPE_STATIC;
-	} else {
+	else
 		/* umac supplied occupied channel list in LFR */
 		chan_list_fp->chan_list_type =
 			WMI_ROAM_SCAN_CHAN_LIST_TYPE_DYNAMIC;
-	}
 
 	buf_ptr += sizeof(wmi_roam_chan_list_fixed_param);
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
@@ -7110,150 +6149,6 @@ static QDF_STATUS send_btm_config_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * send_roam_smd_config_cmd_tlv() - Send wmi cmd for SMD config
- * @wmi_handle: wmi handle
- * @params: pointer to wlan_roam_smd_config
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS send_roam_smd_config_cmd_tlv(
-				wmi_unified_t wmi_handle,
-				struct wlan_roam_smd_config *params)
-{
-	wmi_roam_smd_config_cmd_fixed_param *cmd;
-	wmi_buf_t buf;
-	uint32_t len;
-
-	len = sizeof(*cmd);
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf)
-		return QDF_STATUS_E_NOMEM;
-
-	cmd = (wmi_roam_smd_config_cmd_fixed_param *)wmi_buf_data(buf);
-	WMITLV_SET_HDR(&cmd->tlv_header,
-		       WMITLV_TAG_STRUC_wmi_roam_smd_config_cmd_fixed_param,
-		       WMITLV_GET_STRUCT_TLVLEN(
-				wmi_roam_smd_config_cmd_fixed_param));
-	cmd->vdev_id = params->vdev_id;
-	cmd->prefer_mode = params->prefer_mode;
-	cmd->flags = params->flags;
-	cmd->manual_conf = params->manual_conf;
-
-	wmi_debug("RSO_CFG: vdev_id:%u prefer_mode:%u flags:0x%x manual:0x%x",
-		  cmd->vdev_id, cmd->prefer_mode, cmd->flags, cmd->manual_conf);
-
-	wmi_mtrace(WMI_ROAM_SMD_CONFIG_CMDID, cmd->vdev_id, 0);
-	if (wmi_unified_cmd_send(wmi_handle, buf, len,
-				 WMI_ROAM_SMD_CONFIG_CMDID)) {
-		wmi_err("Failed to send WMI_ROAM_SMD_CONFIG_CMDID");
-		wmi_buf_free(buf);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * send_vdev_repurpose_resp_cmd_tlv() - Send vdev repurpose response
- * @wmi_handle: WMI handle
- * @vdev_id: VDEV ID
- * @repurpose_resp: Array of vdev repurpose response TLVs
- * @num_repurpose_resp: Number of repurpose response TLVs
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-send_vdev_repurpose_resp_cmd_tlv(wmi_unified_t wmi_handle,
-				 uint8_t vdev_id,
-				 struct vdev_repurpose_params *repurpose_resp,
-				 uint8_t num_repurpose_resp)
-{
-	wmi_vdev_repurpose_resp_cmd_fixed_param *cmd;
-	wmi_buf_t buf;
-	uint8_t *buf_ptr;
-	uint32_t len;
-	QDF_STATUS status;
-	uint8_t i;
-
-	/* Calculate buffer length */
-	len = sizeof(wmi_vdev_repurpose_resp_cmd_fixed_param);
-	len += WMI_TLV_HDR_SIZE; /* Array header */
-	len += num_repurpose_resp *
-		sizeof(wmi_vdev_repurpose_response_tlv_param);
-
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf) {
-		wmi_err("Failed to allocate memory for vdev repurpose resp");
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	buf_ptr = (uint8_t *)wmi_buf_data(buf);
-
-	/* Fill fixed param */
-	cmd = (wmi_vdev_repurpose_resp_cmd_fixed_param *)buf_ptr;
-	WMITLV_SET_HDR(
-		&cmd->tlv_header,
-		WMITLV_TAG_STRUC_wmi_vdev_repurpose_resp_cmd_fixed_param,
-		WMITLV_GET_STRUCT_TLVLEN(
-			wmi_vdev_repurpose_resp_cmd_fixed_param));
-	cmd->vdev_id = vdev_id;
-
-	buf_ptr += sizeof(wmi_vdev_repurpose_resp_cmd_fixed_param);
-
-	/* Fill TLV array header */
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       num_repurpose_resp *
-		       sizeof(wmi_vdev_repurpose_response_tlv_param));
-	buf_ptr += WMI_TLV_HDR_SIZE;
-
-	/* Fill repurpose response TLVs */
-	for (i = 0; i < num_repurpose_resp; i++) {
-		wmi_vdev_repurpose_response_tlv_param *tlv =
-			(wmi_vdev_repurpose_response_tlv_param *)buf_ptr;
-
-		WMITLV_SET_HDR(
-			&tlv->tlv_header,
-			WMITLV_TAG_STRUC_wmi_vdev_repurpose_response_tlv_param,
-			WMITLV_GET_STRUCT_TLVLEN(
-				wmi_vdev_repurpose_response_tlv_param));
-
-		tlv->repurpose_vdev_id = repurpose_resp[i].repurpose_vdev_id;
-		tlv->status = repurpose_resp[i].status;
-
-		buf_ptr += sizeof(wmi_vdev_repurpose_response_tlv_param);
-	}
-
-	wmi_mtrace(WMI_VDEV_REPURPOSE_RESP_CMDID, vdev_id, 0);
-	status = wmi_unified_cmd_send(wmi_handle, buf, len,
-				      WMI_VDEV_REPURPOSE_RESP_CMDID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wmi_err("Failed to send vdev repurpose resp cmd: %d", status);
-		wmi_buf_free(buf);
-		return status;
-	}
-
-	wmi_debug("Sent vdev repurpose resp for vdev_id %d with %d TLVs",
-		  vdev_id, num_repurpose_resp);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static void wmi_roam_smd_attach_tlv(struct wmi_unified *wmi_handle)
-{
-	struct wmi_ops *ops = wmi_handle->ops;
-
-	ops->send_smd_roam_config = send_roam_smd_config_cmd_tlv;
-	ops->send_vdev_repurpose_resp_cmd = send_vdev_repurpose_resp_cmd_tlv;
-}
-
-#else
-static void wmi_roam_smd_attach_tlv(struct wmi_unified *wmi_handle)
-{
-}
-#endif
-
 /**
  * send_roam_bss_load_config_tlv() - send roam load bss trigger configuration
  * @wmi_handle: wmi handle
@@ -7341,10 +6236,7 @@ send_disconnect_roam_params_tlv(wmi_unified_t wmi_handle,
 
 	cmd->vdev_id = req->vdev_id;
 	cmd->enable = req->enable;
-	cmd->self_roaming_re_enable_time =
-		req->reconnect_disallow_period;
-	wmi_debug("RSO_CFG: vdev_id:%d enable:%d self_roaming_re_enable_time %d ",
-		  cmd->vdev_id, cmd->enable, cmd->self_roaming_re_enable_time);
+	wmi_debug("RSO_CFG: vdev_id:%d enable:%d", cmd->vdev_id, cmd->enable);
 
 	wmi_mtrace(WMI_ROAM_DEAUTH_CONFIG_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -7669,7 +6561,6 @@ void wmi_roam_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_roam_preauth_status = send_roam_preauth_status_tlv;
 	ops->extract_roam_event = extract_roam_event_tlv;
 
-	wmi_roam_smd_attach_tlv(wmi_handle);
 	wmi_roam_mlo_attach_tlv(wmi_handle);
 	wmi_lfr_subnet_detection_attach_tlv(wmi_handle);
 	wmi_rssi_monitor_attach_tlv(wmi_handle);

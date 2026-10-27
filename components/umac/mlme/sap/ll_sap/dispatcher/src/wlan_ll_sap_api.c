@@ -29,9 +29,6 @@
 #define SET_HT_MCS3(mcs) do { \
 	mcs[0] = 0x0f;        \
 	mcs[1] = 0x00;        \
-	mcs[2] = 0x00;        \
-	mcs[3] = 0x00;        \
-	mcs[WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS / BITS_IN_A_BYTE] = 0x1; \
 	} while(0)
 
 wlan_bs_req_id
@@ -297,11 +294,12 @@ qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 	} else if (wlan_reg_is_passive_for_freq(pdev, chan_freq))  {
 		*csa_reason = CSA_REASON_CHAN_PASSIVE;
 		goto get_new_ll_lt_sap_freq;
-	} else if (!policy_mgr_is_unsafe_freq_allowed(psoc, vdev_id,
-						      chan_freq)) {
+	} else if (!policy_mgr_is_sap_freq_allowed(psoc,
+				wlan_get_opmode_from_vdev_id(pdev, vdev_id),
+				chan_freq)) {
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
-	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc, chan_freq)) {
+	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
 		*csa_reason = CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
 	}
@@ -352,13 +350,8 @@ wlan_ll_sap_fw_bearer_switch_req(struct wlan_objmgr_psoc *psoc,
 	else
 		status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
 
-	if (QDF_IS_STATUS_ERROR(status)) {
-		ll_sap_err("vdev %d Bearer req failed type %d",
-			   ll_lt_sap_vdev_id, req_type);
-		ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(psoc,
-					req_type, WLAN_BS_STATUS_REJECTED);
-		return QDF_STATUS_E_INVAL;
-	}
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_ALREADY;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -516,20 +509,6 @@ wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
 	return ll_sap_set_cur_freq_unused_cu(psoc, vdev_id, unused_cu);
 }
 
-bool
-wlan_ll_sap_is_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id)
-{
-	return ll_sap_is_start_bss_in_progress(psoc, vdev_id);
-}
-
-QDF_STATUS
-wlan_ll_sap_set_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
-				      uint8_t vdev_id, bool start_bss)
-{
-	return ll_sap_set_start_bss_in_progress(psoc, vdev_id, start_bss);
-}
-
 uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
@@ -661,7 +640,7 @@ bool wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
 
 	cu = ll_sap_get_cur_freq_unused_cu(psoc, vdev_id);
 	coch_intfr_threshold = wlan_dcs_get_trnsprt_switch_rjt_th_cu(psoc,
-								     vdev_id);
+								     mac_id);
 	if (cu && cu > coch_intfr_threshold)
 		return true;
 

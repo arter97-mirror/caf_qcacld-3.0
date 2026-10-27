@@ -20,7 +20,6 @@
 #include "wifi_pos_ucfg_api.h"
 #include "wifi_pos_utils_i.h"
 #include "os_if_wifi_pos_utils.h"
-#include "os_if_wifi_pos.h"
 
 #if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 QDF_STATUS
@@ -54,17 +53,4 @@ ucfg_wifi_pos_psoc_close(struct wlan_objmgr_psoc *psoc)
 
 	return status;
 }
-
-#if defined(WLAN_FEATURE_RTT_11AZ_SUPPORT) && defined(CFG80211_PD_SUPPORT)
-void ucfg_wifi_pos_pmsr_complete_on_concurrency(struct wlan_objmgr_psoc *psoc)
-{
-	struct osif_wifi_pos_legacy_ops *legacy_cb;
-
-	legacy_cb = osif_wifi_pos_get_legacy_cb();
-	if (!legacy_cb || !legacy_cb->pmsr_complete_cb)
-		return;
-
-	legacy_cb->pmsr_complete_cb(psoc);
-}
-#endif /* WLAN_FEATURE_RTT_11AZ_SUPPORT && CFG80211_PD_SUPPORT */
 #endif /* WIFI_POS_CONVERGED && WLAN_FEATURE_RTT_11AZ_SUPPORT */

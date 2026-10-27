@@ -154,7 +154,6 @@ void target_if_pmo_register_tx_ops(struct wlan_pmo_tx_ops *pmo_tx_ops)
 	tgt_if_pmo_icmp_tx_ops(pmo_tx_ops);
 	pmo_tx_ops->psoc_set_wow_enable_ack_failed =
 		target_if_pmo_set_wow_enable_ack_failed;
-	pmo_tx_ops->send_apf_mode_req =
-		target_if_pmo_send_apf_mode_req;
+
 }
 

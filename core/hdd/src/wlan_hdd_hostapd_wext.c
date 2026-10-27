@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- *Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,6 +61,73 @@
 #define HT_RC_2_STREAMS(_rc)    ((((_rc) & 0x78) >> 3) + 1)
 #define RC_2_RATE_IDX_11AC(_rc)        ((_rc) & 0xf)
 #define HT_RC_2_STREAMS_11AC(_rc)    ((((_rc) & 0x30) >> 4) + 1)
+
+static int hdd_sap_get_chan_width(struct hdd_adapter *adapter, int *value)
+{
+	struct sap_context *sap_ctx;
+	struct hdd_hostapd_state *hostapdstate;
+
+	hdd_enter();
+	hostapdstate = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+
+	if (hostapdstate->bss_state != BSS_START) {
+		*value = -EINVAL;
+		return -EINVAL;
+	}
+
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+
+	*value = wlansap_get_chan_width(sap_ctx);
+	hdd_debug("chan_width = %d", *value);
+
+	return 0;
+}
+
+int
+static __iw_softap_get_ini_cfg(struct net_device *dev,
+			       struct iw_request_info *info,
+			       union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx;
+	int ret;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	hdd_debug("Printing CLD global INI Config");
+	hdd_cfg_get_global_config(hdd_ctx, extra, QCSAP_IOCTL_MAX_STR_LEN);
+	wrqu->data.length = strlen(extra) + 1;
+
+	return 0;
+}
+
+int
+static iw_softap_get_ini_cfg(struct net_device *dev,
+			     struct iw_request_info *info,
+			     union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_softap_get_ini_cfg(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
 
 /**
  * __iw_softap_set_two_ints_getnone() - Generic "set two integer" ioctl handler
@@ -142,6 +209,10 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 	/* Firmware debug log */
 	case QCSAP_IOCTL_SET_FW_CRASH_INJECT:
 		ret = hdd_crash_inject(adapter, value[1], value[2]);
+		break;
+
+	case QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL:
+		hdd_set_dump_dp_trace(value[1], value[2]);
 		break;
 
 	case QCSAP_ENABLE_FW_PROFILE:
@@ -296,7 +367,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	QDF_STATUS status;
 	int ret = 0;
 	struct hdd_context *hdd_ctx;
-	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
+	bool bval = false;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
@@ -359,7 +430,7 @@ static __iw_softap_setparam(struct net_device *dev,
 							    set_value, 0,
 							    CH_WIDTH_MAX,
 							    NO_SCHANS_PUNC,
-							    false, true, NULL);
+							    false, true);
 		} else {
 			hdd_err("Channel Change Failed, Device in test mode");
 			ret = -EINVAL;
@@ -439,13 +510,12 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("MC Target rate %d", set_value);
 		qdf_copy_macaddr(&rate_update.bssid,
 				 &adapter->mac_addr);
-		status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
-						    &enable_mimo);
+		status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("unable to get vht_enable2x2");
 			ret = -1;
 		}
-		rate_update.nss = enable_mimo ? 1 : 0;
+		rate_update.nss = (bval == 0) ? 0 : 1;
 
 		rate_update.dev_mode = adapter->device_mode;
 		rate_update.mcastDataRate24GHz = set_value;
@@ -469,6 +539,77 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
+	/* Firmware debug log */
+	case QCSAP_DBGLOG_LOG_LEVEL:
+	{
+		hdd_debug("QCSAP_DBGLOG_LOG_LEVEL val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_LOG_LEVEL,
+					  set_value, DBG_CMD);
+		break;
+	}
+
+	case QCSAP_DBGLOG_VAP_ENABLE:
+	{
+		hdd_debug("QCSAP_DBGLOG_VAP_ENABLE val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_VAP_ENABLE,
+					  set_value, DBG_CMD);
+		break;
+	}
+
+	case QCSAP_DBGLOG_VAP_DISABLE:
+	{
+		hdd_debug("QCSAP_DBGLOG_VAP_DISABLE val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_VAP_DISABLE,
+					  set_value, DBG_CMD);
+		break;
+	}
+
+	case QCSAP_DBGLOG_MODULE_ENABLE:
+	{
+		hdd_debug("QCSAP_DBGLOG_MODULE_ENABLE val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_MODULE_ENABLE,
+					  set_value, DBG_CMD);
+		break;
+	}
+
+	case QCSAP_DBGLOG_MODULE_DISABLE:
+	{
+		hdd_debug("QCSAP_DBGLOG_MODULE_DISABLE val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_MODULE_DISABLE,
+					  set_value, DBG_CMD);
+		break;
+	}
+
+	case QCSAP_DBGLOG_MOD_LOG_LEVEL:
+	{
+		hdd_debug("QCSAP_DBGLOG_MOD_LOG_LEVEL val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_MOD_LOG_LEVEL,
+					  set_value, DBG_CMD);
+		break;
+	}
+
+	case QCSAP_DBGLOG_TYPE:
+	{
+		hdd_debug("QCSAP_DBGLOG_TYPE val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_TYPE,
+					  set_value, DBG_CMD);
+		break;
+	}
+	case QCSAP_DBGLOG_REPORT_ENABLE:
+	{
+		hdd_debug("QCSAP_DBGLOG_REPORT_ENABLE val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  WMI_DBGLOG_REPORT_ENABLE,
+					  set_value, DBG_CMD);
+		break;
+	}
 	case QCSAP_PARAM_SET_MCC_CHANNEL_LATENCY:
 	{
 		wlan_hdd_set_mcc_latency(adapter, set_value);
@@ -493,6 +634,17 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
+	case QCSAP_PARAM_RTSCTS:
+	{
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_vdev_param_enable_rtscts,
+					  set_value, VDEV_CMD);
+		if (ret) {
+			hdd_err("FAILED TO SET RTSCTS at SAP");
+			ret = -EIO;
+		}
+		break;
+	}
 	case QCASAP_SET_11N_RATE:
 	{
 		uint8_t preamble = 0, nss = 0, rix = 0;
@@ -676,6 +828,15 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
+	case QCSAP_GTX_BWMASK:
+	{
+		hdd_debug("wmi_vdev_param_gtx_bw_mask%d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_vdev_param_gtx_bw_mask,
+					  set_value, GTX_CMD);
+		break;
+	}
+
 	case QCASAP_SET_TM_LEVEL:
 	{
 		hdd_debug("Set Thermal Mitigation Level %d", set_value);
@@ -702,10 +863,8 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 
 		ret = wlansap_set_dfs_target_chnl(mac_handle,
-						  wlan_reg_legacy_chan_to_freq(
-							hdd_ctx->pdev,
-							set_value),
-						  link_info->vdev_id);
+						  wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+									       set_value));
 		break;
 	}
 
@@ -757,32 +916,59 @@ static __iw_softap_setparam(struct net_device *dev,
 
 		break;
 	}
+	case QCASAP_TX_CHAINMASK_CMD:
+	{
+		hdd_debug("QCASAP_TX_CHAINMASK_CMD val %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_pdev_param_tx_chain_mask,
+					  set_value, PDEV_CMD);
+		ret = hdd_set_antenna_mode(link_info, set_value);
+		break;
+	}
 
 	case QCASAP_RX_CHAINMASK_CMD:
 	{
-		uint8_t tx_mask;
-
 		hdd_debug("QCASAP_RX_CHAINMASK_CMD val %d", set_value);
 		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_pdev_param_rx_chain_mask,
 					  set_value, PDEV_CMD);
-		if (ret)
-			break;
-
 		ret = hdd_set_antenna_mode(link_info, set_value);
-		if (ret)
-			break;
-
-		/* Save RX chain mask to MLME config for consistent reporting */
-		status = ucfg_mlme_get_chain_mask(hdd_ctx->psoc, &tx_mask,
-						  NULL);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			status = ucfg_mlme_set_chain_mask(hdd_ctx->psoc,
-							  tx_mask, set_value);
-			if (QDF_IS_STATUS_ERROR(status))
-				hdd_err("failed to save RX chain mask to mlme");
-		}
 		break;
+	}
+
+	case QCASAP_NSS_CMD:
+	{
+		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
+		hdd_update_nss(link_info, set_value, set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_vdev_param_nss,
+					  set_value, VDEV_CMD);
+		break;
+	}
+
+	case QCSAP_IPA_UC_STAT:
+	{
+		/* If input value is non-zero get stats */
+		switch (set_value) {
+		case 1:
+			ucfg_ipa_uc_stat(hdd_ctx->pdev);
+			break;
+		case 2:
+			ucfg_ipa_uc_info(hdd_ctx->pdev);
+			break;
+		case 3:
+			ucfg_ipa_uc_rt_debug_host_dump(hdd_ctx->pdev);
+			break;
+		case 4:
+			ucfg_ipa_dump_info(hdd_ctx->pdev);
+			break;
+		default:
+			/* place holder for stats clean up
+			 * Stats clean not implemented yet on FW and IPA
+			 */
+			break;
+		}
+		return ret;
 	}
 
 	case QCASAP_SET_PHYMODE:
@@ -828,12 +1014,30 @@ static __iw_softap_setparam(struct net_device *dev,
 					  WMI_WLAN_PROFILE_TRIGGER_CMDID,
 					  set_value, DBG_CMD);
 		break;
+	case QCASAP_PARAM_LDPC:
+		ret = hdd_set_ldpc(link_info, set_value);
+		break;
 	case QCASAP_PARAM_TX_STBC:
 		ret = hdd_set_tx_stbc(link_info, set_value);
+		break;
+	case QCASAP_PARAM_RX_STBC:
+		ret = hdd_set_rx_stbc(link_info, set_value);
 		break;
 	case QCASAP_SET_11AX_RATE:
 		ret = hdd_set_11ax_rate(adapter, set_value,
 					&link_info->session.ap.sap_config);
+		break;
+	case QCASAP_PARAM_DCM:
+		hdd_debug("Set wmi_vdev_param_he_dcm_enable: %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_vdev_param_he_dcm_enable,
+					  set_value, VDEV_CMD);
+		break;
+	case QCASAP_PARAM_RANGE_EXT:
+		hdd_debug("Set wmi_vdev_param_he_range_ext: %d", set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
+					  wmi_vdev_param_he_range_ext,
+					  set_value, VDEV_CMD);
 		break;
 	case QCSAP_SET_DEFAULT_AMPDU:
 		hdd_debug("QCSAP_SET_DEFAULT_AMPDU val %d", set_value);
@@ -1077,6 +1281,15 @@ static __iw_softap_getparam(struct net_device *dev,
 		break;
 	}
 
+	case QCSAP_GTX_BWMASK:
+	{
+		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_gtx_bw_mask,
+					     GTX_CMD);
+		break;
+	}
+
 	case QCASAP_GET_DFS_NOL:
 	{
 		struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -1103,24 +1316,41 @@ static __iw_softap_getparam(struct net_device *dev,
 		break;
 	}
 
-	case QCASAP_RX_CHAINMASK_CMD:
+	case QCASAP_TX_CHAINMASK_CMD:
 	{
-		uint8_t rx_mask;
-		QDF_STATUS status;
-
-		hdd_debug("QCASAP_RX_CHAINMASK_CMD");
-		status = ucfg_mlme_get_chain_mask(hdd_ctx->psoc, NULL,
-						  &rx_mask);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("failed to get RX chain mask from mlme");
-			ret = -EINVAL;
-			break;
-		}
-
-		*value = rx_mask;
+		hdd_debug("QCASAP_TX_CHAINMASK_CMD");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_pdev_param_tx_chain_mask,
+					     PDEV_CMD);
 		break;
 	}
 
+	case QCASAP_RX_CHAINMASK_CMD:
+	{
+		hdd_debug("QCASAP_RX_CHAINMASK_CMD");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_pdev_param_rx_chain_mask,
+					     PDEV_CMD);
+		break;
+	}
+
+	case QCASAP_NSS_CMD:
+	{
+		hdd_debug("QCASAP_NSS_CMD");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_nss,
+					     VDEV_CMD);
+		break;
+	}
+	case QCSAP_CAP_TSF:
+		ret = hdd_capture_tsf(adapter, (uint32_t *)value, 1);
+		break;
+	case QCASAP_GET_TEMP_CMD:
+	{
+		hdd_debug("QCASAP_GET_TEMP_CMD");
+		ret = wlan_hdd_get_temperature(adapter, value);
+		break;
+	}
 	case QCSAP_GET_FW_PROFILE_DATA:
 		hdd_debug("QCSAP_GET_FW_PROFILE_DATA");
 		ret = wma_cli_set_command(
@@ -1128,11 +1358,37 @@ static __iw_softap_getparam(struct net_device *dev,
 				WMI_WLAN_PROFILE_GET_PROFILE_DATA_CMDID,
 				0, DBG_CMD);
 		break;
-
+	case QCASAP_PARAM_LDPC:
+	{
+		ret = hdd_get_ldpc(adapter, value);
+		break;
+	}
+	case QCASAP_PARAM_TX_STBC:
+	{
+		ret = hdd_get_tx_stbc(adapter, value);
+		break;
+	}
+	case QCASAP_PARAM_RX_STBC:
+	{
+		ret = hdd_get_rx_stbc(adapter, value);
+		break;
+	}
+	case QCSAP_PARAM_CHAN_WIDTH:
+	{
+		ret = hdd_sap_get_chan_width(adapter, value);
+		break;
+	}
 	case QCASAP_PARAM_DCM:
 	{
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_he_dcm_enable,
+					     VDEV_CMD);
+		break;
+	}
+	case QCASAP_PARAM_RANGE_EXT:
+	{
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_he_range_ext,
 					     VDEV_CMD);
 		break;
 	}
@@ -1165,6 +1421,90 @@ static iw_softap_getparam(struct net_device *dev,
 	return errno;
 }
 
+/* Usage:
+ *  DENY_LIST  = 0
+ *  ALLOW_LIST  = 1
+ *  ADD MAC = 0
+ *  REMOVE MAC  = 1
+ *
+ *  mac addr will be accepted as a 6 octet mac address with each octet
+ *  inputted in hex for e.g. 00:0a:f5:11:22:33 will be represented as
+ *  0x00 0x0a 0xf5 0x11 0x22 0x33 while using this ioctl
+ *
+ *  Syntax:
+ *  iwpriv softap.0 modify_acl
+ *  <6 octet mac addr> <list type> <cmd type>
+ *
+ *  Examples:
+ *  eg 1. to add a mac addr 00:0a:f5:89:89:90 to the deny list
+ *  iwpriv softap.0 modify_acl 0x00 0x0a 0xf5 0x89 0x89 0x90 0 0
+ *  eg 2. to delete a mac addr 00:0a:f5:89:89:90 from allow list
+ *  iwpriv softap.0 modify_acl 0x00 0x0a 0xf5 0x89 0x89 0x90 1 1
+ */
+static
+int __iw_softap_modify_acl(struct net_device *dev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = (netdev_priv(dev));
+	uint8_t *value = (uint8_t *) extra;
+	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
+	int list_type, cmd, i;
+	int ret;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++)
+		peer_mac[i] = *(value + i);
+
+	list_type = (int)(*(value + i));
+	i++;
+	cmd = (int)(*(value + i));
+
+	hdd_debug("Modify ACL mac:" QDF_MAC_ADDR_FMT " type: %d cmd: %d",
+	       QDF_MAC_ADDR_REF(peer_mac), list_type, cmd);
+
+	qdf_status = wlansap_modify_acl(
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+		peer_mac, (eSapACLType) list_type, (eSapACLCmdType) cmd);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		hdd_err("Modify ACL failed");
+		ret = -EIO;
+	}
+	hdd_exit();
+	return ret;
+}
+
+static
+int iw_softap_modify_acl(struct net_device *dev,
+			 struct iw_request_info *info,
+			 union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_softap_modify_acl(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 int
 static __iw_softap_getchannel(struct net_device *dev,
 			      struct iw_request_info *info,
@@ -1189,8 +1529,7 @@ static __iw_softap_getchannel(struct net_device *dev,
 
 	*value = 0;
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-				adapter->deflink->link_flags))
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
 		*value = wlan_reg_freq_to_chan(
 				hdd_ctx->pdev,
 				ap_ctx->operating_chan_freq);
@@ -1277,6 +1616,60 @@ static iw_softap_set_max_tx_power(struct net_device *dev,
 
 	return errno;
 }
+
+#ifndef REMOVE_PKT_LOG
+int
+static __iw_softap_set_pktlog(struct net_device *dev,
+				    struct iw_request_info *info,
+				    union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = netdev_priv(dev);
+	struct hdd_context *hdd_ctx;
+	int *value = (int *)extra;
+	int ret;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	if (wrqu->data.length < 1 || wrqu->data.length > 2) {
+		hdd_err("pktlog: either 1 or 2 parameters are required");
+		return -EINVAL;
+	}
+
+	return hdd_process_pktlog_command(hdd_ctx, value[0], value[1]);
+}
+
+int
+static iw_softap_set_pktlog(struct net_device *dev,
+				  struct iw_request_info *info,
+				  union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_softap_set_pktlog(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
+int
+static iw_softap_set_pktlog(struct net_device *dev,
+				  struct iw_request_info *info,
+				  union iwreq_data *wrqu, char *extra)
+{
+	return -EINVAL;
+}
+#endif
 
 int
 static __iw_softap_set_tx_power(struct net_device *dev,
@@ -1391,8 +1784,7 @@ static __iw_softap_getassoc_stamacaddr(struct net_device *dev,
 
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
 				  STA_INFO_SAP_GETASSOC_STAMACADDR) {
-		if (left >= QDF_MAC_ADDR_SIZE &&
-		    !qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
+		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
 			memcpy(&buf[maclist_index], &sta_info->sta_mac,
 			       QDF_MAC_ADDR_SIZE);
 			maclist_index += QDF_MAC_ADDR_SIZE;
@@ -1432,6 +1824,82 @@ static iw_softap_getassoc_stamacaddr(struct net_device *dev,
 	return errno;
 }
 
+/* Usage:
+ *  mac addr will be accepted as a 6 octet mac address with each octet
+ *  inputted in hex for e.g. 00:0a:f5:11:22:33 will be represented as
+ *  0x00 0x0a 0xf5 0x11 0x22 0x33 while using this ioctl
+ *
+ *  Syntax:
+ *  iwpriv softap.0 disassoc_sta <6 octet mac address>
+ *
+ *  e.g.
+ *  disassociate sta with mac addr 00:0a:f5:11:22:33 from softap
+ *  iwpriv softap.0 disassoc_sta 0x00 0x0a 0xf5 0x11 0x22 0x33
+ */
+
+int
+static __iw_softap_disassoc_sta(struct net_device *dev,
+				struct iw_request_info *info,
+				union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = (netdev_priv(dev));
+	struct hdd_context *hdd_ctx;
+	uint8_t *peer_macaddr;
+	int ret;
+	struct csr_del_sta_params del_sta_params;
+
+	hdd_enter_dev(dev);
+
+	if (!capable(CAP_NET_ADMIN)) {
+		hdd_err("permission check failed");
+		return -EPERM;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	/* iwpriv tool or framework calls this ioctl with
+	 * data passed in extra (less than 16 octets);
+	 */
+	peer_macaddr = (uint8_t *) (extra);
+
+	hdd_debug("data " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_macaddr));
+	wlansap_populate_del_sta_params(peer_macaddr,
+					REASON_DEAUTH_NETWORK_LEAVING,
+					SIR_MAC_MGMT_DISASSOC,
+					&del_sta_params);
+	hdd_softap_sta_disassoc(adapter, &del_sta_params);
+
+	hdd_exit();
+	return 0;
+}
+
+int
+static iw_softap_disassoc_sta(struct net_device *dev,
+			      struct iw_request_info *info,
+			      union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_softap_disassoc_sta(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 /**
  * __iw_get_char_setnone() - Generic "get char" private ioctl handler
  * @dev: device upon which the ioctl was received
@@ -1462,6 +1930,10 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		return ret;
 
 	switch (sub_cmd) {
+	case QCSAP_GET_STATS:
+		hdd_wlan_get_stats(adapter->deflink, &wrqu->data.length,
+				   extra, WE_MAX_STR_LEN);
+		break;
 	case QCSAP_LIST_FW_PROFILE:
 		hdd_wlan_list_fw_profile(&(wrqu->data.length),
 					extra, WE_MAX_STR_LEN);
@@ -1497,6 +1969,128 @@ static int iw_get_char_setnone(struct net_device *dev,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
+}
+
+static int iw_get_channel_list(struct net_device *dev,
+			       struct iw_request_info *info,
+			       union iwreq_data *wrqu, char *extra)
+{
+	uint32_t num_channels = 0;
+	uint8_t i = 0;
+	struct hdd_adapter *hostapd_adapter = (netdev_priv(dev));
+	struct channel_list_info *channel_list =
+		(struct channel_list_info *)extra;
+	struct regulatory_channel *cur_chan_list = NULL;
+	struct hdd_context *hdd_ctx;
+	int ret;
+	QDF_STATUS status;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(hostapd_adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
+	if (!cur_chan_list)
+		return -ENOMEM;
+
+	status = ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err_rl("Failed to get the current channel list");
+		qdf_mem_free(cur_chan_list);
+		return -EIO;
+	}
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		/*
+		 * current channel list includes all channels. do not report
+		 * disabled channels
+		 */
+		if (cur_chan_list[i].chan_flags & REGULATORY_CHAN_DISABLED)
+			continue;
+
+		/*
+		 * do not include 6 GHz channels since they are ambiguous with
+		 * 2.4 GHz and 5 GHz channels. 6 GHz-aware applications should
+		 * not be using this interface, but instead should be using the
+		 * frequency-based interface
+		 */
+		if (wlan_reg_is_6ghz_chan_freq(cur_chan_list[i].center_freq))
+			continue;
+		channel_list->channels[num_channels] =
+						cur_chan_list[i].chan_num;
+		num_channels++;
+
+	}
+
+	qdf_mem_free(cur_chan_list);
+	hdd_debug_rl("number of channels %d", num_channels);
+	channel_list->num_channels = num_channels;
+	wrqu->data.length = num_channels + 1;
+	hdd_exit();
+
+	return 0;
+}
+
+int iw_get_channel_list_with_cc(struct net_device *dev,
+				mac_handle_t mac_handle,
+				struct iw_request_info *info,
+				union iwreq_data *wrqu,
+				char *extra)
+{
+	uint8_t i, len;
+	char *buf;
+	uint8_t ubuf[REG_ALPHA2_LEN + 1] = {0};
+	uint8_t ubuf_len = REG_ALPHA2_LEN + 1;
+	struct channel_list_info channel_list;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	hdd_enter_dev(dev);
+
+	memset(&channel_list, 0, sizeof(channel_list));
+
+	if (0 != iw_get_channel_list(dev, info, wrqu, (char *)&channel_list)) {
+		hdd_err_rl("GetChannelList Failed!!!");
+		return -EINVAL;
+	}
+
+	/*
+	 * Maximum buffer needed =
+	 * [4: 3 digits of num_chn + 1 space] +
+	 * [REG_ALPHA2_LEN: REG_ALPHA2_LEN digits] +
+	 * [4 * num_chn: (1 space + 3 digits of chn[i]) * num_chn] +
+	 * [1: Terminator].
+	 *
+	 * Check if sufficient buffer is available and then
+	 * proceed to fill the buffer.
+	 */
+	if (WE_MAX_STR_LEN <
+	    (4 + REG_ALPHA2_LEN + 4 * channel_list.num_channels + 1)) {
+		hdd_err_rl("Insufficient Buffer to populate channel list");
+		return -EINVAL;
+	}
+
+	buf = extra;
+	len = scnprintf(buf, WE_MAX_STR_LEN, "%u ", channel_list.num_channels);
+	wlan_reg_get_cc_and_src(mac->psoc, ubuf);
+	/* Printing Country code in getChannelList(break at '\0') */
+	for (i = 0; i < (ubuf_len - 1) && ubuf[i] != 0; i++)
+		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, "%c", ubuf[i]);
+
+	for (i = 0; i < channel_list.num_channels; i++)
+		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, " %u",
+				 channel_list.channels[i]);
+
+	wrqu->data.length = strlen(extra) + 1;
+
+	hdd_exit();
+	return 0;
 }
 
 static
@@ -1587,8 +2181,7 @@ __iw_softap_stopbss(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-				adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
@@ -1605,8 +2198,7 @@ __iw_softap_stopbss(struct net_device *dev,
 				QDF_ASSERT(0);
 			}
 		}
-		qdf_atomic_clear_bit(SOFTAP_BSS_STARTED,
-				     adapter->deflink->link_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 					     adapter->device_mode,
 					     adapter->deflink->vdev_id);
@@ -1682,6 +2274,169 @@ static int iw_softap_version(struct net_device *dev,
 	return errno;
 }
 
+static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
+				   uint8_t *buf,
+				   int size)
+{
+	int written;
+	struct hdd_station_info *sta, *tmp = NULL;
+
+	hdd_enter();
+
+	written = scnprintf(buf, size, "\nstaId staAddress\n");
+
+	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta, tmp,
+				  STA_INFO_SOFTAP_GET_STA_INFO) {
+		if (written >= size - 1) {
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta, true,
+					     STA_INFO_SOFTAP_GET_STA_INFO);
+			if (tmp)
+				hdd_put_sta_info_ref(&adapter->sta_info_list,
+						&tmp, true,
+						STA_INFO_SOFTAP_GET_STA_INFO);
+			break;
+		}
+
+		if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes)) {
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta, true,
+					     STA_INFO_SOFTAP_GET_STA_INFO);
+			continue;
+		}
+
+		written += scnprintf(buf + written, size - written,
+				     QDF_MAC_ADDR_FMT
+				     " ecsa=%d\n",
+				     QDF_MAC_ADDR_REF(sta->sta_mac.bytes),
+				     sta->ecsa_capable);
+
+		if (!qdf_is_macaddr_zero(&sta->mld_addr))
+			written += scnprintf(buf + written, size - written,
+					     "MLD:"
+					     QDF_MAC_ADDR_FMT"\n",
+					     QDF_MAC_ADDR_REF(sta->mld_addr.bytes));
+
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true,
+				     STA_INFO_SOFTAP_GET_STA_INFO);
+	}
+
+	hdd_exit();
+
+	return 0;
+}
+
+static int __iw_softap_get_channel_list(struct net_device *dev,
+					struct iw_request_info *info,
+					union iwreq_data *wrqu,
+					char *extra)
+{
+	int ret;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx;
+	mac_handle_t mac_handle;
+
+	hdd_enter_dev(dev);
+
+	if (hdd_validate_adapter(adapter))
+		return -ENODEV;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	mac_handle = hdd_ctx->mac_handle;
+
+	ret = iw_get_channel_list_with_cc(dev, mac_handle,
+					  info, wrqu, extra);
+
+	if (0 != ret)
+		return -EINVAL;
+
+	hdd_exit();
+	return 0;
+}
+
+static int iw_softap_get_channel_list(struct net_device *dev,
+				      struct iw_request_info *info,
+				      union iwreq_data *wrqu,
+				      char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_softap_get_channel_list(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+static int __iw_softap_get_sta_info(struct net_device *dev,
+				    struct iw_request_info *info,
+				    union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
+
+	hdd_enter_dev(dev);
+
+	adapter = netdev_priv(dev);
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
+		return errno;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	errno = hdd_check_private_wext_control(hdd_ctx, info);
+	if (errno)
+		return errno;
+
+	errno = hdd_softap_get_sta_info(adapter, extra, WE_SAP_MAX_STA_INFO);
+	if (errno) {
+		hdd_err("Failed to get sta info; errno:%d", errno);
+		return errno;
+	}
+
+	wrqu->data.length = strlen(extra);
+
+	hdd_exit();
+
+	return 0;
+}
+
+static int iw_softap_get_sta_info(struct net_device *dev,
+				  struct iw_request_info *info,
+				  union iwreq_data *wrqu,
+				  char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_softap_get_sta_info(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 static int __iw_softap_get_ba_timeout(struct net_device *dev,
 				      struct iw_request_info *info,
 				      union iwreq_data *wrqu, char *extra)
@@ -1744,6 +2499,128 @@ static int iw_softap_get_ba_timeout(struct net_device *dev,
 		return errno;
 
 	errno = __iw_softap_get_ba_timeout(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+static
+int __iw_get_softap_linkspeed(struct net_device *dev,
+			      struct iw_request_info *info,
+			      union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = (netdev_priv(dev));
+	struct hdd_context *hdd_ctx;
+	char *out_link_speed = (char *)extra;
+	uint32_t link_speed = 0;
+	int len = sizeof(uint32_t) + 1;
+	struct qdf_mac_addr mac_address;
+	char macaddr_string[MAC_ADDRESS_STR_LEN + 1];
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	int rc, ret;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	hdd_debug("wrqu->data.length(%d)", wrqu->data.length);
+
+	/* Linkspeed is allowed for GO/SAP mode */
+	if (adapter->device_mode != QDF_P2P_GO_MODE &&
+	    adapter->device_mode != QDF_SAP_MODE) {
+		hdd_err("Link Speed is not allowed in Device mode %s(%d)",
+			qdf_opmode_str(adapter->device_mode),
+			adapter->device_mode);
+		return -ENOTSUPP;
+	}
+
+	if (wrqu->data.length >= MAC_ADDRESS_STR_LEN - 1) {
+		if (copy_from_user(macaddr_string,
+				   wrqu->data.pointer, MAC_ADDRESS_STR_LEN)) {
+			hdd_err("failed to copy data to user buffer");
+			return -EFAULT;
+		}
+		macaddr_string[MAC_ADDRESS_STR_LEN - 1] = '\0';
+
+		if (!mac_pton(macaddr_string, mac_address.bytes)) {
+			hdd_err("String to Hex conversion Failed");
+			return -EINVAL;
+		}
+	}
+	/* If no mac address is passed and/or its length is less than 17,
+	 * link speed for first connected client will be returned.
+	 */
+	if (wrqu->data.length < 17 || !QDF_IS_STATUS_SUCCESS(status)) {
+		struct hdd_station_info *sta_info, *tmp = NULL;
+
+		hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
+					  STA_INFO_GET_SOFTAP_LINKSPEED) {
+			if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
+				qdf_copy_macaddr(&mac_address,
+						 &sta_info->sta_mac);
+				status = QDF_STATUS_SUCCESS;
+				hdd_put_sta_info_ref(
+						&adapter->sta_info_list,
+						&sta_info, true,
+						STA_INFO_GET_SOFTAP_LINKSPEED);
+				if (tmp)
+					hdd_put_sta_info_ref(
+						&adapter->sta_info_list,
+						&tmp, true,
+						STA_INFO_GET_SOFTAP_LINKSPEED);
+				break;
+			}
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta_info, true,
+					     STA_INFO_GET_SOFTAP_LINKSPEED);
+		}
+	}
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Invalid peer macaddress");
+		return -EINVAL;
+	}
+	rc = wlan_hdd_get_linkspeed_for_peermac(adapter->deflink,
+						&mac_address, &link_speed);
+	if (rc) {
+		hdd_err("Unable to retrieve SME linkspeed");
+		return rc;
+	}
+
+	/* linkspeed in units of 500 kbps */
+	link_speed = link_speed / 500;
+	wrqu->data.length = len;
+	rc = snprintf(out_link_speed, len, "%u", link_speed);
+	if ((rc < 0) || (rc >= len)) {
+		/* encoding or length error? */
+		hdd_err("Unable to encode link speed");
+		return -EIO;
+	}
+	hdd_exit();
+	return 0;
+}
+
+static int
+iw_get_softap_linkspeed(struct net_device *dev,
+			struct iw_request_info *info,
+			union iwreq_data *wrqu,
+			char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_get_softap_linkspeed(dev, info, wrqu, extra);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -1909,10 +2786,49 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCSAP_PARAM_CONC_SYSTEM_PREF,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,
 		"setConcSysPref"
+	},
+#ifdef FEATURE_FW_LOG_PARSING
+	/* Sub-cmds DBGLOG specific commands */
+	{
+		QCSAP_DBGLOG_LOG_LEVEL,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "dl_loglevel"
 	}, {
+		QCSAP_DBGLOG_VAP_ENABLE,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dl_vapon"
+	}, {
+		QCSAP_DBGLOG_VAP_DISABLE,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "dl_vapoff"
+	}, {
+		QCSAP_DBGLOG_MODULE_ENABLE,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dl_modon"
+	}, {
+		QCSAP_DBGLOG_MODULE_DISABLE,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "dl_modoff"
+	}, {
+		QCSAP_DBGLOG_MOD_LOG_LEVEL,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "dl_mod_loglevel"
+	}, {
+		QCSAP_DBGLOG_TYPE,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dl_type"
+	}, {
+		QCSAP_DBGLOG_REPORT_ENABLE,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "dl_report"
+	},
+#endif /* FEATURE_FW_LOG_PARSING */
+	{
+
 		QCASAP_TXRX_FWSTATS_RESET,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "txrx_fw_st_rst"
+	}, {
+		QCSAP_PARAM_RTSCTS,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "enablertscts"
 	}, {
 		QCASAP_SET_11N_RATE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -1957,6 +2873,10 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "gtxMinTpc"
 	}, {
+		QCSAP_GTX_BWMASK,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "gtxBWMask"
+	}, {
 		QCSAP_PARAM_CLR_ACL,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "setClearAcl"
@@ -1983,6 +2903,15 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCASAP_SET_RADAR_CMD,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "setRadar"
+	},
+	{
+		QCSAP_IPA_UC_STAT,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ipaucstat"
+	},
+	{
+		QCASAP_TX_CHAINMASK_CMD,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "set_txchainmask"
 	}, {
 		QCASAP_RX_CHAINMASK_CMD,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -1990,6 +2919,9 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCASAP_SET_HE_BSS_COLOR,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_he_bss_clr"
+	}, {
+		QCASAP_NSS_CMD,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_nss"
 	}, {
 		QCASAP_SET_PHYMODE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -2007,9 +2939,17 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "startProfile"
 	}, {
+		QCASAP_PARAM_LDPC,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "ldpc"
+	}, {
 		QCASAP_PARAM_TX_STBC,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "set_tx_stbc"
+	}, {
+		QCASAP_PARAM_RX_STBC,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "set_rx_stbc"
 	}, {
 		QCSAP_IOCTL_GETPARAM, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getparam"
@@ -2022,6 +2962,9 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_PARAM_GET_WLAN_DBG, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getwlandbg"
+	}, {
+		QCSAP_GTX_BWMASK, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_gtxBWMask"
 	}, {
 		QCSAP_GTX_MINTPC, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_gtxMinTpc"
@@ -2056,15 +2999,44 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCSAP_GET_ACL, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_acl_list"
 	}, {
+		QCASAP_PARAM_LDPC, 0,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_ldpc"
+	}, {
+		QCASAP_PARAM_TX_STBC, 0,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_tx_stbc"
+	}, {
+		QCASAP_PARAM_RX_STBC, 0,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_rx_stbc"
+	}, {
+		QCSAP_PARAM_CHAN_WIDTH, 0,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_chwidth"
+	}, {
+		QCASAP_TX_CHAINMASK_CMD, 0,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_txchainmask"
+	}, {
 		QCASAP_RX_CHAINMASK_CMD, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_rxchainmask"
+	}, {
+		QCASAP_NSS_CMD, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"get_nss"
+	}, {
+		QCSAP_CAP_TSF, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		"cap_tsf"
 	}, {
 		QCSAP_IOCTL_SET_NONE_GET_THREE, 0, IW_PRIV_TYPE_INT |
 		IW_PRIV_SIZE_FIXED | 3,    ""
 	}, {
 		QCSAP_GET_TSF, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
 		"get_tsf"
+	}, {
+		QCASAP_GET_TEMP_CMD, 0,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_temp"
 	}, {
 		QCSAP_GET_FW_PROFILE_DATA, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getProfileData"
@@ -2079,11 +3051,18 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCSAP_IOCTL_VERSION, 0, IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 		"version"
 	}, {
+		QCSAP_IOCTL_GET_STA_INFO, 0,
+		IW_PRIV_TYPE_CHAR | WE_SAP_MAX_STA_INFO, "get_sta_info"
+	}, {
 		QCSAP_IOCTL_GET_CHANNEL, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getchannel"
 	}, {
 		QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT, 0,
 		IW_PRIV_TYPE_CHAR | WE_SAP_MAX_STA_INFO, "get_ba_timeout"
+	}, {
+		QCSAP_IOCTL_DISASSOC_STA,
+		IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 6, 0,
+		"disassoc_sta"
 	}
 	/* handler for main ioctl */
 	, {
@@ -2092,8 +3071,17 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}
 	/* handler for sub-ioctl */
 	, {
+		QCSAP_GET_STATS, 0,
+		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, "getStats"
+	}
+	, {
 		QCSAP_LIST_FW_PROFILE, 0,
 		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, "listProfile"
+	}
+	, {
+		QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED,
+		IW_PRIV_TYPE_CHAR | 18,
+		IW_PRIV_TYPE_CHAR | 5, "getLinkSpeed"
 	}
 	, {
 		QCSAP_IOCTL_PRIV_GET_RSSI,
@@ -2163,6 +3151,20 @@ static const struct iw_priv_args hostapd_private_args[] = {
 #endif /* FW_THERMAL_THROTTLE_SUPPORT */
 	/* handlers for main ioctl */
 	{
+		QCSAP_IOCTL_MODIFY_ACL,
+		IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 8, 0, "modify_acl"
+	}
+	,
+	/* handlers for main ioctl */
+	{
+		QCSAP_IOCTL_GET_CHANNEL_LIST,
+		0,
+		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+		"getChannelList"
+	}
+	,
+	/* handlers for main ioctl */
+	{
 		QCSAP_IOCTL_SET_TX_POWER,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "setTxPower"
 	}
@@ -2174,6 +3176,19 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		0, "setTxMaxPower"
 	}
 	,
+	{
+		QCSAP_IOCTL_SET_PKTLOG,
+		IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+		0, "pktlog"
+	}
+	,
+	/* Get HDD CFG Ini param */
+	{
+		QCSAP_IOCTL_GET_INI_CFG,
+		0, IW_PRIV_TYPE_CHAR | QCSAP_IOCTL_MAX_STR_LEN, "getConfig"
+	}
+	,
+	/* handlers for main ioctl */
 	{
 	/* handlers for main ioctl */
 		QCSAP_IOCTL_SET_TWO_INT_GET_NONE,
@@ -2195,6 +3210,15 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		0,  "setRadarDbg"
 	}
 	,
+#ifdef CONFIG_DP_TRACE
+	/* dump dp trace - descriptor or dp trace records */
+	{
+		QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+		0, "dump_dp_trace"
+	}
+	,
+#endif
 	{
 		QCSAP_ENABLE_FW_PROFILE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
@@ -2233,6 +3257,18 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		0, "set_11ax_rate"
 	}
 	,
+	{
+		QCASAP_PARAM_DCM,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "enable_dcm"
+	}
+	,
+	{
+		QCASAP_PARAM_RANGE_EXT,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "range_ext"
+	}
+	,
 	{	QCSAP_SET_DEFAULT_AMPDU,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "def_ampdu"
@@ -2262,6 +3298,8 @@ static const iw_handler hostapd_private[] = {
 		iw_softap_getchannel,
 	[QCSAP_IOCTL_ASSOC_STA_MACADDR - SIOCIWFIRSTPRIV] =
 		iw_softap_getassoc_stamacaddr,
+	[QCSAP_IOCTL_DISASSOC_STA - SIOCIWFIRSTPRIV] =
+		iw_softap_disassoc_sta,
 	[QCSAP_PRIV_GET_CHAR_SET_NONE - SIOCIWFIRSTPRIV] =
 		iw_get_char_setnone,
 	[QCSAP_IOCTL_PRIV_SET_THREE_INT_GET_NONE -
@@ -2270,14 +3308,27 @@ static const iw_handler hostapd_private[] = {
 	[QCSAP_IOCTL_PRIV_SET_VAR_INT_GET_NONE -
 	 SIOCIWFIRSTPRIV] =
 		iw_set_var_ints_getnone,
+	[QCSAP_IOCTL_MODIFY_ACL - SIOCIWFIRSTPRIV] =
+		iw_softap_modify_acl,
+	[QCSAP_IOCTL_GET_CHANNEL_LIST - SIOCIWFIRSTPRIV] =
+		iw_softap_get_channel_list,
+	[QCSAP_IOCTL_GET_STA_INFO - SIOCIWFIRSTPRIV] =
+		iw_softap_get_sta_info,
 	[QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT - SIOCIWFIRSTPRIV] =
 		iw_softap_get_ba_timeout,
+	[QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED -
+	 SIOCIWFIRSTPRIV] =
+		iw_get_softap_linkspeed,
 	[QCSAP_IOCTL_PRIV_GET_RSSI - SIOCIWFIRSTPRIV] =
 		iw_get_peer_rssi,
 	[QCSAP_IOCTL_SET_TX_POWER - SIOCIWFIRSTPRIV] =
 		iw_softap_set_tx_power,
 	[QCSAP_IOCTL_SET_MAX_TX_POWER - SIOCIWFIRSTPRIV] =
 		iw_softap_set_max_tx_power,
+	[QCSAP_IOCTL_SET_PKTLOG - SIOCIWFIRSTPRIV] =
+		iw_softap_set_pktlog,
+	[QCSAP_IOCTL_GET_INI_CFG - SIOCIWFIRSTPRIV] =
+		iw_softap_get_ini_cfg,
 	[QCSAP_IOCTL_SET_TWO_INT_GET_NONE - SIOCIWFIRSTPRIV] =
 		iw_softap_set_two_ints_getnone,
 };

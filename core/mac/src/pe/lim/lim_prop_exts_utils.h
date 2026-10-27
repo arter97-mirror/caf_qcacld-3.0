@@ -38,11 +38,12 @@
 /**
  * lim_extract_ap_capability() - extract AP's HCF/WME/WSM capability
  * @mac_ctx: Pointer to Global MAC structure
- * @session: A pointer to session entry.
- * @bss_desc: BSS descriptor pointer
+ * @p_ie: Pointer to starting IE in Beacon/Probe Response
+ * @ie_len: Length of all IEs combined
  * @qos_cap: Bits are set according to capabilities
  * @uapsd: pointer to uapsd
  * @local_constraint: Pointer to local power constraint.
+ * @session: A pointer to session entry.
  * @is_pwr_constraint: Check for Power constraint bit in beacon
  *
  * This function is called to extract AP's HCF/WME/WSM capability
@@ -50,51 +51,42 @@
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
-				     struct pe_session *session,
-				     struct bss_description *bss_desc,
-				     uint8_t *qos_cap, uint8_t *uapsd,
-				     int8_t *local_constraint,
-				     bool *is_pwr_constraint);
+QDF_STATUS
+lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
+			  uint16_t ie_len, uint8_t *qos_cap, uint8_t *uapsd,
+			  int8_t *local_constraint, struct pe_session *session,
+			  bool *is_pwr_constraint);
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * lim_extract_eht_op() - Extract and process EHT Operation IE parameters
- * @mac: Pointer to MAC context
- * @session: Pointer to PE session
- * @bcn_ies: Pointer to parsed beacon IEs from AP
+ * lim_extract_eht_op() - Extract EHT operation IE into session
+ * @session: Pointer to pe_session
+ * @beacon_struct: Pointer to extracted beacon/probe response of the
+ * AP
  *
- * This function extracts EHT (Extremely High Throughput / 802.11be) Operation
- * IE parameters from the AP's beacon and configures the session's operating
- * bandwidth accordingly. It handles:
- * - Channel width determination (20/40/80/160/320 MHz)
- * - Center frequency segment configuration (CCFS0 and CCFS1)
- * - Firmware capability validation and bandwidth adjustment
- *
- * The function validates the AP's advertised EHT channel width against the
- * firmware's maximum supported bandwidth and adjusts downward if necessary.
- * For example, if the AP advertises 320MHz but firmware only supports 160MHz,
- * the session will be configured for 160MHz operation.
- *
- * EHT introduces support for 320MHz bandwidth in the 6GHz band, which is
- * handled by this function along with legacy bandwidths.
- *
- * Context: Called during AP capability extraction for EHT-capable connections
- *
- * Return: None (void function - updates session structure with EHT parameters)
+ * Return: None
  */
-void lim_extract_eht_op(struct mac_context *mac,
-			struct pe_session *session,
-			tDot11fBeaconIEs *bcn_ies);
+void lim_extract_eht_op(struct pe_session *session,
+			tSirProbeRespBeacon *beacon_struct);
 #else
-static inline
-void lim_extract_eht_op(struct mac_context *mac,
-			struct pe_session *session,
-			tDot11fBeaconIEs *bcn_ies)
+static inline void
+lim_extract_eht_op(struct pe_session *session,
+		   tSirProbeRespBeacon *beacon_struct)
 {}
 #endif
 
 ePhyChanBondState lim_get_htcb_state(ePhyChanBondState aniCBMode);
+
+/**
+ * lim_objmgr_update_vdev_nss() - update nss in vdev object
+ * @psoc: Pointer to Global MAC structure
+ * @vdev_id: vdev id
+ * @nss: nss
+ *
+ * Return: None
+ */
+void lim_objmgr_update_vdev_nss(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint8_t nss);
 
 /**
  * lim_update_he_mcs_12_13_map() - update he_mcs_12_13_map in vdev object

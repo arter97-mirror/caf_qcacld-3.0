@@ -221,12 +221,12 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	ucfg_dp_event_eapol_log(nbuf, QDF_RX);
 	qdf_dp_trace_log_pkt(adapter->deflink->vdev_id,
 			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID,
-			     adapter->device_mode, 0);
+			     adapter->device_mode);
 	DPTRACE(qdf_dp_trace(nbuf,
 			     QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
 			     QDF_TRACE_DEFAULT_PDEV_ID,
 			     qdf_nbuf_data_addr(nbuf),
-			     qdf_nbuf_len(nbuf), QDF_RX));
+			     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
 	DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
 				      QDF_DP_TRACE_RX_PACKET_RECORD, 0,
 				      QDF_RX));
@@ -241,6 +241,7 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 
 	nbuf->dev = adapter->dev;
 	nbuf->protocol = eth_type_trans(nbuf, nbuf->dev);
+	nbuf->ip_summed = CHECKSUM_NONE;
 	len = nbuf->len;
 
 	/*
@@ -409,7 +410,7 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 	}
 
 	/* Always select the primary pipe for connection that is EHT160 or
-	 * EHT320 due to higher tput requirements.
+	 * EHT320 due to higher tput requiements.
 	 */
 	if (conn.wlan_80211_mode == QCA_WLAN_802_11_MODE_11BE &&
 	    (conn.ch_width == CH_WIDTH_160MHZ ||
@@ -502,7 +503,7 @@ static QDF_STATUS hdd_process_ipa_wds_event(struct scheduler_msg *msg)
 	status = ucfg_ipa_wlan_evt(ipa_wds_evt->pdev,
 				   ipa_wds_evt->net_dev,
 				   QDF_SAP_MODE,
-				   ipa_wds_evt->vdev_id, false,
+				   ipa_wds_evt->vdev_id,
 				   ipa_wds_evt->event,
 				   ipa_wds_evt->mac_addr.bytes, false);
 	qdf_mem_free(msg->bodyptr);

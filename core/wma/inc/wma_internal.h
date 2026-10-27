@@ -74,8 +74,8 @@
  */
 struct index_data_rate_type {
 	uint8_t  mcs_index;
-	uint32_t ht20_rate[2];
-	uint32_t ht40_rate[2];
+	uint16_t ht20_rate[2];
+	uint16_t ht40_rate[2];
 };
 
 /**
@@ -88,10 +88,10 @@ struct index_data_rate_type {
  */
 struct index_vht_data_rate_type {
 	uint8_t mcs_index;
-	uint32_t ht20_rate[2];
-	uint32_t ht40_rate[2];
-	uint32_t ht80_rate[2];
-	uint32_t ht160_rate[2];
+	uint16_t ht20_rate[2];
+	uint16_t ht40_rate[2];
+	uint16_t ht80_rate[2];
+	uint16_t ht160_rate[2];
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -106,10 +106,10 @@ struct index_vht_data_rate_type {
  */
 struct index_he_data_rate_type {
 	uint8_t beacon_rate_index;
-	uint32_t supported_he20_rate[MAX_HE_DCM_INDEX][3];
-	uint32_t supported_he40_rate[MAX_HE_DCM_INDEX][3];
-	uint32_t supported_he80_rate[MAX_HE_DCM_INDEX][3];
-	uint32_t supported_he160_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_he20_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_he40_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_he80_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_he160_rate[MAX_HE_DCM_INDEX][3];
 };
 #endif
 
@@ -641,7 +641,7 @@ void wma_set_vdev_intrabss_fwd(tp_wma_handle wma_handle,
  */
 void wma_delete_bss_ho_fail(tp_wma_handle wma, uint8_t vdev_id);
 
-enum mlme_bcn_tx_rate_code wma_get_bcn_rate_code(uint16_t rate);
+uint32_t wma_get_bcn_rate_code(uint16_t rate);
 
 /*
  * wma_mgmt.c functions declarations
@@ -701,6 +701,26 @@ void wma_set_sta_keep_alive(tp_wma_handle wma, uint8_t vdev_id,
  */
 void wma_objmgr_set_peer_mlme_phymode(tp_wma_handle wma, uint8_t *mac_addr,
 				      enum wlan_phymode phymode);
+
+/**
+ * wma_objmgr_set_peer_mlme_nss() - set nss to peer object
+ * @wma:      wma handle
+ * @mac_addr: mac addr of peer
+ * @nss:  nss value to set
+ *
+ * Return: None
+ */
+void wma_objmgr_set_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr,
+				  uint8_t nss);
+
+/**
+ * wma_objmgr_get_peer_mlme_nss() - set nss to peer object
+ * @wma:      wma handle
+ * @mac_addr: mac addr of peer
+ *
+ * Return: Peer NSS
+ */
+uint8_t wma_objmgr_get_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr);
 
 QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 					   tSirNwType nw_type,
@@ -1044,8 +1064,7 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
  *
  * Return: 0 for success
  */
-int wma_rso_cmd_status_event_handler(uint8_t vdev_id,
-				     enum cm_roam_notif notif);
+int wma_rso_cmd_status_event_handler(uint8_t vdev_id, uint32_t notif);
 
 QDF_STATUS wma_send_link_speed(uint32_t link_speed);
 
@@ -1064,15 +1083,13 @@ int wma_unified_debug_print_event_handler(void *handle, uint8_t *datap,
  * @is_vht: is vht supported
  * @is_he: is HE supported
  * @is_eht: is EHT supported
- * @@is_uhr: is UHR supported
  *
  * Return: host phymode
  */
 enum wlan_phymode
 wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 		 uint8_t is_ht, uint8_t ch_width,
-		 uint8_t is_vht, bool is_he, bool is_eht,
-		 bool is_uhr);
+		 uint8_t is_vht, bool is_he, bool is_eht);
 
 int32_t wma_txrx_fw_stats_reset(tp_wma_handle wma_handle,
 				uint8_t vdev_id, uint32_t value);
@@ -1137,8 +1154,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 				     uint32_t len);
 
 int wma_d0_wow_disable_ack_event(void *handle, uint8_t *event, uint32_t len);
-
-void wma_wow_log_deferred_wakeup(struct wlan_objmgr_psoc *psoc);
 
 int wma_pdev_resume_event_handler(void *handle, uint8_t *event, uint32_t len);
 
@@ -1213,7 +1228,7 @@ wma_set_auto_shutdown_timer_req(tp_wma_handle wma_handle,
 				struct auto_shutdown_cmd *auto_sh_cmd);
 #endif
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#ifdef WLAN_FEATURE_TSF
 int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len);
 QDF_STATUS wma_capture_tsf(tp_wma_handle wma_handle, uint32_t vdev_id);
 QDF_STATUS wma_reset_tsf_gpio(tp_wma_handle wma_handle, uint32_t vdev_id);
@@ -1263,13 +1278,6 @@ static inline QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 {
 	return QDF_STATUS_E_INVAL;
 }
-
-static inline QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle,
-						 uint32_t vdev_id,
-						 uint32_t param_id, bool ena)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
 #endif
 
 QDF_STATUS wma_set_wisa_params(tp_wma_handle wma, struct sir_wisa_params *wisa);
@@ -1311,17 +1319,6 @@ QDF_STATUS wma_process_ch_avoid_update_req(tp_wma_handle wma_handle,
 #ifdef FEATURE_WLAN_TDLS
 int wma_update_tdls_peer_state(WMA_HANDLE handle,
 			       struct tdls_peer_update_state *peer_state);
-
-/*
- * wma_update_tdls_off_chan_mode() - Process the message from TDLS to send
- * off-channel mode to firmware
- * @handle: ol scn handle
- * @ch_params: off-channel params
- *
- * Return: 0 for success or error code
- */
-int wma_update_tdls_off_chan_mode(WMA_HANDLE handle,
-				  struct tdls_channel_switch_params *ch_params);
 #endif
 
 void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id);
@@ -1346,18 +1343,6 @@ QDF_STATUS wma_process_set_ie_info(tp_wma_handle wma,
 				   struct vdev_ie_info *ie_info);
 int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 				uint32_t len);
-
-/**
- * wma_handle_peer_assoc_conf() - handle peer assoc confirmation
- * @wma: WMA handle
- * @vdev_id: VDEV id
- * @status: peer assoc status
- * @macaddr: peer MAC address
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_handle_peer_assoc_conf(tp_wma_handle wma, uint8_t vdev_id,
-				      uint8_t status, uint8_t *macaddr);
 
 /**
  * wma_peer_create_confirm_handler  - Handle peer create confirmation
@@ -1749,7 +1734,8 @@ int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
  * wma_mcs_rate_match() - find the match mcs rate
  * @raw_rate: the rate to look up
  * @is_he: if it is he rate
- * @nss_rate: the NSS rate for NSS [1-4]
+ * @nss1_rate: the nss1 rate
+ * @nss2_rate: the nss2 rate
  * @nss: the nss in use
  * @guard_interval: to get guard interval from rate
  *
@@ -1758,11 +1744,11 @@ int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
  *
  * Return: the found rate or 0 otherwise
  */
-uint32_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
-			    const uint32_t *nss_rate[4],
+uint16_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
+			    const uint16_t *nss1_rate,
+			    const uint16_t *nss2_rate,
 			    uint8_t *nss, enum txrate_gi *guard_interval);
 
-#ifndef CONFIG_HL_SUPPORT
 /**
  * wma_update_edca_pifs_param() - Update edca/pifs param
  * @handle: wma handle
@@ -1775,14 +1761,7 @@ uint32_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
 QDF_STATUS
 wma_update_edca_pifs_param(WMA_HANDLE handle,
 			   struct edca_pifs_vparam *edca_pifs_param);
-#else
-static inline QDF_STATUS
-wma_update_edca_pifs_param(WMA_HANDLE handle,
-			   struct edca_pifs_vparam *edca_pifs_param)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
+
 /**
  * wma_update_bss_peer_phy_mode() - Update phymode of peer object
  * @des_chan: des_chan object which has channel information

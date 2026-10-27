@@ -110,6 +110,8 @@
 /* GAS initial request action frame identifier */
 #define IEEE80211_ACTION_GAS_INITIAL_REQUEST 10
 
+#define BITS_IN_A_BYTE 8
+
 #define IEEE80211_IS_BROADCAST(_a)	          \
 	((_a)[0] == 0xff &&                         \
 	 (_a)[1] == 0xff &&                         \
@@ -219,13 +221,6 @@ enum {
 	IEEE80211_ELEMID_TCLAS_PROCESS = 44,
 	IEEE80211_ELEMID_INT_ACC_CAT_PRIORITY = 184,
 	IEEE80211_ELEMID_VENDOR           = 221,  /* vendor private */
-	IEEE80211_ELEMID_EXTN             = 255,
-};
-
-/* Element ID extensions
- */
-enum {
-	IEEE80211_ELEMID_EXT_QOS_ATTR = 113, /* QoS Characteristics IE */
 };
 
 /*
@@ -437,7 +432,7 @@ struct ieee80211_ie_srp_extie {
 
 /*
  * 802.11ax HE Capability
- * with capability & PPE (PPDU packet Extension) threshold
+ * with cabability & PPE (PPDU packet Extension) threshold
  */
 struct ieee80211_ie_hecap {
 	u_int8_t elem_id;
@@ -654,17 +649,5 @@ struct intra_access_priority_category_elem {
 	uint8_t ie_len;
 	uint8_t intra_access_priority;
 } __packed;
-
-/* WME stream classes */
-#define WME_AC_BE                          0    /* best effort */
-#define WME_AC_BK                          1    /* background */
-#define WME_AC_VI                          2    /* video */
-#define WME_AC_VO                          3    /* voice */
-
-#define TID_TO_WME_AC(_tid) (      \
-	(((_tid) == 0) || ((_tid) == 3)) ? WME_AC_BE : \
-	(((_tid) == 1) || ((_tid) == 2)) ? WME_AC_BK : \
-	(((_tid) == 4) || ((_tid) == 5)) ? WME_AC_VI : \
-	WME_AC_VO)
 
 #endif //_IEEE80211_H_

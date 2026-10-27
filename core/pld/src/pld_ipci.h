@@ -176,12 +176,6 @@ pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 	return -EINVAL;
 }
 
-static inline int
-pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
-{
-	return -EINVAL;
-}
-
 static inline int pld_ipci_thermal_register(struct device *dev,
 					    unsigned long max_state,
 					    int mon_id)
@@ -207,11 +201,6 @@ static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
 }
 
 static inline int pld_ipci_exit_power_save(struct device *dev)
-{
-	return 0;
-}
-
-static inline int pld_ipci_set_bmps(struct device *dev, bool disable)
 {
 	return 0;
 }
@@ -250,11 +239,6 @@ static inline void
 pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 						 unsigned int *cpumask)
 {
-}
-
-static inline bool pld_ipci_is_direct_refill_supported(struct device *dev)
-{
-	return false;
 }
 
 static inline
@@ -299,18 +283,6 @@ void pld_ipci_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 static inline
 int pld_ipci_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 				     size_t *size)
-{
-	return -EINVAL;
-}
-
-static inline int
-pld_ipci_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
-{
-	return -EINVAL;
-}
-
-static inline
-int pld_ipci_set_vendor_wonder_priv_data(const void *priv_data)
 {
 	return -EINVAL;
 }
@@ -491,7 +463,7 @@ pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
 	return icnss_qmi_send(dev, type, cmd, cmd_len, cb_ctx, cb);
 }
 
-#if defined(WLAN_CHIPSET_STATS) && defined(CNSS_QMI_ASYNC_EVENT_SUPPORT)
+#ifdef WLAN_CHIPSET_STATS
 static inline int
 pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 			  int (*cb)(void *ctx, uint16_t type,
@@ -499,20 +471,6 @@ pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 {
 	return icnss_register_driver_async_data_cb(dev, cb_ctx, cb);
 }
-
-#if defined(CONFIG_SEC_SS_CNSS_FEATURE_SYSFS)
-static inline int
-pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
-{
-	return icnss_get_dump_inprogress(dev, val);
-}
-#else
-static inline int
-pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
-{
-	return -EPERM;
-}
-#endif
 #else
 static inline int
 pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
@@ -520,12 +478,6 @@ pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 				    void *event, int event_len))
 {
 	return 0;
-}
-
-static inline int
-pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
-{
-	return -EINVAL;
 }
 #endif
 
@@ -561,19 +513,9 @@ static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
 }
 #endif
 
-static inline bool pld_ipci_is_direct_refill_supported(struct device *dev)
-{
-	return icnss_get_fw_cap(dev, ICNSS_FW_CAP_DIRECT_REFILL_SUPPORT);
-}
-
 static inline int pld_ipci_exit_power_save(struct device *dev)
 {
 	return icnss_exit_power_save(dev);
-}
-
-static inline int pld_ipci_set_bmps(struct device *dev, bool disable)
-{
-	return icnss_set_bmps(dev, disable);
 }
 
 static inline int pld_ipci_prevent_l1(struct device *dev)
@@ -596,7 +538,7 @@ static inline int pld_ipci_mhi_state(struct device *dev)
 	return icnss_get_mhi_state(dev);
 }
 
-#ifdef FEATURE_DT_CPU_MASK_DP_INTR
+#ifdef CONFIG_DT_CPU_MASK_DP_INTR
 static inline void
 pld_ipci_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
 					    unsigned int *cpumask)
@@ -622,7 +564,7 @@ pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 						 unsigned int *cpumask)
 {
 }
-#endif /* FEATURE_DT_CPU_MASK_DP_INTR */
+#endif /* CONFIG_DT_CPU_MASK_DP_INTR */
 
 static inline
 int pld_ipci_request_bus_bandwidth(struct device *dev, int bandwidth)
@@ -715,16 +657,5 @@ static inline int pld_ipci_get_direct_link_sid(struct device *dev,
 }
 #endif
 
-static inline int
-pld_ipci_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
-{
-	return icnss_get_iova_info(dev, addr, size);
-}
-
-static inline
-int pld_ipci_set_vendor_wonder_priv_data(const void *priv_data)
-{
-	return icnss_set_vendor_wonder_priv_data(priv_data);
-}
 #endif
 #endif

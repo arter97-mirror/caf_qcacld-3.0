@@ -24,12 +24,6 @@
 #include <wlan_twt_public_structs.h>
 #include <wlan_mlme_twt_public_struct.h>
 
-#define TWT_RESPONDER_IS_SAP_PRESENT(cfg) ((cfg) & \
-						BIT(CFG_TWT_RESPONDER_BIT_SAP))
-#define TWT_RESPONDER_IS_LL_LT_SAP_PRESENT(cfg) \
-				((cfg) & BIT(CFG_TWT_RESPONDER_BIT_LL_LT_SAP))
-#define TWT_RESPONDER_IS_P2P_GO_PRESENT(cfg) \
-				((cfg) & BIT(CFG_TWT_RESPONDER_BIT_P2P_GO))
 /**
  * wlan_twt_cfg_get_req_flag() - Get TWT requestor flag
  * @psoc: Pointer to global psoc object
@@ -41,62 +35,14 @@ QDF_STATUS
 wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
- * wlan_twt_cfg_get_req_en_dis_vdev_support() - Get TGT capability for
- * per-vdev TWT enable/disable command support for TWT requestor role
- * @psoc: Pointer to global psoc object
- * @val: pointer to output variable; set to true if supported
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_cfg_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
-					 bool *val);
-
-/**
- * wlan_twt_cfg_get_vdev_requestor_flag() - Get per-vdev TWT requestor flag
- * @psoc: Pointer to global psoc object
- * @vdev_id: VDEV ID
- * @val: pointer to output variable; set to true if TWT requestor is enabled
- *       for this vdev (vdev-level TWT path)
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_cfg_get_vdev_requestor_flag(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id, bool *val);
-
-/**
  * wlan_twt_cfg_get_res_flag() - Get TWT responder flag
  * @psoc: Pointer to global psoc object
- * @vdev_id: VDEV ID
  * @val: pointer to output variable
  *
  * Return: QDF_STATUS_SUCCESS
  */
 QDF_STATUS
-wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			  bool *val);
-
-/**
- * wlan_twt_cfg_get_twt_dis_on_scan() - Get TWT disable on scan flag
- * @psoc: Pointer to global psoc object
- * @val: pointer to output variable
- *
- * Return: QDF_STATUS_SUCCESS
- */
-QDF_STATUS
-wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val);
-
-/**
- * wlan_twt_cfg_get_setup_defer_on_scan() - Get TWT setup defer on scan flag
- * @psoc: Pointer to global psoc object
- * @val: pointer to output variable
- *
- * Return: QDF_STATUS_SUCCESS
- */
-QDF_STATUS
-wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc,
-				     bool *val);
+wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
  * wlan_twt_cfg_get_req_support_for_ht_vht() - Get TWT requestor support for
@@ -108,18 +54,6 @@ wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 wlan_twt_cfg_get_req_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
-					bool *val);
-
-/**
- * wlan_twt_cfg_get_res_support_for_ht_vht() - Get TWT requestor support for
- * ht/vht mode
- * @psoc: Pointer to global psoc object
- * @val: pointer to output variable
- *
- * Return: QDF_STATUS_SUCCESS
- */
-QDF_STATUS
-wlan_twt_cfg_get_res_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
 					bool *val);
 
 /**
@@ -151,7 +85,7 @@ wlan_twt_get_requestor_cfg(struct wlan_objmgr_psoc *psoc, bool *val);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_twt_get_responder_cfg(struct wlan_objmgr_psoc *psoc, uint8_t *val);
+wlan_twt_get_responder_cfg(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
  * wlan_twt_get_rtwt_support() - Get rTWT support
@@ -229,27 +163,11 @@ wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 bool
 wlan_is_twt_session_present(struct wlan_objmgr_psoc *psoc,
 			    uint8_t *peer_macaddr);
-/**
- * wlan_twt_check_responder_bit: This API check TWT INI configuration for
- * provide opmode.
- * @psoc: Pointer to PSOC object
- * @vdev_id: VDEV ID
- * @device_mode: device OP mode
- * @cfg: TWT responder INI configuration
- *
- * Return: true if TWT responder is enable for given opmode, otherwise disablw
- */
-bool wlan_twt_check_responder_bit(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id, enum QDF_OPMODE device_mode,
-				  uint8_t cfg);
 #else
-
 static inline QDF_STATUS
-wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			  bool *val)
+wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 {
-	*val = false;
-	return QDF_STATUS_E_NOSUPPORT;
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS
@@ -260,13 +178,6 @@ wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_req_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
-					bool *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_twt_cfg_get_res_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
 					bool *val)
 {
 	return QDF_STATUS_SUCCESS;
@@ -286,19 +197,7 @@ wlan_twt_get_requestor_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 static inline QDF_STATUS
-wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_twt_cfg_get_setup_defer_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_twt_get_responder_cfg(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+wlan_twt_get_responder_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -339,13 +238,5 @@ wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
-
-static inline
-bool wlan_twt_check_responder_bit(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id, enum QDF_OPMODE device_mode,
-				  uint8_t cfg)
-{
-	return false;
-}
 #endif
 #endif

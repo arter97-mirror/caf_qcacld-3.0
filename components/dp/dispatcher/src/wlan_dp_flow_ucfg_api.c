@@ -19,20 +19,21 @@
 #include "wlan_dp_ucfg_api.h"
 
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
-static inline int ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
-					       qdf_nbuf_t nbuf)
+static inline void ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
 {
-	return wlan_dp_sawfish_update_metadata(dp_intf, nbuf);
+	wlan_dp_sawfish_update_metadata(dp_intf, nbuf);
+
+	return;
 }
 #else
-static inline int ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
-					       qdf_nbuf_t nbuf)
+static inline void ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
 {
-	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
-#ifdef WLAN_SUPPORT_LAPB
+#ifdef CONFIG_WLAN_SUPPORT_LAPB
 static inline void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
 						qdf_nbuf_t nbuf)
 {
@@ -78,8 +79,7 @@ void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	if (QDF_IS_STATUS_SUCCESS(ucfg_dp_update_sawf_metadata(dp_intf, nbuf)))
-		return;
+	ucfg_dp_update_sawf_metadata(dp_intf, nbuf);
 	ucfg_dp_update_lapb_metadata(dp_intf, nbuf);
 }
 #endif
@@ -215,4 +215,23 @@ ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policies,
 	return fpm_policy_get(fpm, policies, max_count);
 }
 
+void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (qdf_unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return;
+	}
+
+	dp_fpm_display_policy(dp_intf);
+}
 #endif

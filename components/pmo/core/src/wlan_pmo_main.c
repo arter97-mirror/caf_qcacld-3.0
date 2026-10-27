@@ -297,12 +297,6 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_ACTIVE_MC_BC_APF_MODE);
 	psoc_cfg->is_apf_configure_per_screen_state =
 			cfg_get(psoc, CFG_CONFIGURE_APF_PER_SCREEN_STATE);
-	psoc_cfg->apfv6_disable_offload_bitmap =
-			cfg_get(psoc, CFG_OFFLOAD_APFV6_MODE);
-	psoc_cfg->is_ap_mode_enable =
-			cfg_get(psoc, CFG_ENABLE_APF_MODE);
-	psoc_cfg->apf_instruction_size =
-			cfg_get(psoc, CFG_APF_INSTRUCTION_SIZE);
 	psoc_cfg->ito_repeat_count = cfg_get(psoc, CFG_ITO_REPEAT_COUNT);
 	wlan_pmo_ra_filtering_init_cfg(psoc, psoc_cfg);
 	wlan_pmo_gpio_wakeup_init_cfg(psoc, psoc_cfg);
@@ -321,8 +315,6 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->ssr_frequency_on_pagefault =
 			cfg_get(psoc, CFG_SSR_FREQUENCY_ON_PAGEFAULT);
 	psoc_cfg->ra_priority_enable = cfg_get(psoc, CFG_RA_PRIORITY);
-	psoc_cfg->beacon_lio_update_on_screen_on_off =
-		cfg_get(psoc, CFG_PMO_BEACON_LIO_UPDATE_ON_SCREEN_ON_OFF);
 }
 
 QDF_STATUS pmo_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -562,20 +554,6 @@ uint32_t pmo_get_ssr_frequency_on_pagefault(struct wlan_objmgr_psoc *psoc)
 	return pmo_psoc_ctx->psoc_cfg.ssr_frequency_on_pagefault;
 }
 
-bool pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc)
-{
-	bool rate_limit_needed = false;
-	int pending_cmds = pmo_tgt_psoc_get_pending_cmnds(psoc);
-
-	if (pending_cmds > WMI_MAX_CMDS / 2) {
-		rate_limit_needed = true;
-		pmo_debug_rl("pending_cmds %d max %d", pending_cmds,
-			     WMI_MAX_CMDS);
-	}
-
-	return rate_limit_needed;
-}
-
 QDF_STATUS pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr *bridgeaddr)
 {
@@ -625,23 +603,4 @@ QDF_STATUS pmo_core_get_listen_interval(struct wlan_objmgr_vdev *vdev,
 	qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-bool pmo_is_apf_mode_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	struct pmo_psoc_priv_obj *pmo_psoc_ctx;
-
-	if (!psoc) {
-		pmo_err("null psoc");
-		return false;
-	}
-
-	pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
-
-	if (!pmo_psoc_ctx) {
-		pmo_err("null psoc ctx");
-		return false;
-	}
-
-	return pmo_psoc_ctx->psoc_cfg.is_ap_mode_enable;
 }

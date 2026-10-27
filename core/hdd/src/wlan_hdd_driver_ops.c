@@ -51,7 +51,6 @@
 #include "wlan_dp_ucfg_api.h"
 #include "qdf_ssr_driver_dump.h"
 #include "wlan_hdd_ioctl.h"
-#include "wlan_hdd_wondertap.h"
 
 #ifdef MODULE
 #ifdef WLAN_WEAR_CHIPSET
@@ -89,37 +88,6 @@ static inline void hdd_remove_pm_qos(struct device *dev)
 {
 	pld_remove_pm_qos(dev);
 }
-
-#ifdef CONFIG_NO_QMI
-/**
- * hdd_hif_athdiag_read_write() - HIF callback for athdiag read/write via WMI
- * @offset: target register/memory address
- * @memtype: memory region type
- * @datalen: number of bytes to read/write
- * @buf: data buffer (output for read, input for write)
- * @is_write: true for write operation, false for read
- *
- * Return: 0 or other error codes.
- */
-static int hdd_hif_athdiag_read_write(uint32_t offset, uint32_t memtype,
-				      uint32_t datalen, uint8_t *buf,
-				      bool is_write)
-{
-	QDF_STATUS status;
-
-	status = wma_athdiag_read_write(offset, memtype, datalen, buf,
-					is_write);
-
-	return qdf_status_to_os_return(status);
-}
-#else
-static inline int hdd_hif_athdiag_read_write(uint32_t offset,
-					     uint32_t memtype, uint32_t datalen,
-					     uint8_t *buf, bool is_write)
-{
-	return -EOPNOTSUPP;
-}
-#endif /* CONFIG_NO_QMI */
 
 /**
  * hdd_get_bandwidth_level() - get current bandwidth level
@@ -376,6 +344,11 @@ static void hdd_soc_recovery_cleanup(void)
 		return;
 	}
 
+	if (cds_is_load_or_unload_in_progress()) {
+		hdd_info("Load/unload in progress, ignore SSR shutdown");
+		return;
+	}
+
 	hdd_psoc_shutdown_notify(hdd_ctx);
 	hdd_exit();
 }
@@ -391,15 +364,8 @@ static void hdd_set_recovery_in_progress(void *data, uint8_t val)
 {
 	cds_set_recovery_in_progress(val);
 	/* SSR can be triggred late cleanup existing queue for kernel handshake */
-	if (!qdf_in_interrupt()) {
-		struct hdd_context *hdd_ctx;
-
-		hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-		if (!hdd_ctx)
-			return;
-
-		wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
-	}
+	if (!qdf_in_interrupt())
+		hdd_soc_recovery_cleanup();
 }
 
 /**
@@ -430,7 +396,6 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 		hdd_dp_prealloc_get_multi_pages;
 	cbk->prealloc_put_multi_pages =
 		hdd_dp_prealloc_put_multi_pages;
-	cbk->athdiag_read_write = hdd_hif_athdiag_read_write;
 }
 
 #ifdef HIF_DETECTION_LATENCY_ENABLE
@@ -594,7 +559,6 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 		return -ENOMEM;
 	}
 
-	hif_rtpm_register(HIF_RTPM_ID_OSIF, NULL);
 	ret = hdd_init_cds_hif_context(hif_ctx);
 	if (ret) {
 		hdd_err("Failed to set global HIF CDS Context err: %d", ret);
@@ -653,40 +617,9 @@ err_deinit_hif_context:
 	hdd_deinit_cds_hif_context();
 
 err_hif_close:
-	hif_rtpm_deregister(HIF_RTPM_ID_OSIF);
 	hif_close(hif_ctx);
 	return ret;
 }
-
-#ifdef CONFIG_CNSS_IO_COHERENCY
-static void hdd_update_dma_dev(struct device *dma_dev)
-{
-	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-
-	if (!qdf_ctx || !dma_dev)
-		return;
-
-	qdf_ctx->dma_dev = dma_dev;
-	hdd_debug("IO coherent: dma_dev updated to %s", dev_name(dma_dev));
-}
-
-static void hdd_init_dma_dev(qdf_device_t qdf_dev, struct device *dev)
-{
-	/*
-	 * Default dma_dev to pci_dev (safe for all paths).
-	 * The retargeting to wlan_fig plat_dev for IO coherency is triggered
-	 * via the PLD_UPDATE_DMA_DEV uevent, fired by cnss after opening the
-	 * aggr-NoC coherent bit in cnss_wlan_enable().  This happens inside
-	 * hif_enable() before hif_config_ce() allocates CE ring descriptors,
-	 * ensuring all QDF DMA allocations use the correct device.
-	 */
-	qdf_dev->dma_dev = dev;
-}
-#else
-static void hdd_update_dma_dev(struct device *dma_dev) {}
-
-static void hdd_init_dma_dev(qdf_device_t qdf_dev, struct device *dev) {}
-#endif /* CONFIG_CNSS_IO_COHERENCY */
 
 void hdd_hif_close(struct hdd_context *hdd_ctx, void *hif_ctx)
 {
@@ -704,7 +637,6 @@ void hdd_hif_close(struct hdd_context *hdd_ctx, void *hif_ctx)
 	hdd_napi_destroy(true);
 
 	hdd_deinit_cds_hif_context();
-	hif_rtpm_deregister(HIF_RTPM_ID_OSIF);
 	hif_close(hif_ctx);
 
 	ucfg_pmo_psoc_set_hif_handle(hdd_ctx->psoc, NULL);
@@ -729,7 +661,6 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 		return -EINVAL;
 
 	qdf_dev->dev = dev;
-	hdd_init_dma_dev(qdf_dev, dev);
 	qdf_dev->drv_hdl = bdev;
 	qdf_dev->bus_type = bus_type;
 	qdf_dev->bid = bid;
@@ -891,12 +822,11 @@ static int __hdd_soc_probe(struct device *dev,
 	probe_fail_cnt = 0;
 	cds_set_driver_loaded(true);
 	cds_set_load_in_progress(false);
+	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
-	hdd_ddr_bw_mitigation_register(hdd_ctx, dev);
 
 	hdd_set_sar_init_index(hdd_ctx);
 	hdd_soc_load_unlock(dev);
-	wlan_hdd_wondertap_register_ops(dev);
 
 	return 0;
 
@@ -954,12 +884,9 @@ static int hdd_soc_probe(struct device *dev,
 
 	osif_psoc_sync_trans_stop(psoc_sync);
 
-	hdd_start_complete(0);
-
 	return 0;
 
 destroy_sync:
-	hdd_start_complete(errno);
 	osif_psoc_sync_unregister(dev);
 	osif_psoc_sync_wait_for_ops(psoc_sync);
 
@@ -1008,8 +935,8 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	 * in progress
 	 */
 	if (!qdf_is_fw_down()) {
-		hdd_handle_cached_commands();
 		cds_set_recovery_in_progress(false);
+		hdd_handle_cached_commands();
 	}
 
 	if (!hdd_is_any_interface_open(hdd_ctx)) {
@@ -1077,9 +1004,6 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 	osif_psoc_sync_trans_stop(psoc_sync);
 	hdd_start_complete(0);
 
-	if (!errno)
-		wlan_hdd_wondertap_register_ops(dev);
-
 	return errno;
 }
 
@@ -1094,7 +1018,6 @@ static void __hdd_soc_remove(struct device *dev)
 	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
-	wlan_hdd_wondertap_unregister_ops(dev, true);
 	qdf_rtpm_sync_resume();
 	cds_set_driver_loaded(false);
 	cds_set_unload_in_progress(true);
@@ -1106,7 +1029,6 @@ static void __hdd_soc_remove(struct device *dev)
 		qdf_nbuf_deinit_replenish_timer();
 	} else {
 		hdd_thermal_mitigation_unregister(hdd_ctx, dev);
-		hdd_ddr_bw_mitigation_unregister(hdd_ctx, dev);
 		hdd_wlan_exit(hdd_ctx);
 	}
 
@@ -1465,16 +1387,10 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 		goto resume_txrx;
 	}
 
-	status = ucfg_dp_dal_notify_suspend(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Prevent suspend, dal suspend rejected");
-		goto resume_txrx;
-	}
-
 	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
 		hdd_debug("Prevent suspend, ep work pending");
 		err = -EBUSY;
-		goto resume_dal;
+		goto resume_txrx;
 	}
 
 	/*
@@ -1487,13 +1403,6 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 
 	hdd_info("bus suspend succeeded");
 	return 0;
-
-resume_dal:
-	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
-		return qdf_status_to_os_return(status);
-	}
 
 resume_txrx:
 	status = ucfg_pmo_core_txrx_resume(hdd_ctx->psoc);
@@ -1680,12 +1589,6 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	}
 
 	hif_system_pm_set_state_resuming(hif_ctx);
-
-	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Prevent resume, dal resume rejected");
-		goto out;
-	}
 
 	qdf_status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
 						  type);
@@ -1882,13 +1785,6 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 	if (status == QDF_STATUS_SUCCESS)
 		ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
 
-	/*
-	 * Arm the TBTT-nack retry delay only after this suspend attempt
-	 * (and any WMI traffic it generated) has fully returned, so the
-	 * shortened delay is not immediately reset by that same attempt.
-	 */
-	ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(hdd_ctx->psoc);
-
 	hdd_debug("Runtime suspend done result: %d", err);
 
 	return err;
@@ -1916,13 +1812,12 @@ static int hdd_pld_runtime_resume_cb(void)
  * Sets the runtime pm state and coordinates resume between hif wma and
  * ol_txrx.
  *
- * Return: 0 on success or an errno corresponding to the PMO failure
+ * Return: success since failure is a bug
  */
 static int wlan_hdd_runtime_resume(struct device *dev)
 {
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
-	int err;
 	qdf_time_t delta;
 
 	hdd_debug("Starting runtime resume");
@@ -1961,7 +1856,6 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 
 	status = ucfg_pmo_psoc_bus_runtime_resume(hdd_ctx->psoc,
 						  hdd_pld_runtime_resume_cb);
-	err = qdf_status_to_os_return(status);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("PMO Runtime resume failed: %d", status);
 	} else {
@@ -1969,9 +1863,9 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 			ucfg_dp_bus_bw_compute_timer_try_start(hdd_ctx->psoc);
 	}
 
-	hdd_debug("Runtime resume done result: %d", err);
+	hdd_debug("Runtime resume done");
 
-	return err;
+	return 0;
 }
 #endif
 
@@ -2315,14 +2209,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		break;
 	case PLD_FW_DOWN:
 		hdd_debug("Received firmware down indication");
-
-		/* Only dump logs if driver is loaded and target is ready
-		 * to avoid accessing uninitialized resources
-		 */
-		if (cds_is_driver_loaded() && cds_is_target_ready())
-			hdd_dump_log_buffer(NULL, NULL);
-
-		hif_set_target_access_allowed(false);
+		hdd_dump_log_buffer(NULL, NULL);
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 		hdd_init_start_completion();
@@ -2380,20 +2267,15 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		break;
 	case PLD_BUS_EVENT:
 		hdd_debug("Bus event received");
-		hif_set_target_access_allowed(false);
 
 		/* Currently only link_down and link_resume_fail taken care.
 		 * Need to extend event buffer to define more bus info,
 		 * if need later.
 		 */
-		cds_set_recovery_in_progress(true);
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL)
 			cds_set_driver_state(CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL);
-		break;
-	case PLD_UPDATE_DMA_DEV:
-		hdd_update_dma_dev(event_data->dma_dev);
 		break;
 	default:
 		/* other events intentionally not handled */

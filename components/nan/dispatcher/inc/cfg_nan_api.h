@@ -85,16 +85,6 @@ QDF_STATUS cfg_nan_get_ndp_max_sessions(struct wlan_objmgr_psoc *psoc,
 					uint32_t *val);
 
 /**
- * cfg_nan_get_ndp_peer_count() - Return the ndp peer count
- * @psoc: Pointer to psoc object
- * @val: pointer to ndp peer count
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS cfg_nan_get_ndp_peer_count(struct wlan_objmgr_psoc *psoc,
-				      uint32_t *val);
-
-/**
  * cfg_nan_get_max_ndi() - get max number of ndi host supports
  * @psoc: pointer to psoc object
  * @val: pointer to hold max number of ndi

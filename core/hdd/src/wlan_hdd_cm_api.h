@@ -118,9 +118,6 @@ QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
 				 u8 key_index, bool pairwise,
 				 enum wlan_crypto_cipher_type cipher_type);
 
-QDF_STATUS hdd_cm_mgmt_tx_status(struct wlan_objmgr_vdev *vdev, u64 cookie,
-				 const u8 *buf, uint32_t len, bool ack);
-
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 /**
  * hdd_cm_get_vendor_handoff_params() - to get vendor handoff params from fw
@@ -479,17 +476,6 @@ void hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
  */
 void hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx);
 
-/**
- * hdd_cm_clear_link_info() - Clear existing link information
- * @vdev_id: vdev ID
- *
- * This function clears the existing link information for all links
- * associated with the given vdev before updating with new connection info.
- *
- * Return: None
- */
-void hdd_cm_clear_link_info(uint8_t vdev_id);
-
 #else
 static inline void
 hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
@@ -526,22 +512,5 @@ static inline void
 hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx)
 {
 }
-
-static inline void
-hdd_cm_clear_link_info(uint8_t vdev_id)
-{
-}
 #endif /* WLAN_FEATURE_11BE_MLO */
-
-/**
- * hdd_configure_wow_commands() - Configure WoW commands for vdev
- * @vdev: Pointer to vdev object
- * @hdd_ctx: pointer to hdd context
- *
- * This function configures WoW (Wake on Wireless) commands for the given vdev.
- *
- * Return: None
- */
-void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
-				struct hdd_context *hdd_ctx);
 #endif /* __WLAN_HDD_CM_API_H */

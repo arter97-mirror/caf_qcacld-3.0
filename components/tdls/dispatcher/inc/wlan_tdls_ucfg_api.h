@@ -475,17 +475,6 @@ void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
  * Return: true or false
  */
 bool ucfg_tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_tdls_is_key_install_allowed() - ucfg API to check if key_install request
- * is allowed for TDLS peer in current state.
- * @vdev: Vdev object pointer
- * @mac_addr: Mac address of the peer
- *
- * Return: True if key_install can be allowed
- */
-bool ucfg_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
-				      struct qdf_mac_addr *mac_addr);
 #else
 static inline
 bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
@@ -596,13 +585,6 @@ static inline
 bool  ucfg_tdls_is_fw_11ax_capable(struct wlan_objmgr_psoc *psoc)
 {
 return false;
-}
-
-static inline
-bool ucfg_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
-				      struct qdf_mac_addr *mac_addr)
-{
-	return false;
 }
 #endif /* FEATURE_WLAN_TDLS */
 #endif

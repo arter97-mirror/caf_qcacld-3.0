@@ -241,7 +241,7 @@
  * gEnableHtSMPS - Enable the SM Power Save
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to enable SM Power Save
  *
@@ -255,7 +255,7 @@
  */
 #define CFG_ENABLE_HT_SMPS CFG_INI_BOOL( \
 	"gEnableHtSMPS", \
-	0, \
+	1, \
 	"Enable HT SM PowerSave")
 
 /*
@@ -263,7 +263,7 @@
  * gHtSMPS - SMPS Mode
  * @Min: 0
  * @Max: 3
- * @Default: 3
+ * @Default: 1
  *
  * This ini is used to set default SM Power Save Antenna mode
  * 0 - Static
@@ -283,7 +283,7 @@
 	"gHtSMPS", \
 	0, \
 	3, \
-	3, \
+	1, \
 	CFG_VALUE_OR_DEFAULT, \
 	"HT SM Power Save Config")
 

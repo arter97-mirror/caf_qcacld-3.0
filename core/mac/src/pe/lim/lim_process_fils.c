@@ -29,7 +29,6 @@
 #include "qdf_util.h"
 #include "wlan_crypto_global_api.h"
 #include "wlan_cm_roam_api.h"
-#include "lim_security_utils.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 
@@ -59,7 +58,7 @@ static void lim_fils_data_dump(char *type, uint8_t *data, uint32_t len)
  *
  * Return: hash length
  */
-static int lim_get_crypto_digest_len(const uint8_t *type)
+static int lim_get_crypto_digest_len(uint8_t *type)
 {
 	if (!strcmp(type, HMAC_SHA386_CRYPTO_TYPE))
 		return SHA384_DIGEST_SIZE;
@@ -76,7 +75,7 @@ static int lim_get_crypto_digest_len(const uint8_t *type)
  *
  * Return: tag length
  */
-static int lim_get_auth_tag_len(enum fils_erp_cryptosuite crypto_suite)
+static uint8_t lim_get_auth_tag_len(enum fils_erp_cryptosuite crypto_suite)
 {
 	switch (crypto_suite) {
 	case HMAC_SHA256_64:
@@ -110,6 +109,30 @@ static uint8_t *lim_get_hash_crypto_type(uint8_t akm)
 	}
 }
 
+/**
+ * lim_get_hmac_crypto_type()- This API returns crypto type based on akm suite
+ * used.
+ * @akm: akm used for authentication
+ *
+ * This API is used to get the crypto type when HMAC-hash() needs to
+ * be generated.
+ * Eg: PMK = HMAC-Hash(SNonce || ANonce, rMSK [ || DHss ])
+ *     Here HMAC-Hash will be either hmac(sha256) or hmac(sha384)
+ *
+ * Return: Crypto type
+ */
+static uint8_t *lim_get_hmac_crypto_type(uint8_t akm)
+{
+	switch (akm) {
+	case eCSR_AUTH_TYPE_FILS_SHA384:
+	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
+		return HMAC_SHA386_CRYPTO_TYPE;
+	case eCSR_AUTH_TYPE_FILS_SHA256:
+	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
+	default:
+		return HMAC_SHA256_CRYPTO_TYPE;
+	}
+}
 
 /**
  * lim_get_Q_length()- This API returns pmk length based on akm used
@@ -250,11 +273,9 @@ static int lim_get_ick_len(uint8_t akm)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS lim_get_key_from_prf(const uint8_t *type, uint8_t *secret,
-				       uint32_t secret_len, uint8_t *label,
-				       uint8_t *optional_data,
-				       uint32_t optional_data_len, uint8_t *key,
-				       uint32_t keylen)
+static QDF_STATUS lim_get_key_from_prf(uint8_t *type, uint8_t *secret,
+		uint32_t secret_len, uint8_t *label, uint8_t *optional_data,
+		uint32_t optional_data_len, uint8_t *key, uint32_t keylen)
 {
 	uint8_t count[2];
 	uint8_t *addr[4];
@@ -488,7 +509,7 @@ static QDF_STATUS lim_generate_ap_key_auth(struct pe_session *pe_session,
  * Return: None
  */
 static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
-					uint8_t *peer_mac_addr)
+					tSirMacAddr peer_mac_addr)
 {
 	uint8_t *buf, *addr[1];
 	uint32_t len;
@@ -550,11 +571,11 @@ static QDF_STATUS lim_generate_key_auth(struct pe_session *pe_session,
  * FILS-FT = L(FILS-Key-Data, KCK_bits + KEK_bits + TK_bits, FILS-FT_bits)
  * @pe_session: pe session pointer
  *
- * Return: QDF_STATUS
+ * Return: None
  */
-static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
-			       struct pe_session *pe_session,
-			       tSirMacAddr peer_mac_addr)
+static void lim_get_keys(struct mac_context *mac_ctx,
+			 struct pe_session *pe_session,
+			 tSirMacAddr peer_mac_addr)
 {
 	uint8_t key_label[] = PTK_KEY_LABEL;
 	uint8_t *data;
@@ -575,12 +596,7 @@ static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
 
 	if (!fils_info) {
 		pe_err("Failed to get fils_info");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!fils_info->fils_pmk || !fils_info->fils_pmk_len) {
-		pe_err("FILS PMK is not available");
-		return QDF_STATUS_E_FAILURE;
+		return;
 	}
 
 	if (LIM_IS_AP_ROLE(pe_session)) {
@@ -616,7 +632,7 @@ static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
 	data_len = 2 * SIR_FILS_NONCE_LENGTH + 2 * QDF_MAC_ADDR_SIZE;
 	data = qdf_mem_malloc(data_len);
 	if (!data)
-		return QDF_STATUS_E_NOMEM;
+		return;
 
 	/* data is  SPA || AA ||SNonce || ANonce */
 	buf = data;
@@ -642,10 +658,8 @@ static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
 			     SIR_FILS_NONCE_LENGTH);
 	}
 	/* Derive FILS-Key-Data */
-	status = lim_generate_key_data(fils_info, key_label, data, data_len,
-				       key_data, key_data_len);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto free_data;
+	lim_generate_key_data(fils_info, key_label, data, data_len,
+			      key_data, key_data_len);
 	buf = key_data;
 
 	qdf_mem_copy(fils_info->ick, buf, ick_len);
@@ -675,55 +689,11 @@ static QDF_STATUS lim_get_keys(struct mac_context *mac_ctx,
 		if  (QDF_IS_STATUS_ERROR(status))
 			pe_err("Failed to update FILS FT to mlme");
 	}
-
-free_data:
 	qdf_mem_zero(data, data_len);
 	qdf_mem_free(data);
-
-	return status;
 }
 
 #ifdef WLAN_FEATURE_FILS_SK_SAP
-QDF_STATUS lim_fils_cleanup(struct pe_session *pe_session,
-			    const void *mac_addr)
-{
-	struct pe_fils_session *fils_info;
-	struct qdf_delayed_work *hlp_timeout_work;
-	struct tLimPreAuthNode *auth_node;
-
-	fils_info = lim_get_fils_info(pe_session, (uint8_t *)mac_addr);
-	if (!fils_info) {
-		pe_err("Failed to get Fils info");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Delete Pre auth node here as it is skipped while receiving
-	 * Assoc Req if auth type is FILS_SK
-	 */
-	if (fils_info->is_fils_connection) {
-		hlp_timeout_work = &fils_info->hlp_timeout_work;
-		qdf_delayed_work_stop_sync(hlp_timeout_work);
-		qdf_delayed_work_destroy(hlp_timeout_work);
-		auth_node = lim_search_pre_auth_list(pe_session->mac_ctx,
-						     (uint8_t *)mac_addr);
-		qdf_mem_free(fils_info->hlp_data);
-		fils_info->hlp_data = NULL;
-
-		fils_info->hlp_data_len = 0;
-		qdf_mem_free(auth_node->fils_info);
-		auth_node->fils_info = NULL;
-
-		lim_delete_pre_auth_node(pe_session->mac_ctx,
-					 (uint8_t *)mac_addr);
-		pe_debug("FILS hlp timeout work clean up done vdev: %d peer:"
-			QDF_MAC_ADDR_FMT,
-			pe_session->vdev_id,
-			QDF_MAC_ADDR_REF((const uint8_t *)mac_addr));
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session, bool unicast,
 			      uint8_t key_id, uint16_t key_length,
 			      uint8_t *key, struct qdf_mac_addr *mac_addr)
@@ -790,31 +760,38 @@ QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
 				       WLAN_CRYPTO_KEY_TYPE_UNICAST :
 				       WLAN_CRYPTO_KEY_TYPE_GROUP));
 }
-
 QDF_STATUS lim_install_fils_key(struct pe_session *pe_session,
 				const void *mac_addr)
 {
 	struct pe_fils_session *fils_info;
-	fils_info = lim_get_fils_info(pe_session, (uint8_t *)mac_addr);
-	if (!fils_info) {
-		pe_err("Failed to get Fils info");
-		return QDF_STATUS_E_FAILURE;
-	}
 
-	if (fils_info->is_fils_connection) {
+	fils_info = lim_get_fils_info(pe_session, mac_addr);
+
+	if (fils_info && fils_info->is_fils_connection) {
 		pe_debug("Installing FILS key for connection");
 		lim_cache_fils_key(pe_session, true, FILS_TK_INDEX,
-				   fils_info->tk_len, fils_info->tk,
-				   (struct qdf_mac_addr *)mac_addr);
+				   fils_info->tk_len, fils_info->tk, mac_addr);
 		lim_cache_fils_key(pe_session, false, FILS_GTK_INDEX,
 				   fils_info->gtk_len,
 				   fils_info->gtk,
-				   (struct qdf_mac_addr *)pe_session->bssId);
-		lim_set_fils_key(pe_session, true, FILS_TK_INDEX);
-		lim_set_fils_key(pe_session, false, FILS_GTK_INDEX);
+				   pe_session->bssId);
+		lim_set_fils_key(pe_session, true, FILS_TK_INDEX, mac_addr);
+		lim_set_fils_key(pe_session, false, FILS_GTK_INDEX,
+				 pe_session->bssId);
 	}
+
+	/* Delete Pre auth node here as it is skipped while receiving
+	 * Assoc Req if auth type is FILS_SK
+	 */
+	if (sme_assoc_ind->authType == SIR_FILS_SK_WITHOUT_PFS) {
+		qdf_mem_free(fils_info);
+		lim_delete_pre_auth_node(pe_session->mac_ctx,
+					 mac_addr);
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
+
 
 /**
  * lim_generate_gtk()- This API generates GTK
@@ -1046,7 +1023,7 @@ static QDF_STATUS lim_process_auth_wrapped_data(struct pe_session *pe_session,
 	uint32_t remaining_len = data_len, new_len;
 	uint8_t *input_data[1];
 	uint32_t input_len[1];
-	int auth_tag_len;
+	uint8_t auth_tag_len;
 
 	fils_info = pe_session->fils_info;
 	input_data[0] = wrapped_data;
@@ -1055,7 +1032,7 @@ static QDF_STATUS lim_process_auth_wrapped_data(struct pe_session *pe_session,
 	if (!fils_info)
 		return QDF_STATUS_E_FAILURE;
 
-	pe_debug("trying to process the wrapped data");
+	pe_debug("trying to process the wrappped data");
 
 	code = *wrapped_data;
 	wrapped_data++;
@@ -1103,11 +1080,6 @@ static QDF_STATUS lim_process_auth_wrapped_data(struct pe_session *pe_session,
 	remaining_len--;
 
 	auth_tag_len = lim_get_auth_tag_len(crypto);
-	if (auth_tag_len < 0 || (uint32_t)auth_tag_len > remaining_len) {
-		pe_err("invalid auth tag len %d remaining %u", auth_tag_len,
-		       remaining_len);
-		return QDF_STATUS_E_INVAL;
-	}
 	input_len[0] -= auth_tag_len;
 	/* if we have auth tag remaining */
 	if (remaining_len == auth_tag_len) {
@@ -1170,7 +1142,7 @@ bool lim_is_valid_fils_auth_frame(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_create_fils_wrapper_data()- This API create wrapped data which will be
+ * lim_create_fils_wrapper_data()- This API create warpped data which will be
  * sent in auth request.
  * @fils_info: fils session info
  *
@@ -1782,17 +1754,14 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 		}
 	}
 
-	if (pe_session->fils_info->fils_pmk &&
-	    pe_session->fils_info->fils_pmk_len) {
-		for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
-			if (qdf_mem_cmp(dot11f_ie_rsn.pmkid[i],
-					pe_session->fils_info->fils_pmkid,
-					PMKID_LEN) == 0) {
-				pmkid_found = true;
-				pe_debug("pmkid match in rsn ie total_count %d",
-					 dot11f_ie_rsn.pmkid_count);
-				break;
-			}
+	for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
+		if (qdf_mem_cmp(dot11f_ie_rsn.pmkid[i],
+		    pe_session->fils_info->fils_pmkid,
+		    PMKID_LEN) == 0) {
+			pmkid_found = true;
+			pe_debug("pmkid match in rsn ie total_count %d",
+				dot11f_ie_rsn.pmkid_count);
+			break;
 		}
 	}
 	if (!pmkid_found) {
@@ -1802,9 +1771,7 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 			rx_auth_frm_body->wrapped_data_len))
 			return false;
 	}
-	status = lim_get_keys(mac_ctx, pe_session, NULL);
-	if (QDF_IS_STATUS_ERROR(status))
-		return false;
+	lim_get_keys(mac_ctx, pe_session, NULL);
 	if (pe_session->is11Rconnection) {
 		status = lim_generate_fils_pmkr0(pe_session);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -1873,7 +1840,7 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 {
 	uint32_t ret, i;
 	bool pmkid_found = false;
-	struct wlan_crypto_pmksa pmksa;
+	struct wlan_crypto_pmksa *pmksa = NULL;
 	tDot11fIERSN dot11f_ie_rsn = {0};
 	struct pe_fils_session *fils_info = NULL;
 	struct qdf_mac_addr *sta_addr = (struct qdf_mac_addr *)peer_mac_addr;
@@ -1901,20 +1868,18 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 		return false;
 	}
 
-	if (QDF_IS_STATUS_ERROR(wlan_crypto_get_pmksa_copy(pe_session->vdev,
-							   sta_addr, &pmksa))) {
-		pe_debug("pmkid not found for sta ");
-		return false;
-	}
-
 	for (i = 0; i < dot11f_ie_rsn.pmkid_count; i++) {
-		if (qdf_mem_cmp(pmksa.pmkid, dot11f_ie_rsn.pmkid[i],
-				PMKID_LEN))
-			continue;
-		pmkid_found = true;
-		pe_debug("pmkid match in rsn ie total_count %d",
-			 dot11f_ie_rsn.pmkid_count);
-		break;
+		pmksa = wlan_crypto_get_pmksa(pe_session->vdev,
+					      sta_addr);
+		if (pmksa) {
+			if (qdf_mem_cmp(pmksa->pmkid, dot11f_ie_rsn.pmkid[i],
+					PMKID_LEN))
+				continue;
+			pmkid_found = true;
+			pe_debug("pmkid match in rsn ie total_count %d",
+				 dot11f_ie_rsn.pmkid_count);
+			break;
+		}
 	}
 	if (!pmkid_found) {
 		pe_debug("pmkid not found for sta ");
@@ -1927,7 +1892,7 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 	fils_info->akm = lim_get_akm_type(pe_session->vdev);
 	fils_info->auth = SIR_FILS_SK_WITHOUT_PFS;
 
-	fils_info->fils_pmk_len = pmksa.pmk_len;
+	fils_info->fils_pmk_len = pmksa->pmk_len;
 	if (fils_info->fils_pmk)
 		qdf_mem_free(fils_info->fils_pmk);
 
@@ -1939,16 +1904,16 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 
 	/* RSN_IE */
 	wlan_crypto_build_rsnie_with_pmksa(pe_session->vdev,
-					   fils_info->rsn_ie, &pmksa);
+					   fils_info->rsn_ie, pmksa);
 
 	fils_info->rsn_ie_len = fils_info->rsn_ie[1] + 2;
 
 	/* PMK ID */
-	qdf_mem_copy(fils_info->fils_pmkid, pmksa.pmkid,
+	qdf_mem_copy(fils_info->fils_pmkid, pmksa->pmkid,
 		     PMKID_LEN);
 
 	/* PMK */
-	qdf_mem_copy(fils_info->fils_pmk, pmksa.pmk,
+	qdf_mem_copy(fils_info->fils_pmk, pmksa->pmk,
 		     fils_info->fils_pmk_len);
 
 	/* Snonce */
@@ -1962,13 +1927,7 @@ bool lim_process_fils_auth_frame1(struct mac_context *mac_ctx,
 	qdf_mem_copy(fils_info->fils_session,
 		     rx_auth_frm_body->session, SIR_FILS_SESSION_LENGTH);
 
-	status = lim_get_keys(mac_ctx, pe_session, peer_mac_addr);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("failed to generate FILS keys");
-		qdf_mem_free(fils_info->fils_pmk);
-		fils_info->fils_pmk = NULL;
-		return false;
-	}
+	lim_get_keys(mac_ctx, pe_session, peer_mac_addr);
 
 	lim_generate_key_auth(pe_session, peer_mac_addr);
 	lim_generate_ap_key_auth(pe_session, peer_mac_addr);
@@ -2335,161 +2294,28 @@ void lim_update_fils_hlp_data(struct qdf_mac_addr *hlp_frm_src_mac,
 			      uint16_t frm_hlp_len, uint8_t *frm_hlp_data,
 			      struct pe_session *pe_session)
 {
+	struct pe_fils_session *pe_fils_info = pe_session->fils_info;
 
-	struct pe_fils_session *fils_info;
-
-	fils_info = lim_get_fils_info(pe_session,
-				      (uint8_t *)hlp_frm_src_mac);
-
-	if (!fils_info) {
+	if (!pe_fils_info) {
 		pe_err("Not a fils connection");
 		return;
 	}
 
 	if (frm_hlp_data && frm_hlp_len) {
-		qdf_mem_free(fils_info->hlp_data);
-		fils_info->hlp_data = NULL;
-		fils_info->hlp_data = qdf_mem_malloc(frm_hlp_len);
-		if (!fils_info->hlp_data)
+		qdf_mem_free(pe_fils_info->hlp_data);
+		pe_fils_info->hlp_data = qdf_mem_malloc(frm_hlp_len);
+		if (!pe_fils_info->hlp_data)
 			return;
 
 		pe_debug("FILS: hlp_data_len:%d", frm_hlp_len);
 		cds_copy_hlp_info(hlp_frm_dest_mac, hlp_frm_src_mac,
 				  frm_hlp_len, frm_hlp_data,
-				  &fils_info->dst_mac,
-				  &fils_info->src_mac,
-				  &fils_info->hlp_data_len,
-				  fils_info->hlp_data);
+				  &pe_fils_info->dst_mac,
+				  &pe_fils_info->src_mac,
+				  &pe_fils_info->hlp_data_len,
+				  pe_fils_info->hlp_data);
 	}
 }
-
-#ifdef WLAN_FEATURE_FILS_SK_SAP
-void lim_update_hlp_info(struct mac_context *mac_ctx,
-			 struct pe_session *session_entry,
-			 struct qdf_mac_addr *peer_mac_addr)
-{
-	struct pe_fils_session *fils_info;
-	struct tLimPreAuthNode *sta_pre_auth_ctx;
-	struct qdf_delayed_work *hlp_timeout_work;
-	QDF_STATUS status;
-
-	if (!peer_mac_addr) {
-		pe_err("peer_mac_addr is NULL");
-		return;
-	}
-
-	fils_info = lim_get_fils_info(session_entry,
-				      peer_mac_addr->bytes);
-	if (!fils_info) {
-		pe_err("Failed to get Fils info");
-		return;
-	}
-
-	sta_pre_auth_ctx = lim_search_pre_auth_list(session_entry->mac_ctx,
-						    peer_mac_addr->bytes);
-
-	if (!sta_pre_auth_ctx) {
-		pe_debug("No preauth node created for " QDF_MAC_ADDR_FMT,
-			 QDF_MAC_ADDR_REF(peer_mac_addr->bytes));
-		return;
-	}
-
-	if (mac_ctx->hlp_frame_ind_cb)
-		mac_ctx->hlp_frame_ind_cb(session_entry->vdev_id,
-					  fils_info->hlp_data,
-					  fils_info->hlp_data_len,
-					  (struct qdf_mac_addr *)
-					  fils_info->src_mac.bytes,
-					  (struct qdf_mac_addr *)
-					  fils_info->dst_mac.bytes);
-
-	hlp_timeout_work = &fils_info->hlp_timeout_work;
-	status = qdf_delayed_work_create(hlp_timeout_work,
-					 lim_sap_hlp_timeout_callback,
-					 sta_pre_auth_ctx);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("Failed to create hlp work queue, status: %d",
-		       status);
-		return;
-	}
-
-	sta_pre_auth_ctx->mlmState = LIM_MLM_WT_FILS_HLP_STATE;
-	qdf_delayed_work_start(&fils_info->hlp_timeout_work,
-			       FILS_HLP_PROCESSING_WAIT_TIME);
-}
-
-void lim_sap_hlp_timeout_callback(void *priv)
-{
-	struct tLimPreAuthNode *sta_pre_auth_ctx = priv;
-	struct lim_assoc_data *assoc_req;
-	bool assoc_ind_sent;
-	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	struct pe_fils_session *fils_info;
-	struct pe_session *session;
-
-	if (!mac_ctx) {
-		pe_err("mac_ctx is NULL");
-		return;
-	}
-
-	if (!sta_pre_auth_ctx) {
-		pe_err("Preauth context is NULL");
-		return;
-	}
-
-	if (!sta_pre_auth_ctx->fils_info) {
-		pe_err("No Fils Info present");
-		return;
-	}
-
-	/* Check if already processed by HLP response */
-	if (sta_pre_auth_ctx->mlmState != LIM_MLM_WT_FILS_HLP_STATE) {
-		pe_debug("HLP already processed");
-		return;
-	}
-
-	fils_info = sta_pre_auth_ctx->fils_info;
-
-	session = pe_find_session_by_vdev_id(mac_ctx,
-					     sta_pre_auth_ctx->vdev_id);
-	if (!session) {
-		pe_err("Not able to find session for HLP timeout handling");
-		return;
-	}
-
-	assoc_req = &sta_pre_auth_ctx->assoc_req;
-
-	sta_pre_auth_ctx->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
-	/* Send assoc indication to SME if any assoc request is cached*/
-	if (assoc_req->present) {
-		/* Assoc request is present in preauth context. Get the assoc
-		 * request and make it invalid in preauth context. It'll be
-		 * freed later in the legacy path.
-		 */
-		bool assoc_req_copied;
-
-		assoc_req->present = false;
-		pe_debug("Assoc req cached; handle it");
-		assoc_ind_sent =
-			lim_send_assoc_ind_to_sme(mac_ctx,
-						  session,
-						  assoc_req->sub_type,
-						  assoc_req->sa,
-						  assoc_req->assoc_req,
-						  fils_info->akm,
-						  assoc_req->pmf_connection,
-						  &assoc_req_copied,
-						  assoc_req->dup_entry, false,
-						  assoc_req->partner_peer_idx);
-		if (!assoc_ind_sent)
-			lim_process_assoc_cleanup(session->mac_ctx,
-						  session,
-						  assoc_req->sta_ds,
-						  assoc_req_copied);
-	}
-	lim_fils_cleanup(session, assoc_req->sa);
-}
-#endif /* WLAN_FEATURE_FILS_SK_SAP */
 
 bool lim_verify_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 				      struct pe_session *session_entry,
@@ -2629,15 +2455,11 @@ bool lim_verify_fils_params_assoc_req(struct mac_context *mac_ctx,
 
 	qdf_mem_free(fils_key_auth);
 
-	lim_update_fils_hlp_data(&assoc_req->src_mac,
-				 &assoc_req->dst_mac,
+	lim_update_fils_hlp_data(&assoc_req->dst_mac,
+				 &assoc_req->src_mac,
 				 assoc_req->hlp_data_len,
 				 assoc_req->hlp_data,
 				 session_entry);
-
-	if (assoc_req->hlp_data_len)
-		lim_update_hlp_info(mac_ctx, session_entry,
-				    (struct qdf_mac_addr *)peer_mac_addr);
 	return true;
 
 verify_fils_params_fails:
@@ -3057,6 +2879,7 @@ QDF_STATUS aead_decrypt_assoc_rsp(struct mac_context *mac_ctx,
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 				  struct pe_session *session,
+				  tDot11fAssocRequest *ar,
 				  uint8_t *p_frame, uint32_t *n_frame,
 				  tSirMacAddr peer_mac_addr)
 {

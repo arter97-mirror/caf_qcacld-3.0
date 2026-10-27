@@ -100,9 +100,8 @@ struct wlan_cds_feature_set {
  * @enable_tx_compl_tsf64:
  * @cds_feature_set: CDS feature set structure.
  * @get_wifi_features: Get wifi features from fw
+ * @exclude_selftx_from_cca_busy: Exclude selx tx time from cca busy time
  * @is_pm_fw_debug_enable: flag to check FW debug is enabled or not
- * @enable_bcn_rssi_history_report: beacon rssi history report config
- * @enable_snr_stats_report: snr stats report config
  */
 
 struct cds_config_info {
@@ -139,10 +138,7 @@ struct cds_config_info {
 	struct wlan_cds_feature_set cds_feature_set;
 	bool get_wifi_features;
 #endif
+	bool exclude_selftx_from_cca_busy;
 	bool is_pm_fw_debug_enable;
-	bool enable_bcn_rssi_history_report;
-#ifdef FEATURE_SNR_STATS
-	bool enable_snr_stats_report;
-#endif /* FEATURE_SNR_STATS */
 };
 #endif /* !defined( __CDS_CONFIG_H ) */

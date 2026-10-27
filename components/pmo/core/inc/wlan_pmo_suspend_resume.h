@@ -119,21 +119,6 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 					     pmo_pld_auto_resume_cb pld_cb);
-
-/**
- * pmo_core_psoc_apply_tbtt_nack_rtpm_delay(): arm the RTPM TBTT-nack delay
- * @psoc: objmgr psoc
- *
- * Consumes the TBTT nack flag set by the just-completed runtime suspend
- * attempt (if any) and, when set, shortens the RTPM autosuspend delay so
- * the next suspend attempt is retried soon after the TBTT window has
- * passed. Must be called only after the runtime suspend attempt (and any
- * WMI traffic it generated) has fully returned, so the shortened delay is
- * not immediately reset by that same attempt's own WMI activity.
- *
- * Return: none
- */
-void pmo_core_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc);
 #endif
 
 /**
@@ -638,14 +623,6 @@ void pmo_core_vdev_set_moddtim_user(struct wlan_objmgr_vdev *vdev,
 	vdev_ctx->dyn_modulated_dtim = value;
 	qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
 }
-
-/**
- * pmo_core_is_wow_optimization_enabled() - Check if WoW optimization is enabled
- * @psoc: psoc objmgr handle
- *
- * Return: true if WoW timeline optimization is supported, false otherwise
- */
-bool pmo_core_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc);
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #endif /* end  of _WLAN_PMO_SUSPEND_RESUME_H_ */

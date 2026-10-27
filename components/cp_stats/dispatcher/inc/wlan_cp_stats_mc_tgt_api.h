@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -44,12 +43,6 @@
  */
 #define TARGET_MAX_TX_POWER    63
 
-/* Maximum number of power stats entries to prevent memory exhaustion */
-#define MAX_POWER_STATS_ENTRIES 16
-
-/* Maximum number of TX rate stats entries to prevent memory exhaustion */
-#define MAX_TX_RATE_STATS_ENTRIES 32
-
 /**
  * target_if_mc_cp_get_mac_id(): API to get mac id
  * @vdev_mlme: vdev mlme pointer
@@ -69,20 +62,6 @@ uint8_t target_if_mc_cp_get_mac_id(struct vdev_mlme_obj *vdev_mlme);
 QDF_STATUS
 tgt_mc_cp_stats_process_stats_event(struct wlan_objmgr_psoc *psoc,
 				    struct stats_event *ev);
-
-#ifdef WLAN_FEATURE_QSH_SCAN
-/**
- * tgt_mc_cp_stats_process_qsh_scan_stats(): API to process QSH stats event
- * @psoc: pointer to psoc object
- * @ev: event parameters
- *
- * Return: QDF_STATUS_SUCCESS on Success, other QDF_STATUS error codes on
- * failure
- */
-QDF_STATUS
-tgt_mc_cp_stats_process_qsh_scan_stats(struct wlan_objmgr_psoc *psoc,
-				       struct qsh_stats_event *ev);
-#endif
 
 #ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
 /**
@@ -114,21 +93,6 @@ tgt_mc_cp_stats_process_big_data_stats_event(
 				struct big_data_stats_event *event);
 #endif
 
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-/**
- * tgt_mc_cp_stats_process_power_datapath_stats_event(): API to process power
- * datapath stats event
- * @psoc: pointer to psoc object
- * @event: power datapath stats event parameters
- *
- * Return: status of operation
- */
-QDF_STATUS
-tgt_mc_cp_stats_process_power_datapath_stats_event(
-				struct wlan_objmgr_psoc *psoc,
-				struct cp_stats_power_datapath_info *event);
-#endif
-
 /**
  * tgt_send_mc_cp_stats_req(): API to send stats request to lmac
  * @psoc: pointer to psoc object
@@ -140,81 +104,6 @@ tgt_mc_cp_stats_process_power_datapath_stats_event(
 QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    enum stats_req_type type,
 				    struct request_info *req);
-
-#ifdef WLAN_FEATURE_CTAS
-/**
- * tgt_cp_stats_is_ctas_plim_indication_supported() - Check whether FW
- * supports C-TAS power indication and power limit enquiring
- * @psoc: pointer to psoc object
- *
- * Calls target_if_is_ctas_plim_indication_supported() via the target_if
- * layer. Not for direct use by HDD — call ucfg wrapper instead.
- *
- * Return: true if FW supports the capability, false otherwise
- */
-bool tgt_cp_stats_is_ctas_plim_indication_supported(
-					struct wlan_objmgr_psoc *psoc);
-
-/**
- * tgt_cp_stats_send_tas_mode() - Send TAS mode to firmware
- * @psoc: pointer to psoc object
- * @direction: TAS direction as enum host_tas_direction; WMI layer converts
- *             to wmi_plim_direction_type before sending to firmware
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS tgt_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-				      enum host_tas_direction direction);
-
-/**
- * tgt_cp_stats_send_get_avg_tx_power() - Request avg TX power from FW
- * @psoc: pointer to psoc object
- * @dsi_id: DSI ID for the query
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
-					      uint32_t dsi_id);
-
-/**
- * tgt_cp_stats_send_get_tx_power_calling() - Request per-chain TX power
- *                                            limits from FW
- * @psoc: pointer to psoc object
- * @dsi_id: DSI ID for the query
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS tgt_cp_stats_send_get_tx_power_calling(
-					struct wlan_objmgr_psoc *psoc,
-					uint32_t dsi_id);
-#else /* WLAN_FEATURE_CTAS */
-static inline bool
-tgt_cp_stats_is_ctas_plim_indication_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline QDF_STATUS
-tgt_cp_stats_send_tas_mode(struct wlan_objmgr_psoc *psoc,
-			   enum host_tas_direction direction)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-tgt_cp_stats_send_get_avg_tx_power(struct wlan_objmgr_psoc *psoc,
-				   uint32_t dsi_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-tgt_cp_stats_send_get_tx_power_calling(struct wlan_objmgr_psoc *psoc,
-				       uint32_t dsi_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_CTAS */
 
 /**
  * tgt_set_pdev_stats_update_period(): API to set pdev stats update

@@ -363,7 +363,6 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
 	tx_action->vdev_id = mgmt_frm->vdev_id;
 	tx_action->chan_freq = mgmt_frm->chan_freq;
 	tx_action->duration = mgmt_frm->wait;
-	tx_action->zero_wait = !mgmt_frm->wait;
 	tx_action->buf_len = mgmt_frm->len;
 	tx_action->no_cck = mgmt_frm->no_cck;
 	tx_action->no_ack = mgmt_frm->dont_wait_for_ack;
@@ -756,7 +755,7 @@ ucfg_is_p2p_device_dynamic_set_mac_addr_supported(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 				    struct p2p_usd_attr_params *param)
 {
@@ -767,26 +766,12 @@ bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 {
 	return p2p_is_fw_support_usd(psoc);
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 bool ucfg_p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 {
 	return p2p_is_vdev_wfd_r2_mode(vdev);
 }
-
-bool ucfg_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
-{
-	return p2p_is_fw_support_wfd_r2(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-bool ucfg_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
-{
-	return p2p_is_fw_support_pcc(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
 
 bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 {

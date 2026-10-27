@@ -111,6 +111,7 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  * Return: void
  */
 void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
+
 #else
 static inline
 QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
@@ -264,31 +265,6 @@ wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
  */
 QDF_STATUS wlan_cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				 uint8_t reason);
-
-#ifdef WLAN_STA_SEAMLESS_ROAMING
-/**
- * wlan_cm_roam_set_ipa_sw_routing() - Set the roam ipa sw routing enable/disable
- * @psoc: psoc pointer
- * @vdev: Pointer to vdev
- * @mac_addr: MAC address of the wlan client
- * @vdev_id: vdev id
- * @is_enable: enable/disable ipa sw routing
- *
- * Return: void
- */
-void wlan_cm_roam_set_ipa_sw_routing(struct wlan_objmgr_psoc *psoc,
-				     struct wlan_objmgr_vdev *vdev,
-				     uint8_t *mac_addr, uint8_t vdev_id,
-				     bool is_enable);
-#else
-static inline
-void wlan_cm_roam_set_ipa_sw_routing(struct wlan_objmgr_psoc *psoc,
-				     struct wlan_objmgr_vdev *vdev,
-				     uint8_t *mac_addr, uint8_t vdev_id,
-				     bool is_enable)
-{
-}
-#endif
 
 /**
  * wlan_cm_roam_cfg_get_value  - Get RSO config value from mlme vdev private
@@ -444,11 +420,13 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 
 /**
  * wlan_cm_rso_config_deinit  - deinit RSO config
+ * @vdev: vdev pointer
  * @rso_cfg: rso config to deinit
  *
  * Return: void
  */
-void wlan_cm_rso_config_deinit(struct rso_config *rso_cfg);
+void wlan_cm_rso_config_deinit(struct wlan_objmgr_vdev *vdev,
+			       struct rso_config *rso_cfg);
 
 /**
  * wlan_cm_fill_crypto_filter_from_vdev() - fill scan filter crypto from vdev
@@ -487,12 +465,12 @@ uint32_t cm_crypto_authmode_to_wmi_authmode(int32_t authmodeset,
 uint32_t cm_wmi_auth_type_to_crypto_key_mgmt(uint32_t akm);
 
 /**
- * cm_get_wmi_auth_type() - API to get wmi auth type
+ * cm_get_rsn_wmi_auth_type() - API to get wmi auth type
  * @akm: akm
  *
  * Return: WMI auth type
  */
-uint32_t cm_get_wmi_auth_type(uint32_t akm);
+uint32_t cm_get_rsn_wmi_auth_type(int32_t akm);
 
 uint8_t *wlan_cm_get_rrm_cap_ie_data(void);
 
@@ -708,27 +686,12 @@ void cm_update_session_assoc_ie(struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id,
 				struct element_info *assoc_ie);
 
-#ifdef WLAN_FEATURE_SECURITY_PROFILE
-void cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
-					uint8_t vdev_id,
-					int8_t sec_profile_num);
-#else
-static inline void
-cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id,
-				   int8_t sec_profile_num)
-{
-}
-#endif
-
 /**
  * wlan_cm_roam_invoke() - Validate and send Roam invoke req to CM
  * @pdev: Pdev pointer
  * @vdev_id: vdev_id
  * @bssid: Target bssid
  * @chan_freq: channel frequency on which reassoc should be send
- * @num_chan: number of channels for OOQROAM, 0 for FASTREASSOC
- * @chan_freq_list: channel frequency list for OOQROAM, NULL for FASTREASSOC
  * @source: source of roam
  *
  * Return: QDF_STATUS
@@ -736,7 +699,6 @@ cm_update_session_security_profile(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
-		    u8 num_chan, qdf_freq_t *chan_freq_list,
 		    enum wlan_cm_source source);
 
 /**
@@ -1123,14 +1085,13 @@ cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_invalid_roam_reason_handler() - Handler for invalid roam reason
- * @roam_event: roam offload event ptr
+ * @vdev_id: vdev id
  * @notif: roam notification of type enum cm_roam_notif
  * @reason: Notif param value from the roam event that carries trigger reason
  *
  * Return: QDF_STATUS
  */
-void cm_invalid_roam_reason_handler(struct roam_offload_roam_event *roam_event,
-				    enum cm_roam_notif notif,
+void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
 				    uint32_t reason);
 
 /**
@@ -1563,13 +1524,6 @@ bool wlan_cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 			     enum wlan_diag_btm_block_reason reason);
-
-void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
-				    struct element_info *assoc_ie);
-
-void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id);
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1864,17 +1818,6 @@ wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-
-static inline
-void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
-				    struct element_info *assoc_ie)
-{}
-
-static inline
-void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id)
-{}
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -1890,30 +1833,6 @@ void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_crypto_key_entry *keys,
 					  uint8_t num_keys);
-
-/**
- * wlan_cm_set_cross_vdev_roam - set cross_vdev_roam flag in mlo sta ctx
- * @vdev: pointer to vdev
- *
- * Return: None
- */
-void wlan_cm_set_cross_vdev_roam(struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_cm_clear_cross_vdev_roam - clears cross_vdev_roam flag in mlo sta ctx
- * @vdev: pointer to vdev
- *
- * Return: None
- */
-void wlan_cm_clear_cross_vdev_roam(struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_cm_is_cross_vdev_roaming - Check weather ROAM events received on non-assoc vdev
- * @vdev: pointer to vdev
- *
- * Return: returns true on cross-vdev roam case, false otherwise
- */
-bool wlan_cm_is_cross_vdev_roaming(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -1921,20 +1840,6 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_keys)
 {
 	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-void wlan_cm_set_cross_vdev_roam(struct wlan_objmgr_vdev *vdev)
-{}
-
-static inline
-void wlan_cm_clear_cross_vdev_roam(struct wlan_objmgr_vdev *vdev)
-{}
-
-static inline
-bool wlan_cm_is_cross_vdev_roaming(struct wlan_objmgr_vdev *vdev)
-{
-	return false;
 }
 #endif
 
@@ -2181,25 +2086,11 @@ QDF_STATUS cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
 			       struct roam_offload_synch_ind *sync_ind);
 
 /**
- * cm_roam_delete_session_for_sl_to_ml_failure() - Delete newly added pe
- * session in case of sl to ml switch failure
- * @vdev_id: vdev id
- *
- * This function will deleted the newly created pe session for failure in
- * in sl to ml switch
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-cm_roam_delete_session_for_sl_to_ml_failure(uint8_t vdev_id);
-
-/**
  * cm_roam_pe_sync_callback() - Callback registered at pe, gets invoked when
  * ROAM SYNCH event is received from firmware
  * @sync_ind: Structure with roam synch parameters
  * @vdev_id: vdev id
  * @len: length for bss_description
- * @new_link_session: bool for whether new pe session was created
  *
  * This is a PE level callback called from CM to complete the roam synch
  * propagation at PE level and also fill the BSS descriptor which will be
@@ -2209,8 +2100,7 @@ cm_roam_delete_session_for_sl_to_ml_failure(uint8_t vdev_id);
  */
 QDF_STATUS
 cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id, uint16_t len,
-			 bool *new_link_session);
+			 uint8_t vdev_id, uint16_t len);
 
 /**
  * cm_update_phymode_on_roam() - Update new phymode after
@@ -2413,23 +2303,12 @@ cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode);
  */
 bool
 wlan_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev);
-
-void
-wlan_cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
-			struct wlan_objmgr_vdev *vdev,
-			struct wlan_roam_start_config *start_req);
 #else
 static inline bool
 wlan_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }
-
-static inline void
-wlan_cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
-			struct wlan_objmgr_vdev *vdev,
-			struct wlan_roam_start_config *start_req)
-{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -2539,35 +2418,5 @@ uint32_t cm_roam_get_roam_score_algo(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 wlan_update_peer_phy_mode(struct wlan_channel *des_chan,
 			  struct wlan_objmgr_vdev *vdev);
-
-#if (defined(CONNECTIVITY_DIAG_EVENT) && \
-	defined(WLAN_FEATURE_ROAM_OFFLOAD))
-/**
- * wlan_set_log_instance_id() - Increment the log instance id for each preauth
- * event received.
- * @pdev: pdev object
- * @vdev_id : Vdev id
- *
- * Return: QDF_STATUS
- */
-void
-wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
-#else
-static inline void
-wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{}
-#endif
-
-/**
- * cm_get_roam_sync_timeout() - Get serialization timeout for FW roam command
- * @vdev: VDEV object
- *
- * Returns FW_SMD_ROAM_SYNC_TIMEOUT when WLAN_FEATURE_11BN_SMD is enabled
- * and SMD roaming is in progress on the vdev, FW_ROAM_SYNC_TIMEOUT otherwise.
- *
- * Return: timeout in milliseconds
- */
-uint32_t
-cm_get_roam_sync_timeout(struct wlan_objmgr_vdev *vdev);
 
 #endif  /* WLAN_CM_ROAM_API_H__ */

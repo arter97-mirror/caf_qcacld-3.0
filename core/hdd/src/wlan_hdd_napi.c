@@ -551,7 +551,7 @@ int hdd_clear_napi_stats(void)
 	for (i = 0; i < CE_COUNT_MAX; i++)
 		if (napid->ce_map & (0x01 << i)) {
 			napii = napid->napis[i];
-			for (j = 0; j < num_possible_cpus(); j++) {
+			for (j = 0; j < NR_CPUS; j++) {
 				napis = &(napii->stats[j]);
 				qdf_mem_zero(napis,
 					     sizeof(struct qca_napi_stat));

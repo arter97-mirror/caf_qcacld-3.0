@@ -54,6 +54,17 @@
 
 /* enums exported by LIM are as follows */
 
+/*System role definition */
+typedef enum eLimSystemRole {
+	eLIM_UNKNOWN_ROLE,
+	eLIM_AP_ROLE,
+	eLIM_STA_ROLE,
+	eLIM_P2P_DEVICE_ROLE,
+	eLIM_P2P_DEVICE_GO,
+	eLIM_P2P_DEVICE_CLIENT,
+	eLIM_NDI_ROLE
+} tLimSystemRole;
+
 /*
  * SME state definition accessible across all Sirius modules.
  * AP only states are LIM_SME_CHANNEL_SCAN_STATE &
@@ -124,9 +135,8 @@ typedef enum eLimMlmStates {
 	eLIM_MLM_WT_SET_STA_BCASTKEY_STATE,
 	eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE,
 	eLIM_MLM_WT_FT_REASSOC_RSP_STATE,
-	eLIM_MLM_WT_EXTERNAL_AUTH_STATE,
+	eLIM_MLM_WT_SAE_AUTH_STATE,
 	eLIM_MLM_WT_FT_AUTH_STATE,
-	LIM_MLM_WT_FILS_HLP_STATE,
 } tLimMlmStates;
 
 /* 11h channel switch states */
@@ -153,6 +163,12 @@ typedef struct sLimMlmAuthReq {
 
 typedef struct sLimMlmJoinReq {
 	uint8_t sessionId;
+	struct bss_description bssDescription;
+	/*
+	 * WARNING: Pls make bssDescription as last variable in struct
+	 * tLimMlmJoinReq as it has ieFields followed after this bss
+	 * description. Adding a variable after this corrupts the ieFields
+	 */
 } tLimMlmJoinReq, *tpLimMlmJoinReq;
 
 /* Forward declarations */
@@ -211,7 +227,6 @@ typedef struct tLimPreAuthNode {
 	 * like anonce, snonce , tk etc.
 	 */
 	struct pe_fils_session *fils_info;
-	uint8_t vdev_id;
 } tLimPreAuthNode, *tpLimPreAuthNode;
 
 /* Pre-authentication table definition */
@@ -242,7 +257,6 @@ typedef struct tLimPreAuthTable {
  * @ft_ie:         Pointer to FT related IE
  * @ft_ie_len:     Length of FT related IE
  * @eht_capable:     802.11be EHT capability
- * @uhr_capable:     802.11bn UHR capability
  */
 struct lim_sta_context {
 	tLimMlmStates mlmState;
@@ -272,9 +286,6 @@ struct lim_sta_context {
 	uint32_t ft_ie_len;
 #ifdef WLAN_FEATURE_11BE
 	bool eht_capable;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	bool uhr_capable;
 #endif
 };
 

@@ -88,44 +88,6 @@ netdev_tx_t hdd_softap_hard_start_xmit(struct sk_buff *skb,
  */
 QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/**
- * hdd_softap_wds_ext_start_xmit() - Transmit a frame on wds_ext interface
- * @skb: pointer to OS packet
- * @dev: pointer to wds_ext net_device structure
- *
- * Function registered as a net_device .ndo_start_xmit() method for
- * wds_ext interface, called by the OS if any packet needs to be transmitted.
- * Parent net_device of wds_ext interface points to a SoftAP interface.
- *
- * For any unicast packets, regular TX path is used with net_device replaced to
- * parent net_device of the wds_ext interface.
- *
- * For multicast packets, tx_exception_metadata.peer_id and
- * tx_exception_metadata.is_wds_extended_mc_bc are set. Then TX exception path
- * is used with net_device replaced to parent net_device of the wds_ext
- * interface.
- *
- * Return: Status of the transmission
- */
-netdev_tx_t hdd_softap_wds_ext_start_xmit(struct sk_buff *skb,
-					  struct net_device *dev);
-
-/**
- * hdd_softap_wds_ext_rx_handler() - Passing RX packets to network stack
- * @osif_dev: pointer of hdd_wds_ext structure
- * @rxbuf: pointer of RX socket buffeir
- *
- * This function passes rx packets to network stack via the wds_ext interface.
- * ucfg_dp_softap_wds_ext_rx_handler() is invoked, with net device pointing to
- * the new virtual per-repeater wds_ext interface.
- *
- * Return: QDF_STATUS_STATUS for success otherwise failure
- */
-QDF_STATUS hdd_softap_wds_ext_rx_handler(void *osif_dev, qdf_nbuf_t rxbuf);
-
-#endif /* QCA_SUPPORT_WDS_EXTENDED */
-
 /**
  * hdd_softap_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
@@ -192,11 +154,11 @@ QDF_STATUS hdd_softap_register_bc_sta(struct wlan_hdd_link_info *link_info,
 
 /**
  * hdd_softap_stop_bss() - Stop the BSS
- * @link_info: Link info pointer in HDD adapter
+ * @adapter: pointer to adapter context
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info);
+QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter);
 
 /**
  * hdd_softap_change_sta_state() - Change the state of a SoftAP station

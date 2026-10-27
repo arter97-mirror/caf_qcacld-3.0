@@ -209,17 +209,6 @@ void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
  */
 void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_tdls_recompute_offchannel_mode() - Recompute TDLS offchannel mode
- * related parameters
- * @psoc: Pointer to PSOC object
- * @vdev: Pointer to vdev
- *
- * Return: None
- */
-void wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
@@ -249,59 +238,6 @@ void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr);
-
-/**
- * wlan_tdls_record_mgmt_tx_complete() - Record a TDLS management frame
- *                                       tx completion as a stats entry.
- * @psoc: PSOC object
- * @vdev_id: vdev/session ID
- * @peer_mac: peer MAC address (6 bytes)
- * @type: stats event type (enum tdls_stats_type)
- * @subtype: stats event subtype (enum tdls_stats_subtype)
- * @success: true if tx completed successfully, false otherwise
- * @reason_code: teardown reason code (enum tdls_stats_reason_code);
- *               use TDLS_STATS_REASON_GENERAL for non-teardown frames
- *
- * Populates a struct tdls_stats_entry with timestamp, peer MAC, RSSI
- * (looked up via tdls_find_peer), session ID, type/subtype, success
- * flag, and reason_code, then delivers it to the TDLS stats SM via
- * TDLS_STATS_EV_NEW_EVENT.
- *
- * Return: None
- */
-void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
-				       uint8_t vdev_id,
-				       const uint8_t *peer_mac,
-				       uint8_t type,
-				       uint8_t subtype,
-				       bool success,
-				       uint8_t reason_code);
-
-/**
- * wlan_tdls_stats_entry_fill_vdev_info() - Snapshot dut_mac and link_id
- *                                          into a stats entry.
- * @entry: Stats entry to populate.
- * @psoc:  PSOC used to look up the vdev by entry->session_id.
- *
- * Dispatcher wrapper around tdls_stats_entry_fill_vdev_info().  Must be
- * called while the vdev is still valid (at entry construction time).
- */
-void wlan_tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
-					  struct wlan_objmgr_psoc *psoc);
-
-/**
- * wlan_tdls_stats_entry_find_vdev_info() - Resolve per-peer vdev then
- *                                             fill dut_mac and link_id.
- * @entry: Stats entry whose peer_mac is used to find the correct vdev.
- * @psoc:  PSOC for the psoc-wide peer lookup.
- *
- * Use instead of wlan_tdls_stats_entry_fill_vdev_info() when
- * entry->session_id may be wrong (e.g. FW batch events that carry a single
- * ev->vdev_id for all peers).  Corrects session_id from the peer's actual
- * registered vdev before stamping dut_mac and link_id.
- */
-void wlan_tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
-					  struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_tdls_teardown_links_for_non_dbs() - notify TDLS module to teardown
@@ -344,32 +280,6 @@ void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 					       uint8_t *macaddr);
-
-/**
- * wlan_tdls_is_key_install_allowed() - API to check if key_install request
- * is allowed for TDLS peer in current state.
- * @vdev: Vdev object pointer
- * @mac_addr: Mac address of the peer
- *
- * Return: True if key_install can be allowed
- */
-bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
-				      struct qdf_mac_addr *mac_addr);
-
-/**
- * wlan_tdls_process_cmd() - Dispatcher wrapper for the TDLS command processor.
- * @msg: Scheduler message containing the TDLS command type and body pointer.
- *
- * This is the public dispatcher-layer entry point for TDLS scheduler
- * messages posted from external components (e.g. the DP layer via
- * wlan_dp_rx_tdls_packet()).  It is registered as msg.callback in
- * scheduler_post_message() calls and simply forwards to the core handler
- * tdls_process_cmd().
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_tdls_process_cmd(struct scheduler_msg *msg);
-
 #else
 static inline
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
@@ -462,26 +372,6 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 {}
 
 static inline
-void wlan_tdls_record_mgmt_tx_complete(struct wlan_objmgr_psoc *psoc,
-				       uint8_t vdev_id,
-				       const uint8_t *peer_mac,
-				       uint8_t type,
-				       uint8_t subtype,
-				       bool success,
-				       uint8_t reason_code)
-{}
-
-static inline
-void wlan_tdls_stats_entry_fill_vdev_info(struct tdls_stats_entry *entry,
-					  struct wlan_objmgr_psoc *psoc)
-{}
-
-static inline
-void wlan_tdls_stats_entry_find_vdev_info(struct tdls_stats_entry *entry,
-					  struct wlan_objmgr_psoc *psoc)
-{}
-
-static inline
 QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id)
 {
@@ -496,31 +386,12 @@ bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline
-void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev,
-				uint8_t wlan_tdls_peer_delete_reason)
-
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
 {}
 
 static inline
 QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 					       uint8_t *macaddr)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
-				      struct qdf_mac_addr *mac_addr)
-{
-	return false;
-}
-
-static inline void
-wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
-				    struct wlan_objmgr_vdev *vdev)
-{}
-
-static inline QDF_STATUS wlan_tdls_process_cmd(struct scheduler_msg *msg)
 {
 	return QDF_STATUS_SUCCESS;
 }

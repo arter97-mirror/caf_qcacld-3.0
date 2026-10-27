@@ -519,7 +519,7 @@ ol_tx_hl_base(
 
 		qdf_dp_trace_log_pkt(vdev->vdev_id, msdu, QDF_TX,
 				     QDF_TRACE_DEFAULT_PDEV_ID,
-				     vdev->qdf_opmode, 0);
+				     vdev->qdf_opmode);
 		DPTRACE(qdf_dp_trace_data_pkt(msdu, QDF_TRACE_DEFAULT_PDEV_ID,
 					      QDF_DP_TRACE_TX_PACKET_RECORD,
 					      tx_desc->id, QDF_TX));
@@ -2077,7 +2077,7 @@ void ol_txrx_update_tx_queue_groups(
 	qdf_spin_lock_bh(&pdev->tx_queue_spinlock);
 	/*
 	 * if the membership (vdev id mask and ac mask)
-	 * matches then no need to update tx queue groups.
+	 * matches then no need to update tx qeue groups.
 	 */
 	if (group->membership == membership)
 		/* Update Credit Only */

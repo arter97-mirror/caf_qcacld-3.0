@@ -223,24 +223,14 @@ QDF_STATUS wmi_unified_set_ric_req_cmd(wmi_unified_t wmi_handle, void *msg,
 /**
  * wmi_unified_roam_synch_complete_cmd() - roam synch complete command to fw.
  * @wmi_handle: wmi handle
- * @params: roam synch complete params including vdev_id and repurpose responses
+ * @vdev_id: vdev id
  *
  * This function sends roam synch complete event to fw.
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
-			struct wlan_roam_synch_complete_params *params);
-
-/**
- * wmi_get_host_roam_frame_tx_status() - API to convert FW TX status code to
- * Host reason code
- * @tx_status: FW TX status. Refer WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS
- *
- * Return: Returns enum wlan_roam_frame_tx_status value
- */
-enum wlan_roam_frame_tx_status
-wmi_get_host_roam_frame_tx_status(WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS tx_status);
+					       uint8_t vdev_id);
 
 /**
  * wmi_unified_roam_invoke_cmd() - send roam invoke command to fw.
@@ -564,19 +554,6 @@ wmi_unified_roam_mlo_config_cmd(wmi_unified_t wmi_handle,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BN_SMD
-QDF_STATUS
-wmi_send_roam_smd_start_status_cmd(wmi_unified_t wmi_handle,
-				   struct wlan_roam_smd_start_status_params *params);
-#else
-static inline QDF_STATUS
-wmi_send_roam_smd_start_status_cmd(wmi_unified_t wmi_handle,
-				   struct wlan_roam_smd_start_status_params *params)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
 /**
  * wmi_unified_roam_scan_offload_mode_cmd() - set roam scan parameters
  * @wmi_handle: wmi handle
@@ -738,36 +715,4 @@ QDF_STATUS wmi_unified_invoke_neighbor_report_cmd(
 QDF_STATUS wmi_unified_get_roam_scan_ch_list(wmi_unified_t wmi_handle,
 					     uint8_t vdev_id);
 
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * wmi_unified_send_roam_smd_config() - Send SMD roam configuration to firmware
- * @wmi_handle: WMI handle
- * @params: SMD roam configuration parameters
- *
- * This function sends the SMD roam configuration command to firmware to enable
- * or disable SMD roaming features post-connection.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-QDF_STATUS wmi_unified_send_roam_smd_config(
-				wmi_unified_t wmi_handle,
-				struct wlan_roam_smd_config *params);
-/**
- * wmi_unified_vdev_repurpose_resp_cmd() - Send vdev repurpose response
- *                                         to firmware
- * @wmi_handle: WMI handle
- * @vdev_id: VDEV ID
- * @repurpose_resp: Array of vdev repurpose response TLVs
- * @num_repurpose_resp: Number of repurpose response TLVs
- *
- * This function sends vdev repurpose response to firmware
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS wmi_unified_vdev_repurpose_resp_cmd(
-				wmi_unified_t wmi_handle,
-				uint8_t vdev_id,
-				struct vdev_repurpose_params *repurpose_resp,
-				uint8_t num_repurpose_resp);
-#endif /* WLAN_FEATURE_11BN_SMD */
 #endif /* _WMI_UNIFIED_ROAM_API_H_ */

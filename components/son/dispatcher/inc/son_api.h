@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -398,7 +398,7 @@ int wlan_son_deliver_inst_rssi(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_son_deliver_opmode() - notify user app of opmode
  * @vdev: vdev objmgr
- * @bw: channel width defined in enum phy_ch_width
+ * @bw: channel width defined in enum eSirMacHTChannelWidth
  * @nss: supported rx nss
  * @addr: source addr
  *

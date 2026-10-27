@@ -171,14 +171,6 @@ void wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
 void hdd_init_scan_reject_params(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_reset_scan_reject_params - API to reset scan reject params.
- * @vdev: Pointer to vdev object
- *
- * Return: QDF STATUS
- */
-QDF_STATUS hdd_reset_scan_reject_params(struct wlan_objmgr_vdev *vdev);
-
-/**
  * wlan_hdd_cfg80211_scan_block() - scan block handler
  * @adapter: HDD adapter to work against
  *

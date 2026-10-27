@@ -143,30 +143,12 @@ void tgt_tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
  * tgt_tdls_delete_all_peers_indication()- Indication to tdls component
  * @psoc: soc object
  * @session_id: session id
- * @reason: reason for deleting all TDLS peers
  *
  * This function called from legacy lim to tdls component to delete tdls peers.
  *
  * Return: None
  */
 void tgt_tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					  uint32_t session_id,
-					  enum wlan_tdls_peer_delete_reason reason);
-
-/**
- * tgt_tdls_request_stats_info() - Send WMI_REQUEST_STATS_INFO_CMDID to FW
- * @psoc: PSOC object
- * @vdev_id: ID of the STA vdev for which stats collection is requested
- * @enable: 1 = enable FW TDLS stats collection; host never sends 0
- *          (FW handles disable automatically on disconnect/MCC)
- *
- * Invokes the request_stats_info tx_op registered by the target_if layer.
- * Called from tdls_stats_handle_sta_connection() when a single-STA SCC
- * condition is detected after a STA connection event.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
- */
-QDF_STATUS tgt_tdls_request_stats_info(struct wlan_objmgr_psoc *psoc,
-				       uint8_t vdev_id, uint32_t enable);
+					  uint32_t session_id);
 
 #endif

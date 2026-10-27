@@ -35,9 +35,9 @@ struct p2p_lo_event;
 struct mgmt_rx_event_params;
 enum mgmt_frame_type;
 struct p2p_set_mac_filter_evt;
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 struct p2p_usd_attr_params;
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 
@@ -230,7 +230,7 @@ tgt_p2p_add_mac_addr_status_event_cb(
 	struct wlan_objmgr_psoc *psoc,
 	struct p2p_set_mac_filter_evt *event_info);
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * tgt_p2p_send_usd_params() - Sent USD parameters to target
  * @psoc: pointer to PSOC object
@@ -249,29 +249,7 @@ QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  * Return: true if USD is supported by FW else false
  */
 bool tgt_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2*/
-
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
-/**
- * tgt_p2p_is_fw_support_wfd_r2() - wrapper API for function
- * target_if_p2p_is_fw_support_wfd_r2()
- * @psoc: pointer to PSOC object
- *
- * Return: true if WFD R2 is supported by FW else false
- */
-bool tgt_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-/**
- * tgt_p2p_is_fw_support_pcc() - wrapper API for function
- * target_if_p2p_is_fw_support_pcc()
- * @psoc: pointer to PSOC object
- *
- * Return: true if PCC is supported by FW else false
- */
-bool tgt_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
  * tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler() - Function to handle the
@@ -287,14 +265,4 @@ bool tgt_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id);
-
-/**
- * tgt_p2p_is_fw_cancel_one_shot_noa_supported() - Check if FW supports
- * cancel one shot NoA
- * @psoc: pointer to psoc object
- *
- * Return: true if FW supports cancel one shot NoA, false otherwise
- */
-bool tgt_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc);
-
 #endif /* _WLAN_P2P_TGT_API_H_ */

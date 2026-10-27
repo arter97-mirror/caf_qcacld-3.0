@@ -49,7 +49,6 @@
 #define BSS_OPERATIONAL_MODE_STA    1
 #define BSS_OPERATIONAL_MODE_IBSS   2
 #define BSS_OPERATIONAL_MODE_NDI    3
-#define BSS_OPERATIONAL_MODE_PASSTHRU 4
 
 /* STA entry type in add sta message */
 #define STA_ENTRY_SELF              0
@@ -65,13 +64,6 @@
 #define IS_TDLS_PEER(type) false
 #endif /* FEATURE_WLAN_TDLS */
 #define STA_ENTRY_NDI_PEER          5
-#define STA_ENTRY_PASSTHRU_PEER     6
-
-#ifdef DRIVER_PASSTHRU_MODE
-#define IS_PASSTHRU_PEER(type) ((type) == STA_ENTRY_PASSTHRU_PEER)
-#else
-#define IS_PASSTHRU_PEER(type) false
-#endif
 
 #define STA_INVALID_IDX 0xFF
 
@@ -146,45 +138,25 @@ struct med_sync_delay {
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * struct ml_partner_link_info: partner link info
- * @vdev_id: partner link vdev ID
  * @link_id: partner link ID
- * @link_tx_nss: negotiated Tx NSS for the partner link
- * @link_rx_nss: negotiated Rx NSS for the partner link
  * @link_addr: partner link address
- * @self_mac_addr: Self mac address for this link
- * @channel_info: Link channel info
+ * @ch_freq:Channel in Mhz
+ * @ch_phymode: Channel phymode
  */
 struct ml_partner_link_info {
 	uint8_t vdev_id;
 	uint8_t link_id;
-	uint8_t link_tx_nss;
-	uint8_t link_rx_nss;
 	struct qdf_mac_addr link_addr;
 	struct qdf_mac_addr self_mac_addr;
 	struct wlan_channel channel_info;
 };
 
-/**
- * struct peer_ml_info: MLO peer link information
- * @vdev_id: vdev ID
- * @link_id: link ID
- * @link_addr: BSSID of the peer
- * @channel_info: Channel info of link
- * @self_mac_addr: Self mac addr of the link
- * @link_tx_nss: negotiated Tx NSS for the link
- * @link_rx_nss: negotiated Rx NSS for the link
- * @num_links: Number of partner links
- * @partner_info: Each partner link info
- * @rec_max_simultaneous_links: Recommended max simultaneous links
- */
 struct peer_ml_info {
 	uint32_t vdev_id;
 	uint32_t link_id;
 	struct qdf_mac_addr link_addr;
 	struct wlan_channel channel_info;
 	struct qdf_mac_addr self_mac_addr;
-	uint8_t link_tx_nss;
-	uint8_t link_rx_nss;
 	uint8_t num_links;
 	struct ml_partner_link_info partner_info[MLD_MAX_LINKS - 1];
 	uint8_t rec_max_simultaneous_links;
@@ -236,11 +208,7 @@ struct peer_ml_info {
  * @vht_caps: VHT vapabalities
  * @nwType: NW Type
  * @maxTxPower: max tx power
- * @bcn_tx_nss: Tx NSS from beacon
- * @self_cap_tx_nss: Intersected DUT Tx capability NSS to be used with this peer
- * @self_cap_rx_nss: Intersected DUT Rx capability NSS to be used with this peer
- * @self_op_tx_nss: Intersected DUT Tx operating NSS to be used with this peer.
- * @self_op_rx_nss: Intersected DUT Rx operating NSS to be used with this peer.
+ * @nss: Return the number of spatial streams supported
  * @stbc_capable: stbc capable
  * @no_ptk_4_way: Do not need 4-way handshake
  * @eht_capable: is EHT capabale or not
@@ -250,13 +218,10 @@ struct peer_ml_info {
  * @is_assoc_peer: is assoc peer or not
  * @emlsr_support: is EMLSR mode supported or not
  * @msd_caps_present: is MSD capability present in MLO IE or not
- * @ext_mld_caps_present: if Extended MLD capability present in MLO IE
  * @link_id: per link id
  * @emlsr_trans_timeout: EMLSR transition timeout value
  * @eml_info: EMLSR capability info for sta peer under mlo sap mode
  * @mld_info: mld and operation capability info for sta peer under mlo sap mode
- * @uhr_capable: is UHR capabale or not
- * @uhr_config: UHR capability
  *
  * This structure contains parameter required for
  * add sta request of upper layer.
@@ -276,14 +241,6 @@ typedef struct {
 	uint8_t maxSPLen;
 	uint8_t htCapable;
 	enum phy_ch_width ch_width;
-	/*
-	 * AP maximum supported channel width (derived from peer capabilities).
-	 * This is distinct from the negotiated operational channel width
-	 * (ch_width) which may be capped by STA/session/firmware constraints.
-	 */
-	enum phy_ch_width ap_max_ch_width;
-	uint8_t center_freq_seg0;
-	uint8_t center_freq_seg1;
 	tSirMacHTMIMOPowerSaveState mimoPS;
 	uint8_t maxAmpduSize;
 	uint8_t maxAmpduDensity;
@@ -303,14 +260,13 @@ typedef struct {
 	/* The return status of SIR_HAL_ADD_STA_REQ is reported here */
 	QDF_STATUS status;
 	uint8_t updateSta;
-	/* 1 = passthru NEW: WMI_PEER_CREATE only; skip WMI_PEER_ASSOC_CMDID */
-	uint8_t create_only;
 	uint8_t rmfEnabled;
 	uint32_t encryptType;
 	uint8_t sessionId;
 	uint8_t p2pCapableSta;
 	uint8_t csaOffloadEnable;
 	uint8_t vhtCapable;
+	uint8_t vhtSupportedRxNss;
 	uint8_t vht_160mhz_nss;
 	uint8_t vht_80p80mhz_nss;
 	uint8_t vht_extended_nss_bw_cap;
@@ -333,11 +289,7 @@ typedef struct {
 	tSirNwType nwType;
 	int8_t maxTxPower;
 	uint8_t nonRoamReassoc;
-	uint8_t bcn_tx_nss;
-	uint8_t self_cap_tx_nss;
-	uint8_t self_cap_rx_nss;
-	uint8_t self_op_tx_nss;
-	uint8_t self_op_rx_nss;
+	uint32_t nss;
 #ifdef WLAN_FEATURE_11AX
 	bool he_capable;
 	tDot11fIEhe_cap he_config;
@@ -362,29 +314,14 @@ typedef struct {
 	bool is_assoc_peer;
 	bool emlsr_support;
 	bool msd_caps_present;
-	bool ext_mld_caps_present;
 	uint8_t link_id;
 	uint16_t emlsr_trans_timeout;
 	struct wlan_mlo_eml_cap eml_info;
 	struct wlan_mlo_mld_cap mld_info;
 	struct ml_partner_link_info ml_partner_info[MLD_MAX_LINKS - 1];
 	struct peer_ml_info ml_info;
-	struct wlan_mlo_ext_mld_cap ext_mld_cap;
 #endif
 	struct security_info sec_info;
-	uint8_t peer_cck_rx_support_5ghz : 1,
-	peer_cck_tx_support_5ghz : 1;
-#ifdef WLAN_FEATURE_11BN
-	bool uhr_capable;
-	struct wlan_uhr_cap_info uhr_config;
-	struct wlan_uhr_op_ie uhr_op_ie;
-	struct wlan_npca_caps npca_cap;
-#endif
-#ifdef WLAN_FEATURE_11BN_SMD
-	bool roam_enabled;
-	bool dl_data_forwarding;
-	bool ul_data_forwarding;
-#endif
 } tAddStaParams, *tpAddStaParams;
 
 /**
@@ -454,7 +391,6 @@ typedef struct {
  * @he_capable: HE Capability
  * @no_ptk_4_way: Do not need 4-way handshake
  * @eht_capable: EHT capability
- * @uhr_capable: UHR capability
  */
 struct bss_params {
 	tSirMacAddr bssId;
@@ -483,9 +419,6 @@ struct bss_params {
 	uint16_t bss_max_idle_period;
 #ifdef WLAN_FEATURE_11BE
 	bool eht_capable;
-#endif
-#ifdef WLAN_FEATURE_11BN
-	bool uhr_capable;
 #endif
 };
 

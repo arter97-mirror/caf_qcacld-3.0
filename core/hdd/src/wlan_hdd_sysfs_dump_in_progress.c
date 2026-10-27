@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,23 +29,7 @@
 #include "wlan_hdd_sysfs_dump_in_progress.h"
 #include "wlan_hdd_sysfs.h"
 #include "osif_sync.h"
-#include "wlan_cp_stats_ucfg_api.h"
-#include "wlan_hdd_apf.h"
 
-/**
- * __hdd_sysfs_dump_in_progress_store() - Handle sysfs write for
- * dump_in_progress
- * @hdd_ctx: Pointer to HDD context
- * @attr: Pointer to kobject attribute
- * @buf: Input buffer from sysfs write
- * @count: Number of bytes in input buffer
- *
- * This function is invoked when a user writes to the dump_in_progress sysfs
- * node. It parses the input, validates it, updates the internal state, and
- * optionally triggers log flushing if enhanced chipset logging is enabled.
- *
- * Return: Number of bytes processed on success, error code otherwise.
- */
 static ssize_t
 __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 				   struct kobj_attribute *attr,
@@ -55,7 +38,6 @@ __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
 	char *sptr, *token;
 	int value, ret;
-	QDF_STATUS status;
 
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
@@ -80,26 +62,6 @@ __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 
 	hdd_ctx->dump_in_progress = value;
-
-	if (hdd_ctx->dump_in_progress && hdd_ctx->enhance_chipset_logging) {
-		hdd_apf_dump_history(hdd_ctx);
-		ucfg_cp_stats_flush_host_buffer_if_pending(hdd_ctx->psoc);
-
-		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
-					WLAN_LOG_INDICATOR_FRAMEWORK,
-					WLAN_LOG_REASON_DUMP_IN_PROGRESS,
-					false, false);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to trigger bug report");
-			return qdf_status_to_os_return(status);
-		}
-
-		status = wlan_logging_wait_for_flush_log_completion();
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("wait for flush log timed out");
-			return qdf_status_to_os_return(status);
-		}
-	}
 
 	return count;
 }
@@ -171,8 +133,7 @@ static struct kobj_attribute dump_in_progress_attribute =
 	__ATTR(dump_in_progress, 0660, hdd_sysfs_dump_in_progress_show,
 	       hdd_sysfs_dump_in_progress_store);
 
-void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
-						 struct hdd_context *hdd_ctx)
+void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject)
 {
 	int error;
 
@@ -184,9 +145,6 @@ void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
 				  &dump_in_progress_attribute.attr);
 	if (error)
 		hdd_err("could not create dump in progress sysfs file");
-
-	if (!error)
-		hdd_ctx->is_drv_dump_in_progress_valid = true;
 }
 
 void hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject)
@@ -200,139 +158,3 @@ void hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject)
 			  &dump_in_progress_attribute.attr);
 }
 
-/**
- * hdd_sysfs_enhance_chipset_logging_store() - Store handler for
- * enhance_chipset_logging
- * @kobj: Pointer to the kobject representing the sysfs file
- * @attr: Pointer to the kobj_attribute structure
- * @buf: Buffer containing the input string from userspace
- * @count: Size of the input buffer
- *
- * This function is invoked when userspace writes to the sysfs file.
- * It parses the input and sets the enhance_chipset_logging_enabled flag
- * in hdd_context accordingly.
- *
- * Return: Number of bytes written on success, -EINVAL on failure
- */
-static ssize_t
-hdd_sysfs_enhance_chipset_logging_store(struct kobject *kobj,
-					struct kobj_attribute *attr,
-					const char *buf, size_t count)
-{
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	unsigned long val;
-	int ret;
-
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
-		return -EINVAL;
-	}
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret)
-		return -EINVAL;
-
-	if (val == 1) {
-		hdd_debug_rl("enhance_chipset_logging enabled by cnss_diag");
-		hdd_ctx->enhance_chipset_logging = true;
-		ucfg_cp_stats_enable_direct_log_dispatch(hdd_ctx->psoc, true);
-	} else {
-		hdd_debug_rl("enhance_chipset_logging disabled");
-		hdd_ctx->enhance_chipset_logging = false;
-		ucfg_cp_stats_enable_direct_log_dispatch(hdd_ctx->psoc, false);
-	}
-
-	return count;
-}
-
-/**
- * __hdd_sysfs_enhance_chipset_logging_show - internal helper to format
- *                                            enhance_chipset_logging value
- * @hdd_ctx: Pointer to the HDD context
- * @attr:    Pointer to the kobj_attribute structure
- * @buf:     Buffer to store the formatted output
- *
- * Return: Number of bytes written to @buf
- */
-static ssize_t
-__hdd_sysfs_enhance_chipset_logging_show(struct hdd_context *hdd_ctx,
-					 struct kobj_attribute *attr,
-					 char *buf)
-{
-	ssize_t ret_val;
-
-	hdd_debug_rl("enhance_chipset_logging: %d",
-		     hdd_ctx->enhance_chipset_logging);
-	ret_val = scnprintf(buf, PAGE_SIZE, "%d\n",
-			    hdd_ctx->enhance_chipset_logging);
-
-	return ret_val;
-}
-
-/**
- * hdd_sysfs_enhance_chipset_logging_show - sysfs read handler for
- *                                          enhance_chipset_logging attribute
- * @kobj: Pointer to the kobject representing the sysfs file
- * @attr: Pointer to the kobj_attribute structure
- * @buf:  Buffer to store the output string
- *
- * Return: Number of bytes written to @buf on success, or a negative error code
- *         on failure.
- */
-static ssize_t
-hdd_sysfs_enhance_chipset_logging_show(struct kobject *kobj,
-				       struct kobj_attribute *attr, char *buf)
-{
-	struct osif_psoc_sync *psoc_sync;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	ssize_t errno_size;
-	int ret;
-
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret != 0)
-		return ret;
-
-	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
-					     &psoc_sync);
-	if (errno_size)
-		return errno_size;
-
-	errno_size = __hdd_sysfs_enhance_chipset_logging_show(hdd_ctx, attr,
-							      buf);
-
-	osif_psoc_sync_op_stop(psoc_sync);
-
-	return errno_size;
-}
-
-static struct kobj_attribute enhance_chipset_logging_attribute =
-			__ATTR(enhance_chipset_logging, 0660,
-			       hdd_sysfs_enhance_chipset_logging_show,
-			       hdd_sysfs_enhance_chipset_logging_store);
-
-void
-hdd_sysfs_create_enhance_chipset_logging_interface(struct kobject *wifi_kobject,
-						   struct hdd_context *hdd_ctx)
-{
-	int error;
-
-	if (!wifi_kobject) {
-		hdd_err("could not get wifi kobject!");
-		return;
-	}
-
-	error = sysfs_create_file(wifi_kobject,
-				  &enhance_chipset_logging_attribute.attr);
-	if (error)
-		hdd_err("could not create enhance_chipset_logging sysfs file");
-}
-
-void hdd_sysfs_destroy_enhance_chipset_logging_interface(
-					struct kobject *wifi_kobject)
-{
-	if (!wifi_kobject)
-		return;
-
-	sysfs_remove_file(wifi_kobject,
-			  &enhance_chipset_logging_attribute.attr);
-}

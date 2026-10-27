@@ -51,8 +51,6 @@ set_service_class_params_policy[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_BUFFER_LATENCY_TOLERANCE] = { .type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_TRIGGER_DSCP] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_REPLACE_DSCP] = { .type = NLA_U8 },
-	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ENABLE_TWT_TRAFFIC_END] = {
-		.type = NLA_FLAG },
 };
 
 static bool is_lapb_enabled(void)
@@ -71,13 +69,13 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 {
 	if (!(svc_data->flags & (DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE |
 				 DP_SVC_FLAGS_APP_IND_DEF_DSCP |
-				 DP_SVC_FLAGS_APP_IND_SPL_DSCP |
-				 DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)))
+				 DP_SVC_FLAGS_APP_IND_SPL_DSCP)))
 		return QDF_STATUS_E_INVAL;
 
 	if (svc_data->flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) {
 		if (!is_lapb_enabled())
 			return QDF_STATUS_E_INVAL;
+
 		if ((svc_data->buffer_latency_tolerance < MIN_BUF_LAT_TOLERENCE) ||
 		    (svc_data->buffer_latency_tolerance > MAX_BUF_LAT_TOLERENCE))
 			return QDF_STATUS_E_INVAL;
@@ -87,9 +85,7 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 		if (!is_lapb_enabled())
 			return QDF_STATUS_E_INVAL;
 		if (!(svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP) ||
-		    (!(svc_data->flags &
-		       DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) &&
-		     !(svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)))
+		    !(svc_data->flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE))
 			return QDF_STATUS_E_INVAL;
 		if (svc_data->app_ind_default_dscp >= 64)
 			return QDF_STATUS_E_INVAL;
@@ -98,26 +94,12 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 	if (svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP) {
 		if (!is_lapb_enabled())
 			return QDF_STATUS_E_INVAL;
+
 		if (!(svc_data->flags & DP_SVC_FLAGS_APP_IND_DEF_DSCP) ||
-		    (!(svc_data->flags &
-		       DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) &&
-		     !(svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)))
+		    !(svc_data->flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE))
 			return QDF_STATUS_E_INVAL;
 
 		if (svc_data->app_ind_special_dscp >= 64)
-			return QDF_STATUS_E_INVAL;
-	}
-
-	if (svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END) {
-		if (!is_lapb_enabled())
-			return QDF_STATUS_E_INVAL;
-		if (!(svc_data->flags & DP_SVC_FLAGS_APP_IND_DEF_DSCP) ||
-		    !(svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP))
-			return QDF_STATUS_E_INVAL;
-	}
-
-	if (svc_data->flags & DP_SVC_FLAGS_SVC_TID) {
-		if (svc_data->override_tid > 7)
 			return QDF_STATUS_E_INVAL;
 	}
 
@@ -173,18 +155,6 @@ os_if_dp_service_class_set_cmd(struct nlattr *svc_params[])
 	if (tb[cmd_id]) {
 		svc_data.app_ind_special_dscp =	nla_get_u8(tb[cmd_id]);
 		svc_data.flags |= DP_SVC_FLAGS_APP_IND_SPL_DSCP;
-	}
-
-	cmd_id = QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TID;
-	if (tb[cmd_id]) {
-		svc_data.override_tid = nla_get_u8(tb[cmd_id]);
-		svc_data.flags |= DP_SVC_FLAGS_SVC_TID;
-	}
-
-	cmd_id = QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ENABLE_TWT_TRAFFIC_END;
-	if (tb[cmd_id]) {
-		svc_data.en_twt_end_indication = nla_get_flag(tb[cmd_id]);
-		svc_data.flags |= DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END;
 	}
 
 	status = svc_validate_data(&svc_data);
@@ -279,49 +249,20 @@ os_if_dp_service_class_get_cmd(struct wiphy *wiphy, struct nlattr *svc_params[])
 
 	for (i = 0; i < count; i++) {
 		svc_info = nla_nest_start(skb, i);
-		if (!svc_info)
-			goto free_skb;
-		if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ID,
-			       svc_table[i].svc_id)) {
-			osif_err("svc_id %u attr SDWF_SVC_ID nla_put_u8 failed",
-				 svc_table[i].svc_id);
-			goto free_skb;
+		if (!svc_info) {
+			wlan_cfg80211_vendor_free_skb(skb);
+			return QDF_STATUS_E_INVAL;
 		}
-		if ((svc_table[i].flags &
-		     DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) &&
-		    nla_put_u32(skb,
-				QCA_WLAN_VENDOR_ATTR_SDWF_SVC_BUFFER_LATENCY_TOLERANCE,
-				svc_table[i].buffer_latency_tolerance)) {
-			osif_err("attr SDWF_SVC_BUFFER_LATENCY_TOLERANCE nla_put_u32 failed");
-			goto free_skb;
-		}
-		if ((svc_table[i].flags & DP_SVC_FLAGS_APP_IND_DEF_DSCP) &&
-		    nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_TRIGGER_DSCP,
-			       svc_table[i].app_ind_default_dscp)) {
-			osif_err("attr SDWF_SVC_TX_TRIGGER_DSCP nla_put_u8 failed");
-			goto free_skb;
-		}
-		if ((svc_table[i].flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP) &&
-		    nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_REPLACE_DSCP,
-			       svc_table[i].app_ind_special_dscp)) {
-			osif_err("attr SDWF_SVC_TX_REPLACE_DSCP nla_put_u8 failed");
-			goto free_skb;
-		}
-		if ((svc_table[i].flags & DP_SVC_FLAGS_SVC_TID) &&
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TID,
-			       svc_table[i].override_tid)) {
-			osif_err("attr SDWF_SVC_TID nla_put_u8 failed");
-			goto free_skb;
-		}
-		if ((svc_table[i].flags &
-		     DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END) &&
-		    nla_put_flag(skb,
-				 QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ENABLE_TWT_TRAFFIC_END)) {
-			osif_err("attr SDWF_SVC_ENABLE_TWT_TRAFFIC_END nla_put_flag failed");
-			goto free_skb;
-		}
+		nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ID, svc_table[i].svc_id);
+		if (svc_table[i].flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE)
+			nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_BUFFER_LATENCY_TOLERANCE,
+				    svc_table[i].buffer_latency_tolerance);
+		if (svc_table[i].flags & DP_SVC_FLAGS_APP_IND_DEF_DSCP)
+			nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_TRIGGER_DSCP,
+				   svc_table[i].app_ind_default_dscp);
+		if (svc_table[i].flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP)
+			nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_REPLACE_DSCP,
+				   svc_table[i].app_ind_special_dscp);
 
 		nla_nest_end(skb, svc_info);
 	}
@@ -330,10 +271,6 @@ os_if_dp_service_class_get_cmd(struct wiphy *wiphy, struct nlattr *svc_params[])
 	wlan_cfg80211_vendor_cmd_reply(skb);
 
 	return QDF_STATUS_SUCCESS;
-
-free_skb:
-	wlan_cfg80211_vendor_free_skb(skb);
-	return QDF_STATUS_E_INVAL;
 }
 
 QDF_STATUS

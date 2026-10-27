@@ -50,11 +50,17 @@
  */
 #define MAX_LEGACY_CONCURRENCT_MODES   2
 
-/*Max allowed forced links*/
-#define MAX_FORCE_ACTIVE_LINKS         2
-
-/* QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_MIXED */
-#define CONTROL_MODE_MIXED	       2
+static
+void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t flag,
+			    uint8_t ml_num_link_sz,
+			    struct ml_link_info *ml_link_info,
+			    qdf_freq_t *ml_freq_lst,
+			    uint8_t *ml_vdev_lst,
+			    uint8_t *ml_linkid_lst,
+			    uint8_t *ml_num_link,
+			    uint32_t *ml_link_bitmap);
 
 static uint32_t
 ml_nlink_set_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
@@ -432,7 +438,7 @@ disallow_mlo_mode_table_dbs = {
 };
 
 #define HC_MAP_DATA(_HC_2G_, _HC_5GL_, _HC_5GH_) \
-	(((_HC_2G_) & 0xFF) | (((_HC_5GL_) & 0xFF) << 8) | \
+	((_HC_2G_) & 0xFF | ((_HC_5GL_) & 0xFF) << 8 | \
 				((_HC_5GH_) & 0xFF) << 16)
 
 #define HC_MAP(_HC_, _HC_2G_, _HC_5GL_, _HC_5GH_) \
@@ -1773,50 +1779,6 @@ ml_nlink_get_dynamic_inactive_links(struct wlan_objmgr_psoc *psoc,
 	mlo_dev_lock_release(mlo_dev_ctx);
 }
 
-void
-ml_nlink_update_force_state_on_link_delete(
-			struct wlan_objmgr_vdev *vdev,
-			uint8_t delete_link_id)
-{
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct ml_link_force_state *force_state;
-	struct set_link_req *req;
-	uint32_t delete_link_bitmap;
-	uint8_t source;
-
-	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo_ctx or sta_ctx null");
-		return;
-	}
-	if (delete_link_id == WLAN_INVALID_LINK_ID) {
-		mlo_err("invalid link id");
-		return;
-	}
-	mlo_dev_lock_acquire(mlo_dev_ctx);
-	force_state = &mlo_dev_ctx->sta_ctx->link_force_ctx.force_state;
-	delete_link_bitmap = 1 << delete_link_id;
-	ml_nlink_dump_force_state(force_state, "cur, del bitmap 0x%x",
-				  delete_link_bitmap);
-
-	force_state->curr_active_bitmap &= ~delete_link_bitmap;
-	force_state->curr_dynamic_inactive_bitmap &= ~delete_link_bitmap;
-	force_state->curr_inactive_bitmap &= ~delete_link_bitmap;
-	force_state->force_active_bitmap &= ~delete_link_bitmap;
-	force_state->force_inactive_bitmap &= ~delete_link_bitmap;
-	ml_nlink_dump_force_state(force_state, "updated");
-
-	for (source = 0; source < SET_LINK_SOURCE_MAX; source++) {
-		req = &mlo_dev_ctx->sta_ctx->link_force_ctx.reqs[source];
-		req->force_active_bitmap &= ~delete_link_bitmap;
-		req->force_inactive_bitmap &= ~delete_link_bitmap;
-		mlo_debug("source %d act 0x%x inact 0x%x",
-			  source, req->force_active_bitmap,
-			  req->force_inactive_bitmap);
-	}
-	mlo_dev_lock_release(mlo_dev_ctx);
-}
-
 /**
  * ml_nlink_get_affect_ml_sta() - Get ML STA whose link can be
  * force inactive
@@ -1999,7 +1961,6 @@ ml_nlink_get_standby_link_freq(struct wlan_objmgr_psoc *psoc,
 	return freq;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * ml_nlink_get_link_info() - Get ML STA link info
  * @psoc: PSOC object information
@@ -2016,16 +1977,16 @@ ml_nlink_get_standby_link_freq(struct wlan_objmgr_psoc *psoc,
  *
  * Return: void
  */
-void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
-			    struct wlan_objmgr_vdev *vdev,
-			    uint8_t flag,
-			    uint8_t ml_num_link_sz,
-			    struct ml_link_info *ml_link_info,
-			    qdf_freq_t *ml_freq_lst,
-			    uint8_t *ml_vdev_lst,
-			    uint8_t *ml_linkid_lst,
-			    uint8_t *ml_num_link,
-			    uint32_t *ml_link_bitmap)
+static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev,
+				   uint8_t flag,
+				   uint8_t ml_num_link_sz,
+				   struct ml_link_info *ml_link_info,
+				   qdf_freq_t *ml_freq_lst,
+				   uint8_t *ml_vdev_lst,
+				   uint8_t *ml_linkid_lst,
+				   uint8_t *ml_num_link,
+				   uint32_t *ml_link_bitmap)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx;
@@ -2124,7 +2085,6 @@ void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 	*ml_num_link = num_link;
 	*ml_link_bitmap = link_bitmap;
 }
-#endif
 
 static uint32_t
 ml_nlink_get_available_link_bitmap(struct wlan_objmgr_psoc *psoc,
@@ -2863,12 +2823,11 @@ ml_nlink_handle_mcc_links(struct wlan_objmgr_psoc *psoc,
 	if (ml_num_link < 2)
 		return;
 
-	if (!policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
-					       ml_vdev_lst,
-					       ml_linkid_lst,
-					       ml_num_link,
-					       &affected_link_bitmap))
-		return;
+	policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
+					  ml_vdev_lst,
+					  ml_linkid_lst,
+					  ml_num_link,
+					  &affected_link_bitmap);
 	if (affected_link_bitmap) {
 		force_cmd->force_inactive_num =
 			convert_link_bitmap_to_link_ids(
@@ -2905,45 +2864,18 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	uint8_t i;
 	bool force_link_required = false;
 	uint32_t mcc_to_scc_switch;
-	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
-	bool cfg_sta_dfs_ch_peer_scc = false;
-	QDF_STATUS status;
 
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
 			       &ml_link_bitmap);
-
-	status = policy_mgr_get_cfg_sta_indoor_ch_peer_scc(psoc,
-							   &cfg_sta_indoor_ch_peer_scc);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_debug("Failed to get cfg_sta_indoor_ch_peer_scc");
-		cfg_sta_indoor_ch_peer_scc = 0;
-	}
-
-	status = policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
-							&cfg_sta_dfs_ch_peer_scc);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_debug("Failed to get cfg_sta_dfs_ch_peer_scc");
-		cfg_sta_dfs_ch_peer_scc = false;
-	}
-
 	if (ml_num_link < 2)
 		return;
 
 	switch (pm_mode) {
 	case PM_P2P_CLIENT_MODE:
 	case PM_P2P_GO_MODE:
-		if ((cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_P2P_SCC) ||
-		    cfg_sta_dfs_ch_peer_scc) {
-			force_link_required = true;
-			break;
-		}
-
-		goto force_inactive_num;
 	case PM_STA_MODE:
 		goto force_inactive_num;
 	case PM_SAP_MODE:
@@ -2997,14 +2929,6 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 
 	if (force_inactive_link_bitmap && force_link_required)
 		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
-
-	/* If STA & peer SCC is enabled on STA connected indoor channel
-	 * or STA & peer SCC is enabled on STA connected DFS channel,
-	 * force active the ML link which has same freq as legacy_freq).
-	 */
-	if ((cfg_sta_indoor_ch_peer_scc || cfg_sta_dfs_ch_peer_scc) &&
-	    force_link_required)
-		force_cmd->force_active_bitmap = scc_link_bitmap;
 
 	return;
 
@@ -3244,49 +3168,6 @@ ml_nlink_handle_legacy_sap_intf(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ml_nlink_handle_ll_lt_sap_intf() - Check force inactive needed
- * with LL_LT_SAP
- * @psoc: PSOC object information
- * @vdev: vdev object
- * @force_cmd: force command to be returned
- * @ll_sap_freq: LL_LT_SAP channel frequency
- *
- * If LL_LT_SAP and MLO STA non-assoc link on same frequency,
- * non-assoc link have to be force inactive with num 1.
- *
- * Return: void
- */
-static void
-ml_nlink_handle_ll_lt_sap_intf(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_objmgr_vdev *vdev,
-			       struct ml_link_force_state *force_cmd,
-			       qdf_freq_t ll_sap_freq)
-{
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t i = 0;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-
-	if (ml_num_link < 2)
-		return;
-
-	for (i = 0; i < ml_num_link; i++) {
-		if (ll_sap_freq && ll_sap_freq == ml_freq_lst[i])
-			force_cmd->force_inactive_bitmap |=
-							1 << ml_linkid_lst[i];
-	}
-}
-
-/**
  * ml_nlink_handle_legacy_p2p_intf() - Check force inactive needed
  * with p2p
  * @psoc: PSOC object information
@@ -3471,156 +3352,6 @@ ml_nlink_handle_legacy_nan_intf(struct wlan_objmgr_psoc *psoc,
 			mlo_get_num_5gh_links(ml_freq_lst, ml_num_link) - 1;
 }
 
-static bool policy_mgr_is_dual_sap_mcc_with_ml_sta(
-		qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS],
-		qdf_freq_t sta_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS])
-{
-	uint8_t i, j;
-
-	/* for dual SAP mcc all four frequency should be diff*/
-	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		for (j = 0; j < MAX_NUMBER_OF_CONC_CONNECTIONS; j++) {
-			if (sap_freq_list[i] &&
-			    sap_freq_list[i] == sta_freq_list[j]) {
-				return false;
-			}
-		}
-	}
-
-	return true;
-}
-
-static bool ml_nlink_is_dual_sap_mcc(struct wlan_objmgr_psoc *psoc,
-				     struct wlan_objmgr_vdev *vdev)
-{
-	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
-	uint8_t num_ml_sap = 0, num_non_ml_sap = 0;
-	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	qdf_freq_t sta_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t sta_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t non_ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	bool dual_sap_mcc = false;
-
-	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
-						&num_non_ml_sta, non_ml_sta_idx,
-						sta_freq_list, sta_vdev_id_list,
-						PM_STA_MODE);
-
-	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sap, ml_sap_idx,
-						&num_non_ml_sap, non_ml_sap_idx,
-						sap_freq_list, sap_vdev_id_list,
-						PM_SAP_MODE);
-	/* num ML STA less than 2 or num SAP/ ML SAP less than 2
-	 */
-	if (num_ml_sta < 2 || (num_non_ml_sap + num_ml_sap) < 2)
-		return false;
-
-	dual_sap_mcc = policy_mgr_is_dual_sap_mcc_with_ml_sta(sta_freq_list,
-							      sap_freq_list);
-
-	if (dual_sap_mcc)
-		return true;
-
-	return false;
-}
-
-static bool
-ml_nlink_handle_dual_sap_intf(struct wlan_objmgr_psoc *psoc,
-			      struct ml_link_force_state *force_cmd,
-			      struct wlan_objmgr_vdev *vdev)
-{
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t non_ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t num_ml_sap = 0, num_non_ml_sap = 0;
-	uint8_t i;
-	bool is_5ghz_only_sap = false;
-	uint32_t affected_link_bitmap = 0;
-	uint8_t count = 0;
-
-	if (!policy_mgr_is_dual_sap_active(psoc))
-		return false;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	/* No need to send FORCE INACTIVE/INACTIVE_NUM in case of one link */
-	if (ml_num_link < 2)
-		return false;
-
-	policy_mgr_get_ml_and_non_ml_mode_count(
-				psoc, &num_ml_sap, ml_sap_idx,
-				&num_non_ml_sap, non_ml_sap_idx,
-				sap_freq_list, sap_vdev_id_list,
-				PM_SAP_MODE);
-	for (i = 0; i < num_ml_sap + num_non_ml_sap; i++) {
-		/* if none of the frequency is 6 GHz and it not 6 GHz capable
-		 * its a 5 GHz only SAP
-		 */
-		if (sap_freq_list[i] &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(sap_freq_list[i]) &&
-		    !policy_mgr_get_ap_6ghz_capable(
-			    psoc,
-			    sap_vdev_id_list[i],
-			    NULL))
-			is_5ghz_only_sap = true;
-	}
-
-	/*
-	 * Check if the 5 GHz only SAP is present
-	 * In case of 5 GHz only SAP disable 6 GHz ML STA
-	 */
-	for (i = 0; i < ml_num_link; i++) {
-		if (wlan_reg_is_6ghz_chan_freq(ml_freq_lst[i]) &&
-		    is_5ghz_only_sap) {
-			force_cmd->force_inactive_bitmap |=
-						1 << ml_linkid_lst[i];
-			count++;
-		}
-	}
-
-	/* No need to set force inactive further as it has reached max limit */
-	if ((ml_num_link - count) < 2)
-		return true;
-
-	/* force inactive one of the link if dual sap mcc is present*/
-	if (ml_nlink_is_dual_sap_mcc(psoc, vdev))
-		for (i = 0; i < ml_num_link; i++)
-			affected_link_bitmap |= 1 << ml_linkid_lst[i];
-
-	if (affected_link_bitmap) {
-		force_cmd->force_inactive_num =
-			convert_link_bitmap_to_link_ids(
-				affected_link_bitmap, 0, NULL);
-		if (force_cmd->force_inactive_num > 1) {
-			force_cmd->force_inactive_num--;
-			force_cmd->force_inactive_num_bitmap =
-					affected_link_bitmap;
-		} else {
-			force_cmd->force_inactive_num = 0;
-		}
-	}
-
-	/* No need check force inactive further as num link is set */
-	if (force_cmd->force_inactive_num != 0)
-		return true;
-
-	return false;
-}
-
 static void
 ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
@@ -3687,9 +3418,6 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 		disallow_mcc = true;
 		break;
 	case PM_SAP_MODE:
-		if (ml_nlink_handle_dual_sap_intf(psoc, force_cmd, vdev))
-			return;
-		fallthrough;
 	case PM_NAN_DISC_MODE:
 		ml_nlink_handle_legacy_nan_intf(psoc, force_cmd, vdev);
 		break;
@@ -4361,10 +4089,6 @@ ml_nlink_handle_legacy_intf(struct wlan_objmgr_psoc *psoc,
 			break;
 		case PM_NAN_DISC_MODE:
 			break;
-		case PM_LL_LT_SAP_MODE:
-			ml_nlink_handle_ll_lt_sap_intf(
-				psoc, vdev, force_cmd, freq_lst[0]);
-			break;
 		default:
 			/* unexpected legacy connection count */
 			mlo_debug("unexpected legacy intf mode %d",
@@ -4672,16 +4396,6 @@ ml_nlink_validate_request(struct wlan_objmgr_psoc *psoc,
 			return false;
 		}
 
-		link_num =
-			convert_link_bitmap_to_link_ids(request->force_active_bitmap,
-							0, NULL);
-		/* Don't allow forcing 3 links */
-		if (link_num > MAX_FORCE_ACTIVE_LINKS) {
-			mlo_err("Invalid number of force active links %d",
-				link_num);
-			return false;
-		}
-
 		link_bitmap = ~request->force_active_bitmap &
 			combined->force_inactive_num_bitmap;
 		if (combined->force_inactive_num_bitmap) {
@@ -4782,13 +4496,8 @@ ml_nlink_validate_request(struct wlan_objmgr_psoc *psoc,
 				  source, request->force_active_num);
 			return false;
 		}
-
-		/* Avoid check for CONTROL_MODE_MIXED, as force_active_num
-		 * will come from userspace and fw expects to set all the link.
-		 */
 		if (request->force_active_num > 1 &&
-		    combined->force_inactive_num &&
-		    request->link_ctrl_mode != CONTROL_MODE_MIXED) {
+		    combined->force_inactive_num) {
 			link_bitmap = ~request->force_active_num_bitmap &
 				combined->force_inactive_num_bitmap;
 			if (!link_bitmap) {
@@ -5338,75 +5047,6 @@ end:
 }
 
 /**
- * ml_nlink_handle_passthru_intf() - Check force inactive needed
- * with PASSTHRU (wondertap) interface
- * @psoc: PSOC object information
- * @vdev: ml sta vdev object
- * @force_cmd: force command to be updated
- *
- * PASSTHRU is not part of policy_mgr_get_legacy_conn_info()'s mode list,
- * so it never contributes to the force-inactive decisions computed by
- * ml_nlink_handle_legacy_intf_emlsr()/ml_nlink_handle_legacy_intf(). This
- * means an ML STA connect/reconnect/roam-sync while PASSTHRU is already
- * active never re-applies PASSTHRU's mac-sharing constraint, and a later
- * FW-initiated link switch can land 2 STA links + PASSTHRU on one mac.
- * If PASSTHRU is active and shares a mac with one of the ML STA's current
- * links, force that link inactive.
- *
- * Return: void
- */
-static void
-ml_nlink_handle_passthru_intf(struct wlan_objmgr_psoc *psoc,
-			      struct wlan_objmgr_vdev *vdev,
-			      struct ml_link_force_state *force_cmd)
-{
-	uint32_t passthru_freq = 0;
-	uint8_t passthru_vdev_id = 0;
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0, force_inactive_link_bitmap = 0;
-	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t i;
-
-	if (!policy_mgr_get_mode_specific_conn_info(psoc, &passthru_freq,
-						    &passthru_vdev_id,
-						    PM_PASSTHRU_MODE))
-		return;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	if (ml_num_link < 2)
-		return;
-
-	for (i = 0; i < ml_num_link; i++) {
-		if (ml_freq_lst[i] == passthru_freq)
-			continue;
-		if (policy_mgr_2_freq_always_on_same_mac(psoc, ml_freq_lst[i],
-							 passthru_freq))
-			force_inactive_link_bitmap |= 1 << ml_linkid_lst[i];
-	}
-
-	if (!force_inactive_link_bitmap)
-		return;
-
-	/* Don't force inactive if no active link would be left */
-	if (!(ml_link_bitmap & ~force_inactive_link_bitmap)) {
-		mlo_debug("unexpected ML conc with PASSTHRU freq %d",
-			  passthru_freq);
-		return;
-	}
-
-	force_cmd->force_inactive_bitmap |= force_inactive_link_bitmap;
-	mlo_debug("PASSTHRU vdev %d freq %d force inactive link bitmap 0x%x",
-		  passthru_vdev_id, passthru_freq, force_inactive_link_bitmap);
-}
-
-/**
  * ml_nlink_state_change_emlsr() - Handle ML STA link force
  * with concurrency internal function (HW EMLSR conc supported)
  * @psoc: PSOC object information
@@ -5423,7 +5063,7 @@ ml_nlink_handle_passthru_intf(struct wlan_objmgr_psoc *psoc,
  * and compute a new force command based on current connection table.
  * If any difference between "current" and "new", driver sends update
  * command to target. Driver will update the current force command
- * record after get successful response from target.
+ * record after get successful respone from target.
  *
  * Return: QDF_STATUS_SUCCESS if no new command updated to target.
  *	   QDF_STATUS_E_PENDING if new command is sent to target.
@@ -5453,8 +5093,6 @@ ml_nlink_state_change_emlsr(struct wlan_objmgr_psoc *psoc,
 
 	ml_nlink_handle_legacy_intf_emlsr(psoc, vdev,
 					  &legacy_intf_force_state);
-	ml_nlink_handle_passthru_intf(psoc, vdev,
-				      &legacy_intf_force_state);
 
 	force_state.force_inactive_bitmap |=
 		legacy_intf_force_state.force_inactive_bitmap;
@@ -5595,7 +5233,7 @@ end:
  * and compute a new force command based on current connection table.
  * If any difference between "current" and "new", driver sends update
  * command to target. Driver will update the current force command
- * record after get successful response from target.
+ * record after get successful respone from target.
  *
  * Return: QDF_STATUS_SUCCESS if no new command updated to target.
  *	   QDF_STATUS_E_PENDING if new command is sent to target.
@@ -5624,8 +5262,6 @@ ml_nlink_state_change_mlmr(struct wlan_objmgr_psoc *psoc,
 	ml_nlink_handle_mcc_links(psoc, vdev, &force_state);
 
 	ml_nlink_handle_legacy_intf(psoc, vdev, &legacy_intf_force_state);
-	ml_nlink_handle_passthru_intf(psoc, vdev,
-				      &legacy_intf_force_state);
 
 	force_state.force_inactive_bitmap |=
 		legacy_intf_force_state.force_inactive_bitmap;
@@ -5946,8 +5582,6 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	} else if (evt == ml_nlink_connect_completion_evt ||
 		   evt == ml_nlink_connect_failed_evt) {
 		request = ML_EMLSR_DOWNGRADE_BY_STA_START;
-	} else if (evt == ml_nlink_dual_sap_inactive_evt) {
-		request = ML_EMLSR_DOWNGRADE_BY_DUAL_SAP_ACTIVE;
 	} else {
 		mlo_debug("not handled for evt %d", evt);
 		goto end;
@@ -6138,7 +5772,6 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 {
 	struct set_link_req req = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	enum mlo_link_force_reason reason;
 
 	mlo_debug("link ctrl %d mode %d reason %d num %d 0x%x 0x%x",
 		  data->evt.vendor.link_ctrl_mode,
@@ -6154,7 +5787,6 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 						SET_LINK_FROM_VENDOR_CMD);
 		break;
 	case LINK_CONTROL_MODE_USER:
-		req.link_ctrl_mode = data->evt.vendor.link_ctrl_mode;
 		req.mode = data->evt.vendor.mode;
 		req.reason = data->evt.vendor.reason;
 		req.force_active_bitmap = data->evt.vendor.link_bitmap;
@@ -6162,14 +5794,13 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		if (!ml_nlink_validate_link_request(psoc, vdev,
 						    SET_LINK_FROM_VENDOR_CMD,
 						    &req)) {
-			mlo_err_rl("not supported");
+			mlo_debug("not supported");
 			return QDF_STATUS_E_INVAL;
 		}
 		ml_nlink_update_force_link_request(psoc, vdev, &req,
 						   SET_LINK_FROM_VENDOR_CMD);
 		break;
 	case LINK_CONTROL_MODE_MIXED:
-		req.link_ctrl_mode = data->evt.vendor.link_ctrl_mode;
 		req.mode = data->evt.vendor.mode;
 		req.reason = data->evt.vendor.reason;
 		req.force_active_num = data->evt.vendor.link_num;
@@ -6177,7 +5808,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		if (!ml_nlink_validate_link_request(psoc, vdev,
 						    SET_LINK_FROM_VENDOR_CMD,
 						    &req)) {
-			mlo_err_rl("not supported");
+			mlo_debug("not supported");
 			return QDF_STATUS_E_INVAL;
 		}
 		ml_nlink_update_force_link_request(psoc, vdev, &req,
@@ -6188,13 +5819,8 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	if (data->evt.vendor.reason ==
-	    MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP)
-		reason = MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP;
-	else
-		reason = MLO_LINK_FORCE_REASON_CONNECT;
-
-	status = ml_nlink_state_change(psoc, reason, evt, data);
+	status = ml_nlink_state_change(psoc, MLO_LINK_FORCE_REASON_CONNECT,
+				       evt, data);
 
 	if (status == QDF_STATUS_E_PENDING)
 		status = QDF_STATUS_SUCCESS;
@@ -6214,18 +5840,13 @@ ml_nlink_swtich_dynamic_inactive_link(struct wlan_objmgr_psoc *psoc,
 	struct ml_link_force_state curr_force_state = {0};
 	uint8_t link_ids[MAX_MLO_LINK_ID];
 	uint8_t num_ids;
-	uint8_t last_link_id;
-	uint32_t act_link_bitmap;
-	struct wlan_objmgr_vdev *link_vdev;
-	uint8_t link_vdev_id;
 
 	link_id = wlan_vdev_get_link_id(vdev);
 	if (link_id >= MAX_MLO_LINK_ID) {
 		mlo_err("invalid link id %d", link_id);
 		return QDF_STATUS_E_INVAL;
 	}
-	last_link_id = mlo_mgr_get_link_switch_last_link_id(vdev);
-	act_link_bitmap = ml_nlink_get_available_link_bitmap(psoc, vdev);
+
 	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
 	standby_link_bitmap = ml_nlink_get_standby_link_bitmap(psoc, vdev);
 	standby_link_bitmap &= curr_force_state.force_inactive_num_bitmap &
@@ -6264,50 +5885,6 @@ ml_nlink_swtich_dynamic_inactive_link(struct wlan_objmgr_psoc *psoc,
 			  wlan_vdev_get_id(vdev), link_id, link_ids[0]);
 		ml_nlink_set_dynamic_inactive_links(psoc, vdev,
 						    dynamic_inactive_bitmap);
-	} else if (curr_force_state.curr_dynamic_inactive_bitmap &&
-		   (last_link_id != WLAN_INVALID_LINK_ID) &&
-		   ((1 << last_link_id) & standby_link_bitmap) &&
-		   !((1 << last_link_id) &
-			curr_force_state.curr_dynamic_inactive_bitmap) &&
-		   ((1 << last_link_id) &
-			curr_force_state.force_inactive_num_bitmap)) {
-		act_link_bitmap &=
-			curr_force_state.curr_dynamic_inactive_bitmap;
-		act_link_bitmap &= ~standby_link_bitmap;
-		act_link_bitmap &= ~curr_force_state.force_inactive_bitmap;
-
-		num_ids = convert_link_bitmap_to_link_ids(
-					act_link_bitmap,
-					QDF_ARRAY_SIZE(link_ids),
-					link_ids);
-		if (!num_ids)
-			return QDF_STATUS_SUCCESS;
-
-		link_vdev = mlo_get_vdev_by_link_id(vdev,
-						    link_ids[0],
-						    WLAN_MLO_MGR_ID);
-		if (!link_vdev) {
-			mlo_debug("links vdev not found for link id %d",
-				  link_ids[0]);
-			return QDF_STATUS_SUCCESS;
-		}
-		link_vdev_id = wlan_vdev_get_id(link_vdev);
-
-		/* Remove the link from dynamic inactive bitmap,
-		 * add the standby link to dynamic inactive bitmap.
-		 */
-		dynamic_inactive_bitmap =
-			curr_force_state.curr_dynamic_inactive_bitmap &
-						~(1 << link_ids[0]);
-		dynamic_inactive_bitmap |= 1 << last_link_id;
-		mlo_debug("move out link id %d from dynamic inactive, add standby link id %d",
-			  link_ids[0], last_link_id);
-		ml_nlink_set_dynamic_inactive_links(psoc, vdev,
-						    dynamic_inactive_bitmap);
-		policy_mgr_move_vdev_from_disabled_to_connection_tbl(
-							psoc,
-							link_vdev_id);
-		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -6574,23 +6151,6 @@ end:
 	return status;
 }
 
-static QDF_STATUS
-ml_nlink_link_recfg_completed_handler(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_vdev *vdev,
-				      enum ml_nlink_change_event_type evt,
-				      struct ml_nlink_change_event *data)
-{
-	QDF_STATUS status;
-
-	ml_nlink_clr_requested_emlsr_mode(psoc, vdev);
-
-	status = ml_nlink_state_change_handler(
-		psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
-		evt, data);
-
-	return status;
-}
-
 static QDF_STATUS ml_nlink_emlsr_opportunistic_timer_handler(
 		struct wlan_objmgr_psoc *psoc,
 		struct wlan_objmgr_vdev *vdev,
@@ -6696,8 +6256,6 @@ static void ml_nlink_check_stop_start_emlsr_timer(
 	case ml_nlink_nan_post_disable_evt:
 	case ml_nlink_acs_start_evt:
 	case ml_nlink_acs_completed_evt:
-	case ml_nlink_dual_sap_active_evt:
-	case ml_nlink_dual_sap_inactive_evt:
 		break;
 	default:
 		return;
@@ -6745,22 +6303,14 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	switch (evt) {
 	case ml_nlink_link_switch_start_evt:
 		if (data->evt.link_switch.reason ==
-		    MLO_LINK_SWITCH_REASON_HOST_ADD_LINK) {
-			mlo_debug("REASON_HOST_ADD_LINK target link %d",
-				  data->evt.link_switch.new_ieee_link_id);
-			break;
-		}
-
-		if (data->evt.link_switch.reason ==
 		    MLO_LINK_SWITCH_REASON_HOST_FORCE) {
 			is_host_force = true;
 		} else {
 			is_host_force = false;
 		}
 
-		mlo_debug("set_link_in_prog %d link_recfg_in_prog %d reason %d",
+		mlo_debug("set_link_in_prog %d reason %d",
 			  is_set_link_in_progress,
-			  mlo_is_link_recfg_in_progress(vdev),
 			  data->evt.link_switch.reason);
 
 		if (is_set_link_in_progress) {
@@ -6777,11 +6327,6 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			 * force then reject the link switch
 			 */
 			status = QDF_STATUS_E_INVAL;
-			break;
-		} else if (data->evt.link_switch.reason ==
-			   MLO_LINK_SWITCH_REASON_HOST_FORCE_FOLLOWUP &&
-			   mlo_is_link_recfg_in_progress(vdev)) {
-			status = QDF_STATUS_SUCCESS;
 			break;
 		}
 
@@ -6869,15 +6414,6 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev, evt, data);
 		break;
 	case ml_nlink_ap_csa_end_evt:
-		/* if dual sap is active re evaluate force mode after csa
-		 * as due to dual sap mcc force num inactive would be set
-		 * before csa.
-		 */
-		if (policy_mgr_is_dual_sap_active(psoc)) {
-			status = ml_nlink_state_change_handler(
-				psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
-				evt, data);
-		}
 		status = ml_nlink_ap_csa_end_handler(
 			psoc, vdev, evt, data);
 		break;
@@ -6888,7 +6424,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	case ml_nlink_connection_updated_evt:
 	case ml_nlink_post_set_link_evt:
 		if (mode == QDF_STA_MODE &&
-		    (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))) {
+		    (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
+		     MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))) {
 			mlo_debug("vdev id %d in roam sync", vdev_id);
 			break;
 		}
@@ -6956,26 +6493,6 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			status = ml_nlink_undo_emlsr_downgrade_handler(
 							psoc, vdev, evt, data);
 		break;
-	case ml_nlink_link_recfg_completed_evt:
-		status =
-		ml_nlink_link_recfg_completed_handler(psoc, vdev,
-						      evt, data);
-		break;
-	case ml_nlink_dual_sap_active_evt:
-		/*
-		 * Disable eMLSR as eMLSR + DUAL SAP can not be supported.
-		 */
-			status = ml_nlink_emlsr_downgrade_handler(psoc, vdev,
-								  evt, data);
-		break;
-	case ml_nlink_dual_sap_inactive_evt:
-		/*
-		 * re-enable eMLSR, when DUAL SAP in inactive,
-		 */
-			status = ml_nlink_undo_emlsr_downgrade_handler(
-							psoc, vdev, evt, data);
-		break;
-
 	default:
 		break;
 	}
@@ -6999,29 +6516,11 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 				 uint16_t link_bitmap2)
 {
 	struct ml_nlink_change_event data;
-	struct wlan_objmgr_pdev *pdev;
-	bool cac_in_progress = false;
 
 	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc) &&
 	    !wlan_mlme_is_aux_emlsr_support(psoc)) {
 		mlo_debug("eMLSR concurrency not allow to set link");
 		return QDF_STATUS_E_INVAL;
-	}
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_POLICY_MGR_ID);
-	if (!pdev) {
-		mlo_debug("null pdev");
-		return QDF_STATUS_E_INVAL;
-	}
-	cac_in_progress =
-		wlan_util_is_vdev_in_cac_wait(pdev, WLAN_POLICY_MGR_ID);
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_POLICY_MGR_ID);
-	if (cac_in_progress) {
-		mlo_debug("reject due to cac in progress");
-		return QDF_STATUS_E_BUSY;
-	}
-	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
-		mlo_debug("reject due to ch switch in progress");
-		return QDF_STATUS_E_BUSY;
 	}
 
 	qdf_mem_zero(&data, sizeof(data));
@@ -7075,12 +6574,9 @@ mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
 	uint8_t i = 0;
 	uint8_t curr_link_comb = 0;
 
-	if (!vdev->mlo_dev_ctx)
-		return 0;
-
 	/* Iterate from 1st index, because assoc link is at 0th index */
 	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = vdev->mlo_dev_ctx->sta_ctx->links_info[i];
+		link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
 		if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
 			break;
 
@@ -7092,3 +6588,4 @@ mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
 	return curr_link_comb;
 }
 #endif
+

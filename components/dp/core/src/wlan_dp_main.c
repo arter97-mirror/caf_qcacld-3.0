@@ -38,7 +38,6 @@
 #include <htc_api.h>
 #include <cdp_txrx_cmn_reg.h>
 #include <cdp_txrx_bus.h>
-#include <cdp_txrx_misc.h>
 #if defined(WLAN_DP_PROFILE_SUPPORT) || defined(FEATURE_DIRECT_LINK)
 #include "cdp_txrx_ctrl.h"
 #endif
@@ -50,8 +49,6 @@
 #include "wlan_dp_stc.h"
 #include "wlan_dp_spm.h"
 #include "wlan_dp_telemetry_priv.h"
-#include "wlan_dp_haps.h"
-#include "wlan_ipa_ucfg_api.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -90,8 +87,6 @@ QDF_STATUS dp_allocate_ctx(void)
 	qdf_list_create(&dp_ctx->intf_list, 0);
 	TAILQ_INIT(&dp_ctx->inactive_dp_link_list);
 	wlan_dp_spm_flow_table_attach(dp_ctx);
-	if (QDF_IS_STATUS_ERROR(wlan_dp_stc_ctx_init(dp_ctx)))
-		dp_info("Failed to init STC context");
 	dp_ctx->monitor_flag = 0;
 
 	dp_attach_ctx(dp_ctx);
@@ -106,7 +101,6 @@ void dp_free_ctx(void)
 	dp_ctx =  dp_get_context();
 
 	wlan_dp_spm_flow_table_detach(dp_ctx);
-	wlan_dp_stc_ctx_deinit(dp_ctx);
 	qdf_spinlock_destroy(&dp_ctx->dp_link_del_lock);
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
@@ -249,7 +243,7 @@ QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
 }
 
 QDF_STATUS dp_softap_handle_hlp(struct wlan_dp_intf *dp_intf,
-				struct qdf_mac_addr *addr, qdf_nbuf_t nbuf)
+				struct qdf_mac_addr *addr)
 {
 	struct fils_peer_hlp_node *hlp_node = NULL;
 
@@ -435,7 +429,7 @@ void dp_wait_complete_tasks(struct wlan_dp_psoc_context *dp_ctx)
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
 		/*
 		 * If timeout happens for one interface better to bail out
-		 * instead of waiting for other interfaces task completion
+		 * instead of waiting for other intefaces task completion
 		 */
 		if (qdf_atomic_read(&dp_intf->num_active_task))
 			if (dp_intf_wait_for_task_complete(dp_intf))
@@ -571,8 +565,26 @@ void dp_trace_init(struct wlan_objmgr_psoc *psoc)
 	qdf_dp_trace_init(live_mode, thresh, thresh_time_limit,
 			  verbosity, proto_bitmap);
 }
+
+void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
+{
+	dp_debug("DUMP_DP_TRACE_LEVEL: %d %d",
+		 cmd_type, count);
+	if (cmd_type == DUMP_DP_TRACE)
+		qdf_dp_trace_dump_all(count, QDF_TRACE_DEFAULT_PDEV_ID);
+	else if (cmd_type == ENABLE_DP_TRACE_LIVE_MODE)
+		qdf_dp_trace_enable_live_mode();
+	else if (cmd_type == CLEAR_DP_TRACE_BUFFER)
+		qdf_dp_trace_clear_buffer();
+	else if (cmd_type == DISABLE_DP_TRACE_LIVE_MODE)
+		qdf_dp_trace_disable_live_mode();
+}
 #else
 void dp_trace_init(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
 {
 }
 #endif
@@ -587,10 +599,6 @@ void dp_trace_init(struct wlan_objmgr_psoc *psoc)
 static void dp_ini_bus_bandwidth(struct wlan_dp_psoc_cfg *config,
 				 struct wlan_objmgr_psoc *psoc)
 {
-	config->bus_bw_super_fast_threshold =
-		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_SUPER_FAST_THRESHOLD);
-	config->bus_bw_fast_threshold =
-		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_FAST_THRESHOLD);
 	config->bus_bw_super_high_threshold =
 		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_SUPER_HIGH_THRESHOLD);
 	config->bus_bw_ultra_high_threshold =
@@ -662,142 +670,6 @@ static void dp_ini_tcp_settings(struct wlan_dp_psoc_cfg *config,
 }
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
-#ifdef FEATURE_STATIC_IRQ_AFFINITY
-/**
- * wlan_dp_static_irq_affinity_set() - Pin TX/RX ring IRQs to fixed CPUs
- * @psoc: psoc handle
- *
- * Called unconditionally at driver open regardless of whether
- * WLAN_DP_LOAD_BALANCE_SUPPORT is enabled.  Assigns each REO destination
- * ring and each TX completion ring to a distinct CPU via round-robin
- * within their respective INI cpumasks:
- *   dp_rx_intr_cpumask      - allowed CPUs for REO (RX) ring IRQs
- *   dp_tx_comp_intr_cpumask - allowed CPUs for TX completion ring IRQs
- *
- * When load-balance is enabled, the LB flow-balance sub-system migrates
- * flows between REO rings via FST steering but skips the IRQ-rebalance
- * step, so the pinning set here is never overwritten by the periodic LB
- * handler.  The two mechanisms are complementary: static IRQ pinning
- * ensures IRQ and NAPI thread stay on the same CPU (no cache-line
- * bouncing); flow balance ensures even load distribution across rings.
- *
- * Return: None
- */
-void wlan_dp_static_irq_affinity_set(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
-	uint32_t rx_cpumask;
-	uint32_t tx_cpumask;
-	uint32_t rx_grp_bitmap;
-	uint32_t tx_grp_bitmap;
-	uint32_t cpu_mask;
-	int grp_idx;
-	int reo_idx;
-	int tx_ring_idx;
-	int bit_idx;
-	int bit, cnt;
-
-	if (!dp_ctx) {
-		dp_err("Unable to get DP context");
-		return;
-	}
-
-	if (!soc) {
-		dp_err("Unable to get dp_soc");
-		return;
-	}
-
-	rx_cpumask = dp_ctx->dp_cfg.dp_rx_intr_cpumask;
-	tx_cpumask = dp_ctx->dp_cfg.dp_tx_comp_intr_cpumask;
-	rx_grp_bitmap = cdp_get_rx_rings_grp_bitmap(soc);
-	tx_grp_bitmap = cdp_get_tx_rings_grp_bitmap(soc);
-
-	if (!rx_cpumask && !tx_cpumask)
-		return;
-
-	dp_info("Static IRQ affinity: rx_mask=0x%x tx_mask=0x%x rx_grp=0x%x tx_grp=0x%x",
-		rx_cpumask, tx_cpumask, rx_grp_bitmap, tx_grp_bitmap);
-
-	/*
-	 * Per-REO-ring CPU assignment via round-robin within rx_cpumask:
-	 *   REO 0 -> CPU0, REO 1 -> CPU1, REO 2 -> CPU2, REO 3 -> CPU3
-	 *   (with dp_rx_intr_cpumask=0xf on a 4-core platform)
-	 *
-	 * Both the IRQ and the NAPI thread are pinned to the same CPU to
-	 * avoid cache-line bouncing between them.
-	 */
-	if (rx_cpumask) {
-		reo_idx = 0;
-
-		for_each_set_bit(grp_idx, (unsigned long *)&rx_grp_bitmap,
-				 BITS_PER_TYPE(uint32_t)) {
-			bit_idx = reo_idx % hweight32(rx_cpumask);
-			cnt = 0;
-
-			cpu_mask = 0;
-			for_each_set_bit(bit, (unsigned long *)&rx_cpumask,
-					 BITS_PER_TYPE(uint32_t)) {
-				if (cnt++ == bit_idx) {
-					cpu_mask = BIT(bit);
-					break;
-				}
-			}
-
-			dp_debug("REO ring %d (grp %d) -> cpu_mask=0x%x",
-				 reo_idx, grp_idx, cpu_mask);
-			hif_set_grp_affinity_cpumaskwise(dp_ctx->hif_handle,
-							 BIT(grp_idx),
-							 cpu_mask, cpu_mask);
-			reo_idx++;
-		}
-	}
-
-	/*
-	 * Per-TX-completion-ring CPU assignment via round-robin within
-	 * tx_cpumask:
-	 *   TX 0 -> CPU0, TX 1 -> CPU1, TX 2 -> CPU2, TX 3 -> CPU3
-	 *   (with dp_tx_comp_intr_cpumask=0xf on a 4-core platform)
-	 *
-	 * tx_ring_idx increments consecutively so gaps in tx_grp_bitmap do not
-	 * skew the distribution.
-	 */
-	if (tx_cpumask) {
-		tx_ring_idx = 0;
-
-		for_each_set_bit(grp_idx, (unsigned long *)&tx_grp_bitmap,
-				 BITS_PER_TYPE(uint32_t)) {
-			bit_idx = tx_ring_idx % hweight32(tx_cpumask);
-			cnt = 0;
-
-			cpu_mask = 0;
-			for_each_set_bit(bit, (unsigned long *)&tx_cpumask,
-					 BITS_PER_TYPE(uint32_t)) {
-				if (cnt++ == bit_idx) {
-					cpu_mask = BIT(bit);
-					break;
-				}
-			}
-
-			dp_debug("TX comp ring %d (grp %d) -> cpu_mask=0x%x",
-				 tx_ring_idx, grp_idx, cpu_mask);
-			hif_set_grp_affinity_cpumaskwise(dp_ctx->hif_handle,
-							 BIT(grp_idx),
-							 cpu_mask, 0);
-			tx_ring_idx++;
-		}
-	}
-}
-
-void dp_static_irq_affinity_cfg_init(struct wlan_dp_psoc_cfg *config,
-				     struct wlan_objmgr_psoc *psoc)
-{
-	config->dp_rx_intr_cpumask = cfg_get(psoc, CFG_DP_RX_INTR_CPUMASK);
-	config->dp_tx_comp_intr_cpumask =
-			cfg_get(psoc, CFG_DP_TX_COMP_INTR_CPUMASK);
-}
-#endif /* FEATURE_STATIC_IRQ_AFFINITY */
-
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
 /**
  * dp_ini_load_balance() - Initialize INIs concerned about load balance
@@ -811,8 +683,6 @@ static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
 {
 	config->is_load_balance_enabled = cfg_get(psoc,
 						  CFG_DP_ENABLE_LOAD_BALANCE);
-	config->lb_cpumask_override = cfg_get(psoc,
-					      CFG_DP_LB_CPUMASK_OVERRIDE);
 }
 #else
 static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
@@ -884,26 +754,6 @@ dp_nud_tracking_cfg_update(struct wlan_dp_psoc_cfg *config,
 static void
 dp_nud_tracking_cfg_update(struct wlan_dp_psoc_cfg *config,
 			   struct wlan_objmgr_psoc *psoc)
-{
-}
-#endif
-
-#ifdef WLAN_HAPS_ENABLE
-/**
- * dp_haps_cfg_update() - initialize HAPS config
- * @config : Configuration parameters
- * @psoc: psoc handle
- */
-static void
-dp_haps_cfg_update(struct wlan_dp_psoc_cfg *config,
-		   struct wlan_objmgr_psoc *psoc)
-{
-	config->haps_config = cfg_get(psoc, CFG_HAPS_CONFIG);
-}
-#else
-static void
-dp_haps_cfg_update(struct wlan_dp_psoc_cfg *config,
-		   struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif
@@ -1006,764 +856,6 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 		dp_ctx->rps, dp_ctx->dynamic_rps);
 }
 
-#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-/**
- * enum dp_affinity_type - DP affinity type
- * @DP_RX_INTR_AFFN: RX Interrupt affinity
- * @DP_TX_COMP_INTR_AFFN: TX completion affinity
- * @DP_RX_THREAD_AFFN: Rx Thread affinity
- * @DP_NAPI_RX_THREAD_AFFN: NAPI Rx Thread affinity
- * @DP_AFFINITY_TYPE_MAX: Max count of affinity type
- */
-enum dp_affinity_type {
-	DP_RX_INTR_AFFN,
-	DP_TX_COMP_INTR_AFFN,
-	DP_RX_THREAD_AFFN,
-	DP_NAPI_RX_THREAD_AFFN,
-	DP_AFFINITY_TYPE_MAX
-};
-
-static const uint8_t dp_affn_type_shifts[DP_AFFINITY_TYPE_MAX] = {
-	/*RX INTR shift*/
-	0,
-	/*TX completion INTR shift*/
-	8,
-	/*RX thread affinity shift*/
-	16,
-	/*NAPI RX thread affinity shift*/
-	24
-};
-
-/**
- * dp_affn_type_to_str() - Function to get dp affinity type string
- * @affn_type: affinity type
- *
- * Return: affinity type string.
- */
-static const char *dp_affn_type_to_str(enum dp_affinity_type affn_type)
-{
-	switch (affn_type) {
-	case DP_RX_INTR_AFFN:
-		return "RX_INTR";
-	case DP_TX_COMP_INTR_AFFN:
-		return "TX_COMP_INTR";
-	case DP_RX_THREAD_AFFN:
-		return "RX_THREAD";
-	case DP_NAPI_RX_THREAD_AFFN:
-		return "NAPI_RX_THREAD";
-	default:
-		return "INVALID AFFN";
-	}
-}
-
-/**
- * dp_affn_override_tput_lvl_to_str() - Function to get dp afffinity override
- * throughput level string
- * @tput_level: Throughput level
- *
- * Return: DP affinity override throughput level string.
- */
-static const char *dp_affn_override_tput_lvl_to_str(
-	enum dp_affn_override_tput_level tput_level)
-{
-	switch (tput_level) {
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE:
-		return "IDLE";
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW:
-		return "LOW";
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_MID:
-		return "MID";
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH:
-		return "HIGH";
-	default:
-		return "INVALID";
-	}
-}
-
-/**
- * dp_affn_override_print_params() - Function to print dp affinity override
- * parameters.
- * @dp_ctx: DP context
- *
- * Return: None
- */
-static inline void dp_affn_override_print_params(
-	struct wlan_dp_psoc_context *dp_ctx)
-{
-	uint8_t t_lvl, affn_type;
-
-	struct dp_affn_override_params *affn_param =
-					&dp_ctx->dp_affn_override_params;
-	uint32_t cpu_mask;
-
-	for (affn_type = 0; affn_type < DP_AFFINITY_TYPE_MAX;
-			affn_type++) {
-		dp_info("DP affinity type %s", dp_affn_type_to_str(affn_type));
-		for (t_lvl = 0; t_lvl < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS;
-			t_lvl++) {
-			dp_info("DP AFFN override tput level %s",
-				dp_affn_override_tput_lvl_to_str(t_lvl));
-			switch (affn_type) {
-			case DP_RX_INTR_AFFN:
-				cpu_mask =
-				affn_param->dp_affn_override_rx_intr_mask[
-									t_lvl];
-				dp_info("CPU MASK: 0x%x", cpu_mask);
-				break;
-			case DP_TX_COMP_INTR_AFFN:
-				cpu_mask =
-				affn_param->dp_affn_override_tx_comp_mask[
-									t_lvl];
-				dp_info("CPU MASK: 0x%x", cpu_mask);
-				break;
-			case DP_RX_THREAD_AFFN:
-				cpu_mask =
-				affn_param->dp_affn_override_rx_thread_mask[
-									t_lvl];
-				dp_info("CPU MASK: 0x%x", cpu_mask);
-				break;
-			case DP_NAPI_RX_THREAD_AFFN:
-				cpu_mask =
-				affn_param->dp_affn_override_napi_rx_thread_mask
-									[t_lvl];
-				dp_info("CPU MASK: 0x%x", cpu_mask);
-				break;
-			default:
-				dp_info("Error: Other DP affinity type\n");
-			}
-		}
-	}
-}
-
-/**
- * dp_configure_affn_override_mask() - Function to extract and construct
- * cpu bitmask for DP affinity override mask
- * @dp_affn_mask: 32 bit affinity mask
- * @shift: shift value based on affinity type
- * @cpu_mask: pointer to cpu mask for a particular affinity
- * @affn_type: affinity type
- * @tput_level: throughput level
- *
- * Return: None
- */
-static inline void dp_configure_affn_override_mask(
-	uint32_t dp_affn_mask,
-	uint8_t shift,
-	uint32_t *cpu_mask,
-	enum dp_affinity_type affn_type,
-	enum dp_affn_override_tput_level tput_level)
-{
-	unsigned int cpus;
-	uint32_t cpu_bitmask_new = 0;
-	uint32_t default_mask = 0;
-	int package_id;
-	uint8_t cluster_id, affinity;
-	uint32_t cpu_clusterwise_mask, start_cpu_id;
-	bool use_default = (tput_level == DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE);
-	qdf_cpu_mask *temp_cpu_mask;
-
-	if (!use_default) {
-		affinity = GET_AFFINITY(dp_affn_mask, shift);
-		cluster_id = GET_CLUSTER_CONFIG(affinity);
-		cpu_clusterwise_mask = GET_CPU_CONFIG(affinity);
-	}
-
-	qdf_for_each_possible_cpu(cpus) {
-		package_id = qdf_topology_physical_package_id(cpus);
-		if (package_id < 0)
-			continue;
-
-		/* Build default mask (little cluster) for irqs,
-		 * for threads affine to all cpus.
-		 */
-		if (affn_type == DP_RX_THREAD_AFFN ||
-		    affn_type == DP_NAPI_RX_THREAD_AFFN)
-			default_mask |= BIT(cpus);
-		else if (package_id == CPU_CLUSTER_TYPE_LITTLE)
-			default_mask |= BIT(cpus);
-
-		if (!use_default && package_id == cluster_id) {
-			/* If cpu_clusterwise_mask is 0,
-			 * set all CPUs belonging to this cluster
-			 */
-			if (cpu_clusterwise_mask == 0) {
-				cpu_bitmask_new |= BIT(cpus);
-			} else {
-				temp_cpu_mask =
-					qdf_topology_cluster_cpumask(cpus);
-				start_cpu_id =
-					qdf_cpumask_first(temp_cpu_mask);
-
-				if ((cpu_clusterwise_mask << start_cpu_id) &
-				    BIT(cpus))
-					cpu_bitmask_new |= BIT(cpus);
-			}
-		}
-	}
-
-	/* Use default mask if mask is empty */
-	if (!cpu_bitmask_new) {
-		if (!use_default) {
-			dp_info("Invalid cluster %u for affn %s tput_lvl %s",
-				cluster_id, dp_affn_type_to_str(affn_type),
-				dp_affn_override_tput_lvl_to_str(tput_level));
-		}
-		cpu_bitmask_new = default_mask;
-	}
-
-	*cpu_mask = cpu_bitmask_new;
-}
-
-/**
- * dp_affinity_override_params_init() - Function to init DP affinity
- * override parameters
- * @dp_ctx: DP psoc context
- *
- * Return: None
- */
-static inline void dp_affinity_override_params_init(
-	struct wlan_dp_psoc_context *dp_ctx)
-{
-	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
-	uint8_t tput_lvl, affn_type;
-	uint32_t dp_affn_override_masks[
-			DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {
-		0,
-		dp_cfg->dp_affn_override_low_tput_mask,
-		dp_cfg->dp_affn_override_mid_tput_mask,
-		dp_cfg->dp_affn_override_high_tput_mask
-	};
-
-	struct dp_affn_override_params *dp_affn_param =
-					&dp_ctx->dp_affn_override_params;
-
-	uint32_t *cpu_mask_params[DP_AFFINITY_TYPE_MAX][
-					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {
-		{
-			&dp_affn_param->dp_affn_override_rx_intr_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
-			&dp_affn_param->dp_affn_override_rx_intr_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
-			&dp_affn_param->dp_affn_override_rx_intr_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
-			&dp_affn_param->dp_affn_override_rx_intr_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH]
-		},
-		{
-			&dp_affn_param->dp_affn_override_tx_comp_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
-			&dp_affn_param->dp_affn_override_tx_comp_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
-			&dp_affn_param->dp_affn_override_tx_comp_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
-			&dp_affn_param->dp_affn_override_tx_comp_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH],
-		},
-		{
-			&dp_affn_param->dp_affn_override_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
-			&dp_affn_param->dp_affn_override_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
-			&dp_affn_param->dp_affn_override_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
-			&dp_affn_param->dp_affn_override_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH],
-		},
-		{
-			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
-			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
-			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
-			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH],
-		}
-
-	};
-	for (affn_type = 0; affn_type < DP_AFFINITY_TYPE_MAX;
-		affn_type++) {
-		for (tput_lvl = 0;
-		     tput_lvl < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS; tput_lvl++) {
-			dp_configure_affn_override_mask(
-				dp_affn_override_masks[tput_lvl],
-				dp_affn_type_shifts[affn_type],
-				cpu_mask_params[affn_type][tput_lvl],
-				affn_type, tput_lvl);
-			}
-	}
-}
-
-void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-
-	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg)) {
-		dp_info("DP affinity override is enabled\n");
-		hif_set_affn_override_enabled(dp_ctx->hif_handle, true);
-	} else {
-		dp_info("DP affinity override is disabled\n");
-		hif_set_affn_override_enabled(dp_ctx->hif_handle, false);
-		return;
-	}
-
-	dp_affinity_override_params_init(dp_ctx);
-	dp_affn_override_print_params(dp_ctx);
-
-	dp_ctx->dp_affn_override_curr_tput_level = -1;
-	dp_ctx->dp_affn_sample_count = 0;
-	qdf_mem_zero(dp_ctx->dp_affn_pkt_count_samples,
-		     sizeof(dp_ctx->dp_affn_pkt_count_samples));
-	qdf_mem_zero(dp_ctx->dp_affn_sample_winners,
-		     sizeof(dp_ctx->dp_affn_sample_winners));
-	dp_ctx->dp_affn_decision_sample_idx = 0;
-	qdf_cpumask_clear(&dp_ctx->rx_thread_cpu_mask);
-}
-
-/**
- * dp_affn_override_cfg_init() - DP affinity override cfg init
- * @config: SoC CFG config
- * @psoc: Objmgr PSoC handle
- *
- * Return: None
- */
-static inline
-void dp_affn_override_cfg_init(
-	struct wlan_dp_psoc_cfg *config,
-	struct wlan_objmgr_psoc *psoc)
-{
-	config->dp_affn_override_enabled = cfg_get(
-						psoc,
-						CFG_DP_AFFN_OVERRIDE_ENABLE);
-
-	config->dp_affn_override_high_threshold =
-					cfg_get(
-					psoc,
-					CFG_DP_AFFN_OVERRIDE_HIGH_THRESHOLD);
-	config->dp_affn_override_mid_threshold =
-				cfg_get(
-				psoc,
-				CFG_DP_AFFN_OVERRIDE_MID_THRESHOLD);
-	config->dp_affn_override_low_threshold =
-					cfg_get(
-					psoc,
-					CFG_DP_AFFN_OVERRIDE_LOW_THRESHOLD);
-
-	config->dp_affn_override_low_tput_mask =
-					cfg_get(
-					psoc,
-					CFG_DP_AFFN_OVERRIDE_LOW_TPUT_MASK);
-	config->dp_affn_override_mid_tput_mask =
-					cfg_get(
-					psoc,
-					CFG_DP_AFFN_OVERRIDE_MEDIUM_TPUT_MASK);
-	config->dp_affn_override_high_tput_mask =
-					cfg_get(
-					psoc,
-					CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK);
-}
-
-/**
- * dp_affn_override_set_rx_thread_affinity() - Wrapper Function to set affinity
- * for dp rx threads.
- * @dp_ctx: DP context
- * @cpu_mask: cpu bit mask
- *
- * Return: None
- */
-static inline void dp_affn_override_set_rx_thread_affinity(
-	struct wlan_dp_psoc_context *dp_ctx,
-	uint32_t cpu_mask)
-{
-	qdf_cpu_mask new_cpu_mask;
-	unsigned int cpus;
-
-	if (!cpu_mask)
-		return;
-
-	qdf_cpumask_clear(&new_cpu_mask);
-
-	qdf_for_each_possible_cpu(cpus) {
-		if (BIT(cpus) & cpu_mask)
-			qdf_cpumask_set_cpu(cpus, &new_cpu_mask);
-		}
-
-	if (!qdf_cpumask_equal(&dp_ctx->rx_thread_cpu_mask, &new_cpu_mask)) {
-		dp_debug("Affining DP RX threads to cpumask %*pbl",
-			 qdf_cpumask_pr_args(&new_cpu_mask));
-		qdf_cpumask_copy(&dp_ctx->rx_thread_cpu_mask, &new_cpu_mask);
-		dp_txrx_set_cpu_mask(dp_ctx->cdp_soc, &new_cpu_mask);
-	} else {
-		dp_info_rl("Skip affining dp rx threads same mask %*pbl",
-			   qdf_cpumask_pr_args(&new_cpu_mask));
-	}
-}
-
-/**
- * dp_affn_override_compute_tput_level() - Function to compute tput level
- * based on total number of packets received/transmitted.
- * @dp_ctx: Dp context
- * @total_packets: total packets(tx+rx)
- * Return: dp affinity override throughput level calculated based on threshold
- */
-static inline enum dp_affn_override_tput_level dp_affn_override_compute_tput_level(
-	struct wlan_dp_psoc_context *dp_ctx,
-	uint64_t total_packets)
-{
-	enum dp_affn_override_tput_level tput_level;
-	uint64_t high_thld, mid_thld, low_thld;
-
-	high_thld = (uint64_t)dp_ctx->dp_cfg.dp_affn_override_high_threshold;
-	mid_thld = (uint64_t)dp_ctx->dp_cfg.dp_affn_override_mid_threshold;
-	low_thld = (uint64_t)dp_ctx->dp_cfg.dp_affn_override_low_threshold;
-
-	if (total_packets > high_thld)
-		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH;
-	else if (total_packets > mid_thld)
-		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_MID;
-	else if (total_packets > low_thld)
-		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW;
-	else
-		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
-
-	return tput_level;
-}
-
-/**
- * dp_affn_print_samples() - Helper function to safely print packet samples
- * @dp_ctx: DP context
- * @window_idx: Window index for logging
- * @winner_level: Winner throughput level
- * @winner_count: Number of samples at winner level
- *
- * This function safely prints the packet count samples for a window,
- * handling buffer overflow and array bounds checking.
- *
- * Return: None
- */
-static inline void
-dp_affn_print_samples(struct wlan_dp_psoc_context *dp_ctx,
-		      uint8_t window_idx,
-		      uint8_t winner_level,
-		      uint8_t winner_count)
-{
-	char samples_str[256];
-	int offset = 0;
-	int written;
-	uint8_t idx;
-
-	/* Build samples string with overflow protection */
-	for (idx = 0; idx < DP_AFFN_OVERRIDE_SAMPLE_COUNT; idx++) {
-		written = snprintf(samples_str + offset,
-				   sizeof(samples_str) - offset,
-				   "%s%llu",
-				   (idx == 0) ? "" : " ",
-				   dp_ctx->dp_affn_pkt_count_samples[idx]);
-
-		/* Check for buffer overflow */
-		if (written < 0 || offset + written >= sizeof(samples_str)) {
-			dp_warn("string truncated at index %u", idx);
-			break;
-		}
-		offset += written;
-	}
-
-	dp_info("Window %u samples: [%s], winner: %s (count: %u/%u)",
-		window_idx, samples_str,
-		dp_affn_override_tput_lvl_to_str(winner_level),
-		winner_count, DP_AFFN_OVERRIDE_SAMPLE_COUNT);
-}
-
-/**
- * dp_set_affinity_override() - Function to set affinity based on throughput
- * level.
- * @dp_ctx: Dp context
- * @dp_affn_override_tput_lvl: DP affinity override throughput level
- *
- * Return: None
- */
-static inline void dp_set_affinity_override(
-	struct wlan_dp_psoc_context *dp_ctx,
-	enum dp_affn_override_tput_level dp_affn_override_tput_lvl)
-{
-	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct dp_affn_override_params *affn_param =
-					&dp_ctx->dp_affn_override_params;
-
-	if (!(dp_affn_override_tput_lvl >= DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE &&
-	      dp_affn_override_tput_lvl < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS))
-		return;
-
-	uint32_t rx_intr_affn_mask =
-			affn_param->dp_affn_override_rx_intr_mask[
-					dp_affn_override_tput_lvl];
-	uint32_t tx_comp_affn_mask =
-			affn_param->dp_affn_override_tx_comp_mask[
-					dp_affn_override_tput_lvl];
-	uint32_t rx_thread_affn_mask =
-			affn_param->dp_affn_override_rx_thread_mask[
-					dp_affn_override_tput_lvl];
-	uint32_t napi_rx_thread_affn_mask =
-			affn_param->dp_affn_override_napi_rx_thread_mask[
-					dp_affn_override_tput_lvl];
-
-	/* Set RX interrupt affinity */
-	hif_set_grp_affinity_cpumaskwise(
-		dp_ctx->hif_handle, cdp_get_rx_rings_grp_bitmap(soc),
-		rx_intr_affn_mask, napi_rx_thread_affn_mask);
-	/* Set tx completion interrupt affinity */
-	hif_set_grp_affinity_cpumaskwise(
-		dp_ctx->hif_handle, cdp_get_tx_rings_grp_bitmap(soc),
-		tx_comp_affn_mask, 0);
-	/* Set RX thread affinity */
-	dp_affn_override_set_rx_thread_affinity(dp_ctx, rx_thread_affn_mask);
-}
-
-#define AFFN_OVERRIDE_BELOW_MARGIN_PERCENT 2
-
-/**
- * dp_affn_get_threshold_for_level() - Get threshold value for a given level
- * @dp_ctx: DP context
- * @level: Throughput level
- *
- * Return: Threshold value for the given level
- */
-static inline uint64_t
-dp_affn_get_threshold_for_level(struct wlan_dp_psoc_context *dp_ctx,
-				enum dp_affn_override_tput_level level)
-{
-	switch (level) {
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW:
-		return dp_ctx->dp_cfg.dp_affn_override_low_threshold;
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_MID:
-		return dp_ctx->dp_cfg.dp_affn_override_mid_threshold;
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH:
-		return dp_ctx->dp_cfg.dp_affn_override_high_threshold;
-	case DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE:
-	default:
-		return 0;
-	}
-}
-
-/**
- * dp_affn_find_target_level() - Find target level for upgrade or downgrade
- * @dp_ctx: DP context
- * @curr_level: Current throughput level
- * @is_upgrade: true for upgrade, false for downgrade
- *
- * This function finds which level has the most votes among windows
- * that voted for upgrade (winner > curr_level) or downgrade
- * (winner < curr_level) based on the is_upgrade parameter.
- *
- * Return: Target level for upgrade or downgrade
- */
-static inline enum dp_affn_override_tput_level
-dp_affn_find_target_level(struct wlan_dp_psoc_context *dp_ctx,
-			  int curr_level, bool is_upgrade)
-{
-	uint8_t level_votes[DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {0};
-	enum dp_affn_override_tput_level target =
-				DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
-	uint8_t max_votes = 0;
-	uint8_t i;
-	uint8_t winner_level;
-
-	/* Count votes for each level based on upgrade/downgrade direction */
-	for (i = 0; i < AFFN_OVERRIDE_WINDOW_COUNT; i++) {
-		winner_level = dp_ctx->dp_affn_sample_winners[i];
-
-		/* Bounds check to prevent OOB access */
-		if (winner_level >= DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS) {
-			dp_err("Invalid winner level %u at index %u",
-			       winner_level, i);
-			continue;
-		}
-
-		if (is_upgrade) {
-			if (winner_level > curr_level)
-				level_votes[winner_level]++;
-		} else {
-			if (winner_level < curr_level)
-				level_votes[winner_level]++;
-		}
-	}
-
-	/* Find level with most votes */
-	for (i = 0; i < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS; i++) {
-		if (level_votes[i] > max_votes) {
-			max_votes = level_votes[i];
-			target = i;
-		}
-	}
-
-	return target;
-}
-
-void wlan_dp_affn_override_handler(
-	struct wlan_dp_psoc_context *dp_ctx,
-	uint64_t total_packets)
-{
-	enum dp_affn_override_tput_level curr_level, winner_level, sample_level;
-	enum dp_affn_override_tput_level upgrade_target;
-	enum dp_affn_override_tput_level downgrade_target;
-	uint8_t i, sample_idx;
-	uint8_t up_count = 0, down_count = 0;
-	uint8_t level_counts[DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {0};
-	uint8_t max_count = 0, winner_count = 0;
-	uint64_t threshold, threshold_margin;
-	uint64_t avg_pkt_count = 0;
-
-	/* Store packet count for this sample */
-	sample_idx = dp_ctx->dp_affn_sample_count %
-			DP_AFFN_OVERRIDE_SAMPLE_COUNT;
-	dp_ctx->dp_affn_pkt_count_samples[sample_idx] = total_packets;
-
-	/* Increment sample count */
-	dp_ctx->dp_affn_sample_count++;
-
-	/* Check if we've completed 1 window of 5 samples */
-	if ((dp_ctx->dp_affn_sample_count % DP_AFFN_OVERRIDE_SAMPLE_COUNT) != 0)
-		return;
-
-	/* Count occurrences of each throughput level in this window */
-	for (i = 0; i < DP_AFFN_OVERRIDE_SAMPLE_COUNT; i++) {
-		sample_level = dp_affn_override_compute_tput_level(
-				dp_ctx, dp_ctx->dp_affn_pkt_count_samples[i]);
-		level_counts[sample_level]++;
-	}
-
-	/* Find the level with maximum count (winner) */
-	winner_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
-	for (i = 0; i < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS; i++) {
-		if (level_counts[i] > max_count) {
-			max_count = level_counts[i];
-			winner_level = i;
-		}
-	}
-	winner_count = max_count;
-
-	/* Store the winner for this window */
-	dp_ctx->dp_affn_sample_winners[dp_ctx->dp_affn_decision_sample_idx] =
-			winner_level;
-	/* Increment the decision sample idx count*/
-	dp_ctx->dp_affn_decision_sample_idx++;
-
-	/* Get current throughput level */
-	curr_level = dp_ctx->dp_affn_override_curr_tput_level;
-
-	/* Wait until we have 3 windows */
-	if (dp_ctx->dp_affn_decision_sample_idx < AFFN_OVERRIDE_WINDOW_COUNT)
-		return;
-
-	/* On first state -1, apply winner directly */
-	if (curr_level == -1) {
-		dp_info("Initial state (INVALID). setting to : %s",
-			dp_affn_override_tput_lvl_to_str(winner_level));
-		dp_set_affinity_override(dp_ctx, winner_level);
-		dp_ctx->dp_affn_override_curr_tput_level = winner_level;
-		goto exit;
-	}
-
-	/* Calculate average packet count for this window */
-	for (i = 0; i < DP_AFFN_OVERRIDE_SAMPLE_COUNT; i++)
-		avg_pkt_count += dp_ctx->dp_affn_pkt_count_samples[i];
-	avg_pkt_count /= DP_AFFN_OVERRIDE_SAMPLE_COUNT;
-
-	/* Check UPGRADE logic: 2 out of 3 windows voting for upgrade */
-	for (i = 0; i < AFFN_OVERRIDE_WINDOW_COUNT; i++) {
-		if (dp_ctx->dp_affn_sample_winners[i] > curr_level)
-			up_count++;
-	}
-
-	if (up_count >= AFFN_OVERRIDE_WINDOW_COUNT - 1) {
-		/* Find which level has most votes for upgrade */
-		upgrade_target = dp_affn_find_target_level(dp_ctx,
-							   curr_level, true);
-
-		/* Check if traffic is high enough for the target level */
-		threshold = dp_affn_get_threshold_for_level(dp_ctx,
-							    upgrade_target);
-		threshold_margin = (threshold *
-				    AFFN_OVERRIDE_BELOW_MARGIN_PERCENT) / 100;
-
-		if (threshold > 0 &&
-		    avg_pkt_count >= (threshold - threshold_margin)) {
-			/* Print samples for the last window */
-			dp_affn_print_samples(
-					dp_ctx,
-					dp_ctx->dp_affn_decision_sample_idx,
-					winner_level, winner_count);
-			dp_info(
-			"UPGRADE: %s -> %s (avg:%llu >= up_thresh:%llu)",
-			dp_affn_override_tput_lvl_to_str(curr_level),
-			dp_affn_override_tput_lvl_to_str(upgrade_target),
-			avg_pkt_count, (threshold - threshold_margin));
-
-			dp_set_affinity_override(dp_ctx, upgrade_target);
-			dp_ctx->dp_affn_override_curr_tput_level =
-							upgrade_target;
-			goto exit;
-		}
-	}
-
-	/* Check DOWNGRADE logic: 3 consecutive down windows */
-	for (i = 0; i < AFFN_OVERRIDE_WINDOW_COUNT; i++) {
-		if (dp_ctx->dp_affn_sample_winners[i] < curr_level)
-			down_count++;
-	}
-	if (down_count >= AFFN_OVERRIDE_WINDOW_COUNT) {
-		/* Find which level has most votes for downgrade */
-		downgrade_target = dp_affn_find_target_level(dp_ctx,
-							     curr_level, false);
-
-		/* For downgrade to IDLE, use LOW threshold as reference */
-		if (downgrade_target == DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE) {
-			threshold =
-				dp_affn_get_threshold_for_level(
-					dp_ctx,
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW);
-		} else {
-			/* For other downgrades, use current level threshold */
-			threshold = dp_affn_get_threshold_for_level(dp_ctx,
-								    curr_level);
-		}
-
-		threshold_margin = (threshold *
-				    AFFN_OVERRIDE_BELOW_MARGIN_PERCENT) / 100;
-
-		if (avg_pkt_count <= (threshold - 2 * threshold_margin)) {
-			/* Print samples for the last window */
-			dp_affn_print_samples(
-					dp_ctx,
-					dp_ctx->dp_affn_decision_sample_idx,
-					winner_level, winner_count);
-			/* Apply downgrade */
-			dp_info(
-			"DOWNGRADE: %s -> %s (avg_pkt:%llu <= down_thresh:%llu)",
-			dp_affn_override_tput_lvl_to_str(curr_level),
-			dp_affn_override_tput_lvl_to_str(downgrade_target),
-			avg_pkt_count, (threshold - 2 * threshold_margin));
-
-			dp_set_affinity_override(dp_ctx, downgrade_target);
-			dp_ctx->dp_affn_override_curr_tput_level =
-							downgrade_target;
-			goto exit;
-		}
-	}
-exit:
-	dp_ctx->dp_affn_decision_sample_idx = 0;
-	dp_ctx->dp_affn_sample_count = 0;
-	qdf_mem_zero(dp_ctx->dp_affn_sample_winners,
-		     sizeof(dp_ctx->dp_affn_sample_winners));
-}
-
-#else
-static inline
-void dp_affn_override_cfg_init(
-	struct wlan_dp_psoc_cfg *config,
-	struct wlan_objmgr_psoc *psoc)
-{}
-#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #ifdef FEATURE_DIRECT_LINK
 static
 void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
@@ -1776,22 +868,6 @@ void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
 static inline
 void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
 			     struct wlan_objmgr_psoc *psoc)
-{
-}
-#endif
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-static inline
-void dp_ndp_bw_flow_ctrl_cfg_init(struct wlan_dp_psoc_cfg *config,
-				  struct wlan_objmgr_psoc *psoc)
-{
-	config->is_ndp_bw_flow_ctrl_enabled =
-				cfg_get(psoc, CFG_DP_NDP_BW_FLOW_CTRL_ENABLE);
-}
-#else
-static inline
-void dp_ndp_bw_flow_ctrl_cfg_init(struct wlan_dp_psoc_cfg *config,
-				  struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif
@@ -1852,16 +928,8 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_nud_tracking_cfg_update(config, psoc);
 	dp_trace_cfg_update(config, psoc);
 	dp_fisa_cfg_init(config, psoc);
-	dp_affn_override_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
 	wlan_dp_stc_cfg_init(config, psoc);
-	dp_ndp_bw_flow_ctrl_cfg_init(config, psoc);
-
-	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
-	dp_static_irq_affinity_cfg_init(config, psoc);
-	config->dp_rx_thread_affinity_mask =
-				cfg_get(psoc, CFG_DP_RX_THREAD_AFFINITY_MASK);
-	dp_haps_cfg_update(config, psoc);
 }
 
 /**
@@ -2286,9 +1354,6 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dp_info("DP VDEV OBJ create notification, vdev_id %d",
 		wlan_vdev_get_id(vdev));
 
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_NAN_DISC_MODE)
-		return QDF_STATUS_SUCCESS;
-
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
 		dp_err("Failed to get psoc");
@@ -2367,8 +1432,6 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		dp_flow_priortization_init(dp_intf);
 		wlan_dp_spm_intf_ctx_init(dp_intf);
 		dp_telemetry_init(dp_intf);
-		dp_vdev_haps_attach(wlan_psoc_get_dp_handle(psoc), dp_intf,
-				    vdev->vdev_objmgr.vdev_id);
 
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
@@ -2431,9 +1494,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dp_info("DP VDEV OBJ destroy notification, vdev_id %d",
 		wlan_vdev_get_id(vdev));
 
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_NAN_DISC_MODE)
-		return QDF_STATUS_SUCCESS;
-
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (!dp_link) {
 		dp_err("Failed to get DP link obj");
@@ -2441,25 +1501,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	dp_intf = dp_link->dp_intf;
-	if (!dp_intf) {
-		/*
-		 * dp_intf was already freed (e.g. SSR vdev delete timeout):
-		 * dp_link still needs its own cleanup to avoid leaks.
-		 */
-		dp_err("dp_intf is NULL for dp_link %pK vdev_id %d, dp_intf already destroyed",
-		       dp_link, wlan_vdev_get_id(vdev));
-		dp_ctx = dp_get_context();
-		wlan_dp_resource_mgr_notify_vdev_deletion(dp_ctx->rsrc_mgr_ctx,
-							  vdev);
-		qdf_spin_lock_bh(&dp_link->vdev_lock);
-		dp_link->vdev = NULL;
-		qdf_spin_unlock_bh(&dp_link->vdev_lock);
-		qdf_spinlock_destroy(&dp_link->vdev_lock);
-		wlan_objmgr_vdev_component_obj_detach(vdev, WLAN_COMP_DP,
-						      (void *)dp_link);
-		dp_link_handle_cdp_vdev_delete(dp_ctx, dp_link);
-		return QDF_STATUS_E_INVAL;
-	}
 	dp_ctx = dp_intf->dp_ctx;
 
 	wlan_dp_resource_mgr_notify_vdev_deletion(dp_ctx->rsrc_mgr_ctx, vdev);
@@ -2477,7 +1518,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		 * Interface level operations are stopped when last
 		 * link is deleted
 		 */
-		dp_vdev_haps_detach(dp_intf);
 		wlan_dp_spm_intf_ctx_deinit(dp_intf);
 		dp_flow_priortization_deinit(dp_intf);
 		dp_telemetry_deinit(dp_intf);
@@ -2521,15 +1561,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	qdf_spin_unlock_bh(&dp_link->vdev_lock);
 
 	qdf_spinlock_destroy(&dp_link->vdev_lock);
-
-	/* Defensive: dp_link_handle_cdp_vdev_delete and the inactive-list
-	 * path (wlan_dp_link_cdp_vdev_delete_notification) do not read
-	 * dp_link->dp_intf, so this has no functional effect today.
-	 * The detach below clears vdev_comp_priv_obj[WLAN_COMP_DP], which
-	 * prevents any future dp_get_vdev_priv_obj call from returning this
-	 * dp_link — making the bail-out path unreachable after this point.
-	 */
-	dp_link->dp_intf = NULL;
 
 	status = wlan_objmgr_vdev_component_obj_detach(vdev,
 						       WLAN_COMP_DP,
@@ -2583,7 +1614,7 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 	 * 2) FISA will not start before pdev create, so its safe to attach
 	 * STC after FISA, though there is a dependency on FISA.
 	 */
-	if (QDF_IS_STATUS_ERROR(wlan_dp_stc_pdev_create_handler(dp_ctx)))
+	if (QDF_IS_STATUS_ERROR(wlan_dp_stc_attach(dp_ctx)))
 		wlan_dp_spm_flow_table_detach(dp_ctx);
 
 	return status;
@@ -3333,17 +2364,7 @@ QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	ucfg_ipa_ps_suspend_resume(true);
-
 	return status;
-}
-
-QDF_STATUS __wlan_dp_fisa_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
-{
-	struct wlan_dp_psoc_context *dp_ctx;
-
-	dp_ctx = dp_get_context();
-	return wlan_dp_fisa_suspend(dp_ctx);
 }
 
 QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
@@ -3361,29 +2382,8 @@ QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	ucfg_ipa_ps_suspend_resume(false);
-
 	return status;
 }
-
-#ifdef DP_FEATURE_DIRECT_REFILL
-static inline void
-dp_soc_check_n_set_direct_refill_support(struct wlan_dp_psoc_context *dp_ctx,
-					 struct cdp_soc_attach_params *params)
-{
-	if (!pld_is_direct_refill_supported(dp_ctx->qdf_dev->dev))
-		return;
-
-	dp_info("FW supports direct refill");
-	params->direct_refill_support = 1;
-}
-#else
-static inline void
-dp_soc_check_n_set_direct_refill_support(struct wlan_dp_psoc_context *dp_ctx,
-					 struct cdp_soc_attach_params *params)
-{
-}
-#endif
 
 void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 			      bool *is_wifi3_0_target)
@@ -3393,23 +2393,18 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 	struct hif_opaque_softc *hif_context;
 	HTC_HANDLE htc_ctx = cds_get_context(QDF_MODULE_ID_HTC);
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	struct cdp_soc_attach_params cdp_params = {0};
 
 	dp_ctx = dp_get_context();
 	hif_context = cds_get_context(QDF_MODULE_ID_HIF);
-
-	cdp_params.hif_handle = hif_context;
-	cdp_params.htc_handle = htc_ctx;
-	cdp_params.qdf_osdev = qdf_ctx;
-	cdp_params.ol_ops = params->dp_ol_if_ops;
-	dp_soc_check_n_set_direct_refill_support(dp_ctx, &cdp_params);
 
 	if (TARGET_TYPE_QCA6290 == params->target_type ||
 	    TARGET_TYPE_QCA6390 == params->target_type ||
 	    TARGET_TYPE_QCA6490 == params->target_type ||
 	    TARGET_TYPE_QCA6750 == params->target_type) {
-		cdp_params.device_id = LITHIUM_DP;
-		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
+		dp_soc = cdp_soc_attach(LITHIUM_DP, hif_context,
+					params->target_psoc, htc_ctx,
+					qdf_ctx, params->dp_ol_if_ops);
+
 		if (dp_soc)
 			if (!cdp_soc_init(dp_soc, LITHIUM_DP,
 					  hif_context, params->target_psoc,
@@ -3421,11 +2416,12 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 		   params->target_type == TARGET_TYPE_MANGO ||
 		   params->target_type == TARGET_TYPE_PEACH ||
 		   params->target_type == TARGET_TYPE_WCN7750 ||
-		   params->target_type == TARGET_TYPE_WCN8750 ||
 		   params->target_type == TARGET_TYPE_QCC2072 ||
 		   params->target_type == TARGET_TYPE_FIG) {
-		cdp_params.device_id = BERYLLIUM_DP;
-		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
+		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
+					params->target_psoc,
+					htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
 		if (dp_soc)
 			if (!cdp_soc_init(dp_soc, BERYLLIUM_DP, hif_context,
 					  params->target_psoc, htc_ctx,
@@ -3433,8 +2429,10 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 				goto err_soc_detach;
 		*is_wifi3_0_target = true;
 	} else if (params->target_type == TARGET_TYPE_WCN6450) {
-		cdp_params.device_id = RHINE_DP;
-		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
+		dp_soc =
+			cdp_soc_attach(RHINE_DP, hif_context,
+				       params->target_psoc, htc_ctx,
+				       qdf_ctx, params->dp_ol_if_ops);
 		if (dp_soc)
 			if (!cdp_soc_init(dp_soc, RHINE_DP, hif_context,
 					  params->target_psoc, htc_ctx,
@@ -3442,8 +2440,9 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 				goto err_soc_detach;
 		*is_wifi3_0_target = true;
 	} else {
-		cdp_params.device_id = MOB_DRV_LEGACY_DP;
-		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
+		dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP, hif_context,
+					params->target_psoc, htc_ctx, qdf_ctx,
+					params->dp_ol_if_ops);
 	}
 
 	if (!dp_soc)
@@ -3563,7 +2562,7 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	 * STC detach must be done before FISA detach, since STC uses the
 	 * FISA table.
 	 */
-	wlan_dp_stc_pdev_detach_handler(dp_ctx);
+	wlan_dp_stc_detach(dp_ctx);
 	wlan_dp_rx_fisa_detach(dp_ctx);
 	return cdp_pdev_detach(soc, pdev_id, force);
 }
@@ -4098,6 +3097,7 @@ void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	struct wlan_dp_psoc_context *dp_ctx;
+	struct qdf_mac_addr zero_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	dp_ctx =  dp_psoc_get_priv(psoc);
 
@@ -4124,17 +3124,17 @@ void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
 	}
 
 	dp_info("Update failed dp_intf %pK(" QDF_MAC_ADDR_FMT ") from %pK("
-		QDF_MAC_ADDR_FMT ") to id %d) ",
+		QDF_MAC_ADDR_FMT ") to %pK(" QDF_MAC_ADDR_FMT ") (intf %pK("
+		QDF_MAC_ADDR_FMT ") id %d) ",
 		dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
 		dp_intf->def_link,
 		QDF_MAC_ADDR_REF(dp_intf->def_link->mac_addr.bytes),
+		dp_link, dp_link ? QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes) :
+					QDF_MAC_ADDR_REF(zero_addr.bytes),
+		dp_link ? dp_link->dp_intf : NULL,
+		dp_link ? QDF_MAC_ADDR_REF(dp_link->dp_intf->mac_addr.bytes) :
+				QDF_MAC_ADDR_REF(zero_addr.bytes),
 		dp_link ? dp_link->link_id : WLAN_INVALID_LINK_ID);
-	if (dp_link)
-		dp_info("with %pK(" QDF_MAC_ADDR_FMT ") (intf %pK("
-			QDF_MAC_ADDR_FMT ")",
-			dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes),
-			dp_link->dp_intf,
-			QDF_MAC_ADDR_REF(dp_link->dp_intf->mac_addr.bytes));
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
@@ -4157,40 +3157,5 @@ void wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
 
 	dp_intf->disable_rx_aggr[id] = disable;
 	dp_info("Module: %u disable: %u", id, disable);
-}
-#endif
-
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-void wlan_dp_dump_periodic_custom_stats_enable_req(struct wlan_dp_link *dp_link,
-						   bool enable)
-{
-	struct wlan_dp_intf *dp_intf;
-	ol_txrx_soc_handle soc;
-
-	if (!dp_link) {
-		dp_err("dp_intf is NULL");
-		return;
-	}
-
-	dp_intf = dp_link->dp_intf;
-	if (dp_intf->dump_periodic_custom_stats == enable) {
-		dp_debug("dump_periodic_custom_stats already %s",
-			 enable ? "enabled" : "disabled");
-		return;
-	}
-
-	dp_intf->dump_periodic_custom_stats = enable;
-
-	soc = cds_get_context(QDF_MODULE_ID_SOC);
-	if (!soc) {
-		dp_err("SOC context is NULL");
-		return;
-	}
-
-	/* Call CDP API to enable/disable UL delay */
-	cdp_enable_ul_delay(soc, dp_link->link_id, enable);
-
-	dp_info("dump_periodic_custom_stats %s for vdev_id: %u",
-		enable ? "enabled" : "disabled", dp_link->link_id);
 }
 #endif

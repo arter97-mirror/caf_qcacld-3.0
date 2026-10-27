@@ -28,7 +28,6 @@
 #include <linux/skbuff.h>
 #include <linux/etherdevice.h>
 #include "wlan_hdd_includes.h"
-#include "wlan_hdd_n79_coex.h"
 #include "wlan_hdd_p2p.h"
 #include "osif_sync.h"
 #include "wma_api.h"
@@ -48,8 +47,6 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_hdd_sysfs.h"
 #include "wlan_hdd_stats.h"
-#include <wlan_ipa_ucfg_api.h>
-#include "wlan_hdd_cm_api.h"
 
 /**
  * hdd_nan_datapath_target_config() - Configure NAN datapath features
@@ -155,9 +152,8 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			switch (adapter->device_mode) {
 			case QDF_P2P_GO_MODE:
 				if (!ucfg_nan_is_sta_p2p_ndp_supported(psoc) &&
-				    qdf_atomic_test_bit(
-						SOFTAP_BSS_STARTED,
-						link_info->link_flags)) {
+				    test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -204,9 +200,8 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			case QDF_SAP_MODE:
 				if (!wlan_nan_is_sta_sap_nan_allowed(
 							hdd_ctx->psoc) &&
-				    qdf_atomic_test_bit(
-						SOFTAP_BSS_STARTED,
-						link_info->link_flags)) {
+				    test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -218,9 +213,8 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 				break;
 			case QDF_P2P_GO_MODE:
 				if (!ucfg_nan_is_sta_p2p_ndp_supported(psoc) &&
-				    qdf_atomic_test_bit(
-						SOFTAP_BSS_STARTED,
-						link_info->link_flags)) {
+				    test_bit(SOFTAP_BSS_STARTED,
+					     &link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -622,7 +616,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	int32_t ret_val;
 	mac_handle_t mac_handle;
-	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
+	bool bval = false;
 	uint8_t enable_sifs_burst = 0;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t rts_profile = 0;
@@ -648,11 +642,11 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	mac_handle = hdd_ctx->mac_handle;
 
 	/* Configure self HT/VHT capabilities */
-	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
+	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	sme_set_pdev_ht_vht_ies(mac_handle, enable_mimo);
+	sme_set_pdev_ht_vht_ies(mac_handle, bval);
 	sme_set_vdev_ies_per_band(mac_handle, adapter->deflink->vdev_id,
 				  adapter->device_mode);
 
@@ -713,46 +707,6 @@ wext_unregister:
 
 	return ret_val;
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * hdd_ndi_start_bss_and_init() - Initialize NDI and start BSS for standard mode
- * @adapter: adapter context
- *
- * This function initializes NAN data mode and starts BSS when NAN standard
- * mode is supported by firmware. This is called from hdd_start_adapter when
- * device mode is NDI and firmware supports standard mode.
- *
- * Returns: 0 on success, negative error code on error
- */
-int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter)
-{
-	int ret;
-
-	hdd_enter();
-
-	/* Initialize NAN data mode - creates vdev and sets up adapter */
-	ret = hdd_init_nan_data_mode(adapter);
-	if (ret) {
-		hdd_err("failed to init nan data intf, err:%d", ret);
-		goto end;
-	}
-
-	/* Start BSS on the NDI */
-	ret = hdd_ndi_start_bss(adapter);
-	if (ret) {
-		hdd_err("NDI start bss failed");
-		/* Clean up on failure */
-		hdd_close_ndi(adapter);
-		goto end;
-	}
-
-	ret = 0;
-end:
-	hdd_exit();
-	return ret;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 
 /**
  * hdd_is_max_ndi_count_reached() - Check the NDI max limit
@@ -1032,48 +986,6 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 	return ret;
 }
 
-#ifdef IPA_NAN_SUPPORT
-/**
- * hdd_ndi_ipa_event_deliver() - send NDI event to ipa component.
- * @hdd_ctx: hdd context pointer.
- * @adapter: adapter context.
- * @vdev_id: vdev id.
- * @ipa_event_type: NDI create/delete event.
- *
- * Return: void
- */
-
-static inline void
-hdd_ndi_ipa_event_deliver(struct hdd_context *hdd_ctx,
-			  struct hdd_adapter *adapter,
-			  uint8_t vdev_id,
-			  enum wlan_ipa_wlan_event ipa_event_type)
-{
-	QDF_STATUS status;
-
-	if (!ucfg_ipa_is_enabled())
-		return;
-
-	status = ucfg_ipa_wlan_evt(hdd_ctx->pdev,
-				   adapter->dev,
-				   adapter->device_mode,
-				   vdev_id, false,
-				   ipa_event_type,
-				   adapter->dev->dev_addr,
-				   false);
-	if (status)
-		hdd_err("NAN %d event failed", ipa_event_type);
-}
-#else
-static inline void
-hdd_ndi_ipa_event_deliver(struct hdd_context *hdd_ctx,
-			  struct hdd_adapter *adapter,
-			  uint8_t vdev_id,
-			  enum wlan_ipa_wlan_event ipa_event_type)
-{
-}
-#endif
-
 #define MAX_VDEV_NDP_PARAMS 2
 /* params being sent:
  * wmi_vdev_param_ndp_inactivity_timeout
@@ -1123,11 +1035,9 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 			return;
 		}
 
+		os_if_nan_set_ndp_create_transaction_id(vdev, 0);
 		os_if_nan_set_ndi_state(vdev, NAN_DATA_NDI_CREATED_STATE);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
-
-		/* N79 coex: NDI vdev is up — apply 2x2 if on 5 GHz */
-		hdd_n79_coex_nan_update(hdd_ctx->psoc, vdev_id, true);
 
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1164,9 +1074,6 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 							     setparam, index);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("failed to send vdev set params");
-
-		hdd_ndi_ipa_event_deliver(hdd_ctx, adapter,
-					  vdev_id, WLAN_IPA_AP_CONNECT);
 	} else {
 		hdd_alert("NDI interface creation failed with reason %d",
 			ndi_rsp->reason /* create_reason */);
@@ -1180,14 +1087,6 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 			      &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_NAN_ID);
-	if (!vdev) {
-		qdf_mem_free(roam_info);
-		hdd_err("vdev is NULL");
-		return;
-	}
-	hdd_configure_wow_commands(vdev, hdd_ctx);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 error:
 	qdf_mem_free(roam_info);
 }
@@ -1232,7 +1131,7 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	adapter = link_info->adapter;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_delete_peer(adapter, sta_ctx, &bc_mac_addr);
+	hdd_delete_peer(sta_ctx, &bc_mac_addr);
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1242,14 +1141,8 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	 * For NAN Data interface, the close session results in the final
 	 * indication to the userspace
 	 */
-	if (adapter->device_mode == QDF_NDI_MODE) {
-		/* N79 coex: NDI vdev is going down — clear 2x2 constraint */
-		hdd_n79_coex_nan_update(hdd_ctx->psoc, vdev_id, false);
-		hdd_ndi_ipa_event_deliver(hdd_ctx, adapter,
-					  vdev_id,
-					  WLAN_IPA_AP_DISCONNECT);
+	if (adapter->device_mode == QDF_NDI_MODE)
 		hdd_ndp_session_end_handler(adapter);
-	}
 
 	complete(&adapter->disconnect_comp_var);
 }
@@ -1347,14 +1240,14 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		hdd_disable_rx_ol_in_concurrency(true);
 	}
 
-	sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_bus_bw_compute_prev_txrx_stats(vdev);
-		ucfg_nan_set_peer_mc_list(vdev, *peer_mac_addr);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	}
+
 	ucfg_dp_bus_bw_compute_timer_start(hdd_ctx->psoc);
+	sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
 	hdd_wmm_connect(adapter, roam_info, eCSR_BSS_TYPE_NDI);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1431,7 +1324,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 	adapter = link_info->adapter;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_delete_peer(adapter, sta_ctx, peer_mac_addr);
+	hdd_delete_peer(sta_ctx, peer_mac_addr);
 
 	ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc, link_info->vdev,
 				    peer_mac_addr);
@@ -1456,37 +1349,3 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		hdd_send_obss_scan_req(hdd_ctx, false);
 	}
 }
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-uint8_t hdd_ndp_get_peer_bw(struct hdd_adapter *adapter, uint8_t *peer_mac,
-			    uint8_t *out_peer_idx)
-{
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
-	struct hdd_station_ctx *sta_ctx;
-	enum cdp_peer_bw peer_bw = CDP_PEER_BW_MAX;
-	uint8_t i;
-
-	if (qdf_unlikely(!link_info))
-		return CDP_PEER_BW_20MHZ;
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	for (i = 0; i < MAX_PEERS; i++) {
-		if (!qdf_mem_cmp(&sta_ctx->conn_info.peer_macaddr[i].bytes,
-				 peer_mac, QDF_MAC_ADDR_SIZE)) {
-			peer_bw =
-				hdd_convert_ch_width_to_cdp_peer_bw(sta_ctx->conn_info.peer_bw[i]);
-			/*
-			 * Broadcast peer is always added first in the list of
-			 * NDP peers.
-			 */
-			*out_peer_idx = i - 1;
-			break;
-		}
-	}
-
-	if (peer_bw >= CDP_PEER_BW_MAX)
-		return CDP_PEER_BW_20MHZ;
-
-	return peer_bw;
-}
-#endif

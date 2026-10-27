@@ -56,9 +56,9 @@ QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
  * @curr_freq: current frequency
  * @csa_src: LL_SAP csa source
  *
- * Return: qdf_freq_t
+ * Return: QDF_STATUS
  */
-qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 				    uint8_t vdev_id, qdf_freq_t curr_freq,
 				    enum ll_sap_csa_source csa_src);
 

@@ -156,7 +156,7 @@ struct bmi_info {
  * @fw_indication_work: Work for Fw indication
  * @fw_dl_wakelock: Firmware download wakelock
  * @scn: HIF Context
- * @tgt_def: Target Definition pointer
+ * @tgt_def: Target Defnition pointer
  * @fw_crashed_cb: Callback for firmware crashed ind
  *
  * Structure to hold all ol BMI/Ramdump info

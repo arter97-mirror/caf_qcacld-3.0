@@ -35,8 +35,6 @@
 #include "wlan_lmac_if_def.h"
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_hdd_dcs.h"
-#include <cfg_mlme_vht_caps.h>
-#include "wlan_ll_sap_api.h"
 
 /**
  * hdd_green_ap_check_enable() - to check whether to enable green ap or not
@@ -105,7 +103,8 @@ int hdd_green_ap_start_state_mc(struct hdd_context *hdd_ctx,
 	bool enable_green_ap = false;
 	uint8_t num_sap_sessions = 0, num_p2p_go_sessions = 0, ret = 0;
 	QDF_STATUS status;
-	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE, ps_enable;
+	bool bval = false;
+	uint8_t ps_enable;
 
 	cfg = hdd_ctx->config;
 	if (!cfg) {
@@ -113,14 +112,15 @@ int hdd_green_ap_start_state_mc(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
+	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("unable to get vht_enable2x2");
 		return -EINVAL;
 	}
 
-	if (!enable_mimo)
+	if (!bval) {
 		hdd_debug(" 2x2 not enabled");
+	}
 
 	if (QDF_IS_STATUS_ERROR(ucfg_green_ap_get_ps_config(hdd_ctx->pdev,
 							     &ps_enable)))
@@ -215,10 +215,9 @@ static void wlan_hdd_enable_disable_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 					    uint8_t lp_flags)
 {
 	if (lp_flags == QCA_WLAN_DOZED_AP_ENABLE)
-		ucfg_config_dcs_disable(psoc, vdev_id, WLAN_HOST_DCS_WLANIM);
+		ucfg_config_dcs_disable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
 	else
-		ucfg_config_dcs_enable(psoc, mac_id, vdev_id,
-				       WLAN_HOST_DCS_WLANIM);
+		ucfg_config_dcs_enable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
 
 	hdd_send_dcs_cmd(psoc, mac_id, vdev_id);
 }
@@ -299,9 +298,6 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 				mac_id,
 				vdev_id, lp_flags);
 
-	if (lp_flags == QCA_WLAN_DOZED_AP_ENABLE)
-		wlan_ll_sap_set_cur_freq_unused_cu(hdd_ctx->psoc, vdev_id, 0);
-
 	len = NLMSG_HDRLEN;
 	/*QCA_WLAN_VENDOR_ATTR_DOZED_AP_COOKIE*/
 	len += nla_total_size(sizeof(u64));
@@ -358,11 +354,6 @@ QDF_STATUS wlan_hdd_send_green_ap_ll_ps_event(
 	uint32_t len;
 	struct vdev_osif_priv *osif_priv;
 	struct sk_buff *skb;
-
-	if (!vdev) {
-		hdd_err("VDEV is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv) {

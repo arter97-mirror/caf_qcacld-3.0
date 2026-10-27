@@ -91,6 +91,7 @@ void hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id,
 				       enum ll_sap_csa_source src);
 
+#ifdef WLAN_FEATURE_VDEV_DCS
 /**
  * hdd_send_dcs_cmd() - Send dcs command to firmware
  * @psoc: pointer to psoc
@@ -99,57 +100,17 @@ void hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
  *
  * Return: None
  */
+void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+		      uint32_t mac_id, uint8_t vdev_id);
+#else
 static inline
 void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 		      uint32_t mac_id, uint8_t vdev_id)
 {
-	ucfg_wlan_dcs_cmd(psoc, mac_id, vdev_id);
+	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
 }
-
-#ifdef WLAN_FEATURE_VDEV_DCS
-/**
- * wlan_hdd_cfg80211_dcs_config() - Handle DCS config vendor command
- * @wiphy: Pointer to wireless phy
- * @wdev: Pointer to wireless device
- * @data: Pointer to data
- * @data_len: Data length
- *
- * This function handles QCA_NL80211_VENDOR_SUBCMD_DCS_CONFIG vendor
- * command to get or set DCS configuration parameters.
- *
- * Return: 0 on success, negative errno on failure
- */
-int wlan_hdd_cfg80211_dcs_config(struct wiphy *wiphy,
-				 struct wireless_dev *wdev,
-				 const void *data, int data_len);
-/**
- * enum qca_wlan_vendor_dcs_cmd_type - DCS vendor command types
- * @QCA_WLAN_VENDOR_DCS_CMD_GET: Get DCS configuration
- * @QCA_WLAN_VENDOR_DCS_CMD_SET: Set DCS configuration
- */
-enum qca_wlan_vendor_dcs_cmd_type {
-	QCA_WLAN_VENDOR_DCS_CMD_GET = 0,
-	QCA_WLAN_VENDOR_DCS_CMD_SET = 1,
-};
-
-extern const struct nla_policy dcs_config_policy[];
-
-#define FEATURE_DCS_VENDOR_COMMANDS \
-{ \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID, \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_DCS_CONFIG, \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV | \
-			WIPHY_VENDOR_CMD_NEED_NETDEV, \
-	.doit = wlan_hdd_cfg80211_dcs_config, \
-	vendor_command_policy(dcs_config_policy, \
-			      QCA_WLAN_VENDOR_ATTR_DCS_MAX) \
-},
+#endif
 #else
-#define FEATURE_DCS_VENDOR_COMMANDS
-#endif /* WLAN_FEATURE_VDEV_DCS */
-#else
-#define FEATURE_DCS_VENDOR_COMMANDS
-
 static inline void hdd_dcs_register_cb(struct hdd_context *hdd_ctx)
 {
 }

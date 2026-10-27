@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -415,17 +415,6 @@ bool
 mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev);
 
 /**
- * mlo_check_if_all_peer_authenticated - Check if all peer are authenticated
- * @vdev: vdev pointer
- *
- * This api will check if all the requested peers are authenticated in the MLD.
- *
- * Return: bool, true: all link vdevs of mld in authenticated state
- */
-bool
-mlo_check_if_all_peer_authenticated(struct wlan_objmgr_vdev *vdev);
-
-/**
  * mlo_roam_set_link_id - set link id post roaming
  *
  * @vdev: vdev pointer
@@ -623,12 +612,6 @@ static inline bool
 mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
-}
-
-static inline bool
-mlo_check_if_all_peer_authenticated(struct wlan_objmgr_vdev *vdev)
-{
-	return true;
 }
 
 static inline void

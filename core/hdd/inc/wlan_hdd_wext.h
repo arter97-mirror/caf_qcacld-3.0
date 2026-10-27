@@ -209,6 +209,21 @@ void hdd_wext_send_event(struct net_device *dev, unsigned int cmd,
 	wireless_send_event(dev, cmd, wrqu, extra);
 }
 
+/**
+ * hdd_wlan_get_stats() - Get txrx stats in SAP mode
+ * @link_info: Link info pointer in HDD adapter
+ * @length:   Size of the data copied
+ * @buffer:   Pointer to char buffer.
+ * @buf_len:  Length of the char buffer.
+ *
+ * This function called when the "iwpriv wlan0 get_stats" command is given.
+ * It used to collect the txrx stats when the device is configured in SAP mode.
+ *
+ * Return - none
+ */
+void hdd_wlan_get_stats(struct wlan_hdd_link_info *link_info, uint16_t *length,
+			char *buffer, uint16_t buf_len);
+
 void hdd_wlan_list_fw_profile(uint16_t *length,
 			      char *buffer, uint16_t buf_len);
 
@@ -318,6 +333,13 @@ struct iw_request_info;
  */
 int hdd_check_private_wext_control(struct hdd_context *hdd_ctx,
 				   struct iw_request_info *info);
+
+#ifdef CONFIG_DP_TRACE
+void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count);
+#else
+static inline
+void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count) {}
+#endif
 #else /* WLAN_WEXT_SUPPORT_ENABLE */
 static inline void hdd_register_wext(struct net_device *dev)
 {

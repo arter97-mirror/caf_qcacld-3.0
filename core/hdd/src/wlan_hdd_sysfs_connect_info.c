@@ -28,8 +28,6 @@
 #include "qwlan_version.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "wlan_hdd_object_manager.h"
-#include "wlan_hdd_cfg80211.h"
-#include "wlan_hdd_assoc.h"
 
 /**
  * wlan_hdd_version_info() - Populate driver, FW and HW version
@@ -92,17 +90,13 @@ wlan_hdd_add_nss_info(struct hdd_connection_info *conn_info,
 	ssize_t length = 0;
 	int ret_val;
 
-	if (!(conn_info->conn_flag.ht_present |
-	      conn_info->conn_flag.vht_present |
-	      conn_info->conn_flag.he_present |
-	      conn_info->conn_flag.eht_present |
-	      conn_info->conn_flag.uhr_present))
+	if (!conn_info->conn_flag.ht_present &&
+	    !conn_info->conn_flag.vht_present)
 		return length;
 
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "Tx/Rx nss = %ux%u\n",
-			    conn_info->txrate.nss,
-			    conn_info->rxrate.nss);
+			    "nss = %u\n",
+			    conn_info->txrate.nss);
 	if (ret_val <= 0)
 		return length;
 
@@ -190,339 +184,7 @@ wlan_hdd_add_vht_cap_info(struct hdd_connection_info *conn_info,
 	return length;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
-	defined(WLAN_FEATURE_11AX)
 /**
- * wlan_hdd_add_he_cap_info() - Populate HE info
- * @conn_info: station connection information
- * @buf: output buffer to hold version info
- * @buf_avail_len: available buffer length
- *
- * Return: No.of bytes populated by this function in buffer
- */
-static ssize_t
-wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
-			 uint8_t *buf, ssize_t buf_avail_len)
-{
-	struct ieee80211_he_cap_elem *he_cap_elem;
-	struct ieee80211_he_mcs_nss_supp *he_mcs_nss;
-	ssize_t length = 0;
-	int ret;
-
-	if (!conn_info->conn_flag.he_present)
-		return length;
-
-	he_cap_elem = &conn_info->he_cap_elem;
-	he_mcs_nss = &conn_info->he_cap_mcs;
-
-	ret = scnprintf(buf, buf_avail_len,
-			"he_mac_cap_info = 0x%02x%02x%02x%02x%02x%02x\n"
-			"he_phy_cap_ch_width = 0x%02x\n"
-			"he_phy_cap_8_to_23 = 0x%02x%02x\n"
-			"he_phy_cap_24_to_39 = 0x%02x%02x\n"
-			"he_phy_cap_40_to_55 = 0x%02x%02x\n"
-			"he_phy_cap_56_to_71 = 0x%02x%02x\n"
-			"he_phy_cap_72_to_87 = 0x%02x%02x\n"
-			"rx_he_mcs_lt_80 = 0x%04x\n"
-			"tx_he_mcs_lt_80 = 0x%04x\n",
-			he_cap_elem->mac_cap_info[5],
-			he_cap_elem->mac_cap_info[4],
-			he_cap_elem->mac_cap_info[3],
-			he_cap_elem->mac_cap_info[2],
-			he_cap_elem->mac_cap_info[1],
-			he_cap_elem->mac_cap_info[0],
-			he_cap_elem->phy_cap_info[0] >> 1,
-			he_cap_elem->phy_cap_info[2],
-			he_cap_elem->phy_cap_info[1],
-			he_cap_elem->phy_cap_info[4],
-			he_cap_elem->phy_cap_info[3],
-			he_cap_elem->phy_cap_info[6],
-			he_cap_elem->phy_cap_info[5],
-			he_cap_elem->phy_cap_info[8],
-			he_cap_elem->phy_cap_info[7],
-			he_cap_elem->phy_cap_info[10],
-			he_cap_elem->phy_cap_info[9],
-			he_mcs_nss->rx_mcs_80,
-			he_mcs_nss->tx_mcs_80);
-
-	if (ret <= 0)
-		return length;
-
-	if (!(he_cap_elem->phy_cap_info[0] &
-	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G))
-		goto end;
-
-	length = ret;
-	ret = scnprintf(buf + length, buf_avail_len - length,
-			"rx_he_mcs_160 = 0x%04x\n"
-			"tx_he_mcs_160 = 0x%04x\n",
-			he_mcs_nss->rx_mcs_160,
-			he_mcs_nss->tx_mcs_160);
-
-	if (ret <= 0)
-		return length;
-
-	length += ret;
-	if (!(he_cap_elem->phy_cap_info[0] &
-	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G))
-		return length;
-
-	ret = scnprintf(buf + length, buf_avail_len - length,
-			"rx_he_mcs_80p80 = 0x%04x\n"
-			"tx_he_mcs_80p80 = 0x%04x\n",
-			he_mcs_nss->rx_mcs_80p80,
-			he_mcs_nss->tx_mcs_80p80);
-
-	if (ret <= 0)
-		return length;
-
-	length += ret;
-
-	return length;
-
-end:
-	length = ret;
-
-	return length;
-}
-#else
-static inline ssize_t
-wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
-			 uint8_t *buf, ssize_t buf_avail_len)
-{
-	return 0;
-}
-#endif
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
-	defined(WLAN_FEATURE_11BE)
-/* Calculate 802.11be EHT capabilities IE Tx/Rx EHT MCS NSS Support
- * Field size
- */
-static inline uint8_t
-wlan_hdd_eht_calculate_mcs_nss_size(
-			const struct ieee80211_he_cap_elem *he_cap,
-			const struct ieee80211_eht_cap_elem_fixed *eht_cap)
-{
-	uint8_t count = 0;
-
-	/* on 2.4 GHz, if it supports 40 MHz, the result is 3 */
-	if (he_cap->phy_cap_info[0] &
-	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G)
-		return 3;
-
-	/* on 2.4 GHz, these three bits are reserved, so should be 0 */
-	if (he_cap->phy_cap_info[0] &
-	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G)
-		count += 3;
-
-	if (he_cap->phy_cap_info[0] &
-	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G)
-		count += 3;
-
-	if (eht_cap->phy_cap_info[0] & IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ)
-		count += 3;
-
-	if (count)
-		return count;
-
-	return 3;
-}
-
-/**
- * wlan_hdd_add_eht_cap_info() - Populate EHT info
- * @conn_info: station connection information
- * @buf: output buffer to hold version info
- * @buf_avail_len: available buffer length
- *
- * Return: No.of bytes populated by this function in buffer
- */
-static ssize_t
-wlan_hdd_add_eht_cap_info(struct hdd_connection_info *conn_info,
-			  uint8_t *buf, ssize_t buf_avail_len)
-{
-	struct ieee80211_eht_cap_elem *eht_cap_elem;
-	struct ieee80211_he_cap_elem *he_cap_elem;
-	ssize_t length = 0;
-	int ret;
-	uint8_t count = 0, mcs_nss_len;
-	bool is_band_2g;
-	bool is_mcs_nss_20_2g, is_mcs_nss_20_5g, is_mcs_nss_80;
-
-	if (!conn_info->conn_flag.eht_present)
-		return length;
-
-	if (!conn_info->eht_cap || !conn_info->eht_cap_len)
-		return length;
-
-	he_cap_elem = &conn_info->he_cap_elem;
-	eht_cap_elem = conn_info->eht_cap;
-
-	ret = scnprintf(buf, buf_avail_len,
-			"eht_mac_cap_info = 0x%02x%02x\n"
-			"eht_phy_cap_0_to_15 = 0x%02x%02x\n"
-			"eht_phy_cap_16_to_31 = 0x%02x%02x\n"
-			"eht_phy_cap_32_to_39 = 0x%02x\n"
-			"eht_phy_cap_40_to_63 = 0x%02x%02x%02x\n"
-			"eht_phy_cap_64_to_71 = 0x%02x\n",
-			eht_cap_elem->fixed.mac_cap_info[1],
-			eht_cap_elem->fixed.mac_cap_info[0],
-			eht_cap_elem->fixed.phy_cap_info[1],
-			eht_cap_elem->fixed.phy_cap_info[0],
-			eht_cap_elem->fixed.phy_cap_info[3],
-			eht_cap_elem->fixed.phy_cap_info[2],
-			eht_cap_elem->fixed.phy_cap_info[4],
-			eht_cap_elem->fixed.phy_cap_info[7],
-			eht_cap_elem->fixed.phy_cap_info[6],
-			eht_cap_elem->fixed.phy_cap_info[5],
-			eht_cap_elem->fixed.phy_cap_info[8]);
-
-	if (ret <= 0)
-		return length;
-
-	length = ret;
-	if (!conn_info->conn_flag.he_present)
-		return length;
-
-	mcs_nss_len =
-	wlan_hdd_eht_calculate_mcs_nss_size(he_cap_elem, &eht_cap_elem->fixed);
-
-	if (mcs_nss_len != conn_info->eht_cap_len) {
-		hdd_debug("Length mismatch, mcs_nss_len %d eht_cap_len %d",
-			  mcs_nss_len, conn_info->eht_cap_len);
-		return length;
-	}
-
-	is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(conn_info->chan_freq);
-	is_mcs_nss_20_2g = (is_band_2g && !(he_cap_elem->phy_cap_info[0] &
-			IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G));
-	is_mcs_nss_20_5g =
-		(!is_band_2g && !(he_cap_elem->phy_cap_info[0] &
-		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G) &&
-		!(he_cap_elem->phy_cap_info[0] &
-		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G) &&
-		!(he_cap_elem->phy_cap_info[0] &
-		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G));
-	is_mcs_nss_80 =
-		(is_band_2g && (he_cap_elem->phy_cap_info[0] &
-		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G)) ||
-		(!is_band_2g && (he_cap_elem->phy_cap_info[0] &
-		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G));
-
-	if (is_mcs_nss_20_2g || is_mcs_nss_20_5g) {
-		ret = scnprintf(buf + length, buf_avail_len - length,
-				"eht_mcs_nss_bw_20 = 0x%02x%02x%02x%02x\n",
-				eht_cap_elem->optional[count + 3],
-				eht_cap_elem->optional[count + 2],
-				eht_cap_elem->optional[count + 1],
-				eht_cap_elem->optional[count]);
-		if (ret <= 0)
-			return length;
-
-		count = 4;
-		length += ret;
-	} else {
-		if (is_mcs_nss_80) {
-			ret = scnprintf(buf + length, buf_avail_len - length,
-					"eht_mcs_nss_bw_80 = 0x%02x%02x%02x\n",
-					eht_cap_elem->optional[count + 2],
-					eht_cap_elem->optional[count + 1],
-					eht_cap_elem->optional[count]);
-			if (ret <= 0)
-				return length;
-
-			count = 3;
-			length += ret;
-		}
-	}
-
-	if (he_cap_elem->phy_cap_info[0] &
-	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G) {
-		ret = scnprintf(buf + length, buf_avail_len - length,
-				"eht_mcs_nss_bw_160 = 0x%02x%02x%02x\n",
-				eht_cap_elem->optional[count + 2],
-				eht_cap_elem->optional[count + 1],
-				eht_cap_elem->optional[count]);
-		if (ret <= 0)
-			return length;
-
-		count += 3;
-		length += ret;
-	}
-
-	if (eht_cap_elem->fixed.phy_cap_info[0] &
-	    IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ) {
-		ret = scnprintf(buf + length, buf_avail_len - length,
-				"eht_mcs_nss_bw_320 = 0x%02x%02x%02x\n",
-				eht_cap_elem->optional[count + 2],
-				eht_cap_elem->optional[count + 1],
-				eht_cap_elem->optional[count]);
-		if (ret <= 0)
-			return length;
-
-		length += ret;
-	}
-
-	return length;
-}
-#else
-static ssize_t
-wlan_hdd_add_eht_cap_info(struct hdd_connection_info *conn_info,
-			  uint8_t *buf, ssize_t buf_avail_len)
-{
-	return 0;
-}
-#endif
-
-#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
-/**
- * wlan_hdd_add_uhr_cap_info() - Populate UHR MAC and PHY capabilities
- * @conn_info: station connection information
- * @buf: output buffer
- * @buf_avail_len: available buffer length
- *
- * Return: No.of bytes populated by this function in buffer
- */
-static ssize_t
-wlan_hdd_add_uhr_cap_info(struct hdd_connection_info *conn_info,
-			  uint8_t *buf, ssize_t buf_avail_len)
-{
-	struct ieee80211_sta_uhr_cap *uhr;
-	ssize_t length = 0;
-	int ret;
-
-	if (!conn_info->conn_flag.uhr_present)
-		return length;
-
-	uhr = &conn_info->uhr_cap;
-	if (!uhr->has_uhr)
-		return length;
-
-	ret = scnprintf(buf, buf_avail_len,
-			"uhr_mac_cap_info = 0x%02x%02x%02x%02x%02x\n"
-			"uhr_phy_cap_info = 0x%02x\n",
-			uhr->mac.mac_cap[4],
-			uhr->mac.mac_cap[3],
-			uhr->mac.mac_cap[2],
-			uhr->mac.mac_cap[1],
-			uhr->mac.mac_cap[0],
-			uhr->phy.cap);
-	if (ret <= 0)
-		return length;
-
-	length = ret;
-	return length;
-}
-#else
-static ssize_t
-wlan_hdd_add_uhr_cap_info(struct hdd_connection_info *conn_info,
-			  uint8_t *buf, ssize_t buf_avail_len)
-{
-	return 0;
-}
-#endif
-
-/**`
  * hdd_auth_type_str() - Get string for enum csr auth type
  * @auth_type: authentication id
  *
@@ -536,8 +198,6 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "OPEN SYSTEM";
 	case eCSR_AUTH_TYPE_SHARED_KEY:
 		return "SHARED KEY";
-	case eCSR_AUTH_TYPE_SAE_EXT_KEY:
-		return "SAE EXT";
 	case eCSR_AUTH_TYPE_SAE:
 		return "SAE";
 	case eCSR_AUTH_TYPE_AUTOSWITCH:
@@ -589,10 +249,6 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "SUITEB EAP SHA384";
 	case eCSR_AUTH_TYPE_OSEN:
 		return "OSEN";
-	case eCSR_AUTH_TYPE_FT_SAE_EXT_KEY:
-		return "FT SAE EXT";
-	case eCSR_AUTH_TYPE_EPPKE:
-		return "EPPKE";
 	case eCSR_AUTH_TYPE_FT_SAE:
 		return "FT SAE";
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
@@ -638,45 +294,9 @@ uint8_t *hdd_dot11_mode_str(uint32_t dot11mode)
 	case eCSR_CFG_DOT11_MODE_11BE:
 	case eCSR_CFG_DOT11_MODE_11BE_ONLY:
 		return "DOT11_MODE_11BE";
-#ifdef WLAN_FEATURE_11BN
-	case eCSR_CFG_DOT11_MODE_11BN:
-	case eCSR_CFG_DOT11_MODE_11BN_ONLY:
-		return "DOT11_MODE_11BN";
-#endif
 	}
 
 	return "UNKNOWN";
-}
-
-static enum phy_ch_width
-wlan_hdd_fetch_connect_info_oper_ch_width(struct wlan_hdd_link_info *link_info,
-					  enum phy_ch_width cnx_ch_width)
-{
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	struct wlan_objmgr_vdev *vdev;
-	enum phy_ch_width bss_op_res_ch_width = CH_WIDTH_INVALID;
-	enum phy_ch_width oper_ch_width = cnx_ch_width;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
-	if (!vdev)
-		return oper_ch_width;
-
-	status = ucfg_mlme_vdev_get_bss_oper_ch_width_res(vdev,
-							  &bss_op_res_ch_width);
-	if (QDF_IS_STATUS_ERROR(status) ||
-	    bss_op_res_ch_width == CH_WIDTH_INVALID)
-		goto exit;
-
-	if (wlan_reg_get_bw_value(cnx_ch_width) >
-	    wlan_reg_get_bw_value(bss_op_res_ch_width)) {
-		oper_ch_width = bss_op_res_ch_width;
-		hdd_debug("oper res BW %d for vdev_id %d",
-			  bss_op_res_ch_width, wlan_vdev_get_id(vdev));
-	}
-
-exit:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
-	return oper_ch_width;
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
@@ -734,10 +354,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	bool is_standby = false;
 	uint8_t curr_hw_mode;
 	struct wlan_objmgr_vdev *vdev;
-	uint32_t chan_freq;
-	enum phy_ch_width ch_width, oper_ch_width;
-	struct wlan_channel chan_info;
-	int8_t rssi;
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		len = scnprintf(buf, buf_avail_len,
@@ -852,37 +468,21 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		tx_bit_rate = cfg80211_calculate_bitrate(&conn_info->txrate);
 		rx_bit_rate = cfg80211_calculate_bitrate(&conn_info->rxrate);
 
-		if (is_standby) {
-			int ret;
-			int link_id = conn_info->ieee_link_id;
-
-			ret = wlan_hdd_get_standby_link_chan_info(adapter,
-								  link_id,
-								  &chan_info);
-			if (ret) {
-				hdd_debug("Failed to get standby link info, linkid: %d",
-					  conn_info->ieee_link_id);
-				return length;
-			}
-
-			chan_freq = chan_info.ch_freq;
-			ch_width = chan_info.ch_width;
-			oper_ch_width = ch_width;
-			rssi = WLAN_INVALID_RSSI_VALUE;
-		} else {
-			chan_freq = conn_info->chan_freq;
-			ch_width = conn_info->ch_width;
-			oper_ch_width =
-				wlan_hdd_fetch_connect_info_oper_ch_width(link_info,
-									  ch_width);
-			rssi = conn_info->signal;
-		}
-
 		len = scnprintf(buf + length, buf_avail_len - length,
-				"freq: %u\nch_width: %s\noper_ch_width: %s\nsignal: %ddBm\ntx_bit_rate: %u\nrx_bit_rate: %u\n",
-				chan_freq, hdd_ch_width_str(ch_width),
-				hdd_ch_width_str(oper_ch_width), rssi,
-				tx_bit_rate, rx_bit_rate);
+				"freq: %u\n"
+				"ch_width: %s\n"
+				"signal: %ddBm\n"
+				"tx_bit_rate: %u\n"
+				"rx_bit_rate: %u\n"
+				"last_auth_type: %s\n"
+				"dot11mode: %s\n",
+				conn_info->chan_freq,
+				hdd_ch_width_str(conn_info->ch_width),
+				conn_info->signal,
+				tx_bit_rate,
+				rx_bit_rate,
+				hdd_auth_type_str(conn_info->last_auth_type),
+				hdd_dot11_mode_str(conn_info->dot11mode));
 
 		if (len <= 0)
 			return length;
@@ -909,16 +509,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 
 		length += wlan_hdd_add_vht_cap_info(conn_info, buf + length,
 						    buf_avail_len - length);
-
-		length += wlan_hdd_add_he_cap_info(conn_info, buf + length,
-						   buf_avail_len - length);
-
-		length += wlan_hdd_add_eht_cap_info(conn_info, buf + length,
-						    buf_avail_len - length);
-
-		length += wlan_hdd_add_uhr_cap_info(conn_info, buf + length,
-						    buf_avail_len - length);
-
 		if (is_legacy)
 			return length;
 	}
@@ -934,7 +524,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	struct hdd_connection_info *conn_info;
 	uint32_t tx_bit_rate, rx_bit_rate;
 	int ret_val;
-	enum phy_ch_width ch_width, oper_ch_width;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
@@ -972,10 +561,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		hdd_err("No sufficient buf_avail_len");
 		return buf_avail_len;
 	}
-
-	ch_width = conn_info->ch_width;
-	oper_ch_width = wlan_hdd_fetch_connect_info_oper_ch_width(adapter->deflink,
-								  ch_width);
 	ret_val = scnprintf(buf + length, buf_avail_len - length,
 			    "ssid = %s\n"
 			    "bssid = " QDF_MAC_ADDR_FMT "\n"
@@ -983,7 +568,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 			    "auth_time = %s\n"
 			    "freq = %u\n"
 			    "ch_width = %s\n"
-			    "oper_ch_width = %s\n"
 			    "signal = %ddBm\n"
 			    "tx_bit_rate = %u\n"
 			    "rx_bit_rate = %u\n"
@@ -994,8 +578,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 			    conn_info->connect_time,
 			    conn_info->auth_time,
 			    conn_info->chan_freq,
-			    hdd_ch_width_str(ch_width),
-			    hdd_ch_width_str(oper_ch_width),
+			    hdd_ch_width_str(conn_info->ch_width),
 			    conn_info->signal,
 			    tx_bit_rate,
 			    rx_bit_rate,
@@ -1027,16 +610,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	}
 	length += wlan_hdd_add_vht_cap_info(conn_info, buf + length,
 					    buf_avail_len - length);
-
-	length += wlan_hdd_add_he_cap_info(conn_info, buf + length,
-					   buf_avail_len - length);
-
-	length += wlan_hdd_add_eht_cap_info(conn_info, buf + length,
-					   buf_avail_len - length);
-
-	length += wlan_hdd_add_uhr_cap_info(conn_info, buf + length,
-					    buf_avail_len - length);
-
 	return length;
 }
 #endif
@@ -1060,98 +633,15 @@ wlan_hdd_current_time_info(uint8_t *buf, ssize_t buf_avail_len)
 	return length;
 }
 
-static ssize_t
-wlan_hdd_p2p_connection_info(struct hdd_adapter *adapter,
-			     uint8_t *buf, ssize_t buf_avail_len)
-{
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
-	struct hdd_station_ctx *sta_ctx;
-	struct hdd_connection_info *conn_info;
-	uint32_t tx_bit_rate, rx_bit_rate;
-	ssize_t length = 0;
-	int ret_val;
-
-	if (!link_info)
-		return length;
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	if (!sta_ctx) {
-		hdd_err("Invalid STA_CTX");
-		return length;
-	}
-
-	if (!hdd_cm_is_vdev_associated(link_info)) {
-		ret_val = scnprintf(buf, buf_avail_len,
-				    "P2P_Client is not connected\n");
-		if (ret_val >= 0)
-			return length;
-	}
-
-	ret_val = scnprintf(buf, buf_avail_len,
-			    "\nP2P_CLIENT CONNECTION DETAILS\n");
-	if (ret_val <= 0)
-		return length;
-
-	length += ret_val;
-	if (length >= buf_avail_len) {
-		hdd_err("No sufficient buf_avail_len");
-		return buf_avail_len;
-	}
-
-	conn_info = &sta_ctx->conn_info;
-	tx_bit_rate = cfg80211_calculate_bitrate(&conn_info->txrate);
-	rx_bit_rate = cfg80211_calculate_bitrate(&conn_info->rxrate);
-
-	ret_val = scnprintf(buf + length, buf_avail_len - length,
-			    "ssid = " QDF_SSID_FMT "\n"
-			    "bssid = " QDF_MAC_ADDR_FMT "\n"
-			    "connect_time = %s\n"
-			    "auth_time = %s\n"
-			    "freq = %u\n"
-			    "ch_width = %s\n"
-			    "signal = %ddBm\n"
-			    "tx_bit_rate = %u\n"
-			    "rx_bit_rate = %u\n"
-			    "last_auth_type = %s\n"
-			    "dot11mode = %s\n",
-			    QDF_SSID_REF(conn_info->ssid.SSID.length,
-					 conn_info->ssid.SSID.ssId),
-			    QDF_MAC_ADDR_REF(conn_info->bssid.bytes),
-			    conn_info->connect_time,
-			    conn_info->auth_time,
-			    conn_info->chan_freq,
-			    hdd_ch_width_str(conn_info->ch_width),
-			    conn_info->signal,
-			    tx_bit_rate,
-			    rx_bit_rate,
-			    hdd_auth_type_str(conn_info->last_auth_type),
-			    hdd_dot11_mode_str(conn_info->dot11mode));
-
-	if (ret_val < 0)
-		return length;
-
-	length += ret_val;
-
-	return length;
-}
-
 static ssize_t __show_connect_info(struct net_device *net_dev, char *buf,
 				   ssize_t buf_avail_len)
 {
 	struct hdd_adapter *adapter = netdev_priv(net_dev);
 	struct hdd_context *hdd_ctx;
-	ssize_t len = 0;
-	int ret_val = 0;
-	enum QDF_OPMODE opmode;
+	ssize_t len;
+	int ret_val;
 
 	hdd_enter_dev(net_dev);
-
-	if (hdd_validate_adapter(adapter))
-		goto exit;
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (wlan_hdd_validate_context(hdd_ctx))
-		goto exit;
 
 	len = wlan_hdd_current_time_info(buf, buf_avail_len);
 	if (len >= buf_avail_len) {
@@ -1160,18 +650,13 @@ static ssize_t __show_connect_info(struct net_device *net_dev, char *buf,
 		goto exit;
 	}
 
-	len += wlan_hdd_version_info(hdd_ctx, buf + len, buf_avail_len - len);
-	if (len >= buf_avail_len) {
-		hdd_err("No sufficient buf_avail_len");
-		len = buf_avail_len;
-		goto exit;
-	}
+	ret_val = hdd_validate_adapter(adapter);
+	if (0 != ret_val)
+		return len;
 
-	opmode = adapter->device_mode;
-
-	if ((opmode != QDF_STA_MODE) && (opmode != QDF_P2P_CLIENT_MODE)) {
+	if (adapter->device_mode != QDF_STA_MODE) {
 		ret_val = scnprintf(buf + len, buf_avail_len - len,
-				    "Not in STA or P2P_CLIENT Mode\n");
+				    "Interface is not operating STA Mode\n");
 		if (ret_val <= 0)
 			goto exit;
 
@@ -1179,22 +664,25 @@ static ssize_t __show_connect_info(struct net_device *net_dev, char *buf,
 		goto exit;
 	}
 
-	if (opmode == QDF_STA_MODE) {
-		len += wlan_hdd_connect_info(adapter, buf + len,
-					     buf_avail_len - len);
-		if (len >= buf_avail_len) {
-			hdd_err("No sufficient buf_avail_len");
-			len = buf_avail_len;
-		}
-		goto exit;
-	}
-
-	len += wlan_hdd_p2p_connection_info(adapter, buf + len,
-					    buf_avail_len - len);
 	if (len >= buf_avail_len) {
 		hdd_err("No sufficient buf_avail_len");
 		len = buf_avail_len;
+		goto exit;
 	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret_val = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret_val)
+		goto exit;
+
+	len += wlan_hdd_version_info(hdd_ctx, buf + len, buf_avail_len - len);
+
+	if (len >= buf_avail_len) {
+		hdd_err("No sufficient buf_avail_len");
+		len = buf_avail_len;
+		goto exit;
+	}
+	len += wlan_hdd_connect_info(adapter, buf + len, buf_avail_len - len);
 
 exit:
 	hdd_exit();
@@ -1236,3 +724,4 @@ void hdd_sysfs_connect_info_interface_destroy(struct hdd_adapter *adapter)
 {
 	device_remove_file(&adapter->dev->dev, &dev_attr_connect_info);
 }
+

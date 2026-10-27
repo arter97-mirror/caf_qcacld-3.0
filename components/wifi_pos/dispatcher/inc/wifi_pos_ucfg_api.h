@@ -43,21 +43,7 @@ ucfg_wifi_pos_psoc_open(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS
 ucfg_wifi_pos_psoc_close(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_wifi_pos_pmsr_complete_on_concurrency() - Complete pending PMSR on
- *   concurrency event. Invokes the registered pmsr_complete_cb legacy op.
- * @psoc: Pointer to PSOC object
- */
-#if defined(WLAN_FEATURE_RTT_11AZ_SUPPORT) && defined(CFG80211_PD_SUPPORT)
-void ucfg_wifi_pos_pmsr_complete_on_concurrency(struct wlan_objmgr_psoc *psoc);
-#else
-static inline void
-ucfg_wifi_pos_pmsr_complete_on_concurrency(struct wlan_objmgr_psoc *psoc)
-{
-}
-#endif /* WLAN_FEATURE_RTT_11AZ_SUPPORT && CFG80211_PD_SUPPORT */
-
+#
 #else
 static inline QDF_STATUS
 ucfg_wifi_pos_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -69,11 +55,6 @@ static inline QDF_STATUS
 ucfg_wifi_pos_psoc_close(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-static inline void
-ucfg_wifi_pos_pmsr_complete_on_concurrency(struct wlan_objmgr_psoc *psoc)
-{
 }
 #endif /* WIFI_POS_CONVERGED && WLAN_FEATURE_RTT_11AZ_SUPPORT */
 #endif /* _WLAN_WIFI_POS_UCFG_API_H_ */

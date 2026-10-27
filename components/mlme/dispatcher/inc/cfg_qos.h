@@ -170,7 +170,7 @@
  * <ini>
  * gRxAggregationSize - Gives an option to configure Rx aggregation size
  * in no of MPDUs
- * @Min: 0
+ * @Min: 1
  * @Max: 1024
  * @Default: 256
  *
@@ -187,7 +187,7 @@
  */
 #define CFG_RX_AGGREGATION_SIZE CFG_INI_UINT( \
 			"gRxAggregationSize", \
-			0, \
+			1, \
 			1024, \
 			256, \
 			CFG_VALUE_OR_DEFAULT, \

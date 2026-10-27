@@ -137,17 +137,18 @@ static inline bool lim_process_ft_pre_auth_req(
 #endif
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
-QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
-			       struct bss_description *bss_desc,
-			       struct pe_session *ft_session,
-			       struct pe_session *pe_session,
-			       enum wlan_phymode bss_phymode);
+QDF_STATUS
+lim_fill_ft_session(struct mac_context *mac,
+		    struct bss_description *pbssDescription,
+		    struct pe_session *ft_session,
+		    struct pe_session *pe_session,
+		    enum wlan_phymode bss_phymode);
 
 /**
  * lim_ft_prepare_add_bss_req() - Create Add Bss Req to the new AP
  * @mac: Global MAC context
- * @ft_session: FT PE Session
- * @bss_desc: Pointer to bss descriptor
+ * @add_bss_params: Bss params including rsp data
+ * @pe_session: PE Session
  *
  * This will be used when we are ready to FT to the new AP.
  * The newly created ft Session entry is passed to this function
@@ -156,24 +157,23 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
  */
 void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 				struct pe_session *ft_session,
-				struct bss_description *bss_desc);
+				struct bss_description *bssDescription);
 
 QDF_STATUS lim_send_preauth_scan_offload(struct mac_context *mac_ctx,
 		struct pe_session *session_entry, tSirFTPreAuthReq *ft_preauth_req);
 #else
-static inline QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
-					     struct bss_description *bss_desc,
-					     struct pe_session *ft_session,
-					     struct pe_session *pe_session,
-					     enum wlan_phymode bss_phymode)
+static inline QDF_STATUS
+lim_fill_ft_session(struct mac_context *mac
+		    struct bss_description *pbssDescription,
+		    struct pe_session *ft_session,
+		    struct pe_session *pe_session,
+		    enum wlan_phymode bss_phymode)
 {
 	return QDF_STATUS_SUCCESS;
 }
-
-static inline
-void lim_ft_prepare_add_bss_req(struct mac_context *mac,
-				struct pe_session *ft_session,
-				struct bss_description *bss_desc)
+static inline void lim_ft_prepare_add_bss_req(struct mac_context *mac,
+		struct pe_session *ft_session,
+		struct bss_description *bssDescription)
 {}
 #endif
 

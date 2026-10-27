@@ -30,54 +30,35 @@
  * struct twt_mc_cfg_params - All twt related cfg items
  * @enable_twt: global twt configuration
  * @twt_responder: twt responder enable/disable
- * @twt_responder_orig: Original twt responder enable/disable
  * @twt_requestor: twt requestor enable/disable
  * @twt_congestion_timeout: congestion timeout value
- * @voip_pkt_ul_delay_ms: UPO - delay (ms) from VOIP RTP packet queued until
- * received by the WLAN target, sent in the TWT enable command (STA only)
  * @bcast_requestor_enabled: bcast requestor enable/disable
  * @bcast_responder_enabled: bcast responder enable/disable
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
- * @disable_twt_on_scan: Enable/Disable twt on scan
  * @flex_twt_sched: flex twt scheduling enable/disable
  * @req_flag: requestor flag enable/disable
+ * @res_flag: responder flag enable/disable
  * @rtwt_requestor_enabled: Restricted TWT requestor enable or disable
  * @rtwt_responder_enabled: Restricted TWT responder enable or disable
  * @twt_req_ht_vht: TWT requestor support in ht/vht mode
  * @twt_res_ht_vht: TWT responder support in ht/vht mode
- * @twt_setup_defer_on_scan: defer TWT setup to worker when scan/ROC in progress
  */
 struct twt_mc_cfg_params {
 	bool enable_twt;
-	uint8_t twt_responder;
-	uint8_t twt_responder_orig;
+	bool twt_responder;
 	bool twt_requestor;
 	uint32_t twt_congestion_timeout;
-	uint32_t voip_pkt_ul_delay_ms;
 	bool bcast_requestor_enabled;
 	bool bcast_responder_enabled;
 	bool enable_twt_24ghz;
-	bool disable_twt_on_scan;
 	bool flex_twt_sched;
 	bool req_flag;
+	bool res_flag;
 	bool rtwt_requestor_enabled;
 	bool rtwt_responder_enabled;
 	bool twt_req_ht_vht;
 	bool twt_res_ht_vht;
-	bool twt_setup_defer_on_scan;
-};
-
-/**
- * struct twt_early_terminate_param - SP early termination params
- * @vdev_id: VDEV identifier
- * @dialog_id: TWT dialog ID
- * @peer_macaddr: Peer mac address
- */
-struct twt_early_terminate_param {
-	uint32_t vdev_id;
-	uint8_t dialog_id;
-	struct qdf_mac_addr peer_macaddr;
 };
 
 #endif /* __WLAN_TWT_EXT_DEFS_H__ */

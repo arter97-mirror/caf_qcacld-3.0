@@ -67,30 +67,6 @@ void hdd_ndp_event_handler(struct wlan_hdd_link_info *link_info,
 int wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int data_len);
 int hdd_init_nan_data_mode(struct hdd_adapter *adapter);
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * hdd_ndi_start_bss_and_init() - Initialize NDI and start BSS for standard mode
- * @adapter: adapter context
- *
- * This function initializes NAN data mode and starts BSS when NAN standard
- * mode is supported by firmware. Called from hdd_start_adapter() when
- * device mode is NDI and firmware supports standard mode.
- *
- * Locking: The called functions (hdd_init_nan_data_mode, hdd_ndi_start_bss)
- * acquire their own internal locks as needed. No additional HDD-wide lock
- * is required at this level.
- *
- * Returns: 0 on success, negative error code on error
- */
-int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter);
-#else
-static inline int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter)
-{
-	return 0;
-}
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-
 void hdd_ndp_session_end_handler(struct hdd_adapter *adapter);
 
 /**
@@ -212,25 +188,6 @@ static inline int hdd_ndi_set_mode(const char *iface_name)
 }
 #endif /* LINUX_VERSION_CODE  */
 
-#ifdef NDP_TX_BW_FLOW_CTRL
-/**
- * hdd_ndp_get_peer_bw() - get NDP peer bandwidth
- * @adapter: HDD adapter
- * @peer_mac: ndp peer mac address
- * @out_peer_idx: peer idx filled by API on match
- *
- * Return: peer bandwidth
- */
-uint8_t hdd_ndp_get_peer_bw(struct hdd_adapter *adapter, uint8_t *peer_mac,
-			    uint8_t *out_peer_idx);
-#else
-static inline
-uint8_t hdd_ndp_get_peer_bw(struct hdd_adapter *adapter, uint8_t *peer_mac,
-			    uint8_t *out_peer_idx)
-{
-	return 0;
-}
-#endif
 #else
 #define WLAN_HDD_IS_NDI(adapter)	(false)
 #define WLAN_HDD_IS_NDI_CONNECTED(adapter) (false)
@@ -256,12 +213,6 @@ static inline int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 {
 	return 0;
 }
-
-static inline int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter)
-{
-	return 0;
-}
-
 static inline void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 {
 }

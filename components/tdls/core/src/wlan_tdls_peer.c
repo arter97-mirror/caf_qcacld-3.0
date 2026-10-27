@@ -24,14 +24,12 @@
  */
 #include "wlan_tdls_main.h"
 #include "wlan_tdls_peer.h"
-#include "wlan_tdls_stats.h"
 #include <wlan_reg_services_api.h>
 #include <wlan_utility.h>
 #include <wlan_policy_mgr_api.h>
 #include "wlan_reg_ucfg_api.h"
 #include <host_diag_core_event.h>
 #include "wlan_policy_mgr_api.h"
-#include "wlan_mlme_api.h"
 
 static uint8_t calculate_hash_key(const uint8_t *macaddr)
 {
@@ -195,19 +193,15 @@ qdf_freq_t tdls_get_offchan_freq(struct wlan_objmgr_vdev *vdev,
 uint32_t tdls_get_offchan_bw(struct tdls_soc_priv_obj *soc_obj,
 			     qdf_freq_t off_chan_freq)
 {
-	uint32_t pre_off_chan_bw = soc_obj->tdls_configs.tdls_pre_off_chan_bw;
-	bool is_160_allowed = true;
-	enum phy_ch_width fw_max_bw = wlan_mlme_get_max_bw();
+	uint32_t pre_off_chan_bw;
 
-	if (wlan_reg_is_5ghz_ch_freq(off_chan_freq) ||
-	    fw_max_bw < CH_WIDTH_160MHZ)
-		is_160_allowed = false;
-
-	if (!is_160_allowed &&
+	if (wlan_reg_is_5ghz_ch_freq(off_chan_freq) &&
 	    CHECK_BIT(soc_obj->tdls_configs.tdls_pre_off_chan_bw,
 		      BW_160_OFFSET_BIT))
 		pre_off_chan_bw = soc_obj->tdls_configs.tdls_pre_off_chan_bw &
 						~(1 << BW_160_OFFSET_BIT);
+	else
+		pre_off_chan_bw = soc_obj->tdls_configs.tdls_pre_off_chan_bw;
 
 	return pre_off_chan_bw;
 }
@@ -300,10 +294,6 @@ struct tdls_peer *tdls_add_peer(struct tdls_vdev_priv_obj *vdev_obj,
 	}
 
 	qdf_list_insert_back(head, &peer->node);
-
-	/* Record TDLS stats for new peer addition */
-	tdls_stats_record_peer_add(soc_obj, vdev_obj->vdev, macaddr,
-				   peer->rssi);
 
 	tdls_debug("add tdls peer: " QDF_MAC_ADDR_FMT,
 		   QDF_MAC_ADDR_REF(macaddr));
@@ -635,9 +625,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	enum channel_state ch_state;
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t cur_band;
-	qdf_freq_t ch_freq, allowed_freq, op_freq = 0;
-	enum reg_wifi_band offchan_band, op_band;
-	struct wlan_channel *bss_chan;
+	qdf_freq_t ch_freq, allowed_freq;
 	uint32_t tx_power = 0;
 
 	vdev_obj = peer->vdev_priv;
@@ -676,19 +664,8 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 		return;
 	}
 
-	offchan_band = wlan_reg_freq_to_band(peer->pref_off_chan_freq);
-
-	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev_obj->vdev);
-	if (bss_chan)
-		op_freq = bss_chan->ch_freq;
-	op_band = wlan_reg_freq_to_band(op_freq);
-
-	if (BIT(REG_BAND_2G) == cur_band || op_band != REG_BAND_2G ||
-	    (peer->pref_off_chan_freq && offchan_band == REG_BAND_2G)) {
-		tdls_err("vdev %d off-channel disabled: op_freq %d offchan_freq %d (cur_band cap 0x%x)",
-			 peer_param->vdev_id, op_freq,
-			 peer->pref_off_chan_freq, cur_band);
-		peer_param->peer_cap.peer_off_chan_support = 0;
+	if (BIT(REG_BAND_2G) == cur_band) {
+		tdls_err("sending the offchannel value as 0 as only 2g is supported");
 		peer_param->peer_cap.pref_off_channum = 0;
 		peer_param->peer_cap.opclass_for_prefoffchan = 0;
 		peer_param->peer_cap.pref_offchan_freq = 0;
@@ -722,7 +699,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 
 		ch_state = wlan_reg_get_channel_state_for_pwrmode(
 							pdev, ch_freq,
-							REG_CLI_DEF_VLP);
+							REG_CURRENT_PWR_MODE);
 
 		if (CHANNEL_STATE_INVALID != ch_state &&
 		    !wlan_reg_is_dfs_for_freq(pdev, ch_freq) &&
@@ -733,18 +710,10 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 				wlan_reg_get_channel_reg_power_for_freq(pdev,
 								       ch_freq);
 			} else {
-				if (wlan_reg_is_indoor_ap_detected(pdev))
-					tx_power =
-					tdls_get_6g_pwr_for_power_type(
-							vdev_obj->vdev,
-							ch_freq,
-							REG_CLI_DEF_C2C);
-				else
-					tx_power =
-					tdls_get_6g_pwr_for_power_type(
-							vdev_obj->vdev,
-							ch_freq,
-							REG_CLI_DEF_VLP);
+				tx_power =
+				tdls_get_6g_pwr_for_power_type(vdev_obj->vdev,
+							       ch_freq,
+							       REG_CLI_DEF_VLP);
 			}
 			peer_param->peer_cap.peer_chan[num].pwr = tx_power;
 			peer_param->peer_cap.peer_chan[num].dfs_set = false;
@@ -758,21 +727,6 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	for (i = 0; i < peer->supported_oper_classes_len; i++)
 		peer_param->peer_cap.peer_oper_class[i] =
 			peer->supported_oper_classes[i];
-}
-
-static inline char *
-tdls_link_status_str(enum tdls_link_state link_status)
-{
-	switch (link_status) {
-	CASE_RETURN_STRING(TDLS_LINK_IDLE);
-	CASE_RETURN_STRING(TDLS_LINK_DISCOVERING);
-	CASE_RETURN_STRING(TDLS_LINK_DISCOVERED);
-	CASE_RETURN_STRING(TDLS_LINK_CONNECTING);
-	CASE_RETURN_STRING(TDLS_LINK_CONNECTED);
-	CASE_RETURN_STRING(TDLS_LINK_TEARING);
-	default:
-		return "UNKNOWN";
-	}
 }
 
 #ifdef TDLS_WOW_ENABLED
@@ -790,11 +744,10 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
 		return;
 
 	qdf_wake_lock_acquire(&tdls_soc->wake_lock,
-			      WIFI_POWER_EVENT_WAKELOCK_TDLS,
-			      QDF_WAKE_TIME_UNDEFINED);
+			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
 	qdf_runtime_pm_prevent_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = true;
-	tdls_notice_rl("Acquire WIFI_POWER_EVENT_WAKELOCK_TDLS");
+	tdls_debug("Acquire WIFI_POWER_EVENT_WAKELOCK_TDLS");
 }
 
 /**
@@ -805,7 +758,7 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
  *
  * Return None
  */
-void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
+static void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
 {
 	if (!tdls_soc->is_prevent_suspend)
 		return;
@@ -814,7 +767,7 @@ void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
 			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
 	qdf_runtime_pm_allow_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = false;
-	tdls_notice_rl("Release WIFI_POWER_EVENT_WAKELOCK_TDLS");
+	tdls_debug("Release WIFI_POWER_EVENT_WAKELOCK_TDLS");
 }
 
 /**
@@ -839,11 +792,6 @@ static void tdls_update_pmo_status(struct tdls_vdev_priv_obj *tdls_vdev,
 
 	if (tdls_soc->is_drv_supported)
 		return;
-
-	tdls_debug("vdev:%d old_status:%s new_status:%s",
-		   wlan_vdev_get_id(tdls_vdev->vdev),
-		   tdls_link_status_str(old_status),
-		   tdls_link_status_str(new_status));
 
 	if ((old_status < TDLS_LINK_CONNECTING) &&
 	    (new_status == TDLS_LINK_CONNECTING))
@@ -907,6 +855,21 @@ void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 	}
 }
 
+static inline char *
+tdls_link_status_str(enum tdls_link_state link_status)
+{
+	switch (link_status) {
+	CASE_RETURN_STRING(TDLS_LINK_IDLE);
+	CASE_RETURN_STRING(TDLS_LINK_DISCOVERING);
+	CASE_RETURN_STRING(TDLS_LINK_DISCOVERED);
+	CASE_RETURN_STRING(TDLS_LINK_CONNECTING);
+	CASE_RETURN_STRING(TDLS_LINK_CONNECTED);
+	CASE_RETURN_STRING(TDLS_LINK_TEARING);
+	default:
+		return "UNKNOWN";
+	}
+}
+
 void tdls_set_peer_link_status(struct tdls_peer *peer,
 			       enum tdls_link_state link_status,
 			       enum tdls_link_state_reason link_reason)
@@ -923,12 +886,6 @@ void tdls_set_peer_link_status(struct tdls_peer *peer,
 
 	old_status = peer->link_status;
 	peer->link_status = link_status;
-	if (link_status == TDLS_LINK_CONNECTED) {
-		peer->teardown_stats_recorded = false;
-		tdls_debug("TDLS stats: reset teardown_stats_recorded for peer "
-			  QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(peer->peer_mac.bytes));
-	}
 	tdls_debug("vdev:%d new state: %s old state:%s reason %d peer:" QDF_MAC_ADDR_FMT,
 		   wlan_vdev_get_id(vdev_obj->vdev),
 		   tdls_link_status_str(link_status),

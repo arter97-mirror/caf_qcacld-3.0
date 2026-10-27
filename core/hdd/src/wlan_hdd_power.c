@@ -92,11 +92,6 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include "wlan_dp_ucfg_api.h"
 #include "son_api.h"
-#include "wlan_hdd_tx_powerboost.h"
-#include "wlan_hdd_ioctl.h"
-#include "wlan_pmo_ucfg_api.h"
-#include "wlan_hdd_wondertap.h"
-
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -191,9 +186,6 @@ static void hdd_enable_gtk_offload(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
 
-	if (wlan_vdev_is_open_mode(vdev))
-		return;
-
 	status = ucfg_pmo_enable_gtk_offload_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to enable gtk offload");
@@ -286,20 +278,6 @@ static void hdd_disable_igmp_offload(struct hdd_adapter *adapter,
 {
 	QDF_STATUS status;
 
-	uint8_t vdev_id;
-	struct wlan_objmgr_psoc *psoc;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return;
-
-	vdev_id =  wlan_vdev_get_id(vdev);
-
-	if (ucfg_pmo_is_wow_optimization_enabled(psoc)) {
-		hdd_debug("WOW enhanced cap enabled- skip IGMP DISABLE, vdev_id: %d",
-			  vdev_id);
-		return;
-	}
 	status = hdd_send_igmp_offload_params(adapter, vdev, false);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to disable igmp offload");
@@ -335,23 +313,6 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
 {
 	struct pmo_gtk_rsp_req gtk_rsp_request;
 	QDF_STATUS status;
-	uint8_t vdev_id;
-	struct wlan_objmgr_psoc *psoc;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return;
-
-	vdev_id =  wlan_vdev_get_id(vdev);
-
-	if (ucfg_pmo_is_wow_optimization_enabled(psoc)) {
-		hdd_debug("WOW enhanced offload enabled- skip GTK DISABLE, vdev_id: %d",
-			  vdev_id);
-		return;
-	}
-
-	if (wlan_vdev_is_open_mode(vdev))
-		return;
 
 	/* ensure to get gtk rsp first before disable it*/
 	gtk_rsp_request.callback = wlan_hdd_cfg80211_update_replay_counter_cb;
@@ -372,22 +333,6 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_NS_OFFLOAD
-#ifdef MDM_PLATFORM
-static void
-hdd_dhcp_v6_done_ind(mac_handle_t mac_handle,
-		     uint8_t vdev_id)
-{}
-#else
-static void
-hdd_dhcp_v6_done_ind(mac_handle_t mac_handle,
-		     uint8_t vdev_id)
-{
-	hdd_debug("invoking sme_dhcp_done_ind");
-	sme_dhcp_done_ind(mac_handle,
-			  vdev_id);
-}
-#endif
-
 /**
  * __wlan_hdd_ipv6_changed() - IPv6 notifier callback function
  * @net_dev: net_device whose IP address changed
@@ -408,10 +353,6 @@ static void __wlan_hdd_ipv6_changed(struct net_device *net_dev,
 
 	hdd_enter_dev(net_dev);
 
-	if (net_dev->ieee80211_ptr &&
-	    wlan_hdd_wdev_is_ap_vlan(net_dev->ieee80211_ptr))
-		goto exit;
-
 	errno = hdd_validate_adapter(adapter);
 	if (errno || adapter->dev != net_dev)
 		goto exit;
@@ -427,8 +368,9 @@ static void __wlan_hdd_ipv6_changed(struct net_device *net_dev,
 	if (event == NETDEV_UP &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		hdd_dhcp_v6_done_ind(hdd_ctx->mac_handle,
-				     adapter->deflink->vdev_id);
+		hdd_debug("invoking sme_dhcp_done_ind");
+		sme_dhcp_done_ind(hdd_ctx->mac_handle,
+				  adapter->deflink->vdev_id);
 		schedule_work(&adapter->ipv6_notifier_work);
 	}
 
@@ -599,13 +541,6 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 		goto free_req;
 	}
 
-	ucfg_pmo_set_ns_offload_enable_dynamic(vdev, trigger, true);
-
-	if (!ucfg_pmo_get_ns_offload_enable_dynamic(vdev)) {
-		hdd_debug("NS offload is dynamically disabled");
-		goto free_req;
-	}
-
 	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
 		hdd_debug("Dynamic arp ns offload disabled");
 		ucfg_pmo_flush_ns_offload_req(vdev);
@@ -677,12 +612,6 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 		goto out;
 	}
 
-	if (!ucfg_pmo_get_ns_offload_enable_dynamic(vdev)) {
-		hdd_debug("NS offload is already dynamically disabled");
-		goto out;
-	}
-
-	ucfg_pmo_set_ns_offload_enable_dynamic(vdev, trigger, false);
 	status = ucfg_pmo_disable_ns_offload_in_fwr(vdev, trigger);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Failed to disable NS Offload");
@@ -883,7 +812,6 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger)
 {
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_psoc *psoc;
 
 	hdd_enter();
 
@@ -905,12 +833,6 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 		goto put_vdev;
 	}
 
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		hdd_err("psoc is NULL");
-		goto put_vdev;
-	}
-
 	hdd_debug("enable offloads");
 	hdd_enable_arp_offload(adapter, vdev, trigger);
 	hdd_enable_ns_offload(adapter, vdev, trigger);
@@ -918,11 +840,9 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_enable_igmp_offload(adapter, vdev);
 
-	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
-		if (adapter->device_mode != QDF_NDI_MODE)
-			hdd_enable_hw_filter(vdev);
-		hdd_enable_action_frame_patterns(vdev);
-	}
+	if (adapter->device_mode != QDF_NDI_MODE)
+		hdd_enable_hw_filter(vdev);
+	hdd_enable_action_frame_patterns(vdev);
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 out:
@@ -934,7 +854,6 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger)
 {
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_psoc *psoc;
 
 	hdd_enter();
 
@@ -956,12 +875,6 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 		goto put_vdev;
 	}
 
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		hdd_err("psoc is NULL");
-		goto put_vdev;
-	}
-
 	hdd_debug("disable offloads");
 	hdd_disable_gtk_offload(adapter, vdev);
 	hdd_disable_arp_offload(adapter, vdev, trigger);
@@ -969,12 +882,9 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	hdd_disable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_disable_igmp_offload(adapter, vdev);
-
-	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
-		if (adapter->device_mode != QDF_NDI_MODE)
-			hdd_disable_hw_filter(vdev);
-		hdd_disable_action_frame_patterns(vdev);
-	}
+	if (adapter->device_mode != QDF_NDI_MODE)
+		hdd_disable_hw_filter(vdev);
+	hdd_disable_action_frame_patterns(vdev);
 
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
@@ -1181,85 +1091,6 @@ void hdd_ipv4_notifier_work_queue(struct work_struct *work)
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
-#ifdef MDM_PLATFORM
-static void
-hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
-		     struct hdd_adapter *adapter)
-{
-	hdd_debug("invoking sme_dhcp_stop_ind");
-	/* send dhcp prot stop ind when ip address is obtained */
-	sme_dhcp_done_ind(mac_handle, adapter->deflink->vdev_id);
-	if (hdd_cm_is_vdev_associated(adapter->deflink)) {
-		hdd_debug("associated, sending stop ind");
-		sme_dhcp_stop_ind(mac_handle,
-				  adapter->device_mode,
-				  adapter->mac_addr.bytes,
-				  adapter->deflink->vdev_id);
-	}
-}
-#else
-static void
-hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
-		     struct hdd_adapter *adapter)
-{
-	hdd_debug("invoking sme_dhcp_done_ind");
-	sme_dhcp_done_ind(mac_handle, adapter->deflink->vdev_id);
-}
-#endif
-
-/**
- * hdd_process_deferred_setsuspend() - Process deferred SETSUSPENDMODE 1
- * @hdd_ctx: HDD context
- * @adapter: HDD adapter
- *
- * A SETSUSPENDMODE 1 command is deferred while DHCP is in progress. Process
- * it once DHCP has completed. DHCP completion is signalled either by the
- * IPv4 address change notifier or by the DHCP stop indication sent through
- * power save, the latter being the only indication when the lease is
- * renewed without an IP address change.
- *
- * Only ONE idle roam is allowed per screen-off state. If idle roam monitor
- * was already enabled earlier in this screen-off period, do NOT re-enable
- * it, as that would make the firmware trigger a second idle roam scan.
- *
- * If SETSUSPENDMODE 0 was received before DHCP completed,
- * dhcp_config_setsuspend was cleared and nothing is done here.
- *
- * Return: None
- */
-static void hdd_process_deferred_setsuspend(struct hdd_context *hdd_ctx,
-					    struct hdd_adapter *adapter)
-{
-	struct wlan_hdd_link_info *link_info;
-
-	/* Test and clear so only one DHCP-complete trigger acts on it */
-	if (!adapter->dhcp_config_setsuspend)
-		return;
-	adapter->dhcp_config_setsuspend = false;
-
-	if (adapter->idle_roam_monitor_enabled) {
-		hdd_nofl_debug("Idle roam already enabled this screen-off, skip re-enable after DHCP");
-		return;
-	}
-
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx,
-					      adapter->deflink->vdev_id);
-	if (!link_info)
-		return;
-
-	if (hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1))
-		goto retry;
-	if (hdd_send_idle_roam_suspend_mode(hdd_ctx, 1))
-		goto retry;
-
-	adapter->idle_roam_monitor_enabled = true;
-	return;
-
-retry:
-	/* Keep it deferred so the next DHCP-complete trigger can retry */
-	adapter->dhcp_config_setsuspend = true;
-}
-
 /**
  * __wlan_hdd_ipv4_changed() - IPv4 notifier callback function
  * @net_dev: the net_device whose IP address changed
@@ -1279,10 +1110,6 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 
 	hdd_enter_dev(net_dev);
 
-	if (net_dev->ieee80211_ptr &&
-	    wlan_hdd_wdev_is_ap_vlan(net_dev->ieee80211_ptr))
-		goto exit;
-
 	errno = hdd_validate_adapter(adapter);
 	if (errno || adapter->dev != net_dev)
 		goto exit;
@@ -1294,17 +1121,10 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_dhcp_v4_done_ind(hdd_ctx->mac_handle, adapter);
+		hdd_debug("invoking sme_dhcp_done_ind");
+		sme_dhcp_done_ind(hdd_ctx->mac_handle,
+				  adapter->deflink->vdev_id);
 
-		hdd_process_deferred_setsuspend(hdd_ctx, adapter);
-
-		/*
-		 * If SETSUSPENDMODE 1 was already processed before this DHCP
-		 * renewal (dhcp_config_setsuspend was never set), do not send
-		 * the enable command again.
-		 * If no SETSUSPENDMODE 1 was ever received
-		 * (dhcp_config_setsuspend == false), do not send any command.
-		 */
 		if (!ucfg_pmo_is_arp_offload_enabled(hdd_ctx->psoc)) {
 			hdd_debug("Offload not enabled");
 			goto exit;
@@ -1985,14 +1805,11 @@ static void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
 				       struct hdd_adapter *adapter)
 {
 	bool twt_responder;
-	eCsrPhyMode sap_hw_mode;
 
 	twt_responder =
 		adapter->deflink->session.ap.sap_config.cfg80211_twt_responder;
-	sap_hw_mode = adapter->deflink->session.ap.sap_config.SapHw_mode;
 	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder,
-					 adapter->deflink->vdev_id,
-					 sap_hw_mode);
+					 adapter->deflink->vdev_id);
 }
 #else
 static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
@@ -2057,54 +1874,46 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
 	bool ignore_cac_updated = false;
-	bool restart_due_to_cac_pending;
-	bool re_iterate = false;
+	bool restart_due_to_cac_pending = false;
 
 	hdd_enter();
-
-restart_post_cac_links:
-	restart_due_to_cac_pending = false;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto next_adapter;
-
+restart_post_cac_links:
+		restart_due_to_cac_pending = false;
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
-			if (!qdf_atomic_test_bit(
-						SOFTAP_INIT_DONE,
-						link_info->link_flags))
+			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
 				continue;
 
-			if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-						link_info->link_flags))
+			if (test_bit(SOFTAP_BSS_STARTED,
+				     &link_info->link_flags))
 				continue;
 
 			if (!ignore_cac_updated) {
 				hdd_restore_ignore_cac(hdd_ctx);
 				ignore_cac_updated = true;
 			}
-			if (!re_iterate &&
-			    hdd_ssr_restart_sap_cac_link(adapter, link_info)) {
+			if (hdd_ssr_restart_sap_cac_link(adapter, link_info)) {
 				restart_due_to_cac_pending = true;
 				continue;
 			}
 			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
 				  link_info->vdev_id,
 				  adapter->event_flags,
-				  link_info->link_flags[0],
+				  link_info->link_flags,
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
 			wlan_hdd_start_sap(link_info, true);
 			hdd_apctx_set_ap_suspend(hdd_ctx, link_info);
 		}
+		if (restart_due_to_cac_pending)
+			goto restart_post_cac_links;
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SSR_RESTART_SAP);
-	}
-	if (restart_due_to_cac_pending) {
-		re_iterate = true;
-		goto restart_post_cac_links;
 	}
 
 	hdd_exit();
@@ -2147,8 +1956,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 					       QDF_SYSTEM_SUSPEND);
 	}
 
-
-	wlan_hdd_wondertap_unregister_ops(hdd_ctx->parent_dev, true);
 	wlan_hdd_rx_thread_resume(hdd_ctx);
 
 	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
@@ -2175,6 +1982,8 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	if (soc)
 		cdp_flush_cache_rx_queue(soc);
 
+	/* De-register the HDD callbacks */
+	hdd_deregister_cb(hdd_ctx);
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
@@ -2237,38 +2046,6 @@ static inline void hdd_restore_dbam_config(struct hdd_context *hdd_ctx)
 {
 }
 #endif
-
-/**
- * hdd_restore_aux_listen_config() - restore and send cached aux listen
- * config to fw after SSR
- * @hdd_ctx: HDD context
- *
- * Return: void
- */
-static void hdd_restore_aux_listen_config(struct hdd_context *hdd_ctx)
-{
-	struct hdd_adapter *adapter, *next_adapter = NULL;
-	struct wlan_hdd_link_info *link_info;
-	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
-		if (hdd_is_interface_up(adapter)) {
-			hdd_adapter_for_each_active_link_info(adapter,
-							      link_info) {
-			    hdd_debug("Restore AUX_L config: vdev_id:%d aux_l_disable:%d",
-				      link_info->vdev_id,
-				      adapter->aux_l_disable);
-
-			    wma_cli_set_command(link_info->vdev_id,
-						wmi_vdev_param_aux_l_disable,
-						adapter->aux_l_disable,
-						VDEV_CMD);
-			}
-		}
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-	}
-}
 
 /**
  * hdd_restore_dual_sta_config() - Restore dual sta configuration
@@ -2447,21 +2224,16 @@ QDF_STATUS hdd_wlan_re_init(void)
 				      hdd_chip_pwr_save_fail_detected_cb);
 
 	hdd_restore_thermal_mitigation_config(hdd_ctx);
-	hdd_restore_ddr_bw_mitigation_config(hdd_ctx);
 	hdd_restore_sar_config(hdd_ctx);
 
 	hdd_send_default_scan_ies(hdd_ctx);
 	hdd_restore_dual_sta_config(hdd_ctx);
 	hdd_restore_dbam_config(hdd_ctx);
-	hdd_restore_aux_listen_config(hdd_ctx);
 	hdd_info("WLAN host driver reinitiation completed!");
 
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);
 	if (value)
 		hdd_ssr_restart_sap(hdd_ctx);
-
-	hdd_tx_powerboost_reinit(hdd_ctx);
-
 	hdd_wlan_ssr_reinit_event();
 
 	if (hdd_ctx->is_wiphy_suspended)
@@ -2670,7 +2442,6 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		   TRACE_CODE_HDD_CFG80211_RESUME_WLAN,
 		   NO_SESSION, hdd_ctx->is_wiphy_suspended);
 
-	hdd_ctx->runtime_resume_start_time_stamp = qdf_get_log_timestamp_usecs();
 	hdd_ctx->is_wiphy_suspended = false;
 
 	hdd_ctx->suspend_resume_stats.resumes++;
@@ -2740,18 +2511,8 @@ int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	int errno;
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
-	if (errno) {
-		/*
-		 * Return success if recovery is in progress, otherwise the
-		 * linux kernel will shutdown all interfaces in wiphy_resume.
-		 */
-		if (cds_is_driver_recovering()) {
-			hdd_debug("op_start failed %d, recovery in progress",
-				  errno);
-			return 0;
-		}
+	if (errno)
 		return errno;
-	}
 
 	errno = _wlan_hdd_cfg80211_resume_wlan(wiphy);
 
@@ -3142,14 +2903,6 @@ static void hdd_stop_dhcp_ind(struct wlan_hdd_link_info *link_info,
 			  mac, link_info->vdev_id);
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DHCP);
 	qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.connect);
-
-	/*
-	 * DHCP is done. The IPv4 notifier may never fire (e.g. lease renewal
-	 * with the same IP), so process a deferred SETSUSPENDMODE 1 here too.
-	 */
-	if (adapter->device_mode == QDF_STA_MODE ||
-	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
-		hdd_process_deferred_setsuspend(hdd_ctx, adapter);
 }
 
 /**
@@ -3357,20 +3110,6 @@ int wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 }
 
 /**
- * wlan_hdd_set_cached_txpower_valid() - Set if tx power cache is valid
- * @hdd_ctx: hdd_ctx
- * @is_valid: Is tx power cache valid
- *
- * Return: None
- */
-static inline void
-wlan_hdd_set_cached_txpower_valid(struct hdd_context *hdd_ctx,
-				  bool is_valid)
-{
-	hdd_ctx->cached_txpower_valid = is_valid;
-}
-
-/**
  * __wlan_hdd_cfg80211_set_txpower() - set TX power
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to network device
@@ -3402,11 +3141,6 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 
 	if (!wdev) {
 		hdd_err("wdev is null, set tx power failed");
-		return -EIO;
-	}
-
-	if (!wdev->netdev) {
-		hdd_err("netdev is null, set tx power failed");
 		return -EIO;
 	}
 
@@ -3459,7 +3193,6 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 			dbm, status);
 		return -EIO;
 	}
-	wlan_hdd_set_cached_txpower_valid(hdd_ctx, false);
 
 	hdd_debug("Set tx power level %d dbm", dbm);
 
@@ -3492,24 +3225,10 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  int radio_idx,
-				  enum nl80211_tx_power_setting type,
-				  int mbm)
-#elif defined(CFG80211_HAS_TX_POWER_LINK_ID)
-int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  enum nl80211_tx_power_setting type,
-				  int mbm,
-				  int link_id)
-#else
 int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  enum nl80211_tx_power_setting type,
 				  int mbm)
-#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -3681,28 +3400,19 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 {
 
 	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
-	struct net_device *ndev;
-	struct hdd_adapter *adapter;
+	struct net_device *ndev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	QDF_STATUS status;
 	int ret;
 	static bool is_rate_limited;
 	struct wlan_objmgr_vdev *vdev;
 
-	ndev = hdd_wdev_get_netdev(wdev);
-	if (!ndev) {
-		hdd_err("Failed to get netdev from wdev");
-		return -EINVAL;
-	}
-	adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	hdd_enter_dev(ndev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
 	}
-
-	if (wlan_hdd_wdev_is_ap_vlan(wdev))
-		return -EINVAL;
 
 	*dbm = 0;
 
@@ -3728,8 +3438,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-					 adapter->deflink->link_flags)) {
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags)) {
 			hdd_debug("SAP is not started yet");
 			return 0;
 		}
@@ -3748,23 +3458,11 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		hdd_err("vdev is NULL");
 		return -EINVAL;
 	}
-	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		/* Send cached data to upperlayer */
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
+	    is_rate_limited) {
+		/* Send cached data to upperlayer*/
 		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
-		hdd_debug("Modules not enabled, cached tx power = %d", *dbm);
-		goto deliver_son;
-	}
-
-	if (is_rate_limited && hdd_ctx->cached_txpower_valid) {
-		/* Send cached data to upperlayer */
-		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
-		hdd_debug("Rate limited, cached tx power = %d", *dbm);
-		goto deliver_son;
-	}
-
-	if (hdd_is_sta_key_exchange_in_progress(adapter->deflink)) {
-		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
-		hdd_debug("Key exchange in progress, cached tx power = %d",
+		hdd_debug("Modules not enabled/rate limited, cached tx power = %d",
 			  *dbm);
 		goto deliver_son;
 	}
@@ -3785,7 +3483,6 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		   adapter->deflink->vdev_id, adapter->device_mode);
 
 	ret = wlan_hdd_get_tx_power(adapter, dbm);
-	wlan_hdd_set_cached_txpower_valid(hdd_ctx, true);
 deliver_son:
 	if (adapter->device_mode == QDF_SAP_MODE)
 		wlan_son_deliver_tx_power(vdev, *dbm);
@@ -3794,22 +3491,9 @@ end:
 	return ret;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  int radio_idx,
-				  unsigned int link_id,
-				  int *dbm)
-#elif defined(CFG80211_HAS_TX_POWER_LINK_ID)
-int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  unsigned int link_id,
-				  int *dbm)
-#else
-int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  int *dbm)
-#endif
+					 struct wireless_dev *wdev,
+					 int *dbm)
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -3841,8 +3525,6 @@ hdd_convert_opm_mode(enum qca_wlan_vendor_opm_mode opm_mode)
 		return WMA_STA_PS_OPM_AGGRESSIVE;
 	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
 		return WMA_STA_PS_USER_DEF;
-	case QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED:
-		return WMA_STA_PS_LATENCY_DEF;
 	default:
 		hdd_err("Invalid opm_mode: %d", opm_mode);
 		return WMA_STA_PS_OPM_CONSERVATIVE;
@@ -3862,7 +3544,7 @@ int hdd_set_power_config(struct hdd_context *hddctx,
 		return -EINVAL;
 	}
 
-	if (*opm_mode > QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED ||
+	if (*opm_mode > QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED ||
 	    *opm_mode < QCA_WLAN_VENDOR_OPM_MODE_DISABLE) {
 		hdd_err("invalid power value: %d", *opm_mode);
 		return -EINVAL;
@@ -3884,18 +3566,10 @@ int hdd_set_power_config(struct hdd_context *hddctx,
 }
 
 int hdd_set_power_config_params(struct hdd_context *hddctx,
-				struct hdd_adapter *adapter, uint16_t ps_ito,
-				uint8_t ps_opm_level, uint16_t spec_wake)
+				struct hdd_adapter *adapter,
+				uint16_t ps_ito, uint16_t spec_wake)
 {
 	QDF_STATUS status;
-
-	status =
-	      wma_set_power_config_opm_level(adapter->deflink->vdev_id,
-					     ps_opm_level);
-	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("failed to configure opm level: %d", status);
-		return -EINVAL;
-	}
 
 	status = wma_set_power_config_ito(adapter->deflink->vdev_id, ps_ito);
 	if (status != QDF_STATUS_SUCCESS) {

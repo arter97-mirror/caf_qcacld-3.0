@@ -71,7 +71,6 @@ enum peer_status {
  * @vht_op_present: vht operation present or not
  * @he_present: he operation present or not
  * @eht_op_present: eht operation present or not
- * @uhr_present: uhr element present or not
  */
 struct hdd_conn_flag {
 	uint8_t ht_present:1;
@@ -82,7 +81,6 @@ struct hdd_conn_flag {
 	uint8_t vht_op_present:1;
 	uint8_t he_present:1;
 	uint8_t eht_op_present:1;
-	uint8_t uhr_present:1;
 };
 
 /*defines for tx_BF_cap_info */
@@ -120,15 +118,12 @@ struct hdd_conn_flag {
 #define ANTENNA_SEL_INFO_TX_SOUNDING_PPDU	0x40
 #define ANTENNA_SEL_INFO_RSVD			0x80
 
-#define WLAN_INVALID_RSSI_VALUE -128
-
 /**
  * struct hdd_connection_info - structure to store connection information
  * @conn_state: connection state of the NIC
  * @bssid: BSSID
  * @ssid: SSID Info
  * @peer_macaddr:Peer Mac Address of the IBSS Stations
- * @peer_bw: Bandwidth of connected peers
  * @auth_type: Auth Type
  * @uc_encrypt_type: Unicast Encryption Type
  * @is_authenticated: Remembers authenticated state
@@ -148,8 +143,6 @@ struct hdd_conn_flag {
  * @hs20vendor_ie: holds passpoint/hs20 info
  * @ht_operation: HT operation info
  * @vht_operation: VHT operation info
- * @he_cap_elem: HE capabilities info
- * @he_cap_mcs: HE capabilities of MCS info
  * @he_operation: HE operation info
  * @he_oper_len: length of @he_operation
  * @roam_count: roaming counter
@@ -166,11 +159,8 @@ struct hdd_conn_flag {
  * @prev_ap_bcn_ie: ap beacon IE information to which sta is currently connected
  * @ieee_link_id: AP Link Id valid for MLO connection
  * @mld_addr: AP MLD addr for MLO connection
- * @eht_cap: EHT capabilities info
- * @eht_cap_len: length of @eht_cap
  * @eht_operation: EHT operation info
  * @eht_oper_len: length of @eht_operation
- * @uhr_cap: UHR capabilities info (MAC + PHY)
  * @ap_nss: AP advertised nss
  */
 struct hdd_connection_info {
@@ -178,9 +168,6 @@ struct hdd_connection_info {
 	struct qdf_mac_addr bssid;
 	tCsrSSIDInfo ssid;
 	struct qdf_mac_addr peer_macaddr[MAX_PEERS];
-#ifdef NDP_TX_BW_FLOW_CTRL
-	enum phy_ch_width peer_bw[MAX_PEERS];
-#endif
 	enum csr_akm_type auth_type;
 	eCsrEncryptionType uc_encrypt_type;
 	uint8_t is_authenticated;
@@ -202,10 +189,8 @@ struct hdd_connection_info {
 	struct ieee80211_vht_operation vht_operation;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) \
      && defined(WLAN_FEATURE_11AX)
-	struct ieee80211_he_cap_elem he_cap_elem;
-	struct ieee80211_he_mcs_nss_supp he_cap_mcs;
 	struct ieee80211_he_operation *he_operation;
-	uint8_t he_oper_len;
+	uint32_t he_oper_len;
 #endif
 	uint32_t roam_count;
 	int8_t signal;
@@ -223,13 +208,8 @@ struct hdd_connection_info {
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
 	defined(WLAN_FEATURE_11BE)
-	struct ieee80211_eht_cap_elem *eht_cap;
-	uint32_t eht_cap_len;
 	struct ieee80211_eht_operation eht_operation;
 	uint32_t eht_oper_len;
-#endif
-#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
-	struct ieee80211_sta_uhr_cap uhr_cap;
 #endif
 	uint8_t ap_nss;
 };
@@ -448,14 +428,12 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 
 /**
  * hdd_delete_peer() - removes peer from hdd station context peer table
- * @adapter: pointer to adapter
  * @sta_ctx: pointer to hdd station context
  * @peer_mac_addr: mac address of peer to be deleted
  *
  * Return: None
  */
-void hdd_delete_peer(struct hdd_adapter *adapter,
-		     struct hdd_station_ctx *sta_ctx,
+void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr);
 
 /**
@@ -521,19 +499,6 @@ bool hdd_any_valid_peer_present(struct wlan_hdd_link_info *link_info);
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_cm_register_cb(void);
-
-/**
- * hdd_sta_csa_received_handler() - STA CSA received event handler
- * @vdev_id: vdev id
- * @csa_event: CSA offload parameters
- *
- * Handles CSA IE received event for STA mode. Registered as
- * .osif_vdev_mgr_sta_csa_received in osif_vdev_mgrlegacy_ops.
- *
- * Return: None
- */
-void hdd_sta_csa_received_handler(uint8_t vdev_id,
-				  struct csa_offload_params *csa_event);
 
 /**
  * hdd_cm_unregister_cb - Resets legacy callbacks to osif
@@ -617,54 +582,8 @@ static inline void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
-	defined(WLAN_FEATURE_11BE)
-/**
- * hdd_copy_eht_caps()- copy EHT capabilities element to
- * hdd station context.
- * @hdd_sta_ctx: pointer to hdd station context
- * @assoc_resp: pointer to Assoc response
- *
- * Return: None
- */
-void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
-		       tDot11fAssocResponse * assoc_resp);
-#else
-static inline void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
-				     tDot11fAssocResponse *assoc_resp)
-{
-}
-#endif
-
-#if defined(WLAN_FEATURE_11BN) && defined(CFG80211_FEATURE_11BN_SUPPORT)
-/**
- * hdd_copy_uhr_caps() - copy UHR capabilities to hdd station context
- * @hdd_sta_ctx: pointer to hdd station context
- * @assoc_resp: pointer to Assoc response
- *
- * Return: None
- */
-void hdd_copy_uhr_caps(struct hdd_station_ctx *hdd_sta_ctx,
-		       tDot11fAssocResponse *assoc_resp);
-#else
-static inline void hdd_copy_uhr_caps(struct hdd_station_ctx *hdd_sta_ctx,
-				     tDot11fAssocResponse *assoc_resp)
-{
-}
-#endif
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)
-/**
- * hdd_copy_he_caps()- copy HE capabilities element to
- * hdd station context.
- * @hdd_sta_ctx: pointer to hdd station context
- * @he_caps: pointer to he capabilities
- *
- * Return: None
- */
-void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
-		      tDot11fIEhe_cap * he_caps);
 /**
  * hdd_copy_he_operation()- copy HE operations element to
  * hdd station context.
@@ -678,11 +597,6 @@ void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
 #else
 static inline void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
 					 tDot11fIEhe_op *he_operation)
-{
-}
-
-static inline void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
-				    tDot11fIEhe_cap *he_caps)
 {
 }
 #endif

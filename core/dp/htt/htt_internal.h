@@ -574,12 +574,11 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id);
 void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt);
 #ifdef WLAN_FEATURE_FASTPATH
 void htt_t2h_msg_handler_fast(void *htt_pdev, qdf_nbuf_t *cmpl_msdus,
-			      uint32_t num_cmpls, unsigned int ce_id);
+			      uint32_t num_cmpls);
 #else
 static inline void htt_t2h_msg_handler_fast(void *htt_pdev,
 					   qdf_nbuf_t *cmpl_msdus,
-					   uint32_t num_cmpls,
-					   unsigned int ce_id)
+					   uint32_t num_cmpls)
 {
 }
 #endif
@@ -890,7 +889,7 @@ void htt_rx_dbg_rxbuf_indupd(struct htt_pdev_t *pdev, int alloc_index)
 	}
 }
 /**
- * htt_rx_dbg_rxbuf_httrxind() - add a record for receipt of htt rx_ind msg
+ * htt_rx_dbg_rxbuf_httrxind() - add a record for recipt of htt rx_ind msg
  * @pdev: pdev handle
  *
  * Return: none

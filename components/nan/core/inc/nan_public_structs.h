@@ -32,17 +32,9 @@
 #else
 #include "wlan_tgt_def_config.h"
 #endif
+
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
-struct nan_local_sched_rsp;
-struct nan_peer_sched_params;
-struct nan_peer_sched_rsp;
-struct nan_peer_params_req;
-struct nan_peer_params_rsp;
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-enum phy_ch_width;
-#endif
 
 #define IFACE_NAME_SIZE 64
 #define NDP_QOS_INFO_LEN 255
@@ -68,145 +60,16 @@ enum phy_ch_width;
 #define NAN_5GHZ_SOCIAL_CH_44_FREQ 5220
 #define NAN_2GHZ_SOCIAL_CH_FREQ 2437
 
-#define NAN_PARING_BIT 1
-
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-#define NAN_SET_CONFIGURATION_FLAG 1
-#define NAN_CONFIGURATION_BIT_NUM  1
-#define NAN_CONFIGURATION_BIT_ANTENNA_NUM 4
-
-/**
- * enum nan_flag_bit - NAN flag bit enumeration
- * @NAN_FLAGS_CONFIGURABLE_SYNC_BIT: Configurable SYNC bit
- * @NAN_FLAGS_USERSPACE_DE_BIT: USERSPACE DE bit
- */
-enum nan_flag_bit {
-	NAN_FLAGS_CONFIGURABLE_SYNC_BIT = 0,
-	NAN_FLAGS_USERSPACE_DE_BIT = 1,
-};
-
-/**
- * enum nan_opmode_bit NAN OPMODE bit enumeration
- * @NAN_VHT_OPMODE_BIT: VHT OPMODE bit
- * @NAN_HE_VHT_80_80_OPMODE_BIT: HE/VHT 80-80 OPMODE bit
- * @NAN_HE_VHT_160_OPMODE_BIT: HE/VHT 160 OPMODE bit
- * @NAN_HE_OPMODE_BIT: HE OPMODE bit
- */
-enum nan_opmode_bit {
-	NAN_VHT_OPMODE_BIT = 0,
-	NAN_HE_VHT_80_80_OPMODE_BIT = 1,
-	NAN_HE_VHT_160_OPMODE_BIT = 2,
-	NAN_HE_OPMODE_BIT = 3,
-};
-
-#define NAN_TX_ANT_BIT 0
-#define NAN_RX_ANT_BIT 4
-
-#define NAN_S3_SUPPORT_BIT 4
-
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
-
-#define NAN_MAX_BANDS 6  /* Matches NUM_NL80211_BANDS */
-#define NAN_CLUSTER_ID_LEN 6
-#define NAN_MAX_EXTRA_ATTRS_LEN 512
-#define NAN_MAX_VENDOR_ELEMS_LEN 512
-
-/**
- * struct nan_band_config - NAN band configuration
- * @freq: Channel frequency in MHz
- * @rssi_close: RSSI threshold for close range
- * @rssi_middle: RSSI threshold for middle range
- * @awake_dw_interval: Awake discovery window interval
- * @disable_scan: Flag to disable scan on this band
- */
-struct nan_band_config {
-	uint32_t freq;
-	int8_t rssi_close;
-	int8_t rssi_middle;
-	uint8_t awake_dw_interval;
-	bool disable_scan;
-};
-
-/**
- * struct nan_conf - Internal NAN configuration structure
- * @master_pref: Master preference value
- * @bands: Bitmask of bands to enable
- * @cluster_id: Cluster ID (6 bytes)
- * @cluster_id_len: Length of cluster ID
- * @scan_period: Scan period in milliseconds
- * @scan_dwell_time: Scan dwell time in milliseconds
- * @discovery_beacon_interval: Discovery beacon interval
- * @band_cfgs: Per-band configuration
- * @extra_nan_attrs: Extra NAN attributes
- * @extra_nan_attrs_len: Length of extra NAN attributes
- * @vendor_elems: Vendor specific elements
- * @vendor_elems_len: Length of vendor elements
- */
-struct nan_conf {
-	uint8_t master_pref;
-	uint8_t bands;
-	uint8_t cluster_id[NAN_CLUSTER_ID_LEN];
-	uint8_t cluster_id_len;
-	uint16_t scan_period;
-	uint16_t scan_dwell_time;
-	uint8_t discovery_beacon_interval;
-	struct nan_band_config band_cfgs[NAN_MAX_BANDS];
-	uint8_t extra_nan_attrs[NAN_MAX_EXTRA_ATTRS_LEN];
-	uint16_t extra_nan_attrs_len;
-	uint8_t vendor_elems[NAN_MAX_VENDOR_ELEMS_LEN];
-	uint16_t vendor_elems_len;
-};
-
-/**
- * struct nan_change_conf_req - NAN configuration change request
- * @psoc: Pointer to the psoc object
- * @pdev: Pointer to the pdev object
- * @vdev_id: vdev id
- * @nan_conf: NAN configuration to be changed (internal struct, not kernel)
- * @param_bit_map: bitmap identifying which params changed
- */
-struct nan_change_conf_req {
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_pdev *pdev;
-	uint8_t vdev_id;
-	struct nan_conf nan_conf;
-	uint32_t param_bit_map;
-};
-
-/*
- * The NAN Cluster ID is a MAC address that takes a value from
- * 50-6F-9A-01-00-00 to 50-6F-9A-01-FF-FF and is carried in the A3 field of
- * some of the NAN frames. The NAN Cluster ID is randomly chosen by the device
- * that initiates the NAN Cluster.
- */
-#define NAN_CLUSTER_MATCH      "\x50\x6F\x9A\x01"
-#define NAN_CLUSTER_MATCH_SIZE 4
-#define NAN_CLUSTER_ID_SIZE 6
-
-/**
- * enum nan_disable_req_type - NAN disable request type
- * @NAN_DISABLE_REQ_DEFAULT: Default NAN disable request
- * @NAN_DISABLE_REQ_NB: NB NAN disable request
- * @NAN_DISABLE_REQ_INTERNAL: Internal NAN disable request
- */
-enum nan_disable_req_type {
-	NAN_DISABLE_REQ_DEFAULT,
-	NAN_DISABLE_REQ_NB,
-	NAN_DISABLE_REQ_INTERNAL,
-};
-
 /**
  * enum nan_discovery_msg_type - NAN msg type
  * @NAN_GENERIC_REQ: Type for all the NAN requests other than enable/disable
  * @NAN_ENABLE_REQ: Request type for enabling the NAN Discovery
  * @NAN_DISABLE_REQ: Request type for disabling the NAN Discovery
- * @NAN_CHANGE_CONF_REQ: Request type for changing NAN configuration
  */
 enum nan_discovery_msg_type {
 	NAN_GENERIC_REQ = 0,
 	NAN_ENABLE_REQ  = 1,
 	NAN_DISABLE_REQ = 2,
-	NAN_CHANGE_CONF_REQ = 3,
 };
 
 /**
@@ -241,19 +104,6 @@ enum nan_pasn_msg_type {
  * @NDP_SCHEDULE_UPDATE: ndp schedule update
  * @NDP_END_ALL: end all NDPs request
  * @NDP_HOST_UPDATE: update host about ndp status
- * @NDP_UPDATE_CONFIG: ndp update config
- * @NAN_LOCAL_SCHEDULE_REQ: NAN local schedule request to configure time slots
- *                          and channels for NAN data path
- * @NAN_LOCAL_SCHEDULE_RSP: NAN local schedule response from firmware with
- *                          status of the schedule configuration
- * @NAN_PEER_SCHEDULE_REQ: NAN peer schedule request to configure time slots
- *                         and channels for NAN data path
- * @NAN_PEER_SCHEDULE_RSP: NAN peer schedule response from firmware with
- *                         status of the schedule configuration
- * @NAN_PEER_PARAMS_REQ: NAN peer params request to configure per-peer
- *                        capabilities and attributes for NAN data path
- * @NAN_PEER_PARAMS_RSP: NAN peer params response from firmware with
- *                        status of the peer params configuration
  */
 enum nan_datapath_msg_type {
 	NAN_DATAPATH_INF_CREATE_REQ  = 0,
@@ -274,13 +124,6 @@ enum nan_datapath_msg_type {
 	NDP_SCHEDULE_UPDATE          = 15,
 	NDP_END_ALL                  = 16,
 	NDP_HOST_UPDATE              = 17,
-	NDP_UPDATE_CONFIG            = 18,
-	NAN_LOCAL_SCHEDULE_REQ       = 19,
-	NAN_LOCAL_SCHEDULE_RSP       = 20,
-	NAN_PEER_SCHEDULE_REQ        = 21,
-	NAN_PEER_SCHEDULE_RSP        = 22,
-	NAN_PEER_PARAMS_REQ          = 23,
-	NAN_PEER_PARAMS_RSP          = 24,
 };
 
 /**
@@ -513,61 +356,8 @@ struct nan_datapath_channel_info {
 	uint8_t mac_id;
 };
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * struct nan_next_dw_info_event - NAN next discovery window info event
- * @vdev_id: vdev identifier
- * @channel_freq: Channel frequency in MHz
- */
-struct nan_next_dw_info_event {
-	uint32_t vdev_id;
-	uint32_t channel_freq;
-};
-
-/**
- * struct nan_cluster_event - NAN cluster event information
- * @vdev_id: vdev identifier
- * @cluster_id: 6-byte cluster identifier (MAC address format)
- * @event_type: Type of cluster event (joined or started)
- */
-struct nan_cluster_event {
-	uint32_t vdev_id;
-	uint8_t cluster_id[NAN_CLUSTER_ID_SIZE];
-	uint32_t event_type;
-};
-
-#define NAN_CLUSTER_EVENT_JOINED  0
-#define NAN_CLUSTER_EVENT_STARTED 1
-
-/**
- * struct nan_dfs_channel_availability_ind - NAN DFS channel availability event
- * @vdev_id: vdev identifier
- * @status: DFS channel availability status code;
- *          see WMI_NAN_DFS_CHANNEL_AVAILABILITY_STATUS_TYPE
- */
-struct nan_dfs_channel_availability_ind {
-	uint32_t vdev_id;
-	uint32_t status;
-};
-#endif
-
 #define NAN_CH_INFO_MAX_LEN \
 	(NAN_CH_INFO_MAX_CHANNELS * sizeof(struct nan_datapath_channel_info))
-
-/* NAN Local Schedule Constants */
-#define NAN_MAX_SCHEDULE_SLOTS      32
-#define NAN_MAX_CHANNELS            8
-#define NAN_CHANNEL_ENTRY_MAX_LEN   255
-
-/*
- * Wire size of a single NAN Channel Entry (Wi-Fi Aware Table 100). The
- * kernel enforces this exact length on NL80211_ATTR_NAN_CHANNEL_ENTRY via
- * NLA_POLICY_EXACT_LEN(6) before cfg80211_nan_channel.channel_entry is ever
- * populated, and target firmware's wmi_nan_channel.chan_entry_fields is a
- * fixed 6-byte field. Not a truncation length -- both ends of the pipe are
- * fixed-size by spec.
- */
-#define NAN_CHANNEL_ENTRY_LEN       6
 
 /**
  * struct nan_datapath_inf_create_req - ndi create request params
@@ -746,28 +536,12 @@ struct nan_datapath_end_all_ndps {
 };
 
 /**
- * struct nan_datapath_update_config - Datapath request to update config
- * @vdev: pointer to vdev object
- * @ndp_instance_id: locally created NDP instance ID
- * @latency_ms: latency in ms
- * @tput_mbps: throughput
- */
-
-struct nan_datapath_update_config {
-	struct wlan_objmgr_vdev *vdev;
-	uint32_t ndp_instance_id;
-	uint32_t latency_ms;
-	uint32_t tput_mbps;
-};
-
-/**
  * enum nan_event_id_types - NAN event ID types
  * @nan_event_id_error_rsp: NAN event indicating error
  * @nan_event_id_enable_rsp: NAN Enable Response event ID
  * @nan_event_id_disable_ind: NAN Disable Indication event ID
  * @nan_event_id_generic_rsp: All remaining NAN events, treated as passthrough
  * @nan_event_id_de_ind: Discovery Engine event Indication
- * @nan_event_id_disable_rsp: NAN Disable Response event ID
  */
 enum nan_event_id_types {
 	nan_event_id_error_rsp = 0,
@@ -775,7 +549,6 @@ enum nan_event_id_types {
 	nan_event_id_disable_ind,
 	nan_event_id_generic_rsp,
 	nan_event_id_de_ind,
-	nan_event_id_disable_rsp,
 };
 
 /**
@@ -865,13 +638,11 @@ struct nan_generic_req {
  * @disable_2g_discovery: Flag for disabling Discovery in 2G band
  * @disable_5g_discovery: Flag for disabling Discovery in 5G band
  * @params: NAN request structure containing message for the target
- * @vdev_id: virtual device id
  */
 struct nan_disable_req {
 	struct wlan_objmgr_psoc *psoc;
 	bool disable_2g_discovery;
 	bool disable_5g_discovery;
-	uint8_t vdev_id;
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };
@@ -882,8 +653,6 @@ struct nan_disable_req {
  * @social_chan_2g_freq: Social channel in 2G band for the NAN Discovery
  * @social_chan_5g_freq: Social channel in 5G band for the NAN Discovery
  * @pdev: Pointer to the pdev object
- * @vdev_id: vdev id
- * @nan_conf: internal nan configuration
  * @params: NAN request structure containing message for the target
  */
 struct nan_enable_req {
@@ -891,29 +660,10 @@ struct nan_enable_req {
 	uint32_t social_chan_2g_freq;
 	uint32_t social_chan_5g_freq;
 	struct wlan_objmgr_pdev *pdev;
-#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
-	uint8_t vdev_id;
-	struct nan_conf nan_conf;
-#endif
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * struct nan_enable_rsp_params - nan enable response params
- * @vdev_id: virtual device id
- * @status: status
- * @mac_id: mac id
- *
- * Return: none
- */
-struct nan_enable_rsp_params {
-	uint32_t vdev_id;
-	uint32_t status;
-	uint32_t mac_id;
-};
-#endif
 /**
  * struct nan_datapath_end_rsp_event  - firmware response to ndp end request
  * @vdev: pointer to vdev object
@@ -951,172 +701,6 @@ struct nan_dump_msg {
 	uint8_t *msg;
 	uint32_t data_len;
 };
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * struct nan_local_sched_channel - NAN schedule channel info
- * @freq: Channel frequency
- * @ch_width: Channel width
- * @center_freq1: Center frequency 1
- * @center_freq2: Center frequency 2
- * @channel_entry: Channel entry blob
- * @channel_entry_len: Length of channel entry
- * @rx_nss: RX spatial streams
- */
-struct nan_local_sched_channel {
-	uint32_t freq;
-	uint32_t ch_width;
-	uint32_t center_freq1;
-	uint32_t center_freq2;
-	uint8_t channel_entry[NAN_CHANNEL_ENTRY_MAX_LEN];
-	uint32_t channel_entry_len;
-	uint8_t rx_nss;
-};
-
-/**
- * struct nan_local_sched_params - NAN local schedule parameters
- * @vdev_id: VDEV ID
- * @psoc: PSOC object
- * @schedule: Schedule bitmap (timeslot -> channel index)
- * @num_channels: Number of channels
- * @ch: Array of channel definitions
- */
-struct nan_local_sched_params {
-	uint8_t vdev_id;
-	struct wlan_objmgr_psoc *psoc;
-	uint8_t schedule[NAN_MAX_SCHEDULE_SLOTS];
-	uint8_t num_channels;
-	struct nan_local_sched_channel ch[NAN_MAX_CHANNELS];
-};
-
-/**
- * struct nan_local_sched_rsp - NAN local schedule response
- * @psoc: PSOC object pointer
- * @vdev_id: VDEV ID
- * @status: Response status
- * @reason: Failure reason (if status != success)
- */
-struct nan_local_sched_rsp {
-	struct wlan_objmgr_psoc *psoc;
-	uint8_t vdev_id;
-	uint32_t status;
-	uint32_t reason;
-};
-
-#define NAN_MAX_PEER_MAPS 2
-#define NAN_INVALID_MAP_ID 0xff
-
-/**
- * struct nan_peer_sched_map - NAN peer schedule map
- * @map_id: map ID of this schedule map
- * @schedule: a mapping of time slots to chandef indexes in the schedule's
- *	@nan_channels. Each slot lasts 16TUs. An unscheduled slot will be
- *	set to %NL80211_NAN_SCHED_NOT_AVAIL_SLOT.
- */
-struct nan_peer_sched_map {
-	uint8_t map_id;
-	uint8_t schedule[NAN_MAX_SCHEDULE_SLOTS];
-};
-
-/**
- * struct nan_peer_sched_params - NAN peer schedule parameters
- * @vdev_id: vdev ID
- * @psoc: PSOC object
- * @peer_addr: MAC address of the peer
- * @seq_id: sequence ID of the peer schedule
- * @committed_dw: committed DW as published by the peer
- * @max_chan_switch: maximum channel switch time in microseconds
- * @ulw_size: number of bytes in @init_ulw
- * @num_channels: number of channel definitions in @nan_channels
- * @nan_channels: array of NAN channel definitions
- * @maps: array of peer schedule maps
- * @init_ulw: initial ULWs as published by the peer
- */
-struct nan_peer_sched_params {
-	uint8_t vdev_id;
-	struct wlan_objmgr_psoc *psoc;
-	struct qdf_mac_addr peer_addr;
-	uint8_t seq_id;
-	uint16_t committed_dw;
-	uint16_t max_chan_switch;
-	uint16_t ulw_size;
-	uint8_t num_channels;
-	struct nan_local_sched_channel nan_channels[NAN_MAX_CHANNELS];
-	struct nan_peer_sched_map maps[NAN_MAX_PEER_MAPS];
-	uint8_t init_ulw[]; /* Variable length array */
-};
-
-/**
- * struct nan_peer_sched_rsp - NAN peer schedule response
- * @psoc: PSOC object pointer
- * @vdev_id: VDEV ID
- * @status: Response status
- * @reason: Failure reason (if status != success)
- */
-struct nan_peer_sched_rsp {
-	struct wlan_objmgr_psoc *psoc;
-	uint8_t vdev_id;
-	uint32_t status;
-};
-
-/**
- * enum nan_peer_params_flags - NAN peer flags
- * @NAN_PEER_FLAG_PMF: Protected Management Frame
- * @NAN_PEER_FLAG_AUTHENTICATED: Authenticated
- * @NAN_PEER_FLAG_ASSOCIATED: Associated
- * @NAN_PEER_FLAG_AUTHORIZED: Authorized
- */
-enum nan_peer_params_flags {
-	NAN_PEER_FLAG_PMF           = 0x01,
-	NAN_PEER_FLAG_AUTHENTICATED = 0x02,
-	NAN_PEER_FLAG_ASSOCIATED    = 0x04,
-	NAN_PEER_FLAG_AUTHORIZED    = 0x08,
-};
-
-/**
- * struct nan_peer_params_req - NAN peer parameters request
- * @vdev_id: vdev ID
- * @psoc: PSOC object
- * @peer_nmi_addr: NMI MAC address of the peer
- * @peer_ndi_mac_addr: NDI MAC address of the peer
- * @peer_flags: Flags to enable/disable features
- * @peer_cap_len: Length of peer capability
- * @peer_cap: Peer capability data
- */
-struct nan_peer_params_req {
-	uint8_t vdev_id;
-	struct wlan_objmgr_psoc *psoc;
-	struct qdf_mac_addr peer_nmi_addr;
-	struct qdf_mac_addr peer_ndi_mac_addr;
-	uint32_t peer_flags;
-	uint32_t peer_cap_len;
-	uint8_t peer_cap[]; /* Variable length array */
-};
-
-/**
- * struct nan_peer_params_rsp - NAN peer parameters response
- * @psoc: PSOC object pointer
- * @vdev_id: VDEV ID
- * @status: Response status
- */
-struct nan_peer_params_rsp {
-	struct wlan_objmgr_psoc *psoc;
-	uint8_t vdev_id;
-	uint32_t status;
-};
-
-/**
- * struct nan_del_sta_params - NAN delete station parameters
- * @vdev_id: VDEV ID
- * @psoc: PSOC object
- * @peer_addr: MAC address of the peer to delete
- */
-struct nan_del_sta_params {
-	uint8_t vdev_id;
-	struct wlan_objmgr_psoc *psoc;
-	struct qdf_mac_addr peer_addr;
-};
-#endif
 
 /**
  * struct nan_pasn_peer_req - A NAN PASN peer request for the Target
@@ -1275,11 +859,6 @@ struct nan_pasn_peer_ops {
  * struct nan_callbacks - struct containing callback to non-converged driver
  * @os_if_nan_event_handler: OS IF Callback for handling NAN Discovery events
  * @os_if_ndp_event_handler: OS IF Callback for handling NAN Datapath events
- * @os_if_nan_next_dw_notif_handler: OS IF Callback for NAN next DW notification
- * @os_if_nan_process_cluster_event: OS IF Callback for NAN cluster notification
- * @nan_vdev_destroy_cb: Callback to handle NAN vdev deletion
- * @os_if_nan_dfs_channel_availability_handler: OS IF Callback for NAN DFS
- *     channel availability indication
  * @ucfg_nan_request_process_cb: Callback to indicate NAN enable/disable
  * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
@@ -1300,7 +879,6 @@ struct nan_pasn_peer_ops {
  * @nan_sr_concurrency_update: Callback to handle nan SR(Spatial Reuse)
  * @pasn_peer_ops: structure contains the callbacks for pasn peer
  * concurrency
- * @ndp_update_peer_bw: HDD callback to update peer bandwidth
  */
 struct nan_callbacks {
 	/* callback to os_if layer from umac */
@@ -1308,16 +886,6 @@ struct nan_callbacks {
 	void (*os_if_ndp_event_handler)(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					uint32_t type, void *msg);
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-	void (*os_if_nan_next_dw_notif_handler)(struct wlan_objmgr_vdev *vdev,
-						struct nan_next_dw_info_event *event);
-	void (*os_if_nan_process_cluster_event)(struct wlan_objmgr_vdev *vdev,
-						struct nan_cluster_event *event);
-	void (*nan_vdev_destroy_cb)(struct wlan_objmgr_psoc *psoc);
-	void (*os_if_nan_dfs_channel_availability_handler)(
-			struct wlan_objmgr_vdev *vdev,
-			struct nan_dfs_channel_availability_ind *event);
-#endif
 	void (*ucfg_nan_request_process_cb)(void *cookie);
 	int (*ndi_open)(const char *iface_name, bool is_add_virtual_iface);
 	int (*ndi_set_mode)(const char *iface_name);
@@ -1342,10 +910,6 @@ struct nan_callbacks {
 	void (*nan_sr_concurrency_update)(struct nan_event_params *nan_evt);
 #endif
 	struct nan_pasn_peer_ops pasn_peer_ops;
-#ifdef NDP_TX_BW_FLOW_CTRL
-	void (*ndp_update_peer_bw)(uint8_t, struct qdf_mac_addr *,
-				   enum phy_ch_width);
-#endif
 };
 
 /**
@@ -1409,117 +973,4 @@ struct nan_tgt_caps {
 	};
 };
 
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * struct nan_capabilities - NAN capabilities
- *
- * This structure describes the NAN capabilities
- *
- * @flags: NAN capabilities flags, see &enum wiphy_nan_flags
- * @op_mode: NAN operation mode, as defined in Wi-Fi Aware (TM) specification
- *     Table 81.
- * @n_antennas: number of antennas supported by the device for Tx/Rx. Lower
- *     nibble indicates the number of TX antennas and upper nibble indicates the
- *     number of RX antennas. Value 0 indicates the information is not
- *     available.
- * @max_channel_switch_time: maximum channel switch time in milliseconds.
- * @dev_capabilities: NAN device capabilities as defined in Wi-Fi Aware (TM)
- *     specification Table 79 (Capabilities field).
- */
-struct nan_capabilities {
-	u32 flags;
-	u8 op_mode;
-	u8 n_antennas;
-	u16 max_channel_switch_time;
-	u8 dev_capabilities;
-} qdf_packed;
-
-/* Max bytes cached for the packed EHT Supported MCS and NSS Set field */
-#define NAN_EHT_MCS_NSS_MAX_LEN  16
-
-/**
- * struct nan_phy_caps - NAN PHY capability intersection result (HT/VHT/HE/EHT)
- * @ht_supported: whether HT is supported for NAN
- * @ht_ldpc: HT RX LDPC supported
- * @ht_sgi_20: HT short GI for 20 MHz supported
- * @ht_sgi_40: HT short GI for 40 MHz supported
- * @ht_rx_stbc: HT RX STBC supported
- * @ht_tx_stbc: HT TX STBC supported
- * @ht_mpdu_density: effective HT MPDU density in microseconds
- * @vht_supported: whether VHT is supported for NAN
- * @vht_short_gi_80: VHT short GI for 80 MHz supported
- * @vht_short_gi_160: VHT short GI for 160 MHz supported
- * @vht_rx_ldpc: VHT RX LDPC supported
- * @vht_tx_stbc: VHT TX STBC supported
- * @vht_rx_stbc: VHT RX STBC supported
- * @vht_su_bformer: VHT SU beamformer supported
- * @vht_su_bformee: VHT SU beamformee supported
- * @vht_rx_mcs_map: VHT RX MCS map, 2 bits per NSS as per VHT Capabilities IE
- * @vht_tx_mcs_map: VHT TX MCS map, 2 bits per NSS as per VHT Capabilities IE
- * @he_supported: whether HE is supported for NAN
- * @he_mac_cap_info: packed HE MAC capability bytes, as in the HE
- *     Capabilities element (mirrors ieee80211_he_cap_elem.mac_cap_info)
- * @he_phy_cap_info: packed HE PHY capability bytes, as in the HE
- *     Capabilities element (mirrors ieee80211_he_cap_elem.phy_cap_info)
- * @he_rx_mcs_map_lt_80: HE RX MCS map for <80 MHz, 2 bits per NSS
- * @he_tx_mcs_map_lt_80: HE TX MCS map for <80 MHz, 2 bits per NSS
- * @he_rx_mcs_map_160: HE RX MCS map for 160 MHz, 2 bits per NSS
- * @he_tx_mcs_map_160: HE TX MCS map for 160 MHz, 2 bits per NSS
- * @he_rx_mcs_map_80p80: HE RX MCS map for 80+80 MHz, 2 bits per NSS
- * @he_tx_mcs_map_80p80: HE TX MCS map for 80+80 MHz, 2 bits per NSS
- * @eht_supported: whether EHT is supported for NAN
- * @eht_mac_cap_info: packed EHT MAC capability bytes, as in the EHT
- *     Capabilities element (mirrors ieee80211_eht_cap_elem_fixed.mac_cap_info)
- * @eht_phy_cap_info: packed EHT PHY capability bytes, as in the EHT
- *     Capabilities element (mirrors ieee80211_eht_cap_elem_fixed.phy_cap_info)
- * @eht_mcs_nss_supp: packed EHT Supported MCS and NSS Set bytes, as in the
- *     EHT Capabilities element (mirrors ieee80211_eht_mcs_nss_supp)
- * @eht_mcs_nss_supp_len: number of valid bytes in @eht_mcs_nss_supp
- *
- * OS-agnostic representation of the HT/VHT/HE/EHT capability bits relevant
- * to NAN, after intersecting FW-effective target capability with NAN band
- * enablement. HDD renders this into kernel-facing
- * ieee80211_sta_ht_cap/vht_cap/he_cap/eht_cap structures.
- */
-struct nan_phy_caps {
-	bool ht_supported;
-	bool ht_ldpc;
-	bool ht_sgi_20;
-	bool ht_sgi_40;
-	bool ht_rx_stbc;
-	bool ht_tx_stbc;
-	uint32_t ht_mpdu_density;
-
-	bool vht_supported;
-	bool vht_short_gi_80;
-	bool vht_short_gi_160;
-	bool vht_rx_ldpc;
-	bool vht_tx_stbc;
-	bool vht_rx_stbc;
-	bool vht_su_bformer;
-	bool vht_su_bformee;
-	uint16_t vht_rx_mcs_map;
-	uint16_t vht_tx_mcs_map;
-
-#ifdef WLAN_FEATURE_11AX
-	bool he_supported;
-	uint8_t he_mac_cap_info[6];
-	uint8_t he_phy_cap_info[11];
-	uint16_t he_rx_mcs_map_lt_80;
-	uint16_t he_tx_mcs_map_lt_80;
-	uint16_t he_rx_mcs_map_160;
-	uint16_t he_tx_mcs_map_160;
-	uint16_t he_rx_mcs_map_80p80;
-	uint16_t he_tx_mcs_map_80p80;
-
-#ifdef WLAN_FEATURE_11BE
-	bool eht_supported;
-	uint8_t eht_mac_cap_info[2];
-	uint8_t eht_phy_cap_info[9];
-	uint8_t eht_mcs_nss_supp[NAN_EHT_MCS_NSS_MAX_LEN];
-	uint32_t eht_mcs_nss_supp_len;
 #endif
-#endif
-};
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-#endif /* _NAN_PUBLIC_STRUCTS_H_ */

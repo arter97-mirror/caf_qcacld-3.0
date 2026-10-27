@@ -92,13 +92,11 @@ enum cds_driver_state {
  *              than one retransmission attempt
  * @tx_mpdu_success_with_retries: Number of MPDU transmission retries done
  *				  in case of successful transmission.
- * @tx_dropped: HOST internal dropped packet number
  */
 struct cds_vdev_dp_stats {
 	uint32_t tx_retries;
 	uint32_t tx_retries_mpdu;
 	uint32_t tx_mpdu_success_with_retries;
-	uint32_t tx_dropped;
 };
 
 #define __CDS_IS_DRIVER_STATE(_state, _mask) (((_state) & (_mask)) == (_mask))
@@ -379,7 +377,7 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, bool is_recovery);
+QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc);
 
 QDF_STATUS cds_post_disable(void);
 
@@ -530,6 +528,8 @@ bool cds_is_5_mhz_enabled(void);
 bool cds_is_10_mhz_enabled(void);
 bool cds_is_sub_20_mhz_enabled(void);
 QDF_STATUS cds_set_sub_20_support(bool enable);
+QDF_STATUS
+cds_set_sub_20_channel_width(enum cfg_sub_20_channel_width sub_20_ch_width);
 
 bool cds_is_self_recovery_enabled(void);
 bool cds_is_fw_down(void);

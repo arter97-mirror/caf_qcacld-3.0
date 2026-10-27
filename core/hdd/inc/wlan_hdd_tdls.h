@@ -25,7 +25,6 @@
  */
 
 #include "qca_vendor.h"
-#include <wlan_tdls_stats_public_structs.h>
 
 struct hdd_context;
 
@@ -38,52 +37,6 @@ extern const struct nla_policy
 extern const struct nla_policy
 	wlan_hdd_tdls_disc_rsp_policy
 	[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX + 1];
-
-#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
-extern const struct nla_policy
-	wlan_hdd_tdls_stats_policy
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX + 1];
-
-extern const struct nla_policy
-	wlan_hdd_tdls_reporting_config_policy
-	[QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_MAX + 1];
-
-#define FEATURE_TDLS_VENDOR_EVENTS                                  \
-[QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT_INDEX] = {                    \
-	.vendor_id = QCA_NL80211_VENDOR_ID,                         \
-	.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT,             \
-},                                                                  \
-[QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS_INDEX] = {                    \
-	.vendor_id = QCA_NL80211_VENDOR_ID,                         \
-	.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS,             \
-},
-#else
-#define FEATURE_TDLS_VENDOR_EVENTS
-#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
-
-#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
-#define FEATURE_TDLS_STATS_VENDOR_COMMANDS                             \
-{                                                                      \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID,                       \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS,           \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                          \
-		 WIPHY_VENDOR_CMD_NEED_NETDEV,                         \
-	.doit = wlan_hdd_cfg80211_get_tdls_stats,                      \
-	vendor_command_policy(wlan_hdd_tdls_stats_policy,              \
-			      QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX)     \
-},                                                                     \
-{                                                                      \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID,                       \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG, \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                          \
-		 WIPHY_VENDOR_CMD_NEED_NETDEV,                         \
-	.doit = wlan_hdd_cfg80211_tdls_reporting_config,               \
-	vendor_command_policy(wlan_hdd_tdls_reporting_config_policy,   \
-			      QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_MAX) \
-},
-#else
-#define FEATURE_TDLS_STATS_VENDOR_COMMANDS
-#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 #define FEATURE_TDLS_VENDOR_COMMANDS                                    \
 {                                                                       \
@@ -130,8 +83,7 @@ extern const struct nla_policy
 	.doit = wlan_hdd_cfg80211_exttdls_set_link_id,                 \
 	vendor_command_policy(wlan_hdd_tdls_disc_rsp_policy,           \
 			      QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK) \
-},                                                                     \
-FEATURE_TDLS_STATS_VENDOR_COMMANDS
+},
 
 /* Bit mask flag for tdls_option to FW */
 #define ENA_TDLS_OFFCHAN      (1 << 0)  /* TDLS Off Channel support */
@@ -170,46 +122,6 @@ wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
 				      struct wireless_dev *wdev,
 				      const void *data,
 				      int data_len);
-
-#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
-/**
- * wlan_hdd_cfg80211_get_tdls_stats() - Get TDLS stats command
- * @wiphy:   pointer to wireless wiphy structure.
- * @wdev:    pointer to wireless_dev structure.
- * @data:    Pointer to the data to be passed via vendor interface
- * @data_len:Length of the data to be passed
- *
- * Return: Return the Success or Failure code.
- */
-int wlan_hdd_cfg80211_get_tdls_stats(struct wiphy *wiphy,
-				     struct wireless_dev *wdev,
-				     const void *data,
-				     int data_len);
-
-/**
- * wlan_hdd_cfg80211_tdls_reporting_config() - Configure TDLS event and
- *   statistics reporting simultaneously via
- *   %QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG.
- * @wiphy:    pointer to wireless wiphy structure.
- * @wdev:     pointer to wireless_dev structure.
- * @data:     Pointer to the data to be passed via vendor interface.
- *            Contains %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_EVENTS
- *            and/or %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_STATS
- *            attributes (both optional, u8, values from
- *            enum qca_wlan_tdls_config).
- * @data_len: Length of the data to be passed.
- *
- * Parses the incoming NL attributes and calls wlan_tdls_get_tdls_stats()
- * for the stats path and (when the event path is implemented)
- * wlan_tdls_get_tdls_events() for the event path.
- *
- * Return: 0 on success; negative errno otherwise.
- */
-int wlan_hdd_cfg80211_tdls_reporting_config(struct wiphy *wiphy,
-					    struct wireless_dev *wdev,
-					    const void *data,
-					    int data_len);
-#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 int wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
@@ -387,40 +299,6 @@ QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
  */
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg);
 
-#ifdef FEATURE_TDLS_STATS_VENDOR_EVENTS
-/**
- * hdd_tdls_stats_emit_cb() - OS-IF callback that emits a TDLS stats entry
- *                            as a QCA vendor event.
- * @psoc:  PSOC object pointer.
- * @entry: Stats entry to emit.
- *
- * Registered with the TDLS component via tdls_start_params so that the
- * TDLS stats state machine can forward entries to user space.
- */
-void hdd_tdls_stats_emit_cb(struct wlan_objmgr_psoc *psoc,
-			    const struct tdls_stats_entry *entry);
-
-/**
- * hdd_tdls_stats_register_emit_cb() - Register TDLS stats emit callback
- * @tdls_cfg: pointer to tdls_start_params structure
- *
- * Registers hdd_tdls_stats_emit_cb with the TDLS component so that the
- * TDLS stats state machine can forward entries to user space.
- *
- * Return: none
- */
-static inline void
-hdd_tdls_stats_register_emit_cb(struct tdls_start_params *tdls_cfg)
-{
-	tdls_cfg->tdls_stats_emit_cb = hdd_tdls_stats_emit_cb;
-}
-#else
-static inline void
-hdd_tdls_stats_register_emit_cb(struct tdls_start_params *tdls_cfg)
-{
-}
-#endif /* FEATURE_TDLS_STATS_VENDOR_EVENTS */
-
 /**
  * hdd_config_tdls_with_band_switch() - configure tdls when band changes
  *                                      Disable tdls offchmode if only one of
@@ -498,12 +376,5 @@ bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
 {
 	return true;
 }
-
-/* FEATURE_TDLS_VENDOR_EVENTS is defined inside FEATURE_WLAN_TDLS gated on
- * FEATURE_TDLS_STATS_VENDOR_EVENTS. Define it empty here so vendor command
- * table compile units (e.g. wlan_hdd_linux_ioctl.c) compile cleanly when
- * TDLS is fully disabled.
- */
-#define FEATURE_TDLS_VENDOR_EVENTS
-#endif /* FEATURE_WLAN_TDLS */
+#endif /* End of FEATURE_WLAN_TDLS */
 #endif /* __HDD_TDLS_H */

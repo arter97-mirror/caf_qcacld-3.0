@@ -24,49 +24,11 @@
 
 #define NUM_CPUS_FOR_LOAD_BALANCE 2
 
-/**
- * wlan_dp_load_balance_get_cpumask() - Get RX CPU mask for load balance init
- * @dp_ctx: DP context
- *
- * Determines the RX CPU mask using the dp_lb_cpumask_override INI bitmask:
- *  - If Force INI bit (bit 0) is set: ignore DTSI, use INI RX CPU mask
- *    directly. If INI mask is 0, caller falls back to little cluster CPUs.
- *  - If Force INI bit is not set: read DTSI first. If DTSI is defined,
- *    use it. If DTSI is not defined, use INI RX CPU mask as fallback.
- *    If INI mask is also 0, caller falls back to little cluster CPUs.
- *
- * Return: CPU mask to use, or 0 to let caller use little cluster fallback
- */
-static unsigned int
-wlan_dp_load_balance_get_cpumask(struct wlan_dp_psoc_context *dp_ctx)
-{
-	uint32_t lb_config = dp_ctx->dp_cfg.lb_cpumask_override;
-	unsigned int ini_rx_cpumask;
-	unsigned int dtsi_cpumask = 0;
-
-	ini_rx_cpumask = (lb_config & DP_LB_CPUMASK_OVERRIDE_RX_MASK) >>
-			  DP_LB_CPUMASK_OVERRIDE_RX_MASK_SHIFT;
-
-	if (lb_config & DP_LB_CPUMASK_OVERRIDE_FORCE_INI) {
-		/* Force from INI: ignore DTSI, use INI mask directly */
-		return ini_rx_cpumask;
-	}
-
-	/* Try DTSI first */
-	pld_get_cpumask_for_wlan_rx_interrupts(dp_ctx->qdf_dev->dev,
-					       &dtsi_cpumask);
-	if (dtsi_cpumask)
-		return dtsi_cpumask;
-
-	/* DTSI not defined: use INI mask as fallback */
-	return ini_rx_cpumask;
-}
-
 /* weightage in percentage */
 #define OLDER_SAMPLE_WTG 25
 #define LATEST_SAMPLE_WTG (100 - OLDER_SAMPLE_WTG)
 
-/* time in ns to average the data sample */
+/* time in ns to averge the data sample */
 #define SAMPLING_AVERAGE_TIME_THRS 1000000000
 
 /*time in ns to make the load balance */
@@ -177,9 +139,6 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
 							 weightages[i].ring_id);
 		if (grp_id < 0) {
 			dp_err("failed to get grp id");
-			i++;
-			if (i >= MAX_REO_DEST_RINGS)
-				break;
 			continue;
 		}
 
@@ -362,11 +321,10 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 	struct wlan_dp_rx_ring_wtg weightages[MAX_REO_DEST_RINGS];
 	struct cpu_irq_load *cpu_load;
-	struct cpu_load cpu_load_avgs[QDF_MAX_AVAILABLE_CPU];
+	struct cpu_load cpu_load_avgs[NR_CPUS];
 	struct cpu_load *cpu_load_avg;
 	uint32_t per_ring_pkt_avg[MAX_REO_DEST_RINGS];
 	qdf_cpu_mask *cpu_mask = &lb_data->curr_cpu_mask;
-	qdf_cpu_mask online_cpu_mask;
 	enum wlan_dp_fb_status status = FLOW_BALANCE_NOT_ELIGIBLE;
 	uint64_t start_time;
 	uint32_t num_cpus = 0;
@@ -377,12 +335,6 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	uint8_t targeted_load_per_cpu;
 	uint8_t non_wlan_avg_load = 0;
 	bool do_load_balance = true;
-	/* If DP affinity override is enabled skip
-	 * other affinity settings
-	 */
-	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg) ||
-	    wlan_dp_cfg_is_static_irq_affinity_enabled(&dp_ctx->dp_cfg))
-		return;
 
 	dp_info("cpu mask for load balance %*pbl ",
 		qdf_cpumask_pr_args(cpu_mask));
@@ -397,17 +349,9 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	/* Take the copy of cpu load for the CPUs present in the
 	 * current cpu mask
 	 */
-	qdf_cpumask_copy(&online_cpu_mask, cpu_online_mask);
-
 	qdf_for_each_online_cpu(cpu) {
 		if (!(qdf_cpumask_test_cpu(cpu, cpu_mask)))
 			continue;
-
-		if (cpu >= QDF_MAX_AVAILABLE_CPU ||
-		    num_cpus >= QDF_MAX_AVAILABLE_CPU)
-			dp_info("cpu %d num_cpus %u curr_cpu_mask %*pbl online_cpu_mask %*pbl",
-				cpu, num_cpus, qdf_cpumask_pr_args(cpu_mask),
-				qdf_cpumask_pr_args(&online_cpu_mask));
 
 		cpu_load = &lb_data->cpu_load[cpu];
 		cpu_load_avg = &cpu_load_avgs[num_cpus];
@@ -422,17 +366,11 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 		num_cpus++;
 	}
 
-	if (!num_cpus || !total_wlan_load) {
-		qdf_spin_unlock(&lb_data->load_balance_lock);
-		return;
-	}
-
 	targeted_load_per_cpu = total_cpu_load / num_cpus;
 
 	/*calculate and update per cpu allowed wlan tput weightage */
 	for (cpu = 0; cpu < num_cpus; cpu++) {
 		cpu_load_avg = &cpu_load_avgs[cpu];
-		non_wlan_avg_load = 0;
 		if (cpu_load_avg->total_cpu_avg_load >
 		    cpu_load_avg->wlan_avg_load)
 			non_wlan_avg_load = cpu_load_avg->total_cpu_avg_load -
@@ -625,8 +563,8 @@ wlan_dp_lb_compute_cpu_load_average(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 	struct cpu_irq_load *cpu_load;
 	void *hif_ctx = dp_ctx->hif_handle;
-	uint64_t wlan_irq_time[QDF_MAX_AVAILABLE_CPU] = {0};
-	uint64_t wlan_ksoftirqd_time[QDF_MAX_AVAILABLE_CPU] = {0};
+	uint64_t wlan_irq_time[NR_CPUS] = {0};
+	uint64_t wlan_ksoftirqd_time[NR_CPUS] = {0};
 	uint64_t curr_time_in_ns;
 	uint64_t total_irq_time, total_irq_time_cur;
 	uint64_t wlan_irq_time_cur;
@@ -637,9 +575,6 @@ wlan_dp_lb_compute_cpu_load_average(struct wlan_dp_psoc_context *dp_ctx)
 	hif_get_wlan_rx_time_stats(hif_ctx, wlan_irq_time, wlan_ksoftirqd_time);
 
 	qdf_for_each_online_cpu(cpu) {
-		if (cpu >= QDF_MAX_AVAILABLE_CPU)
-			continue;
-
 		cpu_load = &lb_data->cpu_load[cpu];
 		kcpustat_cpu_fetch(&kcpustat, cpu);
 
@@ -804,8 +739,6 @@ wlan_dp_lb_update_cpu_mask(void *context, uint32_t cpu, bool cpu_up)
 		/* Enable this CPU only if its part of our preferred_mask */
 		qdf_cpumask_set_cpu(cpu, cur_cpu_mask);
 	} else {
-		if (!qdf_cpumask_test_cpu(cpu, preferred_mask))
-			return;
 		qdf_cpumask_clear_cpu(cpu, cur_cpu_mask);
 		if (qdf_cpumask_empty(cur_cpu_mask)) {
 			/*
@@ -951,7 +884,7 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 	lb_data = &dp_ctx->lb_data;
 	qdf_spinlock_create(&lb_data->load_balance_lock);
 
-	cpumask = wlan_dp_load_balance_get_cpumask(dp_ctx);
+	pld_get_cpumask_for_wlan_rx_interrupts(dp_ctx->qdf_dev->dev, &cpumask);
 	if (cpumask) {
 		qdf_for_each_online_cpu(cpus) {
 			if (BIT(cpus) & cpumask)

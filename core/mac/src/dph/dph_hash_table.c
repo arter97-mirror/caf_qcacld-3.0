@@ -245,6 +245,7 @@ tpDphHashNode dph_init_sta_state(struct mac_context *mac, tSirMacAddr staAddr,
 	sta->is_disassoc_deauth_in_progress = 0;
 	sta->sta_deletion_in_progress = false;
 	sta->valid = 1;
+	sta->is_key_installed = 0;
 	return sta;
 }
 

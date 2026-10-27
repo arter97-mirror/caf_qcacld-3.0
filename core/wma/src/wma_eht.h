@@ -41,11 +41,11 @@ enum EHT_TXRX_MCS_NSS_IDX {
  */
 struct index_eht_data_rate_type {
 	uint8_t beacon_rate_index;
-	uint32_t supported_eht20_rate[MAX_EHT_DCM_INDEX][3];
-	uint32_t supported_eht40_rate[MAX_EHT_DCM_INDEX][3];
-	uint32_t supported_eht80_rate[MAX_EHT_DCM_INDEX][3];
-	uint32_t supported_eht160_rate[MAX_EHT_DCM_INDEX][3];
-	uint32_t supported_eht320_rate[MAX_EHT_DCM_INDEX][3];
+	uint16_t supported_eht20_rate[MAX_EHT_DCM_INDEX][3];
+	uint16_t supported_eht40_rate[MAX_EHT_DCM_INDEX][3];
+	uint16_t supported_eht80_rate[MAX_EHT_DCM_INDEX][3];
+	uint16_t supported_eht160_rate[MAX_EHT_DCM_INDEX][3];
+	uint16_t supported_eht320_rate[MAX_EHT_DCM_INDEX][3];
 };
 
 /*
@@ -123,13 +123,11 @@ void wma_print_eht_op(tDot11fIEeht_op *eht_ops);
  *                               peer assoc cmd
  * @peer: pointer to peer assoc params
  * @params: pointer to ADD STA params
- * @pdev: pointer to pdev obj
  *
  * Return: None
  */
 void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
-			       tpAddStaParams params,
-			       struct wlan_objmgr_pdev *pdev);
+			       tpAddStaParams params);
 
 /**
  * wma_vdev_set_eht_bss_params() - set EHT OPs in vdev start
@@ -219,7 +217,7 @@ enum tx_rate_info wma_get_eht_rate_flags(enum phy_ch_width ch_width);
  *
  *  Return: return match rate if found, else 0
  */
-uint32_t wma_match_eht_rate(uint16_t raw_rate,
+uint16_t wma_match_eht_rate(uint16_t raw_rate,
 			    enum tx_rate_info rate_flags,
 			    uint8_t *nss, uint8_t *dcm,
 			    enum txrate_gi *guard_interval,
@@ -301,8 +299,7 @@ void wma_print_eht_op(tDot11fIEeht_op *eht_ops)
 
 static inline
 void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
-			       tpAddStaParams params,
-			       struct wlan_objmgr_pdev *pdev)
+			       tpAddStaParams params)
 {
 }
 
@@ -342,7 +339,7 @@ enum tx_rate_info wma_get_eht_rate_flags(enum phy_ch_width ch_width)
 }
 
 static inline
-uint32_t wma_match_eht_rate(uint16_t raw_rate,
+uint16_t wma_match_eht_rate(uint16_t raw_rate,
 			    enum tx_rate_info rate_flags,
 			    uint8_t *nss, uint8_t *dcm,
 			    enum txrate_gi *guard_interval,
@@ -371,30 +368,10 @@ QDF_STATUS wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode)
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
- * wma_vdev_set_listen_interval() - Set listen interval value to FW
- * @vdev_id: vdev id
- * @val: listen interval value
- *
- * Return: void
- */
 void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val);
-
-/**
- * wma_vdev_set_eht_data_extra_ltf_tx() - Set Extra EHT LTF value to FW
- * @vdev_id: vdev id
- * @val: Extra EHT LTF value
- *
- * Return: void
- */
-void wma_vdev_set_eht_data_extra_ltf_tx(uint8_t vdev_id, uint8_t val);
 #else
 static inline
 void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val)
-{}
-
-static inline
-void wma_vdev_set_eht_data_extra_ltf_tx(uint8_t vdev_id, uint8_t val)
 {}
 #endif
 #endif

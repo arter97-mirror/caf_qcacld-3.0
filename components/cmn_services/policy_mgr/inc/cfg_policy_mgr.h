@@ -398,9 +398,10 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 6, CFG_VALUE_OR_DEFAULT, \
  * This ini is used to allow STA+SAP SCC on DFS channel with master mode
  * support disabled, the value is defined by enum PM_AP_DFS_MASTER_MODE.
  * 0 - Disallow STA+SAP SCC on DFS channel
- * 1 - Allow STA+SAP SCC on DFS channel with master mode enabled
+ * 1 - Allow STA+SAP SCC on DFS channel with master mode disabled
  *       This needs gEnableDFSMasterCap enabled to allow SAP SCC with
- *       STA on DFS but single SAP is not allowed on DFS.
+ *       STA on DFS but dfs master mode disabled. Single SAP is not allowed
+ *       on DFS.
  * 2 - enhance "1" with below requirement
  *	 a. Allow single SAP (GO) start on DFS channel.
  *	 b. Allow CAC process on DFS channel in single SAP (GO) mode
@@ -635,7 +636,7 @@ CFG_INI_UINT("g_pcl_band_priority", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * g_multi_sap_allowed_on_same_band - Allow multi sap started on same band
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to allow multi sap started on same band or not.
  * 0 - Disallow multi sap started on same band
@@ -648,7 +649,7 @@ CFG_INI_UINT("g_pcl_band_priority", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * </ini>
  */
 #define CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND \
-CFG_INI_BOOL("g_multi_sap_allowed_on_same_band", 0, \
+CFG_INI_BOOL("g_multi_sap_allowed_on_same_band", 1, \
 	     "Allow multi SAP started on same band")
 
 #ifdef WLAN_FEATURE_SR

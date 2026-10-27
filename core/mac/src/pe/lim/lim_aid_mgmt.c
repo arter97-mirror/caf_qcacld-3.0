@@ -53,18 +53,7 @@ static void lim_init_peer_idxpool_legacy(struct mac_context *mac,
 					 struct pe_session *pe_session)
 {
 	uint8_t i;
-	uint8_t max_assoc_sta;
-
-	if (!mac) {
-		pe_err("mac_ctx is null");
-		return;
-	}
-
-	max_assoc_sta = mac->lim.max_sta_of_pe_session;
-	if (!pe_session->gpLimPeerIdxpool) {
-		pe_err("peer idx pool is null");
-		return;
-	}
+	uint8_t max_assoc_sta = mac->lim.max_sta_of_pe_session;
 
 	pe_session->gpLimPeerIdxpool[0] = 0;
 

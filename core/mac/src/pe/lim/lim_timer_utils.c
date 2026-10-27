@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -45,10 +44,10 @@
 #define LIM_AUTH_RETRY_TIMER_MS   60
 
 /*
- * SAE auth timer of 3secs. This is required for duration of entire SAE
+ * SAE auth timer of 5secs. This is required for duration of entire SAE
  * authentication.
  */
-#define LIM_AUTH_SAE_TIMER_MS 3000
+#define LIM_AUTH_SAE_TIMER_MS 5000
 #define LIM_CHANNEL_VACATE_TIMER_MS 5000
 
 /*
@@ -139,7 +138,7 @@ static bool lim_create_non_ap_timers(struct mac_context *mac)
 	 * authentication.
 	 */
 	if ((tx_timer_create(mac,
-		&mac->lim.lim_timers.external_auth_timer,
+		&mac->lim.lim_timers.sae_auth_timer,
 		"SAE AUTH Timer",
 		lim_timer_handler, SIR_LIM_AUTH_SAE_TIMEOUT,
 		SYS_MS_TO_TICKS(LIM_AUTH_SAE_TIMER_MS), 0,
@@ -177,13 +176,15 @@ uint32_t lim_create_timers(struct mac_context *mac)
 {
 	uint32_t cfgValue, i = 0;
 
-	pe_debug("Creating Timers used by LIM module");
+	pe_debug("Creating Timers used by LIM module in Role: %d",
+	       mac->lim.gLimSystemRole);
 	/* Create timers required for host roaming feature */
 	if (TX_SUCCESS != lim_create_timers_host_roam(mac))
 		return TX_TIMER_ERROR;
 
-	if (!lim_create_non_ap_timers(mac))
-		goto err_timer;
+	if (mac->lim.gLimSystemRole != eLIM_AP_ROLE)
+		if (false == lim_create_non_ap_timers(mac))
+			goto err_timer;
 
 	cfgValue = mac->mlme_cfg->sta.wait_cnf_timeout;
 	cfgValue = SYS_MS_TO_TICKS(cfgValue);
@@ -244,7 +245,7 @@ uint32_t lim_create_timers(struct mac_context *mac)
 	cfgValue = 1000;
 	cfgValue = SYS_MS_TO_TICKS(cfgValue);
 	if (tx_timer_create(mac, &mac->lim.lim_timers.gLimDeauthAckTimer,
-			    "DEAUTH ACK TIMEOUT",
+			    "DISASSOC ACK TIMEOUT",
 			    lim_process_deauth_ack_timeout,
 			    WLAN_INVALID_VDEV_ID,
 			    cfgValue, 0, TX_NO_ACTIVATE) != TX_SUCCESS) {
@@ -279,7 +280,7 @@ err_timer:
 	tx_timer_delete(&mac->lim.lim_timers.gLimJoinFailureTimer);
 	tx_timer_delete(&mac->lim.lim_timers.gLimPeriodicJoinProbeReqTimer);
 	tx_timer_delete(&mac->lim.lim_timers.g_lim_periodic_auth_retry_timer);
-	tx_timer_delete(&mac->lim.lim_timers.external_auth_timer);
+	tx_timer_delete(&mac->lim.lim_timers.sae_auth_timer);
 	tx_timer_delete(&mac->lim.lim_timers.channel_vacate_timer);
 
 	if (mac->lim.gLimPreAuthTimerTable.pTable) {
@@ -692,16 +693,16 @@ void lim_deactivate_and_change_timer(struct mac_context *mac, uint32_t timerId)
 		}
 		break;
 
-	case eLIM_EXTERNAL_AUTH_TIMER:
+	case eLIM_AUTH_SAE_TIMER:
 		if (tx_timer_deactivate
-		   (&mac->lim.lim_timers.external_auth_timer)
+		   (&mac->lim.lim_timers.sae_auth_timer)
 		    != TX_SUCCESS)
 			pe_err("Unable to deactivate SAE auth timer");
 
 		/* Change timer to reactivate it in future */
 		val = SYS_MS_TO_TICKS(LIM_AUTH_SAE_TIMER_MS);
 
-		if (tx_timer_change(&mac->lim.lim_timers.external_auth_timer,
+		if (tx_timer_change(&mac->lim.lim_timers.sae_auth_timer,
 				    val, 0) != TX_SUCCESS)
 			pe_err("unable to change SAE auth timer");
 

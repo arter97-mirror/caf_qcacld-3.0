@@ -638,32 +638,6 @@
 
 /*
  * <ini>
- * gEnableTDLSStats - Enable TDLS stats reporting feature.
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable the TDLS stats reporting feature.
- * When enabled, the driver collects and reports TDLS connection statistics
- * (setup/teardown events, FW stats) to user space via vendor events.
- * When disabled, the TDLS stats state machine remains in the DISABLED
- * state and no stats are collected or reported.
- *
- * Related: gEnableTDLSSupport.
- *
- * Supported Feature: TDLS
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_TDLS_STATS_ENABLE CFG_INI_BOOL( \
-	"gEnableTDLSStats", \
-	1, \
-	"Enable TDLS stats reporting feature")
-
-/*
- * <ini>
  * gEnableTDLSScan - Allow scan and maintain TDLS link.
  * @Min: 0
  * @Max: 1
@@ -801,7 +775,6 @@
 	CFG(CFG_TDLS_PUAPSD_PEER_TRAFFIC_RSP_TIMEOUT) \
 	CFG(CFG_TDLS_EXTERNAL_CONTROL) \
 	CFG(CFG_TDLS_WMM_MODE_ENABLE) \
-	CFG(CFG_TDLS_STATS_ENABLE) \
 	CFG(CFG_TDLS_SCAN_ENABLE) \
 	CFG(CFG_TDLS_PEER_KICKOUT_THRESHOLD) \
 	CFG(CFG_TDLS_DISCOVERY_WAKE_TIMEOUT) \

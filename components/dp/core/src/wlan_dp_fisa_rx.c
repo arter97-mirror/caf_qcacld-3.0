@@ -24,7 +24,6 @@
 #include "dp_internal.h"
 #include "hif.h"
 #include <wlan_dp_stc.h>
-#include <qdf_tracepoint.h>
 
 static void dp_rx_fisa_flush_flow_wrap(struct dp_fisa_rx_sw_ft *sw_ft);
 
@@ -111,105 +110,6 @@ static void dump_tlvs(hal_soc_handle_t hal_soc_hdl, uint8_t *buf,
 {
 }
 #endif
-
-/**
- * dp_fisa_rx_get_next_rr_ring_id() - Advance the RR cursor to the next
- *   active ring in the reo_rings_mapping bitmask.
- * @last_ring_id: current cursor value (equals rdi -
- *   HAL_REO_DEST_IND_START_OFFSET), i.e. 0-based ring index
- * @ring_map:     bitmask of active REO destination rings (e.g. 0x0F)
- *
- * Walk-through (ring_map=0x0F, 0-based cursor, init=1):
- *   rr=1 → mask>>(1+1)=0x03, ffs(3)=1  → next=1+1=2
- *   rr=2 → mask>>(2+1)=0x01, ffs(1)=1  → next=2+1=3
- *   rr=3 → mask>>(3+1)=0x00 → wrap: ffs(0x0F)-1=0 → next=0
- *   rr=0 → mask>>(0+1)=0x07, ffs(7)=1  → next=0+1=1
- *
- * Shifting by (last_ring_id + 1) excludes the current ring's own bit,
- * preventing the cursor from producing last_ring_id+1 when that ring
- * is absent from ring_map (e.g. cursor=3 → 4 for ring_map=0x0F, where
- * rdi=20 wraps in the HAL remap table back to ring 0).
- *
- * On wrap the cursor is set to qdf_ffs(ring_map)-1 (the lowest active
- * ring index, 0-based) so ring 0 is included in the round-robin after
- * the first pass; the initial value of 1 merely defers it to avoid
- * concentrating the first batch of flows on the non-hash-preferred ring.
- *
- * Return: next cursor value (0-based);
- *         rdi = return_value + HAL_REO_DEST_IND_START_OFFSET
- */
-static uint8_t
-dp_fisa_rx_get_next_rr_ring_id(uint8_t last_ring_id, uint8_t ring_map)
-{
-	uint8_t shifted;
-
-	if (!ring_map)
-		ring_map = 0xF;
-
-	shifted = ring_map >> (last_ring_id + 1);
-	if (shifted)
-		return last_ring_id + qdf_ffs(shifted);
-
-	return qdf_ffs(ring_map) - 1;
-}
-
-#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
-static inline
-bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
-{
-	return (tlv_reo_dest_ind == LSR_DEST_RING);
-}
-#else
-static inline
-bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
-{
-	return false;
-}
-#endif
-
-/**
- * dp_fisa_rx_set_rr_reo_indication() - Override reo_dest_indication with
- *   the current RR cursor value and advance the cursor.
- * @reo_dest_indication: pointer to the rdi value to override
- * @reo_id:              pointer to the NAPI/REO context id (0-based) to set
- * @fisa_hdl:            FST handle containing rr_ring_id cursor
- *
- * Called while holding a per-ring or global FST lock so that concurrent
- * NAPI threads advancing the cursor for different new flows see distinct
- * ring assignments.
- */
-static inline void
-dp_fisa_rx_set_rr_reo_indication(uint32_t *reo_dest_indication,
-				 uint8_t *reo_id,
-				 struct dp_rx_fst *fisa_hdl)
-{
-	struct dp_soc *soc =
-		cdp_soc_t_to_dp_soc(fisa_hdl->dp_ctx->cdp_soc);
-	uint8_t ring_map =
-		(uint8_t)wlan_cfg_get_reo_rings_mapping(soc->wlan_cfg_ctx);
-	uint8_t num_rx_context =
-		(uint8_t)cdp_get_num_rx_contexts(fisa_hdl->dp_ctx->cdp_soc);
-
-	if (!wlan_cfg_is_rx_rr_enabled(soc->wlan_cfg_ctx))
-		return;
-
-	/* LSR flows have already been pinned to the latency-sensitive ring;
-	 * do not overwrite their assignment with the round-robin cursor.
-	 */
-	if (dp_rx_is_routed_to_latency_sensitive_reo(*reo_dest_indication))
-		return;
-
-	*reo_dest_indication = fisa_hdl->rr_ring_id +
-				HAL_REO_DEST_IND_START_OFFSET;
-	*reo_id = fisa_hdl->rr_ring_id % num_rx_context;
-
-	dp_fisa_debug("fisa rr: reo_dest_ind %u reo_id %u ring=%u (ring_map=0x%x)",
-		      *reo_dest_indication, *reo_id, fisa_hdl->rr_ring_id,
-		      ring_map);
-
-	fisa_hdl->rr_ring_id =
-		dp_fisa_rx_get_next_rr_ring_id(fisa_hdl->rr_ring_id, ring_map);
-}
 
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 static
@@ -351,7 +251,7 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 		if ((flow_init_time_ns < LONG_LIVED_FLOW_TIME_THRESH) ||
 		    (last_pkt_rcvd_time_ns > ACTIVE_FLOW_TIME_THRESH)) {
 			sw_ft_entry->elig_for_balance = false;
-			sw_ft_entry->num_pkts_prev = sw_ft_entry->num_pkts;
+			sw_ft_entry->num_pkts = sw_ft_entry->num_pkts_prev;
 			sw_ft_entry->last_avg_cal_time = cur_time_ns;
 			continue;
 		}
@@ -435,6 +335,8 @@ dp_fisa_flow_balance_build_flow_map_tbl(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_spin_unlock_bh(&rx_fst->dp_rx_fst_lock);
 }
 
+#define DP_RX_HASH_START_VALUE 16
+
 /**
  * dp_fisa_update_fst_table - Update fst table for the migrated flows
  * @dp_ctx: dp context
@@ -464,7 +366,6 @@ void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
 		sw_ft_entry->is_mig = true;
 		sw_ft_entry->prev_napi_id = sw_ft_entry->napi_id;
 		sw_ft_entry->napi_id = flow_details->napi_id;
-		DP_STATS_INC(rx_fst, flow_migration, 1);
 
 		dp_info("moving flow %d from napi_id%d to napi_id%d",
 			sw_ft_entry->flow_id, sw_ft_entry->prev_napi_id,
@@ -473,12 +374,10 @@ void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
 		/* Handle the case of hash based routing enabled/disabled */
 		if (flow_details->napi_id > 3)
 			sw_ft_entry->reo_dest_indication =
-				HAL_REO_DEST_IND_START_OFFSET +
-				flow_details->napi_id - 1;
+						DP_RX_HASH_START_VALUE + flow_details->napi_id - 1;
 		else
 			sw_ft_entry->reo_dest_indication =
-				HAL_REO_DEST_IND_START_OFFSET +
-				flow_details->napi_id;
+						DP_RX_HASH_START_VALUE + flow_details->napi_id;
 
 		hal_rx_flow_cmem_update_reo_dst_ind(dp_ctx->hal_soc,
 						    rx_fst->cmem_ba, flow_index,
@@ -890,7 +789,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 	uint32_t skid_count = 0, max_skid_length;
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
 	bool is_fst_updated = false;
-	uint8_t reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
+	uint32_t reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	struct hal_proto_params proto_params;
 
 	if (hal_rx_get_proto_params(fisa_hdl->dp_ctx->hal_soc, rx_tlv_hdr,
@@ -934,12 +833,6 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 						      fisa_hdl->dp_ctx,
 						      hashed_flow_idx);
 
-			/* Apply RR ring assignment before writing FSE so the
-			 * rdi written to DDR already reflects the RR value.
-			 */
-			dp_fisa_rx_set_rr_reo_indication(&reo_dest_indication,
-							 &reo_id,
-							 fisa_hdl);
 			/* Add HW FT entry */
 			sw_ft_entry->hw_fse =
 				dp_rx_fisa_setup_hw_fse(fisa_hdl,
@@ -1099,15 +992,13 @@ dp_rx_fisa_restore_pkt_hist(struct dp_fisa_rx_sw_ft *ft_entry,
  * @fisa_hdl: handle to FISA context
  * @elem: details of the flow which is being added
  * @hashed_flow_idx: hashed flow idx of the deleting flow
- * @flow_evict_success_code: success code of evicting flow
  *
  * Return: None
  */
 static void
 dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 		       struct dp_fisa_rx_fst_update_elem *elem,
-		       uint32_t hashed_flow_idx,
-		       uint8_t flow_evict_success_code)
+		       uint32_t hashed_flow_idx)
 {
 	struct wlan_dp_psoc_context *dp_ctx = fisa_hdl->dp_ctx;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
@@ -1118,8 +1009,6 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 				fisa_hdl->base)[hashed_flow_idx]);
 	reo_id = sw_ft_entry->napi_id;
-	if (reo_id >= MAX_REO_DEST_RINGS)
-		return;
 
 	dp_rx_fisa_acquire_ft_lock(fisa_hdl, reo_id);
 
@@ -1128,12 +1017,9 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	dp_rx_fisa_save_pkt_hist(sw_ft_entry, &pkt_hist);
 	wlan_dp_stc_rx_flow_retire_ind(dp_ctx, sw_ft_entry->classified,
-				       sw_ft_entry->c_flow_id,
-				       flow_evict_success_code);
+				       sw_ft_entry->c_flow_id);
 	/* Clear the sw_ft_entry */
 	qdf_mem_zero(sw_ft_entry, sizeof(*sw_ft_entry));
-	/* Mark NAPI ID is invalid */
-	sw_ft_entry->napi_id = DP_INVALID_ID;
 	dp_rx_fisa_restore_pkt_hist(sw_ft_entry, &pkt_hist);
 
 	if (!elem) {
@@ -1173,7 +1059,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	fisa_hdl->add_flow_count++;
 	fisa_hdl->del_flow_count++;
 	wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx, WLAN_DP_FLOW_DIR_RX,
-				  &flow_tuple, sw_ft_entry->flow_id);
+				  &flow_tuple);
 	dp_rx_fisa_release_ft_lock(fisa_hdl, reo_id);
 }
 
@@ -1211,8 +1097,7 @@ static void dp_fisa_rx_fst_del(struct dp_rx_fst *fisa_hdl,
 	hashed_flow_idx = flow_hash & fisa_hdl->hash_mask;
 
 	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-	dp_fisa_rx_delete_flow(fisa_hdl, NULL, hashed_flow_idx,
-			       DP_EVICT_SUCCESS_CODE_3);
+	dp_fisa_rx_delete_flow(fisa_hdl, NULL, hashed_flow_idx);
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 
 	if (fisa_hdl->fse_cache_flush_allow &&
@@ -1224,50 +1109,6 @@ static void dp_fisa_rx_fst_del(struct dp_rx_fst *fisa_hdl,
 				FSE_CACHE_FLUSH_TIME_OUT);
 	}
 }
-
-#ifdef WLAN_DP_FEATURE_STC
-#define FISA_FT_ENTRY_CLASSIFICATION_END_NS (40 * QDF_NSEC_PER_SEC)
-#define FISA_FT_ENTRY_LONG_LIVE_MIN_NS  (3 * QDF_NSEC_PER_SEC)
-#define FISA_FT_ENTRY_AGING_PKT_CNT 10
-
-/**
- * dp_fisa_flow_evict_check() - Check if flow is eligible for eviction
- * @sw_ft_entry: SW flow table entry
- *
- * Return: True if its been more than 1second since the flow was last accessed.
- *         False if it is selected to sampling or it is active in past second.
- */
-static inline uint8_t
-dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
-{
-	uint64_t sw_timestamp = qdf_sched_clock();
-
-	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
-	    FISA_FT_ENTRY_LONG_LIVE_MIN_NS)
-		return DP_EVICT_SUCCESS_CODE_1;
-
-	if (((sw_timestamp - sw_ft_entry->flow_init_ts) >
-	     FISA_FT_ENTRY_LONG_LIVE_MIN_NS) &&
-	    sw_ft_entry->num_pkts < FISA_FT_ENTRY_AGING_PKT_CNT)
-		return DP_EVICT_SUCCESS_CODE_2;
-
-	return DP_EVICT_DENIED;
-}
-#else
-#define FISA_FT_ENTRY_LAST_ACTIVE_NS 1000000000
-
-static inline bool
-dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
-{
-	uint64_t sw_timestamp = qdf_sched_clock();
-
-	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
-	    FISA_FT_ENTRY_LAST_ACTIVE_NS)
-		return true;
-
-	return false;
-}
-#endif
 
 /**
  * dp_fisa_rx_fst_update() - Core logic which helps in Addition/Deletion
@@ -1294,7 +1135,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	uint32_t lru_ft_entry_idx = 0;
 	uint32_t timestamp;
 	uint32_t reo_dest_indication;
-	uint64_t cur_ts, last_accessed_ts;
+	uint64_t sw_timestamp;
 
 	/* Get the hash from TLV
 	 * FSE FT Toeplitz hash is same Common parser hash available in TLV
@@ -1315,13 +1156,6 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 					fisa_hdl->base)[hashed_flow_idx]);
 		if (!sw_ft_entry->is_populated) {
-			/* Add locking to prevent race condition between FISA
-			 * aggregation and update, which can Lead to NULL
-			 * dp_ctx dereference in dp_add_nbuf_to_fisa_flow.
-			 */
-			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-			dp_rx_fisa_acquire_ft_lock(fisa_hdl, elem->reo_id);
-
 			/* Add SW FT entry */
 			dp_rx_fisa_update_sw_ft_entry(sw_ft_entry,
 						      flow_hash, elem->vdev,
@@ -1345,8 +1179,6 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->flow_tuple_hash =
 				wlan_dp_get_flow_hash(dp_ctx, &flow_tuple);
 			sw_ft_entry->flow_init_ts = qdf_sched_clock();
-			sw_ft_entry->last_accessed_ts =
-						sw_ft_entry->flow_init_ts;
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 			sw_ft_entry->peer_id = elem->peer_id;
@@ -1354,52 +1186,23 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
 			is_fst_updated = true;
-			dp_rx_fisa_release_ft_lock(fisa_hdl, elem->reo_id);
-			qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
-
 			wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx,
 						  WLAN_DP_FLOW_DIR_RX,
-						  &flow_tuple,
-						  sw_ft_entry->flow_id);
+						  &flow_tuple);
 			fisa_hdl->add_flow_count++;
 			break;
 		}
 		/* else */
-
-		/*
-		 * For packets belonging to a flow (which just got added to FISA
-		 * table), the flow_idx_valid=0, since they passed through FSE
-		 * before the HW table update.
-		 * For such packets, is_same_flow has already been checked
-		 * against entry at hashed_flow_idx before queuing the work,
-		 * but if the entry was added at skid the flow tuple check is
-		 * not done. Hence do the flow tuple check here before
-		 * consuming another entry.
-		 */
-		if (is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
-				 rx_flow_tuple_info))
-			break;
-
 		/* hash collision move to the next FT entry */
 		dp_fisa_debug("Hash collision %d",
 			      fisa_hdl->hash_collision_cnt);
 		fisa_hdl->hash_collision_cnt++;
 
-		last_accessed_ts = sw_ft_entry->last_accessed_ts;
-		cur_ts = qdf_sched_clock();
-		if (cur_ts > last_accessed_ts &&
-		    dp_stc_is_remove_flow_allowed(
-					sw_ft_entry->classified,
-					sw_ft_entry->selected_to_sample,
-					sw_ft_entry->inactivity_timeout,
-					last_accessed_ts, qdf_sched_clock())) {
-			timestamp = dp_fisa_rx_get_hw_ft_timestamp(
-							fisa_hdl,
-							hashed_flow_idx);
-			if (timestamp < lru_ft_entry_time) {
-				lru_ft_entry_time = timestamp;
-				lru_ft_entry_idx = hashed_flow_idx;
-			}
+		timestamp = dp_fisa_rx_get_hw_ft_timestamp(fisa_hdl,
+							   hashed_flow_idx);
+		if (timestamp < lru_ft_entry_time) {
+			lru_ft_entry_time = timestamp;
+			lru_ft_entry_idx = hashed_flow_idx;
 		}
 		skid_count++;
 		hashed_flow_idx++;
@@ -1412,20 +1215,18 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	 * Remove LRU flow from SW FT
 	 */
 	if ((skid_count > max_skid_length) &&
-	    lru_ft_entry_time != 0xffffffff &&
 	    wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg)) {
-		uint8_t flow_evict_success_code;
 		dp_fisa_debug("Max skid length reached flow cannot be added, evict existing flow");
 
 		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 				fisa_hdl->base)[lru_ft_entry_idx]);
+		sw_timestamp = qdf_get_log_timestamp();
 
-		flow_evict_success_code =
-				dp_fisa_flow_evict_check(sw_ft_entry);
-		if (flow_evict_success_code) {
+		if (qdf_log_timestamp_to_usecs(sw_timestamp -
+			sw_ft_entry->add_timestamp) >
+			FISA_FT_ENTRY_AGING_US) {
 			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx,
-					       flow_evict_success_code);
+			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx);
 			qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 			is_fst_updated = true;
 		} else {
@@ -1446,25 +1247,6 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 		qdf_timer_start(&fisa_hdl->fse_cache_flush_timer,
 				FSE_CACHE_FLUSH_TIME_OUT);
 	}
-}
-
-static void _dp_fisa_rx_fst_inv_peer_id(struct dp_rx_fst *fisa_hdl,
-					struct dp_fisa_rx_fst_update_elem *elem)
-{
-	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-	uint16_t peer_id = elem->peer_id;
-	uint16_t i, count = 0;
-
-	sw_ft_entry = (struct dp_fisa_rx_sw_ft *)fisa_hdl->base;
-	for (i = 0; i < fisa_hdl->max_entries; i++) {
-		if (sw_ft_entry[i].is_populated &&
-		    sw_ft_entry[i].peer_id == peer_id) {
-			sw_ft_entry[i].peer_id = 0xFFFF;
-			count++;
-		}
-	}
-
-	dp_info("Invalidated %d entries for peer %hu", count, peer_id);
 }
 
 /**
@@ -1488,11 +1270,6 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	}
 
 	if (hif_force_wake_request(((struct hal_soc *)hal_soc_hdl)->hif_handle)) {
-		if (qdf_atomic_read(&fisa_hdl->pm_suspended)) {
-			dp_err_rl("WQ failed due to suspend stage");
-			DP_STATS_INC(fisa_hdl, update_deferred, 1);
-			return;
-		}
 		dp_err("Wake up request failed");
 		qdf_check_state_before_panic(__func__, __LINE__);
 		return;
@@ -1502,15 +1279,6 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	while (qdf_list_peek_front(&fisa_hdl->fst_update_list, &node) ==
 	       QDF_STATUS_SUCCESS) {
 		elem = (struct dp_fisa_rx_fst_update_elem *)node;
-		if (elem->action_code == DP_FT_INV_PEER_ID) {
-			_dp_fisa_rx_fst_inv_peer_id(fisa_hdl,
-						    elem);
-			qdf_list_remove_front(&fisa_hdl->fst_update_list,
-					      &node);
-			qdf_mem_free(elem);
-			continue;
-		}
-
 		vdev = dp_vdev_get_ref_by_id(fisa_hdl->soc_hdl,
 					     elem->vdev_id,
 					     DP_MOD_ID_RX);
@@ -1616,65 +1384,6 @@ static void dp_fisa_rx_fst_del_queue(struct dp_rx_fst *fisa_hdl,
 	}
 }
 
-/* time in ns */
-#define FST_UPDATE_MON_TIME 1000000000
-#define MAX_ALLOWED_FST_UPDATE_PER_SEC 64
-#define MAX_ALLOWED_FST_UPDATE_PENDING 256
-
-static inline bool
-dp_fisa_rx_skip_fst_update(struct dp_rx_fst *fisa_hdl)
-{
-	uint64_t curr_time_ns;
-
-	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
-	curr_time_ns = qdf_sched_clock();
-	if ((curr_time_ns - fisa_hdl->last_update_time_ns) >
-	    FST_UPDATE_MON_TIME) {
-		fisa_hdl->last_update_time_ns = curr_time_ns;
-		fisa_hdl->update_count = 0;
-	}
-
-	if (fisa_hdl->update_count >= MAX_ALLOWED_FST_UPDATE_PER_SEC ||
-	    (qdf_list_size(&fisa_hdl->fst_update_list) >=
-	     MAX_ALLOWED_FST_UPDATE_PENDING)) {
-		qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-		dp_debug_rl("Skip fst update update_cnt:%d list_size:%d",
-			    fisa_hdl->update_count,
-			    qdf_list_size(&fisa_hdl->fst_update_list));
-		return true;
-	}
-
-	fisa_hdl->update_count++;
-	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-	return false;
-}
-
-static inline struct dp_fisa_rx_sw_ft *
-dp_fisa_find_flow_in_sw_ft(struct dp_rx_fst *fisa_hdl, uint32_t flow_hash,
-			   struct cdp_rx_flow_tuple_info *flow_tuple_info)
-{
-	uint32_t hashed_flow_idx = flow_hash & fisa_hdl->hash_mask;
-	uint32_t max_skid_length = fisa_hdl->max_skid_length;
-	uint32_t skid_count = 0;
-	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-
-	do {
-		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
-					fisa_hdl->base)[hashed_flow_idx]);
-		if (sw_ft_entry->is_populated &&
-		    sw_ft_entry->flow_hash == flow_hash &&
-		    is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
-				 flow_tuple_info))
-			return sw_ft_entry;
-
-		hashed_flow_idx++;
-		hashed_flow_idx &= fisa_hdl->hash_mask;
-		skid_count++;
-	} while (skid_count <= max_skid_length);
-
-	return NULL;
-}
-
 /**
  * dp_fisa_rx_queue_fst_update_work() - Queue FST update work
  * @fisa_hdl: Handle to FISA context
@@ -1693,6 +1402,7 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	uint8_t *rx_tlv_hdr = qdf_nbuf_data(nbuf);
 	struct dp_fisa_rx_fst_update_elem *elem;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+	uint32_t hashed_flow_idx;
 	uint32_t reo_dest_indication;
 	bool found;
 	struct hal_proto_params proto_params;
@@ -1715,18 +1425,18 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	if (found)
 		return NULL;
 
+	hashed_flow_idx = flow_idx & fisa_hdl->hash_mask;
+	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
+				fisa_hdl->base)[hashed_flow_idx]);
+
 	wlan_dp_get_flow_tuple_from_nbuf(fisa_hdl->dp_ctx, &flow_tuple_info,
 					 nbuf, rx_tlv_hdr);
 	if (flow_tuple_info.bypass_fisa)
 		return NULL;
 
-	sw_ft_entry = dp_fisa_find_flow_in_sw_ft(fisa_hdl, flow_idx,
-						 &flow_tuple_info);
-	if (sw_ft_entry)
+	if (sw_ft_entry->is_populated && is_same_flow(
+			&sw_ft_entry->rx_flow_tuple_info, &flow_tuple_info))
 		return sw_ft_entry;
-
-	if (dp_fisa_rx_skip_fst_update(fisa_hdl))
-		return NULL;
 
 	elem = qdf_mem_malloc(sizeof(*elem));
 	if (!elem) {
@@ -1747,14 +1457,7 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	elem->peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
 	elem->action_code = DP_FT_ADD;
 
-	/* Advance the RR cursor under dp_rx_fst_lock so concurrent NAPI
-	 * threads cannot race on rr_ring_id and produce duplicate ring
-	 * assignments (lost-update: 2->3->4->2 or 1->2->3->1 sequences).
-	 */
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
-	dp_fisa_rx_set_rr_reo_indication(&elem->reo_dest_indication,
-					 &elem->reo_id,
-					 fisa_hdl);
 	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);
 	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
 
@@ -1828,6 +1531,20 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	return sw_ft_entry;
 }
+
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static inline
+bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
+{
+	return (tlv_reo_dest_ind == LSR_DEST_RING);
+}
+#else
+static inline
+bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
+{
+	return false;
+}
+#endif
 
 #if defined(DP_OFFLOAD_FRAME_WITH_SW_EXCEPTION)
 /*
@@ -2129,12 +1846,7 @@ dp_rx_fisa_aggr_udp(struct dp_rx_fst *fisa_hdl,
 		if (qdf_likely(fisa_flow->last_skb)) {
 			qdf_nbuf_set_next(fisa_flow->last_skb, nbuf);
 		} else {
-		DP_STATS_INC(fisa_hdl, udp_aggr_append_fail, 1);
-		if (qdf_unlikely(qdf_trace_dp_fisa_udp_aggr_append_fail_enabled()))
-			qdf_trace_dp_fisa_udp_aggr_append_fail(fisa_flow->flow_id, nbuf,
-							       (uint32_t)qdf_nbuf_len(nbuf), head_skb,
-							       fisa_hdl->stats.udp_aggr_append_fail);
-		qdf_nbuf_free(nbuf);
+			qdf_nbuf_free(nbuf);
 			return FISA_AGGR_DONE;
 		}
 	} else {
@@ -2191,69 +1903,25 @@ get_new_vdev_ref:
 						cdp_soc_t_to_dp_soc(cdp_soc),
 						vdev_id, DP_MOD_ID_RX);
 	if (qdf_unlikely(!fisa_flow_head_skb_vdev)) {
-		fisa_flow->flush_head_vdev_ref_fail++;
-		if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
-			qdf_trace_dp_fisa_flush_vdev_fail(vdev_id,
-							  fisa_flow->vdev_id, 0,
-							  fisa_flow->flow_id,
-							  NULL,
-							  fisa_flow->vdev,
-							  fisa_flow->flush_head_vdev_ref_fail,
-							  fisa_flow->flush_flow_vdev_ref_fail,
-							  fisa_flow->flush_vdev_ptr_mismatch,
-							  fisa_flow->flush_mld_mismatch_drop);
 		qdf_nbuf_free(fisa_flow->head_skb);
 		goto out;
 	}
 
 	if (qdf_unlikely(fisa_flow_head_skb_vdev != fisa_flow->vdev)) {
 		if (qdf_unlikely(fisa_flow_head_skb_vdev->vdev_id ==
-				 fisa_flow->vdev_id)) {
-			fisa_flow->flush_vdev_ptr_mismatch++;
-			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
-				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
-								  fisa_flow->vdev_id, 2,
-								  fisa_flow->flow_id, fisa_flow_head_skb_vdev,
-								  fisa_flow->vdev,
-								  fisa_flow->flush_head_vdev_ref_fail,
-								  fisa_flow->flush_flow_vdev_ref_fail,
-								  fisa_flow->flush_vdev_ptr_mismatch,
-								  fisa_flow->flush_mld_mismatch_drop);
+				 fisa_flow->vdev_id))
 			goto fisa_flow_vdev_fail;
-		}
 
 		fisa_flow_vdev = dp_vdev_get_ref_by_id(
 						cdp_soc_t_to_dp_soc(cdp_soc),
 						fisa_flow->vdev_id,
 						DP_MOD_ID_RX);
-		if (qdf_unlikely(!fisa_flow_vdev)) {
-			fisa_flow->flush_flow_vdev_ref_fail++;
-			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
-				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
-								  fisa_flow->vdev_id, 1,
-								  fisa_flow->flow_id,
-								  fisa_flow_head_skb_vdev,
-								  NULL,
-								  fisa_flow->flush_head_vdev_ref_fail,
-								  fisa_flow->flush_flow_vdev_ref_fail,
-								  fisa_flow->flush_vdev_ptr_mismatch,
-								  fisa_flow->flush_mld_mismatch_drop);
+		if (qdf_unlikely(!fisa_flow_vdev))
 			goto fisa_flow_vdev_fail;
-		}
 
-		if (qdf_unlikely(fisa_flow_vdev != fisa_flow->vdev)) {
-			fisa_flow->flush_vdev_ptr_mismatch++;
-			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
-				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
-								  fisa_flow->vdev_id, 2,
-								  fisa_flow->flow_id, fisa_flow_head_skb_vdev,
-								  fisa_flow_vdev,
-								  fisa_flow->flush_head_vdev_ref_fail,
-								  fisa_flow->flush_flow_vdev_ref_fail,
-								  fisa_flow->flush_vdev_ptr_mismatch,
-								  fisa_flow->flush_mld_mismatch_drop);
+		if (qdf_unlikely(fisa_flow_vdev != fisa_flow->vdev))
 			goto fisa_flow_vdev_mismatch;
-		}
+
 		/*
 		 * vdev_id may mismatch in case of MLO link switch.
 		 * Check if the vdevs belong to same MLD,
@@ -2263,16 +1931,6 @@ get_new_vdev_ref:
 				fisa_flow_vdev->mld_mac_addr.raw,
 				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
 				QDF_MAC_ADDR_SIZE) != 0)) {
-			fisa_flow->flush_mld_mismatch_drop++;
-			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
-				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
-								  fisa_flow->vdev_id, 3,
-								  fisa_flow->flow_id, fisa_flow_head_skb_vdev,
-								  fisa_flow_vdev,
-								  fisa_flow->flush_head_vdev_ref_fail,
-								  fisa_flow->flush_flow_vdev_ref_fail,
-								  fisa_flow->flush_vdev_ptr_mismatch,
-								  fisa_flow->flush_mld_mismatch_drop);
 			goto fisa_flow_vdev_mismatch;
 		} else {
 			fisa_flow->same_mld_vdev_mismatch++;
@@ -2357,7 +2015,6 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	qdf_nbuf_t linear_skb;
 	struct dp_vdev *fisa_flow_vdev;
 	ol_txrx_soc_handle cdp_soc = fisa_flow->dp_ctx->cdp_soc;
-	struct dp_rx_fst *rx_fst = fisa_flow->dp_ctx->rx_fst;
 
 	dp_fisa_debug("head_skb %pK", head_skb);
 	dp_fisa_debug("cumulative ip length %d",
@@ -2435,32 +2092,15 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	hex_dump_skb_data(fisa_flow->head_skb, false);
 
 	fisa_flow_vdev = dp_fisa_rx_get_flow_flush_vdev_ref(cdp_soc, fisa_flow);
-	if (!fisa_flow_vdev) {
-		DP_STATS_INC(rx_fst, flush_vdev_ref_fail, 1);
-		if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
-			qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 1,
-							  rx_fst->stats.flush_vdev_ref_fail,
-							  rx_fst->stats.udp_flush_linear_osif_rx_fail,
-							  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
-							  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
+	if (!fisa_flow_vdev)
 		goto vdev_ref_get_fail;
-	}
 
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
-		if (qdf_unlikely(vdev->delete.pending) ||
-		    !vdev->osif_rx || QDF_STATUS_SUCCESS !=
-		    vdev->osif_rx(vdev->osif_vdev, linear_skb)) {
-			DP_STATS_INC(rx_fst, udp_flush_linear_osif_rx_fail, 1);
-			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
-				qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 2,
-								  rx_fst->stats.flush_vdev_ref_fail,
-								  rx_fst->stats.udp_flush_linear_osif_rx_fail,
-								  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
-								  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
+		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
+		    vdev->osif_rx(vdev->osif_vdev, linear_skb))
 			qdf_nbuf_free(linear_skb);
-		}
 		/* Free non linear skb */
 		qdf_nbuf_free(fisa_flow->head_skb);
 	} else {
@@ -2470,32 +2110,15 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 		 */
 		if (qdf_unlikely(fisa_flow->frags_cumulative_len !=
 				 qdf_nbuf_get_only_data_len(fisa_flow->head_skb))) {
-			DP_STATS_INC(rx_fst, udp_flush_sanity_len_mismatch_drop, 1);
-			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
-				qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 3,
-								  rx_fst->stats.flush_vdev_ref_fail,
-								  rx_fst->stats.udp_flush_linear_osif_rx_fail,
-								  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
-								  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
 			qdf_assert(0);
 			/* Drop the aggregate */
 			qdf_nbuf_free(fisa_flow->head_skb);
 			goto out;
 		}
 
-		if (qdf_unlikely(vdev->delete.pending) ||
-		    !vdev->osif_rx || QDF_STATUS_SUCCESS !=
-		    vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb)) {
-			DP_STATS_INC(rx_fst, udp_flush_nonlinear_osif_rx_fail,
-				     1);
-			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
-				qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 4,
-								  rx_fst->stats.flush_vdev_ref_fail,
-								  rx_fst->stats.udp_flush_linear_osif_rx_fail,
-								  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
-								  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
+		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
+		    vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb))
 			qdf_nbuf_free(fisa_flow->head_skb);
-		}
 	}
 
 out:
@@ -2548,10 +2171,7 @@ dp_rx_fisa_flush_tcp_flow(struct dp_vdev *vdev,
 	qdf_nbuf_set_next(fisa_flow->head_skb, NULL);
 	if (fisa_flow->last_skb)
 		qdf_nbuf_set_next(fisa_flow->last_skb, NULL);
-	if (qdf_unlikely(vdev->delete.pending || !vdev->osif_rx))
-		qdf_nbuf_free(fisa_flow->head_skb);
-	else
-		vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
+	vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
 
 	fisa_flow->head_skb = NULL;
 
@@ -2582,7 +2202,6 @@ static void dp_rx_fisa_flush_flow(struct dp_vdev *vdev,
  * @hal_aggr_count: current aggregate count from RX PKT TLV
  * @hal_cumulative_ip_len: current cumulative ip length from RX PKT TLV
  * @rx_tlv_hdr: current msdu RX PKT TLV
- * @nbuf: incoming nbuf
  *
  * Return: true - current flow aggregation should stop,
  *	   false - continue to aggregate.
@@ -2591,7 +2210,7 @@ static bool dp_fisa_aggregation_should_stop(
 				struct dp_fisa_rx_sw_ft *fisa_flow,
 				uint32_t hal_aggr_count,
 				uint16_t hal_cumulative_ip_len,
-				uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf)
+				uint8_t *rx_tlv_hdr)
 {
 	uint32_t msdu_len =
 		hal_rx_msdu_start_msdu_len_get(fisa_flow->dp_ctx->hal_soc,
@@ -2635,8 +2254,7 @@ static bool dp_fisa_aggregation_should_stop(
 	    hal_cumulative_ip_len <= fisa_flow->hal_cumultive_ip_len ||
 	    cumulative_ip_len_delta > FISA_MAX_SINGLE_CUMULATIVE_IP_LEN ||
 	    (fisa_flow->last_hal_aggr_count + 1) != hal_aggr_count ||
-	    cumulative_ip_len_delta != (msdu_len - l2_l3_hdr_len) ||
-	    msdu_len != QDF_NBUF_CB_RX_PKT_LEN(nbuf))
+	    cumulative_ip_len_delta != (msdu_len - l2_l3_hdr_len))
 		return true;
 
 	return false;
@@ -2704,8 +2322,8 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 			return FISA_AGGR_NOT_ELIGIBLE;
 		}
 
-		dp_err_rl("REO id mismatch flow:%pK napi:%u nbuf:%pK reo:%u",
-			  fisa_flow, fisa_flow->napi_id, nbuf, napi_id);
+		dp_err("REO id mismatch flow: %pK napi_id: %u nbuf: %pK reo_id: %u",
+		       fisa_flow, fisa_flow->napi_id, nbuf, napi_id);
 		DP_STATS_INC(fisa_hdl, reo_mismatch.allow_non_aggr, 1);
 		QDF_BUG(0);
 		return FISA_AGGR_NOT_ELIGIBLE;
@@ -2738,7 +2356,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 						fisa_flow,
 						hal_aggr_count,
 						hal_cumulative_ip_len,
-						rx_tlv_hdr, nbuf))) {
+						rx_tlv_hdr))) {
 			qdf_assert(0);
 			fisa_flow->do_not_aggregate = true;
 			/*
@@ -2751,7 +2369,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 						fisa_flow,
 						hal_aggr_count,
 						hal_cumulative_ip_len,
-						rx_tlv_hdr, nbuf))) {
+						rx_tlv_hdr))) {
 		qdf_assert(0);
 		/* Either HW cumulative ip length is wrong, or packet is missed
 		 * Flush the flow and do not aggregate until next start new
@@ -2795,7 +2413,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 	 * FISA_FLOW_MAX_AGGR_COUNT - 1.
 	 */
 	if (fisa_flow->cur_aggr > (FISA_FLOW_MAX_AGGR_COUNT - 1))
-		dp_err_rl("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
+		dp_err("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
 
 	dp_fisa_debug("hal cum_len 0x%x - napI_cumu_len 0x%x = flow_cum_len 0x%x cur_aggr %d",
 		      hal_cumulative_ip_len,
@@ -2805,12 +2423,12 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 
 	if (fisa_flow->adjusted_cumulative_ip_length >
 	    FISA_FLOW_MAX_CUMULATIVE_IP_LEN) {
-		dp_err_rl("fisa_flow %pK nbuf %pK", fisa_flow, nbuf);
-		dp_err_rl("fisa_flow->adjusted_cumulative_ip_length %d",
-			  fisa_flow->adjusted_cumulative_ip_length);
-		dp_err_rl("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
-		dp_err_rl("napi_flush_cumulative_ip_length %d",
-			  fisa_flow->napi_flush_cumulative_ip_length);
+		dp_err("fisa_flow %pK nbuf %pK", fisa_flow, nbuf);
+		dp_err("fisa_flow->adjusted_cumulative_ip_length %d",
+		       fisa_flow->adjusted_cumulative_ip_length);
+		dp_err("HAL cumulative_ip_length %d", hal_cumulative_ip_len);
+		dp_err("napi_flush_cumulative_ip_length %d",
+		       fisa_flow->napi_flush_cumulative_ip_length);
 		qdf_assert(0);
 	}
 
@@ -2850,8 +2468,7 @@ static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf, struct dp_vdev *vdev,
 	      vdev->opmode == wlan_op_mode_ap)) ||
 	    qdf_nbuf_is_exc_frame(nbuf) ||
 	    qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) ||
-	    qdf_nbuf_is_da_mcbc(nbuf) ||
-	    qdf_unlikely(vdev->multipass_en))
+	    qdf_nbuf_is_da_mcbc(nbuf))
 		return true;
 
 	return false;
@@ -2972,12 +2589,6 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		next_nbuf = head_nbuf->next;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 
-		/* WLAN_FAST_L2L_RX: flow already matched by HW FSE in
-		 * CMEM, bypass FISA aggregation for this packet.
-		 */
-		if (qdf_nbuf_get_rx_flow_idx_valid(head_nbuf))
-			goto deliver_nbuf;
-
 		/* bypass FISA check */
 		if (dp_is_nbuf_bypass_fisa(head_nbuf, vdev,
 					   dp_fisa_rx_hdl->add_tcp_flow_to_fst))
@@ -3006,9 +2617,6 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 
 		/* Skip FISA aggregation and drop the frame if RDI is REO2TCL. */
 		if (qdf_unlikely(tlv_reo_dest_ind == REO_REMAP_TCL)) {
-			if (qdf_unlikely(qdf_trace_dp_fisa_trace_rdi_invalid_enabled()))
-				qdf_trace_dp_fisa_trace_rdi_invalid(tlv_reo_dest_ind);
-
 			qdf_nbuf_free(head_nbuf);
 			head_nbuf = next_nbuf;
 			DP_STATS_INC(dp_fisa_rx_hdl, incorrect_rdi, 1);
@@ -3023,15 +2631,14 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 						head_nbuf);
 		if (fisa_flow) {
 			fisa_flow->num_pkts++;
-			fisa_flow->last_accessed_ts = qdf_sched_clock();
-			fisa_flow->peer_id = QDF_NBUF_CB_RX_PEER_ID(head_nbuf);
 			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
 		}
 
 		/* Do not FISA aggregate IPSec packets */
-		if ((fisa_flow && fisa_flow->rx_flow_tuple_info.is_exception) ||
-		    !dp_fisa_rx_hdl->is_fisa_aggr_enabled) {
+		if (fisa_flow &&
+		    fisa_flow->rx_flow_tuple_info.is_exception) {
+			fisa_flow->last_accessed_ts = qdf_sched_clock();
 			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
 		}
@@ -3073,27 +2680,9 @@ deliver_nbuf: /* Deliver without FISA */
 		QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(head_nbuf) = 1;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 		hex_dump_skb_data(head_nbuf, false);
-
-		if (qdf_unlikely(qdf_trace_dp_fisa_hex_dump_skb_data_enabled()))
-			qdf_trace_dp_fisa_hex_dump_skb_data(0, (void *)QDF_RET_IP, 0,
-							    head_nbuf, qdf_nbuf_next(head_nbuf),
-							    qdf_nbuf_get_ext_list(head_nbuf),
-							    qdf_nbuf_data(head_nbuf),
-							    (uint32_t)qdf_nbuf_len(head_nbuf),
-							    (uint32_t)qdf_nbuf_get_only_data_len(head_nbuf));
-
-		if (qdf_unlikely(vdev->delete.pending) ||
-		    !vdev->osif_rx || QDF_STATUS_SUCCESS !=
-		    vdev->osif_rx(vdev->osif_vdev, head_nbuf)) {
-			DP_STATS_INC(dp_fisa_rx_hdl, osif_rx_fail, 1);
-			if (qdf_unlikely(qdf_trace_dp_fisa_osif_rx_fail_enabled()))
-				qdf_trace_dp_fisa_osif_rx_fail(fisa_flow->flow_id,
-							       vdev->vdev_id,
-							       rx_ctx_id,
-							       head_nbuf,
-							       dp_fisa_rx_hdl->stats.osif_rx_fail);
+		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
+		    vdev->osif_rx(vdev->osif_vdev, head_nbuf))
 			qdf_nbuf_free(head_nbuf);
-		}
 next_msdu:
 		head_nbuf = next_nbuf;
 	}
@@ -3148,40 +2737,6 @@ QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_fisa_rx_fst_purge_queued_elems_for_vdev() - Discard any pending FST
- *  update work items in fst_update_list that reference the given vdev
- * @fisa_hdl: handle to FISA context
- * @vdev: dp_vdev being detached
- *
- * Return: None
- */
-static void
-dp_fisa_rx_fst_purge_queued_elems_for_vdev(struct dp_rx_fst *fisa_hdl,
-					   struct dp_vdev *vdev)
-{
-	struct dp_fisa_rx_fst_update_elem *elem;
-	qdf_list_node_t *cur_node, *next_node;
-	QDF_STATUS status;
-
-	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
-	status = qdf_list_peek_front(&fisa_hdl->fst_update_list, &cur_node);
-	while (status == QDF_STATUS_SUCCESS) {
-		elem = (struct dp_fisa_rx_fst_update_elem *)cur_node;
-		status = qdf_list_peek_next(&fisa_hdl->fst_update_list,
-					    cur_node, &next_node);
-		if (elem->vdev == vdev) {
-			dp_info("purging stale FST update elem for vdev %pK action %u",
-				vdev, elem->action_code);
-			qdf_list_remove_node(&fisa_hdl->fst_update_list,
-					     cur_node);
-			qdf_mem_free(elem);
-		}
-		cur_node = next_node;
-	}
-	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-}
-
 QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
@@ -3198,9 +2753,6 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 		dp_err("null vdev by vdev_id %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	if (vdev->delete.pending)
-		dp_fisa_rx_fst_purge_queued_elems_for_vdev(fisa_hdl, vdev);
 
 	for (i = 0; i < ft_size; i++) {
 		reo_id = sw_ft_entry[i].napi_id;

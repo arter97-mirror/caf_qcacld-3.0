@@ -196,16 +196,11 @@ twt_del_status_to_vendor_twt_status(enum HOST_TWT_DEL_STATUS status)
 	case HOST_TWT_DEL_STATUS_CHAN_SW_IN_PROGRESS:
 		return QCA_WLAN_VENDOR_TWT_STATUS_CHANNEL_SWITCH_IN_PROGRESS;
 	case HOST_TWT_DEL_STATUS_SCAN_IN_PROGRESS:
-	case HOST_DEL_TWT_STATUS_SCAN_STARTED:
 		return QCA_WLAN_VENDOR_TWT_STATUS_SCAN_IN_PROGRESS;
 	case HOST_TWT_DEL_STATUS_PS_DISABLE_TEARDOWN:
 		return QCA_WLAN_VENDOR_TWT_STATUS_POWER_SAVE_EXIT_TERMINATE;
 	case HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE:
 		return QCA_WLAN_VENDOR_TWT_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE;
-	case HOST_DEL_TWT_STATUS_MLO_LINK_INACTIVE:
-		return QCA_WLAN_VENDOR_TWT_STATUS_MLSR_LINK_INACTIVE;
-	case HOST_DEL_TWT_STATUS_2G_TWT_NOT_ENABLED:
-		return QCA_WLAN_VENDOR_TWT_STATUS_CHAN_SWITCH_24GHZ;
 	default:
 		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
 	}
@@ -747,7 +742,7 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 	enum band_info connected_band;
 	uint8_t peer_cap = 0, self_cap = 0;
 	bool twt_req = false, twt_bcast_req = false;
-	bool is_twt_24ghz_allowed = true, val;
+	bool is_twt_24ghz_allowed = false, val;
 	struct qdf_mac_addr peer_mac;
 	int ret;
 	bool is_sta_connected;
@@ -760,6 +755,8 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 	/* fill only self_capability bitmap if sta is not connected */
 	ucfg_twt_cfg_get_requestor(psoc, &twt_req);
 	osif_debug("twt_req: %d", twt_req);
+	if (twt_req)
+		self_cap |= QCA_WLAN_TWT_CAPA_REQUESTOR;
 
 	ucfg_twt_cfg_get_bcast_requestor(psoc, &twt_bcast_req);
 	osif_debug("twt_bcast_req: %d", twt_bcast_req);
@@ -789,11 +786,14 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 		connected_band = ucfg_cm_get_connected_band(vdev);
 		ucfg_twt_cfg_get_24ghz_enabled(psoc, &val);
 
-		if (connected_band == BAND_2G && !val)
-			is_twt_24ghz_allowed = false;
+		if (connected_band == BAND_2G && val)
+			is_twt_24ghz_allowed = true;
 
 		osif_debug("connected_band:%d val:%d is_twt_24ghz_allowed:%d",
 			   connected_band, val, is_twt_24ghz_allowed);
+
+		if (twt_req && is_twt_24ghz_allowed)
+			self_cap |= QCA_WLAN_TWT_CAPA_REQUESTOR;
 
 		ret = osif_fill_peer_macaddr(vdev, peer_mac.bytes);
 		if (ret)
@@ -806,9 +806,6 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 
 		osif_debug("peer_cap: 0x%x", peer_cap);
 	}
-
-	if (twt_req && is_twt_24ghz_allowed)
-		self_cap |= QCA_WLAN_TWT_CAPA_REQUESTOR;
 
 	ucfg_twt_tgt_caps_get_wake_dur_and_wake_intvl(psoc, &min_wake_dur,
 						      &max_wake_dur,

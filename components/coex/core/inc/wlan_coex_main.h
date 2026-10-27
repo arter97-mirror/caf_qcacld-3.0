@@ -28,11 +28,6 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
 
-#ifdef FEATURE_N79_COEX
-#include "qdf_timer.h"
-#include "qdf_atomic.h"
-#endif
-
 #define coex_err(params...) \
 	QDF_TRACE_ERROR(QDF_MODULE_ID_COEX, params)
 #define coex_info(params...) \
@@ -53,33 +48,11 @@ struct wlan_coex_callback {
 #endif
 
 /**
- * enum n79_coex_policy - N79 coexistence NSS/chain restriction policy
- * @N79_COEX_POLICY_DISABLE: no WLAN restriction when N79 is active
- * @N79_COEX_POLICY_2X2: limit rx_nss, tx_nss, num_rx_chains, num_tx_chains
- *   to 2 on 5 GHz vdevs while N79 is active (default)
- */
-enum n79_coex_policy {
-	N79_COEX_POLICY_DISABLE = 0,
-	N79_COEX_POLICY_2X2,
-};
-
-/**
  * struct coex_psoc_obj - coex object definition
  * @btc_chain_mode: BT Coex chain mode.
  * @coex_config_updated: callback functions for each config type, which will
  *  be called when config is updated.
  * @cb: structure to dbam callback
- * @psoc: back-pointer to owning psoc for timer softirq callbacks
- * @n79_coex_active: atomic flag; non-zero while N79 RF switch holds Rx chains
- * @n79_ss_hysteresis_timer: delays spatial-stream restore after N79 inactive
- * @n79_rx_div_hysteresis_timer: delays Rx-diversity restore after N79 inactive
- * @n79_ss_ms: SS hysteresis timer duration in ms
- * @n79_rx_div_ms: RxDiv hysteresis timer duration in ms
- * @n79_coex_policy: INI-configured restriction policy
- * @n79_limit_rx_nss: max Rx NSS applied when N79 is active
- * @n79_limit_tx_nss: max Tx NSS applied when N79 is active
- * @n79_limit_rx_chain: max Rx chains applied when N79 is active
- * @n79_limit_tx_chain: max Tx chains applied when N79 is active
  */
 struct coex_psoc_obj {
 	enum coex_btc_chain_mode btc_chain_mode;
@@ -87,19 +60,6 @@ struct coex_psoc_obj {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	struct wlan_coex_callback cb;
 #endif
-#ifdef FEATURE_N79_COEX
-	struct wlan_objmgr_psoc *psoc;
-	qdf_atomic_t n79_coex_active;
-	qdf_timer_t n79_ss_hysteresis_timer;
-	qdf_timer_t n79_rx_div_hysteresis_timer;
-	uint32_t n79_ss_ms;
-	uint32_t n79_rx_div_ms;
-	enum n79_coex_policy n79_coex_policy;
-	uint8_t n79_limit_rx_nss;
-	uint8_t n79_limit_tx_nss;
-	uint8_t n79_limit_rx_chain;
-	uint8_t n79_limit_tx_chain;
-#endif /* FEATURE_N79_COEX */
 };
 
 /**
@@ -126,74 +86,6 @@ wlan_psoc_get_coex_obj_fl(struct wlan_objmgr_psoc *psoc,
 	}
 	return psoc_obj;
 }
-
-#ifdef FEATURE_N79_COEX
-/**
- * struct coex_vdev_obj - per-vdev coex state for N79 coexistence
- * @saved_rx_nss: rx_nss saved before N79 active WMI; restored on N79 inactive
- * @saved_tx_nss: tx_nss saved before N79 active WMI; restored on N79 inactive
- * @saved_rx_chains: num_rx_chains saved before N79 active; restored on inactive
- * @saved_tx_chains: num_tx_chains saved before N79 active; restored on inactive
- * @saved_tx_chains_11a: num_tx_chains_11a saved before N79 active
- * @saved_tx_chains_11b: num_tx_chains_11b saved before N79 active
- * @saved_tx_chains_11g: num_tx_chains_11g saved before N79 active
- * @saved_force: true if the pre-N79 config was USER_FORCE; used to restore
- *   the correct force_mode in the WMI restore command
- * @wmi_sent: true if N79 active WMI was sent for this vdev (guards restore)
- * @n79_restore_pending: restore deferred because TDLS was active when the
- *   hysteresis timer fired; cleared on vdev disconnect
- */
-struct coex_vdev_obj {
-	uint8_t saved_rx_nss;
-	uint8_t saved_tx_nss;
-	uint8_t saved_rx_chains;
-	uint8_t saved_tx_chains;
-	uint8_t saved_tx_chains_11a;
-	uint8_t saved_tx_chains_11b;
-	uint8_t saved_tx_chains_11g;
-	bool saved_force;
-	bool wmi_sent;
-	bool n79_restore_pending;
-};
-
-/**
- * wlan_vdev_get_coex_obj() - get per-vdev coex object
- * @vdev: vdev object
- *
- * Return: pointer to coex_vdev_obj, or NULL
- */
-static inline struct coex_vdev_obj *
-wlan_vdev_get_coex_obj(struct wlan_objmgr_vdev *vdev)
-{
-	return (struct coex_vdev_obj *)
-		wlan_objmgr_vdev_get_comp_private_obj(
-			vdev, WLAN_UMAC_COMP_COEX);
-}
-
-/**
- * wlan_coex_n79_is_supported_opmode() - check if vdev opmode supports N79
- *   chain-limit WMI commands
- * @vdev: vdev object
- *
- * N79 chainmask overrides apply only to STA, P2P-client (GC), P2P-GO, and
- * SAP vdevs.  NAN and all other modes must not receive these commands.
- *
- * Return: true if the opmode is supported, false otherwise
- */
-static inline bool
-wlan_coex_n79_is_supported_opmode(struct wlan_objmgr_vdev *vdev)
-{
-	switch (wlan_vdev_mlme_get_opmode(vdev)) {
-	case QDF_STA_MODE:
-	case QDF_P2P_CLIENT_MODE:
-	case QDF_P2P_GO_MODE:
-	case QDF_SAP_MODE:
-		return true;
-	default:
-		return false;
-	}
-}
-#endif /* FEATURE_N79_COEX */
 
 /**
  * wlan_coex_psoc_init() - API to initialize coex component
@@ -270,31 +162,6 @@ QDF_STATUS wlan_coex_psoc_created_notification(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_coex_psoc_destroyed_notification(struct wlan_objmgr_psoc *psoc,
 						 void *arg_list);
 
-#ifdef FEATURE_N79_COEX
-/**
- * wlan_coex_n79_register_vdev_handlers() - register N79 vdev obj handlers
- *
- * Return: QDF_STATUS_SUCCESS on success; error otherwise
- */
-QDF_STATUS wlan_coex_n79_register_vdev_handlers(void);
-
-/**
- * wlan_coex_n79_unregister_vdev_handlers() - unregister N79 vdev obj handlers
- */
-void wlan_coex_n79_unregister_vdev_handlers(void);
-#else
-static inline QDF_STATUS
-wlan_coex_n79_register_vdev_handlers(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline void
-wlan_coex_n79_unregister_vdev_handlers(void)
-{
-}
-#endif /* FEATURE_N79_COEX */
-
 /**
  * wlan_coex_psoc_set_btc_chain_mode() - private API to set BT coex chain mode
  * for psoc
@@ -308,7 +175,7 @@ wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 				  enum coex_btc_chain_mode val);
 
 /**
- * coex_psoc_get_btc_chain_mode() - private API to get BT coex chain mode
+ * wlan_coex_psoc_get_btc_chain_mode() - private API to get BT coex chain mode
  * from psoc
  * @psoc: pointer to psoc object
  * @val: pointer to BT coex chain mode
@@ -316,19 +183,10 @@ wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
  * Return : status of operation
  */
 QDF_STATUS
-coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
-			     enum coex_btc_chain_mode *val);
-#else
-static inline QDF_STATUS
-coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
-			     enum coex_btc_chain_mode *val)
-{
-	if (val)
-		*val = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
-
-	return QDF_STATUS_SUCCESS;
-}
+wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val);
 #endif
+
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 /**
  * wlan_dbam_config_send() - private API to send dbam config

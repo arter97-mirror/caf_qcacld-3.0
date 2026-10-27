@@ -152,6 +152,7 @@
 
 #define WMA_MAX_RF_CHAINS(x)    ((1 << x) - 1)
 #define WMA_MIN_RF_CHAINS               (1)
+#define WMA_MAX_NSS               (2)
 
 #define WMA_NOA_IE_SIZE(num_desc) (2 + (13 * (num_desc)))
 #define WMA_MAX_NOA_DESCRIPTORS 4
@@ -177,7 +178,7 @@
 #define WMA_PEER_CREATE_RESPONSE 0x08
 #define WMA_PEER_CREATE_RESPONSE_TIMEOUT SIR_PEER_CREATE_RESPONSE_TIMEOUT
 
-/* send connect response after bss peer is deleted */
+/* send connect respone after bss peer is deleted */
 #define WMA_DELETE_STA_CONNECT_RSP 0x09
 
 /* Peer create response for 11az PASN peer */
@@ -191,19 +192,8 @@
 
 #define WMA_DELETE_NDP_PEER_RSP 0x0e
 
-/* NDP peer create response */
-#define WMA_NDP_PEER_CREATE_RESPONSE 0x14
-
 #define WMA_TDLS_PEER_CREATE_RESPONSE 0x0f
 #define WMA_TDLS_PEER_DELETE_RESPONSE 0x10
-/* Delete peer response for existing ranging peer */
-#define WMA_DELETE_STA_EXISTING_PASN_PEER_RSP 0x11
-
-#define WMA_QOS_NULL_TX_REQ 0x12
-#define WMA_QOS_NULL_TX_TIMEOUT 2000
-
-/* Peer create response for passthru (Wondertap) NEW peer */
-#define WMA_PASSTHRU_PEER_CREATE_RESPONSE 0x13
 
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
@@ -221,7 +211,7 @@
 
 /*
  * Setting the Tx Comp Timeout to 1 secs.
- * TODO: Need to Revisit the Timing
+ * TODO: Need to Revist the Timing
  */
 #define WMA_TX_FRAME_COMPLETE_TIMEOUT  1000
 #define WMA_TX_FRAME_BUFFER_NO_FREE    0
@@ -595,7 +585,6 @@ typedef struct {
  * struct vdev_cli_config_t - store vdev parameters
  * @nss: nss width
  * @ldpc: is ldpc is enable/disable
- * @two_x_ldpc: is 2xLDPC enabled (UHR only)
  * @tx_stbc: TX STBC is enable/disable
  * @rx_stbc: RX STBC is enable/disable
  * @shortgi: short gi is enable/disable
@@ -628,7 +617,6 @@ typedef struct {
 typedef struct {
 	uint32_t nss;
 	uint32_t ldpc;
-	uint32_t two_x_ldpc;
 	uint32_t tx_stbc;
 	uint32_t rx_stbc;
 	uint32_t shortgi;
@@ -713,6 +701,7 @@ struct wma_invalid_peer_params {
  * @peer_count: peer count
  * @plink_status_req: link status request
  * @psnr_req: snr request
+ * @tx_streams: number of tx streams can be used by the vdev
  * @mac_id: the mac on which vdev is on
  * @arp_offload_req: cached arp offload request
  * @ns_offload_req: cached ns offload request
@@ -757,6 +746,7 @@ struct wma_txrx_node {
 #ifdef FEATURE_WLAN_EXTSCAN
 	bool extscan_in_progress;
 #endif
+	uint32_t tx_streams;
 	int32_t roam_synch_delay;
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;
@@ -786,11 +776,13 @@ struct mac_ss_bw_info {
 /**
  * struct wma_ini_config - Structure to hold wma ini configuration
  * @max_no_of_peers: Max Number of supported
+ * @exclude_selftx_from_cca_busy: Exclude self tx time from cca busy time flag.
  *
  * Placeholder for WMA ini parameters.
  */
 struct wma_ini_config {
 	uint8_t max_no_of_peers;
+	bool exclude_selftx_from_cca_busy;
 };
 
 /**
@@ -875,24 +867,6 @@ struct wma_pf_sym_hist {
 };
 
 /**
- * typedef qos_null_tx_compl_cb - QoS NULL TX completion callback
- * @vdev_id: vdev id
- * @status: TX completion status
- * @ack_rssi: ACK RSSI in dBm
- * @ppdu_id: Hardware PPDU ID
- * @ieee_link_id_valid: IEEE link ID valid flag true for valid for MLO
- * @ieee_link_id: IEEE link ID
- * @context: Callback context
- *
- * This callback is invoked by WMA when QoS NULL frame TX completion
- * event is received from firmware.
- */
-typedef void (*qos_null_tx_compl_cb)(uint8_t vdev_id, uint32_t status,
-				     int32_t ack_rssi, uint32_t ppdu_id,
-				     uint32_t ieee_link_id_valid,
-				     uint32_t ieee_link_id, void *context);
-
-/**
  * struct t_wma_handle - wma context
  * @wmi_handle: wmi handle
  * @cds_context: cds handle
@@ -929,6 +903,8 @@ typedef void (*qos_null_tx_compl_cb)(uint8_t vdev_id, uint32_t status,
  * @pdevconfig: pdev related configurations
  * @wma_hold_req_queue: Queue use to serialize requests to firmware
  * @wma_hold_req_q_lock: Mutex for @wma_hold_req_queue
+ * @vht_supp_mcs: VHT supported MCS
+ * @is_fw_assert: is fw asserted
  * @ack_work_ctx: Context for deferred processing of TX ACK
  * @pGetRssiReq: get RSSI request
  * @get_one_peer_info: When a "get peer info" request is active, is
@@ -1010,10 +986,6 @@ typedef void (*qos_null_tx_compl_cb)(uint8_t vdev_id, uint32_t status,
  * @eht_cap: 802.11be capabilities
  * @set_hw_mode_resp_status: Set HW mode response status
  * @wma_pf_hist: PF symbol history
- * @qos_null_tx_compl_cb: QoS NULL frame TX completion callback
- * @qos_null_tx_compl_cb_context: Context for QoS NULL TX completion callback
- * @get_tsf_cb: get tsf timer callback
- * @get_tsf_cb_ctx: context passed to get tsf callback
  *
  * This structure is the global wma context.  It contains global wma
  * module parameters and handles of other modules.
@@ -1054,6 +1026,8 @@ typedef struct {
 	pdev_cli_config_t pdevconfig;
 	qdf_list_t wma_hold_req_queue;
 	qdf_spinlock_t wma_hold_req_q_lock;
+	uint32_t vht_supp_mcs;
+	uint8_t is_fw_assert;
 	struct wma_tx_ack_work_ctx *ack_work_ctx;
 	void *pGetRssiReq;
 	bool get_one_peer_info;
@@ -1095,7 +1069,9 @@ typedef struct {
 	qdf_mc_timer_t service_ready_ext_timer;
 
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
-						    struct auth_offload_event *auth_event);
+						    uint8_t vdev_id,
+						    struct qdf_mac_addr bssid,
+						    uint32_t akm);
 	QDF_STATUS (*pe_roam_synch_cb)(struct mac_context *mac,
 		uint8_t vdev_id,
 		struct roam_offload_synch_ind *roam_synch_data,
@@ -1111,10 +1087,6 @@ typedef struct {
 					enum QDF_OPMODE device_mode);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
-	/* shared lock for peer key-setup and BSS color-change operations */
-	qdf_wake_lock_t wlan_key_op_wake_lock;
-	qdf_runtime_lock_t wlan_key_op_runtime_lock;
-	qdf_atomic_t wlan_key_op_counter;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
 	qdf_runtime_lock_t ndp_prevent_runtime_pm_lock;
 	enum active_apf_mode active_uc_apf_mode;
@@ -1152,23 +1124,6 @@ typedef struct {
 	qdf_wake_lock_t go_d3_wow_wake_lock;
 	enum set_hw_mode_status set_hw_mode_resp_status;
 	struct wma_pf_sym_hist wma_pf_hist;
-	qos_null_tx_compl_cb qos_null_tx_compl_cb;
-	void *qos_null_tx_compl_cb_context;
-	uint8_t qos_null_tx_vdev_id;
-	qdf_spinlock_t qos_null_tx_lock;
-#ifdef DRIVER_PASSTHRU_MODE
-	wma_get_tsf_timer_cb get_tsf_cb;
-	void *get_tsf_cb_ctx;
-	/* Channel hop status callback and context */
-	wma_chan_hop_status_cb chan_hop_status_cb;
-	void *chan_hop_status_cb_ctx;
-#endif
-	A_INT32 wow_wakeup_reason;
-	uint8_t wow_wakeup_vdev_id;
-	bool wow_wakeup_reason_valid;
-#ifdef CONFIG_NO_QMI
-	struct wma_athdiag_wmi_sync athdiag_sync;
-#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -1590,10 +1545,6 @@ struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 
 int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 				   uint32_t len);
-
-int wma_qos_null_tx_compl_event_handler(void *handle, uint8_t *event_buff,
-					uint32_t len);
-
 int wma_mgmt_tx_bundle_completion_handler(void *handle,
 	uint8_t *cmpl_event_params, uint32_t len);
 uint32_t wma_get_vht_ch_width(void);
@@ -1663,6 +1614,8 @@ QDF_STATUS wma_process_fw_test_cmd(WMA_HANDLE handle,
 
 QDF_STATUS wma_send_ht40_obss_scanind(tp_wma_handle wma,
 	struct obss_ht40_scanind *req);
+
+uint32_t wma_get_num_of_setbits_from_bitmask(uint32_t mask);
 
 #ifdef FEATURE_WLAN_APF
 /**
@@ -1843,28 +1796,7 @@ void wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
 static inline void
 wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
 			     struct cdp_peer_setup_info *peer_info)
-{}
-#endif
-
-#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
-/**
- * wma_remove_existing_pasn_peer() - Remove existing PASN peer
- * This API is called in association request to existing PASN peer case
- * to delete the PASN peer and create a new peer.
- * @psoc: Pointer to PSOC object
- * @req:  Peer create request
- * @is_del_rsp_supported: Is delete response supported
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_remove_existing_pasn_peer(struct wlan_objmgr_psoc *psoc,
-					 struct cm_peer_create_req *req);
-#else
-static inline
-QDF_STATUS wma_remove_existing_pasn_peer(struct wlan_objmgr_psoc *psoc,
-					 struct cm_peer_create_req *req)
 {
-	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
@@ -1987,12 +1919,22 @@ void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
 				       qdf_nbuf_t buf);
+
+QDF_STATUS
+wma_update_edca_pifs_param(WMA_HANDLE handle,
+			   struct edca_pifs_vparam *edca_pifs_param);
 #else
 static inline void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 					  qdf_nbuf_t buf)
 {}
 static inline QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
 						     qdf_nbuf_t buf)
+{
+	return QDF_STATUS_SUCCESS;
+}
+static inline QDF_STATUS
+wma_update_edca_pifs_param(WMA_HANDLE handle,
+			   struct edca_pifs_vparam *edca_pifs_param)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -2431,7 +2373,7 @@ int wma_chip_power_save_failure_detected_handler(void *handle,
 /**
  * wma_get_chain_rssi() - send wmi cmd to get chain rssi
  * @wma_handle: wma handler
- * @req_params: request params
+ * @req_params: requset params
  *
  * Return: Return QDF_STATUS
  */
@@ -2448,19 +2390,6 @@ QDF_STATUS wma_get_chain_rssi(tp_wma_handle wma_handle,
  */
 QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
 		uint32_t final_cnt);
-
-#ifdef WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
-/**
- * wma_config_bmiss_timeout_params() - set bmiss timeout parameters
- * @vdev_id: virtual device for the command
- * @timeout_sec: bmiss timeout value in seconds, applied to both WOW
- * (sleep) and non-WOW (active) modes
- *
- * Return: QDF_STATUS_SUCCESS or non-zero on failure
- */
-QDF_STATUS wma_config_bmiss_timeout_params(uint32_t vdev_id,
-					   uint32_t timeout_sec);
-#endif
 
 #ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
 /**
@@ -2691,8 +2620,6 @@ QDF_STATUS wma_pre_chan_switch_setup(uint8_t vdev_id);
  */
 QDF_STATUS wma_post_chan_switch_setup(uint8_t vdev_id);
 
-QDF_STATUS wma_post_vdev_up_config(struct wlan_objmgr_vdev *vdev);
-
 /**
  * wma_vdev_pre_start() - prepare vdev start
  * @vdev_id: vdev id
@@ -2852,131 +2779,5 @@ wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
 }
 #endif
 
-/**
- * wma_peer_sta_kickout() - Kickout sta for sap
- * @cpsoc: pointer to cdp ctrl psoc object
- * @pdev_id: pdev id
- * @macaddr: mac address
- *
- * Return: 0 if success, otherwise fail
- */
-int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
-			 uint16_t pdev_id, uint8_t *macaddr);
-
-/**
- * wma_get_sap_perf_tuning_enabled() - Get sap perf tuning service capability.
- * @wmi_handle: wmi handler
- *
- * The API will return if fw support sap perf tuning feature or not.
- *
- * Return: true if support sap perf tuning feature otherwise false.
- */
-bool
-wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle);
-
-/**
- * wma_register_qos_null_hdd_cb() - Register QoS NULL TX event hdd callback
- * @callback: Callback function pointer
- * @context: Context to pass back in callback
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_register_qos_null_hdd_cb(qos_null_tx_compl_cb callback,
-					void *context);
-
-/**
- * wma_deregister_qos_null_hdd_cb() - Deregister QoS NULL TX hdd callback
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_deregister_qos_null_hdd_cb(void);
-
-/**
- * wma_set_vdev_mac_id_from_response() - Set vdev MAC ID from unified connect
- * response
- * @rsp: pointer to vdev unified connect response
- *
- * This function handles MAC ID configuration and mapping logic. It gets the
- * target resource configuration, determines the correct MAC ID based on
- * use_pdev_id flag, and sets the vdev MAC ID accordingly.
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error code on failure
- */
-QDF_STATUS
-wma_set_vdev_mac_id_from_response(struct vdev_unified_connect_response *rsp);
-/*
- * wma_qos_null_tx_timeout_handler() - QoS NULL TX timeout handler
- * @wma: wma handle
- * @req: timeout request
- *
- * This function handles QoS NULL frame TX timeout by calling
- * lim_process_qos_null_tx_completion and invoking the HDD callback
- * with timeout status.
- *
- * Return: None
- */
-void wma_qos_null_tx_timeout_handler(tp_wma_handle wma,
-                                     struct wma_target_req *req);
-
-/*
- * wma_peer_delete_resp_notify() - peer delete response notification
- * @wma: pointer to wma handle
- * @vdev_id: vdev id
- * @macaddr: peer mac address
- * @req_msg: target request message
- *
- * This function handles peer delete response notification to upper layers.
- * It processes the response based on request type and notifies appropriate
- * modules. This contains non-firmware-dependent code extracted from
- * wma_peer_delete_handler for better modularity.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_peer_delete_resp_notify(tp_wma_handle wma,
-				       struct wma_target_req *req_msg);
-
-#ifdef DRIVER_PASSTHRU_MODE
-/**
- * wma_send_vdev_ch_hop_sched() - send vdev channel hopping schedule
- *  parameters to fw
- * @params: vdev channel hopping schedule parameters
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params);
-
-/**
- * wma_passthru_get_tsf_timer() - Get MAC TSF timestamp
- * @req: get tsf timer request
- * @cb: callback triggered on receiving response
- * @ctx: context provided to callback
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-QDF_STATUS
-wma_passthru_get_tsf_timer(struct ocb_get_tsf_timer_param *req,
-			   wma_get_tsf_timer_cb cb, void *ctx);
-
-/*
- * wma_vdev_get_chan_hop_status() - Send channel hop status request to firmware
- * @req: Channel hop status request parameters
- * @cb: Callback function to be invoked on receiving response
- * @ctx: Context to be passed to callback
- *
- * This function sends a channel hop status request command to firmware
- * and stores the callback information for later invocation when the
- * response event is received.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code on failure
- */
-QDF_STATUS
-wma_vdev_get_chan_hop_status(struct vdev_chan_hop_status_req *req,
-			     wma_chan_hop_status_cb cb, void *ctx);
-#else
-static inline
-QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
 #endif
-#endif
+

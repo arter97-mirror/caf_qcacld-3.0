@@ -33,7 +33,6 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_tdls_public_structs.h>
-#include <wlan_tdls_stats_public_structs.h>
 #include <scheduler_api.h>
 #include "wlan_serialization_api.h"
 #include <wlan_utility.h>
@@ -200,7 +199,6 @@ struct tdls_callbacks {
  * @tdls_add_sta_req: store eWNI_SME_TDLS_ADD_STA_REQ value
  * @tdls_del_sta_req: store eWNI_SME_TDLS_DEL_STA_REQ value
  * @tdls_update_peer_state: store WMA_UPDATE_TDLS_PEER_STATE value
- * @tdls_update_offchan_mode: store WMA_UPDATE_TDLS_OFF_CHAN value
  * @tdls_del_all_peers:store eWNI_SME_DEL_ALL_TDLS_PEERS
  * @tdls_update_dp_vdev_flags: store CDP_UPDATE_TDLS_FLAGS
  * @tdls_idle_peer_data: provide information about idle peer
@@ -222,11 +220,6 @@ struct tdls_callbacks {
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  * @is_user_tdls_enable: bool to check whether TDLS enable through userspace
  * @tdls_cb: TDLS callbacks to other modules
- * @stats_ctx: TDLS stats state machine context
- * @stats_emit_cb: Callback registered by OS-IF (HDD) to emit a TDLS stats
- *                 entry as a vendor event.  Called by the TDLS stats SM
- *                 instead of directly invoking HDD functions.  The psoc
- *                 pointer (soc_obj->soc) is passed as the first argument.
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -263,7 +256,6 @@ struct tdls_soc_priv_obj {
 	uint16_t tdls_add_sta_req;
 	uint16_t tdls_del_sta_req;
 	uint16_t tdls_update_peer_state;
-	uint16_t tdls_update_offchan_mode;
 	uint16_t tdls_del_all_peers;
 	uint32_t tdls_update_dp_vdev_flags;
 	qdf_spinlock_t tdls_ct_spinlock;
@@ -289,8 +281,6 @@ struct tdls_soc_priv_obj {
 	bool fw_tdls_wideband_capability;
 	bool is_user_tdls_enable;
 	struct tdls_callbacks tdls_cb;
-	struct tdls_stats_context *stats_ctx;
-	tdls_stats_emit_cb stats_emit_cb;
 };
 
 /**
@@ -348,8 +338,6 @@ struct tdls_peer_mlme_info {
  * @rssi: rssi
  * @tdls_support: tdls support
  * @link_status: tdls link status
- * @teardown_stats_recorded: whether teardown stats have already been
- *                           recorded for the current teardown cycle
  * @is_responder: is responder
  * @discovery_processed: discovery processed
  * @discovery_attempt: discovery attempt
@@ -385,7 +373,6 @@ struct tdls_peer {
 	int8_t rssi;
 	enum tdls_peer_capab tdls_support;
 	enum tdls_link_state link_status;
-	bool teardown_stats_recorded;
 	uint8_t is_responder;
 	uint8_t discovery_processed;
 	uint16_t discovery_attempt;
@@ -566,21 +553,6 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg);
-
-/**
- * tdls_process_stats_dp_pkt() - Process a pre-parsed TDLS data-path packet
- *                               on the TDLS scheduler thread.
- * @info: Pointer to a heap-allocated tdls_dp_pkt_info struct.  Ownership
- *        is transferred to this function; it will be freed before returning.
- *
- * Called from tdls_process_cmd() when msg->type == TDLS_CMD_STATS_DP_PKT.
- * Looks up the vdev from the stored psoc, retrieves the TDLS soc private
- * object, and calls tdls_stats_record_dp_pkt() to deliver the event to
- * the TDLS stats state machine.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS tdls_process_stats_dp_pkt(struct tdls_dp_pkt_info *info);
 
 /**
  * tdls_process_evt() - tdls main event process function
@@ -926,7 +898,6 @@ void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
  * allowed for the vdev based on current concurrency.
  * @psoc: soc object
  * @vdev_id: vdev id
- * @reason: reason for deleting all TDLS peers
  *
  * Notify tdls component to cleanup all peers based on current concurrency
  * combination.
@@ -935,8 +906,7 @@ void tdls_scan_serialization_comp_info_cb(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS
 tdls_check_and_indicate_delete_all_peers(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id,
-					 enum wlan_tdls_peer_delete_reason reason);
+					 uint8_t vdev_id);
 
 /**
  * tdls_get_opclass_from_bandwidth() - Return opclass for corresponding BW and
@@ -971,15 +941,6 @@ QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc);
  * Return: True or False
  */
 bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc);
-
-/**
- * tdls_check_if_offchannel_allowed() - Check if tdls off-channel is allowed
- * @vdev: vdev object
- *
- * Function determines the whether TDLS off-channel is allowed
- * Return: true or false
- */
-bool tdls_check_if_offchannel_allowed(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc)
@@ -993,10 +954,5 @@ tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-static inline bool
-tdls_check_if_offchannel_allowed(struct wlan_objmgr_vdev *vdev)
-{
-	return false;
-}
 #endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
 #endif

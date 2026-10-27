@@ -473,7 +473,6 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
  * @psoc: pointer to psoc object
  * @data: Data to be sent to NAN discovery engine, which runs in firmware
  * @data_len: Length of the data
- * @vdev_id: Vdev ID
  *
  * Send NAN disable request to firmware by setting the mandatory
  * params(disable_2g_discovery, disable_5g_discovery) along
@@ -482,17 +481,7 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
  * Return: status of operation
  */
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *data, uint32_t data_len,
-				      uint8_t vdev_id);
-
-/**
- * ucfg_nan_pasn_peer_delete_all() - This API post NAN peer delete all
- * message to the scheduler and wait for NAN peer delete response.
- * @psoc: pointer to PSOC object
- *
- * Return: status of operation
- */
-QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc);
+				      uint8_t *data, uint32_t data_len);
 
 /**
  * ucfg_nan_disable_ndi() - Disable the NDI with given vdev_id
@@ -647,183 +636,6 @@ ucfg_nan_remove_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
  * Return: true if nan  is allowed otherwise false
  */
 bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_nan_cache_disable_req_info() - This API cache disable request info
- * @psoc: pointer to PSOC object
- * @value: parameter to determine NB or internal request
- *
- * Return: QDF status
- */
-QDF_STATUS
-ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value);
-
-/**
- * ucfg_nan_add_peer_in_migrated_addr_list() - record that a NAN peer has
- * migrated from the NAN Discovery vdev to an NDI vdev, without caching the
- * NDI vdev id on the (already-deleted) NAN Discovery peer object
- * @psoc: pointer to psoc object
- * @nan_vdev_id: NAN Discovery vdev id the peer migrated from
- * @peer_mac_addr: peer mac address
- *
- * Return: QDF status
- */
-QDF_STATUS
-ucfg_nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
-					uint8_t nan_vdev_id,
-					struct qdf_mac_addr *peer_mac_addr);
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * ucfg_nan_set_local_schedule() - Set NAN local schedule
- * @params: pointer to local schedule parameters
- *
- * This function sends NAN local schedule configuration to firmware
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_nan_set_local_schedule(struct nan_local_sched_params *params);
-
-/**
- * ucfg_nan_set_local_sched_rsp_status() - Cache NAN local schedule rsp status
- * @vdev: pointer to vdev object
- * @val: value to set
- *
- * Return: status of operation
- */
-QDF_STATUS ucfg_nan_set_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
-					       uint32_t val);
-
-/**
- * ucfg_nan_get_local_sched_rsp_status() - Get cached NAN local schedule rsp
- * status from vdev obj
- * @vdev: pointer to vdev object
- *
- * Return: cached NAN local schedule rsp status
- */
-uint32_t ucfg_nan_get_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_nan_set_peer_schedule() - Set NAN peer schedule
- * @params: pointer to peer schedule parameters
- *
- * This function sends NAN peer schedule configuration to firmware
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_nan_set_peer_schedule(struct nan_peer_sched_params *params);
-
-/**
- * ucfg_nan_set_peer_sched_rsp_status() - Cache NAN peer schedule rsp status
- * @vdev: pointer to vdev object
- * @val: value to set
- *
- * Return: status of operation
- */
-QDF_STATUS ucfg_nan_set_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
-					      uint32_t val);
-
-/**
- * ucfg_nan_get_peer_sched_rsp_status() - Get cached NAN peer schedule rsp
- * status from vdev obj
- * @vdev: pointer to vdev object
- *
- * Return: cached NAN peer schedule rsp status
- */
-uint32_t ucfg_nan_get_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_nan_req_peer_params() - Send NAN peer parameters request
- * @req: pointer to peer parameters request
- *
- * This function sends NAN peer parameters configuration to firmware
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_nan_req_peer_params(struct nan_peer_params_req *req);
-
-/**
- * ucfg_nan_set_peer_params_rsp_status() - Cache NAN peer params rsp status
- * @vdev: pointer to vdev object
- * @val: value to set
- *
- * Return: status of operation
- */
-QDF_STATUS ucfg_nan_set_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev,
-					       uint32_t val);
-
-/**
- * ucfg_nan_get_peer_params_rsp_status() - Get cached NAN peer params rsp
- * status from vdev obj
- * @vdev: pointer to vdev object
- *
- * Return: cached NAN peer params rsp status
- */
-uint32_t ucfg_nan_get_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_nan_ndi_peer_create() - Create NDI peer
- * @psoc: pointer to psoc object
- * @vdev_id: vdev ID
- * @peer_mac: peer MAC address
- *
- * This function creates an NDI peer by calling the NAN core layer
- * which invokes the existing lim_add_ndi_peer_converged callback.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_nan_ndi_peer_create(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
-				    struct qdf_mac_addr *peer_mac);
-
-/**
- * ucfg_nan_is_peer_exist_for_opmode() - wrapper for
- * nan_is_peer_exist_for_opmode
- * @psoc: pointer to PSOC object
- * @peer_mac_addr: peer MAC address
- * @opmode: vdev OP mode to match
- *
- * Return: true if the peer exists on a vdev of the given opmode, else false
- */
-bool ucfg_nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
-				       struct qdf_mac_addr *peer_mac_addr,
-				       enum QDF_OPMODE opmode);
-
-/**
- * ucfg_nan_del_sta() - Delete NAN data path peer
- * @psoc: Pointer to PSOC object
- * @params: Pointer to station deletion parameters
- *
- * This function forwards the station deletion request to the NAN core layer.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-QDF_STATUS ucfg_nan_del_sta(struct wlan_objmgr_psoc *psoc,
-			    struct nan_del_sta_params *params);
-#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-/**
- * ucfg_nan_get_peer_ndi_addr_by_id() - Get peer ndi mac address using ndp
- *  instance id
- * @vdev: ndp vdev
- * @ndp_instance_id: NDP instance identifier
- * @peer_ndi_addr: peer NDI address to be filled
- *
- * Return: QDF status
- */
-QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
-					    uint32_t ndp_instance_id,
-					    struct qdf_mac_addr *peer_ndi_addr);
-#else
-static inline
-QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
-					    uint32_t ndp_instance_id,
-					    struct qdf_mac_addr *peer_ndi_addr)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -913,16 +725,9 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 
 static inline
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *data, uint32_t data_len,
-				      uint8_t vdev_id)
+				      uint8_t *data, uint32_t data_len)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline
@@ -1017,95 +822,5 @@ static inline bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
-
-static inline
-QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
-					    uint32_t ndp_instance_id,
-					    struct qdf_mac_addr *peer_ndi_addr)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
 #endif /* WLAN_FEATURE_NAN */
-
-struct wma_tgt_cfg;
-
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-/**
- * ucfg_nan_is_fw_support_standard_mode() - wrapper API for function
- * nan_is_fw_support_standard_mode()
- * @psoc: pointer to PSOC object
- *
- * Return: true if NAN standard mode supported by FW otherwise false
- */
-bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_nan_set_phy_target_cfg() - ucfg API to compute and cache NAN HT/VHT/HE
- * PHY capability intersection
- * @psoc: pointer to PSOC object
- * @cfg: effective target config (FW intersected with host)
- * @num_rf_chains: number of RF chains supported by the host
- * @enable_2g: whether NAN is enabled on 2.4 GHz band
- * @enable_5g: whether NAN is enabled on 5 GHz band
- * @enable_6g: whether NAN is enabled on 6 GHz band
- *
- * Return: None
- */
-void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
-				 struct wma_tgt_cfg *cfg,
-				 uint8_t num_rf_chains, bool enable_2g,
-				 bool enable_5g, bool enable_6g);
-
-/**
- * ucfg_nan_get_phy_caps() - ucfg API to retrieve cached NAN HT/VHT/HE PHY
- * capability intersection result
- * @psoc: pointer to PSOC object
- * @caps: output NAN PHY capability struct
- *
- * Return: None
- */
-void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
-			   void *caps);
-
-/**
- * ucfg_nan_is_fw_support_ap_assisted_dfs() - wrapper API for function
- * nan_is_fw_support_ap_assisted_dfs()
- * @psoc: pointer to PSOC object
- *
- * Return: true if NAN AP-assisted DFS operation supported by FW else false
- */
-bool ucfg_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc);
-#else
-static inline
-bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline
-bool ucfg_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline
-void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
-				 struct wma_tgt_cfg *cfg,
-				 uint8_t num_rf_chains, bool enable_2g,
-				 bool enable_5g, bool enable_6g)
-{
-}
-
-static inline
-void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
-			   void *caps)
-{
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

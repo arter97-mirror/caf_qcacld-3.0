@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -33,7 +32,6 @@
 #include <linux/if_ether.h>
 #include <wlan_osif_request_manager.h>
 #include <wlan_hdd_sar_limits.h>
-#include <wlan_cp_stats_mc_ucfg_api.h>
 
 #define WLAN_WAIT_TIME_SAR 5000
 /**
@@ -64,12 +62,6 @@ static u32 hdd_sar_wmi_to_nl_enable(uint32_t wmi_value)
 		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_USER;
 	case WMI_SAR_FEATURE_ON_SAR_V2_0:
 		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V2_0;
-	case WMI_SAR_FEATURE_ON_SAR_V3_0:
-		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V3_0;
-	case WMI_SAR_FEATURE_ON_SAR_V4_0:
-		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V4_0;
-	case WMI_SAR_FEATURE_ON_SAR_V5_0:
-		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V5_0;
 	}
 }
 
@@ -335,8 +327,9 @@ static u32 hdd_to_nl_sar_version(enum sar_version hdd_sar_version)
 	case (SAR_VERSION_4):
 		return QCA_WLAN_VENDOR_SAR_VERSION_4;
 	case (SAR_VERSION_5):
-	case (SAR_VERSION_6):
 		return QCA_WLAN_VENDOR_SAR_VERSION_5;
+	case (SAR_VERSION_6):
+		return QCA_WLAN_VENDOR_SAR_VERSION_1;
 	default:
 		hdd_err("Unexpected SAR version received :%u, sending default to userspace",
 			hdd_sar_version);
@@ -482,8 +475,6 @@ static int __wlan_hdd_get_sar_capability(struct wiphy *wiphy,
 	QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SPEC_POWER_LIMIT
 #define SAR_LIMITS_SPEC_POWER_LIMIT_INDEX \
 	QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SPEC_POWER_LIMIT_INDEX
-#define SAR_LIMITS_SPEC_USER_SCENARIO \
-	QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SPEC_USER_SCENARIO
 #define SAR_LIMITS_MAX QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX
 
 const struct nla_policy
@@ -496,7 +487,6 @@ wlan_hdd_sar_limits_policy[SAR_LIMITS_MAX + 1] = {
 	[SAR_LIMITS_SPEC_MODULATION] = {.type = NLA_U32},
 	[SAR_LIMITS_SPEC_POWER_LIMIT] = {.type = NLA_U32},
 	[SAR_LIMITS_SPEC_POWER_LIMIT_INDEX] = {.type = NLA_U32},
-	[SAR_LIMITS_SPEC_USER_SCENARIO] = {.type = NLA_U32},
 };
 
 void hdd_store_sar_config(struct hdd_context *hdd_ctx,
@@ -557,9 +547,6 @@ static int wlan_hdd_cfg80211_sar_convert_limit_set(u32 nl80211_value,
 		*wmi_value = WMI_SAR_FEATURE_ON_USER_DEFINED;
 		break;
 	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V2_0:
-	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V3_0:
-	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V4_0:
-	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V5_0:
 		*wmi_value = WMI_SAR_FEATURE_ON_SAR_V2_0;
 		break;
 
@@ -568,69 +555,6 @@ static int wlan_hdd_cfg80211_sar_convert_limit_set(u32 nl80211_value,
 	}
 	return ret;
 }
-
-#ifdef SAR_SAFETY_FEATURE
-/**
- * hdd_populate_user_scenario() - populate user scenario to dsi for setting sar
- * limits
- * @hdd_ctx: The HDD global context
- * @tb: The parsed array of netlink attributes
- *
- * This utility function returns the index value by fetching user scenario
- * from the vendor command, and converting it using user scenario to DSI
- * mapping ini.
- *
- * Return: index value of user scenario in the mapping table or error code
- */
-
-static int
-hdd_populate_user_scenario(struct hdd_context *hdd_ctx,
-			   struct nlattr *tb[])
-{
-	struct hdd_config *config;
-	uint32_t user_scenario, index;
-
-	hdd_enter();
-
-	config = hdd_ctx->config;
-
-	if (!config) {
-		hdd_err("Config is NULL");
-		return -EINVAL;
-	}
-
-	if (!config->sar_user_scenario_mapping_num) {
-		hdd_err("No SAR user scenario mapping found");
-		return -EINVAL;
-	}
-
-	user_scenario = nla_get_u32(tb[SAR_LIMITS_SPEC_USER_SCENARIO]);
-	hdd_debug("Setting SAR limits for user scenario: %u", user_scenario);
-
-	if (user_scenario >= CFG_SAR_USER_SCENARIOS_MAX_LEN ||
-	    (2 * user_scenario + 1) >=
-				config->sar_user_scenario_mapping_num) {
-		hdd_err("Invalid SAR User scenario value received : user scenario : %u, mapping num : %u",
-			user_scenario, config->sar_user_scenario_mapping_num);
-		return -EINVAL;
-	}
-
-	user_scenario = 2 * user_scenario + 1;
-	index = config->sar_us_to_dsi_mapping[user_scenario];
-	hdd_debug("Fetched DSI: %u for user scenario", index);
-
-	hdd_exit();
-	return index;
-}
-#else
-static int
-hdd_populate_user_scenario(struct hdd_context *hdd_ctx,
-			   struct nlattr *tb[])
-{
-	hdd_err("SAR safety feature not enabled, not populating DSI as per user scenario");
-	return -EINVAL;
-}
-#endif
 
 #ifdef WLAN_FEATURE_SARV1_TO_SARV2
 /**
@@ -778,7 +702,6 @@ static int wlan_hdd_cfg80211_sar_convert_modulation(u32 nl80211_value,
  * hdd_extract_sar_nested_attrs() - Extract nested SAR attribute
  * @spec: nested nla attribute
  * @row: output to hold extract nested attribute
- * @hdd_ctx: HDD context pointer
  *
  * This function extracts nested SAR attribute one at a time which means
  * for each nested attribute this has to be invoked from
@@ -788,22 +711,16 @@ static int wlan_hdd_cfg80211_sar_convert_modulation(u32 nl80211_value,
  *         On Failure - Negative value
  */
 static int hdd_extract_sar_nested_attrs(struct nlattr *spec[],
-					struct sar_limit_cmd_row *row,
-					struct hdd_context *hdd_ctx)
+					struct sar_limit_cmd_row *row)
 {
 	uint32_t limit;
 	uint32_t band;
 	uint32_t modulation;
-	int ret, index = -1;
+	int ret;
 
 	row->validity_bitmap = 0;
 
-	if (spec[SAR_LIMITS_SPEC_USER_SCENARIO])
-		index = hdd_populate_user_scenario(hdd_ctx, spec);
-
-	if (index >= 0) {
-		row->limit_value = index;
-	} else if (spec[SAR_LIMITS_SPEC_POWER_LIMIT]) {
+	if (spec[SAR_LIMITS_SPEC_POWER_LIMIT]) {
 		limit = nla_get_u32(spec[SAR_LIMITS_SPEC_POWER_LIMIT]);
 		row->limit_value = limit;
 	} else if (spec[SAR_LIMITS_SPEC_POWER_LIMIT_INDEX]) {
@@ -974,7 +891,7 @@ static int __wlan_hdd_set_sar_power_limits(struct wiphy *wiphy,
 			goto fail;
 		}
 
-		ret = hdd_extract_sar_nested_attrs(spec, row, hdd_ctx);
+		ret = hdd_extract_sar_nested_attrs(spec, row);
 		if (ret) {
 			hdd_err("Failed to extract SAR nested attrs");
 			goto fail;
@@ -1025,7 +942,6 @@ fail:
 #undef SAR_LIMITS_SPEC_MODULATION
 #undef SAR_LIMITS_SPEC_POWER_LIMIT
 #undef SAR_LIMITS_SPEC_POWER_LIMIT_INDEX
-#undef SAR_LIMITS_SPEC_USER_SCENARIO
 #undef SAR_LIMITS_MAX
 
 int wlan_hdd_cfg80211_set_sar_power_limits(struct wiphy *wiphy,
@@ -1364,24 +1280,6 @@ void wlan_hdd_sar_timers_reset(struct hdd_context *hdd_ctx)
 
 }
 
-void wlan_hdd_sar_timers_stop(struct hdd_context *hdd_ctx)
-{
-	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
-		return;
-
-	hdd_enter();
-
-	if (QDF_TIMER_STATE_RUNNING ==
-		qdf_mc_timer_get_current_state(&hdd_ctx->sar_safety_timer))
-		qdf_mc_timer_stop(&hdd_ctx->sar_safety_timer);
-
-	qdf_event_set(&hdd_ctx->sar_safety_req_resp_event);
-
-	qdf_delayed_work_stop_sync(&hdd_ctx->sar_safety_unsolicited_work);
-
-	hdd_exit();
-}
-
 void wlan_hdd_sar_timers_init(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
@@ -1431,448 +1329,3 @@ void wlan_hdd_sar_timers_deinit(struct hdd_context *hdd_ctx)
 }
 #endif
 
-#ifdef WLAN_FEATURE_CTAS
-const struct nla_policy
-wlan_hdd_tas_policy[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]          = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE]         = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES]       = {.type = NLA_NESTED},
-	[QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO]    = {.type = NLA_U32},
-};
-
-#define HDD_TAS_NUM_BANDS 3
-
-static int hdd_tas_fill_band_entries(struct sk_buff *skb,
-				     const struct hdd_tas_chain_info *chains,
-				     uint32_t num_chains,
-				     uint32_t tx_info_attr,
-				     const char *tag)
-{
-	struct nlattr *band_list, *band_entry, *antenna_list, *antenna_entry;
-	struct nlattr *tx_info;
-	uint32_t band, chain_idx, ant_idx;
-
-	band_list = nla_nest_start(skb, QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES);
-	if (!band_list)
-		return -EMSGSIZE;
-
-	for (band = 0; band < HDD_TAS_NUM_BANDS; band++) {
-		bool has_chains = false;
-
-		for (chain_idx = 0; chain_idx < num_chains; chain_idx++) {
-			if (chains[chain_idx].chain_operating_band == band) {
-				has_chains = true;
-				break;
-			}
-		}
-		if (!has_chains)
-			continue;
-
-		band_entry = nla_nest_start(skb, band);
-		if (!band_entry)
-			return -EMSGSIZE;
-
-		if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_TAS_BAND_INDEX,
-			       (uint8_t)band))
-			return -EMSGSIZE;
-
-		antenna_list = nla_nest_start(
-				skb,
-				QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST);
-		if (!antenna_list)
-			return -EMSGSIZE;
-
-		ant_idx = 0;
-		for (chain_idx = 0; chain_idx < num_chains; chain_idx++) {
-			if (chains[chain_idx].chain_operating_band != band)
-				continue;
-
-			antenna_entry = nla_nest_start(skb, ant_idx++);
-			if (!antenna_entry)
-				return -EMSGSIZE;
-
-			if (nla_put_u32(skb,
-					QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_INDEX,
-					chains[chain_idx].chain_no))
-				return -EMSGSIZE;
-
-			hdd_debug("TAS %s: band=%u chain=%u tx_value=%u",
-				  tag, band, chains[chain_idx].chain_no,
-				  chains[chain_idx].tx_value);
-
-			tx_info = nla_nest_start(
-					skb,
-					QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO);
-			if (!tx_info)
-				return -EMSGSIZE;
-
-			if (nla_put_u32(skb, tx_info_attr,
-					chains[chain_idx].tx_value))
-				return -EMSGSIZE;
-
-			nla_nest_end(skb, tx_info);
-			nla_nest_end(skb, antenna_entry);
-		}
-		nla_nest_end(skb, antenna_list);
-		nla_nest_end(skb, band_entry);
-	}
-	nla_nest_end(skb, band_list);
-	return 0;
-}
-
-static void hdd_get_tas_metrics_cb(struct wlan_tas_metrics_event *ev,
-				   void *cookie)
-{
-	struct osif_request *request;
-	struct hdd_tas_metrics_priv *priv;
-	uint32_t i;
-
-	request = osif_request_get(cookie);
-	if (!request) {
-		hdd_err("Obsolete TAS metrics request");
-		return;
-	}
-
-	priv = osif_request_priv(request);
-	priv->fw_status = ev->fw_status;
-	priv->time_window_in_sec = ev->time_window_in_sec;
-	priv->num_chains = QDF_MIN(ev->num_chains, HDD_TAS_METRICS_MAX_CHAINS);
-	hdd_debug("TAS metrics cb: fw_status=%u time_window=%u num_chains=%u",
-		  priv->fw_status, priv->time_window_in_sec, priv->num_chains);
-	for (i = 0; i < priv->num_chains; i++) {
-		priv->chains[i].chain_no = ev->chains[i].chain_no;
-		priv->chains[i].chain_operating_band =
-			ev->chains[i].chain_operating_band;
-		priv->chains[i].chain_power_region =
-			ev->chains[i].chain_power_region;
-		hdd_debug("TAS metrics cb chain[%u]: chain_no=%u band=%u power_region=%u",
-			  i, priv->chains[i].chain_no,
-			  priv->chains[i].chain_operating_band,
-			  priv->chains[i].chain_power_region);
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-
-static int hdd_handle_tas_get_metrics(struct hdd_context *hdd_ctx,
-				      struct sk_buff *reply_skb)
-{
-	struct hdd_tas_metrics_priv *priv;
-	struct osif_request *request;
-	struct request_info info = {0};
-	bool pending = false;
-	void *cookie;
-	QDF_STATUS status;
-	int errno;
-	uint32_t i;
-	struct hdd_tas_chain_info chains[HDD_TAS_METRICS_MAX_CHAINS];
-	static const struct osif_request_params params = {
-		.priv_size = sizeof(*priv),
-		.timeout_ms = 5000,
-	};
-
-	request = osif_request_alloc(&params);
-	if (!request) {
-		hdd_err("Failed to alloc osif request");
-		return -ENOMEM;
-	}
-
-	cookie = osif_request_cookie(request);
-	status = ucfg_mc_cp_stats_send_get_avg_tx_power(hdd_ctx->psoc, 0,
-							hdd_get_tas_metrics_cb,
-							cookie);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to send get avg tx power cmd");
-		errno = qdf_status_to_os_return(status);
-		goto put_request;
-	}
-
-	errno = osif_request_wait_for_response(request);
-	if (errno) {
-		hdd_err("TAS metrics wait timed out");
-		ucfg_mc_cp_stats_reset_pending_req(hdd_ctx->psoc,
-						   TYPE_TAS_METRICS,
-						   &info, &pending);
-		goto put_request;
-	}
-
-	priv = osif_request_priv(request);
-	if (priv->fw_status) {
-		hdd_err("FW returned failure for TAS metrics: %u",
-			priv->fw_status);
-		errno = -EINVAL;
-		goto put_request;
-	}
-
-	if (nla_put_u32(reply_skb,
-			QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW,
-			priv->time_window_in_sec))
-		goto free_skb;
-
-	for (i = 0; i < priv->num_chains; i++) {
-		chains[i].chain_no = priv->chains[i].chain_no;
-		chains[i].chain_operating_band =
-			priv->chains[i].chain_operating_band;
-		chains[i].tx_value = priv->chains[i].chain_power_region;
-	}
-
-	errno = hdd_tas_fill_band_entries(
-			reply_skb, chains, priv->num_chains,
-			QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LEVEL,
-			"GET_METRICS");
-	if (errno)
-		goto free_skb;
-
-	osif_request_put(request);
-	return 0;
-
-free_skb:
-	errno = -EMSGSIZE;
-put_request:
-	osif_request_put(request);
-	return errno;
-}
-
-static void hdd_get_tas_plimit_cb(struct wlan_tas_plimit_event *ev,
-				  void *cookie)
-{
-	struct osif_request *request;
-	struct hdd_tas_plimit_priv *priv;
-	uint32_t i;
-
-	request = osif_request_get(cookie);
-	if (!request) {
-		hdd_err("Obsolete TAS plimit request");
-		return;
-	}
-
-	priv = osif_request_priv(request);
-	priv->fw_status = ev->fw_status;
-	priv->num_chains = QDF_MIN(ev->num_chains, HDD_TAS_PLIMIT_MAX_CHAINS);
-	hdd_debug("TAS plimit cb: fw_status=%u num_chains=%u",
-		  priv->fw_status, priv->num_chains);
-
-	for (i = 0; i < priv->num_chains; i++) {
-		priv->chains[i].chain_no = ev->chains[i].chain_no;
-		priv->chains[i].chain_operating_band =
-			ev->chains[i].chain_operating_band;
-		priv->chains[i].power = ev->chains[i].power_limit_dbm;
-		hdd_debug("TAS plimit cb chain[%u]: chain_no=%u band=%u power=%d",
-			  i, priv->chains[i].chain_no,
-			  priv->chains[i].chain_operating_band,
-			  priv->chains[i].power);
-	}
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-
-static int hdd_handle_tas_get_plimit(struct hdd_context *hdd_ctx,
-				     struct sk_buff *reply_skb,
-				     uint32_t scenario)
-{
-	struct hdd_tas_plimit_priv *priv;
-	struct osif_request *request;
-	struct request_info info = {0};
-	bool pending = false;
-	void *cookie;
-	QDF_STATUS status;
-	int errno;
-	uint32_t i;
-	struct hdd_tas_chain_info chains[HDD_TAS_PLIMIT_MAX_CHAINS];
-	static const struct osif_request_params params = {
-		.priv_size = sizeof(*priv),
-		.timeout_ms = 5000,
-	};
-
-	request = osif_request_alloc(&params);
-	if (!request) {
-		hdd_err("Failed to alloc osif request");
-		return -ENOMEM;
-	}
-
-	cookie = osif_request_cookie(request);
-	status = ucfg_mc_cp_stats_send_get_tx_power_calling(
-			hdd_ctx->psoc, scenario,
-			hdd_get_tas_plimit_cb, cookie);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to send get tx power calling cmd");
-		errno = qdf_status_to_os_return(status);
-		goto put_request;
-	}
-
-	errno = osif_request_wait_for_response(request);
-	if (errno) {
-		hdd_err("TAS plimit wait timed out");
-		ucfg_mc_cp_stats_reset_pending_req(hdd_ctx->psoc,
-						   TYPE_TAS_CURRENT_PLIMIT,
-						   &info, &pending);
-		goto put_request;
-	}
-
-	priv = osif_request_priv(request);
-	if (priv->fw_status) {
-		hdd_err("FW returned failure for TAS plimit: %u",
-			priv->fw_status);
-		errno = -EINVAL;
-		goto put_request;
-	}
-	hdd_debug("TAS GET_PLIMIT: FW response received, num_chains=%u",
-		  priv->num_chains);
-
-	for (i = 0; i < priv->num_chains; i++) {
-		chains[i].chain_no = priv->chains[i].chain_no;
-		chains[i].chain_operating_band =
-			priv->chains[i].chain_operating_band;
-		/*
-		 * power is A_INT32 in units of 0.25 dBm;
-		 * cast to uint32_t for NL
-		 */
-		chains[i].tx_value = (uint32_t)priv->chains[i].power;
-	}
-
-	errno = hdd_tas_fill_band_entries(
-			reply_skb, chains, priv->num_chains,
-			QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LIMIT_DBM,
-			"GET_PLIMIT");
-	if (errno)
-		goto free_skb;
-
-	osif_request_put(request);
-	return 0;
-
-free_skb:
-	errno = -EMSGSIZE;
-put_request:
-	osif_request_put(request);
-	return errno;
-}
-
-static int __wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
-				   struct wireless_dev *wdev,
-				   const void *data, int data_len)
-{
-	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TAS_MAX + 1];
-	uint32_t operation, tas_mode;
-	enum host_tas_direction direction;
-	struct sk_buff *reply_skb;
-	QDF_STATUS status;
-	int errno;
-	uint32_t scenario;
-
-	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
-	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
-		hdd_err("Command not allowed in FTM/MONITOR mode");
-		return -EPERM;
-	}
-
-	errno = wlan_hdd_validate_context(hdd_ctx);
-	if (errno)
-		return errno;
-
-	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_TAS_MAX,
-				    data, data_len,
-				    wlan_hdd_tas_policy)) {
-		hdd_err("Invalid TAS attributes");
-		return -EINVAL;
-	}
-
-	if (!tb[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]) {
-		hdd_err("TAS operation not present");
-		return -EINVAL;
-	}
-
-	if (!ucfg_cp_stats_is_ctas_plim_indication_supported(hdd_ctx->psoc)) {
-		hdd_err("FW does not support CTAS PLIM indication");
-		return -EOPNOTSUPP;
-	}
-
-	operation = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_TAS_OPERATION]);
-	switch (operation) {
-	case QCA_WLAN_TAS_OPERATION_SET_MODE:
-		if (!tb[QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE]) {
-			hdd_err("TAS mode value not present");
-			return -EINVAL;
-		}
-		tas_mode = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE]);
-		switch (tas_mode) {
-		case QCA_WLAN_TAS_MODE_NONE:
-			direction = HOST_TAS_DIRECTION_NONE;
-			break;
-		case QCA_WLAN_TAS_MODE_INCREASE:
-			direction = HOST_TAS_DIRECTION_INCREASE;
-			break;
-		case QCA_WLAN_TAS_MODE_DECREASE:
-			direction = HOST_TAS_DIRECTION_DECREASE;
-			break;
-		default:
-			hdd_err("Invalid TAS mode value: %u", tas_mode);
-			return -EINVAL;
-		}
-		hdd_debug("TAS SET_MODE: sending direction=%d to FW",
-			  direction);
-		status = ucfg_cp_stats_send_tas_mode(hdd_ctx->psoc, direction);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to send TAS mode, status: %d", status);
-			return qdf_status_to_os_return(status);
-		}
-		return 0;
-	case QCA_WLAN_TAS_OPERATION_GET_METRICS:
-		reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(
-				wiphy, NLMSG_DEFAULT_SIZE);
-		if (!reply_skb)
-			return -ENOMEM;
-
-		errno = hdd_handle_tas_get_metrics(hdd_ctx, reply_skb);
-		if (errno) {
-			kfree_skb(reply_skb);
-			return errno;
-		}
-		hdd_debug("TAS GET_METRICS: reply sent successfully");
-		return cfg80211_vendor_cmd_reply(reply_skb);
-	case QCA_WLAN_TAS_OPERATION_GET_PLIMIT:
-		if (!tb[QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO]) {
-			hdd_err("TAS plimit scenario not present");
-			return -EINVAL;
-		}
-		scenario = nla_get_u32(
-				tb[QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO]);
-		reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(
-					wiphy, NLMSG_DEFAULT_SIZE);
-		if (!reply_skb)
-			return -ENOMEM;
-
-		errno = hdd_handle_tas_get_plimit(hdd_ctx, reply_skb, scenario);
-		if (errno) {
-			kfree_skb(reply_skb);
-			return errno;
-		}
-		hdd_debug("TAS GET_PLIMIT: reply sent successfully");
-		return cfg80211_vendor_cmd_reply(reply_skb);
-	default:
-		hdd_err("Unsupported TAS operation: %u", operation);
-		return -EOPNOTSUPP;
-	}
-}
-
-int wlan_hdd_cfg80211_tas(struct wiphy *wiphy,
-			  struct wireless_dev *wdev,
-			  const void *data, int data_len)
-{
-	struct osif_psoc_sync *psoc_sync;
-	int errno;
-
-	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
-	if (errno)
-		return errno;
-
-	errno = __wlan_hdd_cfg80211_tas(wiphy, wdev, data, data_len);
-
-	osif_psoc_sync_op_stop(psoc_sync);
-
-	return errno;
-}
-#endif /* WLAN_FEATURE_CTAS */

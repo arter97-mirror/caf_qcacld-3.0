@@ -25,7 +25,6 @@
 #include "wma_api.h"
 #include "wma_tgt_cfg.h"
 #include "i_cds_packet.h"
-#include <wlan_cm_roam_public_struct.h>
 
 #define IS_FEATURE_SUPPORTED_BY_FW(feat_enum_value) \
 				wma_get_fw_wlan_feat_caps(feat_enum_value)
@@ -33,12 +32,6 @@
 #define IS_FEATURE_11BE_SUPPORTED_BY_FW IS_FEATURE_SUPPORTED_BY_FW(DOT11BE)
 #else
 #define IS_FEATURE_11BE_SUPPORTED_BY_FW 0
-#endif
-
-#ifdef WLAN_FEATURE_11BN
-#define IS_FEATURE_11BN_SUPPORTED_BY_FW IS_FEATURE_SUPPORTED_BY_FW(DOT11BN)
-#else
-#define IS_FEATURE_11BN_SUPPORTED_BY_FW 0
 #endif
 
 #define DPU_FEEDBACK_UNPROTECTED_ERROR 0x0F
@@ -234,7 +227,6 @@ enum wmamsgtype {
 
 #ifdef FEATURE_WLAN_TDLS
 	WMA_UPDATE_TDLS_PEER_STATE = SIR_HAL_UPDATE_TDLS_PEER_STATE,
-	WMA_UPDATE_TDLS_OFF_CHAN = SIR_HAL_UPDATE_TDLS_OFF_CHAN_MODE,
 #endif
 	WMA_SET_SAP_INTRABSS_DIS = SIR_HAL_SET_SAP_INTRABSS_DIS,
 
@@ -513,17 +505,6 @@ typedef QDF_STATUS (*wma_tx_ota_comp_callback)(void *context, qdf_nbuf_t buf,
 /* generic callback for updating parameters from target to HDD */
 typedef int (*wma_tgt_cfg_cb)(hdd_handle_t handle, struct wma_tgt_cfg *cfg);
 
-typedef void (*wma_get_tsf_timer_cb)(void *ctx, void *response_ptr);
-
-/**
- * typedef wma_chan_hop_status_cb - Channel hop status callback
- * @ctx: Callback context
- * @response: Response structure pointer
- *
- * Callback function type for channel hop status response.
- */
-typedef void (*wma_chan_hop_status_cb)(void *ctx, void *response);
-
 /**
  * struct wma_cli_set_cmd_t - set command parameters
  * @param_id: parameter id
@@ -611,7 +592,7 @@ void wma_tx_abort(uint8_t vdev_id);
  * @tx_frame: frame buffer
  * @frmLen: frame length
  * @frmType: frame type
- * @txDir: tx direction
+ * @txDir: tx diection
  * @tid: TID
  * @tx_frm_download_comp_cb: tx download callback handler
  * @pData: tx packet
@@ -674,8 +655,10 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
-				struct mac_context *mac,
-				struct auth_offload_event *auth_event),
+			struct mac_context *mac,
+			uint8_t vdev_id,
+			struct qdf_mac_addr bssid,
+			uint32_t akm),
 		pe_roam_synch_fn_t pe_roam_synch_cb,
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
@@ -687,7 +670,9 @@ QDF_STATUS wma_register_roaming_callbacks(
 static inline QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
-			struct auth_offload_event *auth_event),
+			uint8_t vdev_id,
+			struct qdf_mac_addr bssid,
+			uint32_t akm),
 		pe_roam_synch_fn_t pe_roam_synch_cb,
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
@@ -700,18 +685,4 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 }
 #endif
 
-/**
- * wma_send_qos_null_frame() - Send QoS null frame to WMI
- * @mac: MAC context
- * @vdev_id: VDEV ID
- * @frame: Frame buffer (qdf_nbuf)
- * @frame_len: Length of qos null frame
- * @peer_addr: Peer MAC address
- * @desc_id: Management descriptor ID for tracking
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_send_qos_null_frame(struct mac_context *mac, uint8_t vdev_id,
-				   qdf_nbuf_t frame, uint32_t frame_len,
-				   uint8_t *peer_addr, uint32_t desc_id);
 #endif

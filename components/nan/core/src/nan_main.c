@@ -31,7 +31,6 @@
 #include "wlan_serialization_api.h"
 #include "wlan_objmgr_cmn.h"
 #include "wlan_tdls_ucfg_api.h"
-#include "wlan_tdls_stats_api.h"
 #include "wlan_objmgr_global_obj.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
@@ -44,13 +43,10 @@
 #include "wlan_if_mgr_public_struct.h"
 #include "wlan_if_mgr_api.h"
 #include "wlan_mlme_api.h"
-#include "cfg_nan_api.h"
-#include "wlan_nan_api_i.h"
 
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	struct nan_psoc_priv_obj *psoc_nan_obj;
-	uint8_t pair_cfg;
 
 	if (!psoc) {
 		nan_err("psoc is null");
@@ -63,8 +59,7 @@ bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 		return false;
 	}
 
-	pair_cfg = psoc_nan_obj->cfg_param.nan_config & NAN_PARING_BIT;
-	return psoc_nan_obj->nan_caps.nan_pairing_peer_create_cap && pair_cfg;
+	return psoc_nan_obj->nan_caps.nan_pairing_peer_create_cap;
 }
 
 bool nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
@@ -110,51 +105,12 @@ void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	if (is_increment) {
+	if (is_increment)
 		nan_vdev_obj->num_pasn_peers++;
-	} else if (!nan_vdev_obj->num_pasn_peers) {
-		nan_err("No PASN peers present");
-		return;
-	} else if (nan_vdev_obj->num_pasn_peers) {
+	else if (nan_vdev_obj->num_pasn_peers)
 		nan_vdev_obj->num_pasn_peers--;
-	}
 
 	nan_debug("Pasn peer count:%d", nan_vdev_obj->num_pasn_peers);
-}
-
-QDF_STATUS nan_get_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
-				   uint32_t *val)
-{
-	struct nan_vdev_priv_obj *nan_vdev_obj;
-
-	nan_vdev_obj = nan_get_vdev_priv_obj(vdev);
-	if (!nan_vdev_obj) {
-		nan_err("NAN vdev priv obj is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = nan_vdev_obj->num_pasn_peers;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS nan_get_max_pairing_sessions(struct wlan_objmgr_psoc *psoc,
-					uint32_t *val)
-{
-	struct target_psoc_info *tgt_hdl;
-
-	if (!psoc) {
-		nan_err("psoc is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
-	if (!tgt_hdl) {
-		nan_err("tgt_hdl is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = tgt_hdl->info.service_ext2_param.max_nan_pairing_sessions;
-	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -165,7 +121,7 @@ QDF_STATUS nan_get_max_pairing_sessions(struct wlan_objmgr_psoc *psoc,
  *
  * Return: QDF status
  */
-QDF_STATUS
+static QDF_STATUS
 nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id,
 				   struct qdf_mac_addr *peer_mac_addr)
@@ -174,7 +130,6 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t idx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -189,10 +144,8 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
-	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
-
 	idx = nan_vdev_priv->num_peer_migrated;
-	if (idx >= max_ndp_sessions) {
+	if (idx >= MAX_NAN_MIGRATED_PEERS) {
 		nan_err("num migrated peers %d more than max migrated peers",
 			nan_vdev_priv->num_peer_migrated);
 		status = QDF_STATUS_E_FAILURE;
@@ -203,11 +156,6 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		     peer_mac_addr->bytes, QDF_MAC_ADDR_SIZE);
 
 	nan_debug("add peer to migrated list at index %d", idx);
-
-	if (!nan_vdev_priv->num_peer_migrated) {
-		qdf_event_reset(&nan_vdev_priv->migration_complete_event);
-		nan_debug("peer migration event reset vdev_id %d", vdev_id);
-	}
 
 	nan_vdev_priv->num_peer_migrated++;
 ref_rel:
@@ -233,7 +181,6 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	uint8_t i = 0, idx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -248,10 +195,8 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
-	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
-
 	idx = nan_vdev_priv->num_peer_migrated;
-	if (idx > max_ndp_sessions) {
+	if (idx > MAX_NAN_MIGRATED_PEERS) {
 		nan_err("idx %d more than max migrated peers", idx);
 		status = QDF_STATUS_E_FAILURE;
 		goto ref_rel;
@@ -282,49 +227,6 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		  i, idx);
 	nan_vdev_priv->num_peer_migrated--;
 
-	if (!nan_vdev_priv->num_peer_migrated) {
-		qdf_event_set(&nan_vdev_priv->migration_complete_event);
-		nan_debug("peer migration completed for vdev_id %d", vdev_id);
-	}
-
-ref_rel:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return status;
-}
-
-QDF_STATUS
-nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_vdev_priv_obj *nan_vdev_priv;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!nan_is_pairing_allowed(psoc)) {
-		nan_debug("NAN pairing is not allowed");
-		return QDF_STATUS_SUCCESS;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("vdev is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	nan_vdev_priv = nan_get_vdev_priv_obj(vdev);
-	if (!nan_vdev_priv) {
-		nan_err("NAN vdev priv obj is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto ref_rel;
-	}
-
-	if (nan_vdev_priv->num_peer_migrated) {
-		nan_info("NAN Waiting for peer migration to complete");
-		status = qdf_wait_for_event_completion(
-				&nan_vdev_priv->migration_complete_event, 5000);
-		if (QDF_IS_STATUS_ERROR(status))
-			nan_err("peer migration completion failed");
-	}
 ref_rel:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 	return status;
@@ -346,7 +248,6 @@ nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	uint8_t i;
 	bool is_peer_migrated = false;
-	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -360,10 +261,8 @@ nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto ref_rel;
 	}
 
-	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
-
-	if (!nan_vdev_priv->num_peer_migrated ||
-	    nan_vdev_priv->num_peer_migrated > max_ndp_sessions)
+	if (!nan_vdev_priv->num_peer_migrated &&
+	    nan_vdev_priv->num_peer_migrated > MAX_NAN_MIGRATED_PEERS)
 		goto ref_rel;
 
 	for (i = 0; i < nan_vdev_priv->num_peer_migrated; i++) {
@@ -531,41 +430,6 @@ ref_rel:
 	return status;
 }
 
-/**
- * nan_pasn_peer_create_confirmed() - finish migration-recreate bookkeeping
- * once a NAN PASN peer create for a previously-migrated peer is confirmed
- * @psoc: pointer to psoc object
- * @vdev_id: NAN vdev id
- * @peer_mac_addr: peer mac address
- *
- * The PASN key for this peer was installed to FW before it migrated to the
- * NDP vdev and is not reinstalled as part of this recreate, so the recreated
- * peer object's key_installed flag must be marked explicitly once the
- * recreate is confirmed, otherwise the WEP/Privacy bit is not set for
- * subsequent frames to this peer.
- *
- * Return: none
- */
-static void
-nan_pasn_peer_create_confirmed(struct wlan_objmgr_psoc *psoc,
-			       uint8_t vdev_id,
-			       struct qdf_mac_addr *peer_mac_addr)
-{
-	QDF_STATUS status;
-
-	if (!peer_mac_addr) {
-		nan_err("peer mac address is null for vdev id %d", vdev_id);
-		return;
-	}
-
-	wlan_peer_set_key_install_flag(psoc, peer_mac_addr->bytes, true);
-
-	status = nan_remove_peer_in_migrated_addr_list(psoc, vdev_id,
-						       peer_mac_addr);
-	if (QDF_IS_STATUS_ERROR(status))
-		nan_err("fail to remove peer addr in migrated list");
-}
-
 QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 				    struct qdf_mac_addr *peer_mac_addr)
 {
@@ -574,8 +438,6 @@ QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 	struct nan_pasn_peer_ops *peer_ops;
 	struct wlan_objmgr_vdev *nan_vdev;
 	uint8_t nan_vdev_id;
-	uint32_t pasn_peer_count;
-	uint32_t max_nan_pairing_session;
 
 	if (!nan_is_pairing_allowed(psoc)) {
 		nan_debug("NAN pairing is not allowed");
@@ -612,75 +474,28 @@ QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
-	status = nan_get_pasn_peer_count(nan_vdev, &pasn_peer_count);
+	status = peer_ops->nan_pasn_peer_create_cb(psoc, peer_mac_addr,
+						   nan_vdev_id,
+						   NAN_PASN_PEER_CREATE);
+
 	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to get pasn peer");
+		nan_err("NAN PASN peer create request fails");
 		goto ref_rel;
 	}
 
-	status = nan_get_max_pairing_sessions(psoc, &max_nan_pairing_session);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to max pairing session");
-		goto ref_rel;
-	}
+	nan_update_pasn_peer_count(nan_vdev, true);
 
-	if (pasn_peer_count < max_nan_pairing_session) {
-		status = peer_ops->nan_pasn_peer_create_cb(
-						psoc,
-						peer_mac_addr,
-						nan_vdev_id,
-						NAN_PASN_PEER_CREATE);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			nan_err("NAN PASN peer create request fails");
-			goto ref_rel;
-		}
-		nan_update_pasn_peer_count(nan_vdev, true);
-	}
+	status = nan_remove_peer_in_migrated_addr_list(psoc, nan_vdev_id,
+						       peer_mac_addr);
 
-	/*
-	 * When FW does not support an async peer-create-confirm event,
-	 * wma_pasn_peer_create() above has already completed the create
-	 * synchronously, so finish the migration-recreate bookkeeping
-	 * (key-installed flag + migrated-list removal) right here. When
-	 * FW does support it, defer both to nan_handle_pasn_peer_create_rsp()
-	 * once FW actually confirms the peer create, since only then is
-	 * the recreate genuinely successful.
-	 */
-	if (!wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_F_PEER_CREATE_RESP))
-		nan_pasn_peer_create_confirmed(psoc, nan_vdev_id,
-					       peer_mac_addr);
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("fail to remove peer addr in migrated list");
 
 ref_rel:
 	wlan_objmgr_vdev_release_ref(nan_vdev, WLAN_NAN_ID);
 
 	return status;
 }
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc)
-{
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-
-	if (!ucfg_nan_is_fw_support_standard_mode(psoc))
-		return QDF_STATUS_SUCCESS;
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (psoc_nan_obj->cb_obj.nan_vdev_destroy_cb)
-		psoc_nan_obj->cb_obj.nan_vdev_destroy_cb(psoc);
-
-	return QDF_STATUS_SUCCESS;
-}
-#else
-QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state)
@@ -782,12 +597,6 @@ void nan_release_cmd(void *in_req, uint32_t cmdtype)
 		vdev = req->vdev;
 		break;
 	}
-	case WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ: {
-		struct nan_datapath_update_config *req = in_req;
-
-		vdev = req->vdev;
-		break;
-	}
 	default:
 		nan_err("invalid req type: %d", cmdtype);
 		break;
@@ -843,13 +652,6 @@ static void nan_req_activated(void *in_req, uint32_t cmdtype)
 		req_type = NDP_END_ALL;
 		break;
 	}
-	case WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ: {
-		struct nan_datapath_update_config *req = in_req;
-
-		vdev = req->vdev;
-		req_type = NDP_UPDATE_CONFIG;
-		break;
-	}
 	default:
 		nan_alert("in correct cmdtype: %d", cmdtype);
 		return;
@@ -880,18 +682,6 @@ static void nan_req_activated(void *in_req, uint32_t cmdtype)
 
 	/* send ndp_intiator_req/responder_req/end_req to FW */
 	tx_ops->nan_datapath_req_tx(in_req, req_type);
-
-	if (cmdtype == WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ) {
-		struct wlan_serialization_queued_cmd_info cmd;
-
-		cmd.requestor = WLAN_UMAC_COMP_NAN;
-		cmd.cmd_id = 0;
-		cmd.req_type = WLAN_SER_CANCEL_NON_SCAN_CMD;
-		cmd.queue_type = WLAN_SERIALIZATION_ACTIVE_QUEUE;
-		cmd.cmd_type = WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ;
-		cmd.vdev = vdev;
-		wlan_serialization_remove_cmd(&cmd);
-	}
 }
 
 static QDF_STATUS nan_serialized_cb(struct wlan_serialization_command *ser_cmd,
@@ -920,613 +710,6 @@ static QDF_STATUS nan_serialized_cb(struct wlan_serialization_command *ser_cmd,
 		/* Do nothing but logging */
 		nan_alert("invalid serialized cb reason: %d", reason);
 		break;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-/**
- * nan_handle_local_schedule_req() - Handle NAN local schedule request
- * @req: Pointer to NAN local schedule parameters
- *
- * This function processes the NAN local schedule request by validating
- * parameters, retrieving necessary objects, and sending the request to
- * firmware through tx_ops.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static QDF_STATUS nan_handle_local_schedule_req(
-					struct nan_local_sched_params *req)
-{
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	struct wlan_nan_tx_ops *tx_ops;
-	QDF_STATUS status;
-
-	if (!req) {
-		nan_err("Invalid parameters: req is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!req->psoc) {
-		nan_err("Invalid parameters: psoc is NULL");
-		status = QDF_STATUS_E_INVAL;
-		goto cleanup;
-	}
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(req->psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto cleanup;
-	}
-
-	tx_ops = &psoc_nan_obj->tx_ops;
-	if (!tx_ops->nan_datapath_req_tx) {
-		nan_err("nan_datapath_req_tx is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto cleanup;
-	}
-
-	nan_debug("Processing local schedule request for vdev_id: %d",
-		  req->vdev_id);
-
-	status = tx_ops->nan_datapath_req_tx(req, NAN_LOCAL_SCHEDULE_REQ);
-	if (QDF_IS_STATUS_ERROR(status))
-		nan_err("Failed to send local schedule req to FW, status: %d",
-			status);
-
-cleanup:
-	qdf_mem_free(req);
-	return status;
-}
-
-QDF_STATUS nan_set_local_schedule(struct nan_local_sched_params *params)
-{
-	QDF_STATUS status;
-	struct scheduler_msg msg = {0};
-	struct nan_local_sched_params *req;
-
-	if (!params) {
-		nan_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	req = qdf_mem_malloc(sizeof(*req));
-	if (!req)
-		return QDF_STATUS_E_NOMEM;
-
-	qdf_mem_copy(req, params, sizeof(*req));
-
-	msg.bodyptr = req;
-	msg.type = NAN_LOCAL_SCHEDULE_REQ;
-	msg.callback = nan_scheduled_msg_handler;
-	msg.flush_callback = nan_sch_msg_flush_cb;
-
-	status = scheduler_post_message(QDF_MODULE_ID_HDD,
-					QDF_MODULE_ID_NAN,
-					QDF_MODULE_ID_OS_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to post message, status: %d", status);
-		qdf_mem_free(req);
-	}
-
-	return status;
-}
-
-/**
- * nan_process_local_schedule_msg() - Process NAN local schedule message
- * @msg: Pointer to scheduler message
- *
- * This is a wrapper function to handle NAN_LOCAL_SCHEDULE_REQ message type.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static inline QDF_STATUS
-nan_process_local_schedule_msg(struct scheduler_msg *msg)
-{
-	return nan_handle_local_schedule_req(msg->bodyptr);
-}
-
-/**
- * nan_handle_local_schedule_rsp() - Handle NAN local schedule response
- * @rsp: Pointer to NAN local schedule response structure
- *
- * This function processes the NAN local schedule response by retrieving
- * the vdev from psoc using vdev_id, and then notifying the OS IF layer.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static QDF_STATUS nan_handle_local_schedule_rsp(struct nan_local_sched_rsp *rsp)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev = NULL;
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!rsp || !rsp->psoc) {
-		nan_err("Invalid parameters: rsp=%pK", rsp);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = rsp->psoc;
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	/* Get vdev from psoc using vdev_id */
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp->vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("vdev is null for vdev_id: %d", rsp->vdev_id);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	nan_debug("Processing local schedule response for vdev_id: %d, status: %d, reason: %d",
-		  rsp->vdev_id, rsp->status, rsp->reason);
-
-	/* Notify OS IF layer about response */
-	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, vdev,
-						     NAN_LOCAL_SCHEDULE_RSP,
-						     rsp);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return status;
-}
-
-/**
- * nan_handle_peer_schedule_req() - Handle NAN peer schedule request
- * @req: Pointer to NAN peer schedule parameters
- *
- * This function processes the NAN peer schedule request by validating
- * parameters, retrieving necessary objects, and sending the request to
- * firmware through tx_ops.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static QDF_STATUS nan_handle_peer_schedule_req(
-					struct nan_peer_sched_params *req)
-{
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	struct wlan_nan_tx_ops *tx_ops;
-	QDF_STATUS status;
-
-	if (!req) {
-		nan_err("Invalid parameters: req is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!req->psoc) {
-		nan_err("Invalid parameters: psoc is NULL");
-		status = QDF_STATUS_E_INVAL;
-		goto cleanup;
-	}
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(req->psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto cleanup;
-	}
-
-	tx_ops = &psoc_nan_obj->tx_ops;
-	if (!tx_ops->nan_datapath_req_tx) {
-		nan_err("nan_datapath_req_tx is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto cleanup;
-	}
-
-	nan_debug("Processing peer schedule request for vdev_id: %d",
-		  req->vdev_id);
-
-	status = tx_ops->nan_datapath_req_tx(req, NAN_PEER_SCHEDULE_REQ);
-	if (QDF_IS_STATUS_ERROR(status))
-		nan_err("Failed to send peer schedule req to FW, status: %d",
-			status);
-
-cleanup:
-	/*
-	 * For variable length array (init_ulw), we allocated one block.
-	 * So freeing req frees everything.
-	 */
-	qdf_mem_free(req);
-	return status;
-}
-
-QDF_STATUS nan_set_peer_schedule(struct nan_peer_sched_params *params)
-{
-	QDF_STATUS status;
-	struct scheduler_msg msg = {0};
-	struct nan_peer_sched_params *req;
-	uint32_t len;
-
-	if (!params) {
-		nan_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	len = sizeof(*req) + params->ulw_size;
-	req = qdf_mem_malloc(len);
-	if (!req)
-		return QDF_STATUS_E_NOMEM;
-
-	qdf_mem_copy(req, params, len);
-
-	msg.bodyptr = req;
-	msg.type = NAN_PEER_SCHEDULE_REQ;
-	msg.callback = nan_scheduled_msg_handler;
-	msg.flush_callback = nan_sch_msg_flush_cb;
-
-	status = scheduler_post_message(QDF_MODULE_ID_HDD,
-					QDF_MODULE_ID_NAN,
-					QDF_MODULE_ID_OS_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to post message, status: %d", status);
-		qdf_mem_free(req);
-	}
-
-	return status;
-}
-
-/**
- * nan_process_peer_schedule_msg() - Process NAN peer schedule message
- * @msg: Pointer to scheduler message
- *
- * This is a wrapper function to handle NAN_PEER_SCHEDULE_REQ message type.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static inline QDF_STATUS
-nan_process_peer_schedule_msg(struct scheduler_msg *msg)
-{
-	return nan_handle_peer_schedule_req(msg->bodyptr);
-}
-
-/**
- * nan_handle_peer_schedule_rsp() - Handle NAN peer schedule response
- * @rsp: Pointer to NAN peer schedule response structure
- *
- * This function processes the NAN peer schedule response by retrieving
- * the vdev from psoc using vdev_id, and then notifying the OS IF layer.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static QDF_STATUS nan_handle_peer_schedule_rsp(struct nan_peer_sched_rsp *rsp)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev = NULL;
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!rsp || !rsp->psoc) {
-		nan_err("Invalid parameters: rsp=%pK", rsp);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = rsp->psoc;
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	/* Get vdev from psoc using vdev_id */
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp->vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("vdev is null for vdev_id: %d", rsp->vdev_id);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	nan_debug("Processing peer schedule response for vdev_id: %d, status: %d",
-		  rsp->vdev_id, rsp->status);
-
-	/* Notify OS IF layer about response */
-	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, vdev,
-						     NAN_PEER_SCHEDULE_RSP,
-						     rsp);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return status;
-}
-
-/**
- * nan_handle_peer_params_req() - Handle NAN peer params request
- * @req: Pointer to NAN peer parameters request
- *
- * This function processes the NAN peer parameters request by validating
- * parameters, retrieving necessary objects, and sending the request to
- * firmware through tx_ops.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static QDF_STATUS nan_handle_peer_params_req(struct nan_peer_params_req *req)
-{
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	struct wlan_nan_tx_ops *tx_ops;
-	QDF_STATUS status;
-
-	if (!req) {
-		nan_err("Invalid parameters: req is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!req->psoc) {
-		nan_err("Invalid parameters: psoc is NULL");
-		status = QDF_STATUS_E_INVAL;
-		goto cleanup;
-	}
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(req->psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto cleanup;
-	}
-
-	tx_ops = &psoc_nan_obj->tx_ops;
-	if (!tx_ops->nan_datapath_req_tx) {
-		nan_err("nan_datapath_req_tx is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto cleanup;
-	}
-
-	nan_debug("Processing peer params request for vdev_id: %d",
-		  req->vdev_id);
-
-	status = tx_ops->nan_datapath_req_tx(req, NAN_PEER_PARAMS_REQ);
-	if (QDF_IS_STATUS_ERROR(status))
-		nan_err("Failed to send peer params req to FW, status: %d",
-			status);
-
-cleanup:
-	/*
-	 * For variable length array (peer_cap), we allocated one block.
-	 * So freeing req frees everything.
-	 */
-	qdf_mem_free(req);
-	return status;
-}
-
-QDF_STATUS nan_req_peer_params(struct nan_peer_params_req *params)
-{
-	QDF_STATUS status;
-	struct scheduler_msg msg = {0};
-	struct nan_peer_params_req *req;
-	uint32_t len;
-
-	if (!params) {
-		nan_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	len = sizeof(*req) + params->peer_cap_len;
-	req = qdf_mem_malloc(len);
-	if (!req)
-		return QDF_STATUS_E_NOMEM;
-
-	qdf_mem_copy(req, params, len);
-
-	msg.bodyptr = req;
-	msg.type = NAN_PEER_PARAMS_REQ;
-	msg.callback = nan_scheduled_msg_handler;
-	msg.flush_callback = nan_sch_msg_flush_cb;
-
-	status = scheduler_post_message(QDF_MODULE_ID_HDD,
-					QDF_MODULE_ID_NAN,
-					QDF_MODULE_ID_OS_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to post message, status: %d", status);
-		qdf_mem_free(req);
-	}
-
-	return status;
-}
-
-/**
- * nan_process_peer_params_msg() - Process NAN peer params message
- * @msg: Pointer to scheduler message
- *
- * This is a wrapper function to handle NAN_PEER_PARAMS_REQ message type.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static inline QDF_STATUS
-nan_process_peer_params_msg(struct scheduler_msg *msg)
-{
-	return nan_handle_peer_params_req(msg->bodyptr);
-}
-
-/**
- * nan_handle_peer_params_rsp() - Handle NAN peer params response
- * @rsp: Pointer to NAN peer parameters response structure
- *
- * This function processes the NAN peer params response by retrieving
- * the vdev from psoc using vdev_id, and then notifying the OS IF layer.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-static QDF_STATUS nan_handle_peer_params_rsp(struct nan_peer_params_rsp *rsp)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev = NULL;
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!rsp || !rsp->psoc) {
-		nan_err("Invalid parameters: rsp=%pK", rsp);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = rsp->psoc;
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	/* Get vdev from psoc using vdev_id */
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp->vdev_id,
-						    WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("vdev is null for vdev_id: %d", rsp->vdev_id);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	nan_debug("Processing peer params response for vdev_id: %d, status: %d",
-		  rsp->vdev_id, rsp->status);
-
-	/* Notify OS IF layer about response */
-	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, vdev,
-						     NAN_PEER_PARAMS_RSP,
-						     rsp);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return status;
-}
-
-/**
- * nan_ndi_peer_create_req() - Process NDI peer create request
- * @psoc: pointer to psoc object
- * @vdev_id: vdev ID
- * @peer_mac: peer MAC address
- *
- * This function processes the NDI peer create request by calling the
- * registered callback (lim_add_ndi_peer_converged) which handles the
- * actual peer creation including WMI command to firmware.
- *
- * Return: QDF_STATUS - Success or appropriate error code
- */
-QDF_STATUS nan_ndi_peer_create_req(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id,
-				   struct qdf_mac_addr *peer_mac)
-{
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	QDF_STATUS status;
-
-	if (!peer_mac) {
-		nan_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!psoc) {
-		nan_err("psoc is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (!psoc_nan_obj->cb_obj.add_ndi_peer) {
-		nan_err("add_ndi_peer callback is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	nan_debug("Creating NDI peer: " QDF_MAC_ADDR_FMT " vdev_id: %d",
-		  QDF_MAC_ADDR_REF(peer_mac->bytes), vdev_id);
-
-	/* Call the existing callback which invokes
-	 * lim_add_ndi_peer_converged
-	 */
-	status = psoc_nan_obj->cb_obj.add_ndi_peer(vdev_id, *peer_mac);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to add NDI peer: %d", status);
-		return status;
-	}
-
-	nan_debug("NDI peer created successfully");
-	return QDF_STATUS_SUCCESS;
-}
-#else
-static inline QDF_STATUS
-nan_process_local_schedule_msg(struct scheduler_msg *msg)
-{
-	nan_err("NAN local schedule not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-nan_handle_local_schedule_rsp(struct nan_local_sched_rsp *rsp)
-{
-	nan_err_rl("NAN local schedule not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-nan_process_peer_schedule_msg(struct scheduler_msg *msg)
-{
-	nan_err("NAN peer schedule not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-nan_handle_peer_schedule_rsp(struct nan_peer_sched_rsp *rsp)
-{
-	nan_err("NAN peer schedule not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-nan_process_peer_params_msg(struct scheduler_msg *msg)
-{
-	nan_err("NAN peer params not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-nan_handle_peer_params_rsp(struct nan_peer_params_rsp *rsp)
-{
-	nan_err("NAN peer params not supported");
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
-QDF_STATUS nan_sch_msg_flush_cb(struct scheduler_msg *msg)
-{
-	struct wlan_objmgr_vdev *vdev = NULL;
-
-	if (!msg || !msg->bodyptr)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	switch (msg->type) {
-	case NDP_INITIATOR_REQ:
-		vdev = ((struct nan_datapath_initiator_req *)
-			msg->bodyptr)->vdev;
-		break;
-	case NDP_RESPONDER_REQ:
-		vdev = ((struct nan_datapath_responder_req *)
-			msg->bodyptr)->vdev;
-		break;
-	case NDP_END_REQ:
-		vdev = ((struct nan_datapath_end_req *)msg->bodyptr)->vdev;
-		break;
-	case NDP_END_ALL:
-		vdev = ((struct nan_datapath_end_all_ndps *)msg->bodyptr)->vdev;
-		break;
-	case NDP_UPDATE_CONFIG:
-		vdev = ((struct nan_datapath_update_config *)msg->bodyptr)
-			->vdev;
-		break;
-	case NAN_LOCAL_SCHEDULE_REQ:
-		/* No vdev for this req; only vdev_id and psoc */
-	case NAN_PEER_SCHEDULE_REQ:
-	case NAN_PEER_PARAMS_REQ:
-		qdf_mem_free(msg->bodyptr);
-		msg->bodyptr = NULL;
-		break;
-	default:
-		nan_err("Invalid NAN msg type during sch flush");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (vdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-		qdf_mem_free(msg->bodyptr);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -1570,19 +753,6 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 		cmd.vdev = req->vdev;
 		break;
 	}
-	case NDP_UPDATE_CONFIG: {
-		struct nan_datapath_update_config *req = msg->bodyptr;
-
-		cmd.cmd_type = WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ;
-		cmd.vdev = req->vdev;
-		break;
-	}
-	case NAN_LOCAL_SCHEDULE_REQ:
-		return nan_process_local_schedule_msg(msg);
-	case NAN_PEER_SCHEDULE_REQ:
-		return nan_process_peer_schedule_msg(msg);
-	case NAN_PEER_PARAMS_REQ:
-		return nan_process_peer_params_msg(msg);
 	default:
 		nan_err("wrong request type: %d", msg->type);
 		return QDF_STATUS_E_INVAL;
@@ -1613,12 +783,10 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 static QDF_STATUS
 nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 			   struct qdf_mac_addr *peer_ndi_mac,
-			   struct nan_datapath_channel_info *ndp_chan_info,
-			   uint32_t ndp_instance_id)
+			   struct nan_datapath_channel_info *ndp_chan_info)
 {
 	struct wlan_objmgr_peer *peer;
 	struct nan_peer_priv_obj *peer_nan_obj;
-	uint32_t active_ndp_sessions;
 
 	peer = wlan_objmgr_get_peer_by_mac(psoc,
 					   peer_ndi_mac->bytes,
@@ -1637,18 +805,13 @@ nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 	}
 	qdf_spin_lock_bh(&peer_nan_obj->lock);
 
-	active_ndp_sessions = peer_nan_obj->active_ndp_sessions;
 	/*
 	 * Store the first channel info in NDP Confirm as the home channel info
 	 * and store it in the peer private object.
 	 */
-	if (!active_ndp_sessions)
+	if (!peer_nan_obj->active_ndp_sessions)
 		qdf_mem_copy(&peer_nan_obj->home_chan_info, ndp_chan_info,
 			     sizeof(struct nan_datapath_channel_info));
-
-	if (active_ndp_sessions < MAX_NDP_SESSIONS)
-		peer_nan_obj->ndp_instance_id[active_ndp_sessions] =
-								ndp_instance_id;
 
 	peer_nan_obj->active_ndp_sessions++;
 	nan_debug("Number of active session = %d for peer:"QDF_MAC_ADDR_FMT,
@@ -1661,12 +824,10 @@ nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 }
 
 static QDF_STATUS nan_decrement_ndp_sessions(struct wlan_objmgr_psoc *psoc,
-					     struct qdf_mac_addr *peer_ndi_mac,
-					     uint32_t ndp_instance_id)
+					     struct qdf_mac_addr *peer_ndi_mac)
 {
 	struct wlan_objmgr_peer *peer;
 	struct nan_peer_priv_obj *peer_nan_obj;
-	uint32_t ndp_session_idx;
 
 	peer = wlan_objmgr_get_peer_by_mac(psoc,
 					   peer_ndi_mac->bytes,
@@ -1691,28 +852,6 @@ static QDF_STATUS nan_decrement_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	for (ndp_session_idx = 0;
-	     ndp_session_idx < peer_nan_obj->active_ndp_sessions;
-	     ndp_session_idx++) {
-		if (peer_nan_obj->ndp_instance_id[ndp_session_idx] ==
-		    ndp_instance_id) {
-			if (peer_nan_obj->active_ndp_sessions <=
-			    MAX_NDP_SESSIONS)
-				peer_nan_obj->ndp_instance_id[ndp_session_idx] =
-					peer_nan_obj->ndp_instance_id[peer_nan_obj->active_ndp_sessions - 1];
-			else
-				peer_nan_obj->ndp_instance_id[ndp_session_idx] =
-					peer_nan_obj->ndp_instance_id[MAX_NDP_SESSIONS - 1];
-
-			break;
-		}
-	}
-
-	if (ndp_session_idx == peer_nan_obj->active_ndp_sessions)
-		nan_err("NDP instance id:%d not found in peer active sessions",
-			ndp_instance_id);
-
 	peer_nan_obj->active_ndp_sessions--;
 	nan_debug("Number of active session = %d for peer:"QDF_MAC_ADDR_FMT,
 		  peer_nan_obj->active_ndp_sessions,
@@ -1935,8 +1074,7 @@ static QDF_STATUS nan_handle_confirm(struct nan_datapath_confirm_event *confirm)
 	/* Increment NDP sessions for the Peer */
 	if (confirm->rsp_code == NAN_DATAPATH_RESPONSE_ACCEPT)
 		nan_increment_ndp_sessions(psoc, &confirm->peer_ndi_mac_addr,
-					   &confirm->ch[0],
-					   confirm->ndp_instance_id);
+					   &confirm->ch[0]);
 
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, confirm->vdev,
 						     NDP_CONFIRM, confirm);
@@ -2163,8 +1301,7 @@ static QDF_STATUS nan_handle_end_ind(
 	/* Decrement NDP sessions for all Peers in the event */
 	for (i = 0; i < ind->num_ndp_ids; i++)
 		nan_decrement_ndp_sessions(psoc,
-					   &ind->ndp_map[i].peer_ndi_mac_addr,
-					   ind->ndp_map[i].ndp_instance_id);
+					   &ind->ndp_map[i].peer_ndi_mac_addr);
 
 	for (i = 0; i < ind->num_ndp_ids; i++) {
 		vdev_itr = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
@@ -2377,51 +1514,8 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 	return status;
 }
 
-static QDF_STATUS nan_handle_disable_ind(struct nan_event_params *nan_event,
-					 uint8_t evt_type, bool *is_drop_evt)
+static QDF_STATUS nan_handle_disable_ind(struct nan_event_params *nan_event)
 {
-	uint8_t disable_req_type;
-	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
-
-	status = nan_get_disable_req_info(nan_event->psoc, &disable_req_type);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Unable to get nan disable req info");
-		*is_drop_evt = true;
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if ((disable_req_type == NAN_DISABLE_REQ_NB &&
-	     evt_type == nan_event_id_disable_ind) ||
-	    (disable_req_type == NAN_DISABLE_REQ_INTERNAL &&
-	     evt_type == nan_event_id_disable_rsp)) {
-		nan_debug("drop evt_type %d disable_req_type %d",
-			  evt_type, disable_req_type);
-		*is_drop_evt = true;
-		nan_cache_disable_req_info(nan_event->psoc,
-					   NAN_DISABLE_REQ_DEFAULT);
-		return QDF_STATUS_SUCCESS;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(nan_event->psoc,
-							QDF_NAN_DISC_MODE,
-							WLAN_NAN_ID);
-	if (!vdev) {
-		vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(nan_event->psoc,
-								QDF_STA_MODE,
-								WLAN_NAN_ID);
-	}
-
-	if (vdev) {
-		nan_event->vdev_id = wlan_vdev_get_id(vdev);
-		nan_debug("Populated NAN disable event vdev_id: %d",
-			  nan_event->vdev_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	} else {
-		nan_err("vdev is null");
-	}
-
-	*is_drop_evt = false;
 	return nan_disable_cleanup(nan_event->psoc);
 }
 
@@ -2430,10 +1524,7 @@ static QDF_STATUS nan_handle_schedule_update(
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
-	struct wlan_objmgr_peer *peer = NULL;
-	struct qdf_mac_addr peer_ndi_addr = {0};
-	QDF_STATUS status;
-	uint8_t i;
+	struct wlan_objmgr_peer *peer;
 
 	psoc = wlan_vdev_get_psoc(ind->vdev);
 	if (!psoc) {
@@ -2447,58 +1538,15 @@ static QDF_STATUS nan_handle_schedule_update(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	/*
-	 * peer_addr in schedule update event is the NMI address.
-	 * NDP peers are stored with NDI address. Map the NMI address
-	 * to the corresponding NDI address via the NDP instance ID,
-	 * then look up the peer using the NDI address.
-	 * Iterate through all NDP instances until a peer is found.
-	 *
-	 * Validate num_ndp_instances against the maximum array size to
-	 * guard against out-of-bounds access on malformed firmware events.
-	 */
-	if (ind->num_ndp_instances > NDP_NUM_INSTANCE_ID ||
-	    0 == ind->num_ndp_instances) {
-		nan_debug("invalid num_ndp_instances %d",
-			  ind->num_ndp_instances);
-		ind->num_ndp_instances = NDP_NUM_INSTANCE_ID;
+	peer = wlan_objmgr_get_peer_by_mac(psoc, ind->peer_addr.bytes,
+					   WLAN_NAN_ID);
+	if (peer) {
+		wlan_dp_notify_ndp_channel_info(peer, &ind->ch[0],
+						ind->num_channels);
+		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 	}
 
-	for (i = 0; i < ind->num_ndp_instances; i++) {
-		status = nan_get_peer_ndi_addr_by_id(ind->vdev,
-						     ind->ndp_instances[i],
-						     &peer_ndi_addr);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			nan_debug("Failed to get NDI addr for ndp_instance: %d",
-				  ind->ndp_instances[i]);
-			continue;
-		}
-
-		if (qdf_is_macaddr_zero(&peer_ndi_addr)) {
-			nan_debug("Zero NDI addr for ndp_instance: %d",
-				  ind->ndp_instances[i]);
-			continue;
-		}
-
-		peer = wlan_objmgr_get_peer_by_mac(psoc,
-						   peer_ndi_addr.bytes,
-						   WLAN_NAN_ID);
-		if (peer) {
-			wlan_dp_notify_ndp_channel_info(peer,
-							&ind->ch[0],
-							ind->num_channels);
-			wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
-			break;
-		}
-
-		nan_debug("Peer not found for NDI: " QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(peer_ndi_addr.bytes));
-	}
-
-	if (!qdf_is_macaddr_zero(&peer_ndi_addr))
-		ndi_update_ndp_session(ind->vdev, &peer_ndi_addr, &ind->ch[0]);
-	else
-		nan_err("Failed to resolve NDI addr for schedule update, skip session update");
+	ndi_update_ndp_session(ind->vdev, &ind->peer_addr, &ind->ch[0]);
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, ind->vdev,
 						     NDP_SCHEDULE_UPDATE, ind);
 
@@ -2548,8 +1596,6 @@ QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
 {
 	struct nan_event_params *nan_event;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
-	QDF_STATUS status;
-	bool is_drop_event;
 
 	if (!msg || !msg->bodyptr) {
 		nan_err("msg body is null");
@@ -2573,16 +1619,7 @@ QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
 		nan_handle_enable_rsp(nan_event);
 		break;
 	case nan_event_id_disable_ind:
-	case nan_event_id_disable_rsp:
-		/*
-		 * drop NAN disable indication if NAN Disable Response is
-		 * already sent to the userspace
-		 */
-
-		status = nan_handle_disable_ind(nan_event, msg->type,
-						&is_drop_event);
-		if (is_drop_event)
-			return status;
+		nan_handle_disable_ind(nan_event);
 		break;
 	case nan_event_id_generic_rsp:
 	case nan_event_id_error_rsp:
@@ -2650,15 +1687,6 @@ QDF_STATUS nan_datapath_event_handler(struct scheduler_msg *pe_msg)
 		nan_handle_host_update(pe_msg->bodyptr, &cmd.vdev);
 		cmd.cmd_type = WLAN_SER_CMD_NDP_END_ALL_REQ;
 		wlan_serialization_remove_cmd(&cmd);
-		break;
-	case NAN_LOCAL_SCHEDULE_RSP:
-		status = nan_handle_local_schedule_rsp(pe_msg->bodyptr);
-		break;
-	case NAN_PEER_SCHEDULE_RSP:
-		status = nan_handle_peer_schedule_rsp(pe_msg->bodyptr);
-		break;
-	case NAN_PEER_PARAMS_RSP:
-		status = nan_handle_peer_params_rsp(pe_msg->bodyptr);
 		break;
 	default:
 		nan_alert("Unhandled NDP event: %d", pe_msg->type);
@@ -2847,16 +1875,6 @@ QDF_STATUS nan_discovery_pre_enable(struct wlan_objmgr_pdev *pdev,
 
 	nan_handle_emlsr_concurrency(psoc, true);
 
-	/*
-	 * Record concurrency teardown stats for all connected TDLS peers
-	 * before initiating the teardown due to NAN enable.
-	 */
-	wlan_tdls_stats_record_peers_teardown(
-		psoc, WLAN_UMAC_VDEV_ID_MAX,
-		policy_mgr_is_mcc_on_any_sta_vdev(psoc) ?
-			TDLS_STATS_REASON_CONC_DIFF_BAND :
-			TDLS_STATS_REASON_CONC_SAME_BAND);
-
 	/* Try to teardown TDLS links, but do not wait */
 	status = ucfg_tdls_teardown_links(psoc);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2942,27 +1960,6 @@ static QDF_STATUS nan_discovery_enable_req(struct nan_enable_req *req)
 	return tx_ops->nan_discovery_req_tx(req, NAN_ENABLE_REQ);
 }
 
-static QDF_STATUS nan_discovery_change_conf_req(
-					struct nan_change_conf_req *req)
-{
-	struct nan_psoc_priv_obj *psoc_nan_obj;
-	struct wlan_nan_tx_ops *tx_ops;
-
-	psoc_nan_obj = nan_get_psoc_priv_obj(req->psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	tx_ops = &psoc_nan_obj->tx_ops;
-	if (!tx_ops->nan_discovery_req_tx) {
-		nan_err("NAN Discovery tx op is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return tx_ops->nan_discovery_req_tx(req, NAN_CHANGE_CONF_REQ);
-}
-
 static QDF_STATUS nan_discovery_generic_req(struct nan_generic_req *req)
 {
 	struct nan_psoc_priv_obj *psoc_nan_obj;
@@ -2999,9 +1996,6 @@ QDF_STATUS nan_discovery_flush_callback(struct scheduler_msg *msg)
 	case NAN_DISABLE_REQ:
 		psoc = ((struct nan_disable_req *)msg->bodyptr)->psoc;
 		break;
-	case NAN_CHANGE_CONF_REQ:
-		psoc = ((struct nan_change_conf_req *)msg->bodyptr)->psoc;
-		break;
 	case NAN_GENERIC_REQ:
 		psoc = ((struct nan_generic_req *)msg->bodyptr)->psoc;
 		break;
@@ -3035,9 +2029,6 @@ QDF_STATUS nan_discovery_scheduled_handler(struct scheduler_msg *msg)
 		break;
 	case NAN_GENERIC_REQ:
 		status = nan_discovery_generic_req(msg->bodyptr);
-		break;
-	case NAN_CHANGE_CONF_REQ:
-		status = nan_discovery_change_conf_req(msg->bodyptr);
 		break;
 	default:
 		nan_err("Unsupported request type: %d", msg->type);
@@ -3145,17 +2136,19 @@ bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc)
 		ucfg_is_nan_conc_control_supported(psoc));
 }
 
-bool nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
-	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
-
-	if (!nan_obj) {
-		nan_err("nan psoc priv object is NULL");
-		return false;
-	}
-
-	return nan_obj->nan_caps.ndi_txbf_supported;
+	return ucfg_nan_is_beamforming_supported(psoc);
 }
+
+/*
+ * The NAN Cluster ID is a MAC address that takes a value from
+ * 50-6F-9A-01-00-00 to 50-6F-9A-01-FF-FF and is carried in the A3 field of
+ * some of the NAN frames. The NAN Cluster ID is randomly chosen by the device
+ * that initiates the NAN Cluster.
+ */
+#define NAN_CLUSTER_MATCH      "\x50\x6F\x9A\x01"
+#define NAN_CLUSTER_MATCH_SIZE 4
 
 /**
  * wlan_nan_is_bssid_in_cluster() - to check whether BSSID is a part of NAN
@@ -3350,10 +2343,6 @@ void nan_handle_pasn_peer_create_rsp(struct wlan_objmgr_psoc *psoc,
 		nan_err("psoc is NULL");
 		return;
 	}
-
-	if (peer_create_status == QDF_STATUS_SUCCESS &&
-	    nan_is_peer_migrated(psoc, vdev_id, peer_mac))
-		nan_pasn_peer_create_confirmed(psoc, vdev_id, peer_mac);
 
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
@@ -3565,7 +2554,7 @@ QDF_STATUS nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
 	nan_vdev_obj->num_pasn_peers = 0;
 
 	if (psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb) {
-		cookie = (uint8_t *)psoc_nan_obj->nan_delete_all_peer_ctx;
+		cookie = (uint8_t *)psoc_nan_obj->nan_pairing_create_ctx;
 		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
 	}
 
@@ -3700,199 +2689,3 @@ bool nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 
 	return psoc_nan_obj->cfg_param.enable;
 }
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-QDF_STATUS nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
-				       uint32_t ndp_instance_id,
-				       struct qdf_mac_addr *peer_ndi_addr)
-{
-	struct nan_peer_priv_obj *peer_nan_obj;
-	struct wlan_objmgr_peer *peer, *peer_next;
-	qdf_list_t *peer_list;
-	uint8_t idx;
-
-	peer_list = &vdev->vdev_objmgr.wlan_peer_list;
-	if (!peer_list) {
-		nan_err("Peer list for vdev obj is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	peer = wlan_vdev_peer_list_peek_active_head(vdev, peer_list,
-						    WLAN_NAN_ID);
-
-	while (peer) {
-		peer_nan_obj = nan_get_peer_priv_obj(peer);
-		if (peer_nan_obj) {
-			for (idx = 0; idx < peer_nan_obj->active_ndp_sessions;
-			     idx++) {
-				if (peer_nan_obj->ndp_instance_id[idx] ==
-				    ndp_instance_id) {
-					qdf_mem_copy(peer_ndi_addr->bytes,
-						     peer->macaddr,
-						     QDF_MAC_ADDR_SIZE);
-					wlan_objmgr_peer_release_ref(peer,
-								WLAN_NAN_ID);
-					return QDF_STATUS_SUCCESS;
-				}
-			}
-		}
-
-		peer_next = wlan_peer_get_next_active_peer_of_vdev(vdev,
-								   peer_list,
-								   peer,
-								   WLAN_NAN_ID);
-		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
-		peer = peer_next;
-	}
-
-	return QDF_STATUS_E_FAILURE;
-}
-#endif
-
-QDF_STATUS nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc,
-				      uint8_t value)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_vdev_priv_obj *vdev_nan_obj;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!ucfg_nan_is_vdev_creation_allowed(psoc))
-		return QDF_STATUS_SUCCESS;
-
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NAN_DISC_MODE,
-							WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("vdev is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev_nan_obj = nan_get_vdev_priv_obj(vdev);
-	if (!vdev_nan_obj) {
-		nan_err("nan vdev priv obj is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
-
-	vdev_nan_obj->nan_disable_req_info = value;
-end:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return status;
-}
-
-QDF_STATUS nan_get_disable_req_info(struct wlan_objmgr_psoc *psoc,
-				    uint8_t *value)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct nan_vdev_priv_obj *vdev_nan_obj;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!ucfg_nan_is_vdev_creation_allowed(psoc)) {
-		*value = NAN_DISABLE_REQ_DEFAULT;
-		return QDF_STATUS_SUCCESS;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NAN_DISC_MODE,
-							WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("vdev is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev_nan_obj = nan_get_vdev_priv_obj(vdev);
-	if (!vdev_nan_obj) {
-		nan_err("nan vdev priv obj is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
-
-	*value = vdev_nan_obj->nan_disable_req_info;
-end:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return status;
-}
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-bool nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_nan_is_fw_support_standard_mode(psoc);
-}
-
-QDF_STATUS nan_del_sta(struct nan_del_sta_params *params)
-{
-	struct nan_callbacks cb_obj;
-	QDF_STATUS status;
-
-	if (!params || !params->psoc) {
-		nan_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Validate peer MAC address */
-	if (qdf_is_macaddr_zero(&params->peer_addr) ||
-	    qdf_is_macaddr_broadcast(&params->peer_addr)) {
-		nan_err("Invalid peer MAC address");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Get callbacks */
-	status = ucfg_nan_get_callbacks(params->psoc, &cb_obj);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to get callbacks, status: %d", status);
-		return status;
-	}
-
-	/* Verify delete_peers_by_addr callback is registered */
-	if (!cb_obj.delete_peers_by_addr) {
-		nan_err("delete_peers_by_addr callback not registered");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Call the existing LIM callback to delete the peer */
-	cb_obj.delete_peers_by_addr(params->vdev_id, params->peer_addr);
-
-	nan_debug("NDP peer deletion initiated successfully");
-
-	return QDF_STATUS_SUCCESS;
-}
-
-void nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
-				  const struct qdf_mac_addr *peer_mac)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct nan_vdev_priv_obj *vdev_nan_obj;
-
-	if (!vdev || !peer_mac) {
-		nan_err("Invalid params: vdev or peer_mac is NULL");
-		return;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		nan_err("psoc is NULL");
-		return;
-	}
-
-	if (!nan_is_fw_support_standard_mode(psoc)) {
-		nan_debug("NAN standard mode is not supportedi by FW");
-		return;
-	}
-
-	vdev_nan_obj = nan_get_vdev_priv_obj(vdev);
-	if (!vdev_nan_obj) {
-		nan_err("vdev_nan_obj is NULL");
-		return;
-	}
-
-	/* ndp_init_done is false if nan_handle_end_ind() already cleaned up */
-	if (!vdev_nan_obj->ndp_init_done)
-		return;
-
-	if (qdf_is_macaddr_equal(&vdev_nan_obj->primary_peer_mac, peer_mac))
-		ndi_remove_and_update_primary_connection(psoc, vdev);
-}
-
-bool nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_nan_is_fw_support_ap_assisted_dfs(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */

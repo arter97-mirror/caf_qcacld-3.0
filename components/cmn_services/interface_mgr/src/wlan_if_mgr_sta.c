@@ -40,8 +40,6 @@
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_ll_sap_api.h"
-#include <wlan_cfr_ucfg_api.h>
-#include "wifi_pos_ucfg_api.h"
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
@@ -114,8 +112,6 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 	if (!ucfg_nan_is_sta_nan_ndi_4_port_allowed(psoc))
 		ucfg_nan_check_and_disable_unsupported_ndi(psoc,
 							   false);
-	ucfg_cfr_send_stop(vdev, 0);
-	ucfg_wifi_pos_pmsr_complete_on_concurrency(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -130,9 +126,6 @@ QDF_STATUS if_mgr_connect_active(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
-		/* Check STA+SAP+SAP support by PCL */
-		if (!policy_mgr_validate_sta_start(vdev))
-			return QDF_STATUS_E_INVAL;
 		/*
 		 * In case of STA+STA concurrency, firmware might try to roam
 		 * to same AP where host is trying to do association on the other
@@ -166,7 +159,7 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 		/*
 		 * Due to audio share glitch with P2P clients caused by roam
 		 * scan on concurrent interface, disable roaming if
-		 * "p2p_disable_roam" ini is enabled. Do not re-enable roaming
+		 * "p2p_disable_roam" ini is enabled. Donot re-enable roaming
 		 * again on other STA interface if p2p client connection is
 		 * active on any vdev.
 		 */
@@ -211,8 +204,6 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
 
 	wlan_ll_sap_switch_bearer_on_sta_connect_complete(psoc, vdev_id);
-
-	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -272,8 +263,6 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 	     !wlan_mlme_is_aux_emlsr_support(psoc))
 		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 
-	policy_mgr_update_flow_pool_unmap(psoc, vdev);
-
 	status = if_mgr_enable_roaming_after_p2p_disconnect(pdev, vdev,
 							    RSO_CONNECT_START);
 	if (status) {
@@ -312,7 +301,6 @@ if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
 
 	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
 	policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
-	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }

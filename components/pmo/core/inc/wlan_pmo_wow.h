@@ -75,7 +75,7 @@
  *  2) Unicast Pattern
  *
  * However note that WoWL will not be enabled by default by PMO. WoWL
- * needs to enabled explicitly by exercising the iwpriv command.
+ * needs to enabled explcitly by exercising the iwpriv command.
  *
  * PMO will expose an API that accepts patterns as Hex string in the
  * following format:
@@ -487,43 +487,6 @@ uint16_t pmo_core_get_wow_reason_code(struct pmo_psoc_priv_obj *psoc_ctx)
 }
 
 /**
- * pmo_core_set_tbtt_nack() - Set TBTT nack flag
- * @psoc_ctx: Pointer to objmgr psoc handle
- * @value: true if wow was nacked due to proximity to a TBTT event
- *
- * Return: None
- */
-static inline
-void pmo_core_set_tbtt_nack(struct pmo_psoc_priv_obj *psoc_ctx, bool value)
-{
-	qdf_spin_lock_bh(&psoc_ctx->lock);
-	psoc_ctx->wow.is_tbtt_nack = value;
-	qdf_spin_unlock_bh(&psoc_ctx->lock);
-}
-
-/**
- * pmo_core_get_tbtt_nack() - Get and clear TBTT nack flag
- * @psoc_ctx: Pointer to objmgr psoc handle
- *
- * Returns the current TBTT nack flag and clears it, so each armed
- * retry delay is consumed exactly once by the caller.
- *
- * Return: TBTT nack flag value prior to clearing
- */
-static inline
-bool pmo_core_get_tbtt_nack(struct pmo_psoc_priv_obj *psoc_ctx)
-{
-	bool value;
-
-	qdf_spin_lock_bh(&psoc_ctx->lock);
-	value = psoc_ctx->wow.is_tbtt_nack;
-	psoc_ctx->wow.is_tbtt_nack = false;
-	qdf_spin_unlock_bh(&psoc_ctx->lock);
-
-	return value;
-}
-
-/**
  * pmo_core_update_wow_enable_cmd_sent() - update wow enable cmd sent flag
  * @psoc_ctx: Pointer to objmgr psoc handle
  * @value: true if wow enable cmd sent else false
@@ -577,7 +540,7 @@ void pmo_core_update_wow_initial_wake_up(struct pmo_psoc_priv_obj *psoc_ctx,
  * @psoc_ctx: Pointer to objmgr psoc handle
  *
  * Return:  1 if wow initial wake up is received;
- *          0 if wow initial wake up is not received;
+ *          0 if wow iniital wake up is not received;
  */
 static inline
 int pmo_core_get_wow_initial_wake_up(struct pmo_psoc_priv_obj *psoc_ctx)

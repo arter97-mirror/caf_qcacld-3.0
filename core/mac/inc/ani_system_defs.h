@@ -60,10 +60,6 @@ typedef enum eAniAuthType {
 	SIR_FILS_SK_WITH_PFS = 5,
 	SIR_FILS_PK_AUTH = 6,
 	eSIR_AUTH_TYPE_PASN = 7,
-	/* IEEE 802.1x over Authentication frames */
-	eSIR_AUTH_TYPE_8021X_IN_AUTH = 8,
-	/* EPPKE Authentication */
-	eSIR_AUTH_TYPE_EPPKE = 9,
 	eSIR_AUTH_TYPE_OWE,
 	eSIR_AUTO_SWITCH,
 	eSIR_DONOT_USE_AUTH_TYPE = SIR_MAX_ENUM_SIZE
@@ -94,7 +90,6 @@ enum ani_akm_type {
 	ANI_AKM_TYPE_WPA_PSK,
 	ANI_AKM_TYPE_SAE_EXT_KEY,
 	ANI_AKM_TYPE_FT_SAE_EXT_KEY,
-	ANI_AKM_TYPE_EPPKE,
 	ANI_NUM_OF_SUPPORT_AKM_TYPE,
 	ANI_AKM_TYPE_UNKNOWN = 0xff,
 };
@@ -179,7 +174,7 @@ typedef struct sBcnReportFields {
 
 /* struct ssirrnrie - RNR IE
  * @length: rnrie data buffer actual length
- * @rnriedata: point to rnrie data buffer
+ * @rnriedata: ponit to rnrie data buffer
  */
 struct ssirrnrie {
 	uint16_t length;

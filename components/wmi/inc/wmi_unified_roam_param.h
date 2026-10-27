@@ -74,8 +74,6 @@ struct rssi_monitor_param {
 #define WMI_CHANNEL_LIST_DYNAMIC_FLUSH            3
 /* Occupied channel list can be learnt after update */
 #define WMI_CHANNEL_LIST_DYNAMIC_UPDATE           4
-/* Occupied channel list is restricted to Neighbor Report Response channels */
-#define WMI_CHANNEL_LIST_NEIGHBOR_REPORT          5
 
 /**
  * struct plm_req_params - plm req parameter
@@ -179,16 +177,4 @@ struct set_pcl_cmd_params {
 	uint8_t vdev_id;
 	struct wmi_pcl_chan_weights *weights;
 };
-
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * struct vdev_repurpose_params - VDEV repurpose response parameters
- * @repurpose_vdev_id: VDEV ID to be repurposed
- * @status: Status of the repurpose operation (0 is success)
- */
-struct vdev_repurpose_params {
-	uint32_t repurpose_vdev_id;
-	uint32_t status;
-};
-#endif /* WLAN_FEATURE_11BN_SMD */
 #endif /* _WMI_UNIFIED_ROAM_PARAM_H_ */

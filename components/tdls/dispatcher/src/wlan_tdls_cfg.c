@@ -152,6 +152,24 @@ cfg_tdls_get_uapsd_inactivity_time(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+cfg_tdls_get_rx_pkt_threshold(struct wlan_objmgr_psoc *psoc,
+			      uint32_t *val)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
+	if (!soc_obj) {
+		*val = 0;
+		tdls_err("tdls soc null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = soc_obj->tdls_configs.tdls_rx_pkt_threshold;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 cfg_tdls_get_off_channel_enable(struct wlan_objmgr_psoc *psoc,
 				bool *val)
 {
@@ -231,43 +249,6 @@ void cfg_tdls_restore_off_channel_enable(struct wlan_objmgr_psoc *psoc)
 	soc_obj->tdls_configs.tdls_off_chan_enable =
 		soc_obj->tdls_configs.tdls_off_chan_enable_orig;
 	soc_obj->tdls_configs.tdls_off_chan_enable_orig = false;
-}
-
-QDF_STATUS
-cfg_tdls_get_stats_enable(struct wlan_objmgr_psoc *psoc,
-			  bool *val)
-{
-	struct tdls_soc_priv_obj *soc_obj;
-
-	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
-	if (!soc_obj) {
-		*val = false;
-		tdls_err("tdls soc null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = soc_obj->tdls_configs.tdls_stats_enable;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-cfg_tdls_set_stats_enable(struct wlan_objmgr_psoc *psoc,
-			  bool val)
-{
-	struct tdls_soc_priv_obj *soc_obj;
-
-	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
-	if (!soc_obj) {
-		tdls_err("tdls soc null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	soc_obj->tdls_configs.tdls_stats_enable = val;
-	tdls_debug("Update TDLS stats enable: %d",
-		   soc_obj->tdls_configs.tdls_stats_enable);
-
-	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS

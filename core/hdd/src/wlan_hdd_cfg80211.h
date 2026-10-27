@@ -57,7 +57,6 @@ struct wlan_hdd_link_info;
 #define RATE_TYPE_LEGACY 0
 #define RATE_TYPE_MCS 1
 #define RATE_MCS13 13
-#define RATE_MCS15 15
 
 /* 2GHz band legacy rates */
 #define RATE_1 1
@@ -154,7 +153,7 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #define GAS_COMEBACK_RSP "\x04\x0d"
 #define GAS_COMEBACK_RSP_SIZE 2
 
-#define P2P_PUBLIC_ACTION_FRAME_TYPE "\x04\x09\x50\x6f\x9a\x09"
+#define P2P_PUBLIC_ACTION_FRAME "\x04\x09\x50\x6f\x9a\x09"
 #define P2P_PUBLIC_ACTION_FRAME_SIZE 6
 
 #define P2P_ACTION_FRAME "\x7f\x50\x6f\x9a\x09"
@@ -194,14 +193,6 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #ifndef NL80211_AUTHTYPE_FILS_PK
 #define NL80211_AUTHTYPE_FILS_PK 7
 #endif
-#ifndef NL80211_AUTHTYPE_EPPKE
-#define NL80211_AUTHTYPE_EPPKE 8
-#endif
-#ifndef NL80211_AUTHTYPE_IEEE8021X
-#define NL80211_AUTHTYPE_IEEE8021X 9
-#endif
-
-/* AKM Suites */
 #ifndef WLAN_AKM_SUITE_FILS_SHA256
 #define WLAN_AKM_SUITE_FILS_SHA256 0x000FAC0E
 #endif
@@ -248,10 +239,6 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 
 #ifndef WLAN_AKM_SUITE_FT_SAE_EXT_KEY
 #define WLAN_AKM_SUITE_FT_SAE_EXT_KEY 0x000FAC19
-#endif
-
-#ifndef WLAN_AKM_SUITE_EPPKE
-#define WLAN_AKM_SUITE_EPPKE 0x000FAC1D
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
@@ -337,21 +324,11 @@ typedef enum {
 #define WIFI_FEATURE_SET_TX_POWER_LIMIT 0x4000000
 /* Support changing MAC address without iface reset(down and up) */
 #define WIFI_FEATURE_DYNAMIC_SET_MAC    0x10000000
-/* Support P2P MAC randomization */
-#define WIFI_FEATURE_P2P_RAND_MAC	0x80000000
 #define WIFI_FEATURE_SET_LATENCY_MODE   0x40000000 /* Set latency mode */
 /* Support for configuring roaming mode */
 #define WIFI_FEATURE_ROAMING_MODE_CONTROL 0x800000000
 
-/* Support for configuring VOIP */
-#define WIFI_FEATURE_SET_VOIP_MODE	 0x1000000000
-
 #define WIFI_FEATURE_CACHED_SCAN_RESULTS 0x2000000000
-/* Support MLO SoftAp */
-#define WIFI_FEATURE_MLO_SAP            0x4000000000
-
-/* Dual SL SAP supported */
-#define WIFI_FEATURE_MULTIPLE_MLD_ON_SAP 0x8000000000
 
 #define WIFI_FEATURE_MAX_BIT_POS 64
 
@@ -468,10 +445,6 @@ extern const struct nla_policy
 #define CHAN_USAGE_REQ_MAX       QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_MAX
 #define CHAN_USAGE_REQ_MODE      QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_MODE
 #define CHAN_USAGE_REQ_CHAN_LIST QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_CHAN_LIST
-#define CHAN_USAGE_REQ_UNAVAIL_CONFIG \
-	QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_UNAVAILABILITY_CONFIG_PARAMS
-
-#define TWT_SETUP_ATTR_MAX       QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX
 
 extern const struct nla_policy
 qca_wlan_vendor_p2p_chan_switch_params[CHAN_USAGE_REQ_CHAN_LIST_MAX + 1];
@@ -590,17 +563,9 @@ bool wlan_hdd_is_ap_supports_immediate_power_save(uint8_t *ies, int length);
 int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac);
 
 #if defined(USE_CFG80211_DEL_STA_V2)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)) || \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
-	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
-int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  struct station_del_parameters *param);
-#else
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				  struct net_device *dev,
 				  struct station_del_parameters *param);
-#endif
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
@@ -626,7 +591,7 @@ int wlan_hdd_send_avoid_freq_event(struct hdd_context *hdd_ctx,
  * Return: 0 on success or failure reason
  */
 int wlan_hdd_send_hang_reason_event(struct hdd_context *hdd_ctx,
-				    enum qdf_hang_reason reason, uint8_t *data,
+				    uint32_t reason, uint8_t *data,
 				    size_t data_len);
 
 int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
@@ -648,7 +613,7 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 /**
  * wlan_hdd_cfg80211_acs_ch_select_evt: Callback function for ACS evt
  * @link_info: Link info pointer in HDD adapter
- * @store_acs_freq: Store current ACS frequency flag
+ * @store_acs_freq: Store current ACS frequecy flag
  *
  * This is a callback function on ACS procedure is completed.
  * This function send the ACS selected channel information to hostapd
@@ -657,6 +622,28 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
  */
 void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
 					 bool store_acs_freq);
+
+#ifdef WLAN_CFR_ENABLE
+/*
+ * hdd_cfr_data_send_nl_event() - send cfr data through nl event
+ * @vdev_id: vdev id
+ * @pid: process pid to which send data event unicast way
+ * @data: pointer to the cfr data
+ * @data_len: length of data
+ *
+ * Return: void
+ */
+void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
+				const void *data, uint32_t data_len);
+
+#define FEATURE_CFR_DATA_VENDOR_EVENTS                                  \
+[QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX] = {              \
+        .vendor_id = QCA_NL80211_VENDOR_ID,                             \
+        .subcmd = QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG,       \
+},
+#else
+#define FEATURE_CFR_DATA_VENDOR_EVENTS
+#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -725,28 +712,6 @@ int wlan_hdd_change_hw_mode_for_given_chnl(struct hdd_adapter *adapter,
 					   uint32_t chan_freq,
 					   enum policy_mgr_conn_update_reason reason);
 
-#if defined(WLAN_FEATURE_11BI_SECURITY) || \
-	defined(WLAN_FEATURE_11BN_SMD)
-/**
- * wlan_hdd_external_auth_callback() - Callback to initiate external
- * authentication
- * @link_info: Link Info pointer
- * @params: External authentication parameters pointer
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_hdd_external_auth_callback(struct wlan_hdd_link_info *link_info,
-				struct wlan_external_auth_params *params);
-#else
-static inline QDF_STATUS
-wlan_hdd_external_auth_callback(struct wlan_hdd_link_info *link_info,
-				struct wlan_external_auth_params *params)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /* WLAN_FEATURE_11BI_SECURITY || WLAN_FEATURE_11BN_SMD */
-
 /**
  * enum hdd_rate_info_bw: an HDD internal rate bandwidth representation
  * @HDD_RATE_BW_5: 5MHz
@@ -770,46 +735,11 @@ enum hdd_rate_info_bw {
 /**
  * enum hdd_chain_mode : Representation of Number of chains available.
  * @HDD_CHAIN_MODE_1X1: Chain mask Not Configurable as only one chain available
- * @HDD_CHAIN_MODE_2X2: Chain mask configurable as 2X2
- * @HDD_CHAIN_MODE_3X3: Chain mask configurable as 3X3
- * @HDD_CHAIN_MODE_4X4: Chain mask configurable as 4x4
+ * @HDD_CHAIN_MODE_2X2: Chain mask configurable as both chains available
  */
 enum hdd_chain_mode {
 	HDD_CHAIN_MODE_1X1 = 1,
 	HDD_CHAIN_MODE_2X2 = 3,
-	HDD_CHAIN_MODE_3X3 = 7,
-	HDD_CHAIN_MODE_4X4 = 15,
-};
-
-/**
- * enum wlan_vendor_nss_chains_req_type - Vendor request type to configure
- * NSS and chains
- * @WLAN_VENDOR_NSS_CHAIN_REQ_INVALID: Invalid request params.
- * @WLAN_VENDOR_NSS_CHAIN_REQ_NONE: No change requested
- * @WLAN_VENDOR_NSS_CHAIN_REQ_NO_FORCE: Request to configure
- * NSS/chains as no-force
- * @WLAN_VENDOR_NSS_CHAIN_REQ_FORCE: Request to configure NSS/Chains to vendor
- * force value.
- */
-enum wlan_vendor_nss_chains_req_type {
-	WLAN_VENDOR_NSS_CHAIN_REQ_INVALID = -1,
-	WLAN_VENDOR_NSS_CHAIN_REQ_NONE,
-	WLAN_VENDOR_NSS_CHAIN_REQ_NO_FORCE,
-	WLAN_VENDOR_NSS_CHAIN_REQ_FORCE,
-};
-
-/**
- * enum wlan_vendor_nss_chains_parse_type - Type of vendor params to parse
- * @WLAN_VENDOR_PARSE_TYPE_NSS: Parse NSS attributes
- * @WLAN_VENDOR_PARSE_TYPE_CHAINS: Parse Chains attributes
- * @WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS: Parse Per-Band NSS attributes
- * @WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS: Parse Per-Band Chains attributes
- */
-enum wlan_vendor_nss_chains_parse_type {
-	WLAN_VENDOR_PARSE_TYPE_NSS,
-	WLAN_VENDOR_PARSE_TYPE_CHAINS,
-	WLAN_VENDOR_PARSE_TYPE_PER_BAND_NSS,
-	WLAN_VENDOR_PARSE_TYPE_PER_BAND_CHAINS,
 };
 
 /**
@@ -870,22 +800,6 @@ uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx);
 int wlan_hdd_merge_avoid_freqs(struct ch_avoid_ind_type *destFreqList,
 		struct ch_avoid_ind_type *srcFreqList);
 
-/**
- * hdd_send_gvp_oper_ctrl_event() - Send GVP operation control event
- * @hdd_ctx: HDD context
- * @chan_freq: channel frequency
- * @device_mode: device operating mode
- * @gvp_op_start: true for start, false for stop
- *
- * Checks if GVP operation control is enabled and the channel is 6 GHz,
- * then sends the vendor event to userspace.
- *
- * Return: 0 on success, negative errno on failure.
- */
-int hdd_send_gvp_oper_ctrl_event(struct hdd_context *hdd_ctx,
-				 uint32_t chan_freq,
-				 enum QDF_OPMODE device_mode,
-				 bool gvp_op_start);
 
 /**
  * hdd_bt_activity_cb() - callback function to receive bt activity
@@ -934,11 +848,10 @@ QDF_STATUS wlan_hdd_flush_pmksa_cache(struct wlan_hdd_link_info *link_info);
 /*
  * wlan_hdd_send_mode_change_event() - API to send hw mode change event to
  * userspace
- * @is_hwmode_change: True if invoked to due HW mode change event, else false
  *
  * Return : 0 on success and errno on failure
  */
-int wlan_hdd_send_mode_change_event(bool is_hwmode_change);
+int wlan_hdd_send_mode_change_event(void);
 
 /**
  * wlan_hdd_restore_channels() - Restore the channels which were cached
@@ -1016,14 +929,12 @@ QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
  * @adapter: pointer to network adapter
  * @port_id: port id for which host receives set latency level vendor command
  * @client_id: client id for a given port id
- * @latency_level: latency level requested by user space
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id,
-					   uint16_t latency_level);
+					   uint32_t *client_id);
 
 /**
  * wlan_hdd_get_client_id_bitmap() - to calculate client id bitmap
@@ -1070,8 +981,7 @@ static inline uint8_t wlan_hdd_get_client_id_bitmap(struct hdd_adapter *adapter)
 static inline
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id,
-					   uint16_t latency_level)
+					   uint32_t *client_id)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -1156,7 +1066,7 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
  * Return: 0 on success, negative errno on failure
  */
 int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
-			   enum phy_ch_width chwidth,
+			   enum eSirMacHTChannelWidth chwidth,
 			   uint8_t link_id, bool is_restore);
 
 /**
@@ -1196,21 +1106,6 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       u8 *ta_addr,
 				       struct sk_buff *skb,
 				       bool unencrypted);
-
-/**
- * wlan_hdd_cfg80211_mgmt_tx_status() - mgmt tx status
- * @wdev: Wireless device structure pointer
- * @cookie: Cookie
- * @buf: Buffer
- * @len: Length
- * @ack: Ack
- * @gfp: GFP flags
- *
- * Return: None
- */
-void wlan_hdd_cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
-				      const u8 *buf, size_t len, bool ack,
-				      gfp_t gfp);
 
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 /**
@@ -1373,28 +1268,6 @@ int hdd_vdev_send_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
  */
 void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
 					   uint16_t sta_alive_interval);
-
-/**
- * wlan_hdd_get_standby_link_chan_info() - get channel info of standby link in
- * mlo link connection and copied in chan_info structure
- * @adapter: HDD adapter pointer
- * @link_id: Link id of standby link
- * @chan_info: channel info from wlan channel structure
- */
-
-#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-int
-wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
-				    struct wlan_channel *chan_info);
-#else
-static inline int
-wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
-				    struct wlan_channel *chan_info)
-{
-	return -EINVAL;
-}
-#endif
-
 /**
  * hdd_convert_phy_bw_to_nl_bw - Convert phy bandwidth to nl bandwidth
  * @bw: phy bandwidth
@@ -1404,98 +1277,4 @@ wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
 enum nl80211_chan_width
 hdd_convert_phy_bw_to_nl_bw(enum phy_ch_width bw);
 
-#ifdef WLAN_FEATURE_ACTION_OUI
-/**
- * wlan_hdd_cfg80211_set_action_oui() - set action OUI
- * @wiphy: wiphy pointer
- * @wdev: pointer to struct wireless_dev
- * @data: pointer to incoming NL vendor data
- * @data_len: length of @data
- *
- * Return: 0 on success; error number otherwise.
- */
-int wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
-				     struct wireless_dev *wdev,
-				     const void *data,
-				     int data_len);
-#else
-static inline
-int wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
-				     struct wireless_dev *wdev,
-				     const void *data,
-				     int data_len)
-{
-	return -EOPNOTSUPP;
-}
 #endif
-
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
-/** wlan_hdd_link_removal_is_in_progress() - check link is removing or not
- * @adapter: adapter pointer
- *
- * Return: true if link removal in progress, otherwise false
- */
-bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter);
-#else
-static inline
-bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
-{
-	return false;
-}
-#endif
-
-/**
- * hdd_apply_nss_chains_vdev_init_req() - Apply NSS/chains config in disconnected state
- * @link_info: Link info pointer in HDD adapter
- * @req: requested NSS/chains config (resolved in place against hw limits)
- *
- * Common helper for the disconnect-state NSS update path shared by
- * hdd_config_vendor_nss_chains() and hdd_update_sta_nss_in_disconnect().
- * Validates the request against psoc limits, writes to vdev ini_cfg and
- * dynamic_cfg, and refreshes user_nss_ctx so that hdd_store_nss_chains_cfg_in_vdev()
- * at the next connect-start uses the correct value instead of startup_cfg.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-hdd_apply_nss_chains_vdev_init_req(struct wlan_hdd_link_info *link_info,
-				   struct wlan_mlme_nss_chains *req);
-
-/**
- * hdd_fill_vdev_init_nss_chains_limits() - Fetch per-mode NSS/chains limits
- * @link_info: Link info pointer in HDD adapter
- * @nss_chains_limits: output struct to fill
- * @src: config source (global or startup)
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-hdd_fill_vdev_init_nss_chains_limits(
-				struct wlan_hdd_link_info *link_info,
-				struct wlan_mlme_nss_chains *nss_chains_limits,
-				enum wlan_mlme_cfg_nss_src src);
-
-/**
- * hdd_resolve_non_force_nss_chains_fields() - Resolve unset NSS/chain fields
- * @link_info: Link info pointer in HDD adapter
- * @req: user request struct (updated in place)
- * @limits: per-mode limits struct
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-hdd_resolve_non_force_nss_chains_fields(struct wlan_hdd_link_info *link_info,
-					struct wlan_mlme_nss_chains *req,
-					struct wlan_mlme_nss_chains *limits);
-
-/**
- * hdd_update_vdev_nss_chains_config() - Propagate NSS/chains config to vdev
- * @link_info: Link info pointer in HDD adapter
- * @set_ies: whether to update per-band IEs
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link_info,
-				  bool set_ies);
-#endif /* end of file */

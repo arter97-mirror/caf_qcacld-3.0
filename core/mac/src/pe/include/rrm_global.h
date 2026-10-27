@@ -344,7 +344,7 @@ typedef struct sRrmPEContext {
 	uint32_t startTSF[2];
 	/*
 	 * This value is stored into bssdescription and beacon report
-	 * gets it from bss description.
+	 * gets it from bss decsription.
 	 */
 	tRRMCaps rrmEnabledCaps;
 	int8_t txMgmtPower;

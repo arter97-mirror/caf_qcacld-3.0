@@ -99,10 +99,6 @@ uint8_t *action_oui_token_string(enum action_oui_token_type token_id)
 		CASE_RETURN_STRING(ACTION_OUI_MAC_ADDR_TOKEN);
 		CASE_RETURN_STRING(ACTION_OUI_MAC_MASK_TOKEN);
 		CASE_RETURN_STRING(ACTION_OUI_CAPABILITY_TOKEN);
-		CASE_RETURN_STRING(ACTION_OUI_DATA_BIT_MASK_TOKEN);
-		CASE_RETURN_STRING(ACTION_OUI_MAC_BIT_MASK_TOKEN);
-		CASE_RETURN_STRING(ACTION_OUI_MAC_EXCLUSION_TOKEN);
-		CASE_RETURN_STRING(ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN);
 		CASE_RETURN_STRING(ACTION_OUI_END_TOKEN);
 	}
 
@@ -147,7 +143,6 @@ bool validate_and_convert_oui(uint8_t *token,
  * @token: data length string
  * @ext: pointer to container which holds hex value formed from input str
  * @action_token: next action to be parsed
- * @action_id: action OUI ID
  *
  * This is an internal function invoked from action_oui_parse to validate
  * the data length string for action OUI inis, convert it to hex value and
@@ -159,11 +154,9 @@ bool validate_and_convert_oui(uint8_t *token,
 static bool
 validate_and_convert_data_length(uint8_t *token,
 				struct action_oui_extension *ext,
-				enum action_oui_token_type *action_token,
-				enum action_oui_id action_id)
+				enum action_oui_token_type *action_token)
 {
 	uint32_t token_len = qdf_str_len(token);
-	uint32_t max_data_length;
 	int ret;
 	uint8_t len = 0;
 
@@ -178,15 +171,9 @@ validate_and_convert_data_length(uint8_t *token,
 		return false;
 	}
 
-	/* Allow longer data length for dynamic action OUIs */
-	if (wlan_action_oui_is_dynamic(action_id))
-		max_data_length = ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY;
-	else
-		max_data_length = ACTION_OUI_MAX_DATA_LENGTH;
-
-	if ((uint32_t)len > max_data_length) {
+	if ((uint32_t)len > ACTION_OUI_MAX_DATA_LENGTH) {
 		action_oui_err("action OUI data len %d is more than %u",
-			       len, max_data_length);
+			       len, ACTION_OUI_MAX_DATA_LENGTH);
 		return false;
 	}
 
@@ -338,16 +325,8 @@ validate_and_convert_info_mask(uint8_t *token,
 		*action_token = ACTION_OUI_MAC_ADDR_TOKEN;
 		return true;
 	}
-	if ((info_mask & ACTION_OUI_INFO_AP_CAPABILITY_NSS) ||
-	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_HT) ||
-	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_VHT) ||
-	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_BAND))
-		*action_token = ACTION_OUI_CAPABILITY_TOKEN;
-	else if (info_mask & ACTION_OUI_INFO_MAC_EXCLUSION)
-		*action_token = ACTION_OUI_MAC_EXCLUSION_TOKEN;
-	else
-		*action_token = ACTION_OUI_END_TOKEN;
 
+	*action_token = ACTION_OUI_CAPABILITY_TOKEN;
 	return true;
 }
 
@@ -424,95 +403,12 @@ validate_and_convert_mac_mask(uint8_t *token,
 	if ((info_mask & ACTION_OUI_INFO_AP_CAPABILITY_NSS) ||
 	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_HT) ||
 	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_VHT) ||
-	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_BAND))
+	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_BAND)) {
 		*action_token = ACTION_OUI_CAPABILITY_TOKEN;
-	else if (info_mask & ACTION_OUI_INFO_MAC_EXCLUSION)
-		*action_token = ACTION_OUI_MAC_EXCLUSION_TOKEN;
-	else
-		*action_token = ACTION_OUI_END_TOKEN;
-
-	return true;
-}
-
-/**
- * validate_and_convert_mac_exclusion() - validate and convert MAC exclusion
- * @token: MAC exclusion address string
- * @ext: pointer to container which holds converted hex array
- * @action_token: next action to be parsed
- *
- * This is an internal function invoked from action_oui_parse to validate
- * the MAC exclusion address string for action OUI inis, convert it to hex
- * array and store in action_oui extension. After successful parsing update
- * the @action_token to hold the next expected string.
- *
- * Return: If conversion is successful return true else false
- */
-static bool
-validate_and_convert_mac_exclusion(uint8_t *token,
-				   struct action_oui_extension *ext,
-				   enum action_oui_token_type *action_token)
-{
-	uint32_t expected_token_len[1] = {2 * QDF_MAC_ADDR_SIZE};
-	bool valid;
-
-	valid = action_oui_string_to_hex(token, ext->mac_exclusion.mac_addr, 1,
-					 expected_token_len);
-	if (!valid) {
-		action_oui_err("Failed to parse MAC exclusion address");
-		return false;
+		return true;
 	}
-
-	action_oui_debug("Parsed MAC exclusion address: " QDF_MAC_ADDR_FMT,
-			 QDF_MAC_ADDR_REF(ext->mac_exclusion.mac_addr));
-
-	ext->mac_exclusion_length = QDF_MAC_ADDR_SIZE;
-	*action_token = ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN;
-
-	return true;
-}
-
-/**
- * validate_and_convert_mac_exclusion_mask() - validate and convert MAC
- * exclusion mask
- * @token: MAC exclusion mask string
- * @ext: pointer to container which holds converted hex value
- * @action_token: next action to be parsed
- *
- * This is an internal function invoked from action_oui_parse to validate
- * the MAC exclusion mask string for action OUI inis, convert it to hex value
- * and store in action_oui extension. After successful parsing update the
- * @action_token to hold the next expected string.
- *
- * Return: If conversion is successful return true else false
- */
-static bool
-validate_and_convert_mac_exclusion_mask(uint8_t *token,
-					struct action_oui_extension *ext,
-					enum action_oui_token_type *action_token)
-{
-	uint32_t expected_token_len[1] = {2};
-	bool valid;
-
-	valid = action_oui_string_to_hex(token,
-					 &ext->mac_exclusion.mac_addr_mask,
-					 1, expected_token_len);
-	if (!valid) {
-		action_oui_err("Failed to parse MAC exclusion mask");
-		return false;
-	}
-
-	action_oui_debug("Parsed MAC exclusion mask: 0x%02X (bits: %s%s%s%s%s%s)",
-			 ext->mac_exclusion.mac_addr_mask,
-			 (ext->mac_exclusion.mac_addr_mask & 0x80) ? "B0 " : "",
-			 (ext->mac_exclusion.mac_addr_mask & 0x40) ? "B1 " : "",
-			 (ext->mac_exclusion.mac_addr_mask & 0x20) ? "B2 " : "",
-			 (ext->mac_exclusion.mac_addr_mask & 0x10) ? "B3 " : "",
-			 (ext->mac_exclusion.mac_addr_mask & 0x08) ? "B4 " : "",
-			 (ext->mac_exclusion.mac_addr_mask & 0x04) ? "B5" : "");
-	ext->mac_exclusion_mask_length = 1;
 
 	*action_token = ACTION_OUI_END_TOKEN;
-
 	return true;
 }
 
@@ -568,56 +464,46 @@ validate_and_convert_capability(uint8_t *token,
 
 	ext->capability_length = capability_length;
 
-	if (info_mask & ACTION_OUI_INFO_MAC_EXCLUSION)
-		*action_token = ACTION_OUI_MAC_EXCLUSION_TOKEN;
-	else
-		*action_token = ACTION_OUI_END_TOKEN;
+	*action_token = ACTION_OUI_END_TOKEN;
 
 	return true;
 }
 
-QDF_STATUS
+/**
+ * action_oui_extension_store() - store action oui extension
+ * @psoc_priv: pointer to action_oui priv obj
+ * @oui_priv: type of the action
+ * @ext: oui extension to store in sme
+ *
+ * This function stores the parsed oui extension
+ *
+ * Return: QDF_STATUS
+ *
+ */
+static QDF_STATUS
 action_oui_extension_store(struct action_oui_psoc_priv *psoc_priv,
 			   struct action_oui_priv *oui_priv,
-			   struct action_oui_extension *ext,
-			   uint8_t oui_ext_num)
+			   struct action_oui_extension ext)
 {
 	struct action_oui_extension_priv *ext_priv;
-	uint32_t total_num, max_num, i;
-	bool is_action_id_dynamic;
-
-	is_action_id_dynamic = wlan_action_oui_is_dynamic(oui_priv->id);
-
-	max_num = wlan_action_oui_max_ext_num(oui_priv->id);
 
 	qdf_mutex_acquire(&oui_priv->extension_lock);
-	total_num = qdf_list_size(&oui_priv->extension_list) + oui_ext_num;
-	if (total_num > max_num) {
+	if (qdf_list_size(&oui_priv->extension_list) ==
+			  ACTION_OUI_MAX_EXTENSIONS) {
 		qdf_mutex_release(&oui_priv->extension_lock);
-		action_oui_err("Reached maximum OUI ext num %d/%d",
-			       total_num, max_num);
+		action_oui_err("Reached maximum OUI extensions");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	action_oui_debug("id %d", oui_priv->id);
-	for (i = 0; i < oui_ext_num; i++) {
-		ext_priv = qdf_mem_malloc(sizeof(*ext_priv));
-		if (!ext_priv) {
-			qdf_mutex_release(&oui_priv->extension_lock);
-			action_oui_fatal("malloc %zu B fail for %d/%d oui ext",
-					 sizeof(*ext_priv), i + 1, oui_ext_num);
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		ext_priv->extension = ext[i];
-		qdf_list_insert_back(&oui_priv->extension_list,
-				     &ext_priv->item);
-
-		if (!is_action_id_dynamic)
-			psoc_priv->total_extensions++;
-		wlan_action_oui_extension_dump(&ext[i]);
+	ext_priv = qdf_mem_malloc(sizeof(*ext_priv));
+	if (!ext_priv) {
+		qdf_mutex_release(&oui_priv->extension_lock);
+		return QDF_STATUS_E_NOMEM;
 	}
 
+	ext_priv->extension = ext;
+	qdf_list_insert_back(&oui_priv->extension_list, &ext_priv->item);
+	psoc_priv->total_extensions++;
 	qdf_mutex_release(&oui_priv->extension_lock);
 
 	return QDF_STATUS_SUCCESS;
@@ -634,7 +520,7 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 	char *token;
 	bool valid = true;
 	bool oui_count_exceed = false;
-	uint32_t oui_index = 0, and_oui_index = 0;
+	uint32_t oui_index = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct action_oui_priv *oui_priv;
 
@@ -687,8 +573,7 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 
 		case ACTION_OUI_DATA_LENGTH_TOKEN:
 			valid = validate_and_convert_data_length(token, &ext,
-								&action_token,
-								action_id);
+								&action_token);
 			break;
 
 		case ACTION_OUI_DATA_TOKEN:
@@ -721,18 +606,6 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 							&action_token);
 			break;
 
-		case ACTION_OUI_MAC_EXCLUSION_TOKEN:
-			valid = validate_and_convert_mac_exclusion(token,
-								   &ext,
-								   &action_token);
-			break;
-
-		case ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN:
-			valid = validate_and_convert_mac_exclusion_mask(token,
-									&ext,
-									&action_token);
-			break;
-
 		default:
 			valid = false;
 			break;
@@ -749,9 +622,7 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 		if (action_token != ACTION_OUI_END_TOKEN)
 			continue;
 
-		ext.and_oui_index = and_oui_index;
-		status = action_oui_extension_store(psoc_priv, oui_priv, &ext,
-						    1);
+		status = action_oui_extension_store(psoc_priv, oui_priv, ext);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			valid = false;
 			action_oui_err("sme set of extension: %u for action oui: %u failed",
@@ -766,25 +637,10 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 		}
 
 		oui_index++;
-		if (oui_index == wlan_action_oui_max_ext_num(action_id)) {
+		if (oui_index == ACTION_OUI_MAX_EXTENSIONS) {
 			if (str1)
 				oui_count_exceed = true;
 			break;
-		}
-
-		if (psoc_priv->is_action_oui_v2_used[action_id] &&
-		    str2 && *str2 != '\0') {
-			str1 = (char *)qdf_str_left_trim(str2);
-
-			if (!qdf_mem_cmp(str1, ACTION_OUI_OPERATOR_AND, 2)) {
-				token = strsep(&str1, " ");
-				and_oui_index++;
-			} else if (!qdf_mem_cmp(str1, ACTION_OUI_OPERATOR_OR, 2)) {
-				token = strsep(&str1, " ");
-				and_oui_index = 0;
-			} else {
-				and_oui_index = 0;
-			}
 		}
 
 		/* reset the params for next action OUI parse */
@@ -794,8 +650,7 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 
 	if (oui_count_exceed) {
 		action_oui_err("Reached Maximum extensions: %u in action_oui: %u, ignoring the rest",
-			       wlan_action_oui_max_ext_num(action_id),
-			       action_id);
+			ACTION_OUI_MAX_EXTENSIONS, action_id);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -842,7 +697,7 @@ action_oui_parse_string(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	if (!wlan_action_oui_id_valid(action_id)) {
+	if (action_id >= ACTION_OUI_MAXIMUM_ID) {
 		action_oui_err("Invalid action_oui id: %u", action_id);
 		goto exit;
 	}
@@ -879,66 +734,8 @@ exit:
 	return status;
 }
 
-static bool action_oui_id_valid(struct wlan_objmgr_psoc *psoc,
-				enum action_oui_id action_id)
-{
-	enum action_oui_id active_action_id;
-
-	switch (action_id) {
-	case ACTION_OUI_ALLOW_NSS_GREATER_THAN_2:
-	case ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2:
-
-		if (!wlan_is_nss_allowlist_denylist_config_supported(psoc)) {
-			action_oui_debug("WL/BL feature is not supported");
-			return false;
-		}
-
-		active_action_id = action_oui_get_active_action_id(
-					psoc,
-					ACTION_OUI_ARBITRATOR_TYPE_NSS);
-
-		if (active_action_id == ACTION_OUI_MAXIMUM_ID &&
-		    action_id == ACTION_OUI_ALLOW_NSS_GREATER_THAN_2)
-			return true;
-
-		if (active_action_id != action_id)
-			return false;
-
-		return true;
-	case ACTION_OUI_ALLOW_UL_TX_BEAMFORMER:
-
-		if (!wlan_is_ul_tx_beamformer_config_supported(psoc)) {
-			action_oui_debug("UL TX beamformer feature is not supported");
-			return false;
-		}
-
-		return true;
-	default:
-		return true;
-	}
-}
-
-static uint32_t
-get_dynamic_oui_extension_total_count(struct wlan_objmgr_psoc *psoc)
-{
-	uint32_t count = 0;
-
-	if (!psoc) {
-		action_oui_err("psoc is NULL");
-		return 0;
-	}
-
-	if (wlan_is_nss_allowlist_denylist_config_supported(psoc))
-		count += TOTAL_NO_OUI_EXT;
-
-	if (wlan_is_ul_tx_beamformer_config_supported(psoc))
-		count += TOTAL_NO_BFORMER_OUI_EXT;
-
-	return count;
-}
-
 QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
-			   enum action_oui_id action_id)
+			enum action_oui_id action_id)
 {
 	QDF_STATUS status;
 	struct action_oui_request *req;
@@ -958,14 +755,6 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	if (!psoc_priv->action_oui_enable) {
 		action_oui_debug("action_oui is not enable");
 		return QDF_STATUS_SUCCESS;
-	}
-
-	if (wlan_action_oui_is_dynamic(action_id)) {
-		if (!action_oui_id_valid(psoc_priv->psoc, action_id)) {
-			action_oui_debug("action_id %d is not valid",
-					 action_id);
-			return QDF_STATUS_SUCCESS;
-		}
 	}
 
 	extension_list = &oui_priv->extension_list;
@@ -990,16 +779,8 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	}
 
 	req->action_id = oui_priv->id;
-	req->is_action_oui_dynamic = wlan_action_oui_is_dynamic(action_id);
 	req->no_oui_extensions = no_oui_extensions;
-	if (req->is_action_oui_dynamic)
-		req->total_no_oui_extensions =
-			get_dynamic_oui_extension_total_count(psoc_priv->psoc);
-	else
-		req->total_no_oui_extensions = psoc_priv->max_extensions;
-
-	req->is_action_oui_v2_enabled =
-		psoc_priv->is_action_oui_v2_enabled;
+	req->total_no_oui_extensions = psoc_priv->max_extensions;
 
 	extension = req->extension;
 	qdf_list_peek_front(extension_list, &node);
@@ -1085,65 +866,12 @@ check_for_vendor_ap_mac(struct action_oui_extension *extension,
 	uint8_t mac_mask = 0x80;
 	uint8_t *mac_addr = attr->mac_addr;
 
-	if (!mac_addr)
-		return false;
-
 	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++) {
 		if ((*extension->mac_mask & mac_mask) &&
 		    !(extension->mac_addr[i] == mac_addr[i]))
 			return false;
 		mac_mask = mac_mask >> 1;
 	}
-
-	return true;
-}
-
-/**
- * check_for_mac_exclusion() - checks if AP MAC matches exclusion pattern
- * @extension: pointer to action oui extension data
- * @attr: pointer to structure containing mac_addr (bssid) of AP
- *
- * This function checks if the AP's MAC address matches the exclusion pattern
- * specified in the extension. If it matches, the AP should be excluded from
- * the action OUI configuration.
- *
- * Return: true if MAC matches exclusion (should be excluded), false otherwise
- */
-static bool
-check_for_mac_exclusion(struct action_oui_extension *extension,
-			struct action_oui_search_attr *attr)
-{
-	uint8_t i;
-	uint8_t mac_mask = 0x80;
-	uint8_t *mac_addr = attr->mac_addr;
-
-	if (!mac_addr)
-		return false;
-
-	/* If no MAC exclusion is configured, don't exclude */
-	if (!(extension->info_mask & ACTION_OUI_INFO_MAC_EXCLUSION))
-		return false;
-
-	action_oui_debug("Checking MAC exclusion: AP MAC=" QDF_MAC_ADDR_FMT
-			 " Exclusion=" QDF_MAC_ADDR_FMT " Mask=0x%02X",
-			 QDF_MAC_ADDR_REF(mac_addr),
-			 QDF_MAC_ADDR_REF(extension->mac_exclusion.mac_addr),
-			 extension->mac_exclusion.mac_addr_mask);
-
-	/* Check if MAC matches the exclusion pattern */
-	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++) {
-		if ((extension->mac_exclusion.mac_addr_mask & mac_mask) &&
-		    !(extension->mac_exclusion.mac_addr[i] == mac_addr[i])) {
-			action_oui_debug("MAC exclusion check failed at byte %d: AP=0x%02X Exclusion=0x%02X (mask bit set)",
-					 i, mac_addr[i],
-					 extension->mac_exclusion.mac_addr[i]);
-			return false;
-		}
-		mac_mask = mac_mask >> 1;
-	}
-
-	action_oui_debug("MAC exclusion matches " QDF_MAC_ADDR_FMT,
-			 QDF_MAC_ADDR_REF(mac_addr));
 
 	return true;
 }
@@ -1296,7 +1024,6 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 	QDF_STATUS qdf_status;
 	const uint8_t *oui_ptr;
 	bool wildcard_oui = false;
-	bool oui_matched = false;
 
 	oui_priv = psoc_priv->oui_priv[action_id];
 	if (!oui_priv) {
@@ -1318,15 +1045,7 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 					   struct action_oui_extension_priv,
 					   item);
 		extension = &priv_ext->extension;
-		if (oui_matched) {
-			if (!extension->and_oui_index)
-				goto found;
-		} else {
-			if (extension->and_oui_index)
-				goto next;
-		}
 
-		oui_matched = false;
 		/*
 		 * If a wildcard OUI bit is not set in the info_mask, proceed
 		 * to other checks skipping the OUI and vendor data checks
@@ -1348,36 +1067,20 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 		    !check_for_vendor_ap_mac(extension, attr))
 			goto next;
 
-		/* Check if AP MAC matches exclusion pattern */
-		if (check_for_mac_exclusion(extension, attr))
-			goto next;
-
 		if (!check_for_vendor_ap_capabilities(extension, attr))
 			goto next;
 
-		/*
-		 * If the caller set ignore_wildcards, skip this extension
-		 * entirely when it is a wildcard
-		 */
-		if (wildcard_oui && attr->ignore_wildcards)
-			goto next;
-
-		action_oui_debug("action id %d vendor AP/STA found for OUI", action_id);
+		action_oui_debug("Vendor AP/STA found for OUI");
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   extension->oui, extension->oui_length);
-		oui_matched = true;
-		goto next;
-found:
 		qdf_mutex_release(&oui_priv->extension_lock);
 		return true;
 next:
 		qdf_status = qdf_list_peek_next(extension_list,
 						node, &next_node);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			if (qdf_status == QDF_STATUS_E_EMPTY && oui_matched)
-				goto found;
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			break;
-		}
+
 		node = next_node;
 		next_node = NULL;
 		wildcard_oui = false;

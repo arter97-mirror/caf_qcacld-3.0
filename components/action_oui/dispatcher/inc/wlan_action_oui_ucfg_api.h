@@ -29,7 +29,6 @@
 #include <qdf_types.h>
 #include "wlan_action_oui_public_struct.h"
 #include "wlan_action_oui_objmgr.h"
-#include "wlan_action_oui_main.h"
 
 #ifdef WLAN_FEATURE_ACTION_OUI
 
@@ -45,36 +44,22 @@
 QDF_STATUS ucfg_action_oui_init(void);
 
 /**
- * ucfg_action_oui_deinit() - De-initialize action_oui component
+ * ucfg_action_oui_deinit() - Unregister notification handlers.
  *
- * This function gets called when dispatcher is going down and releases
- * the allocated resources.
+ * This function Unregisters action_oui notification handlers which are
+ * invoked from psoc create/destroy handlers.
  *
  * Return: None
  */
 void ucfg_action_oui_deinit(void);
 
 /**
- * ucfg_action_oui_is_dynamic() - Check if action OUI is dynamic
- * @action_id: action id to check
- *
- * This function checks if the given action id is configured as dynamic
- * in the action OUI component.
- *
- * Return: true if dynamic, false otherwise
- */
-bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id);
-
-/**
  * ucfg_action_oui_psoc_enable() - Notify action oui psoc enable
  * @psoc: psoc object
- * @load_default_config: flag to indicate if we need to load
- * default config or not.
  *
- * Return: QDF_STATUS
+ * Return: None
  */
-QDF_STATUS ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-				       bool load_default_config);
+void ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_action_oui_psoc_disable() - Notify action oui psoc disable
@@ -138,59 +123,18 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 			    enum action_oui_id action_id);
 
 /**
- * ucfg_action_oui_is_nss_allowlist_denylist_config_supported() - Check
- * whether NSS allowlist/denylist configuration is supported
+ * ucfg_action_oui_cleanup() - Remove all in existing oui entry.
  * @psoc: objmgr psoc object
+ * @action_id: type of action to be removed
  *
- * This UCFG API returns true only when both FW services required for NSS
- * allowlist/denylist configuration are enabled.
+ * This is a wrapper function which invokes internal function to remove
+ * all the existing oui entry.
  *
- * Return: true if supported, else false
- */
-bool
-ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
-				struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_action_oui_is_ul_tx_beamformer_config_supported() - Check
- * whether UL TX beamformer configuration is supported
- * @psoc: objmgr psoc object
- *
- * This UCFG API returns true only when both FW services required for UL TX
- * beamformer configuration are enabled.
- *
- * Return: true if supported, else false
- */
-bool
-ucfg_action_oui_is_ul_tx_beamformer_config_supported(
-				struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_action_oui_cleanup() - Cleanup action OUI configuration for given ID
- * @psoc: objmgr psoc object
- * @action_id: type of action to be cleaned up
- *
- * This function cleans up the action OUI configuration for the specified
- * action ID. It removes all existing OUI entries and associated configurations
- * for the given action. Some action IDs may require cleanup of multiple related
- * configurations to ensure complete removal of all associated settings.
- *
- * This is a wrapper function which invokes internal function to perform
- * the cleanup operation.
- *
- * Return: QDF_STATUS_SUCCESS if cleanup is successful,
- *         QDF_STATUS_E_INVAL on validation failure or cleanup error
+ * Return: QDF_STATUS_SUCCESS If remove is successful.
  */
 QDF_STATUS
 ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 			enum action_oui_id action_id);
-
-static inline enum action_oui_id
-ucfg_action_oui_get_active_action_id(struct wlan_objmgr_psoc *psoc,
-				     enum action_oui_arbitrator_type arbitrator_type)
-{
-	return action_oui_get_active_action_id(psoc, arbitrator_type);
-}
 
 /**
  * ucfg_action_oui_send_by_id() - Send action oui for action id
@@ -206,28 +150,6 @@ QDF_STATUS ucfg_action_oui_send_by_id(struct wlan_objmgr_psoc *psoc,
 				      enum action_oui_id id);
 
 /**
- * ucfg_action_oui_restore_default_and_send() - Restore default and send
- * action OUI to firmware
- * @psoc: objmgr psoc object
- * @action_id: type of action to be restored and sent
- *
- * This function performs a two-step operation: first it cleans up the action
- * OUI configuration for the specified action ID (removing all existing OUI
- * entries and associated configurations), then restores the default
- * configuration,
- * and finally sends the configuration to the firmware.
- *
- * This is a wrapper function which combines cleanup,
- * restore default, and send operations.
- *
- * Return: QDF_STATUS_SUCCESS if restore and send is successful,
- *         QDF_STATUS_E_INVAL on validation failure or error
- */
-QDF_STATUS
-ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
-					 enum action_oui_id action_id);
-
-/**
  * ucfg_action_oui_get_config() - Get current action INI config
  * @psoc: objmgr psoc object
  * @action_id: type of action to get
@@ -237,114 +159,6 @@ ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
 uint8_t *
 ucfg_action_oui_get_config(struct wlan_objmgr_psoc *psoc,
 			   enum action_oui_id action_id);
-
-/**
- * ucfg_action_oui_add_token() - Add action oui token to oui extension
- * @action_token: oui token type
- * @value: oui token value
- * @value_len: oui token value
- * @oui_ext: pointer to action oui extension to save token
- *
- * Return: QDF_STATUS.
- */
-static inline QDF_STATUS
-ucfg_action_oui_add_token(enum action_oui_token_type action_token,
-			  uint8_t *value,
-			  uint32_t value_len,
-			  struct action_oui_extension *oui_ext)
-{
-	if (!oui_ext) {
-		action_oui_err("oui_ext is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return wlan_action_oui_add_token(action_token,
-					 value,
-					 value_len,
-					 oui_ext);
-}
-
-#ifdef ACTION_OUI_OP_ATTR
-/**
- * ucfg_action_oui_add_cap() - Add action oui capability config
- * @nss_bitmap: oui token type
- * @nss_bitmap: nss bitmap
- *  bit 0 : NSS 1
- *  bit 1 : NSS 2
- *  bit 2 : NSS 3
- *  bit 3 : NSS 4
- * @ht: is ht supported
- * @vht: is vht supported
- * @band_bitmap: band bitmap: 2G and 5G
- * @oui_ext: pointer to action oui extension to save cap
- *
- * Return: QDF_STATUS.
- */
-static inline QDF_STATUS
-ucfg_action_oui_add_cap(uint8_t nss_bitmap,
-			bool ht,
-			bool vht,
-			uint8_t band_bitmap,
-			struct action_oui_extension *oui_ext)
-{
-	return wlan_action_oui_add_cap(nss_bitmap, ht, vht, band_bitmap,
-				       oui_ext);
-}
-#else
-static inline QDF_STATUS
-ucfg_action_oui_add_cap(uint8_t nss_bitmap,
-			bool ht,
-			bool vht,
-			uint8_t band_bitmap,
-			struct action_oui_extension *oui_ext)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
-/**
- * ucfg_action_oui_extension_store() - Store action oui extension
- * @psoc: objmgr psoc object
- * @action_id: type of action to be stored
- * @oui_ext: pointer to action oui extension to save token
- * @oui_ext_num: number of action oui extension to save token
- *
- * Return: QDF_STATUS.
- */
-static inline QDF_STATUS
-ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
-				enum action_oui_id action_id,
-				struct action_oui_extension *oui_ext,
-				uint8_t oui_ext_num)
-{
-	QDF_STATUS status;
-
-	if (!oui_ext) {
-		action_oui_err("oui_ext is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if ((action_id == ACTION_OUI_ALLOW_NSS_GREATER_THAN_2 ||
-	     action_id == ACTION_OUI_DISALLOW_NSS_GREATER_THAN_2) &&
-	     oui_ext_num > TOTAL_NO_OUI_EXT) {
-		action_oui_warn("Trim OUI count for action id %u from %u to %u",
-				action_id, oui_ext_num,
-				TOTAL_NO_OUI_EXT);
-		oui_ext_num = TOTAL_NO_OUI_EXT;
-	}
-
-	if (action_id == ACTION_OUI_ALLOW_UL_TX_BEAMFORMER &&
-	    oui_ext_num > TOTAL_NO_BFORMER_OUI_EXT) {
-		action_oui_warn("Trim OUI count for action id %u from %u to %u",
-				action_id, oui_ext_num,
-				TOTAL_NO_BFORMER_OUI_EXT);
-		oui_ext_num = TOTAL_NO_BFORMER_OUI_EXT;
-	}
-
-	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext,
-						 oui_ext_num);
-	return status;
-}
 #else
 
 /**
@@ -378,18 +192,12 @@ void ucfg_action_oui_deinit(void)
 /**
  * ucfg_action_oui_psoc_enable() - Notify action oui psoc enable
  * @psoc: psoc object
- * @load_default_config: flag to indicate if we need to load
- * default config or not.
  *
- * In case of SSR, we don't need to load default config and
- * send previously configured action oui IDs.
- * Return: QDF_STATUS
+ * Return: None
  */
 static inline
-QDF_STATUS ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc,
-				       bool load_default_config)
+void ucfg_action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
-	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -470,34 +278,15 @@ bool ucfg_action_oui_search(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
-static inline
-bool ucfg_action_oui_is_nss_allowlist_denylist_config_supported(
-				struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline
-bool ucfg_action_oui_is_ul_tx_beamformer_config_supported(
-				struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
 /**
- * ucfg_action_oui_cleanup() - Cleanup action OUI configuration for given ID
+ * ucfg_action_oui_cleanup() - Remove all of existing oui entry
  * @psoc: objmgr psoc object
- * @action_id: type of action to be cleaned up
+ * @action_id: type of action to be removed
  *
- * This function cleans up the action OUI configuration for the specified
- * action ID. It removes all existing OUI entries and associated configurations
- * for the given action. Some action IDs may require cleanup of multiple related
- * configurations to ensure complete removal of all associated settings.
+ * This is a wrapper function which invokes internal function to remove
+ * all the existing oui entry.
  *
- * This is a wrapper function which invokes internal function to perform
- * the cleanup operation.
- *
- * Return: QDF_STATUS_SUCCESS (always successful in stub implementation)
+ * Return: QDF_STATUS_SUCCESS If remove is successful.
  */
 static inline
 QDF_STATUS
@@ -505,13 +294,6 @@ ucfg_action_oui_cleanup(struct wlan_objmgr_psoc *psoc,
 			enum action_oui_id action_id)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-static inline enum action_oui_id
-ucfg_action_oui_get_active_action_id(struct wlan_objmgr_psoc *psoc,
-				     enum action_oui_arbitrator_type arbitrator_type)
-{
-	return ACTION_OUI_MAXIMUM_ID;
 }
 
 /**
@@ -532,33 +314,6 @@ QDF_STATUS ucfg_action_oui_send_by_id(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_action_oui_restore_default_and_send() - Restore default and send
- * action OUI to firmware
- * @psoc: objmgr psoc object
- * @action_id: type of action to be restored and sent
- *
- * Stub function when WLAN_FEATURE_ACTION_OUI is not enabled.
- *
- * This function performs a two-step operation: first it cleans up the action
- * OUI configuration for the specified action ID (removing all existing OUI
- * entries and associated configurations), then restores the default
- * configuration,
- * and finally sends the configuration to the firmware.
- *
- * This is a wrapper function which combines cleanup,
- * restore default, and send operations.
- *
- * Return: QDF_STATUS_SUCCESS (always successful in stub implementation)
- */
-static inline
-QDF_STATUS
-ucfg_action_oui_restore_default_and_send(struct wlan_objmgr_psoc *psoc,
-					 enum action_oui_id action_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
  * ucfg_action_oui_get_config() - Get current action INI config
  * @psoc: objmgr psoc object
  * @action_id: type of action to get
@@ -570,40 +325,6 @@ ucfg_action_oui_get_config(struct wlan_objmgr_psoc *psoc,
 			   enum action_oui_id action_id)
 {
 	return "";
-}
-
-static inline QDF_STATUS
-ucfg_action_oui_add_token(enum action_oui_token_type action_token,
-			  uint8_t *value,
-			  uint32_t value_len,
-			  struct action_oui_extension *oui_ext)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_action_oui_add_cap(uint8_t nss_bitmap,
-			bool ht,
-			bool vht,
-			uint8_t band_bitmap,
-			struct action_oui_extension *oui_ext)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
-				enum action_oui_id action_id,
-				struct action_oui_extension *oui_ext,
-				uint8_t oui_ext_num)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-bool ucfg_action_oui_is_dynamic(enum action_oui_id action_id)
-{
-	return false;
 }
 #endif /* WLAN_FEATURE_ACTION_OUI */
 

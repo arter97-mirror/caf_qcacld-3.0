@@ -33,14 +33,12 @@
 #include "pld_internal.h"
 #include "pld_ipci.h"
 #include "osif_psoc_sync.h"
-#include "cds_api.h"
 
 #ifdef CONFIG_PLD_IPCI_ICNSS
 
 #define WCN6750_DEVICE_ID 0x6750
 #define WCN6450_DEVICE_ID 0x6450
 #define WCN7750_DEVICE_ID 0x7750
-#define WCN8750_DEVICE_ID 0x8750
 /**
  * pld_ipci_probe() - Probe function for platform driver
  * @dev: device
@@ -87,8 +85,6 @@ static void pld_ipci_remove(struct device *dev)
 	int errno;
 	struct osif_psoc_sync *psoc_sync;
 
-	cds_set_driver_loaded(false);
-	cds_set_unload_in_progress(true);
 	errno = osif_psoc_sync_trans_start_wait(dev, &psoc_sync);
 	if (errno)
 		return;
@@ -519,8 +515,6 @@ static struct device_info pld_ipci_dev_info[] = {
 	{ "wcn6450", WCN6450_DEVICE_ID },
 #elif defined(QCA_WIFI_WCN7750)
 	{ "wcn7750", WCN7750_DEVICE_ID },
-#elif defined(QCA_WIFI_WCN8750)
-	{ "wcn8750", WCN8750_DEVICE_ID },
 #endif
 	{ { 0 } }
 };

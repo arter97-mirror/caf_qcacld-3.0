@@ -36,11 +36,4 @@
  */
 void target_if_mlme_register_tx_ops(struct wlan_mlme_tx_ops *tx_ops);
 
-/**
- * target_if_fw_cck_support() - If FW supports RX/TX CCK or not
- * @psoc: psoc
- *
- * Return: none
- */
-uint32_t target_if_fw_cck_support(struct wlan_objmgr_psoc *psoc);
 #endif

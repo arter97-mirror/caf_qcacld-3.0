@@ -81,7 +81,8 @@ os_if_fwol_get_elna_bypass_callback(void *context,
 }
 
 int os_if_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
-			       struct sk_buff *skb, uint32_t id)
+			       struct sk_buff *skb,
+			       const struct nlattr *attr)
 {
 	struct get_elna_bypass_request req;
 	void *cookie;

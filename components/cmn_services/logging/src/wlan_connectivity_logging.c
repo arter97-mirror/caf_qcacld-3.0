@@ -28,8 +28,6 @@
 #include "cdp_txrx_ctrl.h"
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_scan_api.h"
-#include "wlan_cm_roam_api.h"
-#include "qdf_trace.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -130,7 +128,7 @@ wlan_clear_ml_vdev_sae_auth_logs(struct wlan_objmgr_psoc *psoc,
 		}
 
 		logging_debug("vdev:%d clear sae auth logs cache",
-			       link_vdev_id);
+			      link_vdev_id);
 		qdf_mem_zero(mlme_priv->auth_log, sizeof(mlme_priv->auth_log));
 	}
 }
@@ -208,11 +206,11 @@ QDF_STATUS wlan_print_cached_sae_auth_logs(struct wlan_objmgr_psoc *psoc,
 	 * that bssid
 	 */
 	for (i = 0; i < MAX_ROAM_CANDIDATE_AP; i++) {
-		if (!mlme_priv->auth_log[i][0].pkt_info.diag_cmn.ktime_us)
+		if (!mlme_priv->auth_log[i][0].diag_cmn.ktime_us)
 			continue;
 
 		if (qdf_is_macaddr_equal(bssid,
-					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].pkt_info.diag_cmn.bssid))
+					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].diag_cmn.bssid))
 			break;
 	}
 
@@ -227,12 +225,12 @@ QDF_STATUS wlan_print_cached_sae_auth_logs(struct wlan_objmgr_psoc *psoc,
 	}
 
 	for (j = 0; j < WLAN_ROAM_MAX_CACHED_AUTH_FRAMES; j++) {
-		if (!mlme_priv->auth_log[i][j].pkt_info.diag_cmn.ktime_us)
+		if (!mlme_priv->auth_log[i][j].diag_cmn.ktime_us)
 			continue;
 
-		WLAN_HOST_DIAG_EVENT_REPORT(&mlme_priv->auth_log[i][j].pkt_info,
+		WLAN_HOST_DIAG_EVENT_REPORT(&mlme_priv->auth_log[i][j],
 					    EVENT_WLAN_MGMT);
-		qdf_mem_zero(&mlme_priv->auth_log[i][j].pkt_info,
+		qdf_mem_zero(&mlme_priv->auth_log[i][j],
 			     sizeof(struct wlan_diag_packet_info));
 	}
 
@@ -265,7 +263,7 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 	}
 
 	for (i = 0; i < MAX_ROAM_CANDIDATE_AP; i++) {
-		pkt_info = &mlme_priv->auth_log[i][0].pkt_info;
+		pkt_info = &mlme_priv->auth_log[i][0];
 		if (!pkt_info->diag_cmn.ktime_us)
 			continue;
 
@@ -276,9 +274,6 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-
-	logging_debug("vdev_id:%d log_record_not_found for bssid:" QDF_MAC_ADDR_FMT,
-		      vdev_id, QDF_MAC_ADDR_REF(bssid->bytes));
 
 	return false;
 }
@@ -361,9 +356,6 @@ wlan_add_sae_log_record_to_available_slot(struct wlan_objmgr_psoc *psoc,
 						     (struct qdf_mac_addr *)pkt_info->diag_cmn.bssid,
 						     vdev_id);
 
-	logging_debug("Add Log record:" QDF_MAC_ADDR_FMT,
-		      QDF_MAC_ADDR_REF(pkt_info->diag_cmn.bssid));
-
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv) {
 		logging_err_rl("vdev:%d legacy private object is NULL",
@@ -373,32 +365,32 @@ wlan_add_sae_log_record_to_available_slot(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < MAX_ROAM_CANDIDATE_AP; i++) {
 		if (is_entry_exist &&
-		    mlme_priv->auth_log[i][0].pkt_info.diag_cmn.ktime_us &&
+		    mlme_priv->auth_log[i][0].diag_cmn.ktime_us &&
 		    qdf_is_macaddr_equal((struct qdf_mac_addr *)pkt_info->diag_cmn.bssid,
-					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].pkt_info.diag_cmn.bssid)) {
+					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].diag_cmn.bssid)) {
 			/*
 			 * Frames for given bssid already exists store the new
 			 * frame in corresponding array in empty slot
 			 */
 			for (j = 0; j < WLAN_ROAM_MAX_CACHED_AUTH_FRAMES; j++) {
-				if (mlme_priv->auth_log[i][j].pkt_info.diag_cmn.ktime_us)
+				if (mlme_priv->auth_log[i][j].diag_cmn.ktime_us)
 					continue;
 
 				logging_debug("vdev:%d added at [i][j]:[%d][%d]",
 					      vdev_id, i, j);
-				mlme_priv->auth_log[i][j].pkt_info = *pkt_info;
+				mlme_priv->auth_log[i][j] = *pkt_info;
 				break;
 			}
 
 		} else if (!is_entry_exist &&
-			   !mlme_priv->auth_log[i][0].pkt_info.diag_cmn.ktime_us) {
+			   !mlme_priv->auth_log[i][0].diag_cmn.ktime_us) {
 			/*
 			 * For given record, there is no existing bssid
 			 * so add the entry at first available slot
 			 */
 			logging_debug("vdev:%d added entry at [i][j]:[%d][%d]",
 				      vdev_id, i, 0);
-			mlme_priv->auth_log[i][0].pkt_info = *pkt_info;
+			mlme_priv->auth_log[i][0] = *pkt_info;
 			break;
 		}
 	}
@@ -453,7 +445,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type t2lm_status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      enum wlan_diag_wifi_band band,
+				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
@@ -472,7 +464,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 	wlan_diag_event.is_rx = is_rx;
 
-	wlan_diag_event.band = band;
+	wlan_diag_event.band = wlan_convert_freq_to_diag_band(freq);
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_MLO_T2LM_REQ_RESP);
@@ -520,29 +512,29 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 			struct wlan_diag_sta_info *wlan_diag_event)
 {
 	uint i = 0;
-	struct wlan_mlo_sta *sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	struct mlo_link_switch_context *link_ctx = vdev->mlo_dev_ctx->link_ctx;
 	struct wlan_channel *link_chan_info;
 
-	if (!sta_ctx)
+	if (!link_ctx)
 		return QDF_STATUS_E_FAILURE;
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_chan_info = sta_ctx->links_info[i].link_chan_info;
+		link_chan_info = link_ctx->links_info[i].link_chan_info;
 
 		if (wlan_reg_is_24ghz_ch_freq(
 		    (qdf_freq_t)link_chan_info->ch_freq)) {
 			qdf_mem_copy(wlan_diag_event->mac_2g,
-				     sta_ctx->links_info[i].link_addr.bytes,
+				     link_ctx->links_info[i].link_addr.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		} else if (wlan_reg_is_5ghz_ch_freq(
 			   (qdf_freq_t)link_chan_info->ch_freq)) {
 			qdf_mem_copy(wlan_diag_event->mac_5g,
-				     sta_ctx->links_info[i].link_addr.bytes,
+				     link_ctx->links_info[i].link_addr.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			   link_chan_info->ch_freq)) {
 			qdf_mem_copy(wlan_diag_event->mac_6g,
-				     sta_ctx->links_info[i].link_addr.bytes,
+				     link_ctx->links_info[i].link_addr.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		}
 	}
@@ -551,13 +543,13 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 }
 
 static uint8_t
-wlan_populate_band_bitmap(struct wlan_mlo_sta *sta_ctx)
+wlan_populate_band_bitmap(struct mlo_link_switch_context *link_ctx)
 {
 	uint8_t i, band_bitmap = 0, band;
 	struct wlan_channel *link_chan_info;
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_chan_info = sta_ctx->links_info[i].link_chan_info;
+		link_chan_info = link_ctx->links_info[i].link_chan_info;
 
 		band = wlan_reg_freq_to_band((qdf_freq_t)
 					     link_chan_info->ch_freq);
@@ -573,7 +565,7 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag)
 {
-	struct wlan_mlo_sta *sta_ctx;
+	struct mlo_link_switch_context *link_ctx;
 	struct qdf_mac_addr peer_mac, peer_mld_mac;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -604,14 +596,14 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 	if (tag != WLAN_ASSOC_REQ && tag != WLAN_REASSOC_REQ)
 		return status;
 
-	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
-	if (!sta_ctx) {
-		logging_debug("vdev: %d sta_ctx not found",
+	link_ctx = vdev->mlo_dev_ctx->link_ctx;
+	if (!link_ctx) {
+		logging_debug("vdev: %d link_ctx not found",
 			      wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 
-	data->supported_links = wlan_populate_band_bitmap(sta_ctx);
+	data->supported_links = wlan_populate_band_bitmap(link_ctx);
 
 	return status;
 }
@@ -644,7 +636,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 				  bool is_band_present)
 {
 	uint i = 0;
-	struct wlan_mlo_sta *sta_ctx = NULL;
+	struct mlo_link_switch_context *link_ctx = NULL;
 	struct wlan_channel *chan_info;
 	uint8_t num_links = 0;
 
@@ -675,31 +667,31 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
-	if (!sta_ctx) {
-		logging_err("vdev: %d mlo sta ctx not found",
+	link_ctx = vdev->mlo_dev_ctx->link_ctx;
+	if (!link_ctx) {
+		logging_err("vdev: %d mlo link ctx not found",
 			    wlan_vdev_get_id(vdev));
 		return;
 	}
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		if (sta_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
+		if (link_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
-		chan_info = sta_ctx->links_info[i].link_chan_info;
+		chan_info = link_ctx->links_info[i].link_chan_info;
 		if (!chan_info) {
 			logging_debug("link %d: chan_info not found",
-				      sta_ctx->links_info[i].link_id);
+				      link_ctx->links_info[i].link_id);
 			continue;
 		}
 
 		wlan_diag_event.mlo_cmn_info[num_links].link_id =
-				sta_ctx->links_info[i].link_id;
+				link_ctx->links_info[i].link_id;
 		wlan_diag_event.mlo_cmn_info[num_links].vdev_id =
-				sta_ctx->links_info[i].vdev_id;
+				link_ctx->links_info[i].vdev_id;
 
 		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[num_links].link_addr,
-			     sta_ctx->links_info[i].ap_link_addr.bytes,
+			     link_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
 		wlan_diag_event.mlo_cmn_info[num_links].band =
@@ -720,12 +712,12 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 		 */
 
 		wlan_diag_event.mlo_cmn_info_ext[num_links].link_id =
-				sta_ctx->links_info[i].link_id;
+				link_ctx->links_info[i].link_id;
 		wlan_diag_event.mlo_cmn_info_ext[num_links].vdev_id =
-				sta_ctx->links_info[i].vdev_id;
+				link_ctx->links_info[i].vdev_id;
 
 		qdf_mem_copy(wlan_diag_event.mlo_cmn_info_ext[num_links].link_addr,
-			     sta_ctx->links_info[i].ap_link_addr.bytes,
+			     link_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
 		wlan_diag_event.mlo_cmn_info_ext[num_links].freq =
@@ -782,11 +774,6 @@ wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
 	buf->mlo_cmn_info[bss_link].vdev_id = link_info->vdev_id;
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
-		if (t2lm[dir].direction == WLAN_T2LM_INVALID_DIRECTION) {
-			logging_debug("T2LM dir[%u] invalid, skipping", dir);
-			continue;
-		}
-
 		if (t2lm[dir].default_link_mapping) {
 			buf->mlo_cmn_info[bss_link].tid_ul = DEFAULT_TID_MAP;
 			buf->mlo_cmn_info[bss_link].tid_dl = DEFAULT_TID_MAP;
@@ -1018,7 +1005,6 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	bool cache_sae_frame_cap, is_initial_connection;
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
-	struct qdf_mac_addr macaddr = {0};
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
 
@@ -1052,21 +1038,8 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
 	wlan_diag_event.subtype = (uint8_t)tag;
 
-	/*
-	 * Extract the BSSID from the vdev provided by firmware to
-	 * ensure accurate connectivity logging.
-	 */
-	status = wlan_vdev_get_bss_peer_mac(vdev, &macaddr);
-	if ((tag == WLAN_DEAUTH_TX || tag == WLAN_DISASSOC_TX) &&
-	     QDF_IS_STATUS_SUCCESS(status)) {
-		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
-			     macaddr.bytes,
-			     QDF_MAC_ADDR_SIZE);
-	} else {
-		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
-			     &mac_hdr->i_addr3[0],
-			     QDF_MAC_ADDR_SIZE);
-	}
+	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid, &mac_hdr->i_addr3[0],
+		     QDF_MAC_ADDR_SIZE);
 
 	if (is_initial_connection) {
 		status = wlan_populate_mlo_mgmt_event_param(vdev,
@@ -1076,7 +1049,7 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			goto out;
 	}
 
-	wlan_diag_event.version = DIAG_MGMT_VERSION_V5;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V2;
 	wlan_diag_event.tx_fail_reason = tx_status;
 	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 	wlan_diag_event.rssi = peer_rssi;
@@ -1092,7 +1065,7 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 		wlan_populate_vsie(vdev, &wlan_diag_event, false);
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
-	    wlan_diag_event.subtype < WLAN_CONN_DIAG_DISCONNECT_EVENT)
+	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
 		wlan_diag_event.reason = status_code;
 
 	wlan_diag_event.is_retry_frame =
@@ -1105,11 +1078,6 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	cache_sae_frame_cap =
 		wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					      WLAN_ROAM_STATS_FRAME_INFO_PER_CANDIDATE);
-
-	logging_debug("cache_cap:%d is_initial_connection:%d tag:%d algo:%d",
-		      cache_sae_frame_cap, is_initial_connection, tag,
-		      auth_algo);
-
 	if (!is_initial_connection &&
 	    (tag == WLAN_AUTH_REQ || tag == WLAN_AUTH_RESP) &&
 	    auth_algo == WLAN_SAE_AUTH_ALGO_NUMBER && cache_sae_frame_cap) {
@@ -1124,200 +1092,6 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-}
-
-static enum wlan_diag_disconnect_reason
-wlan_connectivity_discon_reason_to_diag_reason(uint32_t reason,
-					       uint8_t *int_reason,
-					       bool is_peer_disconnect)
-{
-	enum wlan_diag_disconnect_reason discon_reason =
-					WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
-
-	if (reason < REASON_PROP_START) {
-		if (!is_peer_disconnect)
-			return WLAN_DIAG_DISCONNECT_REASON_AP_REQUEST;
-		else
-			return WLAN_DIAG_DISCONNECT_REASON_USERSPACE;
-	}
-
-
-	switch (reason) {
-	case REASON_KEY_FAIL_TO_INSTALL:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_KEY_FAIL_TO_INSTALL;
-		break;
-	case REASON_FW_TRIGGERED_LINK_SWITCH:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_FW_TRIGGERED_LINK_SWITCH;
-		break;
-	case REASON_HOST_TRIGGERED_LINK_DELETE:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_HOST_TRIGGERED_LINK_DELETE;
-		break;
-	case REASON_OCI_MISMATCH:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_OCI_MISMATCH;
-		break;
-	case REASON_FW_TRIGGERED_ROAM_FAILURE:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_ROAM_FAILURE;
-		break;
-	case REASON_USER_TRIGGERED_ROAM_FAILURE:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_EXT_ROAM_FAILURE;
-		break;
-	case REASON_GATEWAY_REACHABILITY_FAILURE:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_GATEWAY_REACHABILITY_FAILURE;
-		break;
-	case REASON_UNSUPPORTED_CHANNEL_CSA:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_UNSUPPORTED_CHANNEL_CSA;
-		break;
-	case REASON_OPER_CHANNEL_DISABLED_INDOOR:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_DISABLED_INDOOR;
-		break;
-	case REASON_OPER_CHANNEL_USER_DISABLED:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_USER_DISABLED;
-		break;
-	case REASON_DEVICE_RECOVERY:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_DEVICE_RECOVERY;
-		break;
-	case REASON_KEY_TIMEOUT:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_KEY_TIMEOUT;
-		break;
-	case REASON_OPER_CHANNEL_BAND_CHANGE:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_BAND_CHANGE;
-		break;
-	case REASON_PEER_XRETRY_FAIL:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_PEER_XRETRY_FAIL;
-		break;
-	case REASON_PEER_INACTIVITY:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_PEER_INACTIVITY;
-		break;
-	case REASON_SA_QUERY_TIMEOUT:
-		*int_reason = WLAN_DIAG_DISCONNECT_REASON_SA_QUERY_TIMEOUT;
-		break;
-	case REASON_CHANNEL_SWITCH_FAILED:
-		*int_reason =
-		WLAN_DIAG_DISCONNECT_REASON_CHANNEL_SWITCH_FAILURE;
-		break;
-	case REASON_IFACE_DOWN:
-		discon_reason = WLAN_DIAG_DISCONNECT_REASON_USERSPACE;
-		break;
-	case REASON_BEACON_MISSED:
-		discon_reason = WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS;
-		break;
-	default:
-		logging_err("No diag code for the qca reason code: %d", reason);
-		discon_reason = WLAN_DIAG_DISCONNECT_REASON_OTHER;
-	}
-
-	return discon_reason;
-}
-
-void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
-					uint8_t *peer_mac, uint32_t reason,
-					int rssi,
-					bool is_peer_disconnect)
-{
-	uint8_t int_reason = 0;
-	uint32_t diag_reason;
-	struct wlan_objmgr_pdev *pdev;
-
-	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
-
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
-		return;
-
-	if (!peer_mac) {
-		logging_err("vdev:%d peer mac not found",
-			    wlan_vdev_get_id(vdev));
-		return;
-	}
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		logging_err("Pdev not found");
-		return;
-	}
-
-	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mac)) {
-		logging_debug("vdev:%d reason:%d , bssid is zero",
-			      wlan_vdev_get_id(vdev), reason);
-		return;
-	}
-
-	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
-		     peer_mac, QDF_MAC_ADDR_SIZE);
-
-	diag_reason =
-	wlan_connectivity_discon_reason_to_diag_reason(reason, &int_reason,
-						       is_peer_disconnect);
-
-	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
-	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
-	wlan_diag_event.subtype = WLAN_CONN_DIAG_DISCONNECT_EVENT;
-	wlan_diag_event.version = DIAG_MGMT_VERSION_V5;
-
-	wlan_diag_event.rssi = rssi;
-
-	wlan_diag_event.reason = diag_reason;
-	wlan_diag_event.sub_reason = int_reason;
-
-	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
-}
-
-enum wlan_diag_tx_rx_status
-wlan_convert_host_to_diag_tx_fail_reason(enum wlan_roam_frame_tx_status
-					 tx_status)
-{
-	switch (tx_status) {
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
-		return WLAN_DIAG_TX_RX_STATUS_OK;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
-		return WLAN_DIAG_TX_RX_STATUS_NO_ACK;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_DROP:
-		return WLAN_DIAG_TX_RX_STATUS_DROP;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
-		return WLAN_DIAG_TX_RX_TX_FILTERED;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
-		return WLAN_DIAG_TX_RX_TXOP_ABORT;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
-		return WLAN_DIAG_TX_RX_TX_TID_DEL;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
-		return WLAN_DIAG_TX_RX_SW_ABORT;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
-		return WLAN_DIAG_TX_RX_TX_MIG_DROP;
-	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
-		return WLAN_DIAG_TX_RX_MLO_TID_MIG;
-	default:
-		return WLAN_DIAG_TX_RX_STATUS_INVALID;
-	}
-}
-
-enum diag_tx_status
-wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status)
-{
-	switch (tx_status) {
-	case WLAN_DIAG_TX_RX_STATUS_FW_DISCARD:
-	case WLAN_DIAG_TX_RX_STATUS_DROP:
-	case WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC:
-	case WLAN_DIAG_TX_RX_TX_FILTERED:
-	case WLAN_DIAG_TX_RX_TXOP_ABORT:
-	case WLAN_DIAG_TX_RX_TX_TID_DEL:
-	case WLAN_DIAG_TX_RX_SW_ABORT:
-	case WLAN_DIAG_TX_RX_TX_MIG_DROP:
-	case WLAN_DIAG_TX_RX_MLO_TID_MIG:
-		return DIAG_TX_STATUS_FAIL;
-	case WLAN_DIAG_TX_RX_STATUS_NO_ACK:
-		return DIAG_TX_STATUS_NO_ACK;
-	case WLAN_DIAG_TX_RX_STATUS_OK:
-		return DIAG_TX_STATUS_ACK;
-	default:
-		return DIAG_TX_STATUS_FAIL;
-	}
 }
 
 void
@@ -1440,7 +1214,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 }
 
 static uint8_t
-wlan_get_supported_link_band_bitmap(struct wlan_mlo_sta *sta_ctx)
+wlan_get_supported_link_band_bitmap(struct mlo_link_switch_context *link_ctx)
 {
 	uint8_t band_bitmap = 0, i = 0;
 	struct mlo_link_info link_info;
@@ -1448,7 +1222,7 @@ wlan_get_supported_link_band_bitmap(struct wlan_mlo_sta *sta_ctx)
 	enum wlan_diag_wifi_band band;
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = sta_ctx->links_info[i];
+		link_info = link_ctx->links_info[i];
 
 		chan_info = link_info.link_chan_info;
 		if (!chan_info)
@@ -1499,8 +1273,8 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
 
-	if (!mld_ctx->sta_ctx) {
-		logging_err("sta ctx for mld_mac: "
+	if (!mld_ctx->link_ctx) {
+		logging_err("link ctx for mld_mac: "
 			    QDF_MAC_ADDR_FMT
 			    " not found",
 			    QDF_MAC_ADDR_REF(src->mld_addr.bytes));
@@ -1508,7 +1282,7 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wlan_diag_event.associated_links =
-			wlan_get_supported_link_band_bitmap(mld_ctx->sta_ctx);
+			wlan_get_supported_link_band_bitmap(mld_ctx->link_ctx);
 
 	if (!wlan_diag_event.associated_links)
 		return;

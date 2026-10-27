@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -106,25 +106,6 @@ void hdd_apf_context_destroy(struct hdd_adapter *adapter);
  */
 void hdd_get_apf_capabilities_cb(void *hdd_context,
 				 struct sir_apf_get_offload *data);
-
-/**
- * hdd_apf_reset_history() - Reset the APF instruction history
- * @adapter: hdd adapter
- *
- * This function frees the memory allocated for stored APF instructions
- * and resets the history counters/index.
- */
-void hdd_apf_reset_history(struct hdd_adapter *adapter);
-
-/**
- * hdd_apf_dump_history() - Dump the APF instruction history to userspace
- * @hdd_ctx: hdd context
- *
- * This function iterates over all adapters and dumps their APF instruction
- * history to userspace using Netlink logs.
- */
-void hdd_apf_dump_history(struct hdd_context *hdd_ctx);
-
 #else /* FEATURE_WLAN_APF */
 
 #define FEATURE_APF_OFFLOAD_VENDOR_COMMANDS
@@ -134,14 +115,6 @@ static inline void hdd_apf_context_init(struct hdd_adapter *adapter)
 }
 
 static inline void hdd_apf_context_destroy(struct hdd_adapter *adapter)
-{
-}
-
-static inline void hdd_apf_reset_history(struct hdd_adapter *adapter)
-{
-}
-
-static inline void hdd_apf_dump_history(struct hdd_context *hdd_ctx)
 {
 }
 

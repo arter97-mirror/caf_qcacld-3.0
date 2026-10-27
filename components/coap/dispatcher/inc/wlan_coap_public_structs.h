@@ -86,7 +86,7 @@ struct coap_offload_periodic_tx_param {
 /**
  * struct coap_buf_node - CoAP message info entry
  * @node: List entry element
- * @tsf: TSF of the CoAP message
+ * @tsf: TSF of the CoAP meesage
  * @src_ip: source IPv4 address of the CoAP message
  * @len: length of the payload
  * @payload: pointer to buffer holding UDP payload of the CoAP message

@@ -38,15 +38,11 @@
 #include "wlan_mlme_api.h"
 #include "osif_vdev_mgr_util.h"
 #include "wlan_hdd_main.h"
-#include "wlan_hdd_p2p.h"
-#include "wma_api.h"
-#include "wlan_hdd_wifi_pos_pasn.h"
-#include "wlan_p2p_api.h"
 
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 const struct nla_policy
 p2p_usd_chan_config_policy[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_DEFAULT_FREQ] = {
@@ -99,55 +95,16 @@ p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_USD_STATUS] = {
 		.type = NLA_U8,
 	},
-	[QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID] = {
-		.type = NLA_BINARY,
-		.len = QDF_MAC_ADDR_SIZE
-	},
 };
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 const struct nla_policy
 p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG] = {.type = NLA_U8,},
 };
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-const struct nla_policy
-p2p_noa_attr_policy[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA] = {.type = NLA_U8},
-
-};
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 #define DST_MAC_ADDRESS_OFFSET 4
 #define MGMT_FRAME_MATCH_LEN 6
-
-static struct osif_p2p_legacy_ops *osif_p2p_legacy_ops;
-
-static struct wireless_dev *
-osif_p2p_get_pd_wdev_by_mac(const uint8_t *mac_addr)
-{
-	if (!osif_p2p_legacy_ops ||
-	    !osif_p2p_legacy_ops->osif_get_pd_wdev_by_mac_addr_cb)
-		return NULL;
-
-	return osif_p2p_legacy_ops->osif_get_pd_wdev_by_mac_addr_cb(mac_addr);
-}
-
-void osif_p2p_set_legacy_cb(struct osif_p2p_legacy_ops *osif_legacy_ops)
-{
-	osif_p2p_legacy_ops = osif_legacy_ops;
-}
-
-void osif_p2p_reset_legacy_cb(void)
-{
-	osif_p2p_legacy_ops = NULL;
-}
 
 /**
  * wlan_p2p_rx_callback() - Callback for rx mgmt frame
@@ -232,15 +189,15 @@ static void wlan_p2p_rx_callback(void *user_data,
 		   match[0], match[1], match[2], match[3], match[4], match[5]);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi,
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
 			       rx_frame->buf, rx_frame->frame_len,
 			       NL80211_RXMGMT_FLAG_ANSWERED);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
-	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi,
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
 			       rx_frame->buf, rx_frame->frame_len,
 			       NL80211_RXMGMT_FLAG_ANSWERED, GFP_ATOMIC);
 #else
-	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi,
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
 			       rx_frame->buf, rx_frame->frame_len, GFP_ATOMIC);
 #endif /* LINUX_VERSION_CODE */
 	osif_debug("indicated frame to userspace: %s",
@@ -266,7 +223,7 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct vdev_osif_priv *osif_priv;
-	struct wireless_dev *wdev, *pd_wdev = NULL;
+	struct wireless_dev *wdev;
 	bool is_success;
 	uint8_t *src_macaddr;
 	struct qdf_mac_addr p2p_mac_addr = {0};
@@ -287,16 +244,12 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 
 	wlan_mlme_get_p2p_device_mac_addr(vdev, &p2p_mac_addr);
 	src_macaddr = &(tx_cnf->buf[SRC_MAC_ADDRESS_OFFSET]);
-	if (src_macaddr)
-		pd_wdev = osif_p2p_get_pd_wdev_by_mac(src_macaddr);
 
 	if (ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc) &&
 	    src_macaddr &&
 	    (qdf_mem_cmp(src_macaddr, p2p_mac_addr.bytes,
 			 QDF_MAC_ADDR_SIZE) == 0)) {
 		wdev = osif_vdev_mgr_get_p2p_wdev();
-	} else if (pd_wdev) {
-		wdev = pd_wdev;
 	} else {
 		osif_priv = wlan_vdev_get_ospriv(vdev);
 		if (!osif_priv) {
@@ -313,72 +266,11 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 
 	osif_debug("send indication to %s interface", wdev->netdev->name);
 	is_success = tx_cnf->status ? false : true;
-	wlan_hdd_cfg80211_mgmt_tx_status(
+	cfg80211_mgmt_tx_status(
 		wdev,
 		tx_cnf->action_cookie,
 		tx_cnf->buf, tx_cnf->buf_len,
 		is_success, GFP_KERNEL);
-fail:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
-}
-
-/**
- * wlan_p2p_tx_expiry_callback() - Callback for mgmt tx expiry
- * @psoc: psoc object
- * @vdev_id: vdev id on which the mgmt tx was requested
- * @cookie: mgmt tx cookie that expired without a tx status
- * @chan_freq: channel frequency on which the mgmt tx was requested
- *
- * This callback will be used to notify cfg80211 that a mgmt frame tx
- * request has expired without receiving a tx status.
- *
- * Return: None
- */
-static void wlan_p2p_tx_expiry_callback(struct wlan_objmgr_psoc *psoc,
-					uint32_t vdev_id, uint64_t cookie,
-					qdf_freq_t chan_freq)
-{
-	struct wlan_objmgr_vdev *vdev = NULL;
-	struct vdev_osif_priv *osif_priv;
-	struct wireless_dev *wdev;
-	struct ieee80211_channel *chan;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    vdev_id,
-						    WLAN_P2P_ID);
-	if (!vdev) {
-		osif_err("vdev is null");
-		return;
-	}
-
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv) {
-		osif_err("osif_priv is null");
-		goto fail;
-	}
-
-	wdev = osif_priv->wdev;
-	if (!wdev) {
-		osif_err("wireless dev is null");
-		goto fail;
-	}
-
-	if (!wdev->wiphy) {
-		osif_err("wiphy is null");
-		goto fail;
-	}
-
-	chan = ieee80211_get_channel(wdev->wiphy, chan_freq);
-	if (!chan) {
-		osif_err("channel conversion failed, freq:%d", chan_freq);
-		goto fail;
-	}
-
-	osif_debug("vdev_id:%d, cookie:%llx, freq:%d",
-		   vdev_id, cookie, chan_freq);
-
-	cfg80211_tx_mgmt_expired(wdev, cookie, chan, GFP_KERNEL);
-
 fail:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 }
@@ -574,7 +466,6 @@ QDF_STATUS p2p_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	start_param.event_cb_data = psoc;
 	start_param.tx_cnf_cb = wlan_p2p_action_tx_cnf_callback;
 	start_param.tx_cnf_cb_data = psoc;
-	start_param.tx_expiry_cb = wlan_p2p_tx_expiry_callback;
 	wlan_p2p_init_lo_event(&start_param, psoc);
 
 	return ucfg_p2p_psoc_start(psoc, &start_param);
@@ -744,7 +635,7 @@ int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 		ucfg_p2p_mgmt_tx_cancel(psoc, vdev, cookie, opmode));
 }
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * osif_p2p_op_type_convert_qca_enum_to_p2p_enum() - this API convert
  * QCA_WLAN_VENDOR_USD_OP_TYPE_XX to P2P_USD_OP_TYPE_XX
@@ -885,10 +776,6 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   usd_param->ssi.data, usd_param->ssi.len);
 	}
 
-	if (qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_CANCEL_SUBSCRIBE ||
-	    qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_CANCEL_PUBLISH)
-		wlan_p2p_del_random_mac(psoc, vdev_id, usd_param->instance_id);
-
 	/**
 	 * no need to parse other attributes for the OP type other than
 	 * Publish and Subscribe
@@ -963,12 +850,6 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	usd_param->freq_config.default_freq = nla_get_u32(tb2[freq_config]);
-	if (qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH ||
-	    qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE)
-		wlan_p2p_add_random_mac(psoc, vdev_id,
-					usd_param->p2p_mac_addr.bytes,
-					usd_param->freq_config.default_freq,
-					usd_param->instance_id);
 
 	freq_config = QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_FREQ_LIST;
 
@@ -1019,14 +900,6 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	usd_param->ttl = nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_USD_TTL]);
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID]) {
-		qdf_mem_copy(usd_param->multicast_mac_addr.bytes,
-			     nla_data(tb[QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID]),
-			     QDF_MAC_ADDR_SIZE);
-	} else {
-		osif_debug("Network ID is not present");
-	}
-
 end:
 	usd_param->vdev_id = vdev_id;
 	status = ucfg_p2p_send_usd_params(psoc, usd_param);
@@ -1053,7 +926,6 @@ mem_free:
 	return ret;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * osif_p2p_mode_convert_qca_enum_to_p2p_enum() - This API converts
  * QCA_P2P_MODE_WFD_XX to P2P_MODE_WFD_XX
@@ -1114,198 +986,4 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 
 	return ret;
 }
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-/**
- * osif_p2p_set_noa_cancel_config() - Set NoA cancellation configuration
- * @adapter: HDD adapter
- * @tb: Parsed netlink attributes
- * @attr_id: Attribute ID to process
- * @device_mode: Expected device mode for this attribute
- * @feature_name: Feature name for logging
- * @mlme_setter: MLME configuration setter function
- * @mlme_getter: MLME configuration getter function
- *
- * This helper function handles setting NoA cancellation configuration with
- * proper validation.
- *
- * Return: 0 on success, -ENOENT if attribute not present,
- *         negative errno on error
- */
-static int
-osif_p2p_set_noa_cancel_config(struct hdd_adapter *adapter,
-			       struct nlattr **tb,
-			       enum qca_wlan_vendor_attr_p2p_set_noa attr_id,
-			       enum QDF_OPMODE device_mode,
-			       const char *feature_name,
-			       QDF_STATUS (*mlme_setter)(struct wlan_objmgr_psoc *, bool),
-			       bool (*mlme_getter)(struct wlan_objmgr_psoc *))
-{
-	uint8_t val;
-	int ret;
-	bool old_value = false;
-
-	/* Check if this attribute applies to current device mode */
-	if (adapter->device_mode != device_mode || !tb[attr_id])
-		return -EINVAL;
-
-	val = nla_get_u8(tb[attr_id]);
-
-	/* Validate input: must be 0 or 1 */
-	if (val > 1) {
-		hdd_err("Invalid value %d for %s, must be 0 or 1",
-			val, feature_name);
-		return -EINVAL;
-	}
-
-	if (mlme_getter)
-		old_value = mlme_getter(adapter->hdd_ctx->psoc);
-	hdd_debug("Setting %s to %d, old %d", feature_name, val, old_value);
-
-	/* Send command to firmware */
-	ret = wma_cli_set_command(adapter->deflink->vdev_id,
-				  wmi_vdev_param_set_go_cancel_noa,
-				  val, VDEV_CMD);
-	if (ret) {
-		hdd_err("Failed to set %s param, ret=%d", feature_name, ret);
-		return ret;
-	}
-
-	/* Store configuration in MLME */
-	if (mlme_setter)
-		if (QDF_IS_STATUS_ERROR(mlme_setter(adapter->hdd_ctx->psoc, val))) {
-			hdd_err("Failed to set %s config", feature_name);
-			return -EINVAL;
-		}
-
-	return 0;
-}
-
-/**
- * osif_p2p_noa_cancel() - Handle P2P NoA cancellation commands
- * @adapter: HDD adapter
- * @data: Pointer to vendor command data
- * @data_len: Length of vendor command data
- *
- * This function handles P2P NoA cancellation features:
- * - P2P GC keep awake during one-shot NoA: When enabled, P2P GC will
- *   remain awake during firmware-initiated one-shot NoA periods instead
- *   of entering power save. This improves performance in MCC scenarios.
- * - P2P GO cancel one-shot NoA: When enabled, P2P GO will automatically
- *   cancel firmware-initiated one-shot NoA schedules when no P2P clients
- *   are in power save mode.
- *
- * Return: 0 on success, -ENOENT if no cancellation attributes present,
- *         negative errno on error
- */
-int osif_p2p_noa_cancel(struct hdd_adapter *adapter, const void *data,
-			int data_len)
-{
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1];
-	int ret = -EINVAL;
-	bool is_cancel_noa_supported;
-
-	/* Parse and fetch NOA params */
-	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX,
-				    data, data_len, p2p_noa_attr_policy)) {
-		osif_debug("Invalid P2P NOA vendor command attributes");
-		return -EINVAL;
-	}
-
-	/* Check if any NoA cancellation attributes are present */
-	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA] &&
-	    !tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA])
-		return -ENOENT;
-
-	/* Validate firmware support */
-	is_cancel_noa_supported =
-		ucfg_p2p_is_fw_cancel_one_shot_noa_supported(
-			adapter->hdd_ctx->psoc);
-	if (!is_cancel_noa_supported) {
-		hdd_err("NoA cancellation not supported by firmware");
-		return -EOPNOTSUPP;
-	}
-
-	/* Validate device mode before processing */
-	if (adapter->device_mode != QDF_P2P_CLIENT_MODE &&
-	    adapter->device_mode != QDF_P2P_GO_MODE) {
-		hdd_err("Invalid device mode %d for NoA cancellation",
-			adapter->device_mode);
-		return -EINVAL;
-	}
-
-	/* Both attributes cannot be set together */
-	if (tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA] &&
-	    tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA]) {
-		hdd_err("Both GO and GC NoA cancel attributes cannot be set together");
-		return -EINVAL;
-	}
-
-	if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-	/* Handle P2P GC keep awake during one-shot NoA */
-		ret = osif_p2p_set_noa_cancel_config(adapter, tb,
-			QCA_WLAN_VENDOR_ATTR_P2P_SET_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA,
-			QDF_P2P_CLIENT_MODE,
-			"P2P GC keep awake during NoA",
-			ucfg_mlme_set_p2p_gc_keep_awake_during_noa,
-			ucfg_mlme_get_p2p_gc_keep_awake_during_noa);
-	} else if (adapter->device_mode == QDF_P2P_GO_MODE) {
-		/* Handle P2P GO cancel one-shot NoA */
-		ret = osif_p2p_set_noa_cancel_config(adapter, tb,
-			QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA,
-			QDF_P2P_GO_MODE,
-			"P2P GO cancel one-shot NoA",
-			ucfg_mlme_set_p2p_go_cancel_one_shot_noa,
-			ucfg_mlme_get_p2p_go_cancel_one_shot_noa);
-	}
-
-	return ret;
-}
-
-int osif_p2p_parse_noa_params(struct hdd_adapter *adapter,
-			      struct p2p_ps_config *noa, const void *data,
-			      int data_len)
-{
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1];
-	int ret = 0;
-	int count, duration = 0, interval = 0, start = 0;
-
-	/* Parse and fetch NOA params*/
-	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX,
-				    data, data_len, p2p_noa_attr_policy)) {
-		osif_debug("Invalid P2P NOA vendor command attributes");
-		return -EINVAL;
-	}
-
-	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT]) {
-		osif_debug("Invalid P2P NOA Count Attribute");
-		return -EINVAL;
-	}
-	count = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT]);
-
-	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION]) {
-		osif_debug("Invalid P2P NOA Duration Attribute");
-		return -EINVAL;
-	}
-	duration = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION]);
-
-	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL]) {
-		osif_debug("Invalid P2P NOA Interval Attribute");
-		return -EINVAL;
-	}
-	interval = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL]);
-
-	if (tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START])
-		start = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START]);
-
-	osif_debug("P2P_SET GO noa: count=%d interval=%d duration=%d start=%d",
-		   count, interval, duration, start);
-
-	noa->count = count;
-	noa->duration = duration;
-	noa->interval = interval;
-	noa->start = start;
-
-	return ret;
-}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

@@ -190,7 +190,7 @@ QDF_STATUS hdd_wlan_re_init(void);
 /**
  * hdd_handle_cached_commands() - Handle north bound commands during SSR
  *
- * This api will be invoked after SSR re-initialization to execute the north
+ * This api will be invoked afte SSR re-initialization to execute the north
  * bound commands received during SSR.
  *
  * Return: None
@@ -406,8 +406,6 @@ void hdd_ipv6_notifier_work_queue(struct work_struct *work);
  * wlan_hdd_cfg80211_get_txpower() - cfg80211 get power handler function
  * @wiphy: Pointer to wiphy structure.
  * @wdev: Pointer to wireless_dev structure.
- * @radio_idx: Radio index
- * @link_id: Link index
  * @dbm: dbm
  *
  * This is the cfg80211 get txpower handler function which invokes
@@ -416,51 +414,23 @@ void hdd_ipv6_notifier_work_queue(struct work_struct *work);
  *
  * Return: 0 for success, error number on failure.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  int radio_idx,
-				  unsigned int link_id,
-				  int *dbm);
-#elif defined(CFG80211_HAS_TX_POWER_LINK_ID)
-int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  unsigned int link_id,
-				  int *dbm);
-#else
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  int *dbm);
-#endif
 
 /**
  * wlan_hdd_cfg80211_set_txpower() - set TX power
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to network device
- * @radio_idx: Radio index
  * @type: TX power setting type
  * @dbm: TX power in dbm
  *
  * Return: 0 for success, non-zero for failure
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  int radio_idx,
-				  enum nl80211_tx_power_setting type,
-				  int dbm);
-#elif defined(CFG80211_HAS_TX_POWER_LINK_ID)
-int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  enum nl80211_tx_power_setting type,
-				  int mbm,
-				  int link_id);
-#else
 int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
 				  enum nl80211_tx_power_setting type,
 				  int dbm);
-#endif
 
 /**
  * wlan_hdd_cfg80211_set_power_mgmt() - set cfg80211 power management config
@@ -560,14 +530,13 @@ int hdd_set_power_config(struct hdd_context *hddctx,
  * @hddctx: HDD context
  * @adapter: HDD adapter
  * @ps_ito: power save inactivitiy duration in ms
- * @ps_opm_level: power save opm level
  * @spec_wake: power save speculative wake duration in ms
  *
  * Return: 0 on success; Errno on failure
  */
 int hdd_set_power_config_params(struct hdd_context *hddctx,
-				struct hdd_adapter *adapter, uint16_t ps_ito,
-				uint8_t ps_opm_level, uint16_t spec_wake);
+				struct hdd_adapter *adapter,
+				uint16_t ps_ito, uint16_t spec_wake);
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
  * hdd_wlan_suspend_resume_event()- send suspend/resume state

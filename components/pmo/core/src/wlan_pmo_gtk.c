@@ -25,20 +25,14 @@
 #include "wlan_pmo_tgt_api.h"
 #include "wlan_pmo_main.h"
 #include "wlan_pmo_obj_mgmt_public_struct.h"
-#include "wlan_pmo_suspend_resume.h"
 
-static QDF_STATUS pmo_core_cache_and_configure_gtk_req(
+static QDF_STATUS pmo_core_cache_gtk_req_in_vdev_priv(
 		struct wlan_objmgr_vdev *vdev,
 		struct pmo_gtk_req *gtk_req)
 {
 	struct pmo_vdev_priv_obj *vdev_ctx;
 	QDF_STATUS status;
 	struct qdf_mac_addr peer_bssid;
-	struct wlan_objmgr_psoc *psoc;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return QDF_STATUS_E_INVAL;
 
 	vdev_ctx = pmo_vdev_get_priv(vdev);
 
@@ -54,20 +48,6 @@ static QDF_STATUS pmo_core_cache_and_configure_gtk_req(
 	vdev_ctx->vdev_gtk_req.flags = PMO_GTK_OFFLOAD_ENABLE;
 	qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
 
-	/* Check if firmware supports WOW enhanced offload capabilities */
-	if (pmo_core_is_wow_optimization_enabled(psoc)) {
-		pmo_debug("WOW offload enabled - sending GTK ENABLE");
-
-		qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
-		status = pmo_tgt_send_gtk_offload_req(vdev,
-						      &vdev_ctx->vdev_gtk_req);
-		qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
-
-		if (status != QDF_STATUS_SUCCESS)
-			pmo_err("Failed to send GTK ENABLE");
-		else
-			pmo_debug("GTK ENABLE sent for autonomous operation");
-	}
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -94,11 +74,6 @@ static QDF_STATUS pmo_core_do_enable_gtk_offload(
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
 	enum QDF_OPMODE op_mode;
-	struct wlan_objmgr_psoc *psoc;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return QDF_STATUS_E_INVAL;
 
 	op_mode = pmo_get_vdev_opmode(vdev);
 	if (QDF_NDI_MODE == op_mode) {
@@ -116,13 +91,6 @@ static QDF_STATUS pmo_core_do_enable_gtk_offload(
 		return QDF_STATUS_E_INVAL;
 
 	vdev_id = pmo_vdev_get_id(vdev);
-
-	/* Check if firmware supports WOW enhanced offload capabilities */
-	if (pmo_core_is_wow_optimization_enabled(psoc)) {
-		pmo_debug("WOW enhanced offload enabled-already sent, vdev_id: %d",
-			  vdev_id);
-		return QDF_STATUS_SUCCESS;
-	}
 
 	qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
 	qdf_mem_copy(op_gtk_req, &vdev_ctx->vdev_gtk_req,
@@ -247,7 +215,7 @@ QDF_STATUS pmo_core_cache_gtk_offload_req(struct wlan_objmgr_vdev *vdev,
 		goto dec_ref;
 	}
 
-	status = pmo_core_cache_and_configure_gtk_req(vdev, gtk_req);
+	status = pmo_core_cache_gtk_req_in_vdev_priv(vdev, gtk_req);
 dec_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 out:

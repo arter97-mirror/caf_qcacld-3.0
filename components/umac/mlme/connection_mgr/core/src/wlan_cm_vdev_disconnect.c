@@ -22,11 +22,9 @@
 
 #include "wlan_cm_vdev_api.h"
 #include "wlan_mlme_main.h"
-#include "wlan_mlme_api.h"
 #include "wlan_cm_api.h"
 #include "wlan_p2p_api.h"
 #include "wlan_tdls_api.h"
-#include <wlan_tdls_stats_api.h>
 #include <wlan_policy_mgr_api.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_pdev_obj.h>
@@ -103,19 +101,9 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 	 * so during subsequent disconnects also to not deleted the TDLS peers
 	 * TODO: Move all TDLS peers deletion logic from IF_MGR to be symmetric
 	 */
-	if (req->source == CM_OSIF_DISCONNECT) {
-		/*
-		 * Record teardown stats for all connected TDLS peers before
-		 * notifying the TDLS component of the AP disconnect.
-		 * Reason: STA is leaving the network (user-initiated disconnect).
-		 */
-		wlan_tdls_stats_record_peers_teardown(
-					psoc,
-					req->vdev_id,
-					TDLS_STATS_REASON_DEAUTH_LEAVING);
+	if (req->source == CM_OSIF_DISCONNECT)
 		wlan_tdls_notify_sta_disconnect(req->vdev_id, false,
 						true, vdev);
-	}
 
 	cm_abort_connect_request_timers(vdev);
 
@@ -229,18 +217,9 @@ cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
 
 	cm_csr_handle_diconnect_req(vdev, req);
 	wlan_roam_reset_roam_params(vdev);
-
-	/*
-	 * If the disconnect request is due to link switch
-	 * do not restore the default config.
-	 */
-	if (req->req.source != CM_MLO_LINK_SWITCH_DISCONNECT)
-		cm_roam_restore_default_config(pdev, vdev_id);
-
+	cm_roam_restore_default_config(pdev, vdev_id);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode == QDF_STA_MODE &&
-	    !wlan_vdev_mlme_is_link_sta_vdev(vdev) &&
-	    req->req.source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
+	if (opmode == QDF_STA_MODE && !wlan_vdev_mlme_is_link_sta_vdev(vdev))
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_DEINIT,
 					  REASON_DISCONNECTED);
@@ -358,11 +337,6 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			psoc, vdev_id, ml_nlink_disconnect_completion_evt,
 			NULL);
 	}
-
-	wlan_vdev_mlme_init_bss_oper_res_params(vdev);
-
-	/* Zero the stored PTK KCK so it does not outlive the session */
-	wlan_mlme_clear_kck(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -584,29 +558,6 @@ wlan_cm_mlo_update_disconnecting_vdev_id(struct wlan_objmgr_psoc *psoc,
 			break;
 		}
 	}
-
-	if (i < num_links) {
-		mlme_debug("found active disconn link vdev %d", *vdev_id);
-		goto release_mlo_ref;
-	}
-	/* if not found active disconnect in link vdev, try to find
-	 * including assoc vdev. In assoc link switch + nb disconnecting,
-	 * assoc link vdev may get disconnect request early than link
-	 * vdev (during link switch assoc link was marked as link vdev
-	 * temporally)
-	 */
-	for (i = 0; i < num_links; i++) {
-		if (wlan_vdev_mlme_is_mlo_vdev(vdev_list[i]) &&
-		    (wlan_cm_is_vdev_disconnecting(vdev_list[i]) ||
-		     wlan_cm_is_vdev_connecting(vdev_list[i])) &&
-		    wlan_cm_get_active_req_type(vdev_list[i]) ==
-							CM_DISCONNECT_ACTIVE) {
-			*vdev_id = wlan_vdev_get_id(vdev_list[i]);
-			break;
-		}
-	}
-	if (i < num_links)
-		mlme_debug("found active disconn vdev %d", *vdev_id);
 
 release_mlo_ref:
 	for (i = 0; i < num_links; i++)

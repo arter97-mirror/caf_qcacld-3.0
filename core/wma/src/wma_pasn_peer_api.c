@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -211,8 +210,7 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	qdf_mem_copy(param.peer_addr.bytes, peer_addr->bytes,
-		     QDF_MAC_ADDR_SIZE);
+	param.peer_addr = peer_addr->bytes;
 	param.peer_type = WMI_PEER_TYPE_PASN;
 	param.vdev_id = vdev_id;
 	if (wmi_unified_peer_create_send(wma->wmi_handle,
@@ -402,32 +400,23 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 
 	wma_acquire_wakelock(&wma->wmi_cmd_rsp_wake_lock,
 			     WMA_PEER_DELETE_RESPONSE_TIMEOUT);
-	wma_debug("Delete all PASN peer of vdev:%d", vdev_id);
+	wma_debug("Delete all PASN peer of vdev:%d", wlan_vdev_get_id(vdev));
 
 	opmode = wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id);
 	if (opmode == QDF_NAN_DISC_MODE) {
-		status = wlan_nan_vdev_delete_all_pasn_peers(vdev);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_resume_vdev_delete(wma, vdev_id);
-			wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
-			return status;
-		}
+		wlan_nan_vdev_delete_all_pasn_peers(vdev);
 	} else {
 		rx_ops = wifi_pos_get_rx_ops(wma->psoc);
 		if (!rx_ops ||
 		    !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb) {
 			wma_err("rx_ops is NULL");
-			wma_resume_vdev_delete(wma, vdev_id);
-			wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 			return QDF_STATUS_E_NULL_VALUE;
 		}
 		status =
 			rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb(vdev);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Delete all ranging peers failed for vdev:%d",
-				vdev_id);
-			wma_resume_vdev_delete(wma, vdev_id);
 			wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+			wma_err("Delete all ranging peers failed");
 			return status;
 		}
 	}
@@ -439,8 +428,8 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 	if (!msg) {
 		wma_err("Failed to allocate request for vdev_id %d", vdev_id);
 		wma_remove_req(wma, vdev_id, WMA_PASN_PEER_DELETE_RESPONSE);
-		wma_resume_vdev_delete(wma, vdev_id);
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+		wma_resume_vdev_delete(wma, vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 

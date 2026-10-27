@@ -95,18 +95,8 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    !(lim_is_sb_disconnect_allowed(pe_session) ||
-	      (pe_session->limMlmState == eLIM_MLM_WT_EXTERNAL_AUTH_STATE &&
-	       pe_session->limSmeState == eLIM_SME_WT_AUTH_STATE) ||
-	      /*
-	       * Deauth received while waiting for the (Re)Assoc Response must
-	       * be processed so that the join attempt is aborted and the STA
-	       * leaves the (Re)Assoc wait state. Otherwise a subsequent
-	       * (Re)Association Response would be accepted in an
-	       * unauthenticated state.
-	       */
-	      pe_session->limMlmState == eLIM_MLM_WT_ASSOC_RSP_STATE ||
-	      pe_session->limMlmState == eLIM_MLM_WT_REASSOC_RSP_STATE ||
-	      pe_session->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE)) {
+	      (pe_session->limMlmState == eLIM_MLM_WT_SAE_AUTH_STATE &&
+	       pe_session->limSmeState == eLIM_SME_WT_AUTH_STATE))) {
 		/*Every 15th deauth frame will be logged in kmsg */
 		if (!(mac->lim.deauthMsgCnt & 0xF)) {
 			pe_debug("received Deauth frame in DEAUTH_WT_STATE"
@@ -178,7 +168,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			QDF_MAC_ADDR_REF(pHdr->da), frame_rssi,
 			reasonCode, pe_session->limMlmState,
 			pe_session->limSmeState,
-			GET_LIM_BSS_TYPE(pe_session));
+			GET_LIM_SYSTEM_ROLE(pe_session));
 
 	lim_diag_event_report(mac, WLAN_PE_DIAG_DEAUTH_FRAME_EVENT,
 		pe_session, 0, reasonCode);
@@ -247,7 +237,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		/* Received Deauth frame un-known role. Log and ignore it */
 		pe_err("received Deauth frame with reasonCode %d in role %d from "
 			QDF_MAC_ADDR_FMT, reasonCode,
-			GET_LIM_BSS_TYPE(pe_session),
+			GET_LIM_SYSTEM_ROLE(pe_session),
 			QDF_MAC_ADDR_REF(pHdr->sa));
 
 		return;
@@ -416,8 +406,8 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 		return;
 	}
 	/* Check for pre-assoc states */
-	switch (GET_LIM_BSS_TYPE(pe_session)) {
-	case eSIR_INFRASTRUCTURE_MODE:
+	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
+	case eLIM_STA_ROLE:
 		switch (pe_session->limMlmState) {
 		case eLIM_MLM_WT_AUTH_FRAME2_STATE:
 			/**
@@ -472,6 +462,10 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				lim_delete_pre_auth_node(mac_ctx, addr);
 
 			lim_stop_pmfcomeback_timer(pe_session);
+			if (pe_session->pLimMlmJoinReq) {
+				qdf_mem_free(pe_session->pLimMlmJoinReq);
+				pe_session->pLimMlmJoinReq = NULL;
+			}
 
 			mlmAssocCnf.resultCode = eSIR_SME_DEAUTH_WHILE_JOIN;
 			mlmAssocCnf.protStatusCode = rc;
@@ -526,7 +520,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				if (IS_CURRENT_BSSID(mac_ctx, addr, pe_session))
 					lim_delete_tdls_peers(mac_ctx,
 							      pe_session,
-							      TDLS_PEER_DEL_REASON_DEAUTH_LEAVING);
+							      TDLS_PEER_DEL_REASON_NONE);
 #endif
 			/**
 			 * This could be Deauthentication frame from
@@ -554,13 +548,13 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				QDF_MAC_ADDR_REF(addr));
 			break;
 
-		case eLIM_MLM_WT_EXTERNAL_AUTH_STATE:
+		case eLIM_MLM_WT_SAE_AUTH_STATE:
 			pe_debug("received Deauth frame state %X with "
 				 "reasonCode=%d from " QDF_MAC_ADDR_FMT,
 				 pe_session->limMlmState, rc,
 				 QDF_MAC_ADDR_REF(addr));
 
-			/* this will be treated as SAE authentication failure
+			/* this will be treated as SAE authenticaton failure
 			 * and connect failure to userspace.
 			 */
 			lim_process_sae_auth_msg(mac_ctx, pe_session, addr);
@@ -574,11 +568,13 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			return;
 		}
 		break;
-	case eSIR_INFRA_AP_MODE:
+
+	case eLIM_AP_ROLE:
 		break;
+
 	default:
 		return;
-	}
+	} /* end switch (mac->lim.gLimSystemRole) */
 
 	/**
 	 * Extract 'associated' context for STA, if any.

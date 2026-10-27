@@ -252,25 +252,6 @@ ucfg_fwol_get_thermal_temp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_DDR_BW_MITIGATION
-QDF_STATUS
-ucfg_fwol_get_ddr_bwm_config(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_fwol_bwm_params *ddr_bwm_info)
-{
-	struct wlan_fwol_psoc_obj *fwol_obj;
-
-	fwol_obj = fwol_get_psoc_obj(psoc);
-	if (!fwol_obj) {
-		fwol_err("Failed to get fwol obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*ddr_bwm_info = fwol_obj->cfg.bwm_params_cfg;
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 QDF_STATUS
 ucfg_fwol_is_neighbor_report_req_supported(struct wlan_objmgr_psoc *psoc,
 					   bool *neighbor_report_req)
@@ -536,37 +517,6 @@ QDF_STATUS ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
 	*dynamic_bw_switch = fwol_obj->cfg.dynamic_bw_switch;
 	return QDF_STATUS_SUCCESS;
 }
-
-QDF_STATUS ucfg_set_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
-					    bool dynamic_bw_switch)
-{
-	struct wlan_fwol_psoc_obj *fwol_obj;
-
-	fwol_obj = fwol_get_psoc_obj(psoc);
-	if (!fwol_obj) {
-		fwol_err("Failed to get FWOL obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	fwol_obj->cfg.dynamic_bw_switch = dynamic_bw_switch;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_get_dynamic_mode_switch_value(struct wlan_objmgr_psoc *psoc,
-					      bool *dynamic_mode_switch)
-{
-	struct wlan_fwol_psoc_obj *fwol_obj;
-
-	fwol_obj = fwol_get_psoc_obj(psoc);
-	if (!fwol_obj) {
-		fwol_err("Failed to get FWOL obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*dynamic_mode_switch = fwol_obj->cfg.dynamic_mode_switch;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS
 ucfg_get_alternative_chainmask_enabled(struct wlan_objmgr_psoc *psoc,
 				       bool *alternative_chainmask_enabled)
@@ -731,7 +681,7 @@ QDF_STATUS ucfg_fwol_get_is_rate_limit_enabled(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#ifdef WLAN_FEATURE_TSF
 QDF_STATUS ucfg_fwol_get_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
 				      uint32_t *tsf_gpio_pin)
 {
@@ -748,6 +698,7 @@ QDF_STATUS ucfg_fwol_get_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_TSF_PLUS
 QDF_STATUS ucfg_fwol_get_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 					 uint32_t *tsf_ptp_options)
 {
@@ -837,6 +788,7 @@ ucfg_fwol_get_tsf_sync_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#endif
 #endif
 #else
 QDF_STATUS ucfg_fwol_get_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,

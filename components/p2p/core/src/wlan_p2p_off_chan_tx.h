@@ -27,8 +27,6 @@
 #include <qdf_types.h>
 #include <qdf_mc_timer.h>
 #include <qdf_list.h>
-#include "wlan_p2p_roc.h"
-#include "wlan_p2p_main.h"
 
 #define P2P_EID_VENDOR                          0xdd
 #define P2P_ACTION_VENDOR_SPECIFIC_CATEGORY     0x7F
@@ -172,9 +170,6 @@ struct p2p_frame_info {
  * @no_ack:         Required ack or not
  * @rand_mac_tx:    Use random MAC address
  * @duration:       Duration for the RoC
- * @zero_wait:      True if userspace requested wait_time of 0. Driver is
- *                  not required to send tx expiry notification in this
- *                  case, since the caller did not ask to wait for tx.
  * @tx_timer:       RoC timer
  * @frame_info:     Frame type information
  * @nbuf:           Network buffer
@@ -195,7 +190,6 @@ struct tx_action_context {
 	bool no_ack;
 	bool rand_mac_tx;
 	uint32_t duration;
-	bool zero_wait;
 	qdf_mc_timer_t tx_timer;
 	struct p2p_frame_info frame_info;
 	qdf_nbuf_t nbuf;
@@ -387,29 +381,6 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
 	struct p2p_soc_priv_obj *p2p_soc_obj, void *nbuf);
 
 #define P2P_80211_FRM_SA_OFFSET 10
-
-/**
- * p2p_add_random_mac() - add or append random mac to given vdev rand mac list
- * @soc: soc object
- * @vdev_id: vdev id
- * @mac: mac addr to be added or append
- * @freq: frequency
- * @rnd_cookie: random mac mgmt tx cookie
- * @skip_timeout_clear: Skip clearing the FW mac addr filter on
- *  clear_timer expiry while this cookie is still present in the list
- *
- * This function will add or append the mac addr entry to vdev random mac list.
- * Once the mac addr filter is not needed, it can be removed by
- * p2p_del_random_mac.
- *
- * Return: QDF_STATUS_E_EXISTS - append to existing list
- *             QDF_STATUS_SUCCESS - add a new entry.
- *             other : failed to add the mac address entry.
- */
-QDF_STATUS
-p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-		   uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
-		   bool skip_timeout_clear);
 
 /**
  * p2p_del_random_mac() - del mac filter from given vdev rand mac list

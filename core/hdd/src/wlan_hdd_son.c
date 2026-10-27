@@ -107,29 +107,29 @@ static uint32_t hdd_son_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
  *
  * Return: mac chan width
  */
-static enum phy_ch_width hdd_son_chan_width_to_chan_width(
+static enum eSirMacHTChannelWidth hdd_son_chan_width_to_chan_width(
 				enum ieee80211_cwm_width son_chwidth)
 {
-	enum phy_ch_width chwidth;
+	enum eSirMacHTChannelWidth chwidth;
 
 	switch (son_chwidth) {
 	case IEEE80211_CWM_WIDTH20:
-		chwidth = CH_WIDTH_20MHZ;
+		chwidth = eHT_CHANNEL_WIDTH_20MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH40:
-		chwidth = CH_WIDTH_40MHZ;
+		chwidth = eHT_CHANNEL_WIDTH_40MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH80:
-		chwidth = CH_WIDTH_80MHZ;
+		chwidth = eHT_CHANNEL_WIDTH_80MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH160:
-		chwidth = CH_WIDTH_160MHZ;
+		chwidth = eHT_CHANNEL_WIDTH_160MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH80_80:
-		chwidth = CH_WIDTH_80P80MHZ;
+		chwidth = eHT_CHANNEL_WIDTH_80P80MHZ;
 		break;
 	default:
-		chwidth = CH_WIDTH_MAX;
+		chwidth = eHT_MAX_CHANNEL_WIDTH;
 	}
 
 	return chwidth;
@@ -145,7 +145,7 @@ static enum phy_ch_width hdd_son_chan_width_to_chan_width(
 static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
 			       enum ieee80211_cwm_width son_chwidth)
 {
-	enum phy_ch_width chwidth;
+	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_hdd_link_info *link_info;
 	uint8_t link_id = 0xFF;
 
@@ -173,24 +173,24 @@ static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
  * Return: son chan width
  */
 static enum ieee80211_cwm_width hdd_chan_width_to_son_chwidth(
-				enum phy_ch_width chwidth)
+				enum eSirMacHTChannelWidth chwidth)
 {
 	enum ieee80211_cwm_width son_chwidth;
 
 	switch (chwidth) {
-	case CH_WIDTH_20MHZ:
+	case eHT_CHANNEL_WIDTH_20MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH20;
 		break;
-	case CH_WIDTH_40MHZ:
+	case eHT_CHANNEL_WIDTH_40MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH40;
 		break;
-	case CH_WIDTH_80MHZ:
+	case eHT_CHANNEL_WIDTH_80MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH80;
 		break;
-	case CH_WIDTH_160MHZ:
+	case eHT_CHANNEL_WIDTH_160MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH160;
 		break;
-	case CH_WIDTH_80P80MHZ:
+	case eHT_CHANNEL_WIDTH_80P80MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH80_80;
 		break;
 	default:
@@ -495,7 +495,7 @@ static int hdd_son_set_bandwidth(struct wlan_objmgr_vdev *vdev,
  * hdd_phymode_chwidth_to_son_bandwidth() - get son bandwidth from
  *                                          phymode and chwidth
  * @phymode: eCsrPhyMode
- * @chwidth: phy_ch_width
+ * @chwidth: eSirMacHTChannelWidth
  *
  * Return: son bandwidth
  */
@@ -679,8 +679,7 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 				    CSA_REASON_USER_INITIATED);
 
 	return hdd_softap_set_channel_change(link_info, freq, 0, CH_WIDTH_MAX,
-					     NO_SCHANS_PUNC, false, false,
-					     NULL);
+					     NO_SCHANS_PUNC, false, false);
 }
 
 /**
@@ -945,61 +944,6 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
-#ifdef WLAN_FEATURE_11BE
-/**
- * hdd_eht_phymode_to_son_phymode() - convert from wlan eht phymode to son
- * phymode
- * @phymode: wlan phymode
- *
- * Return: ieee80211 phymode
- */
-static enum ieee80211_phymode
-hdd_eht_phymode_to_son_phymode(enum wlan_phymode phymode)
-{
-	enum ieee80211_phymode son_phymode;
-
-	switch (phymode) {
-	case WLAN_PHYMODE_11BEA_EHT20:
-		son_phymode = IEEE80211_MODE_11BEA_EHT20;
-		break;
-	case WLAN_PHYMODE_11BEG_EHT20:
-		son_phymode = IEEE80211_MODE_11BEG_EHT20;
-		break;
-	case WLAN_PHYMODE_11BEA_EHT40:
-		son_phymode = IEEE80211_MODE_11BEA_EHT40;
-		break;
-	case WLAN_PHYMODE_11BEG_EHT40PLUS:
-		son_phymode = IEEE80211_MODE_11BEG_EHT40PLUS;
-		break;
-	case WLAN_PHYMODE_11BEG_EHT40MINUS:
-		son_phymode = IEEE80211_MODE_11BEG_EHT40MINUS;
-		break;
-	case WLAN_PHYMODE_11BEG_EHT40:
-		son_phymode = IEEE80211_MODE_11BEG_EHT40;
-		break;
-	case WLAN_PHYMODE_11BEA_EHT80:
-		son_phymode = IEEE80211_MODE_11BEA_EHT80;
-		break;
-	case WLAN_PHYMODE_11BEA_EHT160:
-		son_phymode = IEEE80211_MODE_11BEA_EHT160;
-		break;
-	case WLAN_PHYMODE_11BEA_EHT320:
-		son_phymode = IEEE80211_MODE_11BEA_EHT320;
-		break;
-	default:
-		son_phymode = IEEE80211_MODE_AUTO;
-		break;
-	}
-	return son_phymode;
-}
-#else
-static inline enum ieee80211_phymode
-hdd_eht_phymode_to_son_phymode(enum wlan_phymode phymode)
-{
-	return IEEE80211_MODE_AUTO;
-}
-#endif
-
 /**
  * hdd_wlan_phymode_to_son_phymode() - get son phymode from wlan_phymode phymode
  * @phymode: wlan_phymode phymode
@@ -1096,7 +1040,7 @@ static enum ieee80211_phymode hdd_wlan_phymode_to_son_phymode(
 		son_phymode = IEEE80211_MODE_11AXA_HE80_80;
 		break;
 	default:
-		son_phymode = hdd_eht_phymode_to_son_phymode(phymode);
+		son_phymode = IEEE80211_MODE_AUTO;
 		break;
 	}
 
@@ -2646,7 +2590,7 @@ static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
 	struct hdd_station_info *sta_info;
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
-	bool b_meas_supported = false;
+	bool b_meas_supported;
 	QDF_STATUS status;
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);

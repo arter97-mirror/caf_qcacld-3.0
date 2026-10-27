@@ -80,6 +80,8 @@ void rrm_cache_mgmt_tx_power(struct mac_context *mac,
 tpRRMCaps rrm_get_capabilities(struct mac_context *mac,
 			       struct pe_session *pe_session);
 
+void rrm_get_start_tsf(struct mac_context *mac, uint32_t *pStartTSF);
+
 QDF_STATUS rrm_set_max_tx_power_rsp(struct mac_context *mac,
 				    struct scheduler_msg *limMsgQ);
 

@@ -48,10 +48,6 @@
 #include "wlan_utility.h"
 #include "wlan_hdd_object_manager.h"
 #include "nan_ucfg_api.h"
-#include "wifi_pos_ucfg_api.h"
-#include "wlan_dp_api.h"
-#include "wlan_osif_priv.h"
-#include "wlan_hdd_main.h"
 
 #define SCAN_DONE_EVENT_BUF_SIZE 4096
 #define RATE_MASK 0x7f
@@ -316,41 +312,6 @@ void hdd_init_scan_reject_params(struct hdd_context *hdd_ctx)
 	}
 }
 
-QDF_STATUS hdd_reset_scan_reject_params(struct wlan_objmgr_vdev *vdev)
-{
-	struct hdd_context *hdd_ctx;
-	struct hdd_adapter *adapter;
-	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
-	struct wlan_hdd_link_info *link_info;
-
-	if (!osif_priv) {
-		hdd_err("osif_priv is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	link_info = osif_priv->legacy_osif_priv;
-	if (!link_info) {
-		hdd_err("link_info is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	adapter = link_info->adapter;
-	if (!adapter) {
-		hdd_err("adapter is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	hdd_init_scan_reject_params(hdd_ctx);
-
-	return QDF_STATUS_SUCCESS;
-}
-
 /*
  * wlan_hdd_update_scan_ies() - API to update the scan IEs of scan request
  * with already stored default scan IEs
@@ -399,7 +360,7 @@ static int wlan_hdd_update_scan_ies(struct hdd_adapter *adapter,
 				add_ie = true;
 			break;
 		case WLAN_ELEMID_VENDOR:
-			/* Do not add MBO IE if its already present */
+			/* Donot add MBO IE if its already present */
 			if ((!mbo_ie &&
 			     0 == qdf_mem_cmp(&temp_ie[0], MBO_OUI_TYPE,
 					      MBO_OUI_TYPE_SIZE)) ||
@@ -501,8 +462,6 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	bool enable_connected_scan;
 	enum phy_ch_width con_dfs_ch_width;
 	uint8_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
-	uint8_t dfs_sta_vdev_id;
-	enum hw_mode_bandwidth dfs_sta_ch_width;
 
 	if (cds_is_fw_down()) {
 		hdd_err("firmware is down, scan cmd cannot be processed");
@@ -535,12 +494,6 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		return -EIO;
 	}
 
-	if (!wlan_dp_is_local_pkt_capture_active(hdd_ctx->psoc) &&
-	    policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc)) {
-		hdd_err("STA + MON exist, STA scan is not allowed");
-		return -EINVAL;
-	}
-
 	enable_connected_scan = ucfg_scan_is_connected_scan_enabled(
 							hdd_ctx->psoc);
 	if (!enable_connected_scan &&
@@ -557,8 +510,7 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	 * connection and it does not support scan request either.
 	 */
 	if (QDF_NDI_MODE == adapter->device_mode ||
-	    QDF_MONITOR_MODE == adapter->device_mode ||
-	    QDF_PASSTHRU_MODE == adapter->device_mode) {
+	    QDF_MONITOR_MODE == adapter->device_mode) {
 		hdd_err("Scan not supported for %s",
 			qdf_opmode_str(adapter->device_mode));
 		return -EINVAL;
@@ -577,9 +529,8 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 			con_dfs_ch_freq = ap_ctx->operating_chan_freq;
 
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-		    !policy_mgr_is_sta_present_on_freq(
-					hdd_ctx->psoc, &dfs_sta_vdev_id,
-					con_dfs_ch_freq, &dfs_sta_ch_width) &&
+		    !policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
+		    hdd_ctx->psoc) &&
 		    (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, con_dfs_ch_freq) ||
 		    (wlan_reg_is_5ghz_ch_freq(con_dfs_ch_freq) &&
 		     con_dfs_ch_width == CH_WIDTH_160MHZ))) {
@@ -595,8 +546,7 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 			 * If we return scan failure hostapd fails secondary AP
 			 * startup.
 			 */
-			hdd_err("##In DFS Master mode (DFS freq %d, BW %d). Scan aborted",
-				con_dfs_ch_freq, con_dfs_ch_width);
+			hdd_err("##In DFS Master mode. Scan aborted");
 			if (wlan_hdd_enqueue_blocked_scan_request(dev, request,
 								  source))
 				return -EAGAIN;
@@ -696,14 +646,11 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	if (QDF_P2P_CLIENT_MODE == adapter->device_mode ||
-	    QDF_P2P_DEVICE_MODE == adapter->device_mode) {
-		/* Abort ongoing PMSR to avoid P2P discovery failure */
-		ucfg_wifi_pos_pmsr_complete_on_concurrency(hdd_ctx->psoc);
-
-		if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
-			/* Disable NAN Discovery if enabled */
-			ucfg_nan_disable_concurrency(hdd_ctx->psoc);
+	if ((QDF_P2P_CLIENT_MODE == adapter->device_mode ||
+	     QDF_P2P_DEVICE_MODE == adapter->device_mode) &&
+	    !ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc)) {
+		/* Disable NAN Discovery if enabled */
+		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
 	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
@@ -904,8 +851,8 @@ static void hdd_process_vendor_acs_response(struct hdd_adapter *adapter)
 {
 	qdf_mc_timer_t *vendor_acs_timer;
 
-	if (!qdf_atomic_test_bit(VENDOR_ACS_RESPONSE_PENDING,
-				 adapter->deflink->link_flags)) {
+	if (!test_bit(VENDOR_ACS_RESPONSE_PENDING,
+		      &adapter->deflink->link_flags)) {
 		return;
 	}
 
@@ -1031,13 +978,12 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	uint32_t count, j;
 	int tmp;
 	size_t len, ie_len = 0;
-	struct ieee80211_channel *chan, **chan_ptr;
+	struct ieee80211_channel *chan;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	int ret;
 	struct wlan_hdd_link_info *link_info;
 	int link_id = -1;
-	u8 *ptr = NULL;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -1097,24 +1043,17 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	request = qdf_mem_malloc(len);
 	if (!request)
 		goto error;
-
-	ptr = ((u8 *)request + offsetof(struct cfg80211_scan_request, channels));
-	chan_ptr = (struct ieee80211_channel **)ptr;
-
 	if (n_ssid)
-		request->ssids = (struct cfg80211_ssid *)
-				  (ptr + sizeof(*chan_ptr) * n_channels);
+		request->ssids = (void *)&request->channels[n_channels];
 	request->n_ssids = n_ssid;
-
 	if (ie_len) {
 		if (request->ssids)
-			request->ie = (u8 *)request->ssids +
-				       sizeof(*request->ssids) * n_ssid;
+			request->ie = (void *)(request->ssids + n_ssid);
 		else
-			request->ie = ptr + sizeof(*chan_ptr) * n_channels;
+			request->ie = (void *)(request->channels + n_channels);
 	}
-	request->ie_len = ie_len;
 
+	request->ie_len = ie_len;
 	count = 0;
 	if (tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES]) {
 		nla_for_each_nested(attr,
@@ -1130,7 +1069,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				goto error;
 			if (chan->flags & IEEE80211_CHAN_DISABLED)
 				continue;
-			*(chan_ptr + count) = chan;
+			request->channels[count] = chan;
 			count++;
 		}
 	} else {
@@ -1142,7 +1081,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				chan = &wiphy->bands[band]->channels[j];
 				if (chan->flags & IEEE80211_CHAN_DISABLED)
 					continue;
-				*(chan_ptr + count) = chan;
+				request->channels[count] = chan;
 				count++;
 			}
 		}
@@ -1507,9 +1446,8 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
-	int ret = 0;
+	int ret;
 	bool pno_offload_enabled;
-	struct wlan_hdd_link_info *link_info;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -1530,20 +1468,12 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 		hdd_debug("PnoOffload is not enabled!!!");
 		return -EINVAL;
 	}
-	/*
-	 * For MLO find the vdev on which PNO was enabled, as deflink might have
-	 * changed due to roaming/link switch.
-	 */
-	hdd_adapter_for_each_link_info(adapter, link_info) {
-		if (!link_info->vdev)
-			continue;
-		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_SCAN_ID);
-		if (!vdev)
-			continue;
-		if (ucfg_scan_get_pno_in_progress(vdev))
-			ret = wlan_cfg80211_sched_scan_stop(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
-	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_SCAN_ID);
+	if (!vdev)
+		return -EINVAL;
+	ret = wlan_cfg80211_sched_scan_stop(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 
 	return ret;
 }

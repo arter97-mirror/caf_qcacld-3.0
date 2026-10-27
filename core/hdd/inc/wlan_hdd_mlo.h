@@ -97,7 +97,7 @@ struct hdd_adapter_create_param {
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 /**
  * struct hdd_mlo_adapter_info - Mlo specific adapter information
- * @is_ml_adapter: Whether this is the main ml adapter attached to netdev
+ * @is_ml_adapter: Whether this is the main ml adaper attached to netdev
  * @is_link_adapter: Whether this a link adapter without netdev
  * @associate_with_ml_adapter: adapter which shares the vdev object with the ml
  * adapter
@@ -160,6 +160,18 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_get_assoc_link_adapter() - get assoc link adapter
+ * @ml_adapter: ML adapter
+ *
+ * This function returns assoc link adapter.
+ * For single link ML adapter, function returns
+ * same adapter pointer.
+ *
+ * Return: adapter or NULL
+ */
+struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter);
+
+/**
  * hdd_adapter_set_sl_ml_adapter() - Set adapter as sl ml adapter
  * @adapter: HDD adapter
  *
@@ -206,6 +218,12 @@ void hdd_register_wdev(struct hdd_adapter *sta_adapter,
 {
 }
 
+static inline
+struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
+{
+	return NULL;
+}
+
 static inline void
 hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter)
 {
@@ -224,14 +242,6 @@ struct hdd_adapter *hdd_get_ml_adapter(struct hdd_context *hdd_ctx)
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-/**
- * hdd_mlo_channel_switch_notify - channel switch notify to HDD
- * @link_mac_address: standby link mac address
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS hdd_mlo_channel_switch_notify(struct qdf_mac_addr *link_mac_address);
-
 /**
  * hdd_adapter_set_ml_adapter() - set adapter as ml adapter
  * @adapter: HDD adapter
@@ -253,15 +263,6 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
 QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 						uint8_t non_trans_vdev_id,
 						bool is_start_notify);
-/**
- * hdd_mlo_roam_deflink_update() - Update default link after cross-VDEV roaming
- * @vdev: VDEV object that initiated the roam
- * @roamed_vdev_id: VDEV ID of the link that completed roaming
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-QDF_STATUS hdd_mlo_roam_deflink_update(struct wlan_objmgr_vdev *vdev,
-				       uint8_t roamed_vdev_id);
 
 /**
  * hdd_mlo_t2lm_register_callback() - Register T2LM callback
@@ -387,7 +388,7 @@ QDF_STATUS hdd_mlo_mgr_register_osif_ops(void);
  * hdd_mlo_mgr_unregister_osif_ops() - Deregister OSIF ops with
  * global MLO manager
  *
- * Deregister the callbacks registered with global MLO manager for OSIF
+ * Deregister the calbacks registered with global MLO manager for OSIF
  *
  * Return: QDF_STATUS
  */
@@ -476,28 +477,5 @@ void hdd_update_link_state_cached_timestamp(struct hdd_adapter *adapter)
 }
 
 #define FEATURE_ML_LINK_STATE_COMMANDS
-#endif
-
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * hdd_mlo_update_link_state_change() - API to send the MLO link state change
- * to the userspace.
- * @reason: Reason for the link switch
- * @active_bmap: Current MLO active links
- * @inactive_bmap: Current MLO inactive links
- *
- *
- * Return: None
- */
-void
-hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,
-				 uint32_t inactive_bmap);
-
-#else
-static inline
-void hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,
-				      uint32_t inactive_bmap)
-{
-}
 #endif
 #endif

@@ -30,7 +30,7 @@
  * QoS (QoS here refers to a TSPEC). The setup QoS comes in two flavors: an
  * explicit application invoked and an internal HDD invoked.  The implicit QoS
  * is for applications that do NOT call the custom QCT WLAN OIDs for QoS but
- * which DO mark their traffic for prioritization. It also has logic to start,
+ * which DO mark their traffic for priortization. It also has logic to start,
  * update and stop the U-APSD trigger frame generation. It also has logic to
  * read WMM related config parameters from the registry.
  *
@@ -92,23 +92,18 @@ enum hdd_wmm_user_mode {
 /**
  * enum hdd_wmm_linuxac: AC/Queue Index values for Linux Qdisc to
  * operate on different traffic.
- * @HDD_LINUX_AC_HI_PRIO: unclassified high priority
  * @HDD_LINUX_AC_VO: voice priority
  * @HDD_LINUX_AC_VI: video priority
- * @HDD_LINUX_AC_BK: background priority
  * @HDD_LINUX_AC_BE: best effort priority
- * @HDD_LINUX_AC_MAX: max place holder
- *
- * Any modification to the order could potentially have impact
- * on queue selection logic at hdd_get_tx_queue_for_ac.
+ * @HDD_LINUX_AC_BK: background priority
+ * @HDD_LINUX_AC_HI_PRIO: unclassified high priority
  */
 enum hdd_wmm_linuxac {
-	HDD_LINUX_AC_HI_PRIO = 0,
-	HDD_LINUX_AC_VO = 1,
-	HDD_LINUX_AC_VI = 2,
+	HDD_LINUX_AC_VO = 0,
+	HDD_LINUX_AC_VI = 1,
+	HDD_LINUX_AC_BE = 2,
 	HDD_LINUX_AC_BK = 3,
-	HDD_LINUX_AC_BE = 4,
-	HDD_LINUX_AC_MAX
+	HDD_LINUX_AC_HI_PRIO = 4,
 };
 
 /**

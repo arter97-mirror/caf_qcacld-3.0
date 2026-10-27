@@ -545,8 +545,8 @@
 /* <ini>
  * gtsf_irq_host_gpio_pin
  * @Min: 0
- * @Max: 512
- * @Default: 512
+ * @Max: 254
+ * @Default: 255
  *
  * TSF irq GPIO pin of host platform
  *
@@ -559,8 +559,8 @@
 #define CFG_SET_TSF_IRQ_HOST_GPIO_PIN CFG_INI_INT( \
 		"gtsf_irq_host_gpio_pin", \
 		0, \
-		512, \
-		512, \
+		255, \
+		255, \
 		CFG_VALUE_OR_DEFAULT, \
 		"TSF irq GPIO pin of host platform")
 
@@ -603,7 +603,7 @@
 #define __CFG_SET_TSF_SYNC_HOST_GPIO_PIN
 #endif
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#if defined(WLAN_FEATURE_TSF) && defined(WLAN_FEATURE_TSF_PLUS)
 /* <ini>
  * g_enable_tsf_sync: Enable TSF sync feature
  * @Min: 0
@@ -976,34 +976,6 @@
 
 /*
  * <ini>
- * g_iot_temporal_mode_enabled - Enable IoT temporal mode
- * @Default: 0
- *
- * This INI controls whether the IoT temporal mode feature
- * is enabled in firmware via WMI resource config.
- * BIT 0 of apl_temporal_mode_config_word is set when enabled.
- *
- * Related: None
- *
- * Supported Feature: IoT
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_IOT_TEMPORAL_MODE_ENABLED CFG_INI_BOOL( \
-		"g_iot_temporal_mode_enabled", \
-		0, \
-		"Enable IoT temporal mode")
-
-#ifdef FEATURE_ETM_TRACE_SUPPORT
-#define PCIE_CONFIG 1
-#else
-#define PCIE_CONFIG 0
-#endif
-
-/*
- * <ini>
  * pcie_config - Ini to control pcie gen and lane params
  * @Min: 0
  * @Max: 4
@@ -1029,30 +1001,9 @@
 				"pcie_config", \
 				0, \
 				4, \
-				PCIE_CONFIG, \
+				0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"to control pcie gen and lane")
-
-/*
- * <ini>
- * dynamic_mode_switch - Enable/Disable Dynamic Mode Switch
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini enable/disable the Dynamic Mode Switch feature for STA
- * in FW.
- *
- * Supported Feature: STA
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DYNAMIC_MODE_SWITCH CFG_INI_BOOL( \
-		"dynamic_mode_switch", \
-		1, \
-		"Enable/Disable Dynamic Mode Switch")
 
 #define CFG_FWOL_GENERIC_ALL \
 	CFG_FWOL_DHCP \
@@ -1089,8 +1040,6 @@
 	CFG(CFG_DISABLE_HW_ASSIST) \
 	CFG(CFG_ENABLE_PCI_GEN) \
 	CFG(CFG_PCIE_CONFIG) \
-	CFG(CFG_DYNAMIC_MODE_SWITCH)\
-	CFG(CFG_IOT_TEMPORAL_MODE_ENABLED) \
 	ENABLE_OFDM_SCRAMBLER_SEED
 
 #endif

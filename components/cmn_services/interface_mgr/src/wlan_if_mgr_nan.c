@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
+ * SPDX-License-Identifier: ISC
  */
 
 /*
@@ -9,8 +9,6 @@
 #include "wlan_if_mgr_nan.h"
 #include "wlan_mlo_link_force.h"
 #include "wlan_if_mgr_public_struct.h"
-#include <wlan_cfr_ucfg_api.h>
-#include "wifi_pos_ucfg_api.h"
 
 #if defined(WLAN_FEATURE_NAN)
 QDF_STATUS if_mgr_nan_post_enable(struct wlan_objmgr_vdev *vdev,
@@ -48,10 +46,6 @@ QDF_STATUS if_mgr_nan_pre_enable(struct wlan_objmgr_vdev *vdev,
 	status = ml_nlink_conn_change_notify(
 			psoc, wlan_vdev_get_id(vdev),
 			ml_nlink_nan_pre_enable_evt, NULL);
-
-	ucfg_cfr_send_stop(vdev, 0);
-	ucfg_wifi_pos_pmsr_complete_on_concurrency(psoc);
-
 	return QDF_STATUS_SUCCESS;
 }
 

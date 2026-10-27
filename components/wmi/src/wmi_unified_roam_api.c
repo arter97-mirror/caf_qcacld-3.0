@@ -124,25 +124,13 @@ QDF_STATUS wmi_unified_set_ric_req_cmd(wmi_unified_t wmi_handle, void *msg,
 }
 
 QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
-				struct wlan_roam_synch_complete_params *params)
+					       uint8_t vdev_id)
 {
-	wmi_vdev_repurpose_response_tlv_param
-			repurpose_resp[WLAN_MAX_ML_BSS_LINKS] = {};
-	uint8_t i;
+	if (wmi_handle->ops->send_process_roam_synch_complete_cmd)
+		return wmi_handle->ops->send_process_roam_synch_complete_cmd(
+				wmi_handle, vdev_id);
 
-	if (!wmi_handle->ops->send_process_roam_synch_complete_cmd)
-		return QDF_STATUS_E_FAILURE;
-
-	for (i = 0; i < params->num_vdev_repurpose_resp; i++) {
-		repurpose_resp[i].repurpose_vdev_id =
-				params->vdev_repurpose_resp[i].vdev_id;
-		repurpose_resp[i].status =
-				params->vdev_repurpose_resp[i].status;
-	}
-
-	return wmi_handle->ops->send_process_roam_synch_complete_cmd(
-			wmi_handle, params->vdev_id,
-			params->num_vdev_repurpose_resp, repurpose_resp);
+	return QDF_STATUS_E_FAILURE;
 }
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
@@ -535,7 +523,7 @@ wmi_unified_extract_roam_ml_info(wmi_unified_t wmi_handle, void *event,
 				 struct roam_mlo_link_info *dst,
 				 uint64_t timestamp, uint8_t idx)
 {
-	if (wmi_handle->ops->extract_roam_ml_info)
+	if (wmi_handle->ops->extract_roam_stats_event)
 		return wmi_handle->ops->extract_roam_ml_info(wmi_handle, event,
 							     dst, timestamp,
 							     idx);
@@ -597,39 +585,4 @@ wmi_extract_roam_candidate_frame_event(wmi_unified_t wmi_handle, uint8_t *event,
 								  len, data);
 	return QDF_STATUS_E_FAILURE;
 }
-
-#ifdef WLAN_FEATURE_11BN_SMD
-QDF_STATUS wmi_unified_send_roam_smd_config(wmi_unified_t wmi_handle,
-					    struct wlan_roam_smd_config *params)
-{
-	if (wmi_handle->ops->send_smd_roam_config)
-		return wmi_handle->ops->send_smd_roam_config(wmi_handle,
-							     params);
-	return QDF_STATUS_E_FAILURE;
-}
-
-QDF_STATUS wmi_unified_vdev_repurpose_resp_cmd(
-				wmi_unified_t wmi_handle,
-				uint8_t vdev_id,
-				struct vdev_repurpose_params *repurpose_resp,
-				uint8_t num_repurpose_resp)
-{
-	if (wmi_handle->ops->send_vdev_repurpose_resp_cmd)
-		return wmi_handle->ops->send_vdev_repurpose_resp_cmd(
-							wmi_handle,
-							vdev_id,
-							repurpose_resp,
-							num_repurpose_resp);
-	return QDF_STATUS_E_FAILURE;
-}
-QDF_STATUS
-wmi_send_roam_smd_start_status_cmd(wmi_unified_t wmi_handle,
-				   struct wlan_roam_smd_start_status_params *params)
-{
-	if (wmi_handle->ops->send_smd_roam_start_status_cmd)
-		return wmi_handle->ops->send_smd_roam_start_status_cmd(
-				wmi_handle, params);
-	return QDF_STATUS_E_FAILURE;
-}
-#endif
 #endif

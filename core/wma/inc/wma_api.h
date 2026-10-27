@@ -97,7 +97,6 @@ struct wma_caps_per_phy {
 
 struct wma_ps_params {
 	enum wmi_sta_ps_scheme_cfg opm_mode;
-	uint8_t ps_opm_level;
 	uint16_t ps_ito;
 	uint16_t spec_wake;
 };
@@ -107,13 +106,11 @@ struct wma_ps_params {
  * @WMA_STA_PS_OPM_CONSERVATIVE: Conservative OPM mode
  * @WMA_STA_PS_OPM_AGGRESSIVE: Aggressive OPM mode
  * @WMA_STA_PS_USER_DEF: User defined OPM mode
- * @WMA_STA_PS_LATENCY_DEF: Latency based opm mode
  */
 enum wma_sta_ps_scheme_cfg {
 	WMA_STA_PS_OPM_CONSERVATIVE = 0,
 	WMA_STA_PS_OPM_AGGRESSIVE = 1,
 	WMA_STA_PS_USER_DEF = 2,
-	WMA_STA_PS_LATENCY_DEF = 3,
 };
 
 #define VDEV_CMD 1
@@ -165,13 +162,6 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *ev, uint32_t len);
 int wma_rx_service_ready_ext2_event(void *handle, uint8_t *ev, uint32_t len);
 
 QDF_STATUS wma_wait_for_ready_event(WMA_HANDLE handle);
-
-/**
- * wma_is_wmi_init_cmd_sent() - check if WMI init command has been sent
- *
- * Return: true if WMI init command was sent to firmware, false otherwise
- */
-bool wma_is_wmi_init_cmd_sent(void);
 
 int wma_cli_get_command(int vdev_id, int param_id, int vpdev);
 int wma_cli_set_command(int vdev_id, int param_id, uint32_t sval, int vpdev);
@@ -306,14 +296,6 @@ bool wma_is_csa_offload_enabled(void);
  */
 bool wma_is_mbssid_enabled(void);
 
-/**
- * wma_is_pdev_div_states_report_enabled - Checks support for antenna
- * diversity state reporting
- *
- * Return: true or false
- */
-bool wma_is_pdev_div_states_report_enabled(void);
-
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 bool wma_is_p2p_lo_capable(void);
 #else
@@ -323,15 +305,6 @@ static inline bool wma_is_p2p_lo_capable(void)
 }
 #endif
 bool wma_capability_enhanced_mcast_filter(void);
-
-/**
- * wma_is_vdev_operating_params_event_support_enabled() - Check if vdev
- * operating params event is supported
- *
- * Return: true if supported, false otherwise
- */
-bool wma_is_vdev_operating_params_event_support_enabled(void);
-
 void wma_process_pdev_hw_mode_trans_ind(void *wma,
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
 	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,
@@ -342,7 +315,7 @@ void wma_process_pdev_hw_mode_trans_ind(void *wma,
  * @wma_handle:                  pointer to wma handle.
  * @cts2self_for_p2p_go:         value needs to set to firmware.
  *
- * At the time of driver startup, inform about ini param to FW that
+ * At the time of driver startup, inform about ini parma to FW that
  * if legacy client connects to P2P GO, stop using NOA for P2P GO.
  *
  * Return: QDF_STATUS.
@@ -479,9 +452,9 @@ QDF_STATUS wma_set_tx_power_per_mcs(WMA_HANDLE handle,
 /**
  * wma_send_coex_config_cmd() - Send coex config params
  * @wma_handle: wma handle
- * @coex_cfg_params: struct to coex config params
+ * @coex_cfg_params: struct to coex cofig params
  *
- * This function sends WMI command to send coex config params
+ * This function sends WMI command to send coex cofig params
  *
  * Return: QDF_STATUS
  */
@@ -506,16 +479,6 @@ QDF_STATUS wma_set_power_config(uint8_t vdev_id,
  * Return: QDF_STATUS_SUCCESS on success, error number otherwise
  */
 QDF_STATUS wma_set_power_config_ito(uint8_t vdev_id, uint16_t ps_ito);
-
-/**
- * wma_set_power_config_opm_level() - update power save opm level
- * @vdev_id:	  the Id of the vdev to configure
- * @ps_opm_level: new power save inactivity timeout level
- *
- * Return: QDF_STATUS_SUCCESS on success, error number otherwise
- */
-QDF_STATUS
-wma_set_power_config_opm_level(uint8_t vdev_id, uint8_t ps_opm_level);
 
 /**
  * wma_set_power_config_spec_wake() - update opm speculative wake interval
@@ -763,7 +726,7 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
  *
  * API handle vdev stop during start req
  *
- * Return: SUCCESS always
+ * Return: SUCCESS alsways
  */
 QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 					    enum vdev_cmd_type type,
@@ -819,15 +782,6 @@ wma_send_multi_pdev_vdev_set_params(enum mlme_dev_setparam param_type,
  */
 QDF_STATUS
 wma_validate_txrx_chain_mask(uint32_t paramid, uint32_t paramvalue);
-
-/**
- * wma_get_txrx_default_chain_mask - get default chain mask
- * @psoc: psoc
- *
- * Return: default chain mask
- */
-
-uint8_t wma_get_txrx_default_chain_mask(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wma_vdev_set_data_tx_callback() - Set dp vdev tx callback
@@ -1044,146 +998,4 @@ static inline bool wma_is_epm_supported_fw(WMA_HANDLE handle)
 void
 wma_is_both_psd_eirp_support_present_for_sp(struct reg_tpc_power_info *param,
 					    bool *value);
-
-#ifdef FEATURE_WLAN_APF
-/**
- * wma_get_fw_active_apf_mode() - convert active_apf_mode to WMI
- * configurable APF mode
- * @mode: APF mode
- *
- * Return: FW configurable APF mode
- */
-enum wmi_host_active_apf_mode
-wma_get_fw_active_apf_mode(enum active_apf_mode mode);
-#else
-static inline enum wmi_host_active_apf_mode
-wma_get_fw_active_apf_mode(enum active_apf_mode mode)
-{
-	return WMI_HOST_ACTIVE_APF_DISABLED;
-}
-#endif /* FEATURE_WLAN_APF */
-
-/**
- * wma_vdev_unified_disconnect_rsp_handler() - Handle unified disconnect
- * response
- * @vdev_mlme: vdev mlme obj
- * @rsp: unified disconnect response
- *
- * This function handles the unified disconnect response when MLO link switching
- * is in progress and unified connect/disconnect is enabled. It processes the
- * response and updates the vdev state accordingly.
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-QDF_STATUS
-wma_vdev_unified_disconnect_rsp_handler(
-				struct vdev_mlme_obj *vdev_mlme,
-				struct vdev_unified_disconnect_response *rsp);
-
-/**
- * wma_acquire_key_op_wakelock() - Prevent suspend for a key/color-change op
- *
- * Increments the shared WMA-level reference counter and acquires
- * wlan_key_op_wake_lock with a timeout. Safe to call from any context;
- * never called during vdev teardown so synchronize_srcu is never reached
- * while RTNL or the scheduler lock is held.
- */
-void wma_acquire_key_op_wakelock(void);
-
-/**
- * wma_release_key_op_wakelock() - Allow suspend after a key/color-change op
- *
- * Decrements the shared reference counter and releases wlan_key_op_wake_lock
- * when the count reaches zero.
- */
-void wma_release_key_op_wakelock(void);
-
-#ifdef CONFIG_NO_QMI
-/* Timeout for waiting for WMI_ATHDIAG_READ_WRITE_EVENTID response (ms) */
-#define WMA_ATHDIAG_WMI_TIMEOUT_MS  100
-
-/**
- * struct wma_athdiag_wmi_sync - Synchronization for athdiag WMI operations
- *
- * @athdiag_event:  completion signaled by the WMI event handler
- * @data:           caller's output buffer pointer; valid for the lifetime of
- *                  the in-flight operation
- * @data_len:       size of caller's output buffer
- * @fw_status:      status code returned by firmware (0 = success)
- * @athdiag_lock:   serializes concurrent callers; held for the full duration
- *                  of setup, WMI send, and event wait. The event handler does
- *                  NOT acquire this lock — taking it there would deadlock
- *                  since
- *                  the caller holds it while sleeping on athdiag_event.
- * @pending:        atomic flag; non-zero while an operation is in flight.
- *                  Written by both the caller and the event handler without
- *                  the lock, so must be an atomic type.
- */
-struct wma_athdiag_wmi_sync {
-	qdf_event_t athdiag_event;
-	uint8_t *data;
-	uint32_t data_len;
-	uint32_t fw_status;
-	qdf_mutex_t athdiag_lock;
-	qdf_atomic_t pending;
-};
-
-/**
- * wma_athdiag_read_write() - WMI-based athdiag read/write
- * @offset: target register/memory address
- * @memtype: memory region type
- * @datalen: number of bytes to read/write
- * @buf: data buffer (output for read, input for write)
- * @is_write: true for write operation, false for read
- *
- * Sends WMI_ATHDIAG_READ_WRITE_CMDID and blocks until firmware
- * responds with WMI_ATHDIAG_READ_WRITE_EVENTID or timeout occurs.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF status failure codes otherwise.
- */
-QDF_STATUS wma_athdiag_read_write(uint32_t offset, uint32_t memtype,
-				  uint32_t datalen, uint8_t *buf,
-				  bool is_write);
-
-/**
- * wma_athdiag_register_event_handler() - Register athdiag WMI event handler
- * @handle: WMA Handle
- *
- * Registers WMI_ATHDIAG_READ_WRITE_EVENTID handler and initializes
- * the sync primitives used by wma_athdiag_read_write().
- *
- * Return: 0 or other error codes.
- */
-QDF_STATUS wma_athdiag_register_event_handler(WMA_HANDLE handle);
-
-/**
- * wma_athdiag_unregister_event_handler() - Unregister athdiag WMI event handler
- * @handle: WMA Handle
- *
- * Unregisters WMI_ATHDIAG_READ_WRITE_EVENTID handler and destroys
- * the sync primitives initialized by wma_athdiag_register_event_handler().
- *
- * Return: None
- */
-void wma_athdiag_unregister_event_handler(WMA_HANDLE handle);
-#else
-static inline QDF_STATUS wma_athdiag_read_write(uint32_t offset,
-						uint32_t memtype,
-						uint32_t datalen,
-						uint8_t *buf, bool is_write)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-wma_athdiag_register_event_handler(WMA_HANDLE handle)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline void wma_athdiag_unregister_event_handler(WMA_HANDLE handle)
-{
-}
-#endif /* CONFIG_NO_QMI */
-
 #endif /* WMA_API_H */

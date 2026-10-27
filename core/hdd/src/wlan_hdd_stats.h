@@ -111,10 +111,10 @@ extern const struct nla_policy qca_wlan_vendor_ll_get_policy[
  */
 struct index_he_data_rate_type {
 	uint8_t beacon_rate_index;
-	uint32_t supported_HE20_rate[MAX_HE_DCM_INDEX][3];
-	uint32_t supported_HE40_rate[MAX_HE_DCM_INDEX][3];
-	uint32_t supported_HE80_rate[MAX_HE_DCM_INDEX][3];
-	uint32_t supported_HE160_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_HE20_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_HE40_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_HE80_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_HE160_rate[MAX_HE_DCM_INDEX][3];
 };
 
 /**
@@ -420,8 +420,6 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(hdd_handle_t ctx,
 void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 			   struct sir_lost_link_info *lost_link_info);
 
-void hdd_get_host_link_stats(struct wlan_hdd_link_info *link_info,
-			     struct wifi_host_link_stats *stats);
 #else /* WLAN_FEATURE_LINK_LAYER_STATS */
 
 static inline bool hdd_link_layer_stats_supported(void)
@@ -469,6 +467,7 @@ hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 		      struct sir_lost_link_info *lost_link_info)
 {
 }
+
 #endif /* End of WLAN_FEATURE_LINK_LAYER_STATS */
 
 #ifdef WLAN_FEATURE_STATS_EXT
@@ -503,23 +502,6 @@ int wlan_hdd_cfg80211_connected_chan_stats_req(struct wiphy *wiphy,
 					       const void *data,
 					       int data_len);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)) || \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
-	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
-/**
- * wlan_hdd_cfg80211_get_station() - get station statistics
- * @wiphy: Pointer to wiphy
- * @wdev: Pointer to wireless device
- * @mac: Pointer to mac
- * @sinfo: Pointer to station info
- *
- * Return: 0 for success, non-zero for failure
- */
-int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
-				  struct wireless_dev *wdev,
-				  const uint8_t *mac,
-				  struct station_info *sinfo);
-#else
 /**
  * wlan_hdd_cfg80211_get_station() - get station statistics
  * @wiphy: Pointer to wiphy
@@ -538,26 +520,7 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 				  struct net_device *dev, uint8_t *mac,
 				  struct station_info *sinfo);
 #endif
-#endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)) || \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
-	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
-/**
- * wlan_hdd_cfg80211_dump_station() - dump station statistics
- * @wiphy: Pointer to wiphy
- * @wdev: Pointer to wireless device
- * @idx: variable to determine whether to get stats or not
- * @mac: Pointer to mac
- * @sinfo: Pointer to station info
- *
- * Return: 0 for success, non-zero for failure
- */
-int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
-				   struct wireless_dev *wdev,
-				   int idx, u8 *mac,
-				   struct station_info *sinfo);
-#else
 /**
  * wlan_hdd_cfg80211_dump_station() - dump station statistics
  * @wiphy: Pointer to wiphy
@@ -569,10 +532,9 @@ int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
  * Return: 0 for success, non-zero for failure
  */
 int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
-				   struct net_device *dev,
-				   int idx, u8 *mac,
-				   struct station_info *sinfo);
-#endif
+				struct net_device *dev,
+				int idx, u8 *mac,
+				struct station_info *sinfo);
 
 struct net_device_stats *hdd_get_stats(struct net_device *dev);
 
@@ -582,34 +544,6 @@ int wlan_hdd_cfg80211_dump_survey(struct wiphy *wiphy,
 
 void hdd_display_hif_stats(void);
 void hdd_clear_hif_stats(void);
-
-/**
- * wlan_hdd_reset_bcn_rssi_history_stats() - reset beacon rssi history
- * stats in link info
- * @link_info: link info
- *
- * Return: void
- */
-void wlan_hdd_reset_bcn_rssi_history_stats(
-		struct wlan_hdd_link_info *link_info);
-
-/**
- * wlan_hdd_get_station_bcn_rssi_history() - Retrieves the beacon RSSI
- * history for a station.
- *
- * @link_info: Pointer to the wlan_hdd_link_info structure containing
- * the link information.
- * @bcn_rssi_stats: Pointer to the bcn_his_info_stats structure to store
- * the beacon RSSI history.
- *
- * This function retrieves the beacon RSSI history for a station and
- * stores it in the provided bcn_his_info_stats structure.
- *
- * Return: 0 on success, negative value on failure.
- */
-int wlan_hdd_get_station_bcn_rssi_history(
-			struct wlan_hdd_link_info *link_info,
-			struct bcn_his_info_stats *bcn_rssi_stats);
 
 /**
  * wlan_hdd_cfg80211_stats_ext_callback() - ext stats callback
@@ -689,16 +623,6 @@ QDF_STATUS wlan_hdd_get_rssi(struct wlan_hdd_link_info *link_info,
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
 QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr);
-
-/**
- * wlan_hdd_get_station_ch_load() - Get latest channel load
- * @link_info: Pointer to link_info in adapter
- * @ch_load: pointer to where the channel load should be returned
- *
- * Return: 0 on success, negative errno on error
- */
-int wlan_hdd_get_station_ch_load(struct wlan_hdd_link_info *link_info,
-				 int8_t *ch_load);
 
 /**
  * wlan_hdd_get_linkspeed_for_peermac() - Get link speed for a peer
@@ -1048,14 +972,11 @@ hdd_tx_latency_record_ingress_ts(struct hdd_adapter *adapter,
  * @buff: Buffer to be sent
  * @len: length of the buffer
  * @type: Chipset stats type
- * @is_logging_enable: Indicates whether chipset stats debug logging is enabled
- * via the INI configuration
  *
  * Return: 0 on success -ve value on error
  */
 int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
-				      enum cstats_types type,
-				      bool is_logging_enable);
+				      enum cstats_types type);
 
 /**
  * hdd_register_cstats_ops() - Register chipset stats ops
@@ -1105,8 +1026,7 @@ static inline void hdd_register_cstats_ops(void)
 
 static inline int
 hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
-				  enum cstats_types type,
-				  bool is_logging_enable)
+				  enum cstats_types type)
 {
 	return 0;
 }
@@ -1129,26 +1049,4 @@ hdd_cstats_log_ndi_create_req_evt(struct wlan_objmgr_vdev *vdev,
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
-
-/**
- * wlan_hdd_fill_rate_info() - fill HDD rate info from peer info
- * @txrx_stats: pointer to txrx stats to be filled with rate info
- * @peer_info: peer info pointer
- *
- * This function is used to fill HDD rate info from peer info
- *
- * Return: None
- */
-void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
-			     struct peer_stats_info_ext_event *peer_info);
-
-/**
- * hdd_is_sta_key_exchange_in_progress() - Check if STA/P2P CLI 4-way handshake
- *   is in progress on the given link
- * @link_info: HDD link info pointer
- *
- * Return: true if key exchange is in progress, false otherwise
- */
-bool hdd_is_sta_key_exchange_in_progress(struct wlan_hdd_link_info *link_info);
-
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

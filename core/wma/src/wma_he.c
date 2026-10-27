@@ -27,7 +27,6 @@
 #include "wmi_unified_api.h"
 #include "cds_utils.h"
 #include "wma_internal.h"
-#include "wlan_mlo_mgr_link_switch.h"
 
 /**
  * wma_he_ppet_merge() - Merge PPET8 and PPET16 for a given ru and nss
@@ -177,11 +176,11 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 			       uint32_t tx_chain_mask, uint32_t rx_chain_mask,
 			       uint16_t *mcs_12_13_supp)
 {
-	uint8_t tx_nss, rx_nss, chan_width;
+	uint8_t nss, chan_width;
 	uint16_t rx_mcs_le_80, tx_mcs_le_80, rx_mcs_160, tx_mcs_160;
 
-	tx_nss = qdf_get_hweight32(tx_chain_mask);
-	rx_nss = qdf_get_hweight32(rx_chain_mask);
+	nss = QDF_MAX(wma_get_num_of_setbits_from_bitmask(tx_chain_mask),
+			wma_get_num_of_setbits_from_bitmask(rx_chain_mask));
 
 	he_cap->present = true;
 	/* HE MAC capabilities */
@@ -231,7 +230,7 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 		WMI_HECAP_MAC_PUNCSOUNDING_GET(mac_cap[1]);
 	he_cap->ht_vht_trg_frm_rx_supp =
 		WMI_HECAP_MAC_HTVHTTRIGRX_GET(mac_cap[1]);
-	*mcs_12_13_supp |= WMI_GET_BITS(mac_cap[1], 16, 16);
+	*mcs_12_13_supp = WMI_GET_BITS(mac_cap[1], 16, 16);
 	/* HE PHY capabilities */
 	chan_width = WMI_HECAP_PHY_CBW_GET(phy_cap);
 	he_cap->chan_width_0 = HE_CH_WIDTH_GET_BIT(chan_width, 0);
@@ -324,16 +323,16 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 	rx_mcs_160 = (supp_mcs & 0xFFFF0000) >> 16;
 	tx_mcs_160 = (supp_mcs & 0xFFFF0000) >> 16;
 	/* if FW indicated it is using 1x1 disable upper NSS-MCS sets */
-
-	rx_mcs_le_80 |= HE_DISABLE_MCS_OVER_NSS(rx_nss);
-	tx_mcs_le_80 |= HE_DISABLE_MCS_OVER_NSS(tx_nss);
-	rx_mcs_160 |= HE_DISABLE_MCS_OVER_NSS(rx_nss);
-	tx_mcs_160 |= HE_DISABLE_MCS_OVER_NSS(tx_nss);
-
+	if (nss == NSS_1x1_MODE) {
+		rx_mcs_le_80 |= HE_MCS_INV_MSK_4_NSS(1);
+		tx_mcs_le_80 |= HE_MCS_INV_MSK_4_NSS(1);
+		rx_mcs_160 |= HE_MCS_INV_MSK_4_NSS(1);
+		tx_mcs_160 |= HE_MCS_INV_MSK_4_NSS(1);
+	}
 	he_cap->rx_he_mcs_map_lt_80 = rx_mcs_le_80;
 	he_cap->tx_he_mcs_map_lt_80 = tx_mcs_le_80;
-	*((uint16_t *)he_cap->rx_he_mcs_map_160) = rx_mcs_160;
-	*((uint16_t *)he_cap->tx_he_mcs_map_160) = tx_mcs_160;
+	*((uint16_t *)he_cap->tx_he_mcs_map_160) = rx_mcs_160;
+	*((uint16_t *)he_cap->rx_he_mcs_map_160) = tx_mcs_160;
 	*((uint16_t *)he_cap->rx_he_mcs_map_80_80) = rx_mcs_160;
 	*((uint16_t *)he_cap->tx_he_mcs_map_80_80) = tx_mcs_160;
 }
@@ -376,7 +375,7 @@ static void wma_derive_ext_he_cap(tDot11fIEhe_cap *he_cap,
 	he_cap->min_frag_size = QDF_MIN(he_cap->min_frag_size,
 			new_cap->min_frag_size);
 	he_cap->trigger_frm_mac_pad =
-		QDF_MAX(he_cap->trigger_frm_mac_pad,
+		QDF_MIN(he_cap->trigger_frm_mac_pad,
 				new_cap->trigger_frm_mac_pad);
 	he_cap->multi_tid_aggr_rx_supp = QDF_MIN(he_cap->multi_tid_aggr_rx_supp,
 			new_cap->multi_tid_aggr_rx_supp);
@@ -515,33 +514,20 @@ static void wma_derive_ext_he_cap(tDot11fIEhe_cap *he_cap,
 	/* take intersection for MCS map */
 	mcs_1 = he_cap->rx_he_mcs_map_lt_80;
 	mcs_2 = new_cap->rx_he_mcs_map_lt_80;
-	he_cap->rx_he_mcs_map_lt_80 = HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2);
+	he_cap->rx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(mcs_1, mcs_2);
 	mcs_1 = he_cap->tx_he_mcs_map_lt_80;
 	mcs_2 = new_cap->tx_he_mcs_map_lt_80;
-	he_cap->tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2);
+	he_cap->tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(mcs_1, mcs_2);
 	if (is_5g_cap) {
 		he_cap->rx_pream_puncturing =
 					QDF_MIN(he_cap->rx_pream_puncturing,
 						new_cap->rx_pream_puncturing);
-		mcs_1 = *((uint16_t *)he_cap->rx_he_mcs_map_160);
-		mcs_2 = *((uint16_t *)new_cap->rx_he_mcs_map_160);
 		*((uint16_t *)he_cap->rx_he_mcs_map_160) =
-			HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2);
-
-		mcs_1 = *((uint16_t *)he_cap->tx_he_mcs_map_160);
-		mcs_2 = *((uint16_t *)new_cap->tx_he_mcs_map_160);
+			*((uint16_t *)new_cap->rx_he_mcs_map_160);
 		*((uint16_t *)he_cap->tx_he_mcs_map_160) =
-			HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2);
-
-		mcs_1 = *((uint16_t *)he_cap->rx_he_mcs_map_80_80);
-		mcs_2 = *((uint16_t *)new_cap->rx_he_mcs_map_80_80);
+			*((uint16_t *)new_cap->tx_he_mcs_map_160);
 		*((uint16_t *)he_cap->rx_he_mcs_map_80_80) =
-			HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2);
-
-		mcs_1 = *((uint16_t *)he_cap->tx_he_mcs_map_80_80);
-		mcs_2 = *((uint16_t *)new_cap->tx_he_mcs_map_80_80);
-		*((uint16_t *)he_cap->tx_he_mcs_map_80_80) =
-			HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2);
+			*((uint16_t *)new_cap->rx_he_mcs_map_80_80);
 		*((uint16_t *)he_cap->tx_he_mcs_map_80_80) =
 			*((uint16_t *)new_cap->tx_he_mcs_map_80_80);
 	}
@@ -1029,17 +1015,13 @@ static void wma_parse_he_ppet(int8_t *rcvd_ppet,
 }
 
 void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
-			      tpAddStaParams params,
-			      struct wlan_objmgr_pdev *pdev)
+			      tpAddStaParams params)
 {
 	tDot11fIEhe_cap *he_cap = &params->he_config;
 	tDot11fIEhe_op *he_op = &params->he_op;
 	uint32_t *phy_cap = peer->peer_he_cap_phyinfo;
 	uint32_t mac_cap[PSOC_HOST_MAX_MAC_SIZE] = {0}, he_ops = 0;
 	uint8_t temp, i, chan_width;
-	enum phy_ch_width ch_width_for_mcs_rates;
-	uint32_t freq = wlan_get_operation_chan_freq_vdev_id(pdev,
-							     peer->vdev_id);
 
 	if (!params->he_capable)
 		return;
@@ -1194,12 +1176,9 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 			(params->he_mcs_12_13_map <<
 			 WMA_MCS_12_13_MAP_L80) & WMA_MCS_12_13_PEER_RATE_MAP;
 	}
-	ch_width_for_mcs_rates = wlan_get_bw_for_mcs_set(params->ch_width,
-							 MLME_DOT11_MODE_11AX,
-							 pdev, freq, 0);
+
 	if (params->ch_width > CH_WIDTH_80MHZ ||
-	    IS_TDLS_PEER(params->staType) ||
-	    ch_width_for_mcs_rates > CH_WIDTH_80MHZ) {
+	    IS_TDLS_PEER(params->staType)) {
 		peer->peer_he_mcs_count = WMI_HOST_MAX_HE_RATE_SET;
 		peer->peer_he_rx_mcs_set[1] |=
 			params->supportedRates.rx_he_mcs_map_160;
@@ -1236,6 +1215,8 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 
 #define HE2x2MCSMASK 0xc
 
+	peer->peer_nss = ((params->supportedRates.rx_he_mcs_map_lt_80 &
+			 HE2x2MCSMASK) == HE2x2MCSMASK) ? 1 : 2;
 	for (i = 0; i < peer->peer_he_mcs_count; i++)
 		wma_debug("[HE - MCS Map: %d] rx_mcs: 0x%x, tx_mcs: 0x%x", i,
 			peer->peer_he_rx_mcs_set[i],
@@ -1310,14 +1291,6 @@ void wma_vdev_set_he_config(tp_wma_handle wma, uint8_t vdev_id,
 {
 	QDF_STATUS ret;
 	int8_t pd_min, pd_max, sec_ch_ed, tx_pwr;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
-						    WLAN_LEGACY_WMA_ID);
-	if (mlo_mgr_optimized_link_switch_in_progress(wma->psoc, vdev)) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-		return;
-	}
 
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
 				 wmi_vdev_param_obsspd, add_bss->he_sta_obsspd);
@@ -1329,7 +1302,6 @@ void wma_vdev_set_he_config(tp_wma_handle wma, uint8_t vdev_id,
 	tx_pwr = (add_bss->he_sta_obsspd & 0xff000000) >> 24;
 	wma_debug("HE_STA_OBSSPD: PD_MIN: %d PD_MAX: %d SEC_CH_ED: %d TX_PWR: %d",
 		  pd_min, pd_max, sec_ch_ed, tx_pwr);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 }
 
 QDF_STATUS wma_update_he_ops_ie(tp_wma_handle wma, uint8_t vdev_id,
@@ -1489,26 +1461,27 @@ QDF_STATUS wma_get_hemu_mode(uint32_t *hemumode, struct mac_context *mac)
 
 void wma_prevent_suspend_on_obss_color_collision(struct wlan_objmgr_vdev *vdev)
 {
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct mlme_legacy_priv *mlme_priv;
 
-	if (!wma)
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
 		return;
 
-	qdf_atomic_inc(&wma->wlan_key_op_counter);
-	qdf_wake_lock_timeout_acquire(&wma->wlan_key_op_wake_lock,
+	qdf_wake_lock_timeout_acquire(&mlme_priv->bss_color_change_wakelock,
 				      MAX_WAKELOCK_FOR_BSS_COLOR_CHANGE);
-	qdf_runtime_pm_prevent_suspend(&wma->wlan_key_op_runtime_lock);
+	qdf_runtime_pm_prevent_suspend(
+			&mlme_priv->bss_color_change_runtime_lock);
 }
 
 void wma_allow_suspend_after_obss_color_change(struct wlan_objmgr_vdev *vdev)
 {
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct mlme_legacy_priv *mlme_priv;
 
-	if (!wma || qdf_atomic_read(&wma->wlan_key_op_counter) <= 0)
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
 		return;
 
-	qdf_atomic_dec(&wma->wlan_key_op_counter);
-	if (!qdf_atomic_read(&wma->wlan_key_op_counter))
-		qdf_wake_lock_release(&wma->wlan_key_op_wake_lock, 0);
-	qdf_runtime_pm_allow_suspend(&wma->wlan_key_op_runtime_lock);
+	qdf_runtime_pm_allow_suspend(
+			&mlme_priv->bss_color_change_runtime_lock);
+	qdf_wake_lock_release(&mlme_priv->bss_color_change_wakelock, 0);
 }

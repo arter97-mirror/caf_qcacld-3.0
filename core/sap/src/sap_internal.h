@@ -136,10 +136,6 @@ struct sap_context {
 		uint8_t vdev_id;
 	};
 	uint8_t sap_radar_found_status;
-	/* CAC start time in milliseconds */
-	uint64_t dfs_cac_start_time;
-	/* Remaining CAC time in milliseconds */
-	uint32_t dfs_cac_remaining_time;
 
 	/* vdev object corresponding to sessionId */
 	struct wlan_objmgr_vdev *vdev;
@@ -179,7 +175,7 @@ struct sap_context {
 	eCsrPhyMode phyMode;
 	uint32_t *freq_list;
 	uint8_t num_of_channel;
-	enum phy_ch_width ch_width_orig;
+	uint16_t ch_width_orig;
 	struct ch_params ch_params;
 	uint32_t chan_freq_before_switch_band;
 	enum phy_ch_width chan_width_before_switch_band;
@@ -232,8 +228,6 @@ struct sap_context {
 	wlan_scan_requester req_id;
 	uint8_t sap_sta_id;
 	bool dfs_cac_offload;
-	/* whether set mcast during cac */
-	bool mcstie_send_in_cac;
 	bool is_chan_change_inprogress;
 	/* Disabled mcs13 by sap or not */
 	bool disabled_mcs13;
@@ -340,7 +334,6 @@ void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params);
  * @ch_info: Pointer to sap_sel_ch_info structure
  * @domain: Regulatory Domain
  * @operating_band: Operating band
- * @only_2g_freq: only 2 GHz
  *
  * Return: QDF_STATUS
  *
@@ -348,8 +341,7 @@ void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params);
 QDF_STATUS
 sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
-		      v_REGDOMAIN_t *domain, uint32_t *operating_band,
-		      bool only_2g_freq);
+		      v_REGDOMAIN_t *domain, uint32_t *operating_band);
 
 /**
  * sap_select_channel() - select SAP channel
@@ -392,6 +384,8 @@ sap_print_acl(struct qdf_mac_addr *macList, uint16_t size);
 bool
 sap_search_mac_list(struct qdf_mac_addr *macList, uint16_t num_mac,
 		    uint8_t *peerMac, uint16_t *index);
+
+QDF_STATUS sap_init_dfs_channel_nol_list(struct sap_context *sap_ctx);
 
 bool sap_dfs_is_channel_in_nol_list(struct sap_context *sap_ctx,
 				    qdf_freq_t chan_freq,
@@ -461,7 +455,7 @@ sap_validate_chan(struct sap_context *sap_context,
  * which MDM device's AP with MCC was detected. This function checks if given
  * channel is present in that list.
  *
- * Return: true, if channel was present, false otherwise.
+ * Return: true, if channel was present, false othersie.
  */
 bool
 sap_check_in_avoid_ch_list(struct sap_context *sap_ctx, uint8_t channel);
@@ -584,14 +578,6 @@ sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
  */
 bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch);
 
-/**
- * sap_get_bw_score_multiplier() - get bw score multiplier
- * @ch_width: channel width
- *
- * Return: multiplier
- */
-uint8_t sap_get_bw_score_multiplier(enum phy_ch_width ch_width);
-
 #ifdef QCA_DFS_BW_PUNCTURE
 /**
  * sap_is_chan_change_needed_for_radar() - Check if SAP channel change needed
@@ -609,100 +595,12 @@ uint8_t sap_get_bw_score_multiplier(enum phy_ch_width ch_width);
 bool
 sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 				    qdf_freq_t *freq);
-
-/**
- * dfs_set_optimized_cac_timeout() - Set optimized CAC timeout for punctured channels
- * @sap_ctx: sap context.
- *
- * When radar is detected on punctured channels during CAC, calculate the
- * remaining CAC time to avoid restarting the full CAC duration.
- *
- * Return: Optimized CAC timeout in seconds.
- */
-int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx);
 #else
 static inline bool
 sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 				    qdf_freq_t *freq)
 {
 	return true;
-}
-
-static inline
-int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx)
-{
-	return 0;
-}
-#endif
-/**
- * sap_fsm_send_csa_restart_req() - send csa start event
- * @mac_ctx: mac ctx
- * @sap_ctx: SAP context
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
-			     struct sap_context *sap_ctx);
-
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
-/**
- * sap_post_cac_chan_switch_info() - Post CAC channel switch info to PE
- * @sap_ctx: SAP context
- * @chan_freq: target channel frequency in MHz
- * @ch_params: channel parameters (width, sec_ch_offset, etc.)
- *
- * Posts SIR_LIM_SET_CAC_CHAN_SWITCH_INFO to PE so that PE can update
- * gLimChannelSwitch fields without direct cross-layer access from SAP.
- * switchCount and switchMode are read from INI by the PE handler.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sap_post_cac_chan_switch_info(struct sap_context *sap_ctx,
-					 qdf_freq_t chan_freq,
-					 struct ch_params *ch_params);
-
-/**
- * sap_send_mcst_in_cac() - send mcst ie in bcn template in CAC
- * @sap_ctx: SAP context
- *
- * This function add mcst ie into beacon template and send it to FW during CAC.
- *
- * Return: None
- */
-void sap_send_mcst_in_cac(struct sap_context *sap_ctx);
-
-/**
- * sap_set_mcst_ie_flag_for_cac() - Set mcstie_send_in_cac for CAC
- * @sap_ctx: SAP context
- * @flag: mcastie set or not
- *
- * This function sets dfsIncludeChanSwIe to true for MLO SAP on DFS channel
- * during CAC, so that beacon will include CSA/ECSA and MCST IE.
- *
- * Return: QDF_STATUS
- */
-void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
-				  bool flag);
-
-#else
-static inline QDF_STATUS
-sap_post_cac_chan_switch_info(struct sap_context *sap_ctx,
-			      qdf_freq_t chan_freq,
-			      struct ch_params *ch_params)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-void sap_send_mcst_in_cac(struct sap_context *sap_ctx)
-{
-}
-
-static inline
-void sap_set_mcst_ie_flag_for_cac(struct sap_context *sap_ctx,
-				  bool flag)
-{
 }
 #endif
 #endif

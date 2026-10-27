@@ -19,7 +19,7 @@
 #include <qdf_status.h>
 #include "wlan_dp_priv.h"
 #include "wlan_dp_metadata.h"
-#include "wlan_dp_bus_bandwidth.h"
+
 #ifdef WLAN_DP_FEATURE_STC
 #include <wlan_dp_spm.h>
 #include <wlan_dp_fim.h>
@@ -33,7 +33,9 @@
 #endif
 
 #ifdef WLAN_DP_FEATURE_STC
-#include <wlan_dp_stc.h>
+#define SAWFISH_FLOW_ID_MAX 0x3F
+#define SAWFISH_INVALID_FLOW_ID 0xFFFF
+
 /**
  * wlan_dp_sawfish_update_metadata() - Parse flow info from skb and update svc
  *				       data
@@ -48,15 +50,13 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 	struct sock *sk = NULL;
 	struct flow_info flow = {0};
 	uint16_t peer_id;
-	uint16_t tx_flow_id;
+	uint16_t sk_tx_flow_id;
 	int status = QDF_STATUS_E_INVAL;
+	union generic_ethhdr *eth_hdr;
+	uint8_t *pkt;
 
 	if (!dp_intf->spm_intf_ctx)
 		return QDF_STATUS_E_NOSUPPORT;
-
-	if (dp_rtpm_tput_policy_get_vote(dp_intf->dp_ctx) &
-	    BIT(WLAN_DP_POLICY_SPM_DISABLE_BIT))
-		return QDF_STATUS_E_ABORTED;
 
 	sk = skb->sk;
 	if (qdf_unlikely(!qdf_nbuf_sock_is_valid_fullsock(skb))) {
@@ -64,51 +64,60 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (qdf_nbuf_data_is_ipv6_pkt(skb->data) ||
-	    qdf_nbuf_data_is_dns_query(skb) ||
-	    qdf_nbuf_data_is_dns_response(skb) ||
-	    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data) ||
-	    !qdf_nbuf_is_ipv4_first_fragment(skb)) {
-		skb->mark = FLOW_INVALID_METADATA;
-		return QDF_STATUS_E_INVAL;
-	}
+	sk_tx_flow_id = sk->sk_txtime_unused;
 
-	dp_fim_parse_skb_flow_info(skb, &flow);
-	if (qdf_unlikely(!flow.flags ||
-			 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
-		skb->mark = FLOW_INVALID_METADATA;
-		return QDF_STATUS_E_INVAL;
-	}
+	/* sk_tx_flow_id != 0 means flow_id valid */
+	if (qdf_unlikely(!sk_tx_flow_id)) {
+		/* Bypass special packets so that it does not
+		 * consume TX flow table entries.
+		 */
+		if (qdf_nbuf_data_is_ipv6_pkt(skb->data) ||
+		    qdf_nbuf_data_is_dns_query(skb) ||
+		    qdf_nbuf_data_is_dns_response(skb) ||
+		    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data) ||
+		    !qdf_nbuf_is_ipv4_first_fragment(skb)) {
+			skb->mark = FLOW_INVALID_METADATA;
+			return QDF_STATUS_E_INVAL;
+		}
 
-	tx_flow_id = dp_spm_get_tx_flow_id(dp_intf, skb, &flow);
-	if (tx_flow_id == SAWFISH_INVALID_FLOW_ID) {
-		/* Tx flow not found, add it */
-		union generic_ethhdr *eth_hdr;
-		uint8_t *pkt;
+		if (!wlan_dp_spm_flow_screening(dp_intf, skb))
+			return QDF_STATUS_SUCCESS;
 
+		dp_fim_parse_skb_flow_info(skb, &flow);
+		if (qdf_unlikely(!flow.flags ||
+				 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
+			skb->mark = FLOW_INVALID_METADATA;
+			return QDF_STATUS_E_INVAL;
+		}
 		pkt = skb->data;
 		eth_hdr = (union generic_ethhdr *)pkt;
 		peer_id = cdp_get_peer_id(dp_intf->dp_ctx->cdp_soc,
 					  CDP_VDEV_ALL, eth_hdr->eth_II.h_dest);
 
-		status = dp_spm_add_tx_flow(dp_intf, skb, &tx_flow_id, &flow,
-					    peer_id);
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+		status = wlan_dp_spm_get_flow_id_origin(dp_intf, &sk_tx_flow_id,
+							&flow, (uint64_t)sk,
+							peer_id);
+		/* Check status */
+		if (qdf_unlikely(sk_tx_flow_id > SAWFISH_FLOW_ID_MAX)) {
+			/* skb->mark with svc_metadata, lapb_metadata */
+			return QDF_STATUS_E_INVAL;
+		}
+		sk->sk_txtime_unused = sk_tx_flow_id;
 	}
 
-	/* Tx flow found, update stats */
-	status = wlan_dp_spm_svc_get_metadata(dp_intf, skb, tx_flow_id,
+	status = wlan_dp_spm_svc_get_metadata(dp_intf, skb, sk_tx_flow_id,
 					      (uint64_t)sk);
-	if (qdf_unlikely(status == QDF_STATUS_E_NOENT)) {
+	if (qdf_unlikely(status != QDF_STATUS_SUCCESS)) {
 		/*
 		 * Flow is possibly evicted, so mark for invalid flow.
 		 * Subsequent packets of flow will have new flow allocated.
 		 */
-		return QDF_STATUS_E_NOENT;
+		sk->sk_txtime_unused = 0;
+
+		return QDF_STATUS_E_INVAL;
 	}
 
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -140,11 +149,6 @@ bool fpm_is_tid_override(qdf_nbuf_t nbuf, uint8_t *tid)
 {
 	if (DP_IS_TID_OVERRIDE_TAG(nbuf->mark)) {
 		*tid = DP_EXTRACT_TID(nbuf->mark);
-		return true;
-	}
-
-	if (DP_IS_SVC_TID_OVERRIDE_TAG(nbuf->mark)) {
-		*tid = DP_SVC_EXTRACT_TID(nbuf->mark);
 		return true;
 	}
 
@@ -629,4 +633,53 @@ out:
 	return found;
 }
 
+void dp_fpm_display_policy(struct wlan_dp_intf *dp_intf)
+{
+	struct fpm_table *fpm;
+	struct dp_policy *policy = NULL;
+	struct qdf_ht *lhead;
+	uint16_t hash_idx;
+
+	if (!dp_intf) {
+		dp_err("dp_intf is null");
+		return;
+	}
+
+	if (!dp_intf->fpm_ctx) {
+		dp_err("fpm_ctx is null");
+		return;
+	}
+
+	fpm = dp_intf->fpm_ctx;
+	qdf_rcu_read_lock_bh();
+	for (hash_idx = 0; hash_idx < DP_FLOW_PRIO_MAX; hash_idx++) {
+		lhead = &fpm->policy_tab[hash_idx];
+		qdf_hl_for_each_entry_rcu(policy, lhead, node) {
+			dp_info("policy_id:0x%llx prio:%u",
+				policy->policy_id, policy->prio);
+			dp_info("pflags:0x%x flow_flags:0x%x svc_id:%u tid:%u",
+				policy->flags, policy->flow.flags,
+				policy->svc_id, policy->target_tid);
+			if (policy->flow.flags & DP_FLOW_TUPLE_FLAGS_IPV4) {
+				if (policy->flow.flags &
+				    DP_FLOW_TUPLE_FLAGS_SRC_IP)
+					dp_info("src_ip:0x%x",
+						policy->flow.src_ip.ipv4_addr);
+				if (policy->flow.flags &
+				    DP_FLOW_TUPLE_FLAGS_SRC_IP)
+					dp_info("dst_ip:0x%x",
+						policy->flow.dst_ip.ipv4_addr);
+				if (policy->flow.flags &
+				    DP_FLOW_TUPLE_FLAGS_SRC_IP)
+					dp_info("srcport:%u",
+						policy->flow.src_port);
+				if (policy->flow.flags &
+				    DP_FLOW_TUPLE_FLAGS_SRC_IP)
+					dp_info("dstport:%u",
+						policy->flow.dst_port);
+			}
+		}
+	}
+	qdf_rcu_read_unlock_bh();
+}
 #endif

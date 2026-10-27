@@ -131,6 +131,7 @@ struct cm_vdev_hw_mode_rsp {
  * @connect_rsp: Connect response to be sent to CM
  * @ric_resp_ie: ric ie data
  * @tspec_ie: tspec ie
+ * @nss: used nss
  * @uapsd_mask: uapsd mask
  */
 struct cm_vdev_join_rsp {
@@ -140,6 +141,7 @@ struct cm_vdev_join_rsp {
 #ifdef FEATURE_WLAN_ESE
 	struct element_info tspec_ie;
 #endif
+	uint8_t nss;
 	uint8_t uapsd_mask;
 };
 
@@ -315,14 +317,6 @@ static inline QDF_STATUS
 cm_ext_hdl_create(struct wlan_objmgr_vdev *vdev, cm_ext_t **ext_cm_ptr)
 {
 	struct cm_ext_obj *cm_obj;
-	struct qdf_mac_addr *mld_addr;
-
-	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
-	if (!qdf_is_macaddr_zero(mld_addr)) {
-		mlme_debug("vdev_id:%d MLO vdev, skipping cm_ext allocation",
-			   wlan_vdev_get_id(vdev));
-		return QDF_STATUS_SUCCESS;
-	}
 
 	*ext_cm_ptr = qdf_mem_malloc(sizeof(struct cm_ext_obj));
 	if (!*ext_cm_ptr)
@@ -337,12 +331,7 @@ cm_ext_hdl_create(struct wlan_objmgr_vdev *vdev, cm_ext_t **ext_cm_ptr)
 static inline QDF_STATUS
 cm_ext_hdl_destroy(struct wlan_objmgr_vdev *vdev, cm_ext_t *ext_cm_ptr)
 {
-	if (!ext_cm_ptr) {
-		mlme_debug("vdev_id:%d ext_cm_ptr is NULL, skipping cleanup",
-			   wlan_vdev_get_id(vdev));
-		return QDF_STATUS_SUCCESS;
-	}
-	wlan_cm_rso_config_deinit(&ext_cm_ptr->rso_cfg);
+	wlan_cm_rso_config_deinit(vdev, &ext_cm_ptr->rso_cfg);
 	qdf_mem_free(ext_cm_ptr);
 
 	return QDF_STATUS_SUCCESS;
@@ -449,7 +438,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp);
 
 /**
- * cm_is_vdevid_connected() - check if vdev_id is in connected state
+ * cm_is_vdevid_connected() - check if vdev_id is in conneted state
  * @pdev: pdev pointer
  * @vdev_id: vdev ID
  *
@@ -458,16 +447,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
- * cm_is_vdevid_roaming() - check if vdev_id is in roaming state
- * @pdev: pdev pointer
- * @vdev_id: vdev ID
- *
- * Return: bool
- */
-bool cm_is_vdevid_roaming(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
-
-/**
- * cm_is_vdevid_active() - check if vdev_id is in connected/roaming state
+ * cm_is_vdevid_active() - check if vdev_id is in conneted/roaming state
  * @pdev: pdev pointer
  * @vdev_id: vdev ID
  *
@@ -609,7 +589,7 @@ QDF_STATUS cm_process_join_req(struct cm_vdev_join_req *join_req);
 QDF_STATUS
 cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *join_req);
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
 /**
  * cm_get_pre_auth_mld_addr - Get mld address from preauth list
  * @mac: pointer to mac object
@@ -823,34 +803,13 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * cm_get_ml_partner_info() - Fill ML partner info from scan entry
- * @psoc: psoc object
+ * @pdev: PDEV object
  * @conn_req: Connect request pointer
- * @mlo_support_link_num: Supported Link Count
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
-		       struct cm_connect_req *conn_req,
-		       uint8_t mlo_support_link_num);
+cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
+		       struct cm_connect_req *conn_req);
 #endif
-/**
- * cm_install_link_vdev_keys() - Send an MLO link vdev's deferred keys to
- *				  firmware
- * @vdev: MLO link vdev whose deferred keys are to be installed
- * @from_roam_sync: true when called from the roam sync path.  Keeps the lookup
- *		     on the 11bi aware path instead of diverting to
- *		     mlo_link_recfg_install_unicast_keys(), which resolves the
- *		     key by the vdev's own link address and would disconnect
- *		     with REASON_KEY_FAIL_TO_INSTALL after an 11bi roam.
- *
- * Drains the keys that were stashed in the psoc crypto cache while the link
- * vdev had its set-key deferred (mlo_defer_set_keys()), and clears the defer
- * flag.  A no-op unless @vdev is an STA mode MLO link vdev with keys pending.
- *
- * Return: void
- */
-void
-cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev, bool from_roam_sync);
-
 #endif /* __WLAN_CM_VDEV_API_H__ */

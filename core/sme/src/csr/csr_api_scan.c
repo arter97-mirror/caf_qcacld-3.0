@@ -62,10 +62,20 @@ static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 
 static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 				     tDblLinkList *pList,
-				     enum band_info band);
+				     uint32_t cfgId);
 
 static void csr_purge_channel_power(struct mac_context *mac,
 				    tDblLinkList *pChannelList);
+
+/* pResult is invalid calling this function. */
+void csr_free_scan_result_entry(struct mac_context *mac,
+				struct tag_csrscan_result *pResult)
+{
+	if (pResult->Result.pvIes)
+		qdf_mem_free(pResult->Result.pvIes);
+
+	qdf_mem_free(pResult);
+}
 
 static QDF_STATUS csr_ll_scan_purge_result(struct mac_context *mac,
 					   tDblLinkList *pList)
@@ -77,7 +87,7 @@ static QDF_STATUS csr_ll_scan_purge_result(struct mac_context *mac,
 	while ((pEntry = csr_ll_remove_head(pList, LL_ACCESS_NOLOCK)) != NULL) {
 		bss_desc = GET_BASE_ADDR(pEntry, struct tag_csrscan_result,
 					 Link);
-		qdf_mem_free(bss_desc);
+		csr_free_scan_result_entry(mac, bss_desc);
 	}
 
 	return status;
@@ -602,23 +612,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 	qdf_mem_free(p_buf);
 }
 
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static bool csr_fill_eppke_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
-{
-	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_EPPKE)) {
-		*auth_type = eCSR_AUTH_TYPE_EPPKE;
-		return true;
-	}
-	return false;
-}
-#else
-static inline bool
-csr_fill_eppke_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_11BI_SECURITY */
-
 static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 {
 	/* Try the more preferred ones first. */
@@ -638,8 +631,6 @@ static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 		*auth_type = eCSR_AUTH_TYPE_FT_SAE;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
 		*auth_type = eCSR_AUTH_TYPE_SAE;
-	else if (csr_fill_eppke_auth_type(auth_type, akm))
-		return;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_DPP))
 		*auth_type = eCSR_AUTH_TYPE_DPP_RSN;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OSEN))
@@ -729,9 +720,7 @@ void csr_fill_auth_type(enum csr_akm_type *auth_type,
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_CCKM) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SAE) ||
-	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_EPPKE) ||
-	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_FILS_SK) ||
-	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)) {
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_FILS_SK)) {
 		csr_fill_rsn_auth_type(auth_type, akm);
 		return;
 	}
@@ -806,6 +795,7 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 					struct scan_cache_entry *scan_entry,
 					struct tag_csrscan_result **p_result)
 {
+	tDot11fBeaconIEs *bcn_ies;
 	struct bss_description *bss_desc;
 	tCsrScanResultInfo *result_info;
 	uint8_t *ie_ptr;
@@ -840,19 +830,26 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	csr_fill_neg_crypto_info(bss, &scan_entry->neg_sec_info);
 
 	result_info = &bss->Result;
+	result_info->ssId.length = scan_entry->ssid.length;
+	qdf_mem_copy(result_info->ssId.ssId,
+		scan_entry->ssid.ssid,
+		result_info->ssId.length);
 	result_info->timer = scan_entry->hidden_ssid_timestamp;
 
 	bss_desc = &result_info->BssDescriptor;
-	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
-						    scan_entry);
+
+	wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc, scan_entry);
+
+	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
+						     &bcn_ies);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(bss);
 		return status;
 	}
+	result_info->pvIes = bcn_ies;
 
 	*p_result = bss;
-
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS csr_parse_scan_list(struct mac_context *mac_ctx,

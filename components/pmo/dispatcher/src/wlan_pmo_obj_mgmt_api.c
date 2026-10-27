@@ -290,11 +290,9 @@ QDF_STATUS pmo_vdev_object_created_notification(
 	 * 0 - PMO_PS_ADVANCED_POWER_SAVE_DISABLE
 	 * 1 - PMO_PS_ADVANCED_POWER_SAVE_ENABLE
 	 * 2 - PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED
-	 * 3 - PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED
 	 */
 	vdev_ctx->ps_params.opm_mode = psoc_ctx->psoc_cfg.power_save_mode;
 	vdev_ctx->ps_params.ps_ito = PMO_PS_DATA_INACTIVITY_TIMEOUT;
-	vdev_ctx->ps_params.ps_opm_level = PMO_PS_DATA_OPM_LEVEL;
 	vdev_ctx->ps_params.spec_wake = PMO_PS_DATA_SPEC_WAKE;
 
 out:
@@ -757,60 +755,6 @@ pmo_unregister_is_device_in_low_pwr_mode(struct wlan_objmgr_psoc *psoc)
 		psoc_ctx->is_device_in_low_pwr_mode = NULL;
 	}
 
-	pmo_psoc_put_ref(psoc);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS pmo_register_wow_deferred_wakeup_cb(struct wlan_objmgr_psoc *psoc,
-					       pmo_wow_deferred_wakeup_cb handler)
-{
-	struct pmo_psoc_priv_obj *psoc_ctx;
-	QDF_STATUS status;
-
-	if (!psoc) {
-		pmo_err("psoc is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (!handler) {
-		pmo_err("pmo_wow_deferred_wakeup_cb is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = pmo_psoc_get_ref(psoc);
-	if (status != QDF_STATUS_SUCCESS) {
-		pmo_err("pmo cannot get the reference out of psoc");
-		return status;
-	}
-
-	pmo_psoc_with_ctx(psoc, psoc_ctx) {
-		psoc_ctx->wow_deferred_wakeup_cb = handler;
-	}
-	pmo_psoc_put_ref(psoc);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS pmo_unregister_wow_deferred_wakeup_cb(struct wlan_objmgr_psoc *psoc)
-{
-	struct pmo_psoc_priv_obj *psoc_ctx;
-	QDF_STATUS status;
-
-	if (!psoc) {
-		pmo_err("psoc is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = pmo_psoc_get_ref(psoc);
-	if (status != QDF_STATUS_SUCCESS) {
-		pmo_err("pmo cannot get the reference out of psoc");
-		return status;
-	}
-
-	pmo_psoc_with_ctx(psoc, psoc_ctx) {
-		psoc_ctx->wow_deferred_wakeup_cb = NULL;
-	}
 	pmo_psoc_put_ref(psoc);
 
 	return QDF_STATUS_SUCCESS;

@@ -240,8 +240,7 @@ enum wlan_epcs_frame {
  * options using bitmap based on following ENUM (Name of ENUM to be added)
  * @Min: 0x0
  * @Max: 0xFFFFFFFF
- * @Default: 0x3000f - To allow APs of MLO/non-MLO WPA2 PMF/non-PMF cap,
- * MLO/non-MLO WPA3-SAE w/o H2E cap
+ * @Default: 0x20008 - To allow MLO WPA2-PMF cap APs and WPA3-SAE w/o H2E cap
  *
  * This INI is used to control the driver candidate selection and EHT
  * connection choice based on OEM configuration. The bitmap follows the
@@ -251,7 +250,7 @@ enum wlan_epcs_frame {
 		"oem_eht_mlo_crypto_bitmap", \
 		0x0, \
 		0xFFFFFFFF, \
-		0x3000f, \
+		0x20008, \
 		CFG_VALUE_OR_DEFAULT, \
 		"OEM control to allow/disallow crypto to EHT configuration")
 
@@ -998,15 +997,11 @@ enum wlan_epcs_frame {
  * <ini>
  * gEnableRingBuffer - Enable Ring Buffer for Bug Report
  * @Min: 0
- * @Max: 2
- * @Default: 2
+ * @Max: 1
+ * @Default: 1
  *
- * This ini is used to enable/disable/set Ring Buffer verbose level.
+ * This ini is used to enable Ring Buffer
  *
- * 0 : Completely disable logging in ring buffers for cnss_diag.
- * 1 : Enable Complete logging in ring buffers.
- * 2 : Only enable logging in cnss_diag if
- *     wifi_verbose_log_level > WLAN_LOG_LEVEL_NORMAL
  * Related: None
  *
  * Supported Feature: STA/SAP
@@ -1015,10 +1010,9 @@ enum wlan_epcs_frame {
  *
  * </ini>
  */
-#define CFG_ENABLE_RING_BUFFER CFG_INI_UINT( \
+#define CFG_ENABLE_RING_BUFFER CFG_INI_BOOL( \
 		"gEnableRingBuffer", \
-		0, 2, 2, \
-		CFG_VALUE_OR_DEFAULT, \
+		1, \
 		"To Enable Ring Buffer")
 
 /*
@@ -1322,7 +1316,7 @@ enum wlan_epcs_frame {
  * enable_reduce_pwr_scan - Enable/Disable reduced power scan mode
  * @Min: 0 Disable
  * @Max: 1 Enable
- * @Default: 1
+ * @Default: 0
  *
  * Related: None
  *
@@ -1333,98 +1327,6 @@ enum wlan_epcs_frame {
 	"enable_reduce_pwr_scan", \
 	1, \
 	"Reduce power scan mode")
-
-/*
- * <ini>
- * sap_perf_tuning_enable - Send SAP performance tuning params to
- * firmware on vdev up.
- * @Min: false
- * @Max: true
- * @Default: false
- *
- * This ini is used to monitor SAP performance tuning feature.
- * 0 - Disable SAP tuning performance feature.
- * 1 - Enable SAP tuning performance feature.
- *
- * When Vdev is up, this ini will be sent to firmware based on service
- * capability. This ini is used to check for whether SAP tuning
- * feature is enabled or not.
- *
- * Supported Feature: SAP
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_SAP_PERF_TUNING_ENABLE \
-CFG_INI_BOOL("sap_perf_tuning_enable", false, \
-	     "Send SAP noise monitoring parameters on vdev up")
-
-/*
- * <ini>
- * sap_perf_data_threshold - data_threshold in Kbps corresponds to the total
- * TX/RX bytes.
- * Options.
- * @Min: 0
- * @Max: 102400
- * @Default: 1024
- *
- * This ini is used to set the total data_threshold in Kbps corresponds to
- * the total TX/RX bytes.
- *
- * Supported Feature: SAP
- *
- * Usage: External
- *
- * </ini>
- */
-
-#define CFG_SAP_PERF_DATA_THRESHOLD \
-CFG_INI_UINT("sap_perf_data_threshold", 0, 102400, 1024, \
-	     CFG_VALUE_OR_DEFAULT, "Set TX/RX bytes threshold value")
-/*
- * <ini>
- * sap_traffic_monitoring_time_s - Duration of traffic monitoring in unit of
- * seconds.
- * Options.
- * @Min: 0
- * @Max: 100
- * @Default: 1
- *
- * This ini is used to set the duration of traffic monitoring in unit of sec.
- *
- * Supported Feature: SAP
- *
- * Usage: External
- *
- * </ini>
- */
-
-#define CFG_SAP_TRAFFIC_MONITORING_TIME_S \
-CFG_INI_UINT("sap_traffic_monitoring_time_s", 0, 100, 1, \
-	     CFG_VALUE_OR_DEFAULT, "Set duration for traffic monitoring")
-
-/*
- * <ini>
- * gEdcaTxopLimit - EDCA TXOP limit in milliseconds
- * @Min: 0
- * @Max: 16
- * @Default: 0
- *
- * This ini is used to set the TXOP limit in firmware. The value is
- * specified in milliseconds. This will be set to zero if feature is disabled.
- *
- * Related: None
- *
- * Supported Feature: General
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_EDCA_TXOP_LIMIT \
-CFG_INI_UINT("gEdcaTxopLimit", 0, 16, 0, \
-	     CFG_VALUE_OR_DEFAULT, "TXOP limit in milliseconds")
 
 #define CFG_GENERIC_ALL \
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
@@ -1472,9 +1374,5 @@ CFG_INI_UINT("gEdcaTxopLimit", 0, 16, 0, \
 	CFG_T2LM_NEGOTIATION_SUPPORTED \
 	CFG_LINK_RECFG_SUPPORTED \
 	CFG_RELAXED_LPI_CONN_POLICY \
-	CFG(CFG_REDUCE_PWR_SCAN_MODE) \
-	CFG(CFG_SAP_PERF_TUNING_ENABLE) \
-	CFG(CFG_SAP_PERF_DATA_THRESHOLD) \
-	CFG(CFG_SAP_TRAFFIC_MONITORING_TIME_S) \
-	CFG(CFG_EDCA_TXOP_LIMIT)
+	CFG(CFG_REDUCE_PWR_SCAN_MODE)
 #endif /* __CFG_MLME_GENERIC_H */

@@ -32,7 +32,6 @@
 #ifndef __SIRPARAMS_H
 #define __SIRPARAMS_H
 
-#include <linux/types.h>
 #include "sir_types.h"
 
 #define WAKELOCK_DURATION_RECOMMENDED	1000
@@ -97,7 +96,7 @@ typedef enum {
  * This definition is independent of any other modules.
  * We can use any unused numbers.
  */
-#define MAX_SUPPORTED_FEATURE 33
+#define MAX_SUPPORTED_FEATURE 32
 enum cap_bitmap {
 	MCC = 0,
 	P2P = 1,
@@ -130,11 +129,8 @@ enum cap_bitmap {
 	TDLS_OFF_CHANNEL = 30,
 #endif
 	VDEV_LATENCY_CONFIG = 31,
-#ifdef WLAN_FEATURE_11BN
-	DOT11BN = 32
-#endif
 
-	/* MAX_FEATURE_SUPPORTED = 33 */
+	/* MAX_FEATURE_SUPPORTED = 32 */
 };
 
 /* / Mailbox Message Structure Define */
@@ -161,14 +157,12 @@ typedef struct sSirMbMsg {
  * struct sir_mgmt_msg - Structure used to send auth frame from CSR to LIM
  * @type: Message type
  * @msg_len: Message length
- * @cookie: nl80211 cookie for mgmt tx status
  * @vdev_id: vdev id
  * @data: Pointer to data tobe transmitted
  */
 struct sir_mgmt_msg {
 	uint16_t type;
 	uint16_t msg_len;
-	uint64_t cookie;
 	uint8_t vdev_id;
 	uint8_t *data;
 };
@@ -319,7 +313,6 @@ enum halmsgtype {
 #ifdef FEATURE_WLAN_TDLS
 	/* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 174) is not used */
 	SIR_HAL_UPDATE_TDLS_PEER_STATE    = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 175),
-	SIR_HAL_UPDATE_TDLS_OFF_CHAN_MODE = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 176),
 #endif
 	/* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 176 -> 178) are not used */
 	SIR_HAL_BEACON_TX_SUCCESS_IND     = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 179),
@@ -543,9 +536,6 @@ enum halmsgtype {
 /* Indication from HAL to handle RX invalid peer */
 #define SIR_LIM_RX_INVALID_PEER        (SIR_LIM_ITC_MSG_TYPES_BEGIN + 0x15)
 
-#define SIR_LIM_SEND_BCN_TMPL_IN_CAC   (SIR_LIM_ITC_MSG_TYPES_BEGIN + 0x16)
-#define SIR_LIM_SET_CAC_CHAN_SWITCH_INFO (SIR_LIM_ITC_MSG_TYPES_BEGIN + 0x17)
-
 /* LIM Timeout messages */
 #define SIR_LIM_TIMEOUT_MSG_START      ((SIR_LIM_MODULE_ID << 8) + 0xD0)
 #define SIR_LIM_JOIN_FAIL_TIMEOUT      (SIR_LIM_TIMEOUT_MSG_START + 2)
@@ -568,7 +558,7 @@ enum halmsgtype {
 /* currently unused                     (SIR_LIM_TIMEOUT_MSG_START + 0x25) */
 
 #define SIR_LIM_DISASSOC_ACK_TIMEOUT       (SIR_LIM_TIMEOUT_MSG_START + 0x26)
-#define SIR_LIM_DEAUTH_ACK_TIMEOUT       (SIR_LIM_TIMEOUT_MSG_START + 0x27)
+/*#define SIR_LIM_DEAUTH_ACK_TIMEOUT       (SIR_LIM_TIMEOUT_MSG_START + 0x27) */
 #define SIR_LIM_PERIODIC_JOIN_PROBE_REQ_TIMEOUT \
 					 (SIR_LIM_TIMEOUT_MSG_START + 0x28)
 

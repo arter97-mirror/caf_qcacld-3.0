@@ -78,7 +78,6 @@
 #include <wlan_hdd_sysfs_dp_stc.h>
 #include <wlan_hdd_sysfs_dl_modes.h>
 #include <wlan_hdd_sysfs_swlm.h>
-#include <wlan_hdd_sysfs_dp_dal.h>
 #include <wlan_hdd_sysfs_dump_in_progress.h>
 #include <wlan_hdd_sysfs_txrx_stats_console.h>
 #include <wlan_hdd_sysfs_add_timestamp.h>
@@ -88,6 +87,7 @@
 #include <wlan_hdd_sysfs_get_freq_for_pwr.h>
 #include <wlan_hdd_sysfs_dp_tx_delay_stats.h>
 #include <wlan_hdd_sysfs_wifi_features.h>
+#include <wlan_hdd_sysfs_dp_traffic_end_indication.h>
 #include <wlan_hdd_sysfs_eht_rate.h>
 #include <wlan_hdd_sysfs_direct_link_ut_cmd.h>
 #include <wlan_hdd_sysfs_runtime_pm.h>
@@ -97,13 +97,8 @@
 #include <wlan_hdd_sysfs_roam_trigger_bitmap.h>
 #include <wlan_hdd_sysfs_bitrates.h>
 #include <wlan_hdd_sysfs_rf_test_mode.h>
-#include <wlan_hdd_sysfs_power_datapath_stats.h>
-#include <wlan_hdd_sysfs_smd_roam_config.h>
 #include "wlan_module_ids.h"
 #include <wlan_coex_ucfg_api.h>
-#include <wlan_hdd_sysfs_apfmode.h>
-#include <wlan_hdd_sysfs_tas.h>
-#include <target_if.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -178,18 +173,10 @@ static ssize_t show_driver_version(struct kobject *kobj,
 static ssize_t __show_fw_version(struct hdd_context *hdd_ctx,
 				 char *buf)
 {
-	uint8_t reg_major = 0, reg_minor = 0, bdf_major = 0, bdf_minor = 0;
-	struct target_psoc_info *tgt_hdl;
-
 	hdd_debug("Rcvd req for FW version");
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(hdd_ctx->psoc);
-	if (tgt_hdl)
-		target_psoc_get_version_info(tgt_hdl, &reg_major, &reg_minor,
-					     &bdf_major, &bdf_minor);
-
 	return scnprintf(buf, PAGE_SIZE,
-			 "FW:%d.%d.%d.%d.%d.%d HW:%s Board version: %x Ref design id: %x Customer id: %x Project id: %x Board Data Rev: %x REG DB: %u:%u\n",
+			 "FW:%d.%d.%d.%d.%d.%d HW:%s Board version: %x Ref design id: %x Customer id: %x Project id: %x Board Data Rev: %x\n",
 			 hdd_ctx->fw_version_info.major_spid,
 			 hdd_ctx->fw_version_info.minor_spid,
 			 hdd_ctx->fw_version_info.siid,
@@ -201,8 +188,7 @@ static ssize_t __show_fw_version(struct hdd_context *hdd_ctx,
 			 hdd_ctx->hw_bd_info.ref_design_id,
 			 hdd_ctx->hw_bd_info.customer_id,
 			 hdd_ctx->hw_bd_info.project_id,
-			 hdd_ctx->hw_bd_info.board_data_rev,
-			 reg_major, reg_minor);
+			 hdd_ctx->hw_bd_info.board_data_rev);
 }
 
 static ssize_t show_fw_version(struct kobject *kobj,
@@ -262,7 +248,6 @@ static void hdd_power_debugstats_cb(struct power_stats_response *response,
 
 	/* copy fixed-sized data */
 	priv->power_stats = *response;
-	priv->power_stats.debug_registers = NULL;
 
 	/* copy variable-size data */
 	if (response->num_debug_register) {
@@ -568,7 +553,7 @@ static void hdd_sysfs_create_version_interface(struct wlan_objmgr_psoc *psoc)
 	}
 
 	psoc_id = wlan_psoc_get_nif_phy_version(psoc);
-	scnprintf(buf, MAX_PSOC_ID_SIZE, "%d", psoc_id);
+	scnprintf(buf, PAGE_SIZE, "%d", psoc_id);
 
 	psoc_kobject = kobject_create_and_add(buf, fw_kobject);
 	if (!psoc_kobject) {
@@ -961,16 +946,6 @@ void hdd_destroy_rtpm_interface_sysfs_file(void)
 	hdd_sysfs_destroy_rtpm_interface(wifi_kobject);
 }
 
-void hdd_create_apfmode_interface_sysfs_file(void)
-{
-	hdd_sysfs_create_apfmode_interface(wifi_kobject);
-}
-
-void hdd_destroy_apfmode_interface_sysfs_file(void)
-{
-	hdd_sysfs_destroy_apfmode_interface(wifi_kobject);
-}
-
 int hdd_sysfs_print(void *ctx, const char *fmt, ...)
 {
 	va_list args;
@@ -1231,17 +1206,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_sta_bitrates_create(adapter);
-	hdd_sysfs_power_datapath_stats_create(adapter);
 	hdd_sysfs_ipa_create(adapter);
-	hdd_sysfs_smd_roam_config_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
-	hdd_sysfs_smd_roam_config_destroy(adapter);
 	hdd_sysfs_ipa_destroy(adapter);
-	hdd_sysfs_power_datapath_stats_destroy(adapter);
 	hdd_sysfs_sta_bitrates_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
@@ -1298,19 +1269,19 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dl_modes_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
+	hdd_sysfs_dp_traffic_end_indication_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_dfsnol_create(adapter);
 	hdd_sysfs_sap_bitrates_create(adapter);
-	hdd_sysfs_power_datapath_stats_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 {
-	hdd_sysfs_power_datapath_stats_destroy(adapter);
 	hdd_sysfs_sap_bitrates_destroy(adapter);
 	hdd_sysfs_dfsnol_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
+	hdd_sysfs_dp_traffic_end_indication_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
 	hdd_sysfs_dl_modes_destroy(adapter);
@@ -1353,24 +1324,8 @@ hdd_sysfs_destroy_monitor_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_txrx_stats_destroy(adapter);
 }
 
-static void
-hdd_sysfs_create_passthru_adapter_root_obj(struct hdd_adapter *adapter)
-{
-	hdd_sysfs_txrx_stats_create(adapter);
-}
-
-static void
-hdd_sysfs_destroy_passthru_adapter_root_obj(struct hdd_adapter *adapter)
-{
-	hdd_sysfs_txrx_stats_destroy(adapter);
-}
-
 void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 {
-	struct kobject *kobj = NULL;
-
-	kobj = pld_get_wifi_kobj(NULL);
-
 	hdd_sysfs_create_driver_root_obj();
 	hdd_sysfs_create_version_interface(hdd_ctx->psoc);
 	hdd_sysfs_mem_stats_create(wlan_kobject);
@@ -1378,10 +1333,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_create_powerstats_interface();
 		hdd_sysfs_create_max_chipset_log_size_interface(wifi_kobject,
 								hdd_ctx);
-		if (!kobj)
-			hdd_sysfs_create_dump_in_progress_interface(
-								  wifi_kobject,
-								  hdd_ctx);
+		hdd_sysfs_create_dump_in_progress_interface(wifi_kobject);
 		hdd_sysfs_fw_mode_config_create(driver_kobject);
 		hdd_sysfs_scan_disable_create(driver_kobject);
 		hdd_sysfs_wow_ito_create(driver_kobject);
@@ -1404,30 +1356,18 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_wds_mode_create(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
 		hdd_sysfs_rf_test_mode_create(driver_kobject);
-		hdd_sysfs_tas_create(driver_kobject);
 		hdd_sysfs_create_logging_config_interface(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_create(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_create(driver_kobject);
-		hdd_sysfs_apfmode_create(driver_kobject);
-		hdd_sysfs_dp_dal_create(driver_kobject);
-		hdd_sysfs_create_enhance_chipset_logging_interface(
-							wifi_kobject, hdd_ctx);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
-	struct kobject *kobj = NULL;
-
-	kobj = pld_get_wifi_kobj(NULL);
-
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
-		hdd_sysfs_destroy_enhance_chipset_logging_interface(
-								wifi_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_destroy(driver_kobject);
 		hdd_sysfs_destroy_logging_config_interface(driver_kobject);
-		hdd_sysfs_tas_destroy(driver_kobject);
 		hdd_sysfs_rf_test_mode_destroy(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
 		hdd_sysfs_wds_mode_destroy(driver_kobject);
@@ -1450,14 +1390,9 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_wow_ito_destroy(driver_kobject);
 		hdd_sysfs_scan_disable_destroy(driver_kobject);
 		hdd_sysfs_fw_mode_config_destroy(driver_kobject);
-		if (!kobj)
-			hdd_sysfs_destroy_dump_in_progress_interface(
-								  wifi_kobject);
+		hdd_sysfs_destroy_dump_in_progress_interface(wifi_kobject);
 		hdd_sysfs_destroy_max_chipset_log_size_interface(wifi_kobject);
 		hdd_sysfs_destroy_powerstats_interface();
-		hdd_sysfs_apfmode_destroy(driver_kobject);
-		hdd_sysfs_dp_dal_destroy(driver_kobject);
-
 	}
 	hdd_sysfs_mem_stats_destroy(wlan_kobject);
 	hdd_sysfs_destroy_version_interface();
@@ -1514,9 +1449,6 @@ void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 	case QDF_NDI_MODE:
 		hdd_sysfs_create_ndi_adapter_root_obj(adapter);
 		break;
-	case QDF_PASSTHRU_MODE:
-		hdd_sysfs_create_passthru_adapter_root_obj(adapter);
-		break;
 	default:
 		break;
 	}
@@ -1554,9 +1486,6 @@ void hdd_destroy_adapter_sysfs_files(struct hdd_adapter *adapter)
 		break;
 	case QDF_NDI_MODE:
 		hdd_sysfs_destroy_ndi_adapter_root_obj(adapter);
-		break;
-	case QDF_PASSTHRU_MODE:
-		hdd_sysfs_destroy_passthru_adapter_root_obj(adapter);
 		break;
 	default:
 		break;

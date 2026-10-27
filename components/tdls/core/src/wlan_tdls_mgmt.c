@@ -166,10 +166,7 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct tdls_vdev_priv_obj *tdls_vdev;
-	/*
-	 * expect response number - only count vdevs with
-	 * active discovery timers
-	 */
+	/* expect response number */
 	int expect_num = 0;
 	/* received response number */
 	int receive_num = 0;
@@ -181,38 +178,23 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 		if (!mlo_vdev)
 			continue;
 
-		if (wlan_vdev_mlme_get_opmode(mlo_vdev) != QDF_STA_MODE)
+		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 			continue;
 
-		if (!wlan_cm_is_vdev_connected(mlo_vdev))
-			continue;
+		expect_num++;
 
 		tdls_vdev =
 		     wlan_objmgr_vdev_get_comp_private_obj(mlo_vdev,
 							   WLAN_UMAC_COMP_TDLS);
-		if (!tdls_vdev)
-			continue;
-
-		/*
-		 * Only count vdevs that have discovery timer running
-		 * (i.e., sent discovery request)
-		 */
-		if (QDF_TIMER_STATE_RUNNING ==
-		    qdf_mc_timer_get_current_state(&tdls_vdev->peer_discovery_timer)) {
-			tdls_debug("vdev:%d peer discovery timer is running",
-				   wlan_vdev_get_id(mlo_vdev));
-			expect_num++;
-		}
-
-		if (tdls_vdev->rx_mgmt) {
-			tdls_debug("vdev:%d Discovery response cached",
-				   wlan_vdev_get_id(mlo_vdev));
+		if (tdls_vdev->rx_mgmt)
 			receive_num++;
-		}
 	}
 
-	/* The current rx frame is not cached in rx_mgmt yet, hence +1 */
-	return (expect_num > (receive_num + 1));
+	/* +1 means the one received last has not been recorded */
+	if (expect_num > receive_num + 1)
+		return true;
+	else
+		return false;
 }
 
 struct wlan_objmgr_vdev *
@@ -271,11 +253,6 @@ static struct tdls_vdev_priv_obj
 	if (!tdls_vdev || !rx_mgmt)
 		return NULL;
 
-	if (rx_mgmt->frame_len < TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET) {
-		tdls_err("TDLS MLO: frame too short %u", rx_mgmt->frame_len);
-		return tdls_vdev;
-	}
-
 	ies = &rx_mgmt->buf[TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET];
 	ie_len = rx_mgmt->frame_len - TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET;
 
@@ -284,16 +261,6 @@ static struct tdls_vdev_priv_obj
 								  ies, ie_len);
 	if (!linkid_ie)
 		return tdls_vdev;
-
-	if ((const uint8_t *)linkid_ie + sizeof(*linkid_ie) > ies + ie_len) {
-		tdls_err("TDLS MLO: link id IE truncated");
-		return tdls_vdev;
-	}
-
-	if (linkid_ie->len < (sizeof(*linkid_ie) - 2)) {
-		tdls_err("TDLS MLO: link id IE too short %u", linkid_ie->len);
-		return tdls_vdev;
-	}
 
 	pdev = wlan_vdev_get_pdev(tdls_vdev->vdev);
 	if (!pdev)
@@ -330,23 +297,13 @@ static bool tdls_check_peer_mlo_dev(struct wlan_objmgr_vdev *vdev,
 	if (!vdev || !rx_mgmt)
 		return QDF_STATUS_E_INVAL;
 
-	if (rx_mgmt->frame_len < TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET) {
-		tdls_err("TDLS MLO: frame too short %u", rx_mgmt->frame_len);
-		return false;
-	}
-
 	ies = &rx_mgmt->buf[TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET];
 	ie_len = rx_mgmt->frame_len - TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET;
 
 	ie = wlan_get_ie_ptr_from_eid(elem_id_param, ies, ie_len);
-	if (ie) {
-		uint32_t rem = ie_len - (uint32_t)(ie - ies);
-
-		if (rem >= 2 && (uint32_t)ie[1] + 2 <= rem)
-			qdf_trace_hex_dump(QDF_MODULE_ID_TDLS,
-					   QDF_TRACE_LEVEL_DEBUG,
-					   (void *)ie, (uint32_t)ie[1] + 2);
-	}
+	if (ie)
+		qdf_trace_hex_dump(QDF_MODULE_ID_TDLS, QDF_TRACE_LEVEL_DEBUG,
+				   (void *)&ie[0], ie[1] + 2);
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(&ext_id_param,
 					     1, ies, ie_len);
@@ -366,7 +323,7 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	bool peer_mlo;
-	bool wait_further = false;
+	bool waitmore = false;
 	uint8_t i;
 
 	vdev = tdls_vdev->vdev;
@@ -408,26 +365,28 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	tdls_vdev = tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
 	status = QDF_STATUS_TDLS_MLO_SYNC;
 	if (!tdls_vdev || tdls_vdev->rx_mgmt) {
-		tdls_err("Received duplicate tdls discovery resp on same vdev %d",
-			 tdls_vdev ? wlan_vdev_get_id(tdls_vdev->vdev) : WLAN_INVALID_VDEV_ID);
+		tdls_err("rx dup tdls discovery resp on same vdev:%d",
+			 wlan_vdev_get_id(tdls_vdev->vdev));
 		return status;
 	}
 
-	qdf_mem_free(tdls_vdev->rx_mgmt);
-	tdls_vdev->rx_mgmt = NULL;
+	if (qdf_atomic_read(&tdls_soc->timer_cnt) == 1)
+		waitmore = tdls_check_wait_more(vdev);
 
-	/* Wait for discovery response from all the active links */
-	wait_further = tdls_check_wait_more(vdev);
-	if (wait_further) {
+	if (waitmore) {
 		/* do not stop the timer */
 		tdls_debug("vdev:%d wait further for tdls response",
 			   wlan_vdev_get_id(vdev));
 	} else {
 		tdls_vdev->discovery_sent_cnt = 0;
 		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
+		qdf_atomic_dec(&tdls_soc->timer_cnt);
 	}
 
-	qdf_atomic_dec(&tdls_soc->timer_cnt);
+	if (tdls_vdev->rx_mgmt) {
+		qdf_mem_free(tdls_vdev->rx_mgmt);
+		tdls_vdev->rx_mgmt = NULL;
+	}
 
 	tdls_vdev->rx_mgmt = qdf_mem_malloc_atomic(sizeof(*rx_mgmt) +
 						   rx_mgmt->frame_len);
@@ -597,8 +556,8 @@ static QDF_STATUS tdls_process_rx_mgmt(
 		else
 			tdls_debug("rx mgmt, but no valid up layer callback");
 
-		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
 		tdls_recv_discovery_resp(tdls_vdev, mac);
+		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
 		goto end;
 	}
 
@@ -723,88 +682,6 @@ static QDF_STATUS tdls_activate_send_mgmt_request_flush_cb(
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * tdls_start_all_discovery_timers() - Start discovery timers for all MLO links
- * @action_req: TDLS action frame request
- *
- * For MLO connections, start discovery response wait timers for all links
- * simultaneously when sending discovery request. This ensures that responses
- * from all links are collected before forwarding the best one to supplicant.
- *
- * Return: None
- */
-static void tdls_start_all_discovery_timers(
-				struct tdls_action_frame_request *action_req)
-{
-	struct tdls_vdev_priv_obj *tdls_vdev;
-	struct tdls_soc_priv_obj *tdls_soc_obj;
-	struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
-	uint16_t vdev_count = 0;
-	uint8_t i;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(action_req->vdev))
-		return;
-
-	tdls_soc_obj = wlan_vdev_get_tdls_soc_obj(action_req->vdev);
-	if (!tdls_soc_obj)
-		return;
-
-	/* Get all vdevs in the MLO connection */
-	mlo_get_ml_vdev_list(action_req->vdev, &vdev_count, vdev_list);
-	if (!vdev_count) {
-		tdls_debug("No ML vdevs found");
-		return;
-	}
-
-	tdls_debug("Starting discovery timers for %d ML links", vdev_count);
-
-	/* Start timer for each vdev/link */
-	for (i = 0; i < vdev_count; i++) {
-		if (!vdev_list[i])
-			continue;
-
-		/*
-		 * On non-DBS (single MAC) hardware only one ML STA link is
-		 * active at a time, so skip starting the discovery timer on
-		 * links that are not currently active.
-		 */
-		if (!ucfg_mlo_is_mlo_vdev_active(vdev_list[i])) {
-			tdls_debug("Skip discovery timer on inactive vdev %d",
-				   wlan_vdev_get_id(vdev_list[i]));
-			mlo_release_vdev_ref(vdev_list[i]);
-			continue;
-		}
-
-		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev_list[i]);
-		if (!tdls_vdev) {
-			mlo_release_vdev_ref(vdev_list[i]);
-			continue;
-		}
-
-		if (QDF_TIMER_STATE_RUNNING !=
-		    qdf_mc_timer_get_current_state(
-					&tdls_vdev->peer_discovery_timer)) {
-			tdls_timer_restart(
-					vdev_list[i],
-					&tdls_vdev->peer_discovery_timer,
-					TDLS_DISCOVERY_TIMEOUT_BEFORE_UPDATE);
-			qdf_atomic_inc(&tdls_soc_obj->timer_cnt);
-			tdls_debug("Started discovery timer on vdev %d, timer_cnt now %d",
-				   wlan_vdev_get_id(vdev_list[i]),
-				   qdf_atomic_read(&tdls_soc_obj->timer_cnt));
-		}
-
-		mlo_release_vdev_ref(vdev_list[i]);
-	}
-}
-#else
-static inline void tdls_start_all_discovery_timers(
-				struct tdls_action_frame_request *action_req)
-{
-}
-#endif
-
 static QDF_STATUS
 tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 {
@@ -813,6 +690,7 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 	struct tdls_send_mgmt_request *tdls_mgmt_req;
 	struct wlan_objmgr_peer *peer;
 	struct scheduler_msg msg = {0};
+	struct tdls_vdev_priv_obj *tdls_vdev;
 
 	if (!action_req || !action_req->vdev)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -830,7 +708,7 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 		goto release_cmd;
 	}
 
-	tdls_debug("vdev_id %d "
+	tdls_debug("session_id %d "
 		   "tdls_mgmt.dialog %d "
 		   "tdls_mgmt.frame_type %d "
 		   "tdls_mgmt.status_code %d "
@@ -881,15 +759,27 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 
 	if (wlan_vdev_mlme_is_mlo_vdev(action_req->vdev) &&
 	    !tdls_mlo_get_tdls_link_vdev(action_req->vdev) &&
-	    tdls_mgmt_req->req_type == TDLS_DISCOVERY_REQUEST)
-		/* Start discovery timers for all ML links simultaneously */
-		tdls_start_all_discovery_timers(action_req);
+	    tdls_mgmt_req->req_type == TDLS_DISCOVERY_REQUEST) {
+		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(action_req->vdev);
+		if (QDF_TIMER_STATE_RUNNING !=
+		    qdf_mc_timer_get_current_state(
+					  &tdls_vdev->peer_discovery_timer)) {
+			tdls_timer_restart(tdls_vdev->vdev,
+				     &tdls_vdev->peer_discovery_timer,
+				     tdls_vdev->threshold_config.tx_period_t -
+				     TDLS_DISCOVERY_TIMEOUT_ERE_UPDATE);
+			qdf_atomic_inc(&tdls_soc_obj->timer_cnt);
+		} else {
+			qdf_mem_free(tdls_mgmt_req);
+			status = QDF_STATUS_E_NULL_VALUE;
+			goto release_cmd;
+		}
+	}
 
 	/* Send the request to PE. */
 	qdf_mem_zero(&msg, sizeof(msg));
 
-	tdls_debug("vdev:%d sending TDLS Mgmt Frame req to PE",
-		   action_req->vdev_id);
+	tdls_debug("sending TDLS Mgmt Frame req to PE ");
 	tdls_mgmt_req->message_type = tdls_soc_obj->tdls_send_mgmt_req;
 
 	msg.type = tdls_soc_obj->tdls_send_mgmt_req;
@@ -982,25 +872,7 @@ QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 
 
 	if (req->tdls_mgmt.frame_type == TDLS_DISCOVERY_RESPONSE ||
-	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST ||
-	    req->tdls_mgmt.frame_type == TDLS_SETUP_REQUEST ||
-	    req->tdls_mgmt.frame_type == TDLS_SETUP_RESPONSE ||
-	    req->tdls_mgmt.frame_type == TDLS_SETUP_CONFIRM) {
-		/*
-		 * On non-DBS (single MAC) hardware only one ML STA link can be
-		 * active at a time and TDLS always operates on the currently
-		 * active link. Sending a FORCE_MODE_ACTIVE WMI command here is
-		 * unnecessary and harmful: wlan_vdev_get_link_id() returns the
-		 * IEEE link ID of the TDLS vdev (e.g. link_id=1 for the 5 GHz
-		 * link), so the bitmap 1<<link_id is the *partner* link's IEEE
-		 * link ID, which wrongly forces the dormant link active and
-		 * creates a spurious 5 GHz + 2 GHz MCC condition.
-		 */
-		if (!policy_mgr_is_hw_dbs_capable(psoc)) {
-			req->link_active = true;
-			return QDF_STATUS_SUCCESS;
-		}
-
+	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST) {
 		status = policy_mgr_is_ml_links_in_mcc_allowed(
 						psoc, req->vdev,
 						ml_sta_vdev_lst,

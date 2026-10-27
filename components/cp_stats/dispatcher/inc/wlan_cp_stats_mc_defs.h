@@ -45,6 +45,8 @@
 
 #endif /* WLAN_SUPPORT_TWT */
 
+#define MAX_NUM_CHAINS              2
+
 #define MAX_MIB_STATS               1
 
 #define IS_MSB_SET(__num) ((__num) & BIT(31))
@@ -64,11 +66,6 @@
  * @TYPE_PEER_STATS_INFO_EXT: peer stats info ext was requested
  * @TYPE_CONGESTION_STATS: congestion stats was requested
  * @TYPE_BIG_DATA_STATS: big data stats was requested
- * @TYPE_POWER_DATAPATH_STATS: power datapath stats was requested
- * @TYPE_QSH_SCAN_STATS: QSH scan stats was requested
- * @TYPE_COEX_STATS: coex stats requested
- * @TYPE_TAS_METRICS: TAS avg TX power metrics requested
- * @TYPE_TAS_CURRENT_PLIMIT: TAS effective per-chain power limits requested
  * @TYPE_MAX: maximum value
  */
 enum stats_req_type {
@@ -79,13 +76,6 @@ enum stats_req_type {
 	TYPE_PEER_STATS_INFO_EXT,
 	TYPE_CONGESTION_STATS,
 	TYPE_BIG_DATA_STATS,
-	TYPE_POWER_DATAPATH_STATS,
-	TYPE_QSH_SCAN_STATS,
-	TYPE_COEX_STATS,
-#ifdef WLAN_FEATURE_CTAS
-	TYPE_TAS_METRICS,
-	TYPE_TAS_CURRENT_PLIMIT,
-#endif /* WLAN_FEATURE_CTAS */
 	TYPE_MAX,
 };
 
@@ -109,11 +99,6 @@ enum stats_req_type {
  * @TX_RATE_EHT80: EHT 80 rates
  * @TX_RATE_EHT160: EHT 160 rates
  * @TX_RATE_EHT320: EHT 320 rates
- * @TX_RATE_UHR20: UHR 20 rates
- * @TX_RATE_UHR40: UHR 40 rates
- * @TX_RATE_UHR80: UHR 80 rates
- * @TX_RATE_UHR160: UHR 160 rates
- * @TX_RATE_UHR320: UHR 320 rates
  */
 enum tx_rate_info {
 	TX_RATE_LEGACY = 0x1,
@@ -134,13 +119,6 @@ enum tx_rate_info {
 	TX_RATE_EHT80 = 0x8000,
 	TX_RATE_EHT160 = 0x10000,
 	TX_RATE_EHT320 = 0x20000,
-#ifdef WLAN_FEATURE_11BN
-	TX_RATE_UHR20  = 0x40000,
-	TX_RATE_UHR40  = 0x80000,
-	TX_RATE_UHR80  = 0x100000,
-	TX_RATE_UHR160 = 0x200000,
-	TX_RATE_UHR320 = 0x400000,
-#endif
 };
 
 /**
@@ -166,7 +144,6 @@ enum txrate_gi {
  * @ipv6_mcast_ra_stats:        ipv6 multicast ra stats
  * @ipv6_mcast_ns_stats:        ipv6 multicast ns stats
  * @ipv6_mcast_na_stats:        ipv6 multicast na stats
- * @ipv6_mcast_mlq_stats:	ipv6 multicast mlq stats
  * @icmpv4_count:               ipv4 icmp packet count
  * @icmpv6_count:               ipv6 icmp packet count
  * @rssi_breach_wake_up_count:  rssi breach wakeup count
@@ -196,7 +173,6 @@ struct wake_lock_stats {
 	uint32_t ipv6_mcast_ra_stats;
 	uint32_t ipv6_mcast_ns_stats;
 	uint32_t ipv6_mcast_na_stats;
-	uint32_t ipv6_mcast_mlq_stats;
 	uint32_t icmpv4_count;
 	uint32_t icmpv6_count;
 	uint32_t rssi_breach_wake_up_count;
@@ -262,77 +238,17 @@ struct medium_assess_data {
 	uint32_t my_rx_count;
 };
 
-#ifdef WLAN_FEATURE_CTAS
-/**
- * struct wlan_tas_chain_metrics - per-chain TX power region (GET_METRICS)
- * @chain_no: antenna chain number
- * @chain_operating_band: 0=2GHz, 1=5GHz, 2=6GHz
- * @chain_power_region: 0=invalid,1=low,2=medium,3=high,4=extra_high
- */
-struct wlan_tas_chain_metrics {
-	uint32_t chain_no;
-	uint32_t chain_operating_band;
-	uint32_t chain_power_region;
-};
-
-/**
- * struct wlan_tas_metrics_event - abstracted GET_METRICS response
- * @fw_status: 0=success, 1=failure
- * @time_window_in_sec: regulatory measurement time window
- * @num_chains: number of valid entries in @chains
- * @chains: per-chain power region data
- */
-struct wlan_tas_metrics_event {
-	uint32_t fw_status;
-	uint32_t time_window_in_sec;
-	uint32_t num_chains;
-	struct wlan_tas_chain_metrics chains[WLAN_TAS_MAX_CHAINS];
-};
-
-/**
- * struct wlan_tas_chain_plimit - per-chain TX power limit (GET_PLIMIT)
- * @chain_no: antenna chain number
- * @chain_operating_band: 0=2GHz, 1=5GHz, 2=6GHz
- * @power_limit_dbm: power limit in units of 0.25 dBm (signed)
- */
-struct wlan_tas_chain_plimit {
-	uint32_t chain_no;
-	uint32_t chain_operating_band;
-	int32_t  power_limit_dbm;
-};
-
-/**
- * struct wlan_tas_plimit_event - abstracted GET_PLIMIT response
- * @fw_status: 0=success, 1=failure
- * @dsi_id: Device State Index for which limits are filled
- * @num_chains: number of valid entries in @chains
- * @chains: per-chain power limit data
- */
-struct wlan_tas_plimit_event {
-	uint32_t fw_status;
-	uint32_t dsi_id;
-	uint32_t num_chains;
-	struct wlan_tas_chain_plimit chains[WLAN_TAS_MAX_CHAINS];
-};
-#endif /* WLAN_FEATURE_CTAS */
-
 /**
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
- *     station stats/mib stats/peer stats/coex policy stats/
- *     power datapath stats request when response comes and congestion
- *     notification callback.
+ *     station stats/mib stats/peer stats request when response comes and
+ *     congestion notification callback.
  * @vdev_id: vdev_id of request
  * @pdev_id: pdev_id of request
  * @peer_mac_addr: peer mac address
  * @ml_vdev_info: mlo_stats_vdev_params structure
  * @ml_peer_mac_addr: Array of ml peer mac addresses
- * @power_dp_operation: Power datapath operation type (0=disable, 1=enable,
- *                      2=retrieve)
- * @power_dp_stats_type: Power datapath stats type (0x01=power, 0x02=datapath,
- *                       0x03=all)
- * @power_dp_core_index: Power datapath core index (0=MAC0, 0xFF=all MACs)
  */
 struct request_info {
 	void *cookie;
@@ -348,27 +264,9 @@ struct request_info {
 		void (*congestion_notif_cb)(uint8_t vdev_id,
 					  struct medium_assess_data *data,
 					  bool last);
-		void (*get_coex_stats_cb)(struct wlan_coex_policy_stats *stats,
-					  void *cookie);
-#ifdef WLAN_FEATURE_CTAS
-		void (*get_tas_metrics_cb)(struct wlan_tas_metrics_event *ev,
-					   void *cookie);
-		void (*get_tas_current_plimit_cb)(
-				struct wlan_tas_plimit_event *ev,
-				void *cookie);
-#endif /* WLAN_FEATURE_CTAS */
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
 					      void *cookie);
-#endif
-#ifdef WLAN_FEATURE_QSH_SCAN
-		void (*get_qsh_stats_cb)(struct qsh_stats_event *ev,
-					 void *cookie);
-#endif
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-		void (*get_power_stats_cb)(
-			struct cp_stats_power_datapath_info *ev,
-			void *cookie);
 #endif
 	} u;
 	uint32_t vdev_id;
@@ -377,11 +275,6 @@ struct request_info {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct mlo_stats_vdev_params ml_vdev_info;
 	uint8_t ml_peer_mac_addr[WLAN_UMAC_MLO_MAX_VDEVS][QDF_MAC_ADDR_SIZE];
-#endif
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-	uint32_t power_dp_operation;
-	uint32_t power_dp_stats_type;
-	uint32_t power_dp_core_index;
 #endif
 };
 
@@ -504,104 +397,6 @@ struct per_channel_stats {
 		 channel_status_list[NUM_CHANNELS];
 };
 
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-/**
- * struct cp_stats_power_info - CP stats power information
- * @core_index: Core index (PDEV ID)
- * @radio_on_time: Time radio was on (ms)
- * @radio_off_time: Time radio was off (ms)
- * @wlan_pwr_on_time: WLAN power on time (ms)
- * @tx_time: ms duration radio is in continuous transmit state
- * @rx_time: ms duration radio is in continuous receiving state
- * @sleep_levels_num: Number of sleep levels being sent to host
- * @sleep_time_per_levels: Sleep time per level array (ms)
- */
-struct cp_stats_power_info {
-	uint32_t core_index;
-	uint32_t radio_on_time;
-	uint32_t radio_off_time;
-	uint32_t wlan_pwr_on_time;
-	uint32_t tx_time;
-	uint32_t rx_time;
-	uint32_t sleep_levels_num;
-	uint32_t sleep_time_per_levels[WMI_MAX_SLEEP_LEVELS];
-};
-
-/**
- * struct cp_stats_tx_rate_info - CP stats TX rate info
- * @core_index: Core index
- * @rate_index: Rate index
- * @band: Band (2.4GHz/5GHz/6GHz)
- * @bw: Bandwidth
- * @nss: Number of spatial streams
- * @count: Packet count
- * @tx_retry_count: TX retry count (accumulated over time)
- */
-struct cp_stats_tx_rate_info {
-	uint32_t core_index;
-	uint32_t rate_index;
-	uint32_t band;
-	uint32_t bw;
-	uint32_t nss;
-	uint32_t count;
-	uint32_t tx_retry_count;
-};
-
-/**
- * struct cp_stats_rx_rate_info - CP stats RX rate info
- * @core_index: Core index
- * @rate_index: Rate index
- * @band: Band (2.4GHz/5GHz/6GHz)
- * @bw: Bandwidth
- * @nss: Number of spatial streams
- * @count: Packet count
- */
-struct cp_stats_rx_rate_info {
-	uint32_t core_index;
-	uint32_t rate_index;
-	uint32_t band;
-	uint32_t bw;
-	uint32_t nss;
-	uint32_t count;
-};
-
-/**
- * struct cp_stats_power_datapath_info - CP stats power and datapath info
- * @status: Status from firmware (0 = success, non-zero = error)
- * @stats_type_bitmap: Stats type bitmap indicating which stats are included
- * @wlan_soc_pwr_on_time: WLAN power on time (ms)
- * @wlan_soc_sleep_levels_num: Number of sleep levels supported. Could be less
- * than WMI_MAX_SLEEP_LEVELS based on the chip
- * @wlan_soc_sleep_time_per_level: soc sleep level. Same WMI_MAX_SLEEP_LEVELS
- * is used for sizing
- * @num_power_stats: Number of power stats entries (num_cores)
- * @num_tx_rate_stats: Number of TX rate stats entries
- * @num_rx_rate_stats: Number of RX rate stats entries
- * @power_stats: Power statistics array (dynamically allocated)
- * @power_stats_valid: Indicates if power_stats is valid
- * @tx_rate_stats: TX rate statistics array (dynamically allocated)
- * @tx_rate_stats_valid: Indicates if tx_rate_stats is valid
- * @rx_rate_stats: RX rate statistics array (dynamically allocated)
- * @rx_rate_stats_valid: Indicates if rx_rate_stats is valid
- */
-struct cp_stats_power_datapath_info {
-	uint32_t status;
-	uint32_t stats_type_bitmap;
-	uint32_t wlan_soc_pwr_on_time;
-	uint32_t wlan_soc_sleep_levels_num;
-	uint32_t wlan_soc_sleep_time_per_level[WMI_MAX_SLEEP_LEVELS];
-	uint32_t num_power_stats;
-	uint32_t num_tx_rate_stats;
-	uint32_t num_rx_rate_stats;
-	struct cp_stats_power_info *power_stats;
-	bool power_stats_valid;
-	struct cp_stats_tx_rate_info *tx_rate_stats;
-	bool tx_rate_stats_valid;
-	struct cp_stats_rx_rate_info *rx_rate_stats;
-	bool rx_rate_stats_valid;
-};
-#endif
-
 /**
  * struct pdev_mc_cp_stats: pdev specific stats
  * @max_pwr: max tx power for pdev
@@ -610,8 +405,6 @@ struct cp_stats_power_datapath_info {
  * @cycle_count: accumulative cycle count (total time) of pdev
  * @tx_frame_count: accumulative tx frame count (total time) of pdev
  * @chan_stats: per channel info stats
- * @power_datapath_stats: power and datapath statistics from firmware
- * @power_datapath_stats_valid: indicates if power_datapath_stats is valid
  */
 struct pdev_mc_cp_stats {
 	int32_t max_pwr;
@@ -620,10 +413,6 @@ struct pdev_mc_cp_stats {
 	uint32_t cycle_count;
 	uint32_t tx_frame_count;
 	struct per_channel_stats chan_stats;
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-	struct cp_stats_power_datapath_info power_datapath_stats;
-	bool power_datapath_stats_valid;
-#endif
 };
 
 /**
@@ -679,39 +468,11 @@ struct pmf_bcn_protect_stats {
  * @vdev_id: vdev_id of the event
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @vdev_tx_power: vdev tx power
- * @rx_time: msecs the radio is in active receive
- * @tx_time: msecs the radio is is transmitting
- * @on_time: msecs the radio is awake
- * @cca_time:msecs the CCA register is busy
  */
 struct vdev_summary_extd_stats {
 	uint8_t vdev_id;
 	bool is_mlo_vdev_active;
 	uint32_t vdev_tx_power;
-	uint32_t rx_time;
-	uint32_t tx_time;
-	uint32_t on_time;
-	uint32_t cca_time;
-};
-
-/**
- * struct bcn_his_info - beacon history info
- * @bcn_rssi: beacon rssi
- * @bcn_tsf: beacon tsf
- */
-struct bcn_his_info {
-	int32_t bcn_rssi;
-	uint32_t bcn_tsf;
-};
-
-/**
- * struct recv_bcn_stats - receive beacon stats
- * @vdev_id: vdev_id
- * @bcn_history: structure to bcn_his_info
- */
-struct recv_bcn_stats {
-	uint8_t vdev_id;
-	struct bcn_his_info bcn_history[WMI_MAX_BCN_HISTORY];
 };
 
 /**
@@ -722,18 +483,14 @@ struct recv_bcn_stats {
  * @vdev_summary_stats: vdev's summary stats
  * @pmf_bcn_stats: pmf beacon protect stats
  * @vdev_extd_stats: vdev summary extended stats
- * @num_recv_bcn_stats: number of beacon stats
- * @bcn_stats: beacon history report stats
  */
 struct vdev_mc_cp_stats {
 	struct cca_stats cca;
 	uint32_t tx_rate_flags;
-	int8_t chain_rssi[WLAN_MAX_VDEV_CHAINS];
+	int8_t chain_rssi[MAX_NUM_CHAINS];
 	struct summary_stats vdev_summary_stats;
 	struct pmf_bcn_protect_stats pmf_bcn_stats;
 	struct vdev_summary_extd_stats vdev_extd_stats;
-	uint32_t num_recv_bcn_stats;
-	struct recv_bcn_stats bcn_stats[WLAN_UMAC_MLO_MAX_VDEVS];
 };
 
 /**
@@ -952,17 +709,7 @@ struct summary_stats_event {
  */
 struct chain_rssi_event {
 	uint8_t vdev_id;
-	int8_t chain_rssi[WLAN_MAX_VDEV_CHAINS];
-};
-
-/**
- * struct qsh_stats_event - QSH scan stats event param
- * @scan_req_id: scan module id of the event
- * @scan_count: Wi-Fi scan count from sensor
- */
-struct qsh_stats_event {
-	uint8_t scan_req_id;
-	uint32_t scan_count;
+	int8_t chain_rssi[MAX_NUM_CHAINS];
 };
 
 /**
@@ -1044,8 +791,6 @@ struct peer_stats_info_ext_event {
  * @bcn_protect_stats: pmf bcn protect stats
  * @num_vdev_extd_stats: number of vdev extended stats
  * @vdev_extd_stats: if populated indicates array of ext summary stats per vdev
- * @num_recv_bcn_stats: number of bcn stats
- * @bcn_stats: if populated indicates receive beacon stats
  */
 struct stats_event {
 	uint32_t num_pdev_stats;
@@ -1077,8 +822,6 @@ struct stats_event {
 	struct pmf_bcn_protect_stats bcn_protect_stats;
 	uint32_t num_vdev_extd_stats;
 	struct vdev_summary_extd_stats *vdev_extd_stats;
-	uint32_t num_recv_bcn_stats;
-	struct recv_bcn_stats *bcn_stats;
 };
 
 /**

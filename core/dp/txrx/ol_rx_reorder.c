@@ -202,7 +202,7 @@ ol_rx_seq_num_check(struct ol_txrx_pdev_t *pdev,
 		 * b) Mcast packets are not aggregated & hence single
 		 * c) Result of b) is that, flush / release bit is set
 		 *    always on the mcast packets, so likely to be
-		 *    immediately released.
+		 *    immediatedly released.
 		 */
 		peer->tids_mcast_last_seq[pkt_tid] = seq_num;
 		return htt_rx_status_ok;
@@ -509,10 +509,8 @@ ol_rx_reorder_peer_cleanup(struct ol_txrx_vdev_t *vdev,
 	int tid;
 
 	for (tid = 0; tid < OL_TXRX_NUM_EXT_TIDS; tid++) {
-		qdf_spin_lock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 		ol_rx_reorder_flush(vdev, peer, tid, 0, 0,
 				    htt_rx_flush_discard);
-		qdf_spin_unlock_bh(&peer->tids_rx_reorder[tid].defrag_tid_lock);
 	}
 	OL_RX_REORDER_TIMEOUT_PEER_CLEANUP(peer);
 }

@@ -33,9 +33,6 @@
 #include <qdf_tracepoint.h>
 #include <qdf_pkt_add_timestamp.h>
 #include "wlan_dp_public_struct.h"
-#ifdef NDP_TX_BW_FLOW_CTRL
-#include "wlan_hdd_nan_datapath.h"
-#endif
 
 struct hdd_netif_queue_history;
 struct hdd_context;
@@ -97,20 +94,6 @@ struct hdd_context;
 netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /**
- * hdd_hard_start_xmit_passthru() - Transmit a frame in passthrough mode
- * @skb: pointer to OS packet
- * @dev: pointer to net_device structure
- *
- * Function for raw packet transmission without WMM admission control.
- * This version directly passes the packet to Transport Layer without
- * checking for FTM mode, getting AC/user priority, or WMM admission control.
- *
- * Return: Always returns NETDEV_TX_OK
- */
-netdev_tx_t hdd_hard_start_xmit_passthru(struct sk_buff *skb,
-					 struct net_device *dev);
-
-/**
  * hdd_tx_timeout() - Wrapper function to protect __hdd_tx_timeout from SSR
  * @dev: pointer to net_device structure
  * @txqueue: tx queue
@@ -136,22 +119,27 @@ void hdd_tx_timeout(struct net_device *dev);
  * Return: None
  */
 void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf);
-#else
-static inline
-void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf) { }
-
-#endif
 
 /**
  * hdd_get_tsf_time_cb() - HDD helper function to get TSF time
  * @netdev: netdev
- * @qtime: qtime
+ * @input_time: Input time
  * @tsf_time: time from TFS module
  *
  * Return: None
  */
-void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t qtime,
+void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
 			 uint64_t *tsf_time);
+#else
+static inline
+void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf) { }
+
+static inline
+void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
+			 uint64_t *tsf_time)
+{
+}
+#endif
 
 /**
  * hdd_legacy_gro_get_napi() - HDD function to get napi in legacy gro case
@@ -384,7 +372,6 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
 /**
  * wlan_hdd_dump_queue_history_state() - Dump hdd queue history states
  * @q_hist: pointer to hdd queue history structure
- * @num_tx_queues: number of tx queues
  * @buf: buffer where the queue history string is dumped
  * @size: size of the buffer
  *
@@ -394,8 +381,7 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
  */
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
-				  uint8_t num_tx_queues, char *buf,
-				  uint32_t size);
+				  char *buf, uint32_t size);
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 /**
@@ -411,60 +397,4 @@ static inline void wlan_hdd_set_tx_flow_info(void)
 {
 }
 #endif
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-/**
- * wlan_hdd_get_txq_info_for_ac() - Get tx queue information for access category
- * @adapter: pointer to hdd adapter
- * @ac: access category
- * @txq_base_idx: tx queue base index for ac
- * @num_queues: num of tx queues
- *
- * Return: None
- */
-void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
-				  enum hdd_wmm_linuxac ac,
-				  uint8_t *txq_base_idx, uint8_t *num_queues);
-#else
-static inline
-void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
-				  enum hdd_wmm_linuxac ac,
-				  uint8_t *txq_base_idx, uint8_t *num_queues)
-{
-	*num_queues = TX_QUEUES_PER_AC;
-	*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
-}
-#endif
-
-/**
- * wlan_hdd_qos_null_tx_compl_cb() - QoS NULL TX completion callback
- * @vdev_id: vdev id
- * @status: TX completion status
- * @ack_rssi: ACK RSSI in dBm
- * @ppdu_id: Hardware PPDU ID
- * @ieee_link_id_valid: IEEE link ID valid flag, true for valid for MLO
- * @ieee_link_id: IEEE link ID for MLO
- * @context: Callback context
- *
- * Return: void
- */
-void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
-				   int32_t ack_rssi, uint32_t ppdu_id,
-				   uint32_t ieee_link_id_valid,
-				   uint32_t ieee_link_id, void *context);
-
-#ifdef WLAN_FEATURE_ICMP_ITO_MGMT
-/**
- * hdd_icmp_ito_restore_timer_cb() - Timer callback to restore original ITO
- * @context: pointer to hdd_adapter
- *
- * This callback is invoked when no ICMP request is received for x seconds
- * after the power save mode was temporarily disabled. It restores the power
- * save mode to PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED.
- *
- * Return: None
- */
-void hdd_icmp_ito_restore_timer_cb(void *context);
-#endif
-
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

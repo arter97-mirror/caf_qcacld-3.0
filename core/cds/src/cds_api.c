@@ -36,7 +36,6 @@
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_tsf.h"
-#include "wlan_hdd_wds.h"
 #include <linux/vmalloc.h>
 #if (defined(__ANDROID_COMMON_KERNEL__) && \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)) && \
@@ -114,45 +113,6 @@ struct cds_hang_event_fixed_param {
 	char hang_event_version[HANG_EVENT_VER_LEN];
 } qdf_packed;
 
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-/**
- * cds_wds_ext_peer_learn() - Handle WDS extended peer learning
- * @ctrl_psoc: Control path PSOC object manager pointer
- * @peer_id: Peer ID of the learned peer
- * @vdev_id: VDEV ID on which the peer was learned
- * @peer_mac_addr: MAC address of the learned peer
- *
- * This function handles WDS (Wireless Distribution System) extended peer
- * learning by notifying the kernel about an unexpected 4-address frame
- * reception. When a 4-address frame is received from an unknown peer in
- * WDS mode, this function is called to inform the networking stack about
- * the new peer discovery.
- *
- * Return: None
- */
-static void cds_wds_ext_peer_learn(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-				   uint16_t peer_id, uint8_t vdev_id,
-				   uint8_t *peer_mac_addr)
-{
-	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)ctrl_psoc;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_WDS_ID);
-	if (!vdev) {
-		cds_err("vdev (id %d) is null", vdev_id);
-		return;
-	}
-
-	cds_debug("vdev %d, peer mac addr " QDF_MAC_ADDR_FMT,
-		  vdev_id, QDF_MAC_ADDR_REF(peer_mac_addr));
-
-	hdd_wds_ext_peer_learn(vdev, peer_mac_addr);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_WDS_ID);
-}
-#endif
-
 #ifdef QCA_WIFI_QCA8074
 static inline int
 cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
@@ -209,14 +169,6 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.dp_prealloc_put_consistent = dp_prealloc_put_coherent,
 	.dp_get_multi_pages = dp_prealloc_get_multi_pages,
 	.dp_put_multi_pages = dp_prealloc_put_multi_pages,
-#if defined(DP_FEATURE_TX_PAGE_POOL) || defined(DP_FEATURE_RX_BUFFER_RECYCLE)
-	.dp_get_page_pool = dp_prealloc_get_page_pool,
-	.dp_put_page_pool = dp_prealloc_put_page_pool,
-	.dp_page_pool_init = dp_prealloc_page_pool_init,
-#endif
-#endif
-#if defined(WLAN_DP_DYNAMIC_RESOURCE_MGMT)
-	.dp_get_dynamic_pool_size = dp_rx_pool_get_dynamic_size,
 #endif
 	.dp_get_tx_inqueue = dp_get_tx_inqueue,
 	.dp_send_unit_test_cmd = wma_form_unit_test_cmd_and_send,
@@ -227,14 +179,9 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.peer_unmap_event = wlan_dp_send_ipa_wds_peer_unmap_event,
 	.peer_send_wds_disconnect = wlan_dp_send_ipa_wds_peer_disconnect,
 #endif
-#ifdef QCA_SUPPORT_WDS_EXTENDED
-	.rx_wds_ext_peer_learn = cds_wds_ext_peer_learn,
-#endif
 #ifdef WLAN_DP_FEATURE_STC
 	.dp_peer_event_notify = wlan_dp_stc_peer_event_notify,
-	.rx_fst_inv_peer_id = wlan_dp_fisa_rx_fst_inv_peer_id,
 #endif
-	.peer_sta_kickout = wma_peer_sta_kickout,
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else /* !QCA_WIFI_QCA8074 */
@@ -362,20 +309,6 @@ static QDF_STATUS cds_qmi_indication(void *cb_ctx, qdf_qmi_ind_cb qmi_ind_cb)
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS cds_get_dump_inprogress(uint8_t *val)
-{
-	qdf_device_t qdf_ctx;
-
-	qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	if (!qdf_ctx)
-		return QDF_STATUS_E_INVAL;
-
-	if (pld_get_dump_inprogress(qdf_ctx->dev, val))
-		return QDF_STATUS_E_INVAL;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 /**
  * cds_update_recovery_reason() - update the recovery reason code
  * @recovery_reason: recovery reason
@@ -417,7 +350,6 @@ QDF_STATUS cds_init(void)
 	qdf_register_drv_connected_callback(cds_is_drv_connected);
 	qdf_register_drv_supported_callback(cds_is_drv_supported);
 	qdf_register_wmi_send_recv_qmi_callback(cds_wmi_send_recv_qmi);
-	qdf_register_get_dump_inprogress_cb(cds_get_dump_inprogress);
 	qdf_register_qmi_indication_callback(cds_qmi_indication);
 	qdf_register_recovery_reason_update(cds_update_recovery_reason);
 	qdf_register_get_bus_reg_dump(pld_get_bus_reg_dump);
@@ -451,7 +383,6 @@ void cds_deinit(void)
 	qdf_register_self_recovery_callback(NULL);
 	qdf_register_wmi_send_recv_qmi_callback(NULL);
 	qdf_register_qmi_indication_callback(NULL);
-	qdf_register_get_dump_inprogress_cb(NULL);
 
 	gp_cds_context->qdf_ctx = NULL;
 	qdf_mem_zero(&g_qdf_ctx, sizeof(g_qdf_ctx));
@@ -581,25 +512,6 @@ cds_cdp_update_bundle_params(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
-static inline void
-cds_cdp_update_tc_based_dyn_gro_params(struct wlan_objmgr_psoc *psoc,
-				       struct txrx_pdev_cfg_param_t *cdp_cfg,
-				       uint32_t gro_bit_set)
-{
-	if (gro_bit_set & DP_TC_BASED_DYNAMIC_GRO)
-		cdp_cfg->tc_based_dyn_gro_enable = true;
-	cdp_cfg->tc_ingress_prio = cfg_get(psoc, CFG_DP_TC_INGRESS_PRIO);
-}
-#else
-static inline void
-cds_cdp_update_tc_based_dyn_gro_params(struct wlan_objmgr_psoc *psoc,
-				       struct txrx_pdev_cfg_param_t *cdp_cfg,
-				       uint32_t gro_bit_set)
-{
-}
-#endif
-
 /**
  * cds_cdp_cfg_attach() - attach data path config module
  * @psoc: psoc handle
@@ -640,7 +552,6 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	gro_bit_set = cfg_get(psoc, CFG_DP_GRO);
 	if (gro_bit_set & DP_GRO_ENABLE_BIT_SET)
 		cdp_cfg.gro_enable = true;
-	cds_cdp_update_tc_based_dyn_gro_params(psoc, &cdp_cfg, gro_bit_set);
 	cdp_cfg.enable_flow_steering =
 		cfg_get(psoc, CFG_DP_FLOW_STEERING_ENABLED);
 	cdp_cfg.disable_intra_bss_fwd =
@@ -802,6 +713,21 @@ static qdf_notif_block cds_hang_event_notifier = {
 };
 
 /**
+ * cds_set_exclude_selftx_from_cca_busy_time() - Set exclude self tx time
+ * from cca busy time bool in cds config
+ * @exclude_selftx_from_cca_busy: Bool to be stored in cds config
+ * @cds_cfg: Pointer to cds config
+ *
+ * Return: None
+ */
+static void
+cds_set_exclude_selftx_from_cca_busy_time(bool exclude_selftx_from_cca_busy,
+					  struct cds_config_info *cds_cfg)
+{
+	cds_cfg->exclude_selftx_from_cca_busy = exclude_selftx_from_cca_busy;
+}
+
+/**
  * cds_open() - open the CDS Module
  *
  * cds_open() function opens the CDS Scheduler
@@ -885,7 +811,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	ol_ctx = cds_get_context(QDF_MODULE_ID_BMI);
 	status = bmi_download_firmware(ol_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		cds_alert("BMI FAILED status:%d", status);
+		cds_alert("BMI FIALED status:%d", status);
 		goto err_bmi_close;
 	}
 
@@ -917,6 +843,9 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 		goto err_htc_close;
 	}
 
+	cds_set_exclude_selftx_from_cca_busy_time(
+				hdd_ctx->config->exclude_selftx_from_cca_busy,
+				cds_cfg);
 	/*Open the WMA module */
 	status = wma_open(psoc, hdd_update_tgt_cfg, cds_cfg,
 			  hdd_ctx->target_type);
@@ -1060,28 +989,6 @@ err_dispatcher_disable:
 	return status;
 } /* cds_open() */
 
-#ifdef FEATURE_DAL_DP_SUPPORT
-/**
- * cds_dal_register_shutdown_notifier() - Register DAL shutdown notifier
- * @soc: CDP SoC handle
- *
- * Return: success/failure
- */
-static QDF_STATUS
-cds_dal_register_shutdown_notifier(ol_txrx_soc_handle soc)
-{
-	return cds_shutdown_notifier_register(
-				ucfg_dp_dal_ssr_notify,
-				soc);
-}
-#else
-static QDF_STATUS
-cds_dal_register_shutdown_notifier(ol_txrx_soc_handle soc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS qdf_status;
@@ -1112,7 +1019,6 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_PEACH ||
 	    hdd_ctx->target_type == TARGET_TYPE_WCN6450 ||
 	    hdd_ctx->target_type == TARGET_TYPE_WCN7750 ||
-	    hdd_ctx->target_type == TARGET_TYPE_WCN8750 ||
 	    hdd_ctx->target_type == TARGET_TYPE_QCC2072 ||
 	    hdd_ctx->target_type == TARGET_TYPE_FIG) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
@@ -1133,7 +1039,6 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	}
 
 	ucfg_dp_txrx_set_default_affinity(psoc);
-	ucfg_dp_static_irq_affinity_set(psoc);
 
 	dp_config.enable_rx_threads =
 		(cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) ?
@@ -1161,13 +1066,6 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 
 	ucfg_dp_set_tc_ingress_prio(psoc, cdp_cfg_get(gp_cds_context->dp_soc,
 						      cfg_dp_tc_ingress_prio));
-
-	qdf_status = cds_dal_register_shutdown_notifier(gp_cds_context->dp_soc);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		cds_err("Failed to register DAL shutdown notifier: %d",
-			qdf_status);
-		goto intr_close;
-	}
 
 	return 0;
 
@@ -1319,15 +1217,11 @@ QDF_STATUS cds_pre_enable(void)
 	return QDF_STATUS_SUCCESS;
 
 stop_wmi:
-	/* Stop WMI work and send pdev suspend to fw so FW is aware that host
-	 * is freeing resources. Suspend is skipped if WMI init was never sent
-	 * since firmware has not progressed far enough to handle it.
+	/* Send pdev suspend to fw otherwise FW is not aware that
+	 * host is freeing resources.
 	 */
-	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state())) {
-		wma_wmi_work_close();
-		if (wma_is_wmi_init_cmd_sent())
-			cds_suspend_target(gp_cds_context->wma_context);
-	}
+	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
+		cds_suspend_target(gp_cds_context->wma_context);
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 
@@ -1410,12 +1304,7 @@ QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc)
 	}
 
 	/* Trigger psoc enable for CLD components */
-	qdf_status = hdd_component_psoc_enable(psoc);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		cds_err("hdd_component_psoc_enable failed; status:%d",
-			qdf_status);
-		goto err_soc_target_detach;
-	}
+	hdd_component_psoc_enable(psoc);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -1441,11 +1330,10 @@ err_wma_stop:
 /**
  * cds_disable() - stop/disable cds module
  * @psoc: Psoc pointer
- * @is_recovery: Is recovery in progress
  *
  * Return: QDF status
  */
-QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, bool is_recovery)
+QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS qdf_status;
 	void *handle;
@@ -1458,7 +1346,7 @@ QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, bool is_recovery)
 
 	/* Trigger psoc disable for CLD components */
 	if (psoc) {
-		hdd_component_psoc_disable(psoc, is_recovery);
+		hdd_component_psoc_disable(psoc);
 		dispatcher_psoc_disable(psoc);
 	}
 
@@ -1515,9 +1403,6 @@ QDF_STATUS cds_post_disable(void)
 	 * - Disable HIF Interrupts.
 	 * - Clean up CE tasklets.
 	 */
-
-	cds_debug("suspend dp fisa");
-	ucfg_dp_fisa_suspend(gp_cds_context->dp_soc, OL_TXRX_PDEV_ID);
 
 	cds_debug("send deinit sequence to firmware");
 	if (cds_should_suspend_target())
@@ -2047,7 +1932,7 @@ static QDF_STATUS cds_force_assert_target_via_wmi(qdf_device_t qdf)
 	if (!wma)
 		return QDF_STATUS_E_INVAL;
 
-	status = wma_crash_inject(wma, RECOVERY_SIM_SELF_RECOVERY, 0);
+	status = wma_crash_inject(wma, RECOVERY_SIM_ASSERT, 0);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Failed target force assert; status %d", status);
 		return status;
@@ -2095,7 +1980,7 @@ static QDF_STATUS cds_force_assert_target(qdf_device_t qdf)
 
 	/* wmi assert failed, start recovery without the firmware assert */
 	cds_err("Scheduling recovery work without firmware assert");
-	pld_schedule_recovery_work(qdf->dev, PLD_REASON_FW_ASSERTION_FAIL);
+	pld_schedule_recovery_work(qdf->dev, PLD_REASON_DEFAULT);
 
 	return status;
 }
@@ -2384,7 +2269,7 @@ enum wifi_driver_log_level cds_get_ring_log_level(uint32_t ring_id)
 }
 
 /**
- * cds_set_multicast_logging() - Set multicast logging value
+ * cds_set_multicast_logging() - Set mutlicast logging value
  * @value: Value of multicast logging
  *
  * Set the multicast logging value which will indicate
@@ -2924,6 +2809,34 @@ QDF_STATUS cds_set_sub_20_support(bool enable)
 }
 
 /**
+ * cds_set_sub_20_channel_width() - API to set sub 20 MHz ch width
+ * @sub_20_ch_width: pending sub 20 MHz ch width to set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cds_set_sub_20_channel_width(enum cfg_sub_20_channel_width sub_20_ch_width)
+{
+	struct cds_context *p_cds_context;
+
+	if (sub_20_ch_width > WLAN_SUB_20_CH_WIDTH_10)
+		return QDF_STATUS_E_INVAL;
+
+	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
+	if (!p_cds_context || !p_cds_context->cds_cfg)
+		return QDF_STATUS_NOT_INITIALIZED;
+
+	if (!p_cds_context->cds_cfg->sub_20_support)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	if (sub_20_ch_width == p_cds_context->cds_cfg->sub_20_channel_width)
+		return QDF_STATUS_E_ALREADY;
+
+	p_cds_context->cds_cfg->sub_20_channel_width = sub_20_ch_width;
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * cds_is_self_recovery_enabled() - API to get self recovery enabled
  *
  * Return: true if self recovery enabled, false otherwise
@@ -3056,7 +2969,6 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 		stats->tx_retries_mpdu = vdev_stats->tx.retries_mpdu;
 		stats->tx_mpdu_success_with_retries =
 			vdev_stats->tx.mpdu_success_with_retries;
-		stats->tx_dropped = vdev_stats->tx_i.dropped.dropped_pkt.num;
 		ret = true;
 	}
 
@@ -3067,13 +2979,6 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
-#ifdef IPA_SIM
-QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
-{
-	osdev->smmu_s1_enabled = qdf_get_ipa_smmu_enabled();
-	return QDF_STATUS_SUCCESS;
-}
-#else
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
 	struct iommu_domain *domain;
@@ -3086,11 +2991,8 @@ QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 		int errno = qdf_iommu_domain_get_attr(domain,
 						      QDF_DOMAIN_ATTR_S1_BYPASS,
 						      &attr);
-		/* Fall back to PLD check in -ENOTSUPP case */
-		if (errno == -ENOTSUPP)
-			wlan_smmu_enabled = pld_smmu_s1_enabled(osdev->dev);
-		else
-			wlan_smmu_enabled = !errno && !attr;
+
+		wlan_smmu_enabled = !errno && !attr;
 	} else {
 		cds_info("No SMMU mapping present");
 		wlan_smmu_enabled = false;
@@ -3123,7 +3025,6 @@ exit_with_success:
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif
 
 #else
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)

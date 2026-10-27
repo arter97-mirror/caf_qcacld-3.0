@@ -12,11 +12,10 @@
 #include <wlan_mgmt_rx_srng_public_structs.h>
 #include <hal_internal.h>
 
-#define MGMT_RX_SRNG_ENTRIES 128
+#define MGMT_RX_SRNG_ENTRIES 64
 #define MGMT_RX_BUF_SIZE 3520
 
-#if defined(IPA_OFFLOAD) && (defined(FEATURE_DIRECT_LINK) || \
-	defined(FEATURE_WIFI_TRANSPORT))
+#if defined(IPA_OFFLOAD) && defined(FEATURE_DIRECT_LINK)
 #ifdef IPA_WDI3_VLAN_SUPPORT
 #define MGMT_RX_BUF_REFILL_RING_IDX 5
 #else
@@ -28,7 +27,7 @@
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 3
 #endif
-#elif defined(FEATURE_DIRECT_LINK) || defined(FEATURE_WIFI_TRANSPORT)
+#elif defined(FEATURE_DIRECT_LINK)
 #define MGMT_RX_BUF_REFILL_RING_IDX 3
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 2

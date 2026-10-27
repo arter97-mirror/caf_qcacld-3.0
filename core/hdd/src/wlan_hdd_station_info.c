@@ -45,9 +45,8 @@
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_host_stats.h>
 #include <osif_cm_util.h>
-#include <wlan_cp_stats_ucfg_api.h>
+
 #include "wlan_hdd_stats.h"
-#include <wma_api.h>
 
 /*
  * define short names for the global vendor params
@@ -151,6 +150,12 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY
 #define REMOTE_TX_RETRY_EXHAUST \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY_EXHAUST
+/*
+ * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
+ * feature or not, if first bit is 1 it indicates that FW supports this
+ * feature, if it is 0 it indicates FW doesn't support this feature
+ */
+#define HDD_STATION_INFO_RX_MC_BC_COUNT (1 << 31)
 
 /*
  * Use this macro to check channel bandwidth 160MHZ
@@ -194,7 +199,7 @@ static int hdd_get_sta_congestion(struct wlan_hdd_link_info *link_info,
 
 /**
  * hdd_get_station_assoc_fail() - Handle get station assoc fail
- * @link_info: Link info pointer in HDD adapter
+ * @link_info: Link info pointer in HDD adaper
  *
  * Handles QCA_NL80211_VENDOR_SUBCMD_GET_STATION_ASSOC_FAIL.
  * Validate cmd attributes and send the station info to upper layers.
@@ -301,14 +306,12 @@ static int hdd_convert_auth_type(uint32_t auth_type)
 	case eCSR_AUTH_TYPE_RSN_8021X_SHA256:
 		ret_val = QCA_WLAN_AUTH_TYPE_SHA256;
 		break;
-	case eCSR_AUTH_TYPE_FT_SAE_EXT_KEY:
 	case eCSR_AUTH_TYPE_FT_SAE:
 		ret_val = QCA_WLAN_AUTH_TYPE_FT_SAE;
 		break;
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
 		ret_val = QCA_WLAN_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
 		break;
-	case eCSR_AUTH_TYPE_SAE_EXT_KEY:
 	case eCSR_AUTH_TYPE_SAE:
 		ret_val = QCA_WLAN_AUTH_TYPE_SAE;
 		break;
@@ -1084,65 +1087,16 @@ fail:
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
-static inline
-int32_t remote_station_put_u64(struct sk_buff *skb,
-			       int32_t attrtype,
-			       uint64_t value)
+static inline int32_t remote_station_put_u64(struct sk_buff *skb,
+					     int32_t attrtype,
+					     uint64_t value)
 {
 	return nla_put_u64_64bit(skb, attrtype, value, REMOTE_PAD);
-}
-
-/**
- * remote_station_put_mcs_pkt_u64 - Add a 64-bit MCS packet count to netlink skb
- * @skb: Pointer to netlink socket buffer
- * @attrtype: Netlink attribute type for this value
- * @value: 64-bit value to report (typically per-MCS packet statistics)
- *
- * Helper for reporting 64-bit values (e.g. MCS packet counts) to userspace,
- * using proper padding required by nl80211 vendor extensions. The padding is
- * QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD for newer kernels (>= 4.7.0), allowing
- * 64-bit values to be properly aligned in netlink messages. For older kernels,
- * no special padding is applied.
- *
- * Returns: 0 on success, negative errno on failure.
- */
-static inline
-int32_t remote_station_put_mcs_pkt_u64(struct sk_buff *skb,
-				       int32_t attrtype,
-				       uint64_t value)
-{
-	return nla_put_u64_64bit(skb, attrtype, value,
-				 QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD);
-}
-
-static inline
-int32_t remote_station_put_bw_pkt_u64(struct sk_buff *skb,
-				      int32_t attrtype,
-				      uint64_t value)
-{
-	return nla_put_u64_64bit(skb, attrtype, value,
-				 QCA_WLAN_VENDOR_ATTR_BW_PKT_PAD);
 }
 #else
 static inline int32_t remote_station_put_u64(struct sk_buff *skb,
 					     int32_t attrtype,
 					     uint64_t value)
-{
-	return nla_put_u64(skb, attrtype, value);
-}
-
-static inline
-int32_t remote_station_put_mcs_pkt_u64(struct sk_buff *skb,
-				       int32_t attrtype,
-				       uint64_t value)
-{
-	return nla_put_u64(skb, attrtype, value);
-}
-
-static inline
-int32_t remote_station_put_bw_pkt_u64(struct sk_buff *skb,
-				      int32_t attrtype,
-				      uint64_t value)
 {
 	return nla_put_u64(skb, attrtype, value);
 }
@@ -1429,19 +1383,19 @@ fail:
  *
  * Returns: decoded channel band width.
  */
-static uint16_t hdd_decode_ch_width(enum phy_ch_width ch_width)
+static uint16_t hdd_decode_ch_width(tSirMacHTChannelWidth ch_width)
 {
 	switch (ch_width) {
-	case CH_WIDTH_20MHZ:
+	case 0:
 		return 20;
-	case CH_WIDTH_40MHZ:
+	case 1:
 		return 40;
-	case CH_WIDTH_80MHZ:
+	case 2:
 		return 80;
-	case CH_WIDTH_160MHZ:
-	case CH_WIDTH_80P80MHZ:
+	case 3:
+	case 4:
 		return 160;
-	case CH_WIDTH_320MHZ:
+	case 5:
 		return 320;
 	default:
 		hdd_debug("invalid enum: %d", ch_width);
@@ -1544,10 +1498,17 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 		hdd_err("dot11 mode put fail");
 		goto fail;
 	}
-
-	if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT, stainfo->rx_mc_bc_cnt)) {
+	if (!(stainfo->rx_mc_bc_cnt & HDD_STATION_INFO_RX_MC_BC_COUNT)) {
+		hdd_debug("rx mc bc count is not supported by FW");
+	} else if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT,
+			       (stainfo->rx_mc_bc_cnt &
+			       (~HDD_STATION_INFO_RX_MC_BC_COUNT)))) {
 		hdd_err("rx mc bc put fail");
 		goto fail;
+	} else {
+		hdd_nofl_debug("Remote STA RX mc_bc_count: %d",
+			       (stainfo->rx_mc_bc_cnt &
+			       (~HDD_STATION_INFO_RX_MC_BC_COUNT)));
 	}
 
 	/* Currently rx_retry count is not supported */
@@ -1754,25 +1715,6 @@ static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
 					mac_addr.bytes,
 					STA_INFO_HDD_GET_STATION_REMOTE,
 					STA_INFO_MATCH_STA_OR_MLD_MAC);
-	struct wlan_objmgr_peer *peer = NULL;
-
-	if (stainfo) {
-		/* Fetch cached remote sta info if peer object not present */
-		peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
-						   stainfo->sta_mac.bytes,
-						   WLAN_OSIF_STATS_ID);
-		if (!peer) {
-			hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes));
-			hdd_put_sta_info_ref(&adapter->sta_info_list,
-					     &stainfo, true,
-					     STA_INFO_HDD_GET_STATION_REMOTE);
-			stainfo = NULL;
-		} else {
-			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
-		}
-	}
-
 
 	if (!stainfo) {
 		status = hdd_get_cached_station_remote(hdd_ctx, adapter,
@@ -1945,27 +1887,17 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 		return -EINVAL;
 	}
-
-	if (wlan_objmgr_vdev_try_get_ref(vdev, WLAN_OSIF_STATS_ID) !=
-	    QDF_STATUS_SUCCESS) {
-		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
-		return -EINVAL;
-	}
-
 	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
-	if (!peer_stats) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
+	if (!peer_stats)
 		return -ENOMEM;
-	}
 
 	status = cdp_host_get_peer_stats(soc, wlan_vdev_get_id(vdev),
 					 stainfo->sta_mac.bytes, peer_stats);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("cdp_host_get_peer_stats failed");
 		qdf_mem_free(peer_stats);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 		return -EINVAL;
 	}
 
@@ -1986,7 +1918,6 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	if (ret || !stats) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 		hdd_err("Failed to get peer stats info");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 		return -EINVAL;
 	}
 
@@ -2048,8 +1979,6 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	}
 
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_STATS_ID);
 
 	return ret;
 }
@@ -2620,369 +2549,6 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 	return status;
 }
 
-static int
-hdd_adapter_get_bss_oper_res_len(struct wlan_hdd_link_info *link_info)
-{
-	uint16_t per_mlo_link_addn_len;
-	uint16_t bss_op_res_len = 0, per_bssid_len = 0;
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_hdd_link_info *iter_info;
-	struct hdd_adapter *adapter = link_info->adapter;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return 0;
-
-	if (!ucfg_cm_is_vdev_connected(vdev))
-		goto exit;
-
-	/* Tx + Rx NSS */
-	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
-	/* Tx + Rx Chains */
-	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		bss_op_res_len = per_bssid_len;
-		goto exit;
-	}
-
-	/* MLO Link ID */
-	per_mlo_link_addn_len = nla_total_size(sizeof(uint8_t));
-
-	/* Start of nested attributes */
-	bss_op_res_len += NLA_HDRLEN;
-	hdd_adapter_for_each_link_info(adapter, iter_info) {
-		if (hdd_cm_get_ieee_link_id(iter_info, false) ==
-		    WLAN_INVALID_LINK_ID)
-			continue;
-
-		/* Each element of nested attributes */
-		bss_op_res_len += NLA_HDRLEN;
-		bss_op_res_len += per_bssid_len + per_mlo_link_addn_len;
-	}
-exit:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	hdd_debug("OP BSS Len %d", bss_op_res_len);
-	return bss_op_res_len;
-}
-
-/**
- * hdd_softap_fill_bss_oper_res_params() - Fill BSS operating resource params
- * @link_info: HDD link info pointer
- * @skb: pointer to skb
- *
- * This function calculates the length of BSS operating resource for SAP modes.
- *
- * Return: Length of BSS operating resource
- */
-static int
-hdd_softap_fill_bss_oper_res_params(struct wlan_hdd_link_info *link_info,
-				    struct sk_buff *skb)
-{
-	int ret = 0;
-	QDF_STATUS status;
-	uint8_t tx_nss = 0xFF, rx_nss = 0xFF;
-	uint8_t tx_chains = 0xFF, rx_chains = 0xFF;
-	struct wlan_objmgr_vdev *vdev;
-	struct nlattr *mlo_info_nest, *mlo_link_nest;
-	uint8_t link_id;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return -EINVAL;
-
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		ret = 0;
-		goto exit;
-	}
-
-	status = ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(vdev,
-								  &tx_nss,
-								  &rx_nss,
-								  &tx_chains,
-								  &rx_chains);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		ret = qdf_status_to_os_return(status);
-		goto exit;
-	}
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		hdd_debug("Non-MLO Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
-			  tx_nss, rx_nss, tx_chains, rx_chains);
-
-		if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
-			       tx_nss) ||
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
-			       rx_nss) ||
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
-			       tx_chains) ||
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
-			       rx_chains))
-			ret = -EINVAL;
-
-		goto exit;
-	}
-
-	mlo_info_nest =
-		nla_nest_start(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS);
-	if (!mlo_info_nest) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	link_id = wlan_vdev_get_link_id(vdev);
-	hdd_debug("Link-ID %d Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
-		  link_id, tx_nss, rx_nss, tx_chains, rx_chains);
-
-	mlo_link_nest = nla_nest_start(skb, 0);
-	if (!mlo_link_nest) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	if (nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID,
-		       link_id) ||
-	    nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
-		       tx_nss) ||
-	    nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
-		       rx_nss) ||
-	    nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
-		       tx_chains) ||
-	    nla_put_u8(skb,
-		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
-		       rx_chains)) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	nla_nest_end(skb, mlo_link_nest);
-	nla_nest_end(skb, mlo_info_nest);
-
-exit:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-
-	hdd_debug("Status %d", ret);
-	return ret;
-}
-
-static int
-hdd_softap_get_bss_oper_res_len(struct wlan_hdd_link_info *link_info)
-{
-	uint16_t per_mlo_link_addn_len;
-	uint16_t bss_op_res_len = 0, per_bssid_len = 0;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return 0;
-
-	if (!hdd_is_vdev_in_conn_state(link_info))
-		goto exit;
-
-	/* Tx + Rx NSS */
-	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
-	/* Tx + Rx Chains */
-	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		bss_op_res_len = per_bssid_len;
-		goto exit;
-	}
-
-	/* MLO Link ID */
-	per_mlo_link_addn_len = nla_total_size(sizeof(uint8_t));
-
-	/* Start of nested attributes */
-	bss_op_res_len += NLA_HDRLEN;
-
-	/*
-	 * Implement code as if for_each loop is only run once,
-	 * modify the code such a way to reflect it.
-	 */
-	/* Each element of nested attributes */
-	bss_op_res_len += NLA_HDRLEN;
-	bss_op_res_len += per_bssid_len + per_mlo_link_addn_len;
-
-exit:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	hdd_debug("OP BSS Len %d", bss_op_res_len);
-	return bss_op_res_len;
-}
-
-/**
- * hdd_softap_get_bss_self_info_ex() - send SAP info to userspace,
- * for SAP mode only
- * @link_info: Pointer of link info in HDD adapter.
- *
- * Return: 0 if success else error status
- */
-static int hdd_softap_get_bss_self_info_ex(struct wlan_hdd_link_info *link_info)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	struct sk_buff *skb;
-	uint32_t nl_buf_len = 0;
-	int ret;
-	uint16_t vdev_bss_oper_res_len = 0;
-
-	if (wma_is_vdev_operating_params_event_support_enabled())
-		vdev_bss_oper_res_len =
-				hdd_softap_get_bss_oper_res_len(link_info);
-
-	nl_buf_len += vdev_bss_oper_res_len;
-
-	if (!nl_buf_len) {
-		hdd_debug("No SAP info length present");
-		return 0;
-	}
-
-	nl_buf_len += NLMSG_HDRLEN;
-	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-						       nl_buf_len);
-	if (!skb) {
-		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		return -EINVAL;
-	}
-
-	if (vdev_bss_oper_res_len &&
-	    hdd_softap_fill_bss_oper_res_params(link_info, skb)) {
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
-	}
-
-	ret = wlan_cfg80211_vendor_cmd_reply(skb);
-
-	return ret;
-}
-
-static int
-hdd_adapter_fill_bss_oper_res_params(struct wlan_hdd_link_info *link_info,
-				     struct sk_buff *skb)
-{
-	int ret = 0;
-	QDF_STATUS status;
-	uint8_t i = 0, link_id;
-	uint8_t tx_nss = 0xFF, rx_nss = 0xFF;
-	uint8_t tx_chains = 0xFF, rx_chains = 0xFF;
-	struct wlan_objmgr_vdev *vdev;
-	struct nlattr *mlo_info_nest, *mlo_link_nest;
-	struct wlan_hdd_link_info *iter_info;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return -EINVAL;
-
-	if (!ucfg_cm_is_vdev_connected(vdev)) {
-		ret = 0;
-		goto exit;
-	}
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		status = ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(vdev,
-									  &tx_nss,
-									  &rx_nss,
-									  &tx_chains,
-									  &rx_chains);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			ret = qdf_status_to_os_return(status);
-			goto exit;
-		}
-
-		hdd_debug("Non-MLO Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
-			  tx_nss, rx_nss, tx_chains, rx_chains);
-
-		if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
-			       tx_nss) ||
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
-			       rx_nss) ||
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
-			       tx_chains) ||
-		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
-			       rx_chains))
-			ret = -EINVAL;
-
-		goto exit;
-	}
-
-	mlo_info_nest =
-		nla_nest_start(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS);
-	if (!mlo_info_nest) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	hdd_adapter_for_each_link_info(link_info->adapter, iter_info) {
-		link_id = hdd_cm_get_ieee_link_id(iter_info, false);
-		if (link_id == WLAN_INVALID_LINK_ID)
-			continue;
-
-		if (iter_info->vdev_id == WLAN_INVALID_VDEV_ID ||
-		    !iter_info->is_mlo_vdev_active) {
-			tx_nss = 0xFF;
-			rx_nss = 0xFF;
-			tx_chains = 0xFF;
-			rx_chains = 0xFF;
-		} else {
-			status = ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(iter_info->vdev,
-										  &tx_nss,
-										  &rx_nss,
-										  &tx_chains,
-										  &rx_chains);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				ret = qdf_status_to_os_return(status);
-				goto exit;
-			}
-		}
-
-		hdd_debug("Link-ID %d Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
-			  link_id, tx_nss, rx_nss, tx_chains, rx_chains);
-
-		mlo_link_nest = nla_nest_start(skb, i++);
-		if (!mlo_link_nest) {
-			ret = -EINVAL;
-			goto exit;
-		}
-
-		if (nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID,
-			       link_id) ||
-		    nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
-			       tx_nss) ||
-		    nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
-			       rx_nss) ||
-		    nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
-			       tx_chains) ||
-		    nla_put_u8(skb,
-			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
-			       rx_chains)) {
-			ret = -EINVAL;
-			goto exit;
-		}
-
-		nla_nest_end(skb, mlo_link_nest);
-	}
-
-	nla_nest_end(skb, mlo_info_nest);
-
-exit:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-
-	hdd_debug("Status %d", ret);
-	return ret;
-}
-
-#define MCS_COUNT_MAX 16
-#define BW_COUNT_MAX 5
-#define SS_COUNT_JITTER 4
-
 /**
  * hdd_get_station_info_ex() - send STA info to userspace, for STA mode only
  * @link_info: Pointer of link info in HDD adapter.
@@ -3001,9 +2567,6 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	int ret;
 	struct hdd_station_info *stainfo = NULL;
 	struct qdf_mac_addr *peer_mac_addr;
-	struct wlan_objmgr_vdev *vdev;
-	bool is_enhanced_stats_support;
-	uint16_t vdev_bss_oper_res_len = 0;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
@@ -3011,28 +2574,11 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	if (hdd_cm_is_disconnected(link_info) && big_data_fw_support)
 		big_data_stats_req = true;
 
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		return -EINVAL;
-	}
-
-	/*
-	 * Don't process stats request if link reconfig is
-	 * in progress, as link can be deleted or link switch
-	 * may happen.
-	 */
-	if (mlo_is_link_recfg_in_progress(vdev)) {
-		hdd_debug("link reconfig already in progress");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		return -EBUSY;
-	}
-
 	if (wlan_hdd_get_station_stats(link_info))
 		hdd_err_rl("wlan_hdd_get_station_stats fail");
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
+
 	if (hdd_cm_is_vdev_connected(link_info)) {
 		peer_mac_addr = &link_info->session.station.conn_info.bssid;
 		stainfo = qdf_mem_malloc(sizeof(*stainfo));
@@ -3045,49 +2591,20 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		}
 	}
 
-	if (wma_is_vdev_operating_params_event_support_enabled())
-		vdev_bss_oper_res_len =
-				hdd_adapter_get_bss_oper_res_len(link_info);
-
 	if (big_data_stats_req) {
 		if (wlan_hdd_get_big_data_station_stats(link_info)) {
 			hdd_err_rl("wlan_hdd_get_big_data_station_stats fail");
 			goto free_sta_info;
 		}
-		nl_buf_len += hdd_get_big_data_stats_len(link_info);
+		nl_buf_len = hdd_get_big_data_stats_len(link_info);
 	}
 
-	nl_buf_len += vdev_bss_oper_res_len;
 	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(link_info);
 	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
 	nl_buf_len += connect_fail_rsn_len;
 	nl_buf_len += hdd_get_uplink_delay_len(adapter);
 	if (stainfo)
 		nl_buf_len += hdd_add_peer_stats_get_len(stainfo);
-
-	/* Add length for QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_NSS_PKT_COUNT */
-	nl_buf_len += NLA_HDRLEN * SS_COUNT_JITTER;
-	nl_buf_len += nla_total_size(0) +
-		      SS_COUNT_JITTER * (nla_total_size(sizeof(uint8_t)) +
-					 nla_total_size(sizeof(uint64_t)) +
-					 nla_total_size(sizeof(uint64_t)));
-
-	/* Add length for QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MCS_PKT_COUNT */
-	nl_buf_len += NLA_HDRLEN * MCS_COUNT_MAX;
-	nl_buf_len += nla_total_size(0) +
-		      MCS_COUNT_MAX * (nla_total_size(sizeof(uint8_t)) +
-				       nla_total_size(sizeof(uint64_t)) +
-				       nla_total_size(sizeof(uint64_t)) +
-				       nla_total_size(sizeof(uint64_t)));
-
-	/* Add length for QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BW_PKT_COUNT */
-	nl_buf_len += NLA_HDRLEN * BW_COUNT_MAX;
-	nl_buf_len += nla_total_size(0) +
-		      BW_COUNT_MAX * (nla_total_size(sizeof(uint8_t)) +
-				      nla_total_size(sizeof(uint64_t)) +
-				      nla_total_size(sizeof(uint64_t)) +
-				      nla_total_size(sizeof(uint64_t)));
-
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
 		goto free_sta_info;
@@ -3129,18 +2646,6 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		goto error;
 	}
 
-	is_enhanced_stats_support =
-		ucfg_cp_stats_get_enhanced_stats_support(hdd_ctx->psoc);
-	if (is_enhanced_stats_support) {
-		if (QDF_IS_STATUS_ERROR(wlan_cfg80211_enhance_cp_stats(
-						hdd_ctx->psoc, vdev, skb))) {
-			hdd_err_rl("hdd_get_mcs_bw_pkt_count fail");
-			goto error;
-		}
-	} else {
-		hdd_debug("FW enhanced_stats_support is disabled");
-	}
-
 	if (stainfo && QDF_IS_STATUS_ERROR(hdd_add_peer_stats(skb, stainfo))) {
 		hdd_err_rl("hdd_add_peer_stats fail");
 		goto error;
@@ -3151,16 +2656,11 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		goto error;
 	}
 
-	if (vdev_bss_oper_res_len &&
-	    hdd_adapter_fill_bss_oper_res_params(link_info, skb))
-		goto error;
-
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
 	hdd_reset_roam_params(hdd_ctx->psoc, link_info->vdev_id);
 	if (stainfo)
 		qdf_mem_free(stainfo);
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return ret;
 
 error:
@@ -3171,8 +2671,6 @@ free_sta_info:
 		hdd_free_tx_rx_pkts_per_mcs(stainfo);
 		qdf_mem_free(stainfo);
 	}
-
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return -EINVAL;
 }
 
@@ -3241,12 +2739,7 @@ __hdd_cfg80211_get_sta_info_cmd(struct wiphy *wiphy,
 			   QDF_MAC_ADDR_SIZE);
 		hdd_debug("STA " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(mac_addr.bytes));
-		if (qdf_is_macaddr_equal(&mac_addr,
-					 hdd_adapter_get_link_mac_addr(adapter->deflink)))
-			status = hdd_softap_get_bss_self_info_ex(adapter->deflink);
-		else
-			status = hdd_get_station_remote_ex(hdd_ctx, adapter,
-							   mac_addr);
+		status = hdd_get_station_remote_ex(hdd_ctx, adapter, mac_addr);
 		break;
 	default:
 		hdd_err_rl("Invalid device_mode: %d", adapter->device_mode);
@@ -3286,3 +2779,4 @@ end:
 
 	return errno;
 }
+

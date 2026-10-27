@@ -19,9 +19,6 @@
 #include <wlan_twt_ucfg_ext_cfg.h>
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "twt/core/src/wlan_twt_main.h"
-#include "cfg_twt.h"
-#include <wlan_twt_cfg_ext_api.h>
-#include "twt/core/src/wlan_twt_common.h"
 
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
 {
@@ -51,21 +48,15 @@ ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 QDF_STATUS
-ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_responder(psoc, val);
 }
 
 QDF_STATUS
-ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
+ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return wlan_twt_cfg_set_responder(psoc, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_twt_cfg_reset_responder(psoc);
 }
 
 QDF_STATUS
@@ -89,16 +80,6 @@ QDF_STATUS ucfg_twt_teardown_req(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_twt_teardown_req(psoc, params, context);
 }
-
-#if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
-QDF_STATUS
-ucfg_twt_early_terminate_ind(struct wlan_objmgr_vdev *vdev,
-			     struct twt_early_terminate_param *params,
-			     void *context)
-{
-	return wlan_twt_early_terminate_ind(vdev, params, context);
-}
-#endif
 
 QDF_STATUS
 ucfg_twt_pause_req(struct wlan_objmgr_psoc *psoc,
@@ -157,6 +138,19 @@ bool ucfg_twt_is_setup_in_progress(struct wlan_objmgr_psoc *psoc,
 bool ucfg_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_twt_cfg_is_twt_enabled(psoc);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_get_congestion_timeout(struct wlan_objmgr_psoc *psoc,
+				    uint32_t *val)
+{
+	return wlan_twt_cfg_get_congestion_timeout(psoc, val);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_set_congestion_timeout(struct wlan_objmgr_psoc *psoc, uint32_t val)
+{
+	return wlan_twt_cfg_set_congestion_timeout(psoc, val);
 }
 
 QDF_STATUS
@@ -271,24 +265,6 @@ void ucfg_twt_get_work_params(
 	return wlan_twt_get_work_params(vdev, params, next_action);
 }
 
-void ucfg_twt_set_setup_work_params(struct wlan_objmgr_vdev *vdev,
-				    struct twt_add_dialog_param *params)
-{
-	return wlan_twt_set_setup_work_params(vdev, params);
-}
-
-void ucfg_twt_get_setup_work_params(struct wlan_objmgr_vdev *vdev,
-				    struct twt_add_dialog_param *params,
-				    uint32_t *next_action)
-{
-	return wlan_twt_get_setup_work_params(vdev, params, next_action);
-}
-
-uint32_t ucfg_twt_inc_retry_count(struct wlan_objmgr_vdev *vdev)
-{
-	return wlan_twt_inc_retry_count(vdev);
-}
-
 bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_twt_get_pmo_allowed(psoc);
@@ -319,86 +295,3 @@ ucfg_twt_tgt_caps_get_wake_dur_and_wake_intvl(
 							     min_wake_intvl,
 							     max_wake_intvl);
 }
-
-bool ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			     enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
-{
-	return wlan_twt_check_responder_bit(psoc, vdev_id, mode, twt_resp_cfg);
-}
-
-QDF_STATUS
-ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id)
-{
-	return wlan_twt_send_responder_disable_per_vdev(psoc, vdev_id);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_get_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
-					    uint8_t mac_id,
-					    uint32_t *val)
-{
-	return wlan_twt_cfg_get_congestion_timeout_per_mac(psoc, mac_id, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_set_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
-					    uint8_t mac_id,
-					    uint32_t val)
-{
-	return wlan_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
-					struct wlan_objmgr_psoc *psoc,
-					uint8_t mac_id)
-{
-	return wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
-								     mac_id);
-}
-
-QDF_STATUS
-ucfg_twt_tgt_caps_get_req_en_dis_vdev_support(struct wlan_objmgr_psoc *psoc,
-					      bool *val)
-{
-	return wlan_twt_tgt_caps_get_req_en_dis_vdev_support(psoc, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_get_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint32_t *val)
-{
-	return wlan_twt_cfg_get_vdev_congestion_timeout(psoc, vdev_id, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_set_vdev_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint32_t val)
-{
-	return wlan_twt_cfg_set_vdev_congestion_timeout(psoc, vdev_id, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_reset_vdev_congestion_timeout_to_ini(struct wlan_objmgr_psoc *psoc,
-						  uint8_t vdev_id)
-{
-	return wlan_twt_cfg_reset_vdev_congestion_timeout_to_ini(psoc, vdev_id);
-}
-
-#if defined(WLAN_FEATURE_NAN) && \
-    (defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) || \
-     defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE))
-QDF_STATUS
-ucfg_twt_cfg_set_twt_concurrency_enable(struct wlan_objmgr_vdev *vdev,
-					bool val)
-{
-	return wlan_twt_cfg_set_twt_concurrency_enable(vdev, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_set_allow_btwt_id0(struct wlan_objmgr_vdev *vdev, bool val)
-{
-	return wlan_twt_cfg_set_allow_btwt_id0(vdev, val);
-}
-#endif

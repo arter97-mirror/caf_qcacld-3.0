@@ -23,7 +23,7 @@
  * hdd_sysfs_pktlog_create(): Initialize pktlog specific sysfs file
  * @driver_kobject: Driver Kobject
  *
- * Function to initialize pktlog specific mode sysfs files.
+ * Function to initialize pktlog specific mode syfs files.
  *
  * Return: NONE
  */
@@ -33,7 +33,7 @@ void hdd_sysfs_pktlog_create(struct kobject *driver_kobject);
  * hdd_sysfs_pktlog_destroy(): Remove pktlog sysfs file
  * @driver_kobject: Driver Kobject
  *
- * Function to remove pktlog specific mode sysfs files.
+ * Function to remove pktlog specific mode syfs files.
  *
  * Return: NONE
  */

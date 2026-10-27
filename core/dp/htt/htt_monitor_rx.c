@@ -779,7 +779,7 @@ static qdf_nbuf_t htt_rx_qdf_noclone_buf(qdf_nbuf_t buf)
 	return buf;
 }
 
-/* This function is used by monitor mode code to restitch an MSDU list
+/* This function is used by montior mode code to restitch an MSDU list
  * corresponding to an MPDU back into an MPDU by linking up the skbs.
  */
 qdf_nbuf_t

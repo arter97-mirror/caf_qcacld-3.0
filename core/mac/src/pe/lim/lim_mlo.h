@@ -73,38 +73,6 @@ void lim_get_mlo_vdev_list(struct pe_session *session, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list);
 
 /**
- * lim_mlo_roam_store_nss_from_reassoc_req() - Store NSS values from reassoc req
- * @mac_ctx: Pointer to global MAC context
- * @roam_sync: Pointer to roam sync indication structure
- * @subtype: Subtype of the frame (assoc or reassoc)
- * @assoc_req: Pointer to (re)association request structure
- *
- * This function extracts NSS (Number of Spatial Streams) information
- * from reassociation request frame for each link in an MLO connection
- * during roaming. It processes each link, parses the frame to get NSS
- * capabilities, and updates the corresponding link parameters with the
- * negotiated NSS values.
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error values otherwise
- */
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-QDF_STATUS
-lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
-					struct roam_offload_synch_ind *roam_sync,
-					uint8_t subtype,
-					tpSirAssocReq assoc_req);
-#else
-static inline
-lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
-					struct roam_offload_synch_ind *roam_sync,
-					uint8_t subtype,
-					tpSirAssocReq assoc_req)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
-/**
  * lim_mlo_roam_peer_disconn_del - trigger mlo to delete partner peer
  *                                 This API is only for MLO STA roam.
  * @vdev: vdev pointer
@@ -208,17 +176,6 @@ QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
  * Return: void
  */
 void lim_mlo_ap_sta_assoc_suc(struct wlan_objmgr_peer *peer);
-
-/**
- * lim_mlo_get_cb_mode_for_freq() - fetch cb_mode from freq
- * @vdev_id: objmgr vdev id
- * @freq: freq for which cb_mode is required
- * @cb_mode: callback mode to fetch
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS lim_mlo_get_cb_mode_for_freq(uint8_t vdev_id, qdf_freq_t freq,
-					uint8_t *cb_mode);
 
 /**
  * lim_ap_mlo_sta_peer_ind() - Indicate mlo mgr after receiving sta rsp
@@ -428,51 +385,12 @@ bool lim_is_emlsr_band_supported(struct pe_session *session);
  * @bpcc: pointer to save BSS parameters change count
  * @opclass: pointer to save opclass
  * @chan: Pointer to save chan index.
- * @ebpcc_cnt: pointer to save Enhanced BSS Parameter Change Count (optional)
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
-					      uint8_t *opclass, uint8_t *chan,
-					      uint8_t *ebpcc_cnt);
-
-/**
- * lim_mlo_link_add_join_continue() - link add continue after link recfg
- * response received
- * @psoc: psoc object
- * @vdev: vdev id
- * @recfg_rsp_status: recfg status
- * Return: QDF_STATUS
- */
-QDF_STATUS lim_mlo_link_add_join_continue(struct wlan_objmgr_psoc *psoc,
-					  uint8_t vdev_id,
-					  QDF_STATUS recfg_rsp_status);
-
-/**
- * lim_mlo_link_add_fetch_nss() - Fetch NSS values for MLO link addition
- * @vdev_id: VDEV ID for which NSS values are being fetched
- * @scan_entry: Scan cache entry containing BSS information
- * @tx_nss: Pointer to store the calculated TX NSS value
- * @rx_nss: Pointer to store the calculated RX NSS value
- *
- * This function calculates the appropriate TX and RX NSS (Number of
- * Spatial Streams) values for an MLO link by considering:
- * - VDEV's configured NSS capabilities
- * - Current hardware mode chain capabilities (if configured to use)
- * - BSS's advertised capabilities from scan entry
- *
- * The final NSS values are determined by taking the minimum of local
- * capabilities and what the AP supports.
- *
- * Return: QDF_STATUS_SUCCESS if NSS values were successfully calculated
- *         QDF_STATUS_E_NULL_VALUE if required objects are NULL
- *         QDF_STATUS_E_NOMEM if memory allocation fails
- *         Other error codes for specific failures
- */
-QDF_STATUS lim_mlo_link_add_fetch_nss(uint8_t vdev_id,
-				      struct scan_cache_entry *scan_entry,
-				      uint8_t *tx_nss, uint8_t *rx_nss);
+					      uint8_t *opclass, uint8_t *chan);
 
 /**
  * lim_get_bpcc_from_mlo_ie() - get the bpcc from mlo_ie info
@@ -495,15 +413,6 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn,
 bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
 			  uint8_t link_id, uint8_t new_bpcc);
 #else
-static inline QDF_STATUS
-lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
-					struct roam_offload_synch_ind *roam_sync,
-					uint8_t subtype,
-					tpSirAssocReq assoc_req)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
 static inline void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 {
 }
@@ -549,13 +458,6 @@ static inline bool lim_mlo_partner_auth_type(struct pe_session *session,
 					     tAniAuthType *auth_type)
 {
 	return false;
-}
-
-static inline
-QDF_STATUS lim_mlo_get_cb_mode_for_freq(uint8_t vdev_id, qdf_freq_t freq,
-					uint8_t *cb_mode)
-{
-	return QDF_STATUS_SUCCESS;
 }
 
 static inline void lim_ap_mlo_sta_peer_ind(struct mac_context *mac,
@@ -662,8 +564,7 @@ bool lim_is_emlsr_band_supported(struct pe_session *session)
 static inline
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
-					      uint8_t *opclass, uint8_t *chan,
-					      uint8_t *ebpcc_cnt)
+					      uint8_t *opclass, uint8_t *chan)
 {
 	return QDF_STATUS_E_INVAL;
 }
@@ -682,99 +583,4 @@ bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
 	return true;
 }
 #endif
-
-#ifdef WLAN_FEATURE_11BN_ECU
-/**
- * lim_check_ecu_happens() - check whether Enhanced Critical Update happens
- * @vdev: vdev object
- * @link_id: Link ID to check EBPCC for
- * @new_ebpcc: the new Enhanced BSS Parameter Change Count
- *
- * Return: bool - true if ECU happens, false otherwise
- */
-bool lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
-			   uint8_t link_id, uint8_t new_ebpcc);
-
-/**
- * lim_process_ecu_in_beacon() - Process Enhanced Critical Update in beacon
- * @pos: Pointer to start of IE buffer
- * @end: Pointer to end of IE buffer
- *
- * This function parses the UHR Parameter Update IE from beacon frames and
- * extracts mode tuple information for Enhanced Critical Updates.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise
- */
-QDF_STATUS lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end);
-
-/**
- * lim_check_and_process_ecu_in_beacon() - Check and process ECU in beacon
- * @session: PE session pointer
- * @bcn_ptr: Parsed beacon structure
- * @frame: Raw beacon frame buffer
- * @frame_len: Length of beacon frame
- *
- * Checks for Enhanced Critical Update (ECU) in beacon frames for both the
- * current link (MLE Common Info EBPCC) and partner links (RNR TBTT EBPCC).
- * Calls lim_process_ecu_in_beacon() when ECU is detected.
- *
- * Return: void
- */
-void lim_check_and_process_ecu_in_beacon(struct pe_session *session,
-					 tSchBeaconStruct *bcn_ptr,
-					 uint8_t *frame,
-					 uint16_t frame_len);
-/**
- * lim_handle_ecu_in_probe_rsp() - Handle ECU detection in probe response
- * @session: PE session pointer for the link receiving the probe response
- * @vdev: vdev object for the link
- * @link_id: Link ID of the partner link being evaluated
- * @ebpcc_cnt: Enhanced BSS Parameter Change Count from RNR TBTT info
- * @probe_ies: Pointer to start of IE buffer in the probe response
- * @probe_ies_len: Length of the IE buffer
- *
- * Checks whether an Enhanced Critical Update (ECU) has occurred for the
- * given link by comparing @ebpcc_cnt against the stored value. If an ECU
- * is detected, calls lim_process_ecu_in_beacon() to parse the UHR Parameter
- * Update IE.
- *
- * Must be called before the BPCC gate so ECU is always evaluated
- * independently of regular Critical Updates.
- *
- * Return: void
- */
-void lim_handle_ecu_in_probe_rsp(struct pe_session *session,
-				 struct wlan_objmgr_vdev *vdev,
-				 uint8_t link_id, uint8_t ebpcc_cnt,
-				 uint8_t *probe_ies, uint32_t probe_ies_len);
-#else
-static inline bool
-lim_check_ecu_happens(struct wlan_objmgr_vdev *vdev,
-		      uint8_t link_id, uint8_t new_ebpcc)
-{
-	return false;
-}
-
-static inline QDF_STATUS
-lim_process_ecu_in_beacon(uint8_t *pos, uint8_t *end)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline void
-lim_check_and_process_ecu_in_beacon(struct pe_session *session,
-				    tSchBeaconStruct *bcn_ptr,
-				    uint8_t *frame,
-				    uint16_t frame_len)
-{
-}
-
-static inline void
-lim_handle_ecu_in_probe_rsp(struct pe_session *session,
-			    struct wlan_objmgr_vdev *vdev,
-			    uint8_t link_id, uint8_t ebpcc_cnt,
-			    uint8_t *probe_ies, uint32_t probe_ies_len)
-{
-}
-#endif /* WLAN_FEATURE_11BN_ECU */
 #endif

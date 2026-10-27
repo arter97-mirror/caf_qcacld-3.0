@@ -213,57 +213,6 @@ struct ext_mld_capab_and_op {
 	uint16_t reserved:8;
 };
 
-#ifdef WLAN_FEATURE_11BN_ECU
-/**
- * struct enhanced_critical_update_info - ECU info from ML element
- * @present: ECU info present flag
- * @param_change_count: ECU parameter change count
- * @type: ECU type
- * @all_updates_included: all updates included flag
- */
-struct enhanced_critical_update_info {
-	bool present;
-	uint8_t param_change_count:4;
-	uint8_t type:3;
-	uint8_t all_updates_included:1;
-};
-
-/**
- * struct persta_ecu_info_entry - Per-STA ECU info entry
- * @link_id: link ID of the STA
- * @ecu_info: ECU info for this STA
- */
-struct persta_ecu_info_entry {
-	uint8_t link_id;
-	struct enhanced_critical_update_info ecu_info;
-};
-
-/**
- * struct lim_ecu_info - ECU parameters extracted from a single RNR TBTT entry
- * @enhanced_bss_param_change_cnt: EBPCC from bits 3:0 of the ECU byte
- * @critical_update_type: ECU type from bits 6:4 (1 = UHR Parameter Update)
- * @enhanced_all_updates_included: all-updates flag from bit 7
- * @valid: true when critical_update_type is a recognised value
- */
-struct lim_ecu_info {
-	uint8_t enhanced_bss_param_change_cnt:4;
-	uint8_t critical_update_type:3;
-	uint8_t enhanced_all_updates_included:1;
-	bool valid;
-} qdf_packed;
-
-#define ECU_TYPE_UHR_PARAM_UPDATE    1
-
-/* Bit positions and widths within the ECU Parameters subfield (802.11bn) */
-#define ECU_EBPCC_BIT_POS           0
-#define ECU_EBPCC_BIT_WIDTH         4
-#define ECU_CU_TYPE_BIT_POS         4
-#define ECU_CU_TYPE_BIT_WIDTH       3
-#define ECU_ALL_UPDATES_BIT_POS     7
-#define ECU_ALL_UPDATES_BIT_WIDTH   1
-
-#endif
-
 /**
  * struct wlan_mlo_ie - wlan ML IE info
  * @type: the variant of the ML IE
@@ -277,11 +226,9 @@ struct lim_ecu_info {
  * @ext_mld_capab_and_op_present: Extended MLD Capabilities And
  *                                Operations Present
  * @mld_mac_address_present: MLD MAC address Present
- * @target_ap_mld_mac_address_present: Target AP MLD MAC address Present
  * @reserved_1: reserved
  * @common_info_length: common info length
  * @mld_mac_addr: MLD mac address
- * @target_ap_mld_mac_addr: Target AP MLD mac address
  * @link_id: link id
  * @bss_param_change_count: bss param change count
  * @medium_sync_delay_info: structure of medium_sync_delay
@@ -291,9 +238,6 @@ struct lim_ecu_info {
  * @ext_mld_capab_and_op_info: structure of ext_mld_capab_and operations
  * @num_sta_profile: the number of sta profile
  * @sta_profile: structure of wlan_mlo_sta_profile
- * @ecu_info: ECU info for this link
- * @num_persta_ecu_info: number of per-STA ECU info entries
- * @persta_ecu_info: per-STA ECU info entries
  * @num_data: the length of data
  * @data: the ML IE data, includes element ID + length + extension element ID +
  * multi-link control and common info.
@@ -309,11 +253,9 @@ struct wlan_mlo_ie {
 	uint16_t mld_id_present: 1;
 	uint16_t ext_mld_capab_and_op_present: 1;
 	uint16_t mld_mac_address_present: 1;
-	uint16_t target_ap_mld_mac_address_present:1;
-	uint16_t reserved_1:3;
+	uint16_t reserved_1:4;
 	uint8_t common_info_length;
 	uint8_t mld_mac_addr[6];
-	uint8_t target_ap_mld_mac_addr[6];
 	uint8_t link_id;
 	uint8_t bss_param_change_count;
 	struct medium_sync_delay medium_sync_delay_info;
@@ -322,12 +264,7 @@ struct wlan_mlo_ie {
 	uint8_t mld_id_info;
 	struct ext_mld_capab_and_op ext_mld_capab_and_op_info;
 	uint16_t num_sta_profile;
-	struct wlan_mlo_sta_profile sta_profile[WLAN_MAX_ML_BSS_LINKS + 1];
-#ifdef WLAN_FEATURE_11BN_ECU
-	struct enhanced_critical_update_info ecu_info;
-	uint8_t num_persta_ecu_info;
-	struct persta_ecu_info_entry persta_ecu_info[WLAN_MAX_ML_BSS_LINKS];
-#endif
+	struct wlan_mlo_sta_profile sta_profile[WLAN_MLO_MAX_VDEVS];
 	uint16_t num_data;
 	uint8_t data[WLAN_MLO_IE_COM_MAX_LEN];
 };
@@ -359,10 +296,6 @@ struct wlan_mlo_ie {
  * @link_eht_op: eht op IE
  * @max_chan_swt_time: MLOTD
  * @bss_param_change_cnt: bss param change count
- * @tsf_fw: tsf reported from fw
- * @qtimer_fw: qtimer reported from fw
- * @tsf_host: calculated tsf
- * @tsf_valid: whether tsf_host is valid or not
  */
 struct mlo_link_ie {
 	tDot11fIEDSParams                    link_ds;
@@ -390,10 +323,6 @@ struct mlo_link_ie {
 	tDot11fIEeht_op                      link_eht_op;
 	uint32_t                             max_chan_swt_time;
 	uint8_t                              bss_param_change_cnt;
-	uint64_t                             tsf_fw;
-	uint64_t                             qtimer_fw;
-	uint64_t                             tsf_host;
-	bool                                 tsf_valid;
 };
 
 /**
@@ -496,6 +425,16 @@ struct punc_chan_info {
 	bool present;
 };
 
+#define WFA_CAPABILITIES_IE_LENGTH		0x0B
+#define WFA_CAPABILITIES_OUI			"\x50\x6F\x9A"
+#define WFA_CAPABILITIES_OUI_LENGTH		0x03
+#define WFA_CAPABILITIES_OUI_TYPE		0x23
+#define WFA_CAPABILITIES_LENGTH			0x00
+#define WIFI_GENERATION_CAPABILITY_ATTR_ID	0x01
+#define WIFI_GENERATION_CAPABILITY_ATTR_LENGTH	0x04
+#define WIFI_SUPPORTED_GENERATIONS_LENGTH	0x01
+#define WIFI_CERTIFIED_GENERATIONS_LENGTH	0x01
+
 /**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
@@ -514,11 +453,13 @@ struct punc_chan_info {
  * @limPrevMlmState: Previous MLM State
  * @limSmeState: SME State
  * @limPrevSmeState: Previous SME State
+ * @limSystemRole:
  * @bssType:
  * @nwType:
  * @pLimStartBssReq:
  * @lim_join_req: handle to sme join req
  * @pLimReAssocReq: handle to sme reassoc req
+ * @pLimMlmJoinReq: handle to MLM join Req
  * @pLimMlmReassocRetryReq: keep reasoc req for retry
  * @pLimMlmReassocReq: handle to MLM reassoc Req
  * @channelChangeReasonCode:
@@ -567,7 +508,6 @@ struct punc_chan_info {
  * @assoc_req: Used to store association request frame
  * @assocRspLen: Length of @assocRsp
  * @assocRsp: Used to store association response received while associating
- * @assoc_rsp_protected: Protected bit set in (re)assoc response frame
  * @dph:
  * @parsedAssocReq: Used to store parsed assoc req from various requesting
  *                  station
@@ -698,9 +638,6 @@ struct punc_chan_info {
  * @dfsIncludeChanWrapperIe: Flag to indicate Chan Wrapper Element is required
  * @bw_update_include_ch_sw_ie: Flag to indicate chan switch Element is required
  *                              due to bandwidth update
- * @mcstie_send_in_cac: sap send mcst ie in cac
- * @cac_radar_csa_in_progress: CSA beacon countdown running after radar in CAC
- * @mlo_sta_cac_info: MLO STA related info
  * @cc_switch_mode:
  * @isCiscoVendorAP:
  * @add_ie_params:
@@ -738,13 +675,11 @@ struct punc_chan_info {
  * @vendor_vht_sap:
  * @hs20vendor_ie: HS 2.0 Indication
  * @country_info_present: flag to indicate country code in beacon
+ * @nss:
+ * @nss_forced_1x1:
  * @add_bss_failed:
  * @obss_ht40_scanparam: OBSS Scan IE Parameters
- * @cap_tx_nss: Session's Tx NSS capability, will be intersected NSS for
- * STA/P2P-CLI mode and will be current operating Tx NSS for SAP/P2P-GO.
- * @cap_rx_nss: Session's Rx NSS capability, will be intersected NSS for
- * STA/P2P-CLI mode and will be current operating Rx NSS for SAP/P2P-GO.
- * @nss_forced_1x1: Is NSS forced for this session
+ * @vdev_nss:
  * @supported_nss_1x1: Supported NSS is intersection of self and peer NSS
  * @is_ext_caps_present:
  * @beacon_tx_rate:
@@ -763,10 +698,10 @@ struct punc_chan_info {
  * @bss_color_info:
  * @bss_color_changing:
  * @deauth_retry:
+ * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
  * @ch_switch_in_progress:
  * @post_csa_notify_cap: Send notify capability pending post CSA
- * @post_csa_ocv_sa_query_timer: Timer to check peer STA CSA OCV SA Query
  * @he_with_wep_tkip:
  * @fils_info:
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
@@ -786,6 +721,7 @@ struct punc_chan_info {
  * @mu_edca_present:
  * @def_max_tx_pwr:
  * @active_ba_64_session:
+ * @is_mbssid_enabled:
  * @peer_twt_requestor:
  * @peer_twt_responder:
  * @enable_session_twt_support:
@@ -807,27 +743,13 @@ struct punc_chan_info {
  * @start_bss_rnr_ie: RNRIE
  * @user_edca_set:
  * @is_oui_auth_assoc_6mbps_2ghz_enable: send auth/assoc req with 6 Mbps rate
- * @action_oui_limit_bw_2g: Disable 40 MHz BW when connect 2 GHz IoT AP
  * @is_unexpected_peer_error: true if unexpected peer error
  * on 2.4 GHz
- * @is_amsdu_2g_enabled: Is amsdu enabled for 2g connection with IoT AP
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
  * @rsno_gen_used: rsno gen used for connection
  * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
- * @qcn_ie_present_in_beacon: QCN Ie Present in beacon
- * @uhr_capable: UHR capability flag
- * @uhr_config: UHR cap
- * @uhr_op_ie: UHR op
- * @uhr_op_ie_len: UHR OP IE len
- * @uhr_cap_ie_len: Length of UHR capability IE
- * @ap_uhr_cap: UHR capabilities advertised by the AP
- * @passthru_pending_create_only: one-shot flag set before
- *   lim_add_sta() for passthru NEW action, cleared after
- * @uhr_nontx_mbssid_probe_to_tx_ap: probe req sent to TX AP BSSID
- * @saved_nontx_bssid: saved non-TX BSSID during UHR MBSSID probe redirect
- * @sec_profile_num: selected Security Profile number (-1 if not used)
  */
 struct pe_session {
 	uint8_t available;
@@ -847,11 +769,13 @@ struct pe_session {
 	tLimMlmStates limPrevMlmState;
 	tLimSmeStates limSmeState;
 	tLimSmeStates limPrevSmeState;
+	tLimSystemRole limSystemRole;
 	enum bss_type bssType;
 	tSirNwType nwType;
 	struct start_bss_config *pLimStartBssReq;
 	struct join_req *lim_join_req;
 	struct join_req *pLimReAssocReq;
+	tpLimMlmJoinReq pLimMlmJoinReq;
 	void *pLimMlmReassocRetryReq;
 	void *pLimMlmReassocReq;
 	uint16_t channelChangeReasonCode;
@@ -902,9 +826,6 @@ struct pe_session {
 
 	uint32_t assocRspLen;
 	uint8_t *assocRsp;
-#ifdef WLAN_FEATURE_11BI_SECURITY
-	bool assoc_rsp_protected;
-#endif
 	tAniSirDph dph;
 	void **parsedAssocReq;
 	uint32_t RICDataLen;
@@ -939,6 +860,8 @@ struct pe_session {
 	uint8_t privacy;
 	tAniAuthType authType;
 	tDot11fIEWMMParams wmm_params;
+	tDot11fIERSN gStartBssRSNIe;
+	tDot11fIEWPA gStartBssWPAIe;
 	tSirAPWPSIEs APWPSIEs;
 	uint8_t apUapsdEnable;
 	tSirWPSPBCSession *pAPWPSPBCSession;
@@ -984,14 +907,6 @@ struct pe_session {
 	uint8_t ch_center_freq_seg0;
 	enum phy_ch_width ch_width;
 	enum phy_ch_width ap_ch_width;
-	/**
-	 * @sta_max_ch_width: STA's maximum supported channel width
-	 * capability This represents the STA's true maximum bandwidth
-	 * capability independent of AP's current operational bandwidth.
-	 * Used for advertising in Association
-	 * Request to allow AP to make informed bandwidth decisions.
-	 */
-	enum phy_ch_width sta_max_ch_width;
 #ifdef WLAN_FEATURE_11BE
 	uint16_t puncture_bitmap;
 #endif
@@ -1041,9 +956,6 @@ struct pe_session {
 
 	uint8_t dfsIncludeChanWrapperIe;
 	uint8_t bw_update_include_ch_sw_ie;
-	bool mcstie_send_in_cac;
-	bool cac_radar_csa_in_progress;
-	struct mlo_cac_info mlo_sta_cac_info;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
@@ -1088,11 +1000,11 @@ struct pe_session {
 	bool vendor_vht_sap;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	uint8_t country_info_present;
+	uint8_t nss;
+	bool nss_forced_1x1;
 	bool add_bss_failed;
 	struct obss_scanparam obss_ht40_scanparam;
-	uint8_t cap_tx_nss;
-	uint8_t cap_rx_nss;
-	bool nss_forced_1x1;
+	uint8_t vdev_nss;
 	bool supported_nss_1x1;
 	bool is_ext_caps_present;
 	uint16_t beacon_tx_rate;
@@ -1115,12 +1027,10 @@ struct pe_session {
 #endif
 	struct punc_chan_info he_punc_chan_info;
 	struct deauth_retry_params deauth_retry;
+	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
 	bool post_csa_notify_cap;
-#ifdef WLAN_FEATURE_SA_QUERY_OFFLOAD
-	qdf_mc_timer_t post_csa_ocv_sa_query_timer;
-#endif
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct pe_fils_session *fils_info;
@@ -1142,6 +1052,7 @@ struct pe_session {
 	bool mu_edca_present;
 	int8_t def_max_tx_pwr;
 	bool active_ba_64_session;
+	bool is_mbssid_enabled;
 #ifdef WLAN_SUPPORT_TWT
 	uint8_t peer_twt_requestor;
 	uint8_t peer_twt_responder;
@@ -1169,32 +1080,12 @@ struct pe_session {
 #endif /* WLAN_FEATURE_11BE */
 	uint8_t user_edca_set;
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
-	bool action_oui_limit_bw_2g;
-	bool is_amsdu_2g_enabled;
+	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
 	uint8_t rsno_gen_used;
 	uint8_t wnm_action_dialog_token;
 	struct dfs_p2p_group_info dfs_p2p_info;
-	uint8_t qcn_ie_present_in_beacon;
-#ifdef WLAN_FEATURE_11BN
-	bool uhr_capable;
-	struct wlan_uhr_cap_info uhr_config;
-	struct wlan_uhr_op_ie uhr_op_ie;
-	uint16_t uhr_op_ie_len;
-	uint16_t uhr_cap_ie_len;
-	struct wlan_uhr_cap_info ap_uhr_cap;
-	/* UHR MBSSID non-TX AP probe redirect state */
-	bool uhr_nontx_mbssid_probe_to_tx_ap;
-	tSirMacAddr saved_nontx_bssid;
-#endif
-#ifdef DRIVER_PASSTHRU_MODE
-	/* one-shot flag set before lim_add_sta(NEW), cleared after */
-	uint8_t passthru_pending_create_only;
-#endif
-#ifdef WLAN_FEATURE_SECURITY_PROFILE
-	int8_t sec_profile_num;
-#endif
 };
 
 /*-------------------------------------------------------------------------
@@ -1232,6 +1123,7 @@ static inline void pe_free_dph_node_array_buffer(void)
  * @mac: pointer to global adapter context
  * @bssid: BSSID of the new session
  * @sessionId: PE session ID is returned here, if PE session is created.
+ * @numSta: number of stations
  * @bssType: bss type of new session to do conditional memory allocation.
  * @vdev_id: vdev_id
  *
@@ -1242,7 +1134,8 @@ static inline void pe_free_dph_node_array_buffer(void)
  */
 struct pe_session *pe_create_session(struct mac_context *mac,
 				     uint8_t *bssid, uint8_t *sessionId,
-				     enum bss_type bssType, uint8_t vdev_id);
+				     uint16_t numSta, enum bss_type bssType,
+				     uint8_t vdev_id);
 
 /**
  * pe_find_session_by_bssid() - looks up the PE session given the BSSID.
@@ -1361,73 +1254,6 @@ struct pe_session *pe_find_session_by_scan_id(struct mac_context *mac_ctx,
 				       uint32_t scan_id);
 
 uint8_t pe_get_active_session_count(struct mac_context *mac_ctx);
-
-/**
- * lim_roam_store_nss_from_reassoc_req() - Store NSS parameters from
- * reassoc request
- * @mac_ctx: Pointer to global MAC context
- * @cur_vdev_id: Current VDEV ID
- * @roam_sync: Pointer to roam sync indication structure
- *
- * This function extracts and stores the Number of Spatial Streams (NSS)
- * parameters from the reassociation request during roaming. It handles both
- * MLO and non-MLO scenarios, parsing the reassoc frame to determine appropriate
- * TX and RX NSS values.
- * For non-MLO devices, it calculates NSS based on self capabilities
- * and AP capabilities.
- * For MLO devices, it delegates to a specialized MLO function.
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error code otherwise
- */
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-QDF_STATUS
-lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
-				    uint8_t cur_vdev_id,
-				    struct roam_offload_synch_ind *roam_sync);
-#else
-static inline QDF_STATUS
-lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
-				    uint8_t cur_vdev_id,
-				    struct roam_offload_synch_ind *roam_sync)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
-/**
- * lim_fill_session_nss_params_on_create() - Fill NSS parameters for a session
- * @mac_ctx: Pointer to global MAC context
- * @session: PE session entry
- *
- * This function fills the NSS (Number of Spatial Streams) parameters for a
- * session during its creation. It handles different BSS types (Infrastructure,
- * AP, NDI) and sets appropriate TX and RX NSS values based on hardware
- * capabilities and policy manager decisions.
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error code otherwise
- */
-QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
-						 struct pe_session *session);
-
-/**
- * lim_update_ap_session_nss() - Update NSS parameters for AP session
- * @session: PE session entry
- * @bypass_hw_mode: Bypass HW mode limits while update of NSS
- *
- * This function updates the NSS (Number of Spatial Streams) parameters for
- * an AP session based on current hardware mode and vdev capabilities.
- * It checks if the session supports NSS change, fetches the current NSS values
- * from MLME and policy manager, and updates the session parameters if there's
- * a change in NSS values.
- * It also updates HE and EHT MCS sets according to the new NSS values.
- *
- * If @bypass_hw_mode is set, then logic to limit the session NSS to current
- * hwmode will be by-passed.
- *
- * Return: true if NSS was updated and vdev is in active state, false otherwise
- */
-bool lim_update_ap_session_nss(struct pe_session *session,
-			       bool bypass_hw_mode);
 
 /**
  * lim_dump_session_info() - Dump the key parameters of PE session

@@ -375,26 +375,17 @@
 		1, \
 		"Enables VHT MCS9 in 20M BW")
 
-#define WLAN_MIMO_CAP_DISABLE 0
-#define WLAN_MIMO_CAP_MAX (WLAN_MAX_VDEV_NSS - 1)
-#define WLAN_MIMO_CAP_DEF WLAN_MIMO_CAP_MAX
-
 /*
  * <ini>
- * gEnable2x2 - Enables/disables VHT Tx/Rx MCS values for MIMO/SISO
+ * gEnable2x2 - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @Min: 0
- * @Max: WLAN_MAX_VDEV_NSS
- * @Default: WLAN_MAX_VDEV_NSS
+ * @Max: 1
+ * @Default: 1
  *
- * This ini disables/enables MIMO mode. If this is zero then DUT operates in
- * SISO (1x1). NSS value would be INI value plus 1.
+ * This ini disables/enables 2x2 mode. If this is zero then DUT operates as 1x1
  *
- * Eg:
- * INI value     NSS value
- *    0             1x1
- *    1             2x2
- *    2             3x3
- *   ...            ...
+ * 0, Disable
+ * 1, Enable
  *
  * Related: NA
  *
@@ -404,13 +395,10 @@
  *
  * </ini>
  */
-#define CFG_VHT_MIMO_CAP_FEATURE CFG_INI_UINT( \
+#define CFG_VHT_ENABLE_2x2_CAP_FEATURE CFG_INI_BOOL( \
 		"gEnable2x2", \
-		WLAN_MIMO_CAP_DISABLE, \
-		WLAN_MIMO_CAP_MAX, \
-		WLAN_MIMO_CAP_DEF, \
-		CFG_VALUE_OR_DEFAULT, \
-		"VHT Enable MIMO")
+		1, \
+		"VHT Enable 2x2")
 
 /*
  * <ini>
@@ -651,7 +639,7 @@
 	CFG(CFG_VHT_ENABLE_RX_MCS2x2_8_9) \
 	CFG(CFG_VHT_ENABLE_TX_MCS2x2_8_9) \
 	CFG(CFG_ENABLE_VHT20_MCS9) \
-	CFG(CFG_VHT_MIMO_CAP_FEATURE) \
+	CFG(CFG_VHT_ENABLE_2x2_CAP_FEATURE) \
 	CFG(CFG_VHT_ENABLE_MU_BFORMEE_CAP_FEATURE) \
 	CFG(CFG_VHT_ENABLE_PAID_FEATURE) \
 	CFG(CFG_VHT_ENABLE_GID_FEATURE) \

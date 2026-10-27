@@ -27,21 +27,11 @@
 /* Include Files */
 #include "wlan_hdd_packet_filter_api.h"
 #include "wlan_hdd_packet_filter_rules.h"
-#include "wlan_pmo_ucfg_api.h"
 
 int
 hdd_enable_default_pkt_filters(struct hdd_context *hdd_ctx, uint8_t vdev_id)
 {
 	uint8_t filters = 0, i = 0, filter_id = 1;
-	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-
-	if (!psoc) {
-		hdd_err("psoc is NULL");
-		return 0;
-	}
-
-	if (ucfg_pmo_is_wow_optimization_enabled(psoc))
-		return 0;
 
 	if (hdd_ctx->user_configured_pkt_filter_rules) {
 		hdd_info("user has defined pkt filter run hence skipping default packet filter rule");
@@ -72,16 +62,6 @@ hdd_disable_default_pkt_filters(struct hdd_context *hdd_ctx, uint8_t vdev_id)
 {
 	uint8_t filters = 0, i = 0, filter_id = 1;
 	struct pkt_filter_cfg packet_filter_default_rules = {0};
-
-	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-
-	if (!psoc) {
-		hdd_err("psoc is NULL");
-		return 0;
-	}
-
-	if (ucfg_pmo_is_wow_optimization_enabled(psoc))
-		return 0;
 
 	if (hdd_ctx->user_configured_pkt_filter_rules) {
 		hdd_info("user has defined pkt filter run hence skipping default packet filter rule");
@@ -118,8 +98,7 @@ int wlan_hdd_set_filter(struct hdd_context *hdd_ctx,
 	int i = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (!ucfg_pmo_is_pkt_filter_enabled(hdd_ctx->psoc) &&
-	    hdd_get_device_mode(vdev_id) != QDF_PASSTHRU_MODE) {
+	if (!ucfg_pmo_is_pkt_filter_enabled(hdd_ctx->psoc)) {
 		hdd_warn("Packet filtering disabled in ini");
 		return 0;
 	}

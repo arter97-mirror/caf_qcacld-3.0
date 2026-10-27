@@ -35,7 +35,6 @@
 #include <qdf_types.h>
 #include <qdf_hashtable.h>
 #include <qdf_notifier.h>
-#include <qdf_hrtimer.h>
 #include "wlan_dp_rx_thread.h"
 
 #define DP_MAX_SUBTYPES_TRACKED	4
@@ -98,67 +97,29 @@ struct dp_dhcp_stats {
 };
 
 #ifdef TX_MULTIQ_PER_AC
+#define TX_GET_QUEUE_IDX(ac, off) (((ac) * TX_QUEUES_PER_AC) + (off))
 #define TX_QUEUES_PER_AC 4
 #else
+#define TX_GET_QUEUE_IDX(ac, off) (ac)
 #define TX_QUEUES_PER_AC 1
 #endif
 
-#define TX_HI_PRIO_QUEUE_IDX  0
-
+/** Number of Tx Queues */
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || \
 	defined(QCA_HL_NETDEV_FLOW_CONTROL) || \
 	defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /* Only one HI_PRIO queue */
-#define NUM_HI_PRIO_TX_QUEUES 1
+#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + 1)
 #else
-#define NUM_HI_PRIO_TX_QUEUES 0
+#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
 #endif
 
-/** Number of Tx Queues */
-#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + NUM_HI_PRIO_TX_QUEUES)
-#define NDP_NUM_TX_QUEUES_BK_VO_VI_PRIO (3 * TX_QUEUES_PER_AC + \
-					 NUM_HI_PRIO_TX_QUEUES)
-
-/* Get the tx queue index based on access category and flow hash */
-#define TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, flowq_idx) \
-	(((ac) - HDD_LINUX_AC_VO) * \
-	 TX_QUEUES_PER_AC + (flowq_idx) + \
-	 NUM_HI_PRIO_TX_QUEUES)
-
-#define TX_BE_BASE_QUEUE_IDX \
-	TX_GET_NON_HI_PRIO_QUEUE_IDX(HDD_LINUX_AC_BE, 0)
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-#define NDP_MAX_NUM_PEERS 8
-#define NDP_NUM_TX_QUEUES_PER_PEER TX_QUEUES_PER_AC
-/* One default queue for traffic not classifiable into the peer queues */
-#define NDP_NUM_TX_QUEUES_BE NDP_MAX_NUM_PEERS * NDP_NUM_TX_QUEUES_PER_PEER + 1
-/*
- * Get the tx queue index for NDP peers based on access category,
- * flow hash and peer index
- */
-#define NDP_TX_GET_BE_QUEUE_IDX(ac, flowq_idx, peer_idx) \
-	(TX_BE_BASE_QUEUE_IDX + 1 + \
-	 (peer_idx) * NDP_NUM_TX_QUEUES_PER_PEER + \
-	 (flowq_idx))
-#else /* NDP_TX_BW_FLOW_CTRL */
-#define NDP_NUM_TX_QUEUES_BE TX_QUEUES_PER_AC
-#define NDP_TX_GET_BE_QUEUE_IDX(ac, flowq_idx, peer_idx) \
-	TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, flowq_idx)
-#endif /* NDP_TX_BW_FLOW_CTRL */
-
-#define NDP_NUM_TX_QUEUES           (NDP_NUM_TX_QUEUES_BE + \
-				     NDP_NUM_TX_QUEUES_BK_VO_VI_PRIO)
-
-#define NDP_TX_QUEUE_INDEX_PEER_BW_SHIFT   8
-#define NDP_TX_QUEUE_INDEX_PEER_BW_MASK    0xF00
-#define NDP_TX_QUEUE_INDEX_MASK            0xFF
-
-#define MAX_NUM_TX_QUEUES  QDF_MAX(NDP_NUM_TX_QUEUES, NUM_TX_QUEUES)
-
-/* Use QDF_MAX_AVAILABLE_CPU which caps NR_CPUS to WLAN_MAX_CPUS */
 #ifndef NUM_CPUS
-#define NUM_CPUS QDF_MAX_AVAILABLE_CPU
+#ifdef QCA_CONFIG_SMP
+#define NUM_CPUS NR_CPUS
+#else
+#define NUM_CPUS 1
+#endif
 #endif
 
 /**
@@ -406,7 +367,7 @@ struct dp_tx_rx_stats {
 
 /**
  * struct dp_dhcp_ind - DHCP Start/Stop indication message
- * @dhcp_start: Is DHCP start indication
+ * @dhcp_start: Is DHCP start idication
  * @device_mode: Mode of the device(ex:STA, AP)
  * @intf_mac_addr: MAC address of the interface
  * @peer_mac_addr: MAC address of the connected peer
@@ -501,8 +462,6 @@ typedef struct opaque_hdd_callback_handle *hdd_cb_handle;
  * @BUS_BW_LEVEL_7: vote for level-7 bus bandwidth
  * @BUS_BW_LEVEL_8: vote for level-8 bus bandwidth
  * @BUS_BW_LEVEL_9: vote for level-9 bus bandwidth
- * @BUS_BW_LEVEL_10: vote for level-10 bus bandwidth (fast)
- * @BUS_BW_LEVEL_11: vote for level-11 bus bandwidth (supper fast)
  * @BUS_BW_LEVEL_MAX: vote for max level bus bandwidth
  */
 enum bus_bw_level {
@@ -516,8 +475,6 @@ enum bus_bw_level {
 	BUS_BW_LEVEL_7,
 	BUS_BW_LEVEL_8,
 	BUS_BW_LEVEL_9,
-	BUS_BW_LEVEL_10,
-	BUS_BW_LEVEL_11,
 	BUS_BW_LEVEL_MAX,
 };
 
@@ -527,16 +484,14 @@ enum bus_bw_level {
  * enum tput_level - throughput levels
  *
  * @TPUT_LEVEL_NONE: No throughput
- * @TPUT_LEVEL_IDLE: idle throughput level
+ * @TPUT_LEVEL_IDLE: idle throughtput level
  * @TPUT_LEVEL_LOW: low throughput level
- * @TPUT_LEVEL_MEDIUM: medium throughput level
+ * @TPUT_LEVEL_MEDIUM: medium throughtput level
  * @TPUT_LEVEL_HIGH: high throughput level
  * @TPUT_LEVEL_MID_HIGH: mid high throughput level
  * @TPUT_LEVEL_VERY_HIGH: very high throughput level
  * @TPUT_LEVEL_ULTRA_HIGH: ultra high throughput level
  * @TPUT_LEVEL_SUPER_HIGH: super high throughput level
- * @TPUT_LEVEL_FAST: fast throughput level
- * @TPUT_LEVEL_SUPER_FAST: super fast throughput level
  * @TPUT_LEVEL_MAX: maximum throughput level
  */
 enum tput_level {
@@ -549,8 +504,6 @@ enum tput_level {
 	TPUT_LEVEL_VERY_HIGH,
 	TPUT_LEVEL_ULTRA_HIGH,
 	TPUT_LEVEL_SUPER_HIGH,
-	TPUT_LEVEL_FAST,
-	TPUT_LEVEL_SUPER_FAST,
 	TPUT_LEVEL_MAX,
 };
 
@@ -579,7 +532,6 @@ enum bbm_non_per_flag {
  *  is set without taking other policy vote levels into consideration.
  * @BBM_SELECT_TABLE_POLICY: policy where bus bw table is selected based on
  *  the latency level.
- * @BBM_INTF_MODE_POLICY: Policy specific to certain interfaces
  * @BBM_MAX_POLICY: max policy
  */
 enum bbm_policy {
@@ -588,7 +540,6 @@ enum bbm_policy {
 	BBM_USER_POLICY,
 	BBM_NON_PERSISTENT_POLICY,
 	BBM_SELECT_TABLE_POLICY,
-	BBM_INTF_MODE_POLICY,
 	BBM_MAX_POLICY,
 };
 
@@ -616,10 +567,6 @@ enum wlm_ll_level {
  * @user_level: user bus bandwidth vote. valid for BBM_USER_POLICY.
  * @set: set or reset user level. valid for BBM_USER_POLICY.
  * @usr: user specific info
- * @intf: Interface specific info
- * @intf.intf_mode: Interface opmode. valid for BBM_INTF_MODE_POLICY.
- * @intf.set: flag to indicate set or reset interface mode policy.
- *	      Valid for BBM_INTF_MODE_POLICY.
  */
 union bbm_policy_info {
 	enum QDF_GLOBAL_MODE driver_mode;
@@ -630,10 +577,6 @@ union bbm_policy_info {
 		enum bus_bw_level user_level;
 		bool set;
 	} usr;
-	struct {
-		enum QDF_OPMODE intf_mode;
-		bool set;
-	} intf;
 };
 
 /**
@@ -656,11 +599,6 @@ union wlan_tp_data {
 	struct wlan_tx_tp_data tx_tp_data;
 	struct wlan_rx_tp_data rx_tp_data;
 };
-
-#define WLAN_DP_STC_UL_TID_INVALID 31
-#define WLAN_DP_STC_UL_TID_MASK 0xFF
-#define WLAN_DP_STC_ENCRYPT_UL_TID(ul_tid) \
-	CDP_STC_CLASSIFIED_TAG | ((ul_tid) & WLAN_DP_STC_UL_TID_MASK)
 
 /*
  * Flow tuple related flags
@@ -701,31 +639,21 @@ struct flow_info {
 	uint32_t flow_label;
 };
 
-#define DP_STC_TXRX_SAMPLES_MAX 5
-#define DP_TXRX_SAMPLES_WINDOW_MAX 2
-#define DP_STC_BURST_STAGE_MAX 2
-
 /*
  * struct wlan_dp_stc_flow_classify_result - Flow classification result
  * @flow_tuple: tuple of the flow which is classified
  * @cookie: cookie/identifier
  * @traffic_type: traffic type classified
- * @ul_tid: Uplink TID id for the flow
- * @insight_count: Number of insights (0 if no results)
- * Note: Traffic types are saved for each window individually
- * (maximum 5 windows) across different sampling stages
- * @probable_types: Array of probable traffic types
- * @probabilities: Array of probability scores
  */
 struct wlan_dp_stc_flow_classify_result {
 	struct flow_info flow_tuple;
 	uint32_t cookie;
 	uint8_t traffic_type;
-	uint8_t ul_tid;
-	uint8_t insight_count;
-	uint8_t probable_types[DP_STC_TXRX_SAMPLES_MAX];
-	uint8_t probabilities[DP_STC_TXRX_SAMPLES_MAX];
 };
+
+#define DP_STC_TXRX_SAMPLES_MAX 5
+#define DP_TXRX_SAMPLES_WINDOW_MAX 2
+#define DP_STC_BURST_STAGE_MAX 2
 
 /**
  * struct wlan_dp_stc_txrx_min_max_stats - MIN/MAX stats
@@ -758,13 +686,7 @@ struct wlan_dp_stc_txrx_stats {
 	uint32_t pkt_size_max;
 	uint64_t pkt_iat_min;
 	uint64_t pkt_iat_max;
-	union {
-		struct {
-			uint64_t pkt_iat_txrx_sum;
-			uint64_t pkt_iat_burst_sum;
-		};
-		uint64_t pkt_iat_sum;
-	};
+	uint64_t pkt_iat_sum;
 };
 
 /*
@@ -810,6 +732,7 @@ struct wlan_dp_stc_burst_samples {
 	struct wlan_dp_stc_txrx_samples txrx_samples;
 	struct wlan_dp_stc_burst_stats tx;
 	struct wlan_dp_stc_burst_stats rx;
+	uint64_t sample_window_ns;
 };
 
 #define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
@@ -823,26 +746,14 @@ struct wlan_dp_stc_burst_samples {
  * @flow_tuple: tuple of the flow
  * @txrx_samples: TxRx samples for this flow
  * @burst_sample: Burst samples for this flow
- * @curr_stats_stage: Current stats collection stage
+ * @cur_burst_stats_stage: Current burst stats stage
  */
 struct wlan_dp_stc_flow_samples {
 	uint32_t cookie;
 	struct flow_info flow_tuple;
 	struct wlan_dp_stc_txrx_samples txrx_samples[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
-	struct wlan_dp_stc_burst_samples burst_sample[DP_STC_BURST_STAGE_MAX];
-	uint8_t curr_stats_stage;
-};
-
-/*
- * struct wlan_dp_stc_flow_status - Flow status
- * @flow_tuple: tuple of the flow
- * @traffic type: type of flow
- * @status: Current status of flow
- */
-struct wlan_dp_stc_flow_status {
-	struct flow_info flow_tuple;
-	uint8_t traffic_type;
-	enum qca_flow_status_update_type status;
+	struct wlan_dp_stc_burst_samples burst_sample;
+	uint8_t cur_burst_stats_stage;
 };
 
 /**
@@ -896,15 +807,10 @@ struct wlan_dp_stc_flow_status {
  * @link_monitoring_cb: Callback API to handle link speed change
  * @dp_register_lpass_ssr_notifier: Callback to register for lpass SSR notif
  * @dp_unregister_lpass_ssr_notifier: Callback to unregister for lpass SSR notif
- * @osif_dp_wifi_transport_register: Callback to register Aux device
- * @osif_dp_wifi_transport_deregister: Callback to unregister Aux device
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
  * @send_flow_stats_event: Callback to send flow stats vendor command
  * @send_flow_report_event: Callback to send flow report vendor command
- * @send_flow_status_event: Callback to sed flow status vendor command
  * @dp_get_ndev_by_vdev_id: Callback API to get net device reference by vdev id
- * @wlan_dp_haps_update_qtime_sync_period: Callback API to update the qtime
- * sync period for haps feature
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -914,7 +820,7 @@ struct wlan_dp_psoc_callbacks {
 						     qdf_netdev_t netdev);
 	void (*dp_get_tx_resource)(uint8_t link_id_id,
 				   struct qdf_mac_addr *mac_addr);
-	void (*dp_get_tsf_time)(qdf_netdev_t netdev, uint64_t qtime,
+	void (*dp_get_tsf_time)(qdf_netdev_t netdev, uint64_t input_time,
 				uint64_t *tsf_time);
 	void (*dp_tsf_timestamp_rx)(hdd_cb_handle ctx, qdf_nbuf_t nbuf);
 
@@ -946,7 +852,7 @@ struct wlan_dp_psoc_callbacks {
 	bool (*dp_is_gratuitous_arp_unsolicited_na)(qdf_nbuf_t nbuf);
 
 	bool (*dp_send_rx_pkt_over_nl)(qdf_netdev_t dev, uint8_t *addr,
-				       qdf_nbuf_t nbuf, bool unencrypted);
+				       qdf_nbuf_t nbuf, bool unecrypted);
 	bool
 	(*wlan_dp_sta_get_dot11mode)(hdd_cb_handle context, qdf_netdev_t netdev,
 				     enum qca_wlan_802_11_mode *dot11_mode);
@@ -998,12 +904,6 @@ struct wlan_dp_psoc_callbacks {
 	(*dp_register_lpass_ssr_notifier)(struct wlan_objmgr_psoc *psoc);
 	void (*dp_unregister_lpass_ssr_notifier)(struct wlan_objmgr_psoc *psoc);
 #endif
-#ifdef FEATURE_WIFI_TRANSPORT
-	QDF_STATUS
-	(*osif_dp_wifi_transport_register)(struct wlan_objmgr_psoc *psoc);
-	void (*osif_dp_wifi_transport_deregister)(struct wlan_objmgr_psoc *psoc,
-						  bool is_ssr);
-#endif
 
 #ifdef IPA_WDS_EASYMESH_FEATURE
 	int (*wlan_dp_ipa_wds_peer_cb)(uint8_t vdev_id, uint16_t peer_id,
@@ -1016,14 +916,9 @@ struct wlan_dp_psoc_callbacks {
 	int (*send_flow_report_event)(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_dp_stc_flow_samples *flow_samples,
 				      uint32_t flags);
-	int (*send_flow_status_event)(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_dp_stc_flow_status *status,
-				      uint32_t flags);
 #endif
 	QDF_STATUS (*dp_get_ndev_by_vdev_id)(uint32_t vdev_id,
 					     qdf_netdev_t *netdev);
-	void (*wlan_dp_haps_update_qtime_sync_period)(hdd_cb_handle context,
-						      uint32_t sync_interval);
 };
 
 /**
@@ -1083,11 +978,24 @@ struct wlan_dp_psoc_nb_ops {
 /**
  * struct wlan_dp_user_config - DP component user config
  * @ipa_enable: IPA enabled/disabled config
- * @arp_connectivity_map: ARP connectivity map
+ * @arp_connectivity_map: ARP connectiviy map
  */
 struct wlan_dp_user_config {
 	bool ipa_enable;
 	uint32_t arp_connectivity_map;
+};
+
+/**
+ * struct dp_traffic_end_indication - Traffic end indication
+ * @enabled: Feature enabled/disabled config
+ * @def_dscp: Default DSCP value in regular packets in traffic
+ * @spl_dscp: Special DSCP value to be used by packet to mark
+ *            end of data stream
+ */
+struct dp_traffic_end_indication {
+	bool enabled;
+	uint8_t def_dscp;
+	uint8_t spl_dscp;
 };
 
 #define DP_SVC_INVALID_ID 0xFF
@@ -1100,10 +1008,6 @@ struct wlan_dp_user_config {
 #define DP_SVC_FLAGS_SVC_ID			BIT(3)
 #define DP_SVC_FLAGS_TID                        BIT(4)
 #define DP_SVC_FLAGS_MSDU_LOSS_RATE             BIT(5)
-#define DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END     BIT(6)
-#define DP_SVC_FLAGS_SVC_TID			BIT(7)
-
-
 
 
 /* struct dp_svc_data - service class node
@@ -1113,7 +1017,6 @@ struct wlan_dp_user_config {
  * @buffer_latency_tolerance: buffer latency tolarence in ms
  * @app_ind_default_dscp: default dscp
  * @app_ind_special_dscp: special dscp to override with default dscp
- * @en_twt_end_indication: Enable TWT end indication flag
  */
 struct dp_svc_data {
 	qdf_list_node_t node;
@@ -1127,8 +1030,7 @@ struct dp_svc_data {
 	uint8_t tid;
 	uint32_t msdu_loss_rate;
 #endif
-	uint8_t override_tid;
-	bool en_twt_end_indication;
+
 };
 
 #define DP_FLOW_PRIO_MAX 8
@@ -1194,43 +1096,4 @@ enum ctrl_rx_aggr_client_id {
 	CTRL_RX_AGGR_ID_MAX
 };
 
-#ifdef WLAN_HAPS_ENABLE
-enum haps_hist_buckets {
-	HAPS_BUCKET_20_MS,
-	HAPS_BUCKET_40_MS,
-	HAPS_BUCKET_60_MS,
-	HAPS_BUCKET_80_MS,
-	HAPS_BUCKET_100_MS,
-	HAPS_BUCKET_120_MS,
-	HAPS_BUCKET_140_MS,
-	HAPS_BUCKET_BEYOND,
-	HAPS_BUCKET_MAX
-};
-
-struct dp_haps_stats {
-	uint32_t event_received;
-	uint32_t pause_ind;
-	uint32_t oneshot_pause_ind;
-	uint32_t unpause_ind;
-	uint32_t haps_timer_expired;
-	uint32_t fail_safe_timer_expired;
-	uint32_t haps_pause_bucket[HAPS_BUCKET_MAX];
-	qdf_time_t start_time;
-	qdf_time_t last_time;
-	qdf_time_t total_time;
-	qdf_time_t total_pause_time;
-};
-
-struct dp_haps {
-	bool is_enable;
-	bool is_one_shot;
-	uint8_t state;
-	uint8_t vdev_id;
-	uint16_t fail_safe_timeout;
-	struct dp_soc *soc;
-	struct dp_haps_stats stats;
-	qdf_hrtimer_data_t haps_timer;
-	qdf_hrtimer_data_t haps_fail_safe_timer;
-};
-#endif
 #endif /* end  of _WLAN_DP_PUBLIC_STRUCT_H_ */

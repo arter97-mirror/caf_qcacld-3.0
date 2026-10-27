@@ -192,21 +192,20 @@ static void pm_deinit_trace_set_link_mem(void)
 static void pm_emlsr_opportunistic_timer_handler(void *ctx)
 {
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)ctx;
-	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint32_t sta_cnt;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
 	if (!psoc) {
 		policy_mgr_err("Invalid Context");
 		return;
 	}
-	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL, vdev_id,
-							 PM_STA_MODE);
-	if (!sta_cnt) {
+	policy_mgr_get_mode_specific_conn_info(psoc, NULL, &vdev_id,
+					       PM_STA_MODE);
+	if (vdev_id == WLAN_INVALID_VDEV_ID) {
 		policymgr_nofl_debug("emlsr timeout, no sta active");
 		return;
 	}
 
-	ml_nlink_conn_change_notify(psoc, vdev_id[0],
+	ml_nlink_conn_change_notify(psoc, vdev_id,
 				    ml_nlink_emlsr_timeout_evt,
 				    NULL);
 }
@@ -788,6 +787,12 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	policy_mgr_get_mcc_adaptive_sch(psoc, &enable_mcc_adaptive_sch);
 	policy_mgr_set_dynamic_mcc_adaptive_sch(psoc, enable_mcc_adaptive_sch);
 	pm_ctx->hw_mode_change_in_progress = POLICY_MGR_HW_MODE_NOT_IN_PROGRESS;
+	/* reset sap mandatory channels */
+	status = policy_mgr_reset_sap_mandatory_channels(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to reset mandatory channels");
+		return status;
+	}
 
 	/* init PCL table & function pointers based on HW capability */
 	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
@@ -882,8 +887,6 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 			 policy_mgr_is_2x2_2G_1x1_5G_dbs_capable(psoc));
 	policy_mgr_init_5g_low_high_cut_freq(psoc);
 	policy_mgr_init_rd_type(psoc);
-	policy_mgr_update_dfs_master_dynamic_enabled(psoc, true,
-						     QDF_MAX_NO_OF_MODE, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -941,6 +944,14 @@ QDF_STATUS policy_mgr_psoc_disable(struct wlan_objmgr_psoc *psoc)
 		QDF_ASSERT(0);
 	}
 
+	/* reset sap mandatory channels */
+	if (QDF_IS_STATUS_ERROR(
+		policy_mgr_reset_sap_mandatory_channels(psoc))) {
+		policy_mgr_err("failed to reset sap mandatory channels");
+		status = QDF_STATUS_E_FAILURE;
+		QDF_ASSERT(0);
+	}
+
 	/* deinit pm_conc_connection_list */
 	qdf_mem_zero(pm_conc_connection_list, sizeof(pm_conc_connection_list));
 	policy_mgr_clear_concurrent_session_count(psoc);
@@ -963,8 +974,6 @@ QDF_STATUS policy_mgr_register_conc_cb(struct wlan_objmgr_psoc *psoc,
 					conc_cbacks->connection_info_update;
 	pm_ctx->conc_cbacks.ap_assist_dfs_group_notify =
 					conc_cbacks->ap_assist_dfs_group_notify;
-	pm_ctx->conc_cbacks.sap_user_nss_update_cb =
-					conc_cbacks->sap_user_nss_update_cb;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -979,6 +988,8 @@ QDF_STATUS policy_mgr_register_sme_cb(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	pm_ctx->sme_cbacks.sme_get_nss_for_vdev =
+		sme_cbacks->sme_get_nss_for_vdev;
 	pm_ctx->sme_cbacks.sme_nss_update_request =
 		sme_cbacks->sme_nss_update_request;
 	if (!policy_mgr_is_hwmode_offload_enabled(psoc))
@@ -1048,8 +1059,6 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->wlan_set_tx_rx_nss_cb;
 	pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason =
 		hdd_cbacks->wlan_hdd_set_sap_csa_reason;
-	pm_ctx->hdd_cbacks.hdd_get_sap_connected_sta_band =
-		hdd_cbacks->hdd_get_sap_connected_sta_band;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1074,7 +1083,6 @@ QDF_STATUS policy_mgr_deregister_hdd_cb(struct wlan_objmgr_psoc *psoc)
 	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params = NULL;
 	pm_ctx->hdd_cbacks.wlan_get_sap_acs_band = NULL;
 	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb = NULL;
-	pm_ctx->hdd_cbacks.hdd_get_sap_connected_sta_band = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }

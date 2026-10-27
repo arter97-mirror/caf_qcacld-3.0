@@ -20,7 +20,7 @@
 /**
  *  DOC: wlan_hdd_bootup_marker.c
  *
- *  WLAN Host Device Driver boot-up marker implementation
+ *  WLAN Host Device Driver bootup marker implementation
  *
  */
 

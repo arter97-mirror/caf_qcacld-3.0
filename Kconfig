@@ -8,10 +8,6 @@ config QCA_CLD_WLAN
 
 if QCA_CLD_WLAN != n
 
-config QDF_WAKELOCK_DEBUG
-	bool "Enable QDF wake lock debug infra"
-	default n
-
 config 160MHZ_SUPPORT
 	bool "Enable 160MHZ_SUPPORT"
 	default n
@@ -69,10 +65,6 @@ config BERYLLIUM
 	bool "Enable BERYLLIUM"
 	default n
 
-config BORON
-	bool "Enable BORON"
-	default n
-
 config BUILD_TAG
 	bool "Embed tags and timestamp in wlan version"
 	default n
@@ -88,36 +80,6 @@ config BUS_AUTO_SUSPEND
 config CE_DISABLE_SRNG_TIMER_IRQ
 	bool "Enable CE_DISABLE_SRNG_TIMER_IRQ"
 	default n
-
-config HL_DP_SUPPORT
-	bool "Enable HL_DP_SUPPORT"
-	default n
-
-config CFG_GTK_OFFLOAD_MAX_VDEV
-	int "GTK offload max vdev counts"
-	default 2 if HL_DP_SUPPORT
-	default 3
-
-config CFG_MAX_PERIODIC_TX_PTRNS
-	int "Max periodix tx patterns"
-	default 6
-
-config CFG_NUM_OF_ADDITIONAL_FW_PEERS
-	int "number of additional firmware peers"
-	default 2
-
-config CFG_NUM_OF_TDLS_CONN_TABLE_ENTRIES
-	int "number of TDLS connection table entries"
-	default 8
-
-config CFG_PMO_WOW_FILTERS_MAX
-	int "Enable CFG_PMO_WOW_FILTERS_MAX"
-	default 32
-
-config CFG_ROAM_OFFLOAD_MAX_VDEV
-	int "ROAM offload max vdev counts"
-	default 2 if HL_DP_SUPPORT
-	default 3
 
 config CHECKSUM_OFFLOAD
 	bool "Enable CHECKSUM_OFFLOAD"
@@ -143,24 +105,12 @@ config CNSS_PEACH_V2
 	bool "Enable CNSS_PEACH_V2"
 	default n
 
-config CNSS_FIG
-	bool "Enable CNSS_FIG"
-	default n
-
-config CNSS_FIG_V2
-	bool "Enable CNSS_FIG_V2"
-	default n
-
 config INCLUDE_HAL_KIWI
 	bool "Enable INCLUDE_HAL_KIWI"
 	default n
 
 config INCLUDE_HAL_PEACH
 	bool "Enable INCLUDE_HAL_PEACH"
-	default n
-
-config INCLUDE_HAL_FIG
-	bool "Enable INCLUDE_HAL_FIG"
 	default n
 
 config CNSS_UTILS_MODULE
@@ -197,10 +147,6 @@ config DDP_MON_RSSI_IN_DBM
 
 config DEBUG_RX_RING_BUFFER
 	bool "Enable DEBUG_RX_RING_BUFFER"
-	default n
-
-config ENABLE_DEBUG_ADDRESS_MARKING
-	bool "Enable ENABLE_DEBUG_ADDRESS_MARKING"
 	default n
 
 config WLAN_DP_LOAD_BALANCE_SUPPORT
@@ -281,7 +227,7 @@ config DP_MEM_PRE_ALLOC
 	default n
 
 config DBR_HOLD_LARGE_MEM
-	bool "Enable DBR_HOLD_LARGE_MEM"
+	bool "Enable DP_MEM_PRE_ALLOC"
 	default n
 
 config DUMP_REO_QUEUE_INFO_IN_DDR
@@ -316,27 +262,12 @@ config DP_TRACE
 	bool "Enable DP_TRACE"
 	default n
 
-config DISABLE_DP_STATS
-	bool "Disable DP stats accounting in the hot path"
-	default n
-	help
-	  When enabled, all per-MSDU datapath statistics counters (TX/RX
-	  enqueue, drop, bytes, latency histograms, etc.) are compiled out
-	  of the hot path.  This eliminates the atomic increments and cache
-	  line bouncing associated with stats accounting, saving roughly
-	  100-140 cycles per MSDU at high throughput.  Disable only on
-	  production builds where live DP stats are not required.
-
 config DP_TRAFFIC_END_INDICATION
 	bool "Enable DP_TRAFFIC_END_INDICATION"
 	default n
 
 config DP_TX_COMP_RING_DESC_SANITY_CHECK
 	bool "Enable DP_TX_COMP_RING_DESC_SANITY_CHECK"
-	default n
-
-config DP_RX_RING_DESC_SANITY_CHECK
-	bool "Enable DP_RX_RING_DESC_SANITY_CHECK"
 	default n
 
 config DP_TX_HW_DESC_HISTORY
@@ -369,10 +300,6 @@ config DSC_TEST
 
 config DUP_RX_DESC_WAR
 	bool "Enable DUP_RX_DESC_WAR"
-	default n
-
-config RX_PERFORMANCE
-	bool "Enable RX_PERFORMANCE"
 	default n
 
 config DYNAMIC_RX_AGGREGATION
@@ -435,19 +362,8 @@ config FEATURE_COEX
 	bool "Enable FEATURE_COEX"
 	default n
 
-config FEATURE_N79_COEX
-	bool "Enable N79 5GHz antenna sharing coexistence"
-	depends on FEATURE_COEX
-	default n
-	help
-	  N79-WLAN 5GHz antenna sharing coexistence support.
-
 config FEATURE_CONCURRENCY_MATRIX
 	bool "Enable FEATURE_CONCURRENCY_MATRIX"
-	default n
-
-config FEATURE_CQM_RSSI
-	bool "Enable FEATURE_CQM_RSSI"
 	default n
 
 config FEATURE_DELAYED_PEER_OBJ_DESTROY
@@ -498,10 +414,6 @@ config FEATURE_MEMDUMP_ENABLE
 	bool "Enable FEATURE_MEMDUMP_ENABLE"
 	default n
 
-config FEATURE_MONITOR_LEGACY_MODE_SUPPORT
-	bool "Enable FEATURE_MONITOR_LEGACY_MODE_SUPPORT"
-	default n
-
 config FEATURE_MONITOR_MODE_SUPPORT
 	bool "Enable FEATURE_MONITOR_MODE_SUPPORT"
 	default n
@@ -548,10 +460,6 @@ config FEATURE_RSSI_MONITOR
 	bool "Enable FEATURE_RSSI_MONITOR"
 	default n
 
-config WLAN_STA_SEAMLESS_ROAMING
-	bool "Enable WLAN_STA_SEAMLESS_ROAMING"
-	default n
-
 config FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 	bool "Enable FEATURE_RX_LINKSPEED_ROAM_TRIGGER"
 	default n
@@ -589,24 +497,8 @@ config FEATURE_STATS_EXT_V2
 	bool "Enable FEATURE_STATS_EXT_V2"
 	default n
 
-config DP_FEATURE_TX_PAGE_POOL
-       bool "enable DP_FEATURE_TX_PAGE_POOL"
-       default n
-
 config FEATURE_TSO
 	bool "Enable TCP Segmentation Offload"
-	default n
-
-config DP_FEATURE_USO
-	bool "Enable UDP Segmentation Offload"
-	default n
-
-config FEATURE_DAL_DP_SUPPORT
-	bool "enable FEATURE_DAL_DP_SUPPORT"
-	default n
-
-config FEATURE_DP_DAL_OE_SUPPORT
-	bool "enable FEATURE_DAL_DP_SUPPORT"
 	default n
 
 config FEATURE_TSO_DEBUG
@@ -616,10 +508,6 @@ config FEATURE_TSO_DEBUG
 
 config FEATURE_TSO_STATS
 	bool "Enable FEATURE_TSO_STATS"
-	default n
-
-config TSOSEG_DEBUG
-	bool "Enable TSOSEG_DEBUG"
 	default n
 
 config FEATURE_TX_POWER
@@ -638,14 +526,6 @@ config FEATURE_WLAN_D0WOW
 	bool "Enable FEATURE_WLAN_D0WOW"
 	default n
 
-config FEATURE_WLAN_FT_IEEE8021X
-	bool "Enable FEATURE_WLAN_FT_IEEE8021X"
-	default n
-
-config FEATURE_WLAN_FT_PSK
-	bool "Enable FEATURE_WLAN_FT_PSK"
-	default n
-
 config FEATURE_WLAN_LPHB
 	bool "Enable FEATURE_WLAN_LPHB"
 	default n
@@ -653,11 +533,6 @@ config FEATURE_WLAN_LPHB
 config FEATURE_WLAN_PRE_CAC
 	bool "Enable FEATURE_WLAN_PRE_CAC"
 	default n
-
-config FEATURE_WLAN_DNW
-        bool "Enable FEATURE_WLAN_DNW"
-        depends on FEATURE_WLAN_PRE_CAC
-        default n
 
 config FEATURE_WLAN_RA_FILTERING
 	bool "Enable FEATURE_WLAN_RA_FILTERING"
@@ -699,16 +574,8 @@ config FOURTH_CONNECTION
 	bool "Enable FOURTH_CONNECTION"
 	default n
 
-config FOURTH_CONNECTION_AUTO
-	bool "Enable FOURTH_CONNECTION_AUTO"
-	default n
-
 config FW_THERMAL_THROTTLE
 	bool "Enable FW_THERMAL_THROTTLE"
-	default n
-
-config WLAN_DDR_BW_MITIGATION
-	bool "enable WLAN_DDR_BW_MITIGATION"
 	default n
 
 config GET_DRIVER_MODE
@@ -751,10 +618,6 @@ config HIF_CE_DEBUG_DATA_BUF
 	bool "Enable HIF_CE_DEBUG_DATA_BUF"
 	default n
 
-config HIF_CE_TX_DESC_DATA_DEBUG
-	bool "Enable HIF_CE_TX_DESC_DATA_DEBUG"
-	default n
-
 config HIF_CPU_PERF_AFFINE_MASK
 	bool "Enable HIF_CPU_PERF_AFFINE_MASK"
 	default n
@@ -787,14 +650,6 @@ config QCACLD_FEATURE_SON
 	bool "Enable easymesh for QCACLD"
 	default n
 
-config QCA_SUPPORT_WDS_EXTENDED
-	bool "Enable WDS EXTENDED for SON"
-	default n
-
-config WLAN_FEATURE_MC_BC_4_ADDR
-	bool "Enable TX MC/BC with 4 address"
-	default n
-
 config IPA_OFFLOAD
 	bool "Enable IPA_OFFLOAD"
 	default n
@@ -818,16 +673,8 @@ config IPA_WDS_EASYMESH
 	depends on FEATURE_WDS
 	default n
 
-config IPA_DISABLE_OVERRIDE
-	bool "Enable IPA_DISABLE_OVERRIDE"
-	default n
-
 config KIWI_HEADERS_DEF
 	bool "Enable KIWI_HEADERS_DEF"
-	default n
-
-config QCA6390_HEADERS_DEF
-	bool "Enable QCA6390_HEADERS_DEF"
 	default n
 
 config QCA6490_HEADERS_DEF
@@ -856,14 +703,6 @@ config LITTLE_ENDIAN
 
 config LL_DP_SUPPORT
 	bool "Enable LL_DP_SUPPORT"
-	default n
-
-config LL_DP_LEGACY_SUPPORT
-	bool "Enable LL_DP_LEGACY_SUPPORT"
-	default n
-
-config QCA_LL_TX_FLOW_CONTROL_RESIZE
-	bool "Enable QCA_LL_TX_FLOW_CONTROL_RESIZE"
 	default n
 
 config LOCK_STATS_ON
@@ -978,55 +817,8 @@ config QCA_DFS_BW_PUNCTURE
 config QCA_DMA_PADDR_CHECK
 	bool "Enable dma memory addr check"
 
-config WLAN_SYNC_TSF_PLUS
-	bool "Enable WLAN_SYNC_TSF_PLUS"
-	default n
-
-config WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC
-	bool "Enable WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC"
-	default n
-
-config WLAN_SYNC_TSF_PLUS_NOIRQ
-	bool "Enable WLAN_SYNC_TSF_PLUS_NOIRQ"
-	default n
-
-config WLAN_SYNC_TSF_PLUS_EXT_GPIO_IRQ
-	bool "Enable WLAN_SYNC_TSF_PLUS_EXT_GPIO_IRQ"
-	default n
-
-config WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS
-	bool "Enable WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS"
-	default n
-
 config QCA_GET_TSF_VIA_REG
 	bool "Enable QCA_GET_TSF_VIA_REG"
-	default n
-
-config WLAN_TSF_AUTO_REPORT
-	bool "Enable WLAN_TSF_AUTO_REPORT"
-	default n
-
-config WLAN_TSF_UPLINK_DELAY
-	bool "Enable WLAN_TSF_UPLINK_DELAY"
-	depends on WLAN_TSF_AUTO_REPORT
-	default n
-
-config WLAN_TX_LATENCY_STATS
-	bool "Enable WLAN_TX_LATENCY_STATS"
-	depends on WLAN_TSF_AUTO_REPORT
-	default n
-
-config WLAN_FEATURE_UL_JITTER
-	bool "Enable WLAN_FEATURE_UL_JITTER"
-	depends on WLAN_TSF_UPLINK_DELAY
-	default n
-
-config WLAN_TSF_UPLINK_DELAY
-	bool "Enable WLAN_TSF_UPLINK_DELAY"
-	default n
-
-config WLAN_SYNC_TSF_ACCURACY
-	bool "Enable WLAN_SYNC_TSF_ACCURACY"
 	default n
 
 config QCA_MONITOR_PKT_SUPPORT
@@ -1039,10 +831,6 @@ config QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
 
 config QCA_SUPPORT_TX_THROTTLE
 	bool "Enable QCA_SUPPORT_TX_THROTTLE"
-	default n
-
-config QCA_SUPPORT_TX_THROTTLE_LEGACY
-	bool "Enable QCA_SUPPORT_TX_THROTTLE_LEGACY"
 	default n
 
 config QCA_WIFI_FTM
@@ -1062,14 +850,6 @@ config QCA_WIFI_QCA6490
 	bool "Enable QCA_WIFI_QCA6490"
 	default n
 
-config QCA_WIFI_QCA6390
-	bool "Enable QCA_WIFI_QCA6390"
-	default n
-
-config QCN7605_SUPPORT
-	bool "Enable QCN7605_SUPPORT"
-	default n
-
 config QCA_WIFI_MONITOR_MODE_NO_MSDU_START_TLV_SUPPORT
 	bool "Enable QCA_WIFI_MONITOR_MODE_NO_MSDU_START_TLV_SUPPORT"
 	default n
@@ -1086,10 +866,6 @@ config QCACLD_FEATURE_APF
 	bool "Enable QCACLD_FEATURE_APF"
 	default n
 
-config QCACLD_FEATURE_BTC_CHAIN_MODE
-	bool "enable BTC Chain mode feature"
-	default n
-
 config QCACLD_FEATURE_FW_STATE
 	bool "Enable QCACLD_FEATURE_FW_STATE"
 	default n
@@ -1104,10 +880,6 @@ config QCACLD_FEATURE_GREEN_AP
 
 config QCACLD_FEATURE_NAN
 	bool "Enable NAN feature"
-	default n
-
-config NDP_SAP_CONCURRENCY_ENABLE
-	bool "Enable NDP_SAP_CONCURRENCY_ENABLE"
 	default n
 
 config QCACLD_RX_DESC_MULTI_PAGE_ALLOC
@@ -1132,10 +904,6 @@ config QCOM_ESE
 
 config QCOM_LTE_COEX
 	bool "Enable QCOM LTE Coex feature"
-	default n
-
-config FEATURE_WLAN_SAP_COEX_CHECK_BW
-	bool "Enable SAP Coex check with bandwidth feature"
 	default n
 
 config QCOM_TDLS
@@ -1163,16 +931,8 @@ config REG_CLIENT
 	bool "Enable REG_CLIENT"
 	default n
 
-config WLAN_REG_AUTO
-	bool "Enable WLAN_REG_AUTO"
-	default n
-
 config REGISTER_OP_DEBUG
 	bool "Enable REGISTER_OP_DEBUG"
-	default n
-
-config PKT_LOG
-	bool "Enable PKT_LOG"
 	default n
 
 config REMOVE_PKT_LOG
@@ -1207,17 +967,6 @@ config RX_FISA
 	bool "Enable RX_FISA"
 	default n
 
-config RX_FAST_L2L
-	bool "Enable fast L2L RX path for high throughput"
-	default n
-	help
-	  Replaces dp_rx_packet_cbk with a minimal loop that calls
-	  netif_receive_skb directly, bypassing ARP/DHCP classification,
-	  TDLS, trace, wake-lock, and connectivity stats.
-	  EAPOL frames are detected per-packet and dispatched via
-	  dp_send_rx_pkt_over_nl so PTK/GTK re-keying works correctly.
-	  Only enable for dedicated L2L forwarding scenarios.
-
 config RX_HASH_DEBUG
 	bool "Enable RX_HASH_DEBUG"
 	default n
@@ -1232,10 +981,6 @@ config RXDMA_ERR_PKT_DROP
 
 config SAE_SINGLE_PMK
 	bool "Enable SAE_SINGLE_PMK"
-	default n
-
-config WLAN_FEATURE_PMKSA_DEBUG_DUMP
-	bool "Enable PMKSA table debug dump"
 	default n
 
 config SAP_AVOID_ACS_FREQ_LIST
@@ -1271,14 +1016,6 @@ config SHADOW_V3
 	bool "Enable SHADOW_V3"
 	default n
 
-config SHADOW_WRITE_DELAY
-	bool "Enable SHADOW_WRITE_DELAY"
-	default n
-
-config SIR_SAP_MAX_NUM_PEERS
-	int "Max peers number of sif SAP"
-	default 32
-
 config SMMU_S1_UNMAP
 	bool "Enable SMMU_S1_UNMAP"
 	default n
@@ -1299,10 +1036,6 @@ config SOFTAP_CHANNEL_RANGE
 	bool "Enable SOFTAP_CHANNEL_RANGE"
 	default n
 
-config WLAN_TX_LL_LEGACY
-	bool "Enable WLAN_TX_LL_LEGACY"
-	default n
-
 config SUPPORT_11AX
 	bool "Enable SUPPORT_11AX"
 	default n
@@ -1315,10 +1048,6 @@ config TALLOC_DEBUG
 	bool "Enable TALLOC_DEBUG"
 	default n
 
-config HOST_11D_SCAN
-	bool "Enable HOST_11D_SCAN"
-	default n
-
 config TARGET_11D_SCAN
 	bool "Enable TARGET_11D_SCAN"
 	default n
@@ -1329,10 +1058,6 @@ config TARGET_RAMDUMP_AFTER_KERNEL_PANIC
 
 config THERMAL_STATS_SUPPORT
 	bool "Enable THERMAL_STATS_SUPPORT"
-	default n
-
-config THERMAL_UTIL_THROTTLE_SUPPORT
-	bool "Enable THERMAL_UTIL_THROTTLE_SUPPORT"
 	default n
 
 config TRACE_RECORD_FEATURE
@@ -1355,181 +1080,12 @@ config TX_MULTIQ_PER_AC
 	bool "Enable TX_MULTIQ_PER_AC"
 	default n
 
-config QCA_OL_TX_MULTIQ_SUPPORT
-	bool "Enable CPU-based TX multi-queue support"
-	default n
-	help
-	  Enable per-CPU TX ring selection. Each CPU uses its own
-	  TCL data ring and descriptor pool, eliminating lock contention
-	  in the TX path.
-
-config QCA_OL_TX_LOCK_LESS_ACCESS
-	bool "Enable lockless TX ring access"
-	default n
-	help
-	  Enable lockless access to TCL data rings during TX.
-	  Requires QCA_OL_TX_MULTIQ_SUPPORT to be effective.
-
-config QCA_OL_RX_LOCK_LESS_ACCESS
-	bool "Enable lockless RX ring access"
-	default n
-	help
-	  Enable lockless access to RX destination rings (REO dest rings) on
-	  the datapath RX hot path. When set, dp_rx_srng_access_start() and
-	  dp_rx_srng_access_end() are routed through the unlocked HAL ring
-	  accessors (hal_srng_access_start_unlocked / _end_unlocked) instead
-	  of the IRQ-disabling lock variants. This eliminates a spin-lock
-	  acquire/release per REO ring poll iteration and reduces RX
-	  processing latency. Safe only when each REO ring is polled from a
-	  single CPU context (e.g. per-ring NAPI with rx_mode=4).
-
-config WLAN_TX_DESC_PER_CPU_LOCKLESS
-	bool "Enable lockless TX descriptor pool alloc/free"
-	depends on QCA_OL_TX_MULTIQ_SUPPORT
-	default n
-	help
-	  When QCA_OL_TX_MULTIQ_SUPPORT is enabled, each TX descriptor
-	  pool is owned by exactly one CPU.  Alloc and free both run in
-	  softirq/NAPI context pinned to that CPU, so no cross-CPU access
-	  is possible and the pool spinlock is redundant.  Enabling this
-	  flag replaces TX_DESC_LOCK_LOCK/UNLOCK with no-ops, eliminating
-	  ~80-120 cy/MSDU of spinlock overhead per TX packet.
-	  Requires QCA_OL_TX_MULTIQ_SUPPORT and correct TX completion IRQ
-	  CPU affinity (dp_tx_comp_intr_cpumask).
-
-config QCA_DP_RX_NBUF_NO_MAP_UNMAP
-	bool "Enable RX nbuf no-map/unmap optimization"
-	default n
-	help
-	  Skip per-packet DMA map/unmap operations on the RX hot path by
-	  using physical addresses pre-computed at SKB allocation time.
-	  This eliminates the per-MSDU dma_map/dma_unmap overhead and
-	  reduces RX processing cycles significantly on platforms that
-	  support address pre-computation (e.g. FIG v2 with NO_MAP_UNMAP).
-	  Enable only when the underlying platform and buffer pool support
-	  pre-mapped SKBs; incompatible with the page_pool RX buffer path.
-
-config QCA_DP_TX_NBUF_NO_MAP_UNMAP
-	bool "Enable TX nbuf no-map/unmap optimization"
-	default n
-	help
-	  Skip per-packet DMA map/unmap operations on the TX hot path by
-	  using physical addresses pre-computed at SKB allocation time.
-	  This eliminates per-MSDU dma_map/dma_unmap overhead in the TX
-	  enqueue and completion paths, saving roughly 100-160 cycles per
-	  MSDU on platforms that pre-map SKBs (e.g. FIG v2 NO_MAP_UNMAP).
-	  Enable only when the buffer allocator supplies pre-mapped SKBs;
-	  must be consistent with the RX no-map/unmap setting.
-
-config QCA_DP_TX_DESC_FAST_COMP_ENABLE
-	bool "Enable TX descriptor fast completion"
-	default n
-	help
-	  Enable the fast TX descriptor completion path which bypasses
-	  per-descriptor reference-count checks and deferred-free logic
-	  when the descriptor is known to be solely owned by the completion
-	  ring at the time of processing. This reduces per-packet overhead
-	  in the WBM TX completion NAPI handler. Enable on platforms where
-	  the TX descriptor lifecycle guarantees single-owner completion
-	  (e.g. FIG v2 with MULTIQ per-CPU descriptor pools).
-
-config QCA_DP_NBUF_FAST_RECYCLE_CHECK
-	bool "Enable NBUF fast recycle check in TX path"
-	default n
-	help
-	  Enable the fast SKB recycle-origin check in the datapath TX and RX
-	  buffer replenish paths. When set, dp_rx_nbuf_sync_no_dsb() checks
-	  nbuf->recycled_for_ds and, for recycler-sourced SKBs, performs a
-	  targeted dcache range-clean instead of a full dma_map, using the
-	  physical address pre-computed at allocation time. Also gates the
-	  dp_pdev_nbuf_alloc_and_map_replenish fast path that avoids the
-	  IOMMU mapping round-trip. Requires QCA_DP_RX_NBUF_NO_MAP_UNMAP
-	  and is not compatible with the x86 build target.
-
-config QCA_DP_TX_NBUF_LIST_FREE
-	bool "Enable batch TX nbuf list free"
-	default n
-	help
-	  Accumulate completed TX SKBs into a per-NAPI list during the WBM
-	  TX completion ring processing loop and free them in a single batch
-	  call (qdf_nbuf_dev_kfree_list / dev_kfree_skb_list) after the loop
-	  instead of calling qdf_nbuf_free() individually per descriptor.
-	  This reduces per-packet overhead in the TX completion NAPI handler
-	  by amortising the cost of the network stack SKB reclaim path across
-	  a full ring poll burst.
-
-config QCA_CACHED_RING_DESC
-	bool "Enable cached ring descriptor access"
-	default n
-	help
-	  Use the cached HAL accessor (hal_srng_dst_get_next_cached) for REO
-	  destination ring descriptors instead of the standard non-cached path.
-	  Reduces per-descriptor DRAM fetch latency on platforms where the ring
-	  memory is not hardware-coherent.  Must be paired with
-	  CONFIG_IO_COHERENCY on cache-coherent platforms so that the
-	  DCCIMVAC invalidation step is skipped automatically.
-
-config WLAN_ASSUME_DMA_COHERENT
-	bool "Assume DMA coherency between CPU and device"
-	default n
-	help
-	  On platforms where the CPU and WLAN device share a coherent
-	  interconnect (e.g. IPQ5424 with IO-coherent SMMU), enable this
-	  flag to skip software cache-maintenance operations on DP ring
-	  descriptors.  Must match the actual platform DMA coherency;
-	  enabling on a non-coherent platform causes data corruption.
-
-config QCA_DP_RX_NBUF_AND_NBUF_DATA_PREFETCH
-	bool "Enable RX nbuf and nbuf-data prefetch"
-	default n
-	help
-	  Issue CPU prefetch hints for the next SKB and its packet data during
-	  the REO RX processing loop.  Hides cache-miss latency for both the
-	  sk_buff control block fields (protocol, _skb_refdst, data pointer)
-	  and the first two 64-byte cache lines of packet payload, improving
-	  throughput on high-packet-rate L2L paths.
-
-config QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH
-	bool "Enable RX HW and SW descriptor pipeline prefetch"
-	depends on QCA_CACHED_RING_DESC
-	default n
-	help
-	  Pre-fetch the next hardware REO descriptor (32-byte desc at 64-byte
-	  stride) and the corresponding SW dp_rx_desc into CPU cache while the
-	  current descriptor is being processed.  Creates a 2-iteration
-	  prefetch pipeline that hides the latency of both the VA look-up from
-	  the HW descriptor and the subsequent SW descriptor access.
-	  Requires QCA_CACHED_RING_DESC to be effective.
-
-config QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
-	bool "Enable TX HW and SW descriptor pipeline prefetch"
-	depends on QCA_CACHED_RING_DESC
-	default n
-	help
-	  Pre-fetch the next hardware WBM TX-completion descriptor (32-byte
-	  desc at 64-byte stride) and the corresponding SW TX descriptor into
-	  CPU cache while the current descriptor is being processed.  Mirrors
-	  the RX-side QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH optimization for the
-	  TX completion path.  Requires QCA_CACHED_RING_DESC to be effective.
-
-config WLAN_SUPPORT_TX_DESC_PER_POOL
-	bool "Enable per-pool TX descriptor count configuration"
-	default n
-	help
-	  Allow each TX descriptor pool to have an independent size
-	  configured via separate INI keys (dp_tx_desc_pool_0/1/2/3).
-	  When disabled, all pools share a single dp_tx_desc value.
-
 config TX_PER_PDEV_DESC_POOL
 	bool "Enable TX_PER_PDEV_DESC_POOL"
 	default n
 
 config TX_TID_OVERRIDE
 	bool "Enable TX_TID_OVERRIDE"
-	default n
-
-config TX_AGGREGATION_SIZE_ENABLE
-	bool "Enable TX_AGGREGATION_SIZE_ENABLE"
 	default n
 
 config UNIT_TEST
@@ -1637,10 +1193,6 @@ config WLAN_DIAG_VERSION
 	bool "Enable WLAN_DIAG_VERSION"
 	default n
 
-config ATH_PROCFS_DIAG_SUPPORT
-	bool "Enable ATH_PROCFS_DIAG_SUPPORT"
-	default n
-
 config WLAN_DISABLE_EXPORT_SYMBOL
 	bool "Enable WLAN_DISABLE_EXPORT_SYMBOL"
 	default n
@@ -1690,32 +1242,8 @@ config WLAN_FASTPATH
 	bool "Enable fastpath for datapackets"
 	default n
 
-config WLAN_FASTPATH_NON_RHINE
-	bool "Enable fastpath for non-Rhine chipsets"
-	depends on WLAN_FASTPATH && !RHINE
-	default y if WLAN_FASTPATH && !RHINE
-	help
-	  Enable fastpath compilation only when CONFIG_WLAN_FASTPATH is enabled
-	  and CONFIG_RHINE is NOT enabled.
-
-config WLAN_FASTPATH_LEGACY
-	bool "WLAN_FASTPATH_LEGACY"
-	default n
-
 config WLAN_FEATURE_11AX
 	bool "Enable 11AX(High Efficiency) feature"
-	default n
-
-config WLAN_FEATURE_11BN
-	bool "Enable WLAN_FEATURE_11BN"
-	default n
-
-config WLAN_FEATURE_GVP
-	bool "Enable 6 GHz Geo-Fenced Variable Power AP type (GVP)"
-	default n
-
-config WLAN_FEATURE_SECURITY_PROFILE
-	bool "Enable Security Profile element support"
 	default n
 
 config WLAN_FEATURE_11BE
@@ -1726,28 +1254,8 @@ config WLAN_FEATURE_11BE_MLO_TTLM
 	bool "Enable CONFIG_WLAN_FEATURE_11BE_MLO_TTLM"
 	default n
 
-config CFG80211_SETUP_LINK_RECONFIG_SUPPORT
-	bool "Enable CONFIG_CFG80211_SETUP_LINK_RECONFIG_SUPPORT"
-	default n
-
-config CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
-	bool "Enable CONFIG_CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV"
-	default n
-
-config CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
-	bool "Enable CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC"
-	default n
-
-config CFG80211_PD_SUPPORT
-	bool "Enable CFG80211_PD_SUPPORT"
-	default n
-
 config WLAN_FEATURE_11BE_MLO
 	bool "Enable WLAN_FEATURE_11BE_MLO"
-	default n
-
-config WLAN_FEATURE_11BN_SMD
-	bool "Enable WLAN_FEATURE_11BN_SMD"
 	default n
 
 config WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
@@ -1768,18 +1276,6 @@ config WLAN_FEATURE_ACTION_OUI
 
 config WLAN_FEATURE_BIG_DATA_STATS
 	bool "Enable WLAN_FEATURE_BIG_DATA_STATS"
-	default n
-
-config WLAN_FEATURE_POWER_STATISTICS
-	bool "Enable WLAN_FEATURE_POWER_STATISTICS"
-	default n
-
-config WLAN_FEATURE_STA_BEACON_LOSS_CONFIG
-	bool "Enable WLAN_FEATURE_STA_BEACON_LOSS_CONFIG"
-	default n
-
-config WLAN_FEATURE_QSH_SCAN
-	bool "Enable WLAN_FEATURE_QSH_SCAN"
 	default n
 
 config WLAN_FEATURE_CAL_FAILURE_TRIGGER
@@ -1810,10 +1306,6 @@ config WLAN_FEATURE_DP_BUS_BANDWIDTH
 	bool "Enable WLAN_FEATURE_DP_BUS_BANDWIDTH"
 	default n
 
-config WLAN_DP_BUS_BW_FAST_TPUT_LEVEL
-	bool "Enable WLAN_DP_BUS_BW_FAST_TPUT_LEVEL"
-	default n
-
 config WLAN_FEATURE_DP_CFG_EVENT_HISTORY
 	bool "Enable WLAN_FEATURE_DP_CFG_EVENT_HISTORY"
 	default n
@@ -1826,32 +1318,12 @@ config WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY
 	bool "Enable WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY"
 	default n
 
-config WLAN_FEATURE_DP_MON_DEST_RING_HISTORY
-	bool "Enable WLAN_FEATURE_DP_MON_DEST_RING_HISTORY"
-	default n
-
-config DP_TX_MON_BUF_RING_HISTORY
-	bool "Enable DP_TX_MON_BUF_RING_HISTORY"
-	default n
-
 config WLAN_FEATURE_DP_RX_RING_HISTORY
 	bool "Enable WLAN_FEATURE_DP_RX_RING_HISTORY"
 	default n
 
-config DP_RX_MSDU_DONE_FAILURE_DEBUG
-	bool "Enable DP_RX_MSDU_DONE_FAILURE_DEBUG"
-	default n
-
 config WLAN_FEATURE_DP_RX_THREADS
 	bool "Enable WLAN_FEATURE_DP_RX_THREADS"
-	default n
-
-config WLAN_DP_LEGACY_OL_RX_THREAD
-	bool "Enable WLAN_DP_LEGACY_OL_RX_THREAD"
-	default n
-
-config OL_RX_INDICATION_RECORD
-	bool "Enable OL_RX_INDICATION_RECORD"
 	default n
 
 config WLAN_FEATURE_DP_TX_DESC_HISTORY
@@ -1868,10 +1340,6 @@ config WLAN_FEATURE_ELNA
 
 config WLAN_FEATURE_FILS
 	bool "Enable FILS feature"
-	default n
-
-config WLAN_FEATURE_FILS_SAP
-	bool "Enable FILS SAP feature"
 	default n
 
 config WLAN_FEATURE_FIPS
@@ -1968,16 +1436,8 @@ config WLAN_FEATURE_SAE
 	bool "Enable WLAN_FEATURE_SAE"
 	default n
 
-config WLAN_FEATURE_SA_QUERY_OFFLOAD
-	bool "Enable SA Query offload feature"
-	default n
-
 config WLAN_FEATURE_SAP_ACS_OPTIMIZE
 	bool "Enable WLAN_FEATURE_SAP_ACS_OPTIMIZE"
-	default n
-
-config WLAN_FEATURE_CHECK_RSN_BIP
-	bool "Enable CONFIG_WLAN_FEATURE_CHECK_RSN_BIP"
 	default n
 
 config FEATURE_WLAN_GC_SKIP_JOIN
@@ -2052,19 +1512,11 @@ config WLAN_LOGGING_SOCK_SVC
 	bool "Enable WLAN_LOGGING_SOCK_SVC"
 	default n
 
-config WLAN_LOGGING_BUFFERS_DYNAMICALLY
-	bool "Enable WLAN_LOGGING_BUFFERS_DYNAMICALLY"
-	default n
-
 config WLAN_LRO
 	bool "Enable Large Receive Offload"
 	depends on HELIUMPLUS
 	depends on INET_LRO
 	default n
-
-config WLAN_MAX_VDEVS
-	int "Max wlan vdevs"
-	default 6
 
 config WLAN_MWS_INFO_DEBUGFS
 	bool "Enable WLAN_MWS_INFO_DEBUGFS"
@@ -2104,10 +1556,6 @@ config WLAN_OPEN_P2P_INTERFACE
 	bool "Enable WLAN_OPEN_P2P_INTERFACE"
 	default n
 
-config WLAN_PDEV_MAX_VDEVS
-	int "Max vdevs of pdev"
-	default 6
-
 config WLAN_PDEV_VDEV_SEND_MULTI_PARAM
 	bool "Enable WLAN_PDEV_VDEV_SEND_MULTI_PARAM"
 	default n
@@ -2123,14 +1571,6 @@ config WLAN_POLICY_MGR_ENABLE
 config WLAN_POWER_DEBUG
 	bool "Enable WLAN_POWER_DEBUG"
 	default n
-
-config WLAN_PSOC_MAX_VDEVS
-	int "Max vdevs of psoc"
-	default 6
-
-config WLAN_SER_MAX_PENDING_CMDS_AP
-	int "Max wlan serialize pending commands for AP"
-	default 32
 
 config WLAN_REASSOC
 	bool "Enable WLAN_REASSOC"
@@ -2163,6 +1603,18 @@ config WLAN_STREAMFS
 
 config WLAN_SUPPORT_DATA_STALL
 	bool "Enable WLAN_SUPPORT_DATA_STALL"
+	default n
+
+config WLAN_SYNC_TSF
+	bool "Enable QCOM sync multi devices tsf feature"
+	default n
+
+config WLAN_SYNC_TSF_PLUS
+	bool "Enable WLAN_SYNC_TSF_PLUS"
+	default n
+
+config WLAN_SYNC_TSF_TIMER
+	bool "Enable WLAN_SYNC_TSF_TIMER"
 	default n
 
 config WLAN_SYSFS
@@ -2298,6 +1750,25 @@ config WLAN_TRACEPOINTS
 	bool "Enable WLAN_TRACEPOINTS"
 	default n
 
+config WLAN_TSF_AUTO_REPORT
+	bool "Enable WLAN_TSF_AUTO_REPORT"
+	default n
+
+config WLAN_TSF_UPLINK_DELAY
+	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
+config WLAN_TX_LATENCY_STATS
+	bool "Enable WLAN_TX_LATENCY_STATS"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
+config WLAN_FEATURE_UL_JITTER
+	bool "Enable WLAN_FEATURE_UL_JITTER"
+	depends on WLAN_TSF_UPLINK_DELAY
+	default n
+
 config WLAN_TWT_CONVERGED
 	bool "Enable WLAN_TWT_CONVERGED"
 	default n
@@ -2308,14 +1779,6 @@ config WLAN_TWT_SAP_PDEV_COUNT
 
 config WLAN_TWT_SAP_STA_COUNT
 	bool "Enable WLAN_TWT_SAP_STA_COUNT"
-	default n
-
-config WLAN_TX_FLOW_CONTROL
-	bool "Enable WLAN_TX_FLOW_CONTROL"
-	default n
-
-config WLAN_TX_FLOW_CONTROL_LEGACY
-	bool "enable WLAN_TX_FLOW_CONTROL_LEGACY"
 	default n
 
 config WLAN_TX_FLOW_CONTROL_V2
@@ -2438,12 +1901,6 @@ config WLAN_FEATURE_LATENCY_SENSITIVE_REO
 	bool "enable WLAN_FEATURE_LATENCY_SENSITIVE_REO"
 	default n
 
-config WLAN_HAPS_ENABLE
-	bool "Enable CONFIG_WLAN_HAPS_ENABLE"
-	default n
-	help
-	This option enables the Host Aware Power Save feature.
-
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default "wlan"
@@ -2500,10 +1957,6 @@ config WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
 	bool "Enable CONFIG_WLAN_LOCAL_PKT_CAPTURE_SUBFILTER"
 	default n
 
-config BORON_MONITOR
-	bool "Enable BORON_MONITOR"
-	default n
-
 config DP_TX_PACKET_INSPECT_FOR_ILP
 	bool "enable DP_TX_PACKET_INSPECT_FOR_ILP"
 	default n
@@ -2511,23 +1964,6 @@ config DP_TX_PACKET_INSPECT_FOR_ILP
 config NUM_SOC_PERF_CLUSTER
 	int "enable NUM_SOC_PERF_CLUSTER"
 	default 0
-
-config WLAN_MAX_CPUS
-	int "Maximum number of CPUs for WLAN driver static arrays"
-	default 8
-	help
-	  Caps NR_CPUS for WLAN driver static arrays to avoid
-	  excessive memory allocation on upstream kernels where
-	  NR_CPUS can be up to 256. Default 8 covers most
-	  mobile/IoT platforms.
-
-config WLAN_DP_NAPI_IPI_REDIRECT
-	bool "IPI-based NAPI poll redirect for TX/RX completion groups"
-	default n
-
-config SOC_PERF_CLUSTER_FIRST
-	bool "Enable SOC_PERF_CLUSTER_FIRST"
-	default n
 
 config WLAN_OPEN_SOURCE
 	bool "enable WLAN_OPEN_SOURCE"
@@ -2538,8 +1974,8 @@ config CFG80211_EXT_FEATURE_SECURE_NAN
 	default n
 
 config CNSS_OUT_OF_TREE
-    bool "enable CNSS_OUT_OF_TREE"
-    default n
+        bool "enable CNSS_OUT_OF_TREE"
+        default n
 
 config CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
 	bool "enable CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT"
@@ -2547,6 +1983,10 @@ config CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
 
 config DP_MULTIPASS_SUPPORT
 	bool "enable CONFIG_DP_MULTIPASS_SUPPORT"
+	default n
+
+config WLAN_FEATURE_LL_LT_SAP
+	bool "enable CONFIG_WLAN_FEATURE_LL_LT_SAP"
 	default n
 
 config WLAN_DP_VDEV_NO_SELF_PEER
@@ -2567,14 +2007,6 @@ config NL80211_TESTMODE
 
 config DYNAMIC_DEBUG
 	bool "enable CONFIG_DYNAMIC_DEBUG"
-	default n
-
-config WLAN_DIAG_DEBUG_FEATURE
-	bool "enable DEBUG diag events"
-	default n
-
-config CONFIG_WLAN_DUMP_IN_PROGRESS
-	bool "enable CONFIG_WLAN_DUMP_IN_PROGRESS"
 	default n
 
 config WLAN_CHIPSET_STATS
@@ -2605,10 +2037,6 @@ config FEATURE_WLAN_CH_AVOID_EXT
 	bool "enable FEATURE_WLAN_CH_AVOID_EXT"
 	default n
 
-config SAP_UNSAFE_FIXED_CHAN_ALLOW
-	bool "enable WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW"
-	default n
-
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
 	default n
@@ -2631,10 +2059,6 @@ config QDF_TIMER_MULTIPLIER_FRAC_ENABLE
 
 config QCA_WIFI_PEACH
 	bool "enable QCA_WIFI_PEACH"
-	default n
-
-config QCA_WIFI_FIG
-	bool "enable QCA_WIFI_FIG"
 	default n
 
 config BCN_RATECODE_ENABLE
@@ -2661,10 +2085,6 @@ config CNSS2_MODULE
 	bool "Enable CONFIG_CNSS2_MODULE"
 	default n
 
-config CNSS_IN_CNSS2
-	bool "support CNSS SDIO in CNSS2"
-	default n
-
 config DP_RX_DESC_COOKIE_INVALIDATE
 	bool "Enable CONFIG_DP_RX_DESC_COOKIE_INVALIDATE"
 	default n
@@ -2675,10 +2095,6 @@ config DP_SWLM
 
 config DP_TX_TRACKING
 	bool "Enable DP_TX_TRACKING"
-	default n
-
-config DP_TCP_MEM_PARAM_CTRL
-	bool "Enable DP_TCP_MEM_PARAM_CTRL"
 	default n
 
 config WLAN_DP_MLO_DEV_CTX
@@ -2705,10 +2121,6 @@ config LITHIUM
 	bool "Enable LITHIUM"
 	default n
 
-config DP_RX_IRQ_AFFINITY
-	bool "Enable DP_RX_IRQ_AFFINITY"
-	default n
-
 config QCA6750_HEADERS_DEF
 	bool "Enable QCA6750_HEADERS_DEF"
 	default n
@@ -2724,25 +2136,6 @@ config PLD_IPCI_ICNSS_FLAG
 config SHADOW_V2
 	bool "Enable SHADOW_V2"
 	default n
-
-config CE_CMN_REG_CFG_QMI
-	bool "Enable CE_CMN_REG_CFG_QMI"
-	default n
-	help
-	This option enables support for copy engine common registers
-	configuration over QMI, host sends its configuration for the copy engine to
-	fw.
-
-	choose y to enable the support.
-
-config RECORD_DP_CE_EVTS
-	bool "Enable RECORD_DP_CE_EVTS"
-	default n
-	help
-	This option enables support for recording data path owned
-	copy engine history events.
-
-	choose y to enable the support.
 
 config WLAN_DP_PROFILE_SUPPORT
 	bool "Enable WLAN_DP_PROFILE_SUPPORT"
@@ -2808,28 +2201,8 @@ config WCN7750_HEADERS_DEF
 	bool "Enable WCN7750_HEADERS_DEF"
 	default n
 
-config WCN8750_HEADERS_DEF
-        bool "Enable WCN8750_HEADERS_DEF"
-        default n
-
-config CNSS_WCN8750
-        bool "Enable CNSS_WCN8750"
-        default n
-
 config QCA_WIFI_WCN7750
 	bool "Enable QCA_WIFI_WCN7750"
-	default n
-
-config CNSS_WCN8750
-	bool "Enable CNSS_WCN8750"
-	default n
-
-config WCN8750_HEADERS_DEF
-	bool "Enable WCN8750_HEADERS_DEF"
-	default n
-
-config QCA_WIFI_WCN8750
-	bool "Enable QCA_WIFI_WCN8750"
 	default n
 
 config WLAN_DP_DYNAMIC_RESOURCE_MGMT
@@ -2846,55 +2219,25 @@ config IPA_OPT_WIFI_DP_LOGGING
 	depends on IPA_OPT_WIFI_DP
 	default n
 
-config IPA_WDI3_PENDING_BUFF_REPORT
-        bool "Enable IPA_WDI3_PENDING_BUFF_REPORT"
+config DP_RX_MSDU_DONE_FAIL_HISTORY
+        bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
         default n
 
-config DP_RX_MSDU_DONE_FAIL_HISTORY
-    bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
-    default n
-
 config DP_RX_PEEK_MSDU_DONE_WAR
-    bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
-    default n
-
-config WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY
-	bool "Enable WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY"
-	default n
+        bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
+        default n
 
 config WLAN_AUX_SUPPORT
-    bool "Enable WLAN_AUX_SUPPORT"
-    default n
+        bool "Enable WLAN_AUX_SUPPORT"
+        default n
 
 config WLAN_MCC_MIN_CHANNEL_QUOTA
-    int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
-    default 20
+        int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
+        default 20
 
 config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
 	default n
-
-config FEATURE_STATIC_IRQ_AFFINITY
-	bool "Enable FEATURE_STATIC_IRQ_AFFINITY"
-	default n
-	help
-	This option enables static IRQ affinity for TX completion and RX
-	(REO) rings.  When enabled, dp_rx_intr_cpumask and
-	dp_tx_comp_intr_cpumask INI parameters pin each ring's IRQ to a
-	fixed CPU at driver open, preventing migration and cross-CPU cache
-	invalidation.
-
-	Choose y to enable the support.
-
-config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE"
-	default n
-	help
-	This option enables support for affinity override.
-	DP Interrupts and threads are affined as per various threshold
-	levels and cpumask configured.
-
-	choose y to enable the support.
 
 config FEATURE_MGMT_RX_OVER_SRNG
 	bool "enable FEATURE_MGMT_RX_OVER_SRNG"
@@ -2906,14 +2249,6 @@ config DP_FEATURE_RX_BUFFER_RECYCLE
 
 config FEATURE_WLAN_SUPPORT_USD
 	bool "enable FEATURE_WLAN_SUPPORT_USD"
-	default n
-
-config FEATURE_WLAN_SUPPORT_P2P_R2
-	bool "enable FEATURE_WLAN_SUPPORT_P2P_R2"
-	default n
-
-config FEATURE_WLAN_SUPPORT_PCC
-	bool "enable FEATURE_WLAN_SUPPORT_PCC"
 	default n
 
 config WLAN_SUPPORT_BCAST_TWT
@@ -3016,32 +2351,8 @@ config WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG
 	bool "Enable WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG"
 	default n
 
-config WLAN_MAX_VDEV_CHAINS
-	int "Max VDEV Chains supported"
-	default 2
-
-config WLAN_MAX_VDEV_NSS
-	int "Max VDEV NSS supported"
-	default 2
-
-if QCN7605_SUPPORT
-config WLAN_CE4_SZ_QCN7605
-	int "Enable WLAN_CE4_SZ_QCN7605"
-	default 4096
-endif
-
-if QCN7605_SUPPORT || QCA_WIFI_QCA6390 || QCA_WIFI_QCA6490
-config CFG_BMISS_OFFLOAD_MAX_VDEV
-	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
-	default 3
-
-config CFG_MAX_STA_VDEVS
-	int "Enable CFG_MAX_STA_VDEVS"
-	default 2
-endif
-
-config NDP_TX_BW_FLOW_CTRL
-	bool "Enable NDP_TX_BW_FLOW_CTRL"
+config WLAN_TSF_UPLINK_DELAY
+	bool "Enable WLAN_TSF_UPLINK_DELAY"
 	default n
 
 if CNSS_KIWI_V2
@@ -3058,28 +2369,28 @@ config ROME_IF
 	default pci
 
 config CHIP_VERSION
-    int "Enable CHIP_VERSION"
+        int "Enable CHIP_VERSION"
 	default 1
 
 config DP_RX_BUFFER_POOL_ALLOC_THRES
-    int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
-    default 5
+        int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+        default 5
 
 config DP_RX_BUFFER_POOL_SIZE
-    int "Enable DP_RX_BUFFER_POOL_SIZE"
-    default 128
+        int "Enable DP_RX_BUFFER_POOL_SIZE"
+        default 128
 
 config DP_RX_REFILL_BUFF_POOL_SIZE
-    int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
-    default 2048
+        int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+        default 2048
 
 config DP_RX_REFILL_THRD_THRESHOLD
-    int "Enable DP_RX_REFILL_THRD_THRESHOLD"
-    default 512
+        int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+        default 512
 
 config WLAN_UMAC_MLO_MAX_DEV
-    int "Enable WLAN_UMAC_MLO_MAX_DEV"
-    default 3
+        int "Enable WLAN_UMAC_MLO_MAX_DEV"
+        default 3
 endif
 
 if CNSS_QCA6750
@@ -3088,24 +2399,24 @@ config ROME_IF
 	default ipci
 
 config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
-    int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+        int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
 	default 1
 
 config DP_RX_BUFFER_POOL_ALLOC_THRES
-    int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
-    default 5
+        int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+        default 5
 
 config DP_RX_BUFFER_POOL_SIZE
-    int "Enable DP_RX_BUFFER_POOL_SIZE"
-    default 128
+        int "Enable DP_RX_BUFFER_POOL_SIZE"
+        default 128
 
 config DP_RX_REFILL_BUFF_POOL_SIZE
-    int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
-    default 2048
+        int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+        default 2048
 
 config DP_RX_REFILL_THRD_THRESHOLD
-    int "Enable DP_RX_REFILL_THRD_THRESHOLD"
-    default 512
+        int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+        default 512
 endif
 
 config ADRASTEA_RRI_ON_DDR
@@ -3181,113 +2492,22 @@ config ROME_IF
 	default ipci
 endif
 
-if CNSS_WCN7750 || CNSS_WCN8750
+if CNSS_WCN7750
 config ROME_IF
 	string "Enable ROME_IF"
 	default ipci
 
 config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
-    int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+        int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
 	default 1
 
-config CFG_BMISS_OFFLOAD_MAX_VDEV
-    int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
-	default 4
-
-config CFG_MAX_STA_VDEVS
-    int "Enable CFG_MAX_STA_VDEVS"
-	default 4
-
-config DP_RX_BUFFER_POOL_ALLOC_THRES
-    int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
-    default 5
-
-config DP_RX_BUFFER_POOL_SIZE
-    int "Enable DP_RX_BUFFER_POOL_SIZE"
-    default 128
-
-config DP_RX_REFILL_BUFF_POOL_SIZE
-    int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
-    default 2048
-
-config DP_RX_REFILL_THRD_THRESHOLD
-    int "Enable DP_RX_REFILL_THRD_THRESHOLD"
-    default 512
-
-config WLAN_UMAC_MLO_MAX_DEV
-    int "Enable WLAN_UMAC_MLO_MAX_DEV"
-    default 3
-endif
-
-if CNSS_WCN8750
-config ROME_IF
-	string "Enable ROME_IF"
-	default ipci
-
-config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
-    int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
-	default 1
-
-config CFG_BMISS_OFFLOAD_MAX_VDEV
-    int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
-	default 4
-
-config CFG_MAX_STA_VDEVS
-    int "Enable CFG_MAX_STA_VDEVS"
-	default 4
-
-config DP_RX_BUFFER_POOL_ALLOC_THRES
-    int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
-    default 5
-
-config DP_RX_BUFFER_POOL_SIZE
-    int "Enable DP_RX_BUFFER_POOL_SIZE"
-    default 128
-
-config DP_RX_REFILL_BUFF_POOL_SIZE
-    int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
-    default 2048
-
-config DP_RX_REFILL_THRD_THRESHOLD
-    int "Enable DP_RX_REFILL_THRD_THRESHOLD"
-    default 512
-
-config WLAN_UMAC_MLO_MAX_DEV
-    int "Enable WLAN_UMAC_MLO_MAX_DEV"
-    default 3
-endif
-
-
-if QCA6490_HEADERS_DEF
-config CHIP_VERSION
-    int "Enable CHIP_VERSION"
-    default 1
-endif
-
-config CNSS_WCN7760
-	bool "Enable CNSS_WCN7760"
-	default n
-
-config CNSS_QCC2072
-	bool "Enable CNSS_QCC2072"
-	default n
-
-config QCA_WIFI_QCC2072
-	bool "Enable QCA_WIFI_QCC2072"
-	default n
-
-config QCC2072_HEADERS_DEF
-	bool "Enable QCC2072_HEADERS_DEF"
-	default n
-
-if CNSS_QCC2072
 config CFG_BMISS_OFFLOAD_MAX_VDEV
         int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
-        default 4
+	default 4
 
 config CFG_MAX_STA_VDEVS
         int "Enable CFG_MAX_STA_VDEVS"
-        default 4
+	default 4
 
 config DP_RX_BUFFER_POOL_ALLOC_THRES
         int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
@@ -3310,335 +2530,9 @@ config WLAN_UMAC_MLO_MAX_DEV
         default 3
 endif
 
-config WLAN_TX_POWERBOOST
-	bool "Enable WLAN_TX_POWERBOOST"
-	default n
-
-config WLAN_PREDICTIVE_ROAMING
-	bool "Enable WLAN_PREDICTIVE_ROAMING"
-	depends on WLAN_DP_FEATURE_STC
-	default n
-	help
-	  Enable predictive roaming feature for WLAN station mode.
-	  This feature monitors real-time traffic statistics such as
-	  UL delay, TX retries, NSS and bandwidth packet counts, and
-	  TX PHY rate to proactively trigger roaming decisions before
-	  connection quality degrades. It exposes vendor commands to
-	  userspace to enable/disable stats collection and retrieve
-	  the collected metrics for roaming evaluation.
-
-	  Depends on WLAN_DP_FEATURE_STC because predictive roaming
-	  decisions are made only after traffic classification, which
-	  is performed by the STC (Smart Traffic Classifier)
-	  framework.
-
-config CNSS_ETM_TRACE
-	bool "Enable CNSS_ETM_TRACE"
-	default n
-
-config DELAYED_REG_FORCE_WRITE
-	bool "Enable Delayed Reg force write"
-	default n
-
-config DP_COMP_FW_REINJECT_WAR
-	bool "enable DP_COMP_FW_REINJECT_WAR"
-	default n
-
-config DP_FEATURE_DIRECT_REFILL
-	bool "Enable Direct refill ring feature"
-	default n
-
-config AUTO_PLATFORM
-	bool "Enable Auto platform"
-	default n
-	help
-	Add support for the Qualcomm automotive platform
-
-config QCN7605_PCIE_SHADOW_REG_SUPPORT
-	bool "ENable pcie shadow register for genoa"
-	default n
-
-config IPA3
-    bool "Enable IPA3"
-    default n
-
-config IPA_WDI_UNIFIED_API
-    bool "ipa wdi unified API"
-    default n
-
-config FEATURE_IPA_PIPE_CHANGE_WDI1
-    bool "ipa pipe change wdi1"
-    default n
-
-config ENABLE_VALLOC_REPLACE_MALLOC
-    bool "replace malloc with valloc"
-    default n
-
-config INTRA_BSS_FWD_OFFLOAD
-    bool "intra bss fwd offload"
-    default n
-
-config AR6320_SUPPORT
-    bool "support AR6320"
-    default n
-
-config DYNAMIC_SINGLE_CHIP
-    string "dynamic single chip name"
-    default ""
-
-config DFS_FCC_TYPE4_DURATION_CHECK
-    bool "check DFS FCC TYPE4 duration"
-    default n
-
-config PKT_LOG
-    bool "enable/disable pkt log"
-    default n
-
-config WLAN_FEATURE_BMI
-    bool "feature BMI"
-    default n
-
-config ALLOC_CONTIGUOUS_MULTI_PAGE
-    bool "alloc contiguous multi page"
-    default n
-
-config LEGACY_IPA_OFFLOAD
-    bool "Flag for ROME and GENOA IPA"
-    default n
-
-config DP_IPA_OFFLOAD
-    bool "Flag to enable IPA for chips go dp path"
-    default n
-
-config AR6320_TX_THROTTLE
-    bool "Flag for ROME tx throttle"
-    default n
-
-config AR6320_LL_DP_SUPPORT
-    bool "Flag for ROME LL DP"
-    default n
-
-config AR6320_MONITOR_MODE
-    bool "Flag for ROME MONITOR MODE"
-    default n
-
-config SUPPORT_P2P_BY_ONE_INTF_WLAN
-	bool "support p2p by one interface"
-	default n
-
-config WLAN_IPA_TX_FLOW_CONTROL
-	bool "enable IPA tx flow control"
-	default n
-
-config QCACLD_FEATURE_COEX_CONFIG
-	bool "bt coex config"
-	default n
-
-config IPA_P2P_SUPPORT
-	bool "support p2p when IPA is enabled"
-	default n
-
-config WLAN_BU_DEBUG
-	bool "Enable WLAN DEBUG LOG BUFFER"
-	default n
-
-config MLO_SAP_LINK_REMOVAL
-	bool "Enable MLO SAP LINK REMOVAL"
-	depends on WLAN_FEATURE_MULTI_LINK_SAP
-	default n
-
-config WLAN_POS_GET_BY_NAME_NOT_SUPPORT
-	bool "Enable WLAN_POS_GET_BY_NAME_NOT_SUPPORT"
-	default n
-
-config HIF_SDIO
-	bool "enable HIF SDIO"
-	default n
-
-config QCA_WIFI_SDIO
-	bool "enable WIFI SDIO"
-	default n
-
-config CLD_HL_SDIO_CORE
-	bool "enable CLD_HL_SDIO_CORE"
-	default n
-
-config SDIO_TRANSFER
-	depends on CLD_HL_SDIO_CORE
-    bool "sdio transfer type, n:mailbox, y:adma"
-	default n
-
-config TX_DESC_HI_PRIO_RESERVE
-    bool "enable TX_DESC_HI_PRIO_RESERVE"
-	default n
-
-config FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL
-    bool "enable FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL"
-	default n
-
-config PLD_SDIO_CNSS_FLAG
-    bool "enable CNSS"
-	default n
-
-config BMI_PCIE
-	bool "BMI run under PCIe"
-	default n
-
-config BMI_SDIO
-	bool "BMI run under SDIO"
-	default n
-
-config AR6320_PCI
-	bool "ROME with PCIe interface"
-	default n
-
-config SCAN_RANDOM_MAC_ADDR
-       bool "Enable SCAN Random MAC addr"
-       default n
-
-config TARGET_DUMP_FOR_NON_QC_PLATFORM
-	bool "dump control when msm subsystem is not defined"
-	default n
-
-config DRIVER_PASSTHRU_MODE
-	bool "Enable Driver Passthrough mode"
-	default n
-
-config ICNSS2_MODULE
-	bool "Enable ICNSS2 module"
-	default n
-
-config ICNSS2_HELIUM
-	bool "Enable ICNSS2 feature for Helium"
-	default n
-
-if ICNSS2_HELIUM
-config ROME_IF
-	string "Enable ROME_IF"
-	default snoc
+if QCA6490_HEADERS_DEF
+config CHIP_VERSION
+        int "Enable CHIP_VERSION"
+        default 1
 endif
-
-config PLD_SNOC_ICNSS_FLAG
-	bool "Enable pld snoc ICNSS flag"
-	default n
-
-config QCACLD_FEATURE_METERING
-	bool "Enable QCACLD_FEATURE_METERING"
-	default n
-
-config WLAN_SYNC_TSF
-	bool "Enable QCOM sync multi devices tsf feature"
-	default n
-
-config MPC_UT_FRAMEWORK
-	bool "Enable Unit test framework for multiport concurrency"
-	default n
-
-config BUILD_DEBUG_VERSION
-	bool "Enable build debug version"
-	default n
-
-config BUILD_DIAG_VERSION
-	bool "Enable build diag version"
-	default n
-
-config HIF_SNOC
-	bool "Enable hif snoc feature"
-	default n
-
-config PKTLOG_LEGACY
-	bool "Enable legacy packet log support"
-	default n
-
-config MCL
-	bool "Enable MCL"
-	default n
-
-config FEATURE_BLACKLIST_MGR
-	bool "Enable blacklist manager"
-	default n
-
-config INTERFACE_MGR
-	bool "Enable INTERFACE_MGR"
-	default n
-
-config ENABLE_LOW_POWER_MODE
-	bool "Enable ENABLE_LOW_POWER_MODE"
-	default n
-
-config CNSS_ADRASTEA
-	bool "Enable CNSS_ADRASTEA"
-	default n
-
-config FEATURE_ENABLE_CE_DP_IRQ_AFFINE
-	bool "Enable FEATURE_ENABLE_CE_DP_IRQ_AFFINE"
-	default n
-
-config DT_CPU_MASK_DP_INTR
-	bool "Enable DT_CPU_MASK_DP_INTR"
-	default n
-
-
-config WLAN_FASTPATH_AND_NOT_RHINE
-	bool "Enable WLAN_FASTPATH_AND_NOT_RHINE"
-	default n
-
-config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE feature"
-	default n
-
-config WLAN_FEATURE_POWER_STATISTICS
-	bool "Enable WLAN_FEATURE_POWER_STATISTICS feature"
-	default n
-
-config SCAN_RANDOM_MAC_ADDR
-	bool "Enable SCAN_RANDOM_MAC_ADDR feature"
-	default n
-
-config FEATURE_DAL_DP_SUPPORT
-	bool "Enable FEATURE_DAL_DP_SUPPORT feature"
-	default n
-
-if CNSS_ADRASTEA
-config HIF_LARGE_CE_RING_HISTORY
-	int "Enable HIF_LARGE_CE_RING_HISTORY"
-	default 8192
-endif
-
-config WLAN_TAS_SYSFS
-	bool "Enable TAS sysfs"
-	default n
-
-config WLAN_FEATURE_CTAS
-	bool "Enable C-TAS (Coordinated TAS) feature"
-	depends on CP_STATS
-	default n
-
-config WLAN_FEATURE_SNR_STATS
-	bool "Enable SNR stats"
-	default n
-
-config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE feature"
-	default n
-
-config WLAN_FEATURE_POWER_STATISTICS
-	bool "Enable WLAN_FEATURE_POWER_STATISTICS feature"
-	default n
-
-config SCAN_RANDOM_MAC_ADDR
-	bool "Enable SCAN_RANDOM_MAC_ADDR feature"
-	default n
-
-config FEATURE_DAL_DP_SUPPORT
-	bool "Enable FEATURE_DAL_DP_SUPPORT feature"
-	default n
-
-config WLAN_SURVEY_NOISE_FLOOR
-	int "Survey noise floor value reported in dBm"
-	default -96
-
-config FEATURE_WLAN_HOST_TXRX_STATS
-	bool "Enable FEATURE_WLAN_HOST_TXRX_STATS"
-	default n
 endif # QCA_CLD_WLAN

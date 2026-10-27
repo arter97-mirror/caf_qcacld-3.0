@@ -34,9 +34,6 @@
 #include "qdf_nbuf.h"
 #include "qdf_threads.h"
 #include "qdf_net_if.h"
-#ifdef FEATURE_DAL_DP_SUPPORT
-#include "dp_dal.h"
-#endif
 
 /* Timeout in ms to wait for a DP rx thread */
 #ifdef HAL_CONFIG_SLUB_DEBUG_ON
@@ -142,13 +139,11 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 {
 	uint8_t reo_ring_num;
 	uint32_t off = 0;
-	char nbuf_pkt_string[100];
+	char nbuf_queued_string[100];
 	uint32_t total_queued = 0;
 	uint32_t temp = 0;
-	int cpu_index = 0;
-	uint32_t total_all_cpu = 0;
 
-	qdf_mem_zero(nbuf_pkt_string, sizeof(nbuf_pkt_string));
+	qdf_mem_zero(nbuf_queued_string, sizeof(nbuf_queued_string));
 
 	for (reo_ring_num = 0; reo_ring_num < DP_RX_TM_MAX_REO_RINGS;
 	     reo_ring_num++) {
@@ -156,10 +151,10 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 		if (!temp)
 			continue;
 		total_queued += temp;
-		if (off >= sizeof(nbuf_pkt_string))
+		if (off >= sizeof(nbuf_queued_string))
 			continue;
-		off += qdf_scnprintf(&nbuf_pkt_string[off],
-				     sizeof(nbuf_pkt_string) - off,
+		off += qdf_scnprintf(&nbuf_queued_string[off],
+				     sizeof(nbuf_queued_string) - off,
 				     "reo[%u]:%u ", reo_ring_num, temp);
 	}
 
@@ -170,7 +165,7 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 		rx_thread->id,
 		qdf_nbuf_queue_head_qlen(&rx_thread->nbuf_queue),
 		total_queued,
-		nbuf_pkt_string,
+		nbuf_queued_string,
 		rx_thread->stats.nbuf_dequeued,
 		rx_thread->stats.nbuf_sent_to_stack,
 		rx_thread->stats.gro_flushes,
@@ -182,24 +177,6 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 		rx_thread->stats.dropped_invalid_os_rx_handles,
 		rx_thread->stats.dropped_others,
 		rx_thread->stats.dropped_enq_fail);
-
-	qdf_mem_zero(nbuf_pkt_string, sizeof(nbuf_pkt_string));
-	off = 0;
-	for (cpu_index = 0; cpu_index < QDF_MAX_AVAILABLE_CPU; cpu_index++) {
-		temp = rx_thread->stats.nbuf_per_cpu[cpu_index];
-		if (!temp)
-			continue;
-		total_all_cpu += temp;
-		if (off >= sizeof(nbuf_pkt_string))
-			continue;
-		off += qdf_scnprintf(&nbuf_pkt_string[off],
-				     sizeof(nbuf_pkt_string) - off,
-				     "cpu[%u]:%u ", cpu_index, temp);
-	}
-
-	if (total_all_cpu)
-		dp_info("total:%u %s",
-			total_all_cpu, nbuf_pkt_string);
 }
 
 QDF_STATUS dp_rx_tm_dump_stats(struct dp_rx_tm_handle *rx_tm_hdl)
@@ -236,7 +213,6 @@ QDF_STATUS dp_check_and_update_pending(struct dp_rx_tm_handle_cmn
 	uint32_t nbuf_dequeued_total = 0;
 	uint32_t rx_flushed_total = 0;
 	uint32_t pending = 0;
-	uint64_t dequeued_flushed;
 	int i;
 
 	txrx_handle_cmn =
@@ -271,9 +247,9 @@ QDF_STATUS dp_check_and_update_pending(struct dp_rx_tm_handle_cmn
 		}
 	}
 
-	dequeued_flushed = (uint64_t)nbuf_dequeued_total + rx_flushed_total;
-	if (nbuf_queued_total > dequeued_flushed)
-		pending = (uint32_t)(nbuf_queued_total - dequeued_flushed);
+	if (nbuf_queued_total > (nbuf_dequeued_total + rx_flushed_total))
+		pending = nbuf_queued_total - (nbuf_dequeued_total +
+					       rx_flushed_total);
 
 	if (unlikely(pending > rx_pending_hl_threshold))
 		qdf_atomic_set(&rx_tm_hdl->allow_dropping, 1);
@@ -505,7 +481,6 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 	ol_txrx_soc_handle soc;
 	uint32_t num_list_elements = 0;
 	uint32_t iterates = 0;
-	int cpu_index;
 
 	struct dp_txrx_handle_cmn *txrx_handle_cmn;
 
@@ -530,8 +505,6 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 		num_list_elements += qdf_nbuf_get_gso_segs(nbuf_list);
 		rx_thread->stats.nbuf_dequeued += num_list_elements;
 		iterates += num_list_elements;
-		cpu_index = qdf_get_raw_smp_processor_id();
-		rx_thread->stats.nbuf_per_cpu[cpu_index] += num_list_elements;
 
 		vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf_list);
 		cdp_get_os_rx_handles_from_vdev(soc, vdev_id, &stack_fn,
@@ -863,40 +836,6 @@ static int dp_rx_tm_thread_napi_poll(qdf_napi_struct *napi, int budget)
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
-/**
- * dp_rx_thread_get_dummy_netdev_ptr() - Get dummy netdev pointer
- * fromdp rx thread
- * @rx_thread: DP RX thread pointer
- *
- * Return: dummy netdev pointer
- */
-static inline struct net_device *
-dp_rx_thread_get_dummy_netdev_ptr(struct dp_rx_thread *rx_thread)
-{
-	return rx_thread->netdev;
-}
-
-static inline void
-dp_rx_thread_set_dummy_netdev_ptr(struct dp_rx_thread *rx_thread,
-				  struct net_device *nd)
-{
-	rx_thread->netdev = nd;
-}
-#else
-static inline struct net_device *
-dp_rx_thread_get_dummy_netdev_ptr(struct dp_rx_thread *rx_thread)
-{
-	return &rx_thread->netdev;
-}
-
-static inline void
-dp_rx_thread_set_dummy_netdev_ptr(struct dp_rx_thread *rx_thread,
-				  struct net_device *nd)
-{
-}
-#endif
-
 /**
  * dp_rx_tm_thread_napi_init() - Initialize dummy rx_thread NAPI
  * @rx_thread: dp_rx_thread structure containing dummy napi and netdev
@@ -905,13 +844,9 @@ dp_rx_thread_set_dummy_netdev_ptr(struct dp_rx_thread *rx_thread,
  */
 static void dp_rx_tm_thread_napi_init(struct dp_rx_thread *rx_thread)
 {
-	struct net_device *dummy_nd;
-
-	dummy_nd = dp_rx_thread_get_dummy_netdev_ptr(rx_thread);
 	/* Todo - optimize to use only one dummy netdev for all thread napis */
-	qdf_net_if_create_dummy_if((struct qdf_net_if **)&dummy_nd);
-	dp_rx_thread_set_dummy_netdev_ptr(rx_thread, dummy_nd);
-	qdf_netif_napi_add(dummy_nd, &rx_thread->napi,
+	qdf_net_if_create_dummy_if((struct qdf_net_if *)&rx_thread->netdev);
+	qdf_netif_napi_add(&rx_thread->netdev, &rx_thread->napi,
 			   dp_rx_tm_thread_napi_poll, 64);
 	qdf_napi_enable(&rx_thread->napi);
 }
@@ -924,13 +859,7 @@ static void dp_rx_tm_thread_napi_init(struct dp_rx_thread *rx_thread)
  */
 static void dp_rx_tm_thread_napi_deinit(struct dp_rx_thread *rx_thread)
 {
-	struct net_device *dummy_nd;
-
-	dummy_nd = dp_rx_thread_get_dummy_netdev_ptr(rx_thread);
-	qdf_napi_disable(&rx_thread->napi);
 	qdf_netif_napi_del(&rx_thread->napi);
-	qdf_net_if_destroy_dummy_if((struct qdf_net_if *)dummy_nd);
-	dp_rx_thread_set_dummy_netdev_ptr(rx_thread, NULL);
 }
 
 /*
@@ -1414,7 +1343,7 @@ QDF_STATUS dp_rx_tm_resume(struct dp_rx_tm_handle *rx_tm_hdl)
 			continue;
 		dp_debug("calling thread %d to resume", i);
 
-		/* positively reset event_flag for DP_RX_THREADS_SUSPENDING
+		/* postively reset event_flag for DP_RX_THREADS_SUSPENDING
 		 * state
 		 */
 		qdf_clear_bit(RX_SUSPEND_EVENT,
@@ -1444,7 +1373,7 @@ QDF_STATUS dp_rx_refill_thread_resume(struct dp_rx_refill_thread *refill_thread)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/* positively reset event_flag for DP_RX_REFILL_THREAD_SUSPENDING
+	/* postively reset event_flag for DP_RX_REFILL_THREAD_SUSPENDING
 	 * state
 	 */
 	qdf_clear_bit(RX_REFILL_SUSPEND_EVENT,
@@ -1546,176 +1475,10 @@ static uint8_t dp_rx_tm_select_thread(struct dp_rx_tm_handle *rx_tm_hdl,
 	return selected_rx_thread;
 }
 
-#ifdef FEATURE_DAL_DP_SUPPORT
-void dp_rx_tm_gro_flush_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
-				    enum dp_rx_gro_flush_code flush_code)
-{
-	int i;
-	uint8_t id;
-
-	if (!rx_tm_hdl->dal_dp_enabled)
-		return;
-
-	for (i = 0; i < DAL_DP_RX_THREADS; i++) {
-		id = rx_tm_hdl->dal_dp_rx_thread_start_id + i;
-		if (id >= rx_tm_hdl->num_dp_rx_threads) {
-			dp_err("Invalid DAL thread id %u, max %u",
-			       id, rx_tm_hdl->num_dp_rx_threads);
-			break;
-		}
-
-		dp_rx_tm_thread_gro_flush_ind(rx_tm_hdl->rx_thread[id],
-					      flush_code);
-	}
-}
-
-static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
-					    struct dp_rx_tm_handle *rx_tm_hdl)
-{
-	if (!soc || !rx_tm_hdl)
-		return;
-
-	rx_tm_hdl->dal_dp_enabled = cdp_is_dal_dp_enabled(soc);
-}
-
-static void
-dp_rx_tm_enqueue_pkt_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
-				 qdf_nbuf_t nbuf_list)
-{
-	qdf_nbuf_t list_head[DAL_DP_RX_THREADS] = {NULL};
-	qdf_nbuf_t list_tail[DAL_DP_RX_THREADS] = {NULL};
-	qdf_nbuf_t head_ptr;
-	qdf_nbuf_t next;
-	uint32_t hash;
-	uint8_t id;
-	uint8_t start_id;
-
-	start_id = rx_tm_hdl->dal_dp_rx_thread_start_id;
-	if (start_id + DAL_DP_RX_THREADS > rx_tm_hdl->num_dp_rx_threads) {
-		dp_err("Invalid DAL thread start %d dal_threads %d total %d",
-		       start_id, DAL_DP_RX_THREADS,
-		       rx_tm_hdl->num_dp_rx_threads);
-		qdf_nbuf_list_free(nbuf_list);
-		return;
-	}
-
-	head_ptr = nbuf_list;
-	while (head_ptr) {
-		next = qdf_nbuf_next(head_ptr);
-		hash = QDF_NBUF_CB_RX_FLOW_ID(head_ptr);
-		id = hash % DAL_DP_RX_THREADS;
-
-		if (!list_head[id]) {
-			list_head[id] = head_ptr;
-			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(list_head[id]) = 1;
-		} else {
-			qdf_nbuf_set_next(list_tail[id], head_ptr);
-			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(list_head[id])++;
-		}
-
-		list_tail[id] = head_ptr;
-		qdf_nbuf_set_next(list_tail[id], NULL);
-		head_ptr = next;
-	}
-
-	for (id = 0; id < DAL_DP_RX_THREADS; id++) {
-		if (!list_head[id])
-			continue;
-
-		dp_rx_tm_thread_enqueue(rx_tm_hdl->rx_thread[id + start_id],
-					list_head[id]);
-	}
-}
-
-static inline bool
-dp_rx_tm_check_dal_owned_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
-			     qdf_nbuf_t nbuf_list)
-{
-	if (!rx_tm_hdl->dal_dp_enabled || !qdf_nbuf_dal_owned_get(nbuf_list))
-		return false;
-
-	dp_rx_tm_enqueue_pkt_dal_threads(rx_tm_hdl, nbuf_list);
-	return true;
-}
-
-static inline bool
-dp_rx_tm_gro_flush_ind_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
-				   int rx_ctx_id,
-				   enum dp_rx_gro_flush_code flush_code)
-{
-	int i;
-	uint8_t id;
-
-	if (!rx_tm_hdl->dal_dp_enabled ||
-	    !(BIT(rx_ctx_id) & DAL_DP_REO_RING_MASK))
-		return false;
-
-	/* flush all dal dp rx threads if flush is for dal rings */
-	for (i = 0; i < DAL_DP_RX_THREADS; i++) {
-		id = rx_tm_hdl->dal_dp_rx_thread_start_id + i;
-		dp_rx_tm_thread_gro_flush_ind(rx_tm_hdl->rx_thread[id],
-					      flush_code);
-	}
-
-	return true;
-}
-
-static inline uint8_t
-dp_rx_tm_select_dal_thread(struct dp_rx_tm_handle *rx_tm_hdl,
-			   qdf_nbuf_t nbuf)
-{
-	uint32_t hash = QDF_NBUF_CB_RX_FLOW_ID(nbuf);
-
-	return (hash % DAL_DP_RX_THREADS) +
-		rx_tm_hdl->dal_dp_rx_thread_start_id;
-}
-
-static inline uint8_t
-dp_rx_tm_select_thread_wrapper(struct dp_rx_tm_handle *rx_tm_hdl,
-			       qdf_nbuf_t nbuf)
-{
-	if (rx_tm_hdl->dal_dp_enabled && qdf_nbuf_dal_owned_get(nbuf))
-		return dp_rx_tm_select_dal_thread(rx_tm_hdl, nbuf);
-	else
-		return dp_rx_tm_select_thread(rx_tm_hdl,
-					      QDF_NBUF_CB_RX_CTX_ID(nbuf));
-}
-#else
-static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
-					    struct dp_rx_tm_handle *rx_tm_hdl)
-{
-}
-
-static inline bool
-dp_rx_tm_check_dal_owned_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
-			     qdf_nbuf_t nbuf_list)
-{
-	return false;
-}
-
-static inline bool
-dp_rx_tm_gro_flush_ind_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
-				   int rx_ctx_id,
-				   enum dp_rx_gro_flush_code flush_code)
-{
-	return false;
-}
-
-static inline uint8_t
-dp_rx_tm_select_thread_wrapper(struct dp_rx_tm_handle *rx_tm_hdl,
-			       qdf_nbuf_t nbuf)
-{
-	return dp_rx_tm_select_thread(rx_tm_hdl, QDF_NBUF_CB_RX_CTX_ID(nbuf));
-}
-#endif
-
 QDF_STATUS dp_rx_tm_enqueue_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
 				qdf_nbuf_t nbuf_list)
 {
 	uint8_t selected_thread_id;
-
-	if (dp_rx_tm_check_dal_owned_pkt(rx_tm_hdl, nbuf_list))
-		return QDF_STATUS_SUCCESS;
 
 	selected_thread_id =
 		dp_rx_tm_select_thread(rx_tm_hdl,
@@ -1731,10 +1494,6 @@ dp_rx_tm_gro_flush_ind(struct dp_rx_tm_handle *rx_tm_hdl, int rx_ctx_id,
 {
 	uint8_t selected_thread_id;
 
-	if (dp_rx_tm_gro_flush_ind_dal_threads(rx_tm_hdl,
-					       rx_ctx_id, flush_code))
-		return QDF_STATUS_SUCCESS;
-
 	selected_thread_id = dp_rx_tm_select_thread(rx_tm_hdl, rx_ctx_id);
 	dp_rx_tm_thread_gro_flush_ind(rx_tm_hdl->rx_thread[selected_thread_id],
 				      flush_code);
@@ -1743,11 +1502,11 @@ dp_rx_tm_gro_flush_ind(struct dp_rx_tm_handle *rx_tm_hdl, int rx_ctx_id,
 }
 
 qdf_napi_struct *dp_rx_tm_get_napi_context(struct dp_rx_tm_handle *rx_tm_hdl,
-					   qdf_nbuf_t nbuf)
+					   uint8_t rx_ctx_id)
 {
 	uint8_t selected_thread_id;
 
-	selected_thread_id = dp_rx_tm_select_thread_wrapper(rx_tm_hdl, nbuf);
+	selected_thread_id = dp_rx_tm_select_thread(rx_tm_hdl, rx_ctx_id);
 
 	return &rx_tm_hdl->rx_thread[selected_thread_id]->napi;
 }
@@ -1851,18 +1610,11 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	dp_ext_hdl->refill_thread.enabled = true;
 	cdp_register_rx_refill_thread_sched_handler(soc,
 						    dp_rx_refill_thread_schedule);
-	dp_dal_update_dal_config(soc, &dp_ext_hdl->rx_tm_hdl);
 
 	num_dp_rx_threads = dp_get_rx_threads_num(soc);
-	dp_info("%d RX threads in use",
-		num_dp_rx_threads +
-		dp_get_dal_rx_threads_num(&dp_ext_hdl->rx_tm_hdl));
+	dp_info("%d RX threads in use", num_dp_rx_threads);
 
 	if (dp_ext_hdl->config.enable_rx_threads) {
-		dp_rx_tm_set_dal_start_id(&dp_ext_hdl->rx_tm_hdl,
-					  num_dp_rx_threads);
-		num_dp_rx_threads +=
-			dp_get_dal_rx_threads_num(&dp_ext_hdl->rx_tm_hdl);
 		qdf_status = dp_rx_tm_init(&dp_ext_hdl->rx_tm_hdl,
 					   num_dp_rx_threads);
 	}

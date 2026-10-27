@@ -35,11 +35,6 @@
 #include <target_if_psoc_wake_lock.h>
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_crypto_global_api.h"
-#ifdef WLAN_STA_SEAMLESS_ROAMING
-#include "wlan_ipa_ucfg_api.h"
-#include "wlan_osif_priv.h"
-#include <net/cfg80211.h>
-#endif
 
 struct wlan_cm_roam_rx_ops *
 target_if_cm_get_roam_rx_ops(struct wlan_objmgr_psoc *psoc)
@@ -93,94 +88,6 @@ target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops)
 	target_if_cm_roam_register_vendor_handoff_rx_ops(rx_ops);
 }
 
-#ifdef WLAN_STA_SEAMLESS_ROAMING
-static void target_if_cm_roam_reset_ipa_sw_routing_setting(
-				struct roam_offload_roam_event *roam_event)
-{
-	struct vdev_osif_priv *osif_priv;
-	struct net_device *dev;
-	struct wlan_objmgr_vdev *vdev = NULL;
-	struct wlan_objmgr_pdev *pdev = NULL;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct wlan_mlme_cfg *mlme_cfg;
-
-	psoc = roam_event->psoc;
-	if (!psoc) {
-		target_if_err("psoc is null");
-		return;
-	}
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		target_if_err("Failed to get MLME Obj");
-		return;
-	}
-	mlme_cfg = &mlme_obj->cfg;
-
-	/**
-	 * If seamless roaming is disabled, the ipa will do cleanup and
-	 * re-setup during roaming, so it is meaningless to do ipa sw
-	 * routing switch in this roaming scenario, so do not need to
-	 * do the ipa sw routing reset if seamless roaming is disabled.
-	 */
-	if (!mlme_cfg->lfr.seamless_roaming_enabled) {
-		target_if_info("seamless roaming is disabled!");
-		return;
-	}
-
-	target_if_debug("reset the ipa sw routing setting!");
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, roam_event->vdev_id,
-						    WLAN_PSOC_TARGET_IF_ID);
-	if (!vdev) {
-		target_if_err("vdev_id(%d) not found", roam_event->vdev_id);
-		return;
-	}
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		target_if_err("Failed to find pdev");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_PSOC_TARGET_IF_ID);
-		return;
-	}
-
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_PSOC_TARGET_IF_ID);
-	if (osif_priv && osif_priv->wdev) {
-		dev = osif_priv->wdev->netdev;
-	} else {
-		target_if_err("osif_priv is null");
-		return;
-	}
-
-	ucfg_ipa_sw_routing_set(pdev, (qdf_netdev_t)dev, QDF_STA_MODE,
-				roam_event->vdev_id, NULL, false);
-}
-#else
-static inline void
-target_if_cm_roam_reset_ipa_sw_routing_setting(
-				struct roam_offload_roam_event *roam_event)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BN_SMD
-static void
-target_if_smd_roam_free_ies(struct roam_offload_roam_event *roam_event)
-{
-	if (roam_event->smd_transition_ie) {
-		roam_event->smd_transition_ie->ie_len = 0;
-		qdf_mem_free(roam_event->smd_transition_ie);
-	}
-}
-#else
-static inline void
-target_if_smd_roam_free_ies(struct roam_offload_roam_event *roam_event)
-{
-}
-#endif
-
-
 int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 {
 	QDF_STATUS qdf_status;
@@ -223,19 +130,6 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	    roam_event->reason == ROAM_REASON_HO_FAILED)
 		target_if_stop_rso_stop_timer(roam_event);
 
-	if (roam_event->reason == ROAM_REASON_INVALID) {
-		if (roam_event->notif == CM_ROAM_NOTIF_ROAM_START ||
-		    roam_event->notif == CM_ROAM_NOTIF_ROAM_SMD_START)
-			target_if_prevent_pm_during_roam(psoc);
-		else if (roam_event->notif == CM_ROAM_NOTIF_ROAM_ABORT)
-			target_if_allow_pm_after_roam(psoc);
-	} else if (roam_event->reason == ROAM_REASON_HO_FAILED) {
-		target_if_allow_pm_after_roam(psoc);
-		target_if_cm_roam_reset_ipa_sw_routing_setting(roam_event);
-	} else if (roam_event->reason == ROAM_REASON_DEAUTH) {
-		target_if_cm_roam_reset_ipa_sw_routing_setting(roam_event);
-	}
-
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
 	if (!roam_rx_ops || !roam_rx_ops->roam_event_rx) {
 		target_if_err("No valid roam rx ops");
@@ -254,14 +148,7 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	qdf_status = roam_rx_ops->roam_event_rx(roam_event);
 
 done:
-	if (roam_event) {
-		/* Free dynamically allocated subfields before freeing the main structure */
-		if (roam_event->hw_mode_trans_ind)
-			qdf_mem_free(roam_event->hw_mode_trans_ind);
-
-		target_if_smd_roam_free_ies(roam_event);
-		qdf_mem_free(roam_event);
-	}
+	qdf_mem_free(roam_event);
 	return qdf_status_to_os_return(qdf_status);
 }
 
@@ -400,7 +287,7 @@ int target_if_cm_roam_sync_event(ol_scn_t scn, uint8_t *event,
 		return -EINVAL;
 	}
 
-	target_if_prevent_pm_during_roam(psoc);
+	target_if_prevent_pm_during_roam_sync(psoc);
 
 	qdf_status = wmi_extract_roam_sync_event(wmi_handle, event,
 						 len, &sync_ind);
@@ -428,7 +315,7 @@ int target_if_cm_roam_sync_event(ol_scn_t scn, uint8_t *event,
 
 err:
 	if (status == -EINVAL)
-		target_if_allow_pm_after_roam(psoc);
+		target_if_allow_pm_after_roam_sync(psoc);
 
 	if (sync_ind && sync_ind->ric_tspec_data)
 		qdf_mem_free(sync_ind->ric_tspec_data);
@@ -640,7 +527,7 @@ target_if_cm_roam_auth_offload_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	struct wmi_unified *wmi_handle;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_cm_roam_rx_ops *roam_rx_ops;
-	struct auth_offload_event *auth_event = NULL;
+	struct auth_offload_event auth_event = {0};
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -654,33 +541,22 @@ target_if_cm_roam_auth_offload_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
-	auth_event = qdf_mem_malloc(sizeof(*auth_event));
-	if (!auth_event) {
-		target_if_err("Auth event mem alloc failed");
-		return -ENOMEM;
-	}
-	qdf_mem_zero(auth_event, sizeof(*auth_event));
-
 	qdf_status = wmi_extract_auth_offload_event(wmi_handle, event, len,
-						    auth_event);
+						    &auth_event);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		target_if_err("parsing of event failed, %d", qdf_status);
-		status = -EINVAL;
-		goto end;
+		return -EINVAL;
 	}
 
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
 	if (!roam_rx_ops || !roam_rx_ops->roam_auth_offload_event) {
 		target_if_err("No valid roam rx ops");
-		status = -EINVAL;
-		goto end;
+		return -EINVAL;
 	}
-	qdf_status = roam_rx_ops->roam_auth_offload_event(auth_event);
-	if (QDF_IS_STATUS_ERROR(qdf_status))
+	qdf_status = roam_rx_ops->roam_auth_offload_event(&auth_event);
+	if (QDF_IS_STATUS_ERROR(status))
 		status = -EINVAL;
 
-end:
-	qdf_mem_free(auth_event);
 	return status;
 }
 
@@ -863,7 +739,7 @@ target_if_update_pairwise_key_peer_mac(struct wlan_crypto_key_entry *crypto_entr
 	if (crypto_entry->link_id == MLO_INVALID_LINK_IDX)
 		return;
 
-	for (i = 0; i < WLAN_CRYPTO_MAXKEYIDX; i++) {
+	for (i = 0; i < WLAN_CRYPTO_MAX_VLANKEYIX; i++) {
 		if (!crypto_entry->keys.key[i])
 			continue;
 
@@ -881,7 +757,7 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 	struct wlan_objmgr_psoc *psoc;
 	struct wmi_unified *wmi_handle;
 	struct wlan_cm_roam_rx_ops *roam_rx_ops;
-	struct wlan_crypto_key_entry *keys = NULL;
+	struct wlan_crypto_key_entry *keys;
 	struct qdf_mac_addr mld_addr;
 	struct wlan_mlo_dev_context *ml_ctx = NULL;
 	struct wlan_objmgr_vdev *vdev_list;
@@ -890,7 +766,6 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 	int ret = 0;
 	QDF_STATUS status;
 	uint8_t i, j;
-	bool keys_owned = false;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -964,7 +839,7 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 		    keys[i].link_id != MLO_INVALID_LINK_IDX &&
 		    ml_ctx->link_ctx) {
 			for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
-				link_info = &ml_ctx->sta_ctx->links_info[j];
+				link_info = &ml_ctx->link_ctx->links_info[j];
 				if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
 					continue;
 
@@ -996,22 +871,10 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 		target_if_err("Add keys failed");
 		ret = 0;
 	}
-	/*
-	 * Ownership of the per-link key allocations (GTK/IGTK/BIGTK) is
-	 * transferred into the crypto module by roam_sync_key_event() above,
-	 * even if it partially failed for some links. Freeing keys[] below
-	 * must not touch those pointers again.
-	 */
-	keys_owned = true;
 done:
-	if (keys) {
-		if (!keys_owned)
-			for (i = 0; i < num_keys; i++)
-				wlan_crypto_free_key(&keys[i].keys);
+	qdf_mem_zero(keys, WLAN_MAX_ML_BSS_LINKS * sizeof(*keys));
+	qdf_mem_free(keys);
 
-		qdf_mem_zero(keys, WLAN_MAX_ML_BSS_LINKS * sizeof(*keys));
-		qdf_mem_free(keys);
-	}
 	return ret;
 }
 #endif

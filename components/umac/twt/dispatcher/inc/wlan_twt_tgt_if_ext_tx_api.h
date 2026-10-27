@@ -101,15 +101,4 @@ QDF_STATUS
 tgt_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev,
 				 bool unavailability_mode);
-/**
- * tgt_twt_send_responder_disable_per_vdev - this API is wrapper for
- * function "target_if_twt_send_responder_disable_per_vdev"
- * @psoc: Pointer to PSOC object
- * @vdev_id: VDEV ID
- *
- * Return: QDF Status
- */
-QDF_STATUS
-tgt_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
-					uint8_t vdev_id);
 #endif /* _WLAN_TWT_TGT_IF_EXT_TX_API_H_ */

@@ -131,8 +131,6 @@ struct wlan_fwol_coex_config {
  * @priority_wpps: Priority of the wpps mitigation to consider by fw
  * @thermal_action: thermal action as defined enum thermal_mgmt_action_code
  * @therm_stats_offset: thermal temp offset as set in gThermalStatsTempOffset
- * @thermal_algo_type: thermal throttling algorithm type as set in
- *                     thermal_algo_type ini. Refer enum thermal_algo_type
  */
 struct wlan_fwol_thermal_temp {
 	bool     thermal_mitigation_enable;
@@ -148,26 +146,7 @@ struct wlan_fwol_thermal_temp {
 #ifdef THERMAL_STATS_SUPPORT
 	uint8_t therm_stats_offset;
 #endif
-#ifdef THERMAL_UTIL_THROTTLE_SUPPORT
-	enum thermal_algo_type thermal_algo_type;
-#endif
 };
-
-#ifdef WLAN_DDR_BW_MITIGATION
-/**
- * struct wlan_fwol_bwm_params - BW mitigation related config items
- * @bw_mitigation_enable: To control bw mitigation feature
- * @throttle_dutycycle_level: Array of throttle duty cycle levels
- * @bw_sampling_time: sampling time for bw mitigation in ms
- * @priority_bwm: priority of the bw mitigation to consider by fw
- */
-struct wlan_fwol_bwm_params {
-	bool bw_mitigation_enable;
-	uint32_t throttle_dutycycle_level[FWOL_THERMAL_THROTTLE_LEVEL_MAX];
-	uint16_t bw_sampling_time;
-	uint8_t priority_bwm;
-};
-#endif
 
 /**
  * struct wlan_fwol_ie_allowlist - Probe request IE allowlist config items
@@ -242,7 +221,6 @@ struct wlan_fwol_tsf_accuracy_configs {
  * struct wlan_fwol_cfg - fwol config items
  * @coex_config: coex config items
  * @thermal_temp_cfg: Thermal temperature related config items
- * @bwm_params_cfg: BW mitigation related config items
  * @ie_allowlist_cfg: IE Allowlist related config items
  * @neighbor_report_cfg: 11K neighbor report config
  * @ani_enabled: ANI enable/disable
@@ -255,7 +233,6 @@ struct wlan_fwol_tsf_accuracy_configs {
  * @lower_brssi_thresh: Lower BRSSI threshold
  * @enable_dtim_1chrx: Enable/disable DTIM 1 CHRX
  * @dynamic_bw_switch: Enable/Disable dynamic bandwidth switch
- * @dynamic_mode_switch: Enable/Disable dynamic mode switch
  * @alternative_chainmask_enabled: Alternate chainmask
  * @smart_chainmask_enabled: Enable/disable chainmask
  * @get_rts_profile: Set the RTS profile
@@ -268,11 +245,11 @@ struct wlan_fwol_tsf_accuracy_configs {
  * @sap_xlna_bypass: bypass SAP xLNA
  * @is_rate_limit_enabled: Enable/disable RA rate limited
  * @tsf_gpio_pin: TSF GPIO Pin config
+ * @tsf_irq_host_gpio_pin: TSF GPIO Pin config
+ * @tsf_sync_host_gpio_pin: TSF Sync GPIO Pin config
  * @tsf_ptp_options: TSF Plus feature options config
  * @tsf_sync_enable: TSF sync feature enable/disable
  * @tsf_accuracy_configs: TSF Accuracy feature config parameters
- * @tsf_irq_host_gpio_pin: TSF GPIO Pin config
- * @tsf_sync_host_gpio_pin: TSF Sync GPIO Pin config
  * @sae_enable: SAE feature enable config
  * @gcmp_enable: GCMP feature enable config
  * @enable_tx_sch_delay: Enable TX SCH delay value config
@@ -289,9 +266,6 @@ struct wlan_fwol_cfg {
 	/* Add CFG and INI items here */
 	struct wlan_fwol_coex_config coex_config;
 	struct wlan_fwol_thermal_temp thermal_temp_cfg;
-#ifdef WLAN_DDR_BW_MITIGATION
-	struct wlan_fwol_bwm_params bwm_params_cfg;
-#endif
 	struct wlan_fwol_ie_allowlist ie_allowlist_cfg;
 	struct wlan_fwol_neighbor_report_cfg neighbor_report_cfg;
 	bool ani_enabled;
@@ -304,7 +278,6 @@ struct wlan_fwol_cfg {
 	uint16_t lower_brssi_thresh;
 	bool enable_dtim_1chrx;
 	bool dynamic_bw_switch;
-	bool dynamic_mode_switch;
 	bool alternative_chainmask_enabled;
 	bool smart_chainmask_enabled;
 	uint16_t get_rts_profile;
@@ -318,8 +291,9 @@ struct wlan_fwol_cfg {
 #ifdef FEATURE_WLAN_RA_FILTERING
 	bool is_rate_limit_enabled;
 #endif
-#ifdef WLAN_FEATURE_TSF_PLUS
+#ifdef WLAN_FEATURE_TSF
 	uint32_t tsf_gpio_pin;
+#ifdef WLAN_FEATURE_TSF_PLUS
 	uint32_t tsf_ptp_options;
 	bool tsf_sync_enable;
 #ifdef WLAN_FEATURE_TSF_ACCURACY
@@ -330,6 +304,7 @@ struct wlan_fwol_cfg {
 #endif
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
 	uint32_t tsf_sync_host_gpio_pin;
+#endif
 #endif
 #endif
 #ifdef WLAN_FEATURE_SAE

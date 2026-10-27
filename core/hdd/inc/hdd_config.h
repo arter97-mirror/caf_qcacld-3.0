@@ -105,10 +105,6 @@ enum hdd_dot11_mode {
 	eHDD_DOT11_MODE_11be,
 	eHDD_DOT11_MODE_11be_ONLY,
 #endif
-#ifdef WLAN_FEATURE_11BN
-	eHDD_DOT11_MODE_11bn,
-	eHDD_DOT11_MODE_11bn_ONLY,
-#endif
 };
 
 /*
@@ -287,33 +283,6 @@ enum hdd_dot11_mode {
 			CFG_INTERFACE_CHANGE_WAIT_DEFAULT, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Interface change wait")
-
-#define CFG_IDLESHUTDOWN_BOOTSKIP_DEFAULT 0
-/*
- * <ini>
- * gInterfaceChangeWait_BootSkip  - Whether to skip idle shutdown
- * during load phase.
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to decide whether skip idle shutdown or not during
- * driver load phase.
- *
- * Value 1 can be used to skip idle shutdown during driver loading phase.
- *
- * Related: gInterfaceChangeWait
- *
- * Supported Feature: All
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP CFG_INI_BOOL( \
-		"gInterfaceChangeWait_BootSkip", \
-		CFG_IDLESHUTDOWN_BOOTSKIP_DEFAULT, \
-		"Idle shutdown skip during boot")
 
 #ifdef QCA_WIFI_EMULATION
 #define CFG_TIMER_MULTIPLIER_DEFAULT	100
@@ -648,8 +617,7 @@ enum hdd_runtime_pm_cfg {
  * @Max: 2
  * @Default: 0
  *
- * This ini is used to enable runtime PM, but it doesn't take effect
- * in single MSI mode, RTPM is always off in single MSI mode.
+ * This ini is used to enable runtime PM
  *
  * 0: RTPM disabled, so CxPC aware RTPM will be disabled as well
  * 1: RTPM enabled, but CxPC aware RTPM disabled
@@ -1317,26 +1285,6 @@ struct dhcp_server {
 #define CFG_LINK_STATE_CACHE_EXPIRY_ALL
 #endif /* WLAN_FEATURE_11BE_MLO */
 
-/*
- * <ini>
- * gEnablePrimaryStaMloCap - Enable/Disable primary STA MLO capability
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable primary STA MLO capability.
- *
- * Supported Feature: MLO
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_ENABLE_PRIMARY_STA_MLO_CAP CFG_INI_BOOL( \
-			"gEnablePrimaryStaMloCap", \
-			1, \
-			"Enable/Disable primary STA MLO capability")
-
 /**
  * enum host_log_level - Debug verbose level imposed by user
  * @HOST_LOG_LEVEL_NONE: no trace will be logged.
@@ -1436,6 +1384,25 @@ enum host_log_level {
 
 /*
  * <ini>
+ * exclude_selftx_from_cca_busy_time - Exclude self tx time from cca busy time
+ * @Default: false
+ *
+ * This ini is used to exclude self tx time from cca busy time.
+ *
+ * false: Don't exclude self tx time from cca busy time.
+ * true: Deduct tx time from cca busy time.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME CFG_INI_BOOL( \
+	"exclude_selftx_from_cca_busy_time", \
+	false, \
+	"This ini is used to exclude self tx time from CCA busy time")
+
+/*
+ * <ini>
  * gEnableSmemMailbox - enable shared memory mailbox
  * @Min: 0
  * @Max: 1
@@ -1512,7 +1479,7 @@ enum host_log_level {
  * g_sap_sap_sta_concurrency  - enable SAP-SAP-STA concurrency
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini will not allow SAP-SAP-STA concurrency to be included in the
  * iface combinations.
@@ -1529,7 +1496,7 @@ enum host_log_level {
  */
 #define CFG_SAP_SAP_STA_CONCURRENCY CFG_INI_BOOL( \
 		"g_sap_sap_sta_concurrency", \
-		1, \
+		0, \
 		"This ini is used to enable SAP-SAP-STA concurrency")
 
 /*
@@ -1582,97 +1549,6 @@ enum host_log_level {
 		"g_sta_p2p_ndp_concurrency", \
 		1, \
 		"This ini is used to enable STA+P2P+NDP concurrency")
-
-/*
- * <ini>
- * g_sta_sta_sap_sap_concurrency  - enable STA-STA-SAP-SAP concurrency
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini will not allow STA-STA-SAP-SAP concurrency to be included in the
- * iface combinations.
- *
- * 0: disable STA-STA-SAP-SAP concurrency
- * 1: enable STA-STA-SAP-SAP concurrency
- * Related: None
- *
- * Supported Feature: IFACE combinations
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_STA_STA_SAP_SAP_CONCURRENCY CFG_INI_BOOL( \
-		"g_sta_sta_sap_sap_concurrency", \
-		0, \
-		"This ini is used to enable STA-STA-SAP-SAP concurrency")
-
-/*
- * <ini>
- * g_iface_combination_bitmap - Bitmask to control standalone iface combinations
- * @Min: 0x0
- * @Max: 0xFFFFFFFF
- * @Default: 0x3
- *
- * Each bit enables/disables a specific standalone two-interface combination
- * from being included in the advertised nl80211 iface combinations list.
- *
- * Bit 0: STA+STA combination
- *   0 - disable STA+STA combination
- *   1 - enable  STA+STA combination
- *
- * Bit 1: SAP+SAP combination
- *   0 - disable SAP+SAP combination
- *   1 - enable  SAP+SAP combination
- *
- * Bits 2-31: Reserved for future use.  Must be set to 0.
- *
- * Default 0x3 enables both STA+STA and SAP+SAP.
- *
- * Related: None
- *
- * Supported Feature: IFACE combinations
- *
- * Usage: External
- *
- * </ini>
- */
-#define WLAN_HDD_IFACE_COMBINATION_STA_STA  BIT(0)
-#define WLAN_HDD_IFACE_COMBINATION_SAP_SAP  BIT(1)
-
-#define CFG_IFACE_COMBINATION_BITMAP CFG_INI_UINT( \
-		"g_iface_combination_bitmap", \
-		0x0, \
-		0xFFFFFFFF, \
-		0x3, \
-		CFG_VALUE_OR_DEFAULT, \
-		"Bitmask to control standalone iface combinations")
-
-/*
- * <ini>
- * g_sta_sap_sap_p2p_concurrency  - enable STA-SAP-SAP-P2P concurrency
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini will not allow STA-SAP-SAP-P2P concurrency to be included in the
- * iface combinations.
- *
- * 0: disable STA-SAP-SAP-P2P concurrency
- * 1: enable STA-SAP-SAP-P2P concurrency
- * Related: None
- *
- * Supported Feature: IFACE combinations
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_STA_SAP_SAP_P2P_CONCURRENCY CFG_INI_BOOL( \
-		"g_sta_sap_sap_p2p_concurrency", \
-		0, \
-		"This ini is used to enable STA-SAP-SAP-P2P concurrency")
 
 /*
  * <ini>
@@ -1747,101 +1623,6 @@ enum host_log_level {
 #define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
 #endif
 
-/*
- * <ini>
- * chipset_stats_push_rbs_delay_val_ms - INI to configure delay value when
- *					 pushing chipset stats RB's to userspace
- *
- * @Min: 0
- * @Max: 600000
- * Default: 0
- *
- * This INI is used to provide delay value(in ms) from the user
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS CFG_INI_UINT( \
-			"chipset_stats_push_rbs_delay_val_ms", \
-			0, \
-			600000, \
-			0, \
-			CFG_VALUE_OR_DEFAULT, \
-			"User delay value in ms")
-
-/*
- * <ini>
- * chipset_stats_push_rbs_delay_interval - INI to used to provide delay interval
- *
- * @Min: 0
- * @Max: 600000
- * Default: 0
- *
- * This INI represent after how many RB node the
- * CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS is to be applied
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL CFG_INI_UINT( \
-			"chipset_stats_push_rbs_delay_interval", \
-			0, \
-			600000, \
-			0, \
-			CFG_VALUE_OR_DEFAULT, \
-			"User delay interval")
-
-#ifdef FEATURE_WLAN_TX_POWERBOOST
-/*
- * <ini>
- * tx_powerboost - Control Tx Powerboost feature
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to Control Tx Powerboost feature
- *
- * Supported Feature: FEATURE_WLAN_TX_POWERBOOST
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_TX_POWERBOOST \
-	CFG_INI_BOOL("tx_powerboost", 0, \
-		     "Enable/Disable Tx Powerboost")
-
-#define CFG_TX_POWERBOOST_ALL \
-	CFG(CFG_TX_POWERBOOST)
-#else
-#define CFG_TX_POWERBOOST_ALL
-#endif
-
-/*
- * <ini>
- * gForceSAP20Mhz_cc_id - Force SAP to 20MHz bandwidth for country Indonesia
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to force the SAP to operate in 20MHz bandwidth for
- * country Indonesia regardless of other configurations.
- *
- * Related: None
- *
- * Supported Feature: SAP
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_FORCE_SAP_20MHZ_CC_ID_ENABLE CFG_INI_BOOL( \
-			"gForceSAP20Mhz_cc_id", \
-			0, \
-			"Force SAP to 20MHz bandwidth")
-
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1864,7 +1645,6 @@ enum host_log_level {
 	CFG(CFG_ENABLE_RAMDUMP_COLLECTION) \
 	CFG(CFG_ENABLE_UNIT_TEST_FRAMEWORK) \
 	CFG(CFG_INTERFACE_CHANGE_WAIT) \
-	CFG(CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP) \
 	CFG(CFG_INFORM_BSS_RSSI_RAW) \
 	CFG(CFG_MULTICAST_HOST_FW_MSGS) \
 	CFG(CFG_NUM_VDEV_ENABLE) \
@@ -1881,8 +1661,8 @@ enum host_log_level {
 	SAR_SAFETY_FEATURE_ALL \
 	CFG_GET_WIFI_FEATURES_ALL \
 	CFG_CPU_CXPC_THRESHOLD_ALL \
+	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
 	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
-	CFG(CFG_ENABLE_PRIMARY_STA_MLO_CAP) \
 	CFG(CFG_ENABLE_SMEM_MAILBOX) \
 	CFG(CFG_SAP_STA_NDP_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
@@ -1890,15 +1670,8 @@ enum host_log_level {
 	CFG(CFG_PREFER_NAN_CHAN_FOR_P2P) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
 	CFG(CFG_SAP_SAP_STA_CONCURRENCY) \
-	CFG(CFG_STA_STA_SAP_SAP_CONCURRENCY) \
-	CFG(CFG_IFACE_COMBINATION_BITMAP) \
-	CFG(CFG_STA_SAP_SAP_P2P_CONCURRENCY) \
 	CFG_UL_JITTER_LOG_ALL \
 	CFG_EPM_ENABLE_ALL \
 	CFG_EPM_VALUE_ALL \
-	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL \
-	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS) \
-	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL) \
-	CFG_TX_POWERBOOST_ALL \
-	CFG(CFG_FORCE_SAP_20MHZ_CC_ID_ENABLE)
+	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
 #endif

@@ -46,8 +46,6 @@ struct hdd_context;
 #define CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST_LEN 30
 
 #define FW_MODULE_LOG_LEVEL_STRING_LENGTH  (512)
-#define CFG_SAR_USER_SCENARIOS_MAX_LEN      (34)
-
 #define TX_SCHED_WRR_PARAMS_NUM            (5)
 
 /* Defines for all of the things we read from the configuration (registry). */
@@ -130,7 +128,6 @@ struct hdd_config {
 	bool bug_on_reinit_failure;
 	bool is_ramdump_enabled;
 	uint32_t iface_change_wait_time;
-	bool shutdown_bootskip;
 	uint8_t multicast_host_fw_msgs;
 	enum hdd_wext_control private_wext_control;
 	bool enablefwprint;
@@ -198,8 +195,6 @@ struct hdd_config {
 	uint32_t sar_safety_sleep_index;
 	uint8_t enable_sar_safety;
 	bool config_sar_safety_sleep_index;
-	uint8_t sar_us_to_dsi_mapping[SAR_US_TO_DSI_MAPPING_STRING_LENGTH];
-	uint8_t sar_user_scenario_mapping_num;
 #endif
 	uint8_t nb_commands_interval;
 
@@ -213,11 +208,11 @@ struct hdd_config {
 #ifdef FEATURE_RUNTIME_PM
 	unsigned long cpu_cxpc_threshold;
 #endif
+	bool exclude_selftx_from_cca_busy;
 #ifdef WLAN_FEATURE_11BE_MLO
 	/* ml link state cache expiry time*/
 	qdf_time_t link_state_cache_expiry_time;
 #endif
-	bool enable_primary_sta_mlo_cap;
 	enum cfg_sub_20_channel_width sub_20_ch_width;
 };
 
@@ -235,6 +230,8 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_set_policy_mgr_user_cfg(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_set_sme_chan_list(struct hdd_context *hdd_ctx);
 bool hdd_update_config_cfg(struct hdd_context *hdd_ctx);
+void hdd_cfg_get_global_config(struct hdd_context *hdd_ctx, char *buf,
+			       int buflen);
 
 eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(enum hdd_dot11_mode dot11Mode);
 
@@ -511,7 +508,7 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
 /**
  * hdd_update_channel_width() - Update adapter channel width settings
  * @link_info: Link info in HDD adapter
- * @chwidth: new channel width of enum phy_ch_width
+ * @chwidth: new channel width of enum eSirMacHTChannelWidth
  * @bonding_mode: channel bonding mode of the new channel width
  * @link_id: mlo link id
  * @is_restore: is restore
@@ -519,46 +516,7 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
  * Return: 0 on success, negative errno on failure
  */
 int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
-			     enum phy_ch_width chwidth,
+			     enum eSirMacHTChannelWidth chwidth,
 			     uint32_t bonding_mode, uint8_t link_id,
 			     bool is_restore);
-
-#ifdef FORCE_WAKE
-/**
- * hdd_set_hif_init_phase() - Enable/disable the
- * init_phase flag
- * @hif_ctx: hif opaque handle
- * @init_phase: init phase flag
- *
- * Return: None
- */
-void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
-			    bool init_phase);
-#else
-static inline
-void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
-			    bool init_phase)
-{
-}
-#endif /* FORCE_WAKE */
-
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * hdd_get_mlo_link_freq() - Retrieve the link frequency for a given link
- * @vdev: Pointer to the objmgr vdev object
- * @link_id: ID of the MLO link
- * @link_freq: Pointer to store the retrieved link frequency
- *
- * Return: 0 on success, negative error code on failure
- */
-int hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
-			  uint16_t *link_freq);
-#else
-static inline int
-hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
-		      uint16_t *link_freq)
-{
-	return -EINVAL;
-}
-#endif
 #endif /* end #if !defined(HDD_CONFIG_H__) */

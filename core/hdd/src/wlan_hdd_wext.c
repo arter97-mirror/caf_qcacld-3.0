@@ -228,6 +228,44 @@
 #define WE_SET_PHYMODE       10
 /*
  * <ioctl>
+ * nss - Set the number of spatial streams
+ *
+ * @INPUT: int1…..int3
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL sets the number of spatial streams. Supported values are 1 and 2
+ *
+ * @E.g: iwpriv wlan0 nss 2
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_SET_NSS           11
+/*
+ * <ioctl>
+ * ldpc - Enables or disables LDPC
+ *
+ * @INPUT: 0 – Disable, 1 - Enable
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL enables or disables LDPC
+ *
+ * @E.g: iwpriv wlan0 ldpc 1
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_SET_LDPC          12
+/*
+ * <ioctl>
  * tx_stbc - Enables or disables tx_stbc
  *
  * @INPUT: Int 0 – Disable, 1 - Enable
@@ -245,6 +283,25 @@
  * </ioctl>
  */
 #define WE_SET_TX_STBC       13
+/*
+ * <ioctl>
+ * rx_stbc - Set the rx_stbc parameter
+ *
+ * @INPUT: Int 0 – Disable, 1 - Enable
+ *
+ * @OUTPUT: None
+ *
+ * This IOTCL used to set rx_stbc parameter
+ *
+ * @E.g: iwpriv wlan0 rx_stbc <value>
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_SET_RX_STBC       14
 /*
  * <ioctl>
  * shortgi  - Sets the short-guard interval
@@ -265,6 +322,45 @@
  * </ioctl>
  */
 #define WE_SET_SHORT_GI      15
+/*
+ * <ioctl>
+ * enablertscts - enables or disables rts/cts.
+ *
+ * @INPUT: 1-Enable , 0-Disable
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL enables or disables rts/cts.
+ *
+ * @E.g: iwpriv wlan0 enablertscts <value>
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_SET_RTSCTS        16
+/*
+ * <ioctl>
+ * chwidth - Set the channel bandwidth
+ *
+ * @INPUT: 0-20mhz to 3-160mhz
+ *
+ * @OUTPUT: None
+ *
+ * This IOTCL used to set the channel bandwidth
+ *
+ * @E.g: iwpriv wlan0 chwidth 1
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_SET_CHWIDTH       17
+#define WE_SET_ANI_EN_DIS    18
 #define WE_SET_ANI_POLL_PERIOD    19
 #define WE_SET_ANI_LISTEN_PERIOD  20
 #define WE_SET_ANI_OFDM_LEVEL     21
@@ -288,6 +384,25 @@
  * </ioctl>
  */
 #define WE_SET_DYNAMIC_BW         23
+/*
+ * <ioctl>
+ * txchainmask - This IOCTL sets the current Tx chain mask
+ *
+ * @INPUT: Mask Value
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL sets the current Tx chain mask
+ *
+ * @E.g: iwpriv wlan0 txchainmask 1
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_SET_TX_CHAINMASK  24
 /*
  * <ioctl>
  * rxchainmask - Sets the current Rx chain mask
@@ -404,6 +519,13 @@
  */
 #define WE_SET_TXPOW_5G      30
 /* Private ioctl for firmware debug log */
+#define WE_DBGLOG_LOG_LEVEL             31
+#define WE_DBGLOG_VAP_ENABLE            32
+#define WE_DBGLOG_VAP_DISABLE           33
+#define WE_DBGLOG_MODULE_ENABLE         34
+#define WE_DBGLOG_MODULE_DISABLE        35
+#define WE_DBGLOG_MOD_LOG_LEVEL         36
+#define WE_DBGLOG_TYPE                  37
 #define WE_SET_TXRX_FWSTATS             38
 /*
  * <ioctl>
@@ -424,6 +546,7 @@
  * </ioctl>
  */
 #define WE_SET_VHT_RATE                 39
+#define WE_DBGLOG_REPORT_ENABLE         40
 #define WE_TXRX_FWSTATS_RESET           41
 /*
  * <ioctl>
@@ -465,6 +588,7 @@
  * </ioctl>
  */
 #define WE_SET_MAX_TX_POWER_5_0   43
+#define WE_SET_PKTLOG                   44
 /* Private ioctl for packet power save */
 #define  WE_PPS_PAID_MATCH              45
 #define  WE_PPS_GID_MATCH               46
@@ -652,6 +776,26 @@
  * </ioctl>
  */
 #define WE_SET_GTX_MINTPC               68
+/*
+ * <ioctl>
+ * gtxBWMask - Sets the BW mask (20/40/80/160 Mhz)
+ *
+ * @INPUT: Mask value
+ *
+ * @OUTPUT: None
+ *
+ * This IOTCL used to set gtxBWMask
+ *
+ * @E.g: iwpriv wlan0 gtxBWMask <value>
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+
+#define WE_SET_GTX_BWMASK               69
 /*
  * <ioctl>
  * setMccLatency - Sets the MCC latency value during STA-P2P concurrency
@@ -853,6 +997,46 @@
 
 /*
  * <ioctl>
+ * enable_dcm - enable Dual Carrier Modulation(DCM)
+ *
+ * @INPUT: 0/1
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL enables/disables DCM.
+ *
+ * @E.g: iwpriv wlan0 enable_dcm <0/1>
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WE_SET_DCM                            92
+
+/*
+ * <ioctl>
+ * range_ext - enable Range extension
+ *
+ * @INPUT: 0/1
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL enables/disables Range extension.
+ *
+ * @E.g: iwpriv wlan0 range_ext <1/0>
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WE_SET_RANGE_EXT                      93
+
+/*
+ * <ioctl>
  * wow_ito - sets the timeout value for inactivity data while
  * in power save mode during wow
  *
@@ -922,6 +1106,8 @@
 #define WE_SET_MODULATED_DTIM                   96
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
+#define WE_MOTION_DET_START_STOP                97
+#define WE_MOTION_DET_BASE_LINE_START_STOP      98
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /*
@@ -1001,6 +1187,86 @@
 #define WE_GET_CONCURRENCY_MODE 9
 /*
  * <ioctl>
+ * get_nss - Get the number of spatial STBC streams (NSS)
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: NSS
+ *  wlan0     get_nss:2
+ *
+ * This IOTCL used to get the number of spatial STBC streams
+ *
+ * @E.g: iwpriv wlan0 get_nss
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_NSS           11
+/*
+ * <ioctl>
+ * get_ldpc - This IOCTL gets the low density parity check (LDPC)
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: ldpc
+ *  wlan0     get_ldpc:1
+ *
+ * This IOTCL used to gets the low density parity check (LDPC)
+ *
+ * @E.g: iwpriv wlan0 get_ldpc
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_LDPC          12
+/*
+ * <ioctl>
+ * get_tx_stbc - Get the value of the current Tx space time block code (STBC)
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: TXSTBC
+ *  wlan0     get_tx_stbc:1
+ *
+ * This IOTCL get the value of the current Tx space time block code (STBC)
+ *
+ * @E.g: iwpriv wlan0 get_tx_stbc
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_TX_STBC       13
+/*
+ * <ioctl>
+ * get_rx_stbc - Gets the value of the current Rx STBC
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Rx STBC
+ *  wlan0     get_rx_stbc:1
+ *
+ * This IOTCL used to get the value of the current Rx STBC
+ *
+ * @E.g: iwpriv wlan0 get_rx_stbc
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_RX_STBC       14
+/*
+ * <ioctl>
  * get_shortgi - Get the value of the current short GI setting
  *
  * @INPUT: None
@@ -1039,6 +1305,26 @@
  * </ioctl>
  */
 #define WE_GET_RTSCTS        16
+/*
+ * <ioctl>
+ * get_chwidth - Get the current channel width setting
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: channel width
+ *  wlan0     get_chwidth:0
+ *
+ * This IOTCL get the current channel width setting.
+ *
+ * @E.g: iwpriv wlan0 get_chwidth
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_CHWIDTH       17
 /*
  * <ioctl>
  * get_anienable - Get the anienable
@@ -1141,6 +1427,47 @@
 #define WE_GET_ANI_CCK_LEVEL      22
 /*
  * <ioctl>
+ * get_cwmenable - Get the value of the dynamic channel bandwidth setting
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Enable/disable dynamic channel bandwidth
+ *  wlan0     get_cwmenable:0
+ *
+ * This IOTCL get the value of the dynamic channel bandwidth setting
+ *
+ * @E.g: iwpriv wlan0 get_cwmenable
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_DYNAMIC_BW         23
+/*
+ * <ioctl>
+ * get_txchainmask - Get the txchainmask that was set
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: txchainmask
+ *  wlan0     get_txchainmask:1
+ *
+ * This IOCTL gets the txchainmask that was set
+ * This command is useful if it was previously set
+ *
+ * @E.g: iwpriv wlan0 get_txchainmask
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_TX_CHAINMASK  24
+/*
+ * <ioctl>
  * get_rxchainmask - Get the rxchainmask that was set
  *
  * @INPUT: None
@@ -1181,6 +1508,48 @@
  * </ioctl>
  */
 #define WE_GET_11N_RATE      26
+/*
+ * <ioctl>
+ * get_ampdu - Get the maximum subframe of ampdu
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Maximum subframe of ampdu
+ *  wlan0     get_ampdu:1
+ *
+ * This IOCTL gets the maximum subframe of ampdu
+ * This command is useful only if setting ampdu.
+ *
+ * @E.g: iwpriv wlan0 get_ampdu
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_AMPDU         27
+/*
+ * <ioctl>
+ * get_amsdu - Get the maximum subframe of amsdu
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Maximum subframe of amsdu
+ *  wlan0     get_amsdu:1
+ *
+ * This IOCTL gets the maximum subframe of amsdu.
+ * This command is useful only if setting amsdu
+ *
+ * @E.g: iwpriv wlan0 get_amsdu
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_AMSDU         28
 /*
  * <ioctl>
  * get_txpow2g - Get the current 2 GHz Tx power setting
@@ -1361,14 +1730,14 @@
 #define WE_GET_GTX_STEP                 52
 /*
  * <ioctl>
- * get_gtxMinTpc - Get the tx minimum tpc
+ * get_gtxMinTpc - Get the tx miminum tpc
  *
  * @INPUT: None
  *
  * @OUTPUT: TPC
  * wlan0     get_gtxMinTpc:0
  *
- * This IOCTL is used to get tx minimum tpc
+ * This IOCTL is used to get tx miminum tpc
  *
  * @E.g: iwpriv wlan0 get_gtxMinTpc
  *
@@ -1379,7 +1748,67 @@
  * </ioctl>
  */
 #define WE_GET_GTX_MINTPC               53
+/*
+ * <ioctl>
+ * get_gtxBWMask - Get the tx BW MASK
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: MASK
+ * wlan0     get_gtxBWMask:15
+ *
+ * This IOCTL is used get gtx bw mask
+ *
+ * @E.g: iwpriv wlan0 get_gtxBWMask
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_GTX_BWMASK               54
+#define WE_GET_TEMPERATURE              56
+#define WE_CAP_TSF                      58
 #define WE_GET_ROAM_SYNCH_DELAY         59
+
+/*
+ * <ioctl>
+ * get_dcm - Get dcm enablement value
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: 0/1
+ * wlan0     get_dcm
+ *
+ * This IOCTL is used get dcm value
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WE_GET_DCM                      60
+
+/*
+ * <ioctl>
+ * get_dcm - Get range extension enablement value
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: 0/1
+ * wlan0     get_range_ext
+ *
+ * This IOCTL is used get range_extension value
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WE_GET_RANGE_EXT                61
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_INT_GET_INT     (SIOCIWFIRSTPRIV + 2)
@@ -1451,7 +1880,48 @@
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_GET_CHAR_SET_NONE   (SIOCIWFIRSTPRIV + 5)
 #define WE_WLAN_VERSION      1
+#define WE_GET_STATS         2
+/*
+ * <ioctl>
+ * getConfig - gets the values of all configurations listed in WCNSS
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Current configuration to the sys log
+ *  wlan0	getConfig: WLAN configuration written to system log
+ *
+ * This IOCTL gets the values of all configurations listed in WCNSS
+ *
+ * @E.g: iwpriv wlan0 getConfig
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_CFG           3
 #define WE_GET_WMM_STATUS    4
+/*
+ * <ioctl>
+ * getChannelList - Get the available channel list while in QCMobileAP
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Channel list
+ * wlan0     getChannelList:36 US 1..165
+ *
+ * This IOCTL gets the available channel list while in QCMobileAP
+ *
+ * @E.g: iwpriv wlan0 getChannelList
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_CHANNEL_LIST  5
 /*
  * <ioctl>
  * getRSSI - Get the Received Signal Strength Indicator
@@ -1495,6 +1965,32 @@
  * </ioctl>
  */
 #define WE_GET_SUSPEND_RESUME_STATS 7
+#ifdef FEATURE_WLAN_TDLS
+/*
+ * <ioctl>
+ * getTdlsPeers - Get all TDLS peers.
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: Returns the MAC address of all the TDLS peers
+ * wlan0     getTdlsPeers:
+ * MAC               Id cap up RSSI
+ * ---------------------------------
+ * 00:0a:f5:0e:bd:18  2   Y  Y  -44
+ * 00:0a:f5:bf:0e:12  0   N  N    0
+ *
+ * This IOCTL is used to get all TDLS peers.
+ *
+ * @E.g: iwpriv wlan0 getTdlsPeers
+ *
+ * Supported Feature: TDLS
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_GET_TDLS_PEERS    8
+#endif
 /*
  * <ioctl>
  * getPMFInfo - get the PMF info of the connected session
@@ -1621,6 +2117,26 @@
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_NONE   (SIOCIWFIRSTPRIV + 6)
 
+/*
+ * <ioctl>
+ * reassoc - Trigger STA re-association to the connected AP
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL is used to trigger STA reassociation to the connected AP.
+ *
+ * @E.g: iwpriv wlan0 reassoc
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WE_SET_REASSOC_TRIGGER     8
+
 /* Sub ioctls 11 to 16 are not used */
 #define WE_GET_FW_PROFILE_DATA     18
 /*
@@ -1668,6 +2184,26 @@
 /*
  * Sequence Numbers 11-14, 16, 17-20 are not in use.
  */
+
+/*
+ * <ioctl>
+ * pm_cinfo - Shows the concurrent connection list.
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL is used to show the concurrent connection list.
+ *
+ * @E.g: iwpriv wlan0 pm_cinfo
+ *
+ * Supported Feature: DBS
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WE_POLICY_MANAGER_CINFO_CMD    15
 
 /*
  * <ioctl>
@@ -1756,6 +2292,9 @@
  * </ioctl>
  */
 #define WE_SET_TXRX_STATS    24
+
+#define WE_MOTION_DET_CONFIG_PARAM                25
+#define WE_MOTION_DET_BASE_LINE_CONFIG_PARAM      26
 
 #define WE_SET_THERMAL_THROTTLE_CFG               27
 /*
@@ -1850,6 +2389,28 @@
  * </ioctl>
  */
 #define WLAN_PRIV_DEL_TSPEC (SIOCIWFIRSTPRIV + 11)
+/*
+ * <ioctl>
+ * getTspec - Get TSPEC entry for each AC
+ *
+ * @INPUT: 1 TSPEC param
+ *     @[arg0]: handle
+ *
+ * @OUTPUT: Success/Failure
+ *
+ * This IOCTL is used to get TSPEC entry for each AC.
+ *
+ * @E.g: iwpriv wlan0 getTspec <handle>
+ * iwpriv wlan0 getTspec 7001
+ * wlan0     delTspec:18
+ *
+ * Supported Feature: WMM
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WLAN_PRIV_GET_TSPEC (SIOCIWFIRSTPRIV + 13)
 
 /* (SIOCIWFIRSTPRIV + 10) is currently unused */
 /* (SIOCIWFIRSTPRIV + 12) is currently unused */
@@ -1917,6 +2478,11 @@
 #define WLAN_SET_PACKET_FILTER_PARAMS (SIOCIWFIRSTPRIV + 23)
 #endif
 
+
+#ifdef FEATURE_WLAN_SCAN_PNO
+/* Private ioctl to get the statistics */
+#define WLAN_SET_PNO (SIOCIWFIRSTPRIV + 24)
+#endif
 /*
  * <ioctl>
  * SETBAND - Set the operational band
@@ -1945,6 +2511,8 @@
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_TWO_INT_GET_NONE   (SIOCIWFIRSTPRIV + 28)
 #define WE_SET_SMPS_PARAM    1
+#define WE_SET_FW_CRASH_INJECT    2
+#define WE_DUMP_DP_TRACE_LEVEL    3
 /* Private sub ioctl for enabling and setting histogram interval of profiling */
 #define WE_ENABLE_FW_PROFILE    4
 #define WE_SET_FW_PROFILE_HIST_INTVL    5
@@ -2009,6 +2577,27 @@
 
 /* 802.11p IOCTL */
 #define WLAN_SET_DOT11P_CHANNEL_SCHED    (SIOCIWFIRSTPRIV + 30)
+
+/*
+ * <ioctl>
+ * getLinkSpeed - Gets the current link speed in Mbps
+ *
+ * @INPUT: None
+ *
+ * @OUTPUT: linkspeed in mbps
+ *  wlan0     getLinkSpeed:7
+ *
+ * This IOCTL is used get the current link speed in Mbps
+ *
+ * @E.g: iwpriv wlan0 getLinkSpeed
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ioctl>
+ */
+#define WLAN_GET_LINK_SPEED          (SIOCIWFIRSTPRIV + 31)
 
 #define WLAN_STATS_INVALID            0
 #define WLAN_STATS_RETRY_CNT          1
@@ -2160,6 +2749,121 @@ int hdd_check_private_wext_control(struct hdd_context *hdd_ctx,
 				      info);
 }
 
+void hdd_wlan_get_stats(struct wlan_hdd_link_info *link_info, uint16_t *length,
+			char *buffer, uint16_t buf_len)
+{
+	struct hdd_tx_rx_stats *stats = &link_info->hdd_stats.tx_rx_stats;
+	struct dp_tx_rx_stats *dp_stats;
+	uint32_t len = 0;
+	uint32_t total_rx_pkt = 0, total_rx_dropped = 0;
+	uint32_t total_rx_delv = 0, total_rx_refused = 0;
+	uint32_t total_tx_pkt = 0;
+	uint32_t total_tx_dropped = 0;
+	uint32_t total_tx_orphaned = 0;
+	uint32_t total_tx_classified_ac[WLAN_MAX_AC] = {0};
+	uint32_t total_tx_dropped_ac[WLAN_MAX_AC] = {0};
+	int i = 0;
+	uint8_t ac, rx_ol_con = 0, rx_ol_low_tput = 0;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
+	if (!vdev)
+		return;
+
+	dp_stats = qdf_mem_malloc(sizeof(*dp_stats));
+	if (!dp_stats) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+		return;
+	}
+
+	if (ucfg_dp_get_txrx_stats(vdev, dp_stats)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+		hdd_err("Unable to get stats from DP component");
+		qdf_mem_free(dp_stats);
+		return;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+
+	ucfg_dp_get_disable_rx_ol_val(hdd_ctx->psoc,
+				      &rx_ol_con, &rx_ol_low_tput);
+
+	for (; i < NUM_CPUS; i++) {
+		total_rx_pkt += dp_stats->per_cpu[i].rx_packets;
+		total_rx_dropped += dp_stats->per_cpu[i].rx_dropped;
+		total_rx_delv += dp_stats->per_cpu[i].rx_delivered;
+		total_rx_refused += dp_stats->per_cpu[i].rx_refused;
+		total_tx_pkt += dp_stats->per_cpu[i].tx_called;
+		total_tx_dropped += dp_stats->per_cpu[i].tx_dropped;
+		total_tx_orphaned += dp_stats->per_cpu[i].tx_orphaned;
+		for (ac = 0; ac < WLAN_MAX_AC; ac++) {
+			total_tx_classified_ac[ac] +=
+					 stats->per_cpu[i].tx_classified_ac[ac];
+			total_tx_dropped_ac[ac] +=
+					    stats->per_cpu[i].tx_dropped_ac[ac];
+		}
+	}
+
+	len = scnprintf(buffer, buf_len,
+			"\nTransmit[%lu] - "
+			"called %u, dropped %u orphan %u,"
+			"\n[dropped]    BK %u, BE %u, VI %u, VO %u"
+			"\n[classified] BK %u, BE %u, VI %u, VO %u"
+			"\n\nReceive[%lu] - "
+			"packets %u, dropped %u, unsolict_arp_n_mcast_drp %u, delivered %u, refused %u\n"
+			"GRO - agg %u non-agg %u flush_skip %u low_tput_flush %u disabled(conc %u low-tput %u)\n",
+			qdf_system_ticks(),
+			total_tx_pkt,
+			total_tx_dropped,
+			total_tx_orphaned,
+			total_tx_dropped_ac[SME_AC_BK],
+			total_tx_dropped_ac[SME_AC_BE],
+			total_tx_dropped_ac[SME_AC_VI],
+			total_tx_dropped_ac[SME_AC_VO],
+			total_tx_classified_ac[SME_AC_BK],
+			total_tx_classified_ac[SME_AC_BE],
+			total_tx_classified_ac[SME_AC_VI],
+			total_tx_classified_ac[SME_AC_VO],
+			qdf_system_ticks(),
+			total_rx_pkt, total_rx_dropped,
+			qdf_atomic_read(&dp_stats->rx_usolict_arp_n_mcast_drp),
+			total_rx_delv,
+			total_rx_refused,
+			dp_stats->rx_aggregated, dp_stats->rx_non_aggregated,
+			dp_stats->rx_gro_flush_skip,
+			dp_stats->rx_gro_low_tput_flush,
+			rx_ol_con,
+			rx_ol_low_tput);
+
+	for (i = 0; i < NUM_CPUS; i++) {
+		if (dp_stats->per_cpu[i].rx_packets == 0)
+			continue;
+		len += scnprintf(buffer + len, buf_len - len,
+				 "Rx CPU[%d]:"
+				 "packets %u, dropped %u, delivered %u, refused %u\n",
+				 i, dp_stats->per_cpu[i].rx_packets,
+				 dp_stats->per_cpu[i].rx_dropped,
+				 dp_stats->per_cpu[i].rx_delivered,
+				 dp_stats->per_cpu[i].rx_refused);
+	}
+
+	len += scnprintf(buffer + len, buf_len - len,
+		"\nTX_FLOW"
+		"\nCurrent status: %s"
+		"\ntx-flow timer start count %u"
+		"\npause count %u, unpause count %u",
+		(stats->is_txflow_paused == true ? "PAUSED" : "UNPAUSED"),
+		stats->txflow_timer_cnt,
+		stats->txflow_pause_cnt,
+		stats->txflow_unpause_cnt);
+
+	len += cdp_stats(cds_get_context(QDF_MODULE_ID_SOC),
+			 link_info->vdev_id, &buffer[len],
+			 (buf_len - len));
+	*length = len + 1;
+	qdf_mem_free(dp_stats);
+}
+
 /**
  * wlan_hdd_write_suspend_resume_stats() - Writes suspend/resume stats to buffer
  * @hdd_ctx: The Hdd context owning the stats to be written
@@ -2246,6 +2950,82 @@ void hdd_wlan_list_fw_profile(uint16_t *length,
 static int hdd_we_dump_stats(struct wlan_hdd_link_info *link_info, int value)
 {
 	return hdd_wlan_dump_stats(link_info->adapter, value);
+}
+
+/**
+ * __iw_get_linkspeed() - Get current link speed ioctl
+ * @dev: device upon which the ioctl was received
+ * @info: ioctl request information
+ * @wrqu: ioctl request data
+ * @extra: extra ioctl buffer
+ *
+ * Return: 0 on success, non-zero on error
+ */
+static int __iw_get_linkspeed(struct net_device *dev,
+			      struct iw_request_info *info,
+			      union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	char *out_link_speed = (char *)extra;
+	int len = sizeof(uint32_t) + 1;
+	uint32_t link_speed = 0;
+	struct hdd_context *hdd_ctx;
+	int ret, rc;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	ret = wlan_hdd_get_link_speed(adapter->deflink, &link_speed);
+	if (0 != ret)
+		return ret;
+
+	wrqu->data.length = len;
+	/* return the linkspeed as a string */
+	rc = snprintf(out_link_speed, len, "%u", link_speed);
+	if ((rc < 0) || (rc >= len)) {
+		/* encoding or length error? */
+		hdd_err("Unable to encode link speed");
+		return -EIO;
+	}
+
+	hdd_exit();
+	/* a value is being successfully returned */
+	return 0;
+}
+
+/**
+ * iw_get_linkspeed() - Get current link speed ioctl
+ * @dev: device upon which the ioctl was received
+ * @info: ioctl request information
+ * @wrqu: ioctl request data
+ * @extra: extra ioctl buffer
+ *
+ * Return: 0 on success, non-zero on error
+ */
+static int iw_get_linkspeed(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_get_linkspeed(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 
 #ifdef FEATURE_WLM_STATS
@@ -2888,6 +3668,24 @@ static int hdd_we_set_tm_level(struct wlan_hdd_link_info *link_info, int level)
 	return qdf_status_to_os_return(status);
 }
 
+static int hdd_we_set_nss(struct wlan_hdd_link_info *link_info, int nss)
+{
+	QDF_STATUS status;
+
+	hdd_debug("NSS %d", nss);
+
+	if ((nss > 2) || (nss <= 0)) {
+		hdd_err("Invalid NSS: %d", nss);
+		return -EINVAL;
+	}
+
+	status = hdd_update_nss(link_info, nss, nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("cfg set failed, value %d status %d", nss, status);
+
+	return qdf_status_to_os_return(status);
+}
+
 int hdd_we_set_short_gi(struct wlan_hdd_link_info *link_info, int sgi)
 {
 	int errno;
@@ -2914,6 +3712,56 @@ int hdd_we_set_short_gi(struct wlan_hdd_link_info *link_info, int sgi)
 		hdd_err("cfg set failed, value %d status %d", sgi, errno);
 
 	return errno;
+}
+
+static int hdd_we_set_rtscts(struct wlan_hdd_link_info *link_info, int rtscts)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
+	uint32_t value;
+	uint32_t rts_threshold_val;
+	QDF_STATUS status;
+	int errno;
+
+	hdd_debug("RTSCTS %d", rtscts);
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
+
+	status = ucfg_mlme_get_rts_threshold(hdd_ctx->psoc,
+					     &rts_threshold_val);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Get rts threshold failed, status %d", status);
+		return -EINVAL;
+	}
+
+	if ((rtscts & HDD_RTSCTS_EN_MASK) == HDD_RTSCTS_ENABLE) {
+		value = rts_threshold_val;
+	} else if (((rtscts & HDD_RTSCTS_EN_MASK) == 0) ||
+		   ((rtscts & HDD_RTSCTS_EN_MASK) == HDD_CTS_ENABLE)) {
+		value = cfg_max(CFG_RTS_THRESHOLD);
+	} else {
+		hdd_err_rl("Invalid value %d", rtscts);
+		return -EINVAL;
+	}
+
+	errno = wma_cli_set_command(link_info->vdev_id,
+				    wmi_vdev_param_enable_rtscts,
+				    rtscts, VDEV_CMD);
+	if (errno) {
+		hdd_err("Failed to set firmware, errno %d", errno);
+		return errno;
+	}
+
+	status = ucfg_mlme_set_rts_threshold(hdd_ctx->psoc, value);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Set rts threshold failed, status %d", status);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int hdd_we_set_11n_rate(struct wlan_hdd_link_info *link_info,
@@ -3126,6 +3974,14 @@ static int hdd_we_set_gtx_mintpc(struct wlan_hdd_link_info *link_info,
 					 value);
 }
 
+static int hdd_we_set_gtx_bwmask(struct wlan_hdd_link_info *link_info,
+				 int value)
+{
+	return hdd_we_set_green_tx_param(link_info->adapter,
+					 wmi_vdev_param_gtx_bw_mask,
+					 value);
+}
+
 static int hdd_we_packet_power_save(struct hdd_adapter *adapter,
 				    packet_power_save id,
 				    const char *id_string,
@@ -3308,6 +4164,14 @@ static int hdd_we_set_pdev(struct hdd_adapter *adapter,
 #define hdd_we_set_pdev(adapter, id, value) \
 			hdd_we_set_pdev(adapter, id, #id, value)
 
+static int hdd_we_set_ani_en_dis(struct wlan_hdd_link_info *link_info,
+				 int value)
+{
+	return hdd_we_set_pdev(link_info->adapter,
+			       wmi_pdev_param_ani_enable,
+			       value);
+}
+
 static int hdd_we_set_ani_poll_period(struct wlan_hdd_link_info *link_info,
 				      int value)
 {
@@ -3354,6 +4218,20 @@ static int hdd_we_set_cts_cbw(struct wlan_hdd_link_info *link_info,
 	return hdd_we_set_pdev(link_info->adapter,
 			       wmi_pdev_param_cts_cbw,
 			       value);
+}
+
+static int hdd_we_set_tx_chainmask(struct wlan_hdd_link_info *link_info,
+				   int value)
+{
+	int errno;
+
+	errno = hdd_we_set_pdev(link_info->adapter,
+				wmi_pdev_param_tx_chain_mask,
+				value);
+	if (errno)
+		return errno;
+
+	return hdd_set_antenna_mode(link_info, value);
 }
 
 static int hdd_we_set_rx_chainmask(struct wlan_hdd_link_info *link_info,
@@ -3496,7 +4374,55 @@ hdd_we_set_early_rx_drift_sample(struct wlan_hdd_link_info *link_info,
 			       value);
 }
 
+static int hdd_we_set_dcm(struct wlan_hdd_link_info *link_info,
+			  int value)
+{
+	return hdd_we_set_vdev(link_info->adapter,
+			       wmi_vdev_param_he_dcm_enable,
+			       value);
+}
+
 #define MAX_VDEV_HE_RANGE_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_he_range_ext
+ * wmi_vdev_param_non_data_he_range_ext
+ */
+
+static int hdd_we_set_range_ext(struct wlan_hdd_link_info *link_info,
+				int value)
+{
+	int status;
+	struct dev_set_param setparam[MAX_VDEV_HE_RANGE_PARAMS] = {};
+	uint8_t index = 0;
+
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_he_range_ext,
+					   value, index++,
+					   MAX_VDEV_HE_RANGE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_vdev_param_he_range_ext");
+		goto error;
+	}
+
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_non_data_he_range_ext,
+					   value, index++,
+					   MAX_VDEV_HE_RANGE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_vdev_param_non_data_he_range_ext");
+		goto error;
+	}
+
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     link_info->vdev_id,
+						     setparam, index);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to send vdev set params");
+
+error:
+	return status;
+}
+
 static int hdd_we_set_dbg(struct hdd_adapter *adapter,
 			  int id,
 			  const char *id_string,
@@ -3515,6 +4441,70 @@ static int hdd_we_set_dbg(struct hdd_adapter *adapter,
 
 #define hdd_we_set_dbg(adapter, id, value) \
 			hdd_we_set_dbg(adapter, id, #id, value)
+
+static int hdd_we_dbglog_log_level(struct wlan_hdd_link_info *link_info,
+				   int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_LOG_LEVEL,
+			      value);
+}
+
+static int hdd_we_dbglog_vap_enable(struct wlan_hdd_link_info *link_info,
+				    int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_VAP_ENABLE,
+			      value);
+}
+
+static int hdd_we_dbglog_vap_disable(struct wlan_hdd_link_info *link_info,
+				     int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_VAP_DISABLE,
+			      value);
+}
+
+static int hdd_we_dbglog_module_enable(struct wlan_hdd_link_info *link_info,
+				       int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_MODULE_ENABLE,
+			      value);
+}
+
+static int hdd_we_dbglog_module_disable(struct wlan_hdd_link_info *link_info,
+					int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_MODULE_DISABLE,
+			      value);
+}
+
+static int hdd_we_dbglog_mod_log_level(struct wlan_hdd_link_info *link_info,
+				       int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_MOD_LOG_LEVEL,
+			      value);
+}
+
+static int hdd_we_dbglog_type(struct wlan_hdd_link_info *link_info,
+			      int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_TYPE,
+			      value);
+}
+
+static int hdd_we_dbglog_report_enable(struct wlan_hdd_link_info *link_info,
+				       int value)
+{
+	return hdd_we_set_dbg(link_info->adapter,
+			      WMI_DBGLOG_REPORT_ENABLE,
+			      value);
+}
 
 static int hdd_we_start_fw_profile(struct wlan_hdd_link_info *link_info,
 				   int value)
@@ -3649,6 +4639,87 @@ static int hdd_we_set_modulated_dtim(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+/**
+ * hdd_we_motion_det_start_stop - start/stop motion detection
+ * @link_info: Link info pointer in HDD adapter
+ * @value: start/stop value to set
+ *
+ * Return: 0 on success, error on failure
+ */
+static int hdd_we_motion_det_start_stop(struct wlan_hdd_link_info *link_info,
+					int value)
+{
+	struct sme_motion_det_en motion_det;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (value < 0 || value > 1) {
+		hdd_err("Invalid value %d in mt_start", value);
+		return -EINVAL;
+	}
+
+	if (!adapter->motion_det_cfg) {
+		hdd_err("Motion Detection config values not available");
+		return -EINVAL;
+	}
+
+	if (!adapter->motion_det_baseline_value) {
+		hdd_err("Motion Detection Baselining not started/completed");
+		return -EAGAIN;
+	}
+
+	motion_det.vdev_id = link_info->vdev_id;
+	motion_det.enable = value;
+
+	if (value) {
+		/* For motion detection start, set motion_det_in_progress */
+		adapter->motion_det_in_progress = true;
+	} else {
+		/* For motion detection stop, reset motion_det_in_progress */
+		adapter->motion_det_in_progress = false;
+		adapter->motion_detection_mode = 0;
+	}
+
+	sme_motion_det_enable(hdd_ctx->mac_handle, &motion_det);
+
+	return 0;
+}
+
+/**
+ * hdd_we_motion_det_base_line_start_stop - start/stop md baselining
+ * @link_info: Link info pointer in HDD adapter
+ * @value: start/stop value to set
+ *
+ * Return: 0 on success, error on failure
+ */
+static int
+hdd_we_motion_det_base_line_start_stop(struct wlan_hdd_link_info *link_info,
+				       int value)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct sme_motion_det_base_line_en motion_det_base_line;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (value < 0 || value > 1) {
+		hdd_err("Invalid value %d in mt_bl_start", value);
+		return -EINVAL;
+	}
+
+	/* Do not send baselining start/stop during motion detection phase */
+	if (adapter->motion_det_in_progress) {
+		hdd_err("Motion detection still in progress, try later");
+		return -EAGAIN;
+	}
+
+	motion_det_base_line.vdev_id = link_info->vdev_id;
+	motion_det_base_line.enable = value;
+	sme_motion_det_base_line_enable(hdd_ctx->mac_handle,
+					&motion_det_base_line);
+
+	return 0;
+}
+#endif /* WLAN_FEATURE_MOTION_DETECTION */
+
 int wlan_hdd_set_btcoex_mode(struct wlan_hdd_link_info *link_info, int value)
 {
 	struct coex_config_params coex_cfg_params = {0};
@@ -3711,6 +4782,7 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 #endif
 	[WE_SET_TM_LEVEL] = hdd_we_set_tm_level,
 	[WE_SET_PHYMODE] = hdd_we_update_phymode,
+	[WE_SET_NSS] = hdd_we_set_nss,
 	[WE_SET_GTX_HT_MCS] = hdd_we_set_gtx_ht_mcs,
 	[WE_SET_GTX_VHT_MCS] = hdd_we_set_gtx_vht_mcs,
 	[WE_SET_GTX_USRCFG] = hdd_we_set_gtx_usrcfg,
@@ -3718,8 +4790,14 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_GTX_MARGIN] = hdd_we_set_gtx_margin,
 	[WE_SET_GTX_STEP] = hdd_we_set_gtx_step,
 	[WE_SET_GTX_MINTPC] = hdd_we_set_gtx_mintpc,
+	[WE_SET_GTX_BWMASK] = hdd_we_set_gtx_bwmask,
+	[WE_SET_LDPC] = hdd_set_ldpc,
 	[WE_SET_TX_STBC] = hdd_set_tx_stbc,
+	[WE_SET_RX_STBC] = hdd_set_rx_stbc,
 	[WE_SET_SHORT_GI] = hdd_we_set_short_gi,
+	[WE_SET_RTSCTS] = hdd_we_set_rtscts,
+	[WE_SET_CHWIDTH] = hdd_we_set_ch_width,
+	[WE_SET_ANI_EN_DIS] = hdd_we_set_ani_en_dis,
 	[WE_SET_ANI_POLL_PERIOD] = hdd_we_set_ani_poll_period,
 	[WE_SET_ANI_LISTEN_PERIOD] = hdd_we_set_ani_listen_period,
 	[WE_SET_ANI_OFDM_LEVEL] = hdd_we_set_ani_ofdm_level,
@@ -3730,9 +4808,18 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_VHT_RATE] = hdd_we_set_vht_rate,
 	[WE_SET_AMPDU] = hdd_we_set_ampdu,
 	[WE_SET_AMSDU] = hdd_we_set_amsdu,
+	[WE_SET_TX_CHAINMASK] = hdd_we_set_tx_chainmask,
 	[WE_SET_RX_CHAINMASK] = hdd_we_set_rx_chainmask,
 	[WE_SET_TXPOW_2G] = hdd_we_set_txpow_2g,
 	[WE_SET_TXPOW_5G] = hdd_we_set_txpow_5g,
+	[WE_DBGLOG_LOG_LEVEL] = hdd_we_dbglog_log_level,
+	[WE_DBGLOG_VAP_ENABLE] = hdd_we_dbglog_vap_enable,
+	[WE_DBGLOG_VAP_DISABLE] = hdd_we_dbglog_vap_disable,
+	[WE_DBGLOG_MODULE_ENABLE] = hdd_we_dbglog_module_enable,
+	[WE_DBGLOG_MODULE_DISABLE] = hdd_we_dbglog_module_disable,
+	[WE_DBGLOG_MOD_LOG_LEVEL] = hdd_we_dbglog_mod_log_level,
+	[WE_DBGLOG_TYPE] = hdd_we_dbglog_type,
+	[WE_DBGLOG_REPORT_ENABLE] = hdd_we_dbglog_report_enable,
 	[WE_SET_TXRX_FWSTATS] = hdd_we_set_txrx_fwstats,
 	[WE_TXRX_FWSTATS_RESET] = hdd_we_txrx_fwstats_reset,
 	[WE_DUMP_STATS] = hdd_we_dump_stats,
@@ -3771,8 +4858,15 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_CHANNEL] = hdd_we_set_channel,
 	[WE_SET_CONC_SYSTEM_PREF] = hdd_we_set_conc_system_pref,
 	[WE_SET_11AX_RATE] = hdd_we_set_11ax_rate,
+	[WE_SET_DCM] = hdd_we_set_dcm,
+	[WE_SET_RANGE_EXT] = hdd_we_set_range_ext,
 	[WE_SET_PDEV_RESET] = hdd_handle_pdev_reset,
 	[WE_SET_MODULATED_DTIM] = hdd_we_set_modulated_dtim,
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	[WE_MOTION_DET_START_STOP] = hdd_we_motion_det_start_stop,
+	[WE_MOTION_DET_BASE_LINE_START_STOP] =
+				hdd_we_motion_det_base_line_start_stop,
+#endif /* WLAN_FEATURE_MOTION_DETECTION */
 	[WE_SET_BTCOEX_MODE] = wlan_hdd_set_btcoex_mode,
 	[WE_SET_BTCOEX_RSSI_THRESHOLD] = wlan_hdd_set_btcoex_rssi_threshold,
 };
@@ -4178,6 +5272,22 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_NSS:
+	{
+		uint8_t nss;
+
+		status = hdd_get_nss(adapter, &nss);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("unable to get vht_enable2x2");
+			ret = -EIO;
+			break;
+		}
+		*value = nss;
+
+		hdd_debug("GET_NSS: Current NSS:%d", *value);
+		break;
+	}
+
 	case WE_GET_GTX_HT_MCS:
 	{
 		hdd_debug("GET wmi_vdev_param_gtx_ht_mcs");
@@ -4241,6 +5351,33 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_GTX_BWMASK:
+	{
+		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_gtx_bw_mask,
+					     GTX_CMD);
+		break;
+	}
+
+	case WE_GET_LDPC:
+	{
+		ret = hdd_get_ldpc(adapter, value);
+		break;
+	}
+
+	case WE_GET_TX_STBC:
+	{
+		ret = hdd_get_tx_stbc(adapter, value);
+		break;
+	}
+
+	case WE_GET_RX_STBC:
+	{
+		ret = hdd_get_rx_stbc(adapter, value);
+		break;
+	}
+
 	case WE_GET_SHORT_GI:
 	{
 		hdd_debug("GET wmi_vdev_param_sgi");
@@ -4255,6 +5392,15 @@ static int __iw_setnone_getint(struct net_device *dev,
 		hdd_debug("GET wmi_vdev_param_enable_rtscts");
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_enable_rtscts,
+					     VDEV_CMD);
+		break;
+	}
+
+	case WE_GET_CHWIDTH:
+	{
+		hdd_debug("GET wmi_vdev_param_chwidth");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_chwidth,
 					     VDEV_CMD);
 		break;
 	}
@@ -4304,6 +5450,15 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_DYNAMIC_BW:
+	{
+		hdd_debug("GET wmi_pdev_param_ani_cck_level");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_pdev_param_dynamic_bw,
+					     PDEV_CMD);
+		break;
+	}
+
 	case WE_GET_11N_RATE:
 	{
 		hdd_debug("GET wmi_vdev_param_fixed_rate");
@@ -4313,12 +5468,39 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_AMPDU:
+	{
+		hdd_debug("GET AMPDU");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     GEN_VDEV_PARAM_AMPDU,
+					     GEN_CMD);
+		break;
+	}
+
+	case WE_GET_AMSDU:
+	{
+		hdd_debug("GET AMSDU");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     GEN_VDEV_PARAM_AMSDU,
+					     GEN_CMD);
+		break;
+	}
+
 	case WE_GET_ROAM_SYNCH_DELAY:
 	{
 		hdd_debug("GET ROAM SYNCH DELAY");
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     GEN_VDEV_ROAM_SYNCH_DELAY,
 					     GEN_CMD);
+		break;
+	}
+
+	case WE_GET_TX_CHAINMASK:
+	{
+		hdd_debug("GET wmi_pdev_param_tx_chain_mask");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_pdev_param_tx_chain_mask,
+					     PDEV_CMD);
 		break;
 	}
 
@@ -4474,7 +5656,27 @@ static int __iw_setnone_getint(struct net_device *dev,
 					     QPOWER_CMD);
 		break;
 	}
-
+	case WE_CAP_TSF:
+		ret = hdd_capture_tsf(adapter, (uint32_t *)value, 1);
+		break;
+	case WE_GET_TEMPERATURE:
+	{
+		hdd_debug("WE_GET_TEMPERATURE");
+		ret = wlan_hdd_get_temperature(adapter, value);
+		break;
+	}
+	case WE_GET_DCM:
+		hdd_debug("GET wmi_vdev_param_he_dcm");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_he_dcm_enable,
+					     VDEV_CMD);
+		break;
+	case WE_GET_RANGE_EXT:
+		hdd_debug("GET wmi_vdev_param_he_range_ext");
+		*value = wma_cli_get_command(adapter->deflink->vdev_id,
+					     wmi_vdev_param_he_range_ext,
+					     VDEV_CMD);
+		break;
 	default:
 	{
 		hdd_err("Invalid IOCTL get_value command %d",
@@ -4784,6 +5986,13 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_STATS:
+	{
+		hdd_wlan_get_stats(link_info, &wrqu->data.length,
+				   extra, WE_MAX_STR_LEN);
+		break;
+	}
+
 	case WE_GET_SUSPEND_RESUME_STATS:
 	{
 		ret = wlan_hdd_write_suspend_resume_stats(hdd_ctx, extra,
@@ -4928,6 +6137,15 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_CFG:
+	{
+		hdd_debug("Printing CLD global INI Config");
+		hdd_cfg_get_global_config(WLAN_HDD_GET_CTX(adapter),
+					  extra,
+					  QCSAP_IOCTL_MAX_STR_LEN);
+		wrqu->data.length = strlen(extra) + 1;
+		break;
+	}
 	case WE_GET_RSSI:
 	{
 		int8_t s7Rssi = 0;
@@ -5015,6 +6233,23 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		break;
 	}
 
+	case WE_GET_CHANNEL_LIST:
+	{
+		if (0 !=
+		    iw_get_channel_list_with_cc(dev, mac_handle,
+						info, wrqu, extra))
+			return -EINVAL;
+		break;
+	}
+#ifdef FEATURE_WLAN_TDLS
+	case WE_GET_TDLS_PEERS:
+	{
+		wrqu->data.length =
+			wlan_hdd_tdls_get_all_peers(adapter, extra,
+						    WE_MAX_STR_LEN) + 1;
+		break;
+	}
+#endif
 	case WE_GET_11W_INFO:
 	{
 		struct qdf_mac_addr connected_bssid;
@@ -5117,16 +6352,16 @@ static int __iw_get_char_setnone(struct net_device *dev,
 							   &value);
 			if (!QDF_IS_STATUS_SUCCESS(status))
 				hdd_err("Failed to set channel_width");
-			if (value == CH_WIDTH_20MHZ)
+			if (value == eHT_CHANNEL_WIDTH_20MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT20");
-			else if (value == CH_WIDTH_40MHZ)
+			else if (value == eHT_CHANNEL_WIDTH_40MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT40");
-			else if (value == CH_WIDTH_80MHZ)
+			else if (value == eHT_CHANNEL_WIDTH_80MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT80");
-			else if (value == CH_WIDTH_160MHZ)
+			else if (value == eHT_CHANNEL_WIDTH_160MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT160");
 			break;
@@ -5139,16 +6374,16 @@ static int __iw_get_char_setnone(struct net_device *dev,
 				hdd_err("Failed to set channel_width");
 
 			/* currently using vhtChannelWidth */
-			if (value == CH_WIDTH_20MHZ)
+			if (value == eHT_CHANNEL_WIDTH_20MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_20");
-			else if (value == CH_WIDTH_40MHZ)
+			else if (value == eHT_CHANNEL_WIDTH_40MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_40");
-			else if (value == CH_WIDTH_80MHZ)
+			else if (value == eHT_CHANNEL_WIDTH_80MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_80");
-			else if (value == CH_WIDTH_160MHZ)
+			else if (value == eHT_CHANNEL_WIDTH_160MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_160");
 			break;
@@ -5287,6 +6522,23 @@ static int __iw_setnone_getnone(struct net_device *dev,
 				WMI_WLAN_PROFILE_GET_PROFILE_DATA_CMDID,
 				0, DBG_CMD);
 		break;
+
+	case WE_SET_REASSOC_TRIGGER:
+	{
+		struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+		qdf_freq_t chan_freq =
+			wlan_get_operation_chan_freq(adapter->deflink->vdev);
+		struct qdf_mac_addr target_bssid;
+
+		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev,
+					    adapter->deflink->vdev_id,
+					    &target_bssid);
+		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
+					 adapter->deflink->vdev_id,
+					 &target_bssid, chan_freq,
+					 CM_ROAMING_USER);
+		return 0;
+	}
 
 	case WE_STOP_OBSS_SCAN:
 		/*
@@ -5501,6 +6753,35 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	}
 	break;
 
+	case WE_POLICY_MANAGER_CINFO_CMD:
+	{
+		struct policy_mgr_conc_connection_info *conn_info;
+		uint32_t i = 0, len = 0;
+
+		hdd_info("<iwpriv wlan0 pm_cinfo> is called");
+		conn_info = policy_mgr_get_conn_info(&len);
+		pr_info("+--------------------------+\n");
+		for (i = 0; i < len; i++) {
+			if (!conn_info->in_use)
+				continue;
+
+			pr_info("|table_index[%d]\t\t\n", i);
+			pr_info("|\t|vdev_id - %-10d|\n", conn_info->vdev_id);
+			pr_info("|\t|freq    - %-10d|\n", conn_info->freq);
+			pr_info("|\t|bw      - %-10d|\n", conn_info->bw);
+			pr_info("|\t|mode    - %-10d|\n", conn_info->mode);
+			pr_info("|\t|mac_id  - %-10d|\n", conn_info->mac);
+			pr_info("|\t|in_use  - %-10d|\n", conn_info->in_use);
+			pr_info("+--------------------------+\n");
+			conn_info++;
+		}
+
+		pr_info("|\t|current state dbs - %-10d, sbs - %-10d|\n",
+			policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc),
+			policy_mgr_is_current_hwmode_sbs(hdd_ctx->psoc));
+	}
+	break;
+
 	case WE_UNIT_TEST_CMD:
 	{
 		QDF_STATUS status;
@@ -5559,6 +6840,21 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	}
 	break;
 #endif
+	case WE_SET_PKTLOG:
+	{
+		int ret;
+
+		if (num_args < 1 || num_args > 2) {
+			hdd_err("pktlog: either 1 or 2 parameters are required");
+			return -EINVAL;
+		}
+
+		ret = hdd_process_pktlog_command(hdd_ctx, apps_args[0],
+						   apps_args[1]);
+		if (ret)
+			return ret;
+		break;
+	}
 	case WE_MAC_PWR_DEBUG_CMD:
 	{
 		struct sir_mac_pwr_dbg_cmd mac_pwr_dbg_args;
@@ -5616,8 +6912,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			return -EINVAL;
 		}
 
-		if (apps_args[0] == CDP_TXRX_STATS_28 ||
-		    apps_args[0] == CDP_TXRX_STATS_11) {
+		if (apps_args[0] == CDP_TXRX_STATS_28) {
 			if (sta_ctx->conn_info.is_authenticated) {
 				hdd_debug("ap mac addr: "QDF_MAC_ADDR_FMT,
 					  QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes));
@@ -5629,6 +6924,55 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 					     &req);
 		break;
 	}
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	case WE_MOTION_DET_CONFIG_PARAM:
+	{
+		struct sme_motion_det_cfg motion_det_cfg;
+
+		if (num_args != 15) {
+			hdd_err_rl("mt_config: Invalid no of args");
+			return -EINVAL;
+		}
+
+		motion_det_cfg.vdev_id = adapter->deflink->vdev_id;
+		motion_det_cfg.time_t1 = apps_args[0];
+		motion_det_cfg.time_t2 = apps_args[1];
+		motion_det_cfg.n1 = apps_args[2];
+		motion_det_cfg.n2 = apps_args[3];
+		motion_det_cfg.time_t1_gap = apps_args[4];
+		motion_det_cfg.time_t2_gap = apps_args[5];
+		motion_det_cfg.coarse_K = apps_args[6];
+		motion_det_cfg.fine_K = apps_args[7];
+		motion_det_cfg.coarse_Q = apps_args[8];
+		motion_det_cfg.fine_Q = apps_args[9];
+		motion_det_cfg.md_coarse_thr_high = apps_args[10];
+		motion_det_cfg.md_fine_thr_high = apps_args[11];
+		motion_det_cfg.md_coarse_thr_low = apps_args[12];
+		motion_det_cfg.md_fine_thr_low = apps_args[13];
+		adapter->motion_detection_mode = apps_args[14];
+		sme_motion_det_config(hdd_ctx->mac_handle, &motion_det_cfg);
+		adapter->motion_det_cfg =  true;
+	}
+	break;
+	case WE_MOTION_DET_BASE_LINE_CONFIG_PARAM:
+	{
+		struct sme_motion_det_base_line_cfg motion_det_base_line_cfg;
+
+		if (num_args != 4) {
+			hdd_err_rl("mt_bl_config: Invalid no of args");
+			return -EINVAL;
+		}
+
+		motion_det_base_line_cfg.vdev_id = adapter->deflink->vdev_id;
+		motion_det_base_line_cfg.bl_time_t = apps_args[0];
+		motion_det_base_line_cfg.bl_packet_gap = apps_args[1];
+		motion_det_base_line_cfg.bl_n = apps_args[2];
+		motion_det_base_line_cfg.bl_num_meas = apps_args[3];
+		sme_motion_det_base_line_config(hdd_ctx->mac_handle,
+						&motion_det_base_line_cfg);
+	}
+	break;
+#endif /* WLAN_FEATURE_MOTION_DETECTION */
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	case WE_SET_THERMAL_THROTTLE_CFG:
 	{
@@ -6041,6 +7385,80 @@ static int iw_del_tspec(struct net_device *dev,
 		return errno;
 
 	errno = __iw_del_tspec(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * __iw_get_tspec - Get TSpec private ioctl handler
+ * @dev: device upon which the ioctl was received
+ * @info: ioctl request information
+ * @wrqu: ioctl request data
+ * @extra: ioctl extra data
+ *
+ * Return: 0 on success, non-zero on error
+ */
+static int __iw_get_tspec(struct net_device *dev, struct iw_request_info *info,
+			  union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx;
+	int *params = (int *)extra;
+	hdd_wlan_wmm_status_e *wmm_status = (hdd_wlan_wmm_status_e *) extra;
+	uint32_t handle;
+	int ret;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	/* although we are defined to be a "get" ioctl, the params we require */
+	/* will fit in the iwreq_data, therefore unlike iw_add_tspec() there */
+	/* is no need to copy the params from user space */
+
+	/* validate the handle */
+	handle = params[HDD_WLAN_WMM_PARAM_HANDLE];
+	if (HDD_WMM_HANDLE_IMPLICIT == handle) {
+		/* that one is reserved */
+		*wmm_status = HDD_WLAN_WMM_STATUS_SETUP_FAILED_BAD_PARAM;
+		return 0;
+	}
+
+	*wmm_status = hdd_wmm_checkts(adapter, handle);
+	hdd_exit();
+	return 0;
+}
+
+/**
+ * iw_get_tspec - Get TSpec private ioctl handler
+ * @dev: device upon which the ioctl was received
+ * @info: ioctl request information
+ * @wrqu: ioctl request data
+ * @extra: ioctl extra data
+ *
+ * Return: 0 on success, non-zero on error
+ */
+static int iw_get_tspec(struct net_device *dev,
+			struct iw_request_info *info,
+			union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_get_tspec(dev, info, wrqu, extra);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -6687,6 +8105,360 @@ end:
 	return errno;
 }
 
+#ifdef FEATURE_WLAN_SCAN_PNO
+/*Max Len for PNO notification*/
+#define MAX_PNO_NOTIFY_LEN 100
+static void found_pref_network_cb(struct wlan_objmgr_vdev *vdev,
+	struct scan_event *event, void *args)
+{
+	struct vdev_osif_priv *osif_priv;
+	struct wireless_dev *wdev;
+	union iwreq_data wrqu;
+	char buf[MAX_PNO_NOTIFY_LEN + 1];
+
+	wlan_vdev_obj_lock(vdev);
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	wlan_vdev_obj_unlock(vdev);
+	if (!osif_priv) {
+		hdd_err("osif_priv is null");
+		return;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return;
+	}
+
+	hdd_debug("A preferred network was found");
+
+	/* create the event */
+	qdf_mem_zero(&wrqu, sizeof(wrqu));
+	qdf_mem_zero(buf, sizeof(buf));
+
+	snprintf(buf, MAX_PNO_NOTIFY_LEN,
+		 "QCOM: Found preferred network:");
+
+	wrqu.data.pointer = buf;
+	wrqu.data.length = strlen(buf);
+
+	/* send the event */
+
+	hdd_wext_send_event(wdev->netdev, IWEVCUSTOM, &wrqu, buf);
+}
+
+/**
+ * __iw_set_pno() - Preferred Network Offload ioctl handler
+ * @dev: device upon which the ioctl was received
+ * @info: ioctl request information
+ * @wrqu: ioctl request data
+ * @extra: ioctl extra data
+ *
+ * This function parses a Preferred Network Offload command
+ * Input is string based and expected to be of the form:
+ *
+ * <enable(1) | disable(0)>
+ * when enabling:
+ * <number of networks>
+ * for each network:
+ *    <ssid_len> <ssid> <authentication> <encryption>
+ *    <ch_num> <channel_list optional> <bcast_type> <rssi_threshold>
+ * <scan_time (seconds)>
+ * <scan_repeat_count (0 means indefinite)>
+ * <suspend mode>
+ *
+ * e.g:
+ * 1 2 4 test 0 0 3 1 6 11 2 40 5 test2 4 4 6 1 2 3 4 5 6 1 0 5 2 1
+ *
+ * this translates into:
+ * -----------------------------
+ * enable PNO
+ * 2 networks
+ * Network 1:
+ *   test - with authentication type 0 and encryption type 0,
+ *   search on 3 channels: 1 6 and 11,
+ *   SSID bcast type is unknown (directed probe will be sent if
+ *   AP not found) and must meet -40dBm RSSI
+ * Network 2:
+ *   test2 - with authentication type 4 and encryption type 4,
+ *   search on 6 channels 1, 2, 3, 4, 5 and 6
+ *   bcast type is non-bcast (directed probe will be sent)
+ *   and must not meet any RSSI threshold
+ *   scan every 5 seconds 2 times
+ *   enable on suspend
+ */
+static int __iw_set_pno(struct net_device *dev,
+			struct iw_request_info *info,
+			union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx;
+	uint8_t value;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	int ret = 0;
+	int offset;
+	char *ptr, *data;
+	uint8_t i, j, params;
+	QDF_STATUS status;
+	size_t len;
+
+	/* request is a large struct, so we make it static to avoid
+	 * stack overflow.  This API is only invoked via ioctl, so it
+	 * is serialized by the kernel rtnl_lock and hence does not
+	 * need to be reentrant
+	 */
+	static struct pno_scan_req_params req;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	ret = hdd_check_private_wext_control(hdd_ctx, info);
+	if (0 != ret)
+		return ret;
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(hdd_ctx->pdev,
+							 dev->dev_addr,
+							 WLAN_OSIF_SCAN_ID);
+	if (!vdev) {
+		hdd_err("vdev object is NULL");
+		return -EIO;
+	}
+
+	/* making sure argument string ends with '\0' */
+	len = (wrqu->data.length + 1);
+	data = qdf_mem_malloc(len);
+	if (!data) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	qdf_mem_copy(data, extra, (len-1));
+	ptr = data;
+
+	hdd_debug("PNO data len %d data %s", wrqu->data.length, data);
+
+	if (1 != sscanf(ptr, " %hhu %n", &value, &offset)) {
+		hdd_err("PNO enable input is not valid %s", ptr);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (!value) {
+		status = ucfg_scan_pno_stop(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to disabled PNO");
+			ret = -EINVAL;
+		} else {
+			hdd_debug("PNO scan disabled");
+		}
+		goto exit;
+	}
+
+	if (ucfg_scan_get_pno_in_progress(vdev)) {
+		hdd_debug("pno is already in progress");
+		ret = -EBUSY;
+		goto exit;
+	}
+
+	ptr += offset;
+
+	if (1 != sscanf(ptr, " %hhu %n", &value, &offset)) {
+		hdd_err("PNO count input not valid %s", ptr);
+		ret = -EINVAL;
+		goto exit;
+	}
+	req.networks_cnt = value;
+
+	hdd_debug("PNO enable networks count %d offset %d",
+		 req.networks_cnt, offset);
+
+	if ((0 == req.networks_cnt) ||
+	    (req.networks_cnt > SCAN_PNO_MAX_SUPP_NETWORKS)) {
+		hdd_err("Network count %d invalid",
+			req.networks_cnt);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ptr += offset;
+
+	for (i = 0; i < req.networks_cnt; i++) {
+
+		req.networks_list[i].ssid.length = 0;
+
+		params = sscanf(ptr, " %hhu %n",
+				  &(req.networks_list[i].ssid.length),
+				  &offset);
+
+		if (1 != params) {
+			hdd_err("PNO ssid length input is not valid %s", ptr);
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		if ((0 == req.networks_list[i].ssid.length) ||
+		    (req.networks_list[i].ssid.length > 32)) {
+			hdd_err("SSID Len %d is not correct for network %d",
+				  req.networks_list[i].ssid.length, i);
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		/* Advance to SSID */
+		ptr += offset;
+
+		memcpy(req.networks_list[i].ssid.ssid, ptr,
+		       req.networks_list[i].ssid.length);
+		ptr += req.networks_list[i].ssid.length;
+
+		params = sscanf(ptr, " %u %u %hhu %n",
+				&(req.networks_list[i].authentication),
+				&(req.networks_list[i].encryption),
+				&(req.networks_list[i].pno_chan_list.num_chan),
+				&offset);
+
+		if (3 != params) {
+			hdd_err("Incorrect cmd %s", ptr);
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		hdd_debug("PNO ssid " QDF_SSID_FMT " auth %d encry %d channel count %d offset %d",
+			  QDF_SSID_REF(req.networks_list[i].ssid.length,
+				       req.networks_list[i].ssid.ssid),
+			  req.networks_list[i].authentication,
+			  req.networks_list[i].encryption,
+			  req.networks_list[i].pno_chan_list.num_chan, offset);
+
+		/* Advance to channel list */
+		ptr += offset;
+
+		if (SCAN_PNO_MAX_NETW_CHANNELS_EX <
+		    req.networks_list[i].pno_chan_list.num_chan) {
+			hdd_err("Incorrect number of channels");
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		if (0 != req.networks_list[i].pno_chan_list.num_chan) {
+			for (j = 0;
+			     j < req.networks_list[i].pno_chan_list.num_chan;
+			     j++) {
+				if (1 != sscanf(ptr, " %hhu %n", &value,
+				   &offset)) {
+					hdd_err("PNO network channel is not valid %s",
+						  ptr);
+					ret = -EINVAL;
+					goto exit;
+				}
+				if (!IS_CHANNEL_VALID(value)) {
+					hdd_err("invalid channel: %hhu", value);
+					ret = -EINVAL;
+					goto exit;
+				}
+				req.networks_list[i].pno_chan_list.chan[j].freq =
+					cds_chan_to_freq(value);
+				/* Advance to next channel number */
+				ptr += offset;
+			}
+		}
+
+		if (1 != sscanf(ptr, " %u %n",
+				&(req.networks_list[i].bc_new_type),
+				&offset)) {
+			hdd_err("PNO broadcast network type is not valid %s",
+				  ptr);
+			ret = -EINVAL;
+			goto exit;
+		}
+		if (req.networks_list[i].bc_new_type > 2) {
+			hdd_err("invalid bcast nw type: %u",
+				req.networks_list[i].bc_new_type);
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		hdd_debug("PNO bcastNetwType %d offset %d",
+			  req.networks_list[i].bc_new_type, offset);
+
+		/* Advance to rssi Threshold */
+		ptr += offset;
+		if (1 != sscanf(ptr, " %d %n",
+				&(req.networks_list[i].rssi_thresh),
+				&offset)) {
+			hdd_err("PNO rssi threshold input is not valid %s",
+				  ptr);
+			ret = -EINVAL;
+			goto exit;
+		}
+		hdd_debug("PNO rssi %d offset %d",
+			  req.networks_list[i].rssi_thresh, offset);
+		/* Advance to next network */
+		ptr += offset;
+	} /* For ucNetworkCount */
+
+	req.fast_scan_period = 0;
+	if (sscanf(ptr, " %u %n", &(req.fast_scan_period), &offset) > 0) {
+		req.fast_scan_period *= MSEC_PER_SEC;
+		ptr += offset;
+	}
+	if (req.fast_scan_period == 0) {
+		hdd_err("invalid fast scan period %u",
+			req.fast_scan_period);
+			ret = -EINVAL;
+			goto exit;
+	}
+
+	req.fast_scan_max_cycles = 0;
+	if (sscanf(ptr, " %hhu %n", &value,
+		   &offset) > 0)
+		ptr += offset;
+	req.fast_scan_max_cycles = value;
+
+	wlan_pdev_obj_lock(hdd_ctx->pdev);
+	psoc = wlan_pdev_get_psoc(hdd_ctx->pdev);
+	wlan_pdev_obj_unlock(hdd_ctx->pdev);
+	ucfg_scan_register_pno_cb(psoc,
+		found_pref_network_cb, NULL);
+
+	ucfg_scan_get_pno_def_params(vdev, &req);
+	status = ucfg_scan_pno_start(vdev, &req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to enable PNO");
+		ret = -EINVAL;
+	}
+
+exit:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_SCAN_ID);
+
+	qdf_mem_free(data);
+	return ret;
+}
+
+static int iw_set_pno(struct net_device *dev,
+		      struct iw_request_info *info,
+		      union iwreq_data *wrqu, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __iw_set_pno(dev, info, wrqu, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* FEATURE_WLAN_SCAN_PNO */
+
 static int __iw_set_band_config(struct net_device *dev,
 				struct iw_request_info *info,
 				union iwreq_data *wrqu, char *extra)
@@ -6729,6 +8501,24 @@ static int iw_set_band_config(struct net_device *dev,
 	return errno;
 }
 
+
+
+#ifdef CONFIG_DP_TRACE
+void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
+{
+	hdd_debug("WE_DUMP_DP_TRACE_LEVEL: %d %d",
+		  cmd_type, count);
+	if (cmd_type == DUMP_DP_TRACE)
+		qdf_dp_trace_dump_all(count, QDF_TRACE_DEFAULT_PDEV_ID);
+	else if (cmd_type == ENABLE_DP_TRACE_LIVE_MODE)
+		qdf_dp_trace_enable_live_mode();
+	else if (cmd_type == CLEAR_DP_TRACE_BUFFER)
+		qdf_dp_trace_clear_buffer();
+	else if (cmd_type == DISABLE_DP_TRACE_LIVE_MODE)
+		qdf_dp_trace_disable_live_mode();
+}
+#endif
+
 static int __iw_set_two_ints_getnone(struct net_device *dev,
 				     struct iw_request_info *info,
 				     union iwreq_data *wrqu, char *extra)
@@ -6762,6 +8552,9 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 					      | value[2],
 					  VDEV_CMD);
 		break;
+	case WE_SET_FW_CRASH_INJECT:
+		ret = hdd_crash_inject(adapter, value[1], value[2]);
+		break;
 	case WE_ENABLE_FW_PROFILE:
 		hdd_err("WE_ENABLE_FW_PROFILE: %d %d",
 		       value[1], value[2]);
@@ -6792,6 +8585,9 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		hdd_debug("%d %d", value[1], value[2]);
 		policy_mgr_set_dual_mac_fw_mode_config(hdd_ctx->psoc,
 			value[1], value[2]);
+		break;
+	case WE_DUMP_DP_TRACE_LEVEL:
+		hdd_set_dump_dp_trace(value[1], value[2]);
 		break;
 	case WE_SET_MON_MODE_CHAN:
 		if (value[1] > 256)
@@ -6878,6 +8674,7 @@ static const iw_handler we_private[] = {
 #endif
 	[WLAN_PRIV_ADD_TSPEC - SIOCIWFIRSTPRIV] = iw_add_tspec,
 	[WLAN_PRIV_DEL_TSPEC - SIOCIWFIRSTPRIV] = iw_del_tspec,
+	[WLAN_PRIV_GET_TSPEC - SIOCIWFIRSTPRIV] = iw_get_tspec,
 	[WLAN_PRIV_SET_FTIES - SIOCIWFIRSTPRIV] = iw_set_fties,
 	[WLAN_PRIV_SET_HOST_OFFLOAD - SIOCIWFIRSTPRIV] = iw_set_host_offload,
 	[WLAN_GET_WLAN_STATISTICS - SIOCIWFIRSTPRIV] = iw_get_statistics,
@@ -6887,9 +8684,13 @@ static const iw_handler we_private[] = {
 	[WLAN_SET_PACKET_FILTER_PARAMS - SIOCIWFIRSTPRIV] =
 		iw_set_packet_filter_params,
 #endif
+#ifdef FEATURE_WLAN_SCAN_PNO
+	[WLAN_SET_PNO - SIOCIWFIRSTPRIV] = iw_set_pno,
+#endif
 	[WLAN_SET_BAND_CONFIG - SIOCIWFIRSTPRIV] = iw_set_band_config,
 	[WLAN_PRIV_SET_MCBC_FILTER - SIOCIWFIRSTPRIV] =
 		iw_set_dynamic_mcbc_filter,
+	[WLAN_GET_LINK_SPEED - SIOCIWFIRSTPRIV] = iw_get_linkspeed,
 #ifdef FEATURE_WLM_STATS
 	[WLAN_GET_WLM_STATS - SIOCIWFIRSTPRIV] = iw_get_wlm_stats,
 #endif
@@ -6969,6 +8770,13 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "setTxMaxPower5G"},
 
+#ifndef REMOVE_PKT_LOG
+	{WE_SET_PKTLOG,
+	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+	 0,
+	 "pktlog"},
+#endif
+
 	/* SAP has TxMax whereas STA has MaxTx, adding TxMax for STA
 	 * as well to keep same syntax as in SAP. Now onwards, STA
 	 * will support both
@@ -6995,15 +8803,45 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "setphymode"},
 
+	{WE_SET_NSS,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "nss"},
+
+	{WE_SET_LDPC,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "ldpc"},
+
 	{WE_SET_TX_STBC,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "tx_stbc"},
 
+	{WE_SET_RX_STBC,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "rx_stbc"},
+
 	{WE_SET_SHORT_GI,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "shortgi"},
+
+	{WE_SET_RTSCTS,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "enablertscts"},
+
+	{WE_SET_CHWIDTH,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "chwidth"},
+
+	{WE_SET_ANI_EN_DIS,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "anienable"},
 
 	{WE_SET_ANI_POLL_PERIOD,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -7070,6 +8908,16 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "gtxMinTpc"},
 
+	{WE_SET_GTX_BWMASK,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "gtxBWMask"},
+
+	{WE_SET_TX_CHAINMASK,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "txchainmask"},
+
 	{WE_SET_RX_CHAINMASK,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
@@ -7104,6 +8952,49 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "txpow5g"},
+
+#ifdef FEATURE_FW_LOG_PARSING
+	/* Sub-cmds DBGLOG specific commands */
+	{WE_DBGLOG_LOG_LEVEL,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_loglevel"},
+
+	{WE_DBGLOG_VAP_ENABLE,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_vapon"},
+
+	{WE_DBGLOG_VAP_DISABLE,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_vapoff"},
+
+	{WE_DBGLOG_MODULE_ENABLE,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_modon"},
+
+	{WE_DBGLOG_MODULE_DISABLE,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_modoff"},
+
+	{WE_DBGLOG_MOD_LOG_LEVEL,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_mod_loglevel"},
+
+	{WE_DBGLOG_TYPE,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_type"},
+
+	{WE_DBGLOG_REPORT_ENABLE,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "dl_report"},
+#endif /* FEATURE_FW_LOG_PARSING */
 
 	{WE_SET_TXRX_FWSTATS,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -7291,6 +9182,26 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "getconcurrency"},
 
+	{WE_GET_NSS,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_nss"},
+
+	{WE_GET_LDPC,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_ldpc"},
+
+	{WE_GET_TX_STBC,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_tx_stbc"},
+
+	{WE_GET_RX_STBC,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_rx_stbc"},
+
 	{WE_GET_SHORT_GI,
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -7300,6 +9211,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_rtscts"},
+
+	{WE_GET_CHWIDTH,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_chwidth"},
 
 	{WE_GET_ANI_EN_DIS,
 	 0,
@@ -7325,6 +9241,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_aniccklvl"},
+
+	{WE_GET_DYNAMIC_BW,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_cwmenable"},
 
 	{WE_GET_GTX_HT_MCS,
 	 0,
@@ -7361,6 +9282,16 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_gtxMinTpc"},
 
+	{WE_GET_GTX_BWMASK,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_gtxBWMask"},
+
+	{WE_GET_TX_CHAINMASK,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_txchainmask"},
+
 	{WE_GET_RX_CHAINMASK,
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -7370,6 +9301,16 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_11nrate"},
+
+	{WE_GET_AMPDU,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_ampdu"},
+
+	{WE_GET_AMSDU,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_amsdu"},
 
 	{WE_GET_TXPOW_2G,
 	 0,
@@ -7445,6 +9386,26 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_qnodatapoll"},
+
+	{WE_CAP_TSF,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "cap_tsf"},
+
+	{WE_GET_TEMPERATURE,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_temp"},
+
+	{WE_GET_DCM,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_dcm"},
+
+	{WE_GET_RANGE_EXT,
+	 0,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_range_ext"},
 
 	/* handlers for main ioctl */
 	{WLAN_PRIV_SET_CHAR_GET_NONE,
@@ -7533,6 +9494,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 	 "version"},
 
+	{WE_GET_STATS,
+	 0,
+	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+	 "getStats"},
+
 	{WE_GET_SUSPEND_RESUME_STATS,
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
@@ -7548,6 +9514,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 	 "getHostStates"},
 
+	{WE_GET_CFG,
+	 0,
+	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+	 "getConfig"},
+
 	{WE_GET_RSSI,
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
@@ -7558,6 +9529,16 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 	 "getWmmStatus"},
 
+	{WE_GET_CHANNEL_LIST,
+	 0,
+	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+	 "getChannelList"},
+#ifdef FEATURE_WLAN_TDLS
+	{WE_GET_TDLS_PEERS,
+	 0,
+	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+	 "getTdlsPeers"},
+#endif
 	{WE_GET_11W_INFO,
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
@@ -7599,6 +9580,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "getProfileData"},
 
+	{WE_SET_REASSOC_TRIGGER,
+	0,
+	0,
+	"reassoc"},
+
 	{WE_STOP_OBSS_SCAN,
 	 0,
 	 0,
@@ -7621,6 +9607,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "dumplog"},
 #endif
+
+	{WE_POLICY_MANAGER_CINFO_CMD,
+	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+	 0,
+	 "pm_cinfo"},
 
 	{WE_UNIT_TEST_CMD,
 	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
@@ -7661,6 +9652,12 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "delTspec"},
 
+	/* handlers for main ioctl */
+	{WLAN_PRIV_GET_TSPEC,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "getTspec"},
+
 	/* handlers for main ioctl - host offload */
 	{WLAN_PRIV_SET_HOST_OFFLOAD,
 	 IW_PRIV_TYPE_BYTE | sizeof(struct host_offload_req),
@@ -7684,6 +9681,12 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "setPktFilter"},
 #endif
+#ifdef FEATURE_WLAN_SCAN_PNO
+	{WLAN_SET_PNO,
+	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+	 0,
+	 "setpno"},
+#endif
 	{WLAN_SET_BAND_CONFIG,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
@@ -7693,6 +9696,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 0,
 	 "setMCBCFilter"},
+
+	{WLAN_GET_LINK_SPEED,
+	 IW_PRIV_TYPE_CHAR | 18,
+	 IW_PRIV_TYPE_CHAR | 5,
+	 "getLinkSpeed"},
 
 #ifdef FEATURE_WLM_STATS
 	{WLAN_GET_WLM_STATS,
@@ -7715,6 +9723,12 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_BYTE | sizeof(struct dot11p_channel_sched),
 	 0, "set_dot11p" },
 
+#ifdef CONFIG_WLAN_DEBUG_CRASH_INJECT
+	{WE_SET_FW_CRASH_INJECT,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+	 0, "crash_inject"},
+
+#endif
 #if defined(WMI_INTERFACE_EVENT_LOGGING) || defined(FEATURE_HTC_CREDIT_HISTORY)
 	{WE_LOG_BUFFER,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
@@ -7745,6 +9759,11 @@ static const struct iw_priv_args we_private_args[] = {
 	{WE_SET_DUAL_MAC_FW_MODE_CONFIG,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	 0, "set_fw_mode_cfg"},
+#ifdef CONFIG_DP_TRACE
+	{WE_DUMP_DP_TRACE_LEVEL,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+	 0, "dump_dp_trace"},
+#endif
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	{WE_SET_MON_MODE_CHAN,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
@@ -7760,10 +9779,42 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "set_11ax_rate"},
 
+	{WE_SET_DCM,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "enable_dcm"},
+
+	{WE_SET_RANGE_EXT,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "range_ext"},
+
 	{WLAN_PRIV_SET_FTIES,
 	 IW_PRIV_TYPE_CHAR | MAX_FTIE_SIZE,
 	 0,
 	 "set_ft_ies"},
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	{WE_MOTION_DET_START_STOP,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "mt_start"},
+
+	{WE_MOTION_DET_BASE_LINE_START_STOP,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "mt_bl_start"},
+
+	{WE_MOTION_DET_CONFIG_PARAM,
+	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+	 0,
+	 "mt_config"},
+
+	{WE_MOTION_DET_BASE_LINE_CONFIG_PARAM,
+	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+	 0,
+	 "mt_bl_config"},
+#endif /* WLAN_FEATURE_MOTION_DETECTION */
 };
 
 const struct iw_handler_def we_handler_def = {
@@ -7798,3 +9849,4 @@ void hdd_wext_unregister(struct net_device *dev,
 	if (!rtnl_held)
 		rtnl_unlock();
 }
+

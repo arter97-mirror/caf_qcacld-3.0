@@ -681,7 +681,7 @@ exit:
  * @wh: wma handle
  * @tgt_cfg: target configuration to be updated
  *
- * Update broadcast twt support based on service bit.
+ * Update braodcast twt support based on service bit.
  *
  * Return: None
  */

@@ -44,18 +44,10 @@ struct p2p_app_set_ps {
 	uint8_t ps_selection;
 };
 
-#ifdef CFG80211_REMAIN_ON_CHANNEL_WITH_SRC_MAC
-int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
-					struct wireless_dev *wdev,
-					struct ieee80211_channel *chan,
-					unsigned int duration, u64 *cookie,
-					const u8 *rx_addr);
-#else
 int wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					struct ieee80211_channel *chan,
 					unsigned int duration, u64 *cookie);
-#endif
 
 int wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 					       struct wireless_dev *wdev,
@@ -68,31 +60,6 @@ int wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 int hdd_set_p2p_ps(struct net_device *dev, void *msgData);
 int hdd_set_p2p_opps(struct net_device *dev, uint8_t *command);
 int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command);
-
-/**
- * wlan_hdd_p2p_register_legacy_cb() - Register HDD legacy callbacks with OSIF
- *
- * Return: None
- */
-void wlan_hdd_p2p_register_legacy_cb(void);
-
-/**
- * wlan_hdd_p2p_unregister_legacy_cb() - Unregister HDD legacy callbacks
- *
- * Return: None
- */
-void wlan_hdd_p2p_unregister_legacy_cb(void);
-
-/**
- * hdd_set_p2p_noa_fill_params() - Convert P2P NOA params to usecs and assign to
- * struct p2p_ps_config
- * @adapter: adapter context
- * @noa: pointer to power save configure
- *
- * Return: 0 on success, negative errno if error
- */
-int hdd_set_p2p_noa_fill_params(struct hdd_adapter *adapter,
-				struct p2p_ps_config *noa);
 
 /**
  * hdd_indicate_mgmt_frame_to_user- send mgmt frame to user
@@ -255,7 +222,7 @@ wlan_hdd_get_sta_vdev_for_p2p_dev(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id,
 				  wlan_objmgr_ref_dbgid comp_id);
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * wlan_hdd_cfg80211_p2p_parse_wfd_params - this function start VDEV sync and
  * calls function __wlan_hdd_cfg80211_p2p_parse_wfdr2_params()
@@ -286,34 +253,5 @@ p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1];
 },
 #else
 #define FEATURE_P2P_SET_MODE_VENDOR_COMMANDS
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-/**
- * wlan_hdd_cfg80211_p2p_parse_noa_params - parse P2P NOA params and
- * call function __wlan_hdd_cfg80211_p2p_parse_noa_params()
- * @wiphy: pointer to wiphy structure
- * @wdev: pointer to wireless device
- * @data: pointer to data
- * @data_len: data length
- *
- * Return: 0 on success, negative errno if error
- */
-int wlan_hdd_cfg80211_p2p_parse_noa_params(struct wiphy *wiphy,
-					   struct wireless_dev *wdev,
-					   const void *data, int data_len);
-
-extern const struct nla_policy
-p2p_noa_attr_policy[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1];
-
-#define FEATURE_P2P_SET_NOA_VENDOR_COMMANDS			\
-{								\
-	.info.vendor_id = QCA_NL80211_VENDOR_ID,		\
-	.info.subcmd =						\
-		QCA_NL80211_VENDOR_SUBCMD_P2P_SET_NOA,		\
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |			\
-			WIPHY_VENDOR_CMD_NEED_NETDEV,		\
-	.doit = wlan_hdd_cfg80211_p2p_parse_noa_params,	\
-	vendor_command_policy(p2p_noa_attr_policy,		\
-				QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX)	\
-},
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* __P2P_H */

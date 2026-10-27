@@ -40,6 +40,14 @@
 #define STATS_POLICY_PERIODICITY \
 	QCA_WLAN_VENDOR_ATTR_ASYNC_STATS_POLICY_STATS_PERIODICITY
 
+/**
+ * os_if_telemetry_init() - Telemetry initialization
+ * @psoc: Pointer to psoc context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS os_if_telemetry_init(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_DP_FEATURE_STC
 #define FEATURE_ASYNC_STATS_VENDOR_COMMANDS			           \
 	{								   \
@@ -74,5 +82,11 @@ QDF_STATUS os_if_telemetry_stats_service(struct wlan_objmgr_vdev *vdev,
 }
 
 #endif /* WLAN_DP_FEATURE_STC */
+#else
+static inline
+QDF_STATUS os_if_telemetry_init(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_TELEMETRY */
 #endif /* __OSIF_TELEMETRY_H__ */

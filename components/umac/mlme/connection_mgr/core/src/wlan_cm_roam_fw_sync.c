@@ -23,7 +23,6 @@
  * Implementation for the FW based roaming sync api interfaces.
  */
 #include "qdf_types.h"
-#include "qdf_time.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
@@ -47,8 +46,6 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
-#include "wlan_mlo_mgr_link_switch.h"
-#include "wlan_smd_roam.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_mlo_link_force.h"
 #include <wlan_psoc_mlme_api.h>
@@ -56,7 +53,6 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "utils_mlo.h"
 #include "lim_utils.h"
-#include "wlan_twt_cfg_ext_api.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -104,8 +100,6 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
-	uint32_t is_host_4way_hs_supported;
-	bool disallow_mld_connecting_state_roam_sync;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -114,10 +108,6 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
-	is_host_4way_hs_supported =
-		wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 
 	if (cm_is_vdev_disconnecting(vdev) ||
 	    mlo_is_any_link_disconnecting(vdev)) {
@@ -137,24 +127,7 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/*
-	 * When emergency roaming is enabled, a Roam Sync event may be received
-	 * before the Connect Request while the MLD is still in the connecting
-	 * state (specifically in the JOIN_PENDING substate). In such cases,
-	 * the subsequent roam request activation causes the host to send
-	 * RSO_STOP, since the MLD is considered to be connecting.
-	 *
-	 * To avoid this race condition, permit Roam Sync processing when
-	 * emergency roaming is enabled. This allows the roaming flow to
-	 * proceed even if the MLD is in the connecting state. The existing
-	 * connection is first disconnected, after which the MLD completes
-	 * association with the new AP.
-	 */
-
-	disallow_mld_connecting_state_roam_sync = (!is_host_4way_hs_supported &&
-						   mlo_is_mld_connecting(vdev));
-	if (disallow_mld_connecting_state_roam_sync ||
-	    cm_is_vdev_connecting(vdev) ||
+	if (mlo_is_mld_connecting(vdev) || cm_is_vdev_connecting(vdev) ||
 	    cm_is_peer_preset_on_other_sta(psoc, vdev, vdev_id, event)) {
 		mlme_err("vdev %d Roam sync not handled in connecting state",
 			 vdev_id);
@@ -171,9 +144,6 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_SYNC,
 				     event_data_len, event);
 
-	if (smd_handle_cm_roam_sync_pending(vdev))
-		goto done;
-
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Roam sync was not handled");
 		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
@@ -181,7 +151,6 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 					  REASON_ROAM_SYNCH_FAILED);
 	}
 
-done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 
 	return status;
@@ -252,6 +221,11 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 					sync_ind->roamed_vdev_id,
 					WLAN_ROAM_SYNCH_IN_PROG,
 					REASON_ROAM_HANDOFF_DONE);
+
+		status = wlan_cm_roam_state_change(pdev,
+					vdev_id,
+					WLAN_MLO_ROAM_SYNCH_IN_PROG,
+					REASON_ROAM_HANDOFF_DONE);
 		return status;
 	}
 
@@ -283,9 +257,8 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
-		cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
-					    SCAN_ENTRY_CON_STATE_NONE);
+	cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
+				    SCAN_ENTRY_CON_STATE_NONE);
 
 	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
 		status = wlan_cm_roam_state_change(pdev,
@@ -300,47 +273,6 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 
 	return status;
 }
-
-#ifdef WLAN_FEATURE_11BE_MLO
-void cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlo_dev_context *ml_dev;
-	struct wlan_objmgr_pdev *pdev;
-	struct mlo_link_info *link_info;
-	struct bss_info bss_info = {0};
-	struct mlme_info mlme;
-	QDF_STATUS status;
-	uint8_t i;
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev)
-		return;
-
-	ml_dev = vdev->mlo_dev_ctx;
-	if (!ml_dev)
-		return;
-
-	status = wlan_vdev_mlme_get_ssid(vdev, bss_info.ssid.ssid,
-					 &bss_info.ssid.length);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("Unable to retrieve SSID");
-		return;
-	}
-
-	mlme.assoc_state = SCAN_ENTRY_CON_STATE_NONE;
-
-	link_info = &ml_dev->sta_ctx->links_info[0];
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++, link_info++) {
-		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
-			continue;
-
-		qdf_copy_macaddr(&bss_info.bssid, &link_info->ap_link_addr);
-		bss_info.freq = link_info->link_chan_info->ch_freq;
-
-		wlan_scan_update_mlme_by_bssinfo(pdev, &bss_info, &mlme);
-	}
-}
-#endif
 
 void
 cm_update_scan_mlme_on_roam(struct wlan_objmgr_vdev *vdev,
@@ -529,6 +461,11 @@ cm_populate_connect_ies(struct roam_offload_synch_ind *roam_synch_data,
 			reassoc_rsp_len = roam_synch_data->reassoc_resp_length;
 		}
 
+		mlme_debug("vdevid: %d Assoc Rsp",
+			   rsp->connect_rsp.vdev_id);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
+				   reassoc_rsp_ptr, reassoc_rsp_len);
+
 		/* Skip header and cache the IEs */
 		connect_ies->assoc_rsp.len = reassoc_rsp_len -
 					sizeof(struct wlan_frame_hdr);
@@ -661,27 +598,11 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
 		channel.ch_cfreq2 = ml_link->channel.band_center_freq2;
 
-		/* Firmware must provide band_center_freq1 for all links */
-		if (!channel.ch_cfreq1 && channel.ch_freq) {
-			mlme_debug("FW did not provide band_center_freq1 for link %d, ch_freq %d",
-				   i, channel.ch_freq);
-		}
-
 		/*
-		 * Update Link switch context for each vdev with
-		 * roamed AP link address and self link address for
-		 * each vdev.
+		 * Update Link switch context for each vdev with roamed AP link
+		 * address and self link address for each vdev
 		 */
 		mlo_mgr_roam_update_ap_link_info(vdev, ml_link, &channel);
-
-		/*
-		 * Above roam_update_ap_link_info doesn't update the
-		 * phymode to the link context, so call the dedicated
-		 * channel update API to update all the channel
-		 * related info properly
-		 */
-		cm_update_link_channel_info(vdev, &ml_link->link_addr,
-					    ml_link->channel.mhz);
 	}
 }
 
@@ -804,43 +725,6 @@ cm_fill_num_roam_links_info(struct wlan_roam_sync_info *roam_info,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BN_SMD
-static inline void
-cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
-		     struct roam_offload_synch_ind *roam_synch_data)
-{
-	roaming_info->smd_kdk_len = roam_synch_data->smd_kdk_len;
-	if (roaming_info->smd_kdk_len)
-		qdf_mem_copy(roaming_info->smd_kdk, roam_synch_data->smd_kdk,
-			     roaming_info->smd_kdk_len);
-}
-#else
-static inline void
-cm_fill_roam_smd_kdk(struct wlan_roam_sync_info *roaming_info,
-		     struct roam_offload_synch_ind *roam_synch_data)
-{
-}
-#endif /* WLAN_FEATURE_11BN_SMD */
-
-#ifdef WLAN_FEATURE_11BI_SECURITY
-static inline void
-cm_set_roam_assoc_encrypted(struct wlan_objmgr_vdev *vdev,
-			    struct roam_offload_synch_ind *roam_synch_data,
-			    struct cm_vdev_join_rsp *rsp)
-{
-	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE ||
-	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)
-		rsp->connect_rsp.is_assoc_encrypted = true;
-}
-#else
-static inline void
-cm_set_roam_assoc_encrypted(struct wlan_objmgr_vdev *vdev,
-			    struct roam_offload_synch_ind *roam_synch_data,
-			    struct cm_vdev_join_rsp *rsp)
-{
-}
-#endif
-
 static QDF_STATUS
 cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 		  struct roam_offload_synch_ind *roam_synch_data,
@@ -879,6 +763,7 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	rsp->connect_rsp.is_reassoc = true;
 	rsp->connect_rsp.connect_status = QDF_STATUS_SUCCESS;
 	rsp->connect_rsp.cm_id = cm_id;
+	rsp->nss = roam_synch_data->nss;
 
 	if (roam_synch_data->ric_data_len) {
 		rsp->ric_resp_ie.len = roam_synch_data->ric_data_len;
@@ -896,8 +781,6 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	status = cm_populate_connect_ies(roam_synch_data, rsp);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-
-	cm_set_roam_assoc_encrypted(vdev, roam_synch_data, rsp);
 
 	roaming_info = rsp->connect_rsp.roaming_info;
 	roaming_info->auth_status = roam_synch_data->auth_status;
@@ -926,7 +809,6 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	roaming_info->update_erp_next_seq_num =
 			roam_synch_data->update_erp_next_seq_num;
 	roaming_info->next_erp_seq_num = roam_synch_data->next_erp_seq_num;
-	cm_fill_roam_smd_kdk(roaming_info, roam_synch_data);
 
 	cm_fils_update_erp_seq_num(vdev, roaming_info->next_erp_seq_num, cm_id);
 	cm_update_assoc_btm_cap(vdev, rsp);
@@ -941,13 +823,12 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_roam_sync_info *roaming_info;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct cm_roam_values_copy config;
+	uint8_t mdie_present;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int32_t akm;
-	uint8_t mdie_present;
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	bool is_host_4way_hs_supported = false;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
@@ -972,8 +853,6 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	}
 
 	roaming_info = rsp->connect_rsp.roaming_info;
-	is_host_4way_hs_supported = wlan_psoc_nif_fw_ext2_cap_get(
-				      psoc, WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
 	akm = wlan_crypto_get_param(vdev,
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
 
@@ -999,9 +878,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	 * eapol. So the session->psk_pmk will be stale in PMKSA cached
 	 * SAE/OWE roaming case.
 	 */
+
 	if (roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
-	    (roaming_info->auth_status == ROAM_AUTH_STATUS_CONNECTED &&
-	     is_host_4way_hs_supported) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE) ||
@@ -1039,7 +917,9 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					   MOBILITY_DOMAIN, &config);
 		mdie_present = config.bool_value;
 
-		if (cm_lookup_pmkid_using_bssid(psoc, vdev_id, pmkid_cache)) {
+		if (cm_lookup_pmkid_using_bssid(psoc,
+						vdev_id,
+						pmkid_cache)) {
 			/*
 			 * Consider two APs: AP1, AP2
 			 * Both APs configured with EAP 802.1x security mode
@@ -1106,8 +986,6 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 				qdf_mem_copy(pmksa->pmk, roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmksa->pmk_len = roaming_info->pmk_len;
-				pmksa->pmk_entry_ts =
-						qdf_get_system_timestamp();
 				status = wlan_crypto_set_del_pmksa(vdev,
 								   pmksa, true);
 				if (QDF_IS_STATUS_ERROR(status)) {
@@ -1175,8 +1053,6 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					     roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmksa->pmk_len = roaming_info->pmk_len;
-				pmksa->pmk_entry_ts =
-						qdf_get_system_timestamp();
 
 				status = wlan_crypto_set_del_pmksa(vdev,
 								   pmksa,
@@ -1260,10 +1136,10 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 	uint8_t i;
 
 	ml_dev = vdev->mlo_dev_ctx;
-	if (!ml_dev || !ml_dev->sta_ctx)
+	if (!ml_dev || !ml_dev->link_ctx)
 		return;
 
-	link_info = &ml_dev->sta_ctx->links_info[0];
+	link_info = &ml_dev->link_ctx->links_info[0];
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
 			continue;
@@ -1277,361 +1153,7 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 		link_info++;
 	}
 }
-#endif /* WLAN_FEATURE_11BE_MLO */
-
-#if defined(WLAN_FEATURE_11BI_SECURITY) && defined(WLAN_FEATURE_11BE_MLO)
-/*
- * The keys were hashed under the pre-roam link id, which the vdev no longer
- * carries by the time the assoc vdev is propagated, so probe for it.
- * Caller must hold the crypto lock.
- */
-static uint8_t
-cm_roam_find_assoc_pairwise_key_link_id(struct wlan_objmgr_psoc *psoc,
-					struct qdf_mac_addr *ap_link_addr)
-{
-	uint16_t key_idx;
-	uint8_t link_id;
-	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX;
-
-	for (link_id = 0; link_id <= MAX_MLO_LINK_ID; link_id++) {
-		for (key_idx = 0; key_idx < max_key_index; key_idx++) {
-			if (wlan_crypto_get_ml_sta_link_key(psoc, key_idx,
-							    ap_link_addr,
-							    link_id))
-				return link_id;
-		}
-	}
-
-	return WLAN_INVALID_LINK_ID;
-}
-
-/*
- * cm_roam_copy_assoc_key_to_link_vdev() - Store assoc link pairwise key in
- *					    the partner link's psoc crypto cache
- *					    and defer key installation.
- * @assoc_vdev: assoc vdev whose pairwise key is the source
- * @link_vdev:  target link vdev, NULL for a standby link
- * @link_info:  link info entry for the target link
- * @assoc_link_ap_addr: AP link address of the assoc link, used to look up
- *			 the assoc vdev's EPPKE-roam pairwise key, which is
- *			 hashed by AP link address rather than the vdev's own
- *			 address.
- * @assoc_key_link_id: link id the assoc vdev's keys are hashed under
- *
- * Copies the assoc vdev's pairwise key into the partner link's psoc-level
- * crypto cache via wlan_crypto_copy_ml_sta_link_key(), which performs the
- * lookup, copy and store under the crypto lock, and marks the link's keys as
- * deferred via mlo_defer_set_keys().  The deferred flag ensures the key is
- * installed by cm_install_link_vdev_keys() only after the peer assoc command
- * has been sent to firmware, avoiding a race where keys arrive before the
- * peer is established.  A standby link has no vdev and no peer, so nothing
- * is deferred.
- *
- * Return: void
- */
-static void
-cm_roam_copy_assoc_key_to_link_vdev(struct wlan_objmgr_vdev *assoc_vdev,
-				    struct wlan_objmgr_vdev *link_vdev,
-				    struct mlo_link_info *link_info,
-				    struct qdf_mac_addr *assoc_link_ap_addr,
-				    uint8_t assoc_key_link_id)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_crypto_ml_key_copy_params key_copy = {0};
-	uint8_t link_vdev_id;
-	QDF_STATUS status;
-
-	psoc = wlan_vdev_get_psoc(assoc_vdev);
-	link_vdev_id = link_vdev ? wlan_vdev_get_id(link_vdev)
-				 : WLAN_INVALID_VDEV_ID;
-
-	if (assoc_key_link_id == WLAN_INVALID_LINK_ID) {
-		mlme_err("no assoc vdev key entry for " QDF_MAC_ADDR_FMT
-			 ", link vdev %d not staged",
-			 QDF_MAC_ADDR_REF(assoc_link_ap_addr->bytes),
-			 link_vdev_id);
-		return;
-	}
-
-	/*
-	 * The source key is hashed by the assoc link's AP address and the link
-	 * id its keys were stamped with.  The copy is stored keyed by this
-	 * link's self address, as the install path fetches it that way, and
-	 * points at this link's AP as the peer.
-	 */
-	key_copy.key_type = WLAN_CRYPTO_KEY_TYPE_UNICAST;
-	key_copy.src_link_addr = assoc_link_ap_addr;
-	key_copy.src_link_id = assoc_key_link_id;
-	key_copy.dst_link_addr = &link_info->link_addr;
-	key_copy.dst_link_id = link_info->link_id;
-	key_copy.dst_peer_addr = &link_info->ap_link_addr;
-
-	status = wlan_crypto_copy_ml_sta_link_key(psoc, &key_copy);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("no pairwise key staged for link vdev %d (assoc key link_id %d ap addr "
-			 QDF_MAC_ADDR_FMT ") status %d",
-			 link_vdev_id, assoc_key_link_id,
-			 QDF_MAC_ADDR_REF(assoc_link_ap_addr->bytes), status);
-		return;
-	}
-
-	/*
-	 * Defer key installation so that cm_install_link_vdev_keys()
-	 * sends the key to firmware only after peer assoc completes,
-	 * avoiding a race where the key arrives before the peer.
-	 */
-	if (link_vdev)
-		mlo_defer_set_keys(link_vdev, link_info->link_id, true);
-
-	mlme_debug("staged pairwise key %d for %s link, vdev %d link_id %d self link addr "
-		   QDF_MAC_ADDR_FMT " (from assoc key link_id %d)",
-		   key_copy.copied_key_index, link_vdev ? "active" : "standby",
-		   link_vdev_id, link_info->link_id,
-		   QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
-		   assoc_key_link_id);
-}
-
-/*
- * cm_roam_update_link_vdev_keys() - Store assoc link pairwise key in link
- *				       vdev(s) for MLO EPPKE/8021X_IN_AUTH roam.
- * @vdev: vdev object (assoc or link vdev)
- *
- * For EPPKE and 8021X_IN_AUTH MLO roaming the 4-way handshake is performed
- * by the host supplicant.  Once the assoc link pairwise key is available,
- * copy it into each partner link vdev's psoc crypto cache and defer the key
- * install so cm_install_link_vdev_keys() sends the key to firmware only after
- * peer assoc completes.
- *
- * When @vdev is the assoc vdev all partner link vdevs are updated.
- * When @vdev is a link vdev only that link vdev is updated, using the assoc
- * link vdev as the key source.
- *
- * Return: void
- */
-static void
-cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *assoc_vdev;
-	struct wlan_objmgr_vdev *link_vdev;
-	struct wlan_mlo_dev_context *ml_dev;
-	struct mlo_link_info *link_info;
-	struct mlo_link_info *assoc_link_info;
-	struct qdf_mac_addr *assoc_link_ap_addr;
-	uint16_t link_iter;
-	uint8_t assoc_vdev_id, link_vdev_id, assoc_key_link_id;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
-		return;
-
-	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
-		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
-		if (!assoc_vdev)
-			return;
-	} else {
-		assoc_vdev = vdev;
-	}
-
-	ml_dev = assoc_vdev->mlo_dev_ctx;
-	if (!ml_dev || !ml_dev->sta_ctx)
-		return;
-
-	psoc = wlan_vdev_get_psoc(assoc_vdev);
-	assoc_vdev_id = wlan_vdev_get_id(assoc_vdev);
-
-	assoc_link_info = mlo_mgr_get_ap_link_by_vdev_id(ml_dev, assoc_vdev_id);
-	if (!assoc_link_info) {
-		mlme_err("assoc link ap addr not found for vdev %d",
-			 assoc_vdev_id);
-		return;
-	}
-	assoc_link_ap_addr = &assoc_link_info->ap_link_addr;
-
-	wlan_crypto_aquire_lock();
-	assoc_key_link_id =
-		cm_roam_find_assoc_pairwise_key_link_id(psoc,
-							assoc_link_ap_addr);
-	wlan_crypto_release_lock();
-
-	mlme_debug("assoc vdev %d ap link addr " QDF_MAC_ADDR_FMT
-		   ": keys hashed under link_id %d (vdev link_id %d)",
-		   assoc_vdev_id, QDF_MAC_ADDR_REF(assoc_link_ap_addr->bytes),
-		   assoc_key_link_id, wlan_vdev_get_link_id(assoc_vdev));
-
-	link_info = &ml_dev->sta_ctx->links_info[0];
-	for (link_iter = 0; link_iter < WLAN_MAX_ML_BSS_LINKS;
-	     link_iter++, link_info++) {
-		if (qdf_is_macaddr_zero(&link_info->link_addr))
-			continue;
-
-		link_vdev_id = link_info->vdev_id;
-		if (link_vdev_id == assoc_vdev_id)
-			continue;
-
-		/*
-		 * When called on a specific link vdev, only process that one.
-		 */
-		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
-		    link_vdev_id != wlan_vdev_get_id(vdev))
-			continue;
-
-		/* Standby link: no vdev to look up, stage the key directly */
-		if (link_vdev_id == WLAN_INVALID_VDEV_ID) {
-			cm_roam_copy_assoc_key_to_link_vdev(assoc_vdev, NULL,
-							    link_info,
-							    assoc_link_ap_addr,
-							    assoc_key_link_id);
-			continue;
-		}
-
-		link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-								 link_vdev_id,
-								 WLAN_MLME_SB_ID);
-		if (!link_vdev) {
-			mlme_err("link vdev %d not found", link_vdev_id);
-			continue;
-		}
-
-		cm_roam_copy_assoc_key_to_link_vdev(assoc_vdev, link_vdev,
-						    link_info,
-						    assoc_link_ap_addr,
-						    assoc_key_link_id);
-		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLME_SB_ID);
-	}
-}
-
-/*
- * cm_roam_rehash_assoc_vdev_keys() - Move the assoc vdev's 11bi roam keys from
- *				       (pre-roam link id, AP link address) to
- *				       (post-roam link id, self link address)
- * @vdev: vdev object (only the assoc vdev is processed)
- *
- * The supplicant installs the key during preauth, so it lands under the AP link
- * address; every lookup after roam sync uses the vdev's own link address.
- * Depends on the assoc vdev being propagated last, since the destination is the
- * pair cm_delete_crypto_keys_for_all_links() frees on every invocation.
- *
- * Return: void
- */
-static void
-cm_roam_rehash_assoc_vdev_keys(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_mlo_dev_context *ml_dev;
-	struct mlo_link_info *assoc_link_info;
-	struct wlan_crypto_key *ap_key;
-	struct wlan_crypto_key *self_key;
-	struct qdf_mac_addr *self_link_addr;
-	struct qdf_mac_addr ap_link_addr;
-	uint8_t vdev_id, src_link_id, dst_link_id;
-	uint16_t key_idx;
-	bool rehashed = false;
-	QDF_STATUS status;
-	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
-				 WLAN_CRYPTO_MAXIGTKKEYIDX +
-				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
-
-	/* Only the assoc vdev stores its keys against the AP link address */
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
-	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
-		return;
-
-	ml_dev = vdev->mlo_dev_ctx;
-	if (!ml_dev || !ml_dev->sta_ctx)
-		return;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return;
-
-	vdev_id = wlan_vdev_get_id(vdev);
-
-	assoc_link_info = mlo_mgr_get_ap_link_by_vdev_id(ml_dev, vdev_id);
-	if (!assoc_link_info) {
-		mlme_err("assoc link ap addr not found for vdev %d", vdev_id);
-		return;
-	}
-	qdf_copy_macaddr(&ap_link_addr, &assoc_link_info->ap_link_addr);
-
-	self_link_addr =
-		(struct qdf_mac_addr *)wlan_vdev_mlme_get_linkaddr(vdev);
-	if (!self_link_addr) {
-		mlme_err("self link addr NULL for vdev %d", vdev_id);
-		return;
-	}
-
-	wlan_crypto_aquire_lock();
-	src_link_id = cm_roam_find_assoc_pairwise_key_link_id(psoc,
-							      &ap_link_addr);
-	wlan_crypto_release_lock();
-
-	if (src_link_id == WLAN_INVALID_LINK_ID) {
-		mlme_debug("vdev %d: no keys hashed under ap addr "
-			   QDF_MAC_ADDR_FMT ", nothing to re-hash",
-			   vdev_id, QDF_MAC_ADDR_REF(ap_link_addr.bytes));
-		return;
-	}
-	dst_link_id = assoc_link_info->link_id;
-
-	/* Already hashed the way post-roam lookups will ask for it */
-	if (src_link_id == dst_link_id &&
-	    qdf_is_macaddr_equal(&ap_link_addr, self_link_addr))
-		return;
-
-	for (key_idx = 0; key_idx < max_key_index; key_idx++) {
-		wlan_crypto_aquire_lock();
-		ap_key = wlan_crypto_get_ml_sta_link_key(psoc, key_idx,
-							 &ap_link_addr,
-							 src_link_id);
-		if (!ap_key) {
-			wlan_crypto_release_lock();
-			continue;
-		}
-
-		self_key = qdf_mem_malloc(sizeof(*self_key));
-		if (!self_key) {
-			wlan_crypto_release_lock();
-			mlme_err("vdev %d: malloc failed for key %d",
-				 vdev_id, key_idx);
-			break;
-		}
-		qdf_mem_copy(self_key, ap_key, sizeof(*self_key));
-		wlan_crypto_release_lock();
-
-		status = wlan_crypto_save_ml_sta_key(psoc, key_idx, self_key,
-						     self_link_addr,
-						     dst_link_id);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err("vdev %d: re-hash of key %d failed, status %d",
-				 vdev_id, key_idx, status);
-			qdf_mem_free(self_key);
-			break;
-		}
-
-		rehashed = true;
-		mlme_debug("vdev %d: key %d re-hashed from ap addr "
-			   QDF_MAC_ADDR_FMT " link_id %d to self link addr "
-			   QDF_MAC_ADDR_FMT " link_id %d",
-			   vdev_id, key_idx,
-			   QDF_MAC_ADDR_REF(ap_link_addr.bytes), src_link_id,
-			   QDF_MAC_ADDR_REF(self_link_addr->bytes),
-			   dst_link_id);
-	}
-
-	/* Drop the source only if every key was copied */
-	if (rehashed && key_idx == max_key_index)
-		ucfg_crypto_free_key_by_link_id(psoc, &ap_link_addr,
-						src_link_id);
-}
-#else
-static void
-cm_roam_update_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
-{}
-
-static void
-cm_roam_rehash_assoc_vdev_keys(struct wlan_objmgr_vdev *vdev)
-{}
-#endif /* WLAN_FEATURE_11BI_SECURITY */
+#endif
 
 QDF_STATUS
 cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -1648,29 +1170,32 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	bool eht_capab = false;
 	struct pe_session *session;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	struct wlan_roam_synch_complete_params sync_params = {};
+	uint8_t rso_stop_req_bitmap;
 
-	if (!mac_ctx)
-		return QDF_STATUS_E_FAILURE;
-
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
-		mlme_err("Session not found for vdev_id: %d", vdev_id);
+		/* couldn't find session */
+		pe_err("Session not found for vdev_id: %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vdev = session->vdev;
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		status = QDF_STATUS_E_FAILURE;
-		goto end;
+		goto rel_ref;
 	}
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx) {
 		status = QDF_STATUS_E_FAILURE;
-		goto end;
+		goto rel_ref;
 	}
 
 	roam_req = cm_get_first_roam_command(vdev);
@@ -1682,7 +1207,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	wlan_rec_conn_info(vdev_id, DEBUG_CONN_ROAMING,
 			   roam_synch_data->bssid.bytes, 0, 0);
-	wlan_cm_clear_cross_vdev_roam(vdev);
+
 	cm_roam_update_mlo_mgr_info(vdev, roam_synch_data);
 	cm_delete_crypto_keys_for_all_links(vdev);
 
@@ -1719,18 +1244,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	cm_process_roam_keys(vdev, rsp, cm_id);
 	/*
-	 * For MLO EPPKE/8021X_IN_AUTH roaming, store the assoc link pairwise
-	 * key in partner link vdev(s) and defer installation.  When called for
-	 * a link vdev the assoc link already has its key from the host EAPOL
-	 * exchange.
-	 */
-	if (roam_synch_data->auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH ||
-	    roam_synch_data->auth_algo == eSIR_AUTH_TYPE_EPPKE) {
-		cm_roam_update_link_vdev_keys(vdev);
-		cm_roam_rehash_assoc_vdev_keys(vdev);
-	}
-
-	/*
 	 * Re-enable the disabled link on roaming as decision
 	 * will be taken again to disable the link on roam sync completion.
 	 */
@@ -1753,10 +1266,16 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   QDF_MAC_ADDR_REF(connect_rsp->bssid.bytes));
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 		}
-		sync_params.vdev_id = vdev_id;
-		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc,
-							&sync_params);
+		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
 
+		rso_stop_req_bitmap =
+			mlme_get_rso_pending_disable_req_bitmap(psoc, vdev_id);
+		if (rso_stop_req_bitmap) {
+			mlme_clear_rso_pending_disable_req_bitmap(psoc,
+								  vdev_id);
+			wlan_cm_disable_rso(pdev, vdev_id, rso_stop_req_bitmap,
+					    REASON_DRIVER_DISABLED);
+		}
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
 					       false);
@@ -1776,7 +1295,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err(CM_PREFIX_FMT " fail to post WLAN_CM_SM_EV_ROAM_DONE",
 			 CM_PREFIX_REF(vdev_id, cm_id));
-		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 		goto error;
 	}
 
@@ -1788,7 +1306,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_err(CM_PREFIX_FMT " fail to copy reassoc resp status %d",
 				 CM_PREFIX_REF(vdev_id, cm_id), status);
-			wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 			goto error;
 		}
 	}
@@ -1796,9 +1313,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
-	lim_set_tpc_power(mac_ctx, session, NULL, false, 0);
-	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
-		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
+	lim_set_tpc_power(mac_ctx, session, NULL);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
@@ -1822,7 +1337,9 @@ error:
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_update_connected_links(vdev, 0);
-end:
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+
 	return status;
 }
 
@@ -1867,7 +1384,6 @@ cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 				      struct roam_offload_synch_ind *synch_data)
 {}
 #endif
-
 QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 {
 	struct roam_offload_synch_ind *roam_synch_data;
@@ -1875,9 +1391,6 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
-	uint8_t rso_stop_req_bitmap;
-	enum roam_offload_state rso_cmd = WLAN_ROAM_RSO_ENABLED;
-	bool is_host_4way_hs_supported = false;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1983,27 +1496,18 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 
 	wlan_cm_handle_sta_sta_roaming_enablement(psoc, vdev_id);
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev))
+	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev)) {
 		status = wlan_cm_roam_state_change(pdev,
 						   vdev_id,
 						   WLAN_ROAM_DEINIT,
 						   REASON_ROAM_HANDOFF_DONE);
+	}
 
-	is_host_4way_hs_supported =
-		wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
-	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
-		uint8_t rso_reason = REASON_CONNECT;
-
-		if (policy_mgr_is_chan_switch_in_progress(psoc) ||
-		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc)) {
-			rso_cmd = WLAN_ROAM_RSO_STOPPED;
-			rso_reason = REASON_ROAM_MCC_SCC_TRANSITION;
-		}
-
+	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
 		wlan_cm_roam_state_change(pdev, vdev_id,
-					  rso_cmd, rso_reason);
-	} else if (!is_host_4way_hs_supported) {
+					  WLAN_ROAM_RSO_ENABLED,
+					  REASON_CONNECT);
+	else
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by
@@ -2019,27 +1523,9 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_STOPPED,
 					  REASON_DISCONNECTED);
-	}
-
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
-
-	rso_stop_req_bitmap =
-		mlme_get_rso_pending_disable_req_bitmap(psoc, vdev_id);
-	if (rso_stop_req_bitmap) {
-		mlme_clear_rso_pending_disable_req_bitmap(psoc,
-							  vdev_id);
-		wlan_cm_disable_rso(pdev, vdev_id, rso_stop_req_bitmap,
-				    REASON_DRIVER_DISABLED);
-	}
-
-	if (status == QDF_STATUS_SUCCESS)
-		wlan_cm_roam_set_ipa_sw_routing(psoc, cm_ctx->vdev,
-						roam_synch_data->bssid.bytes,
-						vdev_id, false);
-
 end:
-
 	return status;
 }
 
@@ -2107,7 +1593,7 @@ cm_disconnect_roam_invoke_fail(struct wlan_objmgr_vdev *vdev,
 }
 
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id, bool is_disconnect_required)
+				  uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
@@ -2138,8 +1624,7 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		cm_remove_cmd(cm_ctx, &cm_id);
 
-	if (is_disconnect_required)
-		cm_disconnect_roam_invoke_fail(vdev, cm_id);
+	cm_disconnect_roam_invoke_fail(vdev, cm_id);
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	return status;
@@ -2183,7 +1668,7 @@ cm_ho_fail_is_avoid_list_candidate(struct wlan_objmgr_vdev *vdev,
 			return true;
 	}
 
-	mlo_link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
+	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
 	     link_info_iter++, mlo_link_info++) {
 		if (qdf_is_macaddr_equal(&mlo_link_info->ap_link_addr,
@@ -2371,44 +1856,4 @@ QDF_STATUS wlan_cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
-				    struct element_info *assoc_ie)
-{
-	struct wmi_unified *wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	const uint8_t *ext_cap_ie;
-	struct s_ext_cap *extcap;
-	bool twt_requestor = false;
-	bool vdev_support = false;
-	bool twt_req_support = false;
-
-	if (!wmi_handle)
-		return;
-
-	if (!wmi_service_enabled(wmi_handle, wmi_service_infra_mbssid))
-		return;
-
-	ext_cap_ie  = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_XCAPS,
-					       assoc_ie->ptr, assoc_ie->len);
-	if (!ext_cap_ie)
-		return;
-
-	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
-	/* MBSSID */
-	extcap->multi_bssid = 1;
-	/* TWT requestor: check vdev-level or pdev-level flag based on
-	 * FW service cap to avoid ambiguity between the two paths.
-	 */
-	wlan_twt_get_requestor_cfg(psoc, &twt_requestor);
-	wlan_twt_cfg_get_req_en_dis_vdev_support(psoc, &vdev_support);
-	if (vdev_support)
-		wlan_twt_cfg_get_vdev_requestor_flag(psoc, vdev_id,
-						     &twt_req_support);
-	else
-		wlan_twt_cfg_get_req_flag(psoc, &twt_req_support);
-
-	extcap->twt_requestor_support = twt_requestor && twt_req_support;
-
 }

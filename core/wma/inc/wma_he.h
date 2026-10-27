@@ -127,13 +127,11 @@ void wma_he_update_tgt_services(struct wmi_unified *wmi_handle,
  * wma_populate_peer_he_cap() - populate peer HE capabilities in peer assoc cmd
  * @peer: pointer to peer assoc params
  * @params: pointer to ADD STA params
- * @pdev: pointer to pdev obj
  *
  * Return: None
  */
 void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
-			      tpAddStaParams params,
-			      struct wlan_objmgr_pdev *pdev);
+			      tpAddStaParams params);
 
 /**
  * wma_update_vdev_he_ops() - update he ops in vdev start request
@@ -312,8 +310,7 @@ static inline void wma_he_update_tgt_services(struct wmi_unified *wmi_handle,
 }
 
 static inline void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
-					    tpAddStaParams params,
-					    struct wlan_objmgr_pdev *pdev)
+					    tpAddStaParams params)
 {
 }
 

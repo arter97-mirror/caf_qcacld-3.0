@@ -110,10 +110,6 @@ struct txrx_pdev_cfg_t {
 	u8 credit_update_enabled;
 	struct ol_tx_sched_wrr_ac_specs_t ac_specs[QCA_WLAN_AC_ALL];
 	bool gro_enable;
-#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
-	bool tc_based_dyn_gro_enable;
-	uint32_t tc_ingress_prio;
-#endif
 	bool tso_enable;
 	bool lro_enable;
 	bool sg_enable;

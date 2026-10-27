@@ -25,7 +25,6 @@
 
 #include <qdf_types.h>
 #include "wlan_objmgr_pdev_obj.h"
-#include "wmi_unified.h"
 
 #define MAX_RSSI_AVOID_BSSID_LIST          10
 /*
@@ -34,7 +33,7 @@
  */
 #define MAX_BAD_AP_LIST_SIZE               22
 #define PDEV_MAX_NUM_BSSID_DISALLOW_LIST   22
-#define MAX_CONNECTION_TRIAL_PER_ASSOC_LINK WMI_MAX_FAILED_LINK_COMBO_COUNT
+#define MAX_CONNECTION_TRIAL_PER_ASSOC_LINK WLAN_MAX_ML_BSS_LINKS * 2
 /**
  * enum dlm_reject_ap_source - Source of adding BSSID to DLM
  * @ADDED_BY_DRIVER: Source adding this BSSID is driver
@@ -88,7 +87,7 @@ enum dlm_reject_ap_type {
  * @REASON_UNKNOWN: Unknown reason
  * @REASON_NUD_FAILURE: NUD failure happened with this BSSID
  * @REASON_STA_KICKOUT: STA kickout happened with this BSSID
- * @REASON_ROAM_HO_FAILURE: HO failure happened with this BSSID
+ * @REASON_ROAM_HO_FAILURE: HO failure happenend with this BSSID
  * @REASON_ASSOC_REJECT_POOR_RSSI: assoc rsp with reason 71 received from
  * AP.
  * @REASON_ASSOC_REJECT_OCE: OCE assoc reject received from the AP.
@@ -177,7 +176,7 @@ enum wlan_link_combination_to_reject {
  */
 struct reject_mlo_ap_info {
 	struct qdf_mac_addr mld_addr;
-	uint32_t tried_links[MAX_CONNECTION_TRIAL_PER_ASSOC_LINK];
+	uint16_t tried_links[MAX_CONNECTION_TRIAL_PER_ASSOC_LINK];
 	uint8_t tried_link_count;
 	uint8_t link_action;
 };

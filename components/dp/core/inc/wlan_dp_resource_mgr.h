@@ -14,31 +14,12 @@
 #define dp_rsrc_mgr_debug(params...)
 #endif
 
-#ifdef DP_FEATURE_DIRECT_REFILL
 /*Max throughput(Mbps) supported in different resource levels*/
-#define RESOURCE_LVL_1_TPUT_MBPS  900
-#define RESOURCE_LVL_2_TPUT_MBPS  1800
-#define RESOURCE_LVL_3_TPUT_MBPS  2400
-#define RESOURCE_LVL_4_TPUT_MBPS  5900
-#define RESOURCE_LVL_5_TPUT_MBPS  11800
-
-/* RX buffers required in different resource levels */
-#define RESOURCE_LVL_1_RX_BUFFERS 1024
-#define RESOURCE_LVL_2_RX_BUFFERS (2 * 1024)
-#define RESOURCE_LVL_3_RX_BUFFERS (4 * 1024)
-#define RESOURCE_LVL_4_RX_BUFFERS (10 * 1024)
-#define RESOURCE_LVL_5_RX_BUFFERS ((16 * 1024) - 1)
-
-#define MAX_MAC_RESOURCES 2
-
-#else /* DP_FEATURE_DIRECT_REFILL */
-
 #define RESOURCE_LVL_1_TPUT_MBPS  2400
 #define RESOURCE_LVL_2_TPUT_MBPS  5900
 
 #if defined(QCA_WIFI_WCN7750) || defined(QCA_WIFI_QCA6750) || \
-	defined(QCA_WIFI_WCN6450) || defined(QCA_WIFI_QCC2072) || \
-	defined(QCA_WIFI_WCN8750)
+    defined(QCA_WIFI_WCN6450)
 #define MAX_MAC_RESOURCES 1
 /*RX buffers required in different resource levels*/
 #define RESOURCE_LVL_1_RX_BUFFERS (6 * 1024)
@@ -48,29 +29,19 @@
 #define RESOURCE_LVL_1_RX_BUFFERS (10 * 1024)
 #endif
 #define RESOURCE_LVL_2_RX_BUFFERS ((16 * 1024) - 1)
-#endif /* DP_FEATURE_DIRECT_REFILL */
-
 #define UNKNOWN_MAC_ID 0xf
 
 #define DP_RSRC_MGR_TIMER_MS	1000
 
 /**
  * enum wlan_dp_resource_level - DP Resource levels
- * @RESOURCE_LVL_1: Minimal Resource level for low throughput
- * @RESOURCE_LVL_2: Low Resource level for moderate throughput
- * @RESOURCE_LVL_3: Medium Resource level for high throughput
- * @RESOURCE_LVL_4: High Resource level for very high throughput
- * @RESOURCE_LVL_5: Maximum Resource level for peak throughput
+ * @RESOURCE_LVL_1: Default Resource level
+ * @RESOURCE_LVL_2: Higher resource level in peak tput
  * @RESOURCE_LVL_MAX: MAX resource level undefined
  */
 enum wlan_dp_resource_level {
 	RESOURCE_LVL_1,
 	RESOURCE_LVL_2,
-#ifdef DP_FEATURE_DIRECT_REFILL
-	RESOURCE_LVL_3,
-	RESOURCE_LVL_4,
-	RESOURCE_LVL_5,
-#endif
 	RESOURCE_LVL_MAX
 };
 
@@ -100,11 +71,10 @@ struct wlan_dp_resource_ml_vote_info {
 /**
  * struct wlan_dp_resource_vote_node - DP Resource vote node context
  * @priv_ctx: DP peer priv context ref
+ * @peer: OBJMGR peer reference
  * @self_mac: Self MAC address
  * @remote_mac: Remote MAC address
  * @ml_vote_info: ML vote common info
- * @mlo_peer_ctx: MLO peer context; non-NULL for MLO link peers, used for
- *   BA window dedup (pointer comparison only, never dereferenced)
  * @phymode: phymode it can operate
  * @phymode0: phymode on MAC-0
  * @phymode1: phymode on MAC-1
@@ -115,14 +85,13 @@ struct wlan_dp_resource_ml_vote_info {
  * @tput1: Max throughput on MAC-1
  * @vdev_id: Vdev id
  * @mac_id: HW MAC id
- * @nan_vote: current vote node is for nan
  */
 struct wlan_dp_resource_vote_node {
 	struct wlan_dp_peer_priv_context *priv_ctx;
+	struct wlan_objmgr_peer *peer;
 	struct qdf_mac_addr self_mac;
 	struct qdf_mac_addr remote_mac;
 	struct wlan_dp_resource_ml_vote_info *ml_vote_info;
-	struct wlan_mlo_peer_context *mlo_peer_ctx;
 	enum wlan_phymode phymode;
 	enum wlan_phymode phymode0;
 	enum wlan_phymode phymode1;
@@ -133,7 +102,6 @@ struct wlan_dp_resource_vote_node {
 	uint64_t tput1;
 	uint32_t vdev_id;
 	uint32_t mac_id;
-	bool nan_vote;
 };
 
 /**
@@ -170,87 +138,52 @@ struct wlan_dp_resource_mgr_ctx {
 
 #ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
 
-#if defined(CONFIG_BORON) && defined(DP_FEATURE_DIRECT_REFILL)
-/* BA window minimum buffer floor.
- * Worst-case RX buffer floor for the BA reorder window.
- * BA window is in MPDUs; assumes every MPDU carries a fully-packed
- * A-MSDU (WLAN_DP_MAX_MSDU_PER_AMSDU sub-MSDUs), each needing one
- * RX buffer. This is an upper bound to ensure the ring is never the
- * bottleneck even under worst-case aggregation.
- */
-#define WLAN_DP_11AX_MAX_BA_WINDOW		256
-#define WLAN_DP_11BE_MAX_BA_WINDOW		1024
-#define WLAN_DP_MAX_MSDU_PER_AMSDU		7
-#define WLAN_DP_11AX_BA_WINDOW_MIN_BUFS \
-	(WLAN_DP_11AX_MAX_BA_WINDOW * WLAN_DP_MAX_MSDU_PER_AMSDU)
-#define WLAN_DP_11BE_BA_WINDOW_MIN_BUFS \
-	(WLAN_DP_11BE_MAX_BA_WINDOW * WLAN_DP_MAX_MSDU_PER_AMSDU)
-#endif /* CONFIG_BORON && DP_FEATURE_DIRECT_REFILL */
+/*RX buffers replenished based on batch manner*/
+#define RX_RESOURCE_ALLOC_BATCH_COUNT			64
 
-/*RX buffers replenished based on batch manner - optimized for 5 levels*/
-#define RX_RESOURCE_ALLOC_BATCH_COUNT			128
-#define RX_RESOURCE_ALLOC_LARGE_BATCH_COUNT		256
-#define RX_RESOURCE_ALLOC_SMALL_BATCH_COUNT		64
-
-/* Performance optimization thresholds */
-#define RESOURCE_LEVEL_JUMP_THRESHOLD			2
-#define UPSCALE_AGGRESSIVE_THRESHOLD			(8 * 1024)
-
-#define  WLAN_PHYMODE_11A_TPUT_MBPS			27
-#define  WLAN_PHYMODE_11B_TPUT_MBPS			6
-#define  WLAN_PHYMODE_11G_TPUT_MBPS			27
-#define  WLAN_PHYMODE_11G_ONLY_TPUT_MBPS		27
-#define  WLAN_PHYMODE_11NA_HT20_TPUT_MBPS		75
-#define  WLAN_PHYMODE_11NG_HT20_TPUT_MBPS		75
-#define  WLAN_PHYMODE_11NA_HT40_TPUT_MBPS		75
-#define  WLAN_PHYMODE_11NG_HT40PLUS_TPUT_MBPS		75
-#define  WLAN_PHYMODE_11NG_HT40MINUS_TPUT_MBPS		150
-#define  WLAN_PHYMODE_11NG_HT40_TPUT_MBPS		150
-#define  WLAN_PHYMODE_11AC_VHT20_TPUT_MBPS		138
-#define  WLAN_PHYMODE_11AC_VHT20_2G_TPUT_MBPS		138
-#define  WLAN_PHYMODE_11AC_VHT40_TPUT_MBPS		225
-#define  WLAN_PHYMODE_11AC_VHT40PLUS_2G_TPUT_MBPS	225
-#define  WLAN_PHYMODE_11AC_VHT40MINUS_2G_TPUT_MBPS	225
-#define  WLAN_PHYMODE_11AC_VHT40_2G_TPUT_MBPS		225
-#define  WLAN_PHYMODE_11AC_VHT80_TPUT_MBPS		550
-#define  WLAN_PHYMODE_11AC_VHT80_2G_TPUT_MBPS		550
-#define  WLAN_PHYMODE_11AC_VHT160_TPUT_MBPS		1100
-#define  WLAN_PHYMODE_11AC_VHT80_80_TPUT_MBPS		1100
-#define  WLAN_PHYMODE_11AXA_HE20_TPUT_MBPS		150
-#define  WLAN_PHYMODE_11AXG_HE20_TPUT_MBPS		150
-#define  WLAN_PHYMODE_11AXA_HE40_TPUT_MBPS		300
-#define  WLAN_PHYMODE_11AXG_HE40PLUS_TPUT_MBPS		300
-#define  WLAN_PHYMODE_11AXG_HE40MINUS_TPUT_MBPS		300
-#define  WLAN_PHYMODE_11AXG_HE40_TPUT_MBPS		300
-#define  WLAN_PHYMODE_11AXA_HE80_TPUT_MBPS		600
-#define  WLAN_PHYMODE_11AXG_HE80_TPUT_MBPS		600
-#define  WLAN_PHYMODE_11AXA_HE160_TPUT_MBPS		1200
-#define  WLAN_PHYMODE_11AXA_HE80_80_TPUT_MBPS		1200
+#define  WLAN_PHYMODE_11A_TPUT_MBPS			54
+#define  WLAN_PHYMODE_11B_TPUT_MBPS			12
+#define  WLAN_PHYMODE_11G_TPUT_MBPS			54
+#define  WLAN_PHYMODE_11G_ONLY_TPUT_MBPS		54
+#define  WLAN_PHYMODE_11NA_HT20_TPUT_MBPS		150
+#define  WLAN_PHYMODE_11NG_HT20_TPUT_MBPS		150
+#define  WLAN_PHYMODE_11NA_HT40_TPUT_MBPS		300
+#define  WLAN_PHYMODE_11NG_HT40PLUS_TPUT_MBPS		300
+#define  WLAN_PHYMODE_11NG_HT40MINUS_TPUT_MBPS		300
+#define  WLAN_PHYMODE_11NG_HT40_TPUT_MBPS		300
+#define  WLAN_PHYMODE_11AC_VHT20_TPUT_MBPS		275
+#define  WLAN_PHYMODE_11AC_VHT20_2G_TPUT_MBPS		275
+#define  WLAN_PHYMODE_11AC_VHT40_TPUT_MBPS		550
+#define  WLAN_PHYMODE_11AC_VHT40PLUS_2G_TPUT_MBPS	550
+#define  WLAN_PHYMODE_11AC_VHT40MINUS_2G_TPUT_MBPS	550
+#define  WLAN_PHYMODE_11AC_VHT40_2G_TPUT_MBPS		550
+#define  WLAN_PHYMODE_11AC_VHT80_TPUT_MBPS		1100
+#define  WLAN_PHYMODE_11AC_VHT80_2G_TPUT_MBPS		1100
+#define  WLAN_PHYMODE_11AC_VHT160_TPUT_MBPS		2200
+#define  WLAN_PHYMODE_11AC_VHT80_80_TPUT_MBPS		2200
+#define  WLAN_PHYMODE_11AXA_HE20_TPUT_MBPS		300
+#define  WLAN_PHYMODE_11AXG_HE20_TPUT_MBPS		300
+#define  WLAN_PHYMODE_11AXA_HE40_TPUT_MBPS		600
+#define  WLAN_PHYMODE_11AXG_HE40PLUS_TPUT_MBPS		600
+#define  WLAN_PHYMODE_11AXG_HE40MINUS_TPUT_MBPS		600
+#define  WLAN_PHYMODE_11AXG_HE40_TPUT_MBPS		600
+#define  WLAN_PHYMODE_11AXA_HE80_TPUT_MBPS		1200
+#define  WLAN_PHYMODE_11AXG_HE80_TPUT_MBPS		1200
+#define  WLAN_PHYMODE_11AXA_HE160_TPUT_MBPS		2400
+#define  WLAN_PHYMODE_11AXA_HE80_80_TPUT_MBPS		2400
 #ifdef WLAN_FEATURE_11BE
-#define  WLAN_PHYMODE_11BEA_EHT20_TPUT_MBPS		184
-#define  WLAN_PHYMODE_11BEG_EHT20_TPUT_MBPS		184
-#define  WLAN_PHYMODE_11BEA_EHT40_TPUT_MBPS		368
-#define  WLAN_PHYMODE_11BEG_EHT40PLUS_TPUT_MBPS		368
-#define  WLAN_PHYMODE_11BEG_EHT40MINUS_TPUT_MBPS	368
-#define  WLAN_PHYMODE_11BEG_EHT40_TPUT_MBPS		368
-#define  WLAN_PHYMODE_11BEA_EHT80_TPUT_MBPS		737
-#define  WLAN_PHYMODE_11BEG_EHT80_TPUT_MBPS		737
-#define  WLAN_PHYMODE_11BEA_EHT160_TPUT_MBPS		1475
-#define  WLAN_PHYMODE_11BEA_EHT320_TPUT_MBPS		2950
+#define  WLAN_PHYMODE_11BEA_EHT20_TPUT_MBPS		368
+#define  WLAN_PHYMODE_11BEG_EHT20_TPUT_MBPS		368
+#define  WLAN_PHYMODE_11BEA_EHT40_TPUT_MBPS		737
+#define  WLAN_PHYMODE_11BEG_EHT40PLUS_TPUT_MBPS		737
+#define  WLAN_PHYMODE_11BEG_EHT40MINUS_TPUT_MBPS	737
+#define  WLAN_PHYMODE_11BEG_EHT40_TPUT_MBPS		737
+#define  WLAN_PHYMODE_11BEA_EHT80_TPUT_MBPS		1475
+#define  WLAN_PHYMODE_11BEG_EHT80_TPUT_MBPS		1475
+#define  WLAN_PHYMODE_11BEA_EHT160_TPUT_MBPS		2950
+#define  WLAN_PHYMODE_11BEA_EHT320_TPUT_MBPS		5900
 #endif
-#ifdef WLAN_FEATURE_11BN
-#define  WLAN_PHYMODE_11BNA_UHR20_TPUT_MBPS		184
-#define  WLAN_PHYMODE_11BNG_UHR20_TPUT_MBPS		184
-#define  WLAN_PHYMODE_11BNA_UHR40_TPUT_MBPS		368
-#define  WLAN_PHYMODE_11BNG_UHR40PLUS_TPUT_MBPS		368
-#define  WLAN_PHYMODE_11BNG_UHR40MINUS_TPUT_MBPS	368
-#define  WLAN_PHYMODE_11BNG_UHR40_TPUT_MBPS		368
-#define  WLAN_PHYMODE_11BNA_UHR80_TPUT_MBPS		737
-#define  WLAN_PHYMODE_11BNG_UHR80_TPUT_MBPS		737
-#define  WLAN_PHYMODE_11BNA_UHR160_TPUT_MBPS		1475
-#define  WLAN_PHYMODE_11BNA_UHR320_TPUT_MBPS		2950
-#endif
-#define  WLAN_PHYMODE_DEFAULT_TPUT_MBPS			1200
+#define  WLAN_PHYMODE_DEFAULT_TPUT_MBPS			2400
 
 /**
  * wlan_dp_resource_mgr_max_of_two_vote_nodes() - Max of two phymodes is

@@ -48,20 +48,15 @@
 #define limResetHBPktCount(pe_session)   (pe_session->LimRxedBeaconCntDuringHB = 0)
 
 /* Useful macros for fetching various states in mac->lim */
-#define GET_LIM_BSS_TYPE(_pe_session)      ((_pe_session)->bssType)
-#define LIM_IS_AP_ROLE(_pe_session) \
-	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_INFRA_AP_MODE)
-#define LIM_IS_STA_ROLE(_pe_session) \
-	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_INFRASTRUCTURE_MODE)
-#define LIM_IS_UNKNOWN_ROLE(_pe_session) \
-	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_UNKNOWN_MODE)
-#define LIM_IS_NDI_ROLE(_pe_session) \
-	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_NDI_MODE)
-#define LIM_IS_MONITOR_ROLE(_pe_session) \
-	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_MONITOR_MODE)
-#define LIM_IS_PASSTHRU_ROLE(_pe_session) \
-	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_PASSTHRU_MODE)
-
+/* gLimSystemRole */
+#define GET_LIM_SYSTEM_ROLE(pe_session)      (pe_session->limSystemRole)
+#define LIM_IS_AP_ROLE(pe_session)           (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_AP_ROLE)
+#define LIM_IS_STA_ROLE(pe_session)          (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_STA_ROLE)
+#define LIM_IS_UNKNOWN_ROLE(pe_session)      (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_UNKNOWN_ROLE)
+#define LIM_IS_P2P_DEVICE_ROLE(pe_session)   (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_P2P_DEVICE_ROLE)
+#define LIM_IS_P2P_DEVICE_GO(pe_session)     (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_P2P_DEVICE_GO)
+#define LIM_IS_NDI_ROLE(pe_session) \
+		(GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_NDI_ROLE)
 /* gLimSmeState */
 #define GET_LIM_SME_STATE(mac)                 (mac->lim.gLimSmeState)
 #define SET_LIM_SME_STATE(mac, state)          (mac->lim.gLimSmeState = state)
@@ -90,23 +85,6 @@ enum sr_status_of_roamed_ap {
 	SR_THRESHOLD_NOT_IN_RANGE,
 };
 #endif
-
-/**
- * lim_remove_invalid_partner_links() - remove invalid partner links
- * @session_entry: pe session
- *
- * Return: void
- */
-void lim_remove_invalid_partner_links(struct pe_session *session_entry);
-
-/**
- * lim_clear_ml_partner_info() - clear partner link info
- * @session_entry: pe session
- * @idx: index of partner link info to be cleared
- *
- * Return: void
- */
-void lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx);
 
 /**
  * lim_post_msg_api() - post normal priority PE message
@@ -209,19 +187,6 @@ bool is_mgmt_protected(uint32_t vdev_id, const uint8_t *peer_mac_addr);
  * Return: void
  */
 void lim_check_ap_assist_dfs_p2p_group(bool is_incr_session);
-
-/**
- * lim_handle_sap_user_nss_update_req() - Update NSS and beacon template
- * for one AP vdev
- * @vdev_id: VDEV id
- *
- * Find the active PE session matching @vdev_id, update the AP session NSS
- * while bypassing HW mode NSS limits, and push the updated beacon template
- * to firmware.
- *
- * Return: None
- */
-void lim_handle_sap_user_nss_update_req(uint8_t vdev_id);
 
 /**
  * lim_fill_dfs_p2p_group_params() - Fill the params of P2P group operating
@@ -579,7 +544,7 @@ QDF_STATUS lim_handle_frame_genby_mbssid(uint8_t *frame, uint32_t frame_len,
 void lim_process_sme_addts_rsp_timeout(struct mac_context *mac, uint32_t param);
 QDF_STATUS lim_update_ext_cap_ie(struct mac_context *mac_ctx, uint8_t *ie_data,
 				 uint8_t *local_ie_buf, uint16_t *local_ie_len,
-				 uint8_t vdev_id);
+				 struct pe_session *session);
 
 /**
  * lim_handle_sap_beacon(): Handle the beacon received from scan module for SAP
@@ -674,23 +639,6 @@ void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
 void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq);
 
 /**
- * lim_disable_ht_dynamic_smps() - Disable HT dynamic SMPS
- * @session: pointer to PE session
- */
-void lim_disable_ht_dynamic_smps(struct pe_session *session);
-
-#ifdef WLAN_FEATURE_11AX
-/**
- * lim_disable_he_dynamic_smps() - Disable HE dynamic SMPS
- * @session: pointer to PE session
- */
-void lim_disable_he_dynamic_smps(struct pe_session *session);
-#else
-static inline
-void lim_disable_he_dynamic_smps(struct pe_session *session)
-{}
-#endif
-/**
  * lim_disable_ht_he_dynamic_smps() - disable dynamic SMPS for STA/P2P client
  *@session: pe session
  *@chan_freq: channel frequency
@@ -734,11 +682,34 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
  *
  * Return: qdf status
  */
-QDF_STATUS lim_fill_pe_session(struct mac_context *mac_ctx,
-			       struct pe_session *session,
-			       struct bss_description *bss_desc,
-			       enum wlan_phymode phy_mode,
-			       enum wlan_status_code *req_fail_status_code);
+QDF_STATUS
+lim_fill_pe_session(struct mac_context *mac_ctx,
+		    struct pe_session *session,
+		    struct bss_description *bss_desc,
+		    enum wlan_phymode phy_mode,
+		    enum wlan_status_code *req_fail_status_code);
+
+/**
+ * lim_update_omn_ie_ch_width() - update omn_ie_ch_width in struct
+ * assoc_channel_info while processing bcn/probe resp/assoc resp/re-assoc resp
+ * @vdev: VDEV object manager
+ * @ch_width: ch_width present in OMN IE
+ *
+ * Return: none
+ */
+void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
+				enum phy_ch_width ch_width);
+
+/**
+ * lim_update_bcn_op_ch_width() - update beacon channel width in struct
+ * assoc_channel_info while processing bcn/probe resp
+ * @vdev: VDEV object manager
+ * @ch_width: ch_width present in beacon eht/he/vht op IE and ht info IE
+ *
+ * Return: none
+ */
+void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
+				enum phy_ch_width ch_width);
 
 /**
  * lim_is_he_dynamic_smps_enabled() - Check if Dynamic SMPS enabled in HE caps
@@ -790,11 +761,11 @@ lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
  *
  * Return: qdf_status
  */
-QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
-				   struct wlan_objmgr_vdev *vdev,
-				   struct qdf_mac_addr *link_addr,
-				   uint8_t link_id, uint16_t freq);
-
+QDF_STATUS
+lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+			struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *link_addr, uint8_t link_id,
+			uint16_t freq);
 /**
  * lim_gen_link_specific_probe_rsp() - Generate link specific prb response
  * @mac_ctx: Pointer to mac context
@@ -848,10 +819,11 @@ lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
-						 struct wlan_objmgr_vdev *vdev,
-						 struct qdf_mac_addr *link_addr,
-						 uint8_t link_id, uint16_t freq)
+static inline QDF_STATUS
+lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+			struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *link_addr, uint8_t link_id,
+			uint16_t freq)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -1062,26 +1034,6 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD && WLAN_FEATURE_11BE_MLO */
 
-/**
- * lim_cm_update_gen_link_probe_resp_rnr() - Update the RNR fields of generated
- * link probe response.
- * @gen_link: Pointer to generated probe response
- * @reporting_bssid: BSSID of reporting BSSID
- * @reporting_chan_num: Chan num (index) of reporting link
- * @reporting_op_class: Operating class of reporting link
- * @reporting_link_id: Link ID of reporting link
- *
- * Wrapper API which updates the generated link's RNR by replacing generated
- * BSS's params with reporting link params in RNR.
- *
- * Returns: void
- */
-void lim_cm_update_gen_link_probe_resp_rnr(struct element_info *gen_link,
-					   struct qdf_mac_addr *reporting_bssid,
-					   uint8_t reporting_chan_num,
-					   uint8_t reporting_op_class,
-					   uint8_t reporting_link_id);
-
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * lim_update_cuflag_bpcc_each_link() - Update cu flag and bpcc from
@@ -1153,203 +1105,5 @@ QDF_STATUS lim_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
-
-/**
- * lim_cfg_dsmps_for_iot_ap() - Configure dynamic SMPS for IOT AP
- * @mac_ctx: mac context
- * @session: pe session
- * @bss_desc: bss descriptor
- * @is_roaming: is roaming
- *
- * Configure DSMPS based on allowlist and denylist.
- *
- * Configuration Priority:
- * - If allowlist is configured (non-empty), use allowlist logic
- * - If allowlist is not configured (empty), use denylist logic
- *
- * Allowlist Solution:
- * ==================
- * Initial Connection:
- *   1. AP not in allowlist:
- *      - Send VDEV param 0x0 to disable DSMPS
- *
- *   2. AP in allowlist AND in vendor RSSI OUI list:
- *      - Send VDEV param DSMPS_EN | DSMPS_BASE_ON_RSSI_EN to enable DSMPS with
- *      - RSSI-based control
- *
- *   3. AP in allowlist AND NOT in vendor RSSI OUI list:
- *      - Send VDEV param DSMPS_EN to enable DSMPS without RSSI-based control
- *
- * Roaming:
- *   - Always send VDEV param 0x0 to disable DSMPS after roaming
- *     (regardless of AP's presence in allowlist or RSSI OUI list)
- *
- * Denylist Solution:
- * ==================
- * Initial Connection or Roaming:
- *   1. AP in denylist:
- *      - Send VDEV param 0x0 to disable DSMPS
- *
- *   2. AP not in denylist AND in vendor RSSI OUI list:
- *      - Send VDEV param DSMPS_EN | DSMPS_BASE_ON_RSSI_EN to enable DSMPS with
- *      - RSSI-based control
- *
- *   3. AP not in denylist AND NOT in vendor RSSI OUI list:
- *      - Send VDEV param DSMPS_EN to enable DSMPS without RSSI-based control
- *
- * Return: None
- */
-void
-lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
-			 struct pe_session *session,
-			 struct bss_description *bss_desc,
-			 bool is_roaming);
-
-/**
- * lim_set_amsdu_for_2g_oui() - Set amsdu for 2 GHz IOT AP
- * @mac_ctx: mac context
- * @session: pe session
- * @bss_desc: bss descriptor
- *
- * Query action OUI database for IoT AP, set amsdu state in pe session
- *
- * Return: None
- */
-void lim_set_amsdu_for_2g_oui(struct mac_context *mac_ctx,
-			      struct pe_session *session,
-			      struct bss_description *bss_desc);
-
-/**
- * lim_cfg_disable_bpcc_wow_wake_for_iot_ap() - Configure OUI BPCC WOW
- * wake for IOT AP
- * @mac_ctx: mac context
- * @session: pe session
- * @bss_desc: bss descriptor
- *
- * Query action OUI database for IoT AP, send VDEV param to FW to
- * disable WOW wakeup triggered by BPCC change for the connected AP
- * if it matches the configured OUI list.
- *
- * Return: None
- */
-void
-lim_cfg_disable_bpcc_wow_wake_for_iot_ap(struct mac_context *mac_ctx,
-					 struct pe_session *session,
-					 struct bss_description *bss_desc);
-
-/**
- * lim_cfg_early_rx_check_oui() - Configure early RX for AP with beacon drift
- * @mac_ctx: mac context
- * @session: pe session
- * @bss_desc: bss descriptor
- *
- * Configure adaptive early RX for AP with beacon drift as per action OUI
- *
- * Send pdev param for early RX if OUI search is successful
- *
- * Return: None
- */
-void
-lim_cfg_early_rx_check_oui(struct mac_context *mac_ctx,
-			   struct pe_session *session,
-			   struct bss_description *bss_desc);
-
-#ifdef DRIVER_PASSTHRU_MODE
-/**
- * lim_passthrough_init_session() - Initialize PE session for passthrough mode
- * @mac_ptr: Pointer to global MAC context
- * @msg: Pointer to session creation message containing BSSID and vdev ID
- *
- * This function creates a new PE session for passthrough mode operation.
- *
- * Return: None
- */
-void lim_passthrough_init_session(struct mac_context *mac_ptr,
-				  struct sir_create_session *msg);
-
-/**
- * lim_passthrough_deinit_session() - Delete PE session for passthrough mode
- * @mac_ptr: Pointer to global MAC context
- * @msg: Pointer to session deletion message containing vdev ID
- *
- * This function deletes an existing PE session that was created for
- * passthrough mode operation. It triggers the VDEV state machine to
- * transition to DOWN state and then removes the session from PE.
- *
- * Return: None
- */
-void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
-				    struct sir_delete_session *msg);
-/**
- * lim_passthrough_peer_setup() - peer setup/update for passthrough mode
- * @mac: pointer to global MAC context
- * @msg: pointer to peer setup message (create_only=1 for NEW, 0 for UPDATE)
- *
- * Handles both NEW (create DPH entry, WMI_PEER_CREATE) and UPDATE (update
- * caps in DPH entry, WMI_PEER_ASSOC) actions from set_station_info.
- *
- * Return: None
- */
-void lim_passthrough_peer_setup(struct mac_context *mac,
-				struct sir_passthru_peer_setup_msg *msg);
-
-/**
- * lim_passthru_peer_del() - delete a passthru peer by MAC address
- * @mac: pointer to global MAC context
- * @msg: pointer to peer deletion message
- *
- * Looks up the DPH entry by MAC address and calls lim_del_sta() to post
- * WMA_DELETE_STA_REQ, then removes the DPH entry and releases the AID.
- *
- * Return: None
- */
-void lim_passthru_peer_del(struct mac_context *mac,
-			   struct sir_passthru_peer_del_msg *msg);
-#else
-static inline
-void lim_passthrough_init_session(struct mac_context *mac_ptr,
-				  struct sir_create_session *msg)
-{
-}
-static inline
-void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
-				    struct sir_delete_session *msg)
-{
-}
-static inline
-void lim_passthrough_peer_setup(struct mac_context *mac,
-				struct sir_passthru_peer_setup_msg *msg)
-{
-}
-
-static inline
-void lim_passthru_peer_del(struct mac_context *mac,
-			   struct sir_passthru_peer_del_msg *msg)
-{
-}
-#endif
-
-#ifdef FEATURE_DFS_SAP_SWITCHMODE_OVERRIDE
-/**
- * lim_update_switchmode_dfs_sap() - Update switch mode for DFS SAP
- * @mac_ctx: Pointer to mac context
- * @session: pe session
- * @switch_mode: switch mode pointer
- *
- * This api will update the switch mode for DFS SAP
- *
- * Return: None
- */
-void
-lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
-			      struct pe_session *session,
-			      uint8_t *switch_mode);
-#else
-static inline void
-lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
-			      struct pe_session *session,
-			      uint8_t *switch_mode)
-{
-}
-#endif
+/************************************************************/
 #endif /* __LIM_API_H */

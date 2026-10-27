@@ -66,7 +66,6 @@
 #include "lim_prop_exts_utils.h"
 #include "dph_hash_table.h"
 #include "wma_types.h"
-#include "wma.h"
 #include "cds_regdomain.h"
 #include "cds_utils.h"
 #include "wlan_mlo_mgr_sta.h"
@@ -77,7 +76,6 @@
 #include "wlan_tdls_public_structs.h"
 #include "wlan_cfg80211_tdls.h"
 #include "wlan_tdls_api.h"
-#include "wlan_tdls_stats_api.h"
 #include "lim_mlo.h"
 #include "wlan_mlo_mgr_link_switch.h"
 
@@ -112,51 +110,6 @@ struct tdls_ethernet_hdr {
 
 static const uint8_t eth_890d_tdls_discvory_frm_hdr[] = {
 	0x89, 0x0d, 0x02, 0x0c, 0x0a,
-};
-
-/*
- * TDLS Setup Request is sent as a data frame with 89-0d EtherType.
- * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
- *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_SETUP_REQUEST(0x00)
- */
-static const uint8_t tdls_setup_req_frm_hdr[] = {
-	0x89, 0x0d, 0x02, 0x0c, 0x00,
-};
-
-/*
- * TDLS Setup Response is sent as a data frame with 89-0d EtherType.
- * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
- *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_SETUP_RESPONSE(0x01)
- */
-static const uint8_t tdls_setup_rsp_frm_hdr[] = {
-	0x89, 0x0d, 0x02, 0x0c, 0x01,
-};
-
-/*
- * TDLS Setup Confirm is sent as a data frame with 89-0d EtherType.
- * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
- *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_SETUP_CONFIRM(0x02)
- */
-static const uint8_t tdls_setup_cnf_frm_hdr[] = {
-	0x89, 0x0d, 0x02, 0x0c, 0x02,
-};
-
-/*
- * TDLS Teardown is sent as a data frame with 89-0d EtherType.
- * Pattern: EtherType(0x890D) + PAYLOAD_TYPE_TDLS(0x02) +
- *          ACTION_CATEGORY_TDLS(0x0c) + TDLS_TEARDOWN(0x03)
- */
-static const uint8_t tdls_teardown_frm_hdr[] = {
-	0x89, 0x0d, 0x02, 0x0c, 0x03,
-};
-
-/*
- * TDLS Discovery Response is sent as a public action management frame
- * (802.11 MGMT). Its action body starts at sizeof(tSirMacMgmtHdr).
- * Pattern: ACTION_CATEGORY_PUBLIC (0x04) | TDLS_DISCOVERY_RESPONSE (0x0e)
- */
-static const uint8_t tdls_discovery_rsp_frm_hdr[] = {
-	0x04, 0x0e,
 };
 
 #define TDLS_ETHR_HDR_LEN (sizeof(struct tdls_ethernet_hdr))
@@ -619,16 +572,6 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 	struct tdls_ethernet_hdr *ethernet_hdr;
 	tpSirMacActionFrameHdr action_hdr;
 	bool is_tdls_discvory_frm = false;
-	bool is_tdls_discovery_response_frm = false;
-	bool is_tdls_setup_request_frm = false;
-	bool is_tdls_setup_response_frm = false;
-	bool is_tdls_setup_confirm_frm = false;
-	bool is_tdls_teardown_frm = false;
-	uint8_t *peer_mac = NULL;
-	uint8_t *src_mac = NULL;
-	uint8_t type, subtype;
-	uint8_t stats_reason = TDLS_STATS_REASON_GENERAL;
-	bool tx_ok = (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
 
 
 	if (NO_SESSION != mac_ctx->lim.tdls_frm_session_id) {
@@ -639,39 +582,11 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 					  sizeof(*action_hdr)))) {
 			ethernet_hdr =
 				(struct tdls_ethernet_hdr *)qdf_nbuf_data(buf);
-			/* peer_mac is the first field of the Ethernet header */
-			peer_mac = ethernet_hdr->dest_addr;
-			/* src_mac is the second field of the Ethernet header */
-			src_mac = ethernet_hdr->src_addr;
 			is_tdls_discvory_frm =
 				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
 				TDLS_ETHR_HDR_LEN),
 				eth_890d_tdls_discvory_frm_hdr,
 				sizeof(eth_890d_tdls_discvory_frm_hdr));
-
-			is_tdls_setup_request_frm =
-				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
-				TDLS_ETHR_HDR_LEN),
-				tdls_setup_req_frm_hdr,
-				sizeof(tdls_setup_req_frm_hdr));
-
-			is_tdls_setup_response_frm =
-				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
-				TDLS_ETHR_HDR_LEN),
-				tdls_setup_rsp_frm_hdr,
-				sizeof(tdls_setup_rsp_frm_hdr));
-
-			is_tdls_setup_confirm_frm =
-				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
-				TDLS_ETHR_HDR_LEN),
-				tdls_setup_cnf_frm_hdr,
-				sizeof(tdls_setup_cnf_frm_hdr));
-
-			is_tdls_teardown_frm =
-				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
-				TDLS_ETHR_HDR_LEN),
-				tdls_teardown_frm_hdr,
-				sizeof(tdls_teardown_frm_hdr));
 
 			if (is_tdls_discvory_frm &&
 			    tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
@@ -681,124 +596,15 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 					ethernet_hdr->dest_addr);
 		}
 
-		/*
-		 * TDLS Discovery Response is a public action management frame.
-		 * Its action body (Category + Action) starts at offset
-		 * sizeof(tSirMacMgmtHdr) from the buffer start.
-		 * Match: ACTION_CATEGORY_PUBLIC (0x04) + TDLS_DISCOVERY_RESPONSE (0x0e)
-		 */
-		if (buf &&
-		    (qdf_nbuf_len(buf) >= (sizeof(tSirMacMgmtHdr) +
-					   sizeof(*action_hdr)))) {
-			is_tdls_discovery_response_frm =
-				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
-					      sizeof(tSirMacMgmtHdr)),
-					     tdls_discovery_rsp_frm_hdr,
-					     sizeof(tdls_discovery_rsp_frm_hdr));
-			/*
-			 * For Discovery Response (802.11 MGMT frame), the
-			 * destination address is in addr1 of the MAC header
-			 * at offset 4 (FC=2B + Duration=2B).
-			 */
-			if (is_tdls_discovery_response_frm) {
-				tpSirMacMgmtHdr mgmt_hdr =
-					(tpSirMacMgmtHdr)qdf_nbuf_data(buf);
-				peer_mac = mgmt_hdr->da;
-				src_mac  = mgmt_hdr->sa;
-			}
-		}
-
-		/*
-		 * Record TDLS stats for this tx completion event via the
-		 * dispatcher API which handles entry population, RSSI lookup
-		 * via tdls_find_peer(), and SM delivery internally.
-		 */
-		if (peer_mac &&
-		    (is_tdls_discvory_frm ||
-		     is_tdls_discovery_response_frm ||
-		     is_tdls_setup_request_frm ||
-		     is_tdls_setup_response_frm ||
-		     is_tdls_setup_confirm_frm ||
-		     is_tdls_teardown_frm)) {
-			pe_debug("tdls_frm_session_id: %x tx_complete: %x peer:" QDF_MAC_ADDR_FMT " self:" QDF_MAC_ADDR_FMT " is_discovery:%d is_discovery_rsp:%d is_setup_req:%d is_setup_rsp:%d is_setup_cnf:%d is_teardown:%d",
-				 mac_ctx->lim.tdls_frm_session_id, tx_complete,
-				 QDF_MAC_ADDR_REF(peer_mac),
-				 QDF_MAC_ADDR_REF(src_mac),
-				 is_tdls_discvory_frm,
-				 is_tdls_discovery_response_frm,
-				 is_tdls_setup_request_frm,
-				 is_tdls_setup_response_frm,
-				 is_tdls_setup_confirm_frm,
-				 is_tdls_teardown_frm);
-
-			if (is_tdls_discvory_frm) {
-				type    = TDLS_STATS_DISCOVERY;
-				subtype = TDLS_STATS_SUBTYPE_REQ;
-			} else if (is_tdls_discovery_response_frm) {
-				type    = TDLS_STATS_DISCOVERY;
-				subtype = TDLS_STATS_SUBTYPE_RESP;
-			} else if (is_tdls_setup_request_frm) {
-				type    = TDLS_STATS_SETUP;
-				subtype = TDLS_STATS_SUBTYPE_REQ;
-			} else if (is_tdls_setup_response_frm) {
-				type    = TDLS_STATS_SETUP;
-				subtype = TDLS_STATS_SUBTYPE_RESP;
-			} else if (is_tdls_teardown_frm) {
-				type    = TDLS_STATS_TEARDOWN;
-				subtype = TDLS_STATS_SUBTYPE_COMPLETE;
-				/*
-				 * Parse the 802.11 reason code from the
-				 * teardown frame and map it to the stats
-				 * reason code enum.
-				 * Frame layout after Ethernet header:
-				 *   [EtherType(2)][PAYLOAD_TYPE(1)]
-				 *   [CATEGORY(1)][ACTION(1)][reason(2)]
-				 * The 5-byte tdls_teardown_frm_hdr covers
-				 * bytes 0-4; reason code is at bytes 5-6.
-				 */
-				if (buf &&
-				    qdf_nbuf_len(buf) >=
-				    (TDLS_ETHR_HDR_LEN +
-				     sizeof(tdls_teardown_frm_hdr) +
-				     sizeof(uint16_t))) {
-					const uint8_t *rp =
-						(const uint8_t *)
-						qdf_nbuf_data(buf) +
-						TDLS_ETHR_HDR_LEN +
-						sizeof(tdls_teardown_frm_hdr);
-					uint16_t dot11_reason =
-						(uint16_t)(rp[0] |
-							   (rp[1] << 8));
-
-					if (dot11_reason ==
-					    REASON_TDLS_PEER_UNREACHABLE)
-						stats_reason =
-						TDLS_STATS_REASON_PEER_UNREACHABLE;
-					else
-						stats_reason =
-						TDLS_STATS_REASON_TEARDOWN_UNSPECIFIED;
-				}
-			} else {
-				type    = TDLS_STATS_SETUP;
-				subtype = TDLS_STATS_SUBTYPE_CONFIRM;
-			}
-
-			wlan_tdls_record_mgmt_tx_complete(
-				mac_ctx->psoc,
-				mac_ctx->lim.tdls_frm_session_id,
-				peer_mac, type, subtype, tx_ok,
-				stats_reason);
-		}
-
 		lim_send_sme_mgmt_tx_completion(mac_ctx,
 				mac_ctx->lim.tdls_frm_session_id,
 				tx_complete);
 		mac_ctx->lim.tdls_frm_session_id = NO_SESSION;
-	} else {
-		pe_debug("tdls_frm_session_id: %x tx_complete: %x is_discovery:%d",
-			 mac_ctx->lim.tdls_frm_session_id, tx_complete,
-			 is_tdls_discvory_frm);
 	}
+
+	pe_debug("tdls_frm_session_id: %x tx_complete: %x is_discovery:%d",
+		 mac_ctx->lim.tdls_frm_session_id, tx_complete,
+		 is_tdls_discvory_frm);
 
 	if (buf)
 		qdf_nbuf_free(buf);
@@ -808,29 +614,29 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
- * lim_get_def_dp_link_vdev_id() - get vdev id
+ * lim_get_assoc_link_vdev_id() - get vdev id
  * @session: pe session
  *
- * Since fw only uses primary (def) link vdev to transmit data packets,
+ * Since fw only uses assoc link vdev to transmit data packets,
  * it needs to fetch the right vdev id when transfer tdls management
  * frame for partner link.
  *
  * Return: vdev id
  */
-static uint8_t lim_get_def_dp_link_vdev_id(struct pe_session *session)
+static uint8_t lim_get_assoc_link_vdev_id(struct pe_session *session)
 {
-	uint8_t vdev_id;
+	struct wlan_objmgr_vdev *assoc_vdev;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
-		vdev_id = mlo_mgr_get_def_dp_link_vdev(session->vdev);
-		if (vdev_id != WLAN_INVALID_VDEV_ID)
-			return vdev_id;
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(session->vdev);
+		if (assoc_vdev)
+			return wlan_vdev_get_id(assoc_vdev);
 	}
 
 	return session->smeSessionId;
 }
 #else
-static uint8_t lim_get_def_dp_link_vdev_id(struct pe_session *session)
+static uint8_t lim_get_assoc_link_vdev_id(struct pe_session *session)
 {
 	return session->smeSessionId;
 }
@@ -1019,13 +825,13 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 	}
 #endif
 
-	pe_debug("[TDLS] vdev:%d action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
-		 pe_session->vdev_id, TDLS_DISCOVERY_REQUEST,
-		 lim_trace_tdls_action_string(TDLS_DISCOVERY_REQUEST),
-		 QDF_MAC_ADDR_REF(peer_mac.bytes));
+	pe_debug("[TDLS] action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
+		TDLS_DISCOVERY_REQUEST,
+		lim_trace_tdls_action_string(TDLS_DISCOVERY_REQUEST),
+		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
@@ -1066,7 +872,6 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 	qdf_size_t val_len;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	bool is_wideband;
-	enum phy_ch_width ch_width;
 
 	is_wideband =
 		wlan_cfg80211_tdls_is_fw_wideband_capable(pe_session->vdev);
@@ -1096,8 +901,8 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 			if (pe_session->ch_width == CH_WIDTH_20MHZ)
 				htCap->supportedChannelWidthSet = 0;
 
-		wlan_mlme_set_ht_mcsset_for_nss(mac->psoc, htCap, NULL,
-						nss, nss);
+		if (NSS_1x1_MODE == nss)
+			htCap->supportedMCSSet[1] = 0;
 		/*
 		 * Advertise ht capability and max supported channel bandwidth
 		 * when populating HT IE in TDLS Setup Request/Setup Response/
@@ -1156,20 +961,14 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 				vht_cap_info->rx_supp_data_rate;
 			vhtCap->txMCSMap = vht_cap_info->tx_mcs_map;
 			vhtCap->txSupDataRate = vht_cap_info->tx_supp_data_rate;
-
-			ch_width = (vhtCap->supportedChannelWidthSet >= VHT_CAP_160_SUPP) ?
-					CH_WIDTH_160MHZ : CH_WIDTH_80MHZ;
-
-			vhtCap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
-			vhtCap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
-			vhtCap->txSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
-								nss,
-								true);
-			vhtCap->rxHighSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(ch_width,
-								nss,
-								true);
+			if (nss == NSS_1x1_MODE) {
+				vhtCap->txMCSMap |= DISABLE_NSS2_MCS;
+				vhtCap->rxMCSMap |= DISABLE_NSS2_MCS;
+				vhtCap->txSupDataRate =
+					VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				vhtCap->rxHighSupDataRate =
+					VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+			}
 		} else {
 			vhtCap->present = 0;
 		}
@@ -1302,26 +1101,6 @@ static void lim_tdls_set_he_chan_width(struct mac_context *mac,
 		heCap->chan_width_4 = 0;
 		heCap->chan_width_5 = 0;
 		heCap->chan_width_6 = 0;
-	} else if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
-		uint32_t fw_vht_ch_wd = wma_get_vht_ch_width();
-
-		/*
-		 * In 6 GHz, check if FW supports 160 MHz. If FW doesn't
-		 * advertise 160 MHz support, cap the TDLS peer HE caps
-		 * bandwidth to 80 MHz to avoid FW downgrading to 20 MHz.
-		 */
-		if (fw_vht_ch_wd < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
-			pe_debug("FW max BW %d, capping TDLS HE caps to 80 MHz in 6 GHz",
-				 fw_vht_ch_wd);
-			heCap->chan_width_2 = 0;
-			heCap->chan_width_3 = 0;
-		}
-		/*
-		 * chan_width_4 (26-tone RU in 2.4 GHz) and chan_width_5
-		 * (26-tone RU in 5 GHz) are not applicable in 6 GHz band.
-		 */
-		heCap->chan_width_4 = 0;
-		heCap->chan_width_5 = 0;
 	}
 }
 
@@ -1364,8 +1143,7 @@ static void populate_dot11f_set_tdls_he_cap(struct mac_context *mac,
 					    struct pe_session *session)
 {
 	if (IS_DOT11_MODE_HE(selfDot11Mode)) {
-		populate_dot11f_he_caps(mac, NULL, session->opmode,
-					0, CH_WIDTH_20MHZ, heCap);
+		populate_dot11f_he_caps(mac, NULL, heCap);
 		lim_tdls_set_he_chan_width(mac, heCap, session,
 		      wlan_cfg80211_tdls_is_fw_wideband_capable(session->vdev));
 		lim_tdls_populate_ppe_caps(mac, session, heCap);
@@ -1414,16 +1192,25 @@ static void lim_tdls_populate_he_operations(struct mac_context *mac,
 					    struct pe_session *pe_session,
 					    tDot11fIEhe_op *he_op)
 {
-	struct wlan_mlme_he_caps *he_cap_info = &mac->mlme_cfg->he_caps;
+	struct wlan_mlme_he_caps *he_cap_info;
+	uint16_t mcs_set = 0;
 
+	he_cap_info = &mac->mlme_cfg->he_caps;
 	he_op->co_located_bss = 0;
 	he_op->bss_color = pe_session->he_bss_color_change.new_color;
 	if (!he_op->bss_color)
 		he_op->bss_col_disabled = 1;
 
-	*((uint16_t *)he_op->basic_mcs_nss) =
-			(uint16_t)he_cap_info->he_ops_basic_mcs_nss;
-	populate_dot11f_he_operation(mac, pe_session, he_op);
+	mcs_set = (uint16_t)he_cap_info->he_ops_basic_mcs_nss;
+	if (pe_session->nss == NSS_1x1_MODE)
+		mcs_set |= 0xFFFC;
+	else
+		mcs_set |= 0xFFF0;
+
+	*((uint16_t *)he_op->basic_mcs_nss) = mcs_set;
+	populate_dot11f_he_operation(mac,
+				     pe_session,
+				     he_op);
 }
 
 static void lim_tdls_fill_setup_cnf_he_op(struct mac_context *mac,
@@ -1487,7 +1274,7 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 			&rates->tx_he_mcs_map_160,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_160),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_160),
-			nss, nss,
+			nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -1499,7 +1286,7 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 			&rates->tx_he_mcs_map_160,
 			rx_he_mcs_map_160,
 			tx_he_mcs_map_160,
-			nss, nss,
+			nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -1514,7 +1301,6 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 			&rates->tx_he_mcs_map_80_80,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_80_80),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_80_80), nss,
-			nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 					rx_he_mcs_map_80_80),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -1531,7 +1317,7 @@ static void lim_tdls_populate_he_matching_rate_set(struct mac_context *mac_ctx,
 						   struct pe_session *session)
 {
 	lim_populate_he_mcs_set(mac_ctx, &stads->supportedRates,
-				&stads->he_config, session, nss, nss);
+				&stads->he_config, session, nss);
 
 	lim_tdls_fill_he_wideband_offchannel_mcs(mac_ctx, stads, nss, session);
 }
@@ -1812,7 +1598,7 @@ lim_ieee80211_pack_ehtcap_tdls(struct mac_context *mac,
 					NULL, pe_session);
 
 	lim_ieee80211_pack_ehtcap(eht_cap_ie, pe_session->eht_config,
-				  he_cap, is_band_2g, true);
+				  he_cap, is_band_2g);
 
 	*len = eht_cap_ie[1] + 2;
 	return eht_cap_ie;
@@ -2060,10 +1846,10 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 		qdf_mem_copy(pFrame + sizeof(tSirMacMgmtHdr) + nPayload, addIe,
 			     addIeLen);
 	}
-	pe_debug("[TDLS] vdev:%d action: %d (%s) -DIRECT-> OTA peer="QDF_MAC_ADDR_FMT,
-		 pe_session->vdev_id, TDLS_DISCOVERY_RESPONSE,
-		 lim_trace_tdls_action_string(TDLS_DISCOVERY_RESPONSE),
-		 QDF_MAC_ADDR_REF(peer_mac.bytes));
+	pe_debug("[TDLS] action: %d (%s) -DIRECT-> OTA peer="QDF_MAC_ADDR_FMT,
+		TDLS_DISCOVERY_RESPONSE,
+		lim_trace_tdls_action_string(TDLS_DISCOVERY_RESPONSE),
+		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
@@ -2503,14 +2289,14 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		payload += mlo_ie_len;
 	}
 
-	pe_debug("[TDLS] vdev:%d action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
-		 pe_session->vdev_id, TDLS_SETUP_REQUEST,
-		 lim_trace_tdls_action_string(TDLS_SETUP_REQUEST),
-		 QDF_MAC_ADDR_REF(peer_mac.bytes));
+	pe_debug("[TDLS] action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
+		TDLS_SETUP_REQUEST,
+		lim_trace_tdls_action_string(TDLS_SETUP_REQUEST),
+		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 
-	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) frame,
 				      pe_session, QDF_STATUS_SUCCESS,
@@ -2727,7 +2513,7 @@ QDF_STATUS lim_send_tdls_teardown_frame(struct mac_context *mac,
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 
-	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr)frame,
 				      pe_session, QDF_STATUS_SUCCESS,
@@ -3040,7 +2826,7 @@ lim_send_tdls_setup_rsp_frame(struct mac_context *mac,
 		 QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -3307,7 +3093,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 	       QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
+	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -3387,8 +3173,9 @@ lim_tdls_populate_dot11f_ht_caps(struct mac_context *mac,
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
 	   eHT_CHANNEL_WIDTH_20MHZ */
-	if (pDot11f->supportedChannelWidthSet == CH_WIDTH_20MHZ)
+	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ) {
 		pDot11f->shortGI40MHz = 0;
+	}
 
 	pe_debug("SupportedChnlWidth: %d, mimoPS: %d, GF: %d, shortGI20:%d, shortGI40: %d, dsssCck: %d",
 		pDot11f->supportedChannelWidthSet,
@@ -3544,10 +3331,7 @@ lim_tdls_populate_eht_mcs(struct mac_context *mac_ctx, tpDphHashNode stads,
 {
 	lim_populate_eht_mcs_set(mac_ctx, &stads->supportedRates,
 				 &stads->eht_config, session_entry,
-				 session_entry->ch_width,
-				 session_entry->cap_tx_nss,
-				 session_entry->cap_rx_nss,
-				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
+				 session_entry->ch_width);
 }
 #else
 static void
@@ -3650,8 +3434,6 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 	    (stads->mlmStaContext.htCapability))
 #endif
 	{
-		uint8_t self_rx_nss, self_tx_nss, peer_rx_nss, peer_tx_nss;
-
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
 		if (wlan_mlme_get_cfg_str(
 			mcsSet,
@@ -3662,20 +3444,11 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		lim_extract_ht_caps_txrx_nss(mcsSet, &self_tx_nss,
-					     &self_rx_nss);
-		lim_extract_ht_caps_txrx_nss(supp_mcs_set, &peer_tx_nss,
-					     &peer_rx_nss);
-		for (i = 0; i < VALID_MCS_SIZE_BYTES; i++)
+		if (NSS_1x1_MODE == nss)
+			mcsSet[1] = 0;
+		for (i = 0; i < val_len; i++)
 			stads->supportedRates.supportedMCSSet[i] =
 				mcsSet[i] & supp_mcs_set[i];
-
-		self_tx_nss = QDF_MIN(nss, QDF_MIN(self_tx_nss, peer_rx_nss));
-		self_rx_nss = QDF_MIN(nss, QDF_MIN(self_rx_nss, peer_tx_nss));
-
-		wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, NULL,
-						stads->supportedRates.supportedMCSSet,
-						nss, nss);
 
 		pe_debug("MCS Rate Set Bitmap from CFG and DPH");
 		for (i = 0; i < SIR_MAC_MAX_SUPPORTED_MCS_SET; i++) {
@@ -3683,14 +3456,8 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 				stads->supportedRates.supportedMCSSet[i]);
 		}
 	}
-
-	stads->cap_tx_nss = nss;
-	stads->cap_rx_nss = nss;
-	stads->op_tx_nss = nss;
-	stads->op_rx_nss = nss;
-
 	lim_populate_vht_mcs_set(mac_ctx, &stads->supportedRates, vht_caps,
-				 session_entry, nss, nss, NULL);
+				 session_entry, nss, NULL);
 
 	lim_tdls_populate_eht_mcs(mac_ctx, stads, session_entry);
 
@@ -3855,35 +3622,18 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 		 * not wide band supported
 		 */
 		if (!wide_band_peer ||
-		    wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
-		    wlan_reg_is_dfs_for_freq(mac->pdev,
-					     pe_session->curr_op_freq)) {
+		    wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
 			lim_tdls_fill_session_vht_width(pe_session, sta);
 		} else {
-			uint8_t peer_vht_width;
-
-			peer_vht_width = pVhtCaps->supportedChannelWidthSet;
-			if (peer_vht_width > VHT_CAP_160_AND_80P80_SUPP) {
-				pe_debug("Invalid peer VHT width: %d, treating as 80MHz",
-					 peer_vht_width);
-				peer_vht_width = VHT_CAP_NO_160M_SUPP;
-			}
-
-			switch (pe_session->ch_width) {
-			case CH_WIDTH_80MHZ:
-			case CH_WIDTH_80P80MHZ:
+			if (pVhtCaps->supportedChannelWidthSet >=
+			    VHT_CAP_NO_160M_SUPP)
 				sta->vhtSupportedChannelWidthSet =
-					WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-				break;
-			case CH_WIDTH_160MHZ:
-				if (peer_vht_width >= VHT_CAP_160_SUPP)
-					sta->vhtSupportedChannelWidthSet =
-					WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-				break;
-			default:
-				sta->vhtSupportedChannelWidthSet =
-					WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-				break;
+						WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+
+			if (wlan_reg_is_dfs_for_freq(mac->pdev,
+						    pe_session->curr_op_freq)) {
+				lim_tdls_fill_session_vht_width(pe_session,
+								sta);
 			}
 		}
 
@@ -4251,11 +4001,11 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 	/* check if we are in proper state to work as TDLS client */
 	if (!LIM_IS_STA_ROLE(session_entry)) {
 		pe_err("send mgmt received in wrong system Role: %d",
-		       GET_LIM_BSS_TYPE(session_entry));
+		       GET_LIM_SYSTEM_ROLE(session_entry));
 		goto lim_tdls_send_mgmt_error;
 	}
 
-	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev)) {
+	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry)) {
 		pe_err("roaming in progress, reject mgmt! for session %d",
 		       send_req->session_id);
 		result_code = eSIR_SME_REFUSED;
@@ -4413,11 +4163,11 @@ QDF_STATUS lim_process_sme_tdls_add_sta_req(struct mac_context *mac,
 	/* check if we are in proper state to work as TDLS client */
 	if (!LIM_IS_STA_ROLE(pe_session)) {
 		pe_err("send mgmt received in wrong system Role: %d",
-			  GET_LIM_BSS_TYPE(pe_session));
+			  GET_LIM_SYSTEM_ROLE(pe_session));
 		goto lim_tdls_add_sta_error;
 	}
 
-	if (wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev)) {
+	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session)) {
 		pe_err("roaming in progress, reject add sta! for session %d",
 		       add_sta_req->session_id);
 		goto lim_tdls_add_sta_error;
@@ -4486,11 +4236,11 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 	/* check if we are in proper state to work as TDLS client */
 	if (!LIM_IS_STA_ROLE(pe_session)) {
 		pe_err("Del sta received in wrong system Role %d",
-		       GET_LIM_BSS_TYPE(pe_session));
+		       GET_LIM_SYSTEM_ROLE(pe_session));
 		goto lim_tdls_del_sta_error;
 	}
 
-	if (wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev)) {
+	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session)) {
 		pe_err("roaming in progress, reject del sta! for session %d",
 		       del_sta_req->session_id);
 		lim_send_sme_tdls_del_sta_rsp(mac, del_sta_req->session_id,
@@ -4540,11 +4290,6 @@ static void lim_check_aid_and_delete_peer(struct mac_context *p_mac,
 	size_t aid_bitmap_size = sizeof(session_entry->peerAIDBitmap);
 	struct qdf_mac_addr mac_addr;
 	QDF_STATUS status;
-	struct tdls_soc_priv_obj *tdls_soc;
-
-	/* Get TDLS soc object for DP notification */
-	tdls_soc = wlan_vdev_get_tdls_soc_obj(session_entry->vdev);
-
 	/*
 	 * Check all the set bit in peerAIDBitmap and delete the peer
 	 * (with that aid) entry from the hash table and add the aid
@@ -4564,20 +4309,8 @@ static void lim_check_aid_and_delete_peer(struct mac_context *p_mac,
 			pe_err("Deleting "QDF_MAC_ADDR_FMT,
 			       QDF_MAC_ADDR_REF(stads->staAddr));
 
-			/*
-			 * Notify DP to decrement counter.
-			 * Link state is hardcoded as TEARING since this is
-			 * common deletion path for CSA, roaming, link switch.
-			 */
-			if (tdls_soc && tdls_soc->tdls_dp_vdev_update) {
-				tdls_soc->tdls_dp_vdev_update(
-					&tdls_soc->soc,
-					session_entry->smeSessionId,
-					tdls_soc->tdls_update_dp_vdev_flags,
-					false);
-			}
-
-			if (!wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
+			if (!lim_is_roam_synch_in_progress(p_mac->psoc,
+							   session_entry))
 				lim_send_deauth_mgmt_frame(
 					p_mac,
 					REASON_DEAUTH_NETWORK_LEAVING,
@@ -4628,13 +4361,6 @@ void lim_update_tdls_2g_bw(struct pe_session *session)
 	if (!psoc)
 		return;
 
-	/*
-	 * Record teardown stats for all connected TDLS peers before tearing
-	 * down the links due to AP BW change on 2.4 GHz.
-	 */
-	wlan_tdls_stats_record_peers_teardown(psoc, session->smeSessionId,
-					      TDLS_STATS_REASON_GENERAL);
-
 	wlan_tdls_teardown_links(psoc);
 }
 
@@ -4658,24 +4384,12 @@ QDF_STATUS lim_delete_tdls_peers(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/*
-	 * Record teardown stats for all connected TDLS peers before deleting
-	 * them.  Use TDLS_STATS_REASON_ROAMED when the deletion is triggered
-	 * by a roam synch (pe_roam_synch_callback), so the stats SM captures
-	 * the roaming-induced teardown with the correct reason code.
-	 */
-	if (reason == TDLS_PEER_DEL_REASON_ROAMING)
-		wlan_tdls_stats_record_peers_teardown(
-					mac_ctx->psoc,
-					session_entry->smeSessionId,
-					TDLS_STATS_REASON_ROAMED);
-
 	lim_check_aid_and_delete_peer(mac_ctx, session_entry);
 
 	tgt_tdls_delete_all_peers_indication(mac_ctx->psoc,
-					     session_entry->vdev_id, reason);
+					     session_entry->vdev_id);
 
-	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
+	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry))
 		return QDF_STATUS_SUCCESS;
 
 	/*

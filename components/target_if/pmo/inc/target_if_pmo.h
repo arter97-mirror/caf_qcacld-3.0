@@ -543,19 +543,4 @@ target_if_pmo_send_icmp_offload_req(struct wlan_objmgr_psoc *psoc,
  * Return: none
  */
 void target_if_pmo_set_wow_enable_ack_failed(struct wlan_objmgr_psoc *psoc);
-
-/**
- * target_if_pmo_send_apf_mode_req() - sends apf mode to fwr
- * @psoc: objmgr psoc
- * @apf_mode: apf mode
- * @vdev_id: vdev id
- *
- * This functions sends apf mode to fwr.
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-QDF_STATUS
-target_if_pmo_send_apf_mode_req(struct wlan_objmgr_psoc *psoc,
-				uint32_t apf_mode,
-				uint32_t vdev_id);
 #endif

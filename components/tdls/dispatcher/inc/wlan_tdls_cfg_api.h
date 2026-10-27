@@ -106,6 +106,17 @@ cfg_tdls_get_uapsd_inactivity_time(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *val);
 
 /**
+ * cfg_tdls_get_rx_pkt_threshold() - get tdls rx pkt threshold
+ * @psoc:        pointer to psoc object
+ * @val:         pointer to tdls tdls rx pkt threshold
+ *
+ * This function gets tdls rx pkt threshold
+ */
+QDF_STATUS
+cfg_tdls_get_rx_pkt_threshold(struct wlan_objmgr_psoc *psoc,
+			      uint32_t *val);
+
+/**
  * cfg_tdls_get_off_channel_enable() - get tdls off channel enable
  * @psoc:        pointer to psoc object
  * @val:         pointer to tdls off channel enable
@@ -155,28 +166,6 @@ void cfg_tdls_restore_off_channel_enable(struct wlan_objmgr_psoc *psoc);
  * Return: NULL
  */
 void cfg_tdls_store_off_channel_enable(struct wlan_objmgr_psoc *psoc);
-
-/**
- * cfg_tdls_get_stats_enable() - get tdls stats enable
- * @psoc:        pointer to psoc object
- * @val:         pointer to tdls stats enable
- *
- * This function gets tdls stats enable
- */
-QDF_STATUS
-cfg_tdls_get_stats_enable(struct wlan_objmgr_psoc *psoc,
-			  bool *val);
-
-/**
- * cfg_tdls_set_stats_enable() - set tdls stats enable
- * @psoc:        pointer to psoc object
- * @val:         tdls stats enable
- *
- * This function sets tdls stats enable
- */
-QDF_STATUS
-cfg_tdls_set_stats_enable(struct wlan_objmgr_psoc *psoc,
-			  bool val);
 
 /**
  * cfg_tdls_get_wmm_mode_enable() - get tdls wmm mode enable
@@ -352,6 +341,15 @@ cfg_tdls_get_uapsd_inactivity_time(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline QDF_STATUS
+cfg_tdls_get_rx_pkt_threshold(struct wlan_objmgr_psoc *psoc,
+			      uint32_t *val)
+{
+	*val = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 cfg_tdls_get_off_channel_enable(struct wlan_objmgr_psoc *psoc,
 				bool *val)
 {
@@ -384,22 +382,6 @@ cfg_tdls_restore_off_channel_enable(struct wlan_objmgr_psoc *psoc)
 static inline void
 cfg_tdls_store_off_channel_enable(struct wlan_objmgr_psoc *psoc)
 {
-}
-
-static inline QDF_STATUS
-cfg_tdls_get_stats_enable(struct wlan_objmgr_psoc *psoc,
-			  bool *val)
-{
-	*val = false;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-cfg_tdls_set_stats_enable(struct wlan_objmgr_psoc *psoc,
-			  bool val)
-{
-	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS

@@ -56,33 +56,6 @@ uint32_t ucfg_pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc)
 	return pmo_get_apf_instruction_size(psoc);
 }
 
-uint32_t ucfg_pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc)
-{
-	if (!psoc)
-		return 0;
-
-	return pmo_get_apf_mode(psoc);
-}
-
-QDF_STATUS ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
-				 uint32_t apf_mode,
-				 uint32_t vdev_id)
-{
-	if (!psoc)
-		return QDF_STATUS_E_INVAL;
-
-	return pmo_set_apf_mode(psoc, apf_mode, vdev_id);
-}
-
-QDF_STATUS ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
-				   uint32_t apf_mode)
-{
-	if (!psoc)
-		return QDF_STATUS_E_INVAL;
-
-	return pmo_store_apf_mode(psoc, apf_mode);
-}
-
 uint8_t ucfg_pmo_get_num_wow_filters(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_BUG(psoc);
@@ -223,12 +196,6 @@ ucfg_pmo_disable_ns_offload_in_fwr(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_NS_OFFLOAD */
 
-bool
-ucfg_pmo_tgt_psoc_get_runtime_pm_in_progress(struct wlan_objmgr_psoc *psoc)
-{
-	return pmo_tgt_psoc_get_runtime_pm_inprogress(psoc);
-}
-
 #ifdef FEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
 QDF_STATUS
 ucfg_pmo_dynamic_arp_ns_offload_enable(struct wlan_objmgr_vdev *vdev)
@@ -285,11 +252,6 @@ ucfg_pmo_ns_addr_scope(uint32_t ipv6_scope)
 	}
 
 	return PMO_NS_ADDR_SCOPE_INVALID;
-}
-
-bool ucfg_pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc)
-{
-	return pmo_rate_limit_needed(psoc);
 }
 
 QDF_STATUS ucfg_pmo_cache_mc_addr_list(
@@ -506,11 +468,6 @@ QDF_STATUS ucfg_pmo_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 					    pmo_pld_auto_suspend_cb pld_cb)
 {
 	return pmo_core_psoc_bus_runtime_resume(psoc, pld_cb);
-}
-
-void ucfg_pmo_psoc_apply_tbtt_nack_rtpm_delay(struct wlan_objmgr_psoc *psoc)
-{
-	pmo_core_psoc_apply_tbtt_nack_rtpm_delay(psoc);
 }
 #endif
 
@@ -766,17 +723,15 @@ bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
 
 	return pmo_intersect_apf(pmo_psoc_ctx);
 }
-
-uint32_t ucfg_pmo_get_apfv6_offload_bitmap(struct wlan_objmgr_psoc *psoc)
-{
-	return pmo_get_apfv6_offload_bitmap(psoc);
-}
-
-bool ucfg_pmo_is_apf_mode_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	return pmo_is_apf_mode_enabled(psoc);
-}
 #endif
+
+bool
+ucfg_pmo_is_ssdp_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
+
+	return pmo_psoc_ctx->psoc_cfg.ssdp;
+}
 
 #ifdef FEATURE_RUNTIME_PM
 uint32_t
@@ -847,14 +802,6 @@ ucfg_pmo_get_sta_mod_dtim(struct wlan_objmgr_psoc *psoc)
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	return pmo_psoc_ctx->psoc_cfg.sta_mod_dtim;
-}
-
-bool
-ucfg_pmo_get_beacon_lio_update_on_screen_on_off(struct wlan_objmgr_psoc *psoc)
-{
-	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
-
-	return pmo_psoc_ctx->psoc_cfg.beacon_lio_update_on_screen_on_off;
 }
 
 void
@@ -1203,32 +1150,4 @@ QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 bool ucfg_pmo_is_fw_debug_enable(struct wlan_objmgr_psoc *psoc)
 {
 	return cfg_get(psoc, CFG_PMO_FW_DEBUG_ENABLE);
-}
-
-bool
-ucfg_pmo_get_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev)
-{
-	return pmo_core_get_ns_offload_enable_dynamic(vdev);
-}
-
-void
-ucfg_pmo_set_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev,
-				       enum pmo_offload_trigger trigger,
-				       bool ns_offload_enable_dyn)
-{
-	return pmo_core_set_ns_offload_enable_dynamic(vdev, trigger,
-						      ns_offload_enable_dyn);
-}
-
-bool ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	return pmo_core_is_wow_optimization_enabled(psoc);
-}
-
-QDF_STATUS
-ucfg_pmo_send_vdev_sta_ps_param(struct wlan_objmgr_vdev *vdev,
-				enum pmo_sta_powersave_param ps_param,
-				uint32_t param_value)
-{
-	return pmo_tgt_send_vdev_sta_ps_param(vdev, ps_param, param_value);
 }

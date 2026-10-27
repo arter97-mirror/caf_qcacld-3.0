@@ -52,6 +52,9 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	switch (vdev_opmode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
+					 PMO_WOW_MAX_EVENT_BM_LEN,
+					 event_bitmap);
 		/* set power on failure event only for STA and P2P_CLI mode*/
 		if (psoc_ctx->psoc_cfg.auto_power_save_fail_mode ==
 		    PMO_FW_TO_SEND_WOW_IND_ON_PWR_FAILURE){
@@ -69,10 +72,26 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_OCB_MODE:
 	case QDF_MONITOR_MODE:
+		pmo_set_sta_wow_bitmask(&psoc_ctx->psoc_cfg, event_bitmap,
+					PMO_WOW_MAX_EVENT_BM_LEN);
+		if (vdev_ctx->magic_ptrn_enable)
+			pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
+						 PMO_WOW_MAX_EVENT_BM_LEN,
+						 event_bitmap);
+		break;
+
 	case QDF_IBSS_MODE:
 		pmo_set_sta_wow_bitmask(&psoc_ctx->psoc_cfg, event_bitmap,
 					PMO_WOW_MAX_EVENT_BM_LEN);
+		if (vdev_ctx->magic_ptrn_enable)
+			pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
+						 PMO_WOW_MAX_EVENT_BM_LEN,
+						 event_bitmap);
+		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
+					 PMO_WOW_MAX_EVENT_BM_LEN,
+					 event_bitmap);
 		break;
+
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
 		pmo_set_sap_wow_bitmask(event_bitmap, PMO_WOW_MAX_EVENT_BM_LEN);

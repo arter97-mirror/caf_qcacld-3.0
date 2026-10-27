@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2006-2007, 2014-2018, 2020-2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -123,7 +123,6 @@ const EID_RNR_IE                     = 201;
 const EID_VENDOR_SPECIFIC            = 221;
 const EID_FILS_INDICATION            = 240;
 const EID_FRAGMENT_IE                = 242;
-const EID_RSNXE                      = 244;
 /**
  * Extended Element ID
  *
@@ -491,11 +490,6 @@ FF vendor_action_subtype (1)
 FF count (1)
 {
     count, 1;
-}
-
-FF Type (1)                               // IEEE 802.11bn D1.3 UHR action type
-{
-    type, 1;
 }
 
 IE addba_extn_element(EID_ADDBA_EXTN_ELEMENT)
@@ -1474,7 +1468,7 @@ IE RSN (EID_RSN)                          // 7.3.2.25
     OPTIONAL RSN_Cap[2];
     // Finally, the IE may contain zero or more PMKIDs:
     OPTIONAL pmkid_count, 2;
-    pmkid[16][0..11] COUNTIS pmkid_count;
+    pmkid[16][0..4] COUNTIS pmkid_count;
     OPTIONAL gp_mgmt_cipher_suite[4];
 }
 
@@ -2766,7 +2760,7 @@ IE reduced_neighbor_report (EID_RNR_IE)
 
 IE ExtCap (EID_EXT_CAP)
 {
-    bytes[1..255];
+    bytes[1..15];
 }
 
 IE HTCaps (EID_HT_CAPABILITIES)
@@ -2942,7 +2936,6 @@ const TLV_HE_DL_MUMIMO_SUPPP_ATTR_ID      = 8;
 const TLV_HE_MCS_11_12_ATTR_ID            = 9;
 const TLV_EDCA_PIFS_PARAM_ATTR_ID         = 13;
 const TLV_ECSA_TARGET_TSF_INFO_ATTR_ID    = 14;
-const TLV_TARGET_CCK_SUPPORT_ATTR_ID      = 15;
 
 TLV qcn_version(TLV_VERSION_ATTR_ID) ( 1 : 1 ) LSB
 {
@@ -3004,15 +2997,6 @@ TLV ecsa_target_tsf_info_attr (TLV_ECSA_TARGET_TSF_INFO_ATTR_ID) ( 1 : 1 ) LSB
     target_tsf, 8;
 }
 
-TLV target_cck_support_attr (TLV_TARGET_CCK_SUPPORT_ATTR_ID) ( 1 : 1 ) LSB
-{
-  {
-	target_cck_rx_supp_5g: 1;
-	target_cck_tx_supp_5g: 1;
-	target_cck_unused: 6;
-  }
-}
-
 MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
 {
    OPTIONALTLV qcn_version;
@@ -3026,7 +3010,6 @@ MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
    OPTIONALTLV he_mcs13_attr;
    OPTIONALTLV edca_pifs_param_attr;
    OPTIONALTLV ecsa_target_tsf_info_attr;
-   OPTIONALTLV target_cck_support_attr;
 }
 
 IE esp_information (EID_EXTN_ID_ELEMENT) OUI ( 0x0B )
@@ -3645,8 +3628,7 @@ IE eht_op (EID_EXTN_ID_ELEMENT) OUI (0x6A)
 	eht_default_pe_duration: 1;
 	group_addr_bu_indication_limit: 1;
 	group_addr_bu_indication_exponent: 2;
-	mcs15_disable: 1;
-	reserved: 1;
+	reserved: 2;
     }
     {
 	basic_rx_max_nss_for_mcs_0_to_7: 4;
@@ -3735,37 +3717,6 @@ IE reg_connect (EID_EXTN_ID_ELEMENT) OUI (0x89)
         sp_ap_support: 1;
         reserved: 4;
     }
-}
-
-IE uhr_cap (EID_EXTN_ID_ELEMENT) OUI (0x98)
-{
-    data[11..22];
-}
-
-IE uhr_op (EID_EXTN_ID_ELEMENT) OUI (0x97)
-{
-    data[2];
-}
-
-// IEEE 802.11bn D1.3 Section 9.4.2.357 - SMD BSS Transition Parameters
-// Element ID = 255 (extended), Extension ID = 0x9B (155)
-IE smd_bss_trans_params (EID_EXTN_ID_ELEMENT) OUI (0x9B)
-{
-    data[1..256];
-}
-
-IE security_profile (EID_EXTN_ID_ELEMENT) OUI (0xA2)
-{
-    {
-        extended_key_id: 1;
-        ocvc: 1;
-        reserved: 6;
-    }
-    {
-        number_of_octets_of_security_profile_bitmap: 4;
-        number_of_vendor_security_profile: 4;
-    }
-    data[2..255];
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -4125,16 +4076,6 @@ IE t2lm_ie (EID_EXTN_ID_ELEMENT) OUI (0x6D)
     data[2..255];
 }
 
-IE RSNXEOpaque (EID_RSNXE)
-{
-    data[0..253];
-}
-
-IE MSCSEXTOpaque (EID_EXTN_ID_ELEMENT) OUI (0x58)
-{
-    data[0..253];
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // Frames
 
@@ -4158,7 +4099,7 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
     OPTIE  ExtSuppRates;
-    OPTIE  RSNOpaque;
+    OPTIE  RSN;
     OPTIE  QBSSLoad;
     OPTIE  EDCAParamSet;
     OPTIE  QOSCapsAp;
@@ -4195,8 +4136,6 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
-    OPTIE  uhr_op;
-    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4303,8 +4242,6 @@ FRAME Beacon2
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
-    OPTIE  uhr_op;
-    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4348,7 +4285,7 @@ FRAME BeaconIEs
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
     OPTIE  ExtSuppRates;
-    OPTIE  RSNOpaque;
+    OPTIE  RSN;
     OPTIE  QBSSLoad;
     OPTIE  EDCAParamSet;
     OPTIE  QOSCapsAp;
@@ -4385,8 +4322,6 @@ FRAME BeaconIEs
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
-    OPTIE  uhr_op;
-    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4437,8 +4372,6 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  fils_hlp_container;
     OPTIE  bss_max_idle_period;
     OPTIE  FTInfo;
-    OPTIE  RSNXEOpaque;
-    OPTIE  MSCSEXTOpaque;
     OPTIE  he_cap;
     OPTIE  he_6ghz_band_cap;
 
@@ -4451,8 +4384,6 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  reg_connect;
-    OPTIE  uhr_cap;
-    OPTIE  security_profile;
 
     OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
@@ -4512,9 +4443,6 @@ FRAME AssocResponse                       // 7.2.3.5
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
-    OPTIE  uhr_cap;
-    OPTIE  uhr_op;
-    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMParams;
@@ -4563,8 +4491,6 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  reg_connect;
-    OPTIE  uhr_cap;
-    OPTIE  security_profile;
 
     OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
@@ -4579,7 +4505,6 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  WFDIEOpaque;
     OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
-    OPTIE  qcn_ie;
 } // End frame ReAssocRequest.
 
 FRAME ReAssocResponse                     // 7.2.3.7
@@ -4619,9 +4544,6 @@ FRAME ReAssocResponse                     // 7.2.3.7
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
-    OPTIE  uhr_cap;
-    OPTIE  uhr_op;
-    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMParams;
@@ -4653,7 +4575,6 @@ FRAME ProbeRequest                        // 7.2.3.8
     OPTIE  mlo_ie;
 
     OPTIE  reg_connect;
-    OPTIE  uhr_cap;
     OPTIE  WscProbeReq;
     OPTIE  WFATPC;
     OPTIE  P2PProbeReq;
@@ -4696,7 +4617,6 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  transmit_power_env[0..8];
     OPTIE  ChannelSwitchWrapper;
     OPTIE  VHTExtBssLoad;
-    OPTIE  OperatingMode;
     OPTIE  fils_indication;
     OPTIE  max_chan_switch_time;
     OPTIE  esp_information;
@@ -4714,9 +4634,6 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
-    OPTIE  uhr_cap;
-    OPTIE  uhr_op;
-    OPTIE  security_profile;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -5272,18 +5189,6 @@ FRAME channel_usage_resp
     FF    Action;
     FF    DialogToken;
     MANDIE channel_usage;
-}
-
-// IEEE 802.11bn D1.3 Section 9.6.43.3 - UHR Link Reconfiguration Request
-FRAME uhr_link_reconfig_req
-{
-    FF    Category;
-    FF    Action;
-    FF    DialogToken;
-    FF    Type;
-    MANDIE  mlo_ie;
-    OPTIE   oci;
-    OPTIE   smd_bss_trans_params;
 }
 
 FRAME link_recfg_req

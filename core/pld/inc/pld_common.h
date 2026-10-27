@@ -25,10 +25,12 @@
 #include <linux/pm.h>
 #include <osapi_linux.h>
 
+#ifdef CONFIG_PLD_PCIE_CNSS
 #ifdef CONFIG_CNSS_OUT_OF_TREE
 #include "cnss2.h"
 #else
 #include <net/cnss2.h>
+#endif
 #endif
 
 #ifdef CNSS_UTILS
@@ -115,13 +117,11 @@ enum pld_bus_type {
  * @PLD_BUS_WIDTH_LOW: vote for low bus bandwidth
  * @PLD_BUS_WIDTH_MEDIUM: vote for medium bus bandwidth
  * @PLD_BUS_WIDTH_HIGH: vote for high bus bandwidth
+ * @PLD_BUS_WIDTH_MID_HIGH: vote for mid high bus bandwidth
  * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
  * @PLD_BUS_WIDTH_ULTRA_HIGH: vote for ultra high bus bandwidth
- * @PLD_BUS_WIDTH_SUPER_HIGH: vote for super high bus bandwidth
  * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
- * @PLD_BUS_WIDTH_MID_HIGH: vote for mid high bus bandwidth
- * @PLD_BUS_WIDTH_FAST: vote for fast bus bandwidth
- * @PLD_BUS_WIDTH_SUPER_FAST: vote for super fast bus bandwidth
+ * @PLD_BUS_WIDTH_MAX:
  */
 enum pld_bus_width_type {
 	PLD_BUS_WIDTH_NONE,
@@ -131,11 +131,9 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_HIGH,
 	PLD_BUS_WIDTH_VERY_HIGH,
 	PLD_BUS_WIDTH_ULTRA_HIGH,
-	PLD_BUS_WIDTH_SUPER_HIGH,
+	PLD_BUS_WIDTH_MAX,
 	PLD_BUS_WIDTH_LOW_LATENCY,
 	PLD_BUS_WIDTH_MID_HIGH,
-	PLD_BUS_WIDTH_FAST,
-	PLD_BUS_WIDTH_SUPER_FAST,
 };
 
 #define PLD_MAX_FILE_NAME NAME_MAX
@@ -160,10 +158,10 @@ struct pld_fw_files {
 	char otp_data[PLD_MAX_FILE_NAME];
 	char utf_file[PLD_MAX_FILE_NAME];
 	char utf_board_data[PLD_MAX_FILE_NAME];
-	char epping_file[PLD_MAX_FILE_NAME];
-	char evicted_data[PLD_MAX_FILE_NAME];
 	char setup_file[PLD_MAX_FILE_NAME];
+	char epping_file[PLD_MAX_FILE_NAME];
 	char ibss_image_file[PLD_MAX_FILE_NAME];
+	char evicted_data[PLD_MAX_FILE_NAME];
 };
 
 /**
@@ -207,7 +205,6 @@ struct pld_platform_cap {
  * @PLD_FW_HANG_EVENT: firmware update hang event
  * @PLD_BUS_EVENT: update bus/link event
  * @PLD_SMMU_FAULT: SMMU fault
- * @PLD_UPDATE_DMA_DEV: platform driver wants dma_dev retargeted to a new device
  */
 enum pld_uevent {
 	PLD_FW_DOWN,
@@ -216,7 +213,6 @@ enum pld_uevent {
 	PLD_FW_HANG_EVENT,
 	PLD_BUS_EVENT,
 	PLD_SMMU_FAULT,
-	PLD_UPDATE_DMA_DEV,
 };
 
 /**
@@ -249,7 +245,6 @@ enum pld_device_config {
  * @fw_down: FW down info
  * @hang_data: FW hang data
  * @bus_data: bus related data
- * @dma_dev: device to retarget dma_dev to, valid for PLD_UPDATE_DMA_DEV
  */
 struct pld_uevent_data {
 	enum pld_uevent uevent;
@@ -265,7 +260,6 @@ struct pld_uevent_data {
 			enum pld_bus_event etype;
 			void *event_data;
 		} bus_data;
-		struct device *dma_dev;
 	};
 };
 
@@ -289,21 +283,6 @@ struct pld_ce_tgt_pipe_cfg {
 	u32 flags;
 	u32 reserved;
 };
-
-#ifdef CONFIG_CE_CMN_REG_CFG_QMI
-/**
- * struct pld_ce_cmn_register_config - CE common register configuration
- * structure
- * @offset: offset of common register from base address of CE register.
- * @mask: bit mask for values which are going to be set.
- * @value: final value of the ce common register
- */
-struct pld_ce_cmn_register_config {
-	u32 offset;
-	u32 mask;
-	u32 value;
-};
-#endif
 
 /**
  * struct pld_ce_svc_pipe_cfg - copy engine service pipe configuration
@@ -376,8 +355,6 @@ struct pld_rri_over_ddr_cfg {
  * @rri_over_ddr_cfg: rri over ddr config
  * @num_shadow_reg_v3_cfg: number of shadow register version 3 configuration
  * @shadow_reg_v3_cfg: shadow register version 3 configuration
- * @num_ce_cmn_reg_config: Number of common CE register configurations
- * @ce_cmn_reg_cfg: CE common registers configuration
  *
  * pld_wlan_enable_cfg stores WLAN FW configurations. It will be
  * passed to WLAN FW when WLAN host driver calls wlan_enable.
@@ -396,10 +373,6 @@ struct pld_wlan_enable_cfg {
 #ifdef CONFIG_SHADOW_V3
 	u32 num_shadow_reg_v3_cfg;
 	struct pld_shadow_reg_v3_cfg *shadow_reg_v3_cfg;
-#endif
-#ifdef CONFIG_CE_CMN_REG_CFG_QMI
-	u32 num_ce_cmn_reg_config;
-	struct pld_ce_cmn_register_config *ce_cmn_reg_cfg;
 #endif
 };
 
@@ -540,12 +513,10 @@ struct pld_soc_info {
  * enum pld_recovery_reason - WLAN host driver recovery reason
  * @PLD_REASON_DEFAULT: default
  * @PLD_REASON_LINK_DOWN: PCIe link down
- * @PLD_REASON_FW_ASSERTION_FAIL: FW assertion fail
  */
 enum pld_recovery_reason {
 	PLD_REASON_DEFAULT,
-	PLD_REASON_LINK_DOWN,
-	PLD_REASON_FW_ASSERTION_FAIL
+	PLD_REASON_LINK_DOWN
 };
 
 #ifdef FEATURE_WLAN_TIME_SYNC_FTM
@@ -767,18 +738,6 @@ int pld_set_fw_log_mode(struct device *dev, u8 fw_log_mode);
  * Return: void
  */
 void pld_get_default_fw_files(struct pld_fw_files *pfw_files);
-
-/**
- * pld_set_host_param() - Set host param
- * @dev: device
- * @chip_name: chipname
- *
- * This function sets host params.
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
-int pld_set_host_param(struct device *dev, const char *chip_name);
 
 /**
  * pld_get_fw_files_for_target() - Get FW file names
@@ -1262,16 +1221,6 @@ int pld_force_wake_request(struct device *dev);
 bool pld_is_direct_link_supported(struct device *dev);
 
 /**
- * pld_is_direct_refill_supported() - Get whether direct_link is supported
- *                                    by FW or not
- * @dev: device
- *
- * Return: true if supported
- *         false on failure or if not supported
- */
-bool pld_is_direct_refill_supported(struct device *dev);
-
-/**
  * pld_ce_cmn_cfg_supported() - Get whether ce cmn register config is supported
  *                              by FW or not
  * @dev: device
@@ -1339,16 +1288,6 @@ int pld_force_wake_request_sync(struct device *dev, int timeout_us);
  *         Non zero failure code for errors
  */
 int pld_exit_power_save(struct device *dev);
-
-/**
- * pld_set_bmps() - Send BMPS_CTRL QMI to FW
- * @dev: device
- * @disable: true to disable BMPS, false to enable
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
-int pld_set_bmps(struct device *dev, bool disable);
 
 /**
  * pld_is_device_awake() - Check if it's ready to access MMIO registers
@@ -1548,14 +1487,6 @@ int pld_athdiag_write(struct device *dev, uint32_t offset, uint32_t memtype,
  * Return: Pointer to the domain
  */
 void *pld_smmu_get_domain(struct device *dev);
-
-/**
- * pld_smmu_s1_enabled() - Check if SMMU s1 is enabled
- * @dev: device
- *
- * Return: true if SMMU s1 is enabled, false otherwise
- */
-bool pld_smmu_s1_enabled(struct device *dev);
 #else
 /**
  * pld_smmu_get_mapping() - Get SMMU mapping context
@@ -1774,18 +1705,6 @@ int pld_qmi_send(struct device *dev, int type, void *cmd,
 int pld_qmi_indication(struct device *dev, void *cb_ctx,
 		       int (*cb)(void *ctx, uint16_t type,
 				 void *event, int event_len));
-
-/**
- * pld_get_dump_inprogress() - Get dump_inprogress sysfs value
- * @dev: device pointer
- * @val: address to store the value
- *
- * This API can be used to get dump_inprogress sysfs value
- *
- * Return: 0 if successful
- *         Non zero failure code for errors
- */
-int pld_get_dump_inprogress(struct device *dev, uint8_t *val);
 
 /**
  * pld_is_fw_dump_skipped() - get fw dump skipped status.
@@ -2047,28 +1966,6 @@ int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 void pld_set_tsf_sync_period(struct device *dev, u32 val);
 
 /**
- * pld_register_tsf_sync_qtime() - Register a handler to get host time when
- *				firmware captures tsf time.
- * @dev: device
- * @handler: handler to get host time
- * @context: context
- *
- * Return: Zero upon successful registration; Negative error code for failure
- */
-int pld_register_tsf_sync_qtime(struct device *dev,
-				void (*handler)(void *, uint64_t),
-				void *context);
-
-/**
- * pld_unregister_tsf_sync_qtime() - Unregister for tsf captured host time.
- * @dev: device
- * @context: context
- *
- * Return: Zero upon successful unregistration; Negative error code for failure
- */
-int pld_unregister_tsf_sync_qtime(struct device *dev, void *context);
-
-/**
  * pld_reset_tsf_sync_period() - Reset TSF sync period
  * @dev: device
  *
@@ -2326,7 +2223,7 @@ int pld_oem_event_smem_write(struct device *dev, int flags, const __u8 *data,
 
 #endif
 
-#ifdef FEATURE_DT_CPU_MASK_DP_INTR
+#ifdef CONFIG_DT_CPU_MASK_DP_INTR
 void pld_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
 					    unsigned int *cpumask);
 void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
@@ -2342,43 +2239,6 @@ static inline void
 pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 					    unsigned int *cpumask)
 {
-}
-#endif
-
-#ifdef WLAN_DP_NAPI_IPI_REDIRECT
-bool pld_get_napi_ipi_redirect_enabled(struct device *dev);
-#else
-static inline bool
-pld_get_napi_ipi_redirect_enabled(struct device *dev)
-{
-	return false;
-}
-#endif
-
-#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
-int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size);
-#else
-static inline int
-pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
-{
-	return -EINVAL;
-}
-#endif
-
-#ifdef DRIVER_PASSTHRU_MODE
-/**
- * pld_set_vendor_wonder_priv_data()- Set vendor wondertap priv data
- * @dev: pointer to device
- * @priv_data: pointer to private data
- *
- * Return: 0 on success else failure code
- */
-int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data);
-#else
-static inline
-int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data)
-{
-	return 0;
 }
 #endif
 #endif

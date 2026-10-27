@@ -31,7 +31,6 @@
 #include "wlan_dp_public_struct.h"
 #include "wlan_dp_priv.h"
 #include <cdp_txrx_misc.h>
-#include "wlan_dp_ucfg_api.h"
 
 typedef const enum bus_bw_level
 	bus_bw_table_type[QCA_WLAN_802_11_MODE_INVALID][TPUT_LEVEL_MAX];
@@ -42,14 +41,12 @@ typedef const enum bus_bw_level
  * @curr_bus_bw_lookup_table: current bus bw lookup table
  * @curr_vote_level: current vote level
  * @per_policy_vote: per BBM policy related vote
- * @intf_policy_vote: Interface policy votes for all the OPMODEs
  * @bbm_lock: BBM API lock
  */
 struct bbm_context {
 	bus_bw_table_type *curr_bus_bw_lookup_table;
 	enum bus_bw_level curr_vote_level;
 	enum bus_bw_level per_policy_vote[BBM_MAX_POLICY];
-	enum bus_bw_level intf_policy_vote[QDF_MAX_NO_OF_MODE];
 	qdf_mutex_t bbm_lock;
 };
 

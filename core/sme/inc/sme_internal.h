@@ -387,15 +387,6 @@ typedef QDF_STATUS (*md_host_evt_cb)(void *hdd_ctx, struct sir_md_evt *event);
 typedef QDF_STATUS (*md_bl_evt_cb)(void *hdd_ctx, struct sir_md_bl_evt *event);
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP)
-#define TSF_MAC_HEADER_TIME_2GHZ 192
-#define TSF_MAC_HEADER_TIME_5GHZ 32
-#define TSF_MAC_HEADER_TIME_6GHZ 32
-#define TSF_PHY_HEADER_TIME_2GHZ 192
-#define TSF_PHY_HEADER_TIME_5GHZ 20
-#define TSF_PHY_HEADER_TIME_6GHZ 20
-#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
-
 struct sme_context {
 	eSmeState state;
 	qdf_mutex_t sme_global_lock;
@@ -540,10 +531,6 @@ struct sme_context {
 				      struct wlan_objmgr_vdev *vdev);
 	void (*set_disconnect_link_info_cb)(uint8_t vdev_id,
 					    bool is_disconnect_sent);
-	void (*sap_channel_bw_update_cb)(uint8_t vdev_id);
-#ifdef DRIVER_PASSTHRU_MODE
-	void (*passthrough_mode_cb)(uint8_t vdev_id, bool is_up);
-#endif
 };
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

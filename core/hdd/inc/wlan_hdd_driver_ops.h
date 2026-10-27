@@ -147,6 +147,25 @@ int hdd_soc_idle_restart_lock(struct device *dev);
  */
 void hdd_soc_idle_restart_unlock(void);
 
+#ifdef FORCE_WAKE
+/**
+ * hdd_set_hif_init_phase() - Enable/disable the
+ * init_phase flag
+ * @hif_ctx: hif opaque handle
+ * @init_phase: init phase flag
+ *
+ * Return: None
+ */
+void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
+			    bool init_phase);
+#else
+static inline
+void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
+			    bool init_phase)
+{
+}
+#endif /* FORCE_WAKE */
+
 #ifdef HIF_DETECTION_LATENCY_ENABLE
 /**
  * hdd_hif_set_enable_detection() - enable detection

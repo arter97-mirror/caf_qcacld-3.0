@@ -48,8 +48,6 @@
 #define pmo_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_PMO, params)
 
-#define pmo_debug_rl(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_PMO, params)
-
 #define pmo_enter() QDF_TRACE_ENTER(QDF_MODULE_ID_PMO, "enter")
 #define pmo_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_PMO, "exit")
 
@@ -179,7 +177,7 @@ QDF_STATUS pmo_core_update_psoc_config(struct wlan_objmgr_psoc *psoc,
 /**
  * pmo_psoc_set_caps() - overwrite configured device capability flags
  * @psoc: the psoc for which the capabilities apply
- * @caps: the capability information to configure
+ * @caps: the cabability information to configure
  *
  * Return: None
  */
@@ -372,20 +370,6 @@ static inline bool pmo_intersect_apf(struct pmo_psoc_priv_obj *psoc_ctx)
 }
 
 /**
- * pmo_get_apfv6_offload_bitmap() - API to get Offload bitmap in APFv6 mode
- * @psoc: PSOC object manager pointer.
- *
- * Return: Offload bitmap in APFv6 mode
- */
-static inline uint32_t
-pmo_get_apfv6_offload_bitmap(struct wlan_objmgr_psoc *psoc)
-{
-	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
-
-	return pmo_psoc_ctx->psoc_cfg.apfv6_disable_offload_bitmap;
-}
-
-/**
  * pmo_intersect_packet_filter() - intersect config and firmware capability for
  *	the APF feature
  * @psoc_ctx: A PMO psoc context
@@ -400,15 +384,6 @@ pmo_intersect_packet_filter(struct pmo_psoc_priv_obj *psoc_ctx)
 	return psoc_ctx->psoc_cfg.packet_filter_enabled &&
 		psoc_ctx->caps.packet_filter;
 }
-
-/**
- * pmo_rate_limit_needed() - check allow or not to set mc addr list
- * wmi cmd to fw based on pending cmds
- * @psoc: objmgr psoc
- *
- * Return: bool
- */
-bool pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc);
 
 /*
  * pmo_host_action_on_page_fault() - Returns action host will take on page fault
@@ -513,13 +488,5 @@ pmo_core_is_configure_apf_per_screen_state(struct wlan_objmgr_psoc *psoc)
 
 	return pmo_psoc_ctx->psoc_cfg.is_apf_configure_per_screen_state;
 }
-
-/**
- * pmo_is_apf_mode_enabled() - API to get config of APF mode
- * @psoc: PSOC object manager pointer.
- *
- * Return: True if apf mode can be configured
- */
-bool pmo_is_apf_mode_enabled(struct wlan_objmgr_psoc *psoc);
 #endif
 #endif /* end  of _WLAN_PMO_MAIN_H_ */

@@ -75,8 +75,6 @@ enum csr_cfgdot11mode {
 	eCSR_CFG_DOT11_MODE_11AX_ONLY,
 	eCSR_CFG_DOT11_MODE_11BE,
 	eCSR_CFG_DOT11_MODE_11BE_ONLY,
-	eCSR_CFG_DOT11_MODE_11BN,
-	eCSR_CFG_DOT11_MODE_11BN_ONLY,
 	eCSR_CFG_DOT11_MODE_MAX,
 };
 
@@ -207,7 +205,7 @@ struct csr_roam_connectedinfo {
 /**
  * struct csr_disconnect_stats - Disconnect Stats per session
  * @disconnection_cnt: total no. of disconnections
- * @disconnection_by_app: disconnections triggered by application
+ * @disconnection_by_app: diconnections triggered by application
  * @disassoc_by_peer: disassoc sent by peer
  * @deauth_by_peer: deauth sent by peer
  * @bmiss: disconnect triggered by beacon miss
@@ -256,6 +254,7 @@ struct csr_roam_session {
 	uint32_t roamTS1;
 #endif
 	bool ch_switch_in_progress;
+	uint8_t nss;
 	bool dhcp_done;
 	struct csr_disconnect_stats disconnect_stats;
 	bool dhcp_in_progress;
@@ -353,17 +352,6 @@ struct csr_roamstruct {
 #define CSR_IS_CFG_DOT11_PHY_MODE_11BE(dot11mode) 0
 #define CSR_IS_CFG_DOT11_PHY_MODE_11BE_ONLY(dot11mode) 0
 #endif
-
-#ifdef WLAN_FEATURE_11BN
-#define CSR_IS_CFG_DOT11_PHY_MODE_11BN(dot11mode) \
-	((dot11mode) == eCSR_CFG_DOT11_MODE_11BN)
-#define CSR_IS_CFG_DOT11_PHY_MODE_11BN_ONLY(dot11mode) \
-	((dot11mode) == eCSR_CFG_DOT11_MODE_11BN_ONLY)
-#else
-#define CSR_IS_CFG_DOT11_PHY_MODE_11BN(dot11mode) 0
-#define CSR_IS_CFG_DOT11_PHY_MODE_11BN_ONLY(dot11mode) 0
-#endif
-
 /*
  * this function returns true if the NIC is operating exclusively in
  * the 2.4 GHz band, meaning. it is NOT operating in the 5.0 GHz band.
@@ -549,9 +537,7 @@ QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac,
 					    uint32_t target_chan_freq,
 					    uint8_t csaIeReqd,
 					    struct ch_params *ch_params,
-					    uint32_t new_cac_ms,
-					    uint8_t beacon_cnt,
-					    uint8_t mode);
+					    uint32_t new_cac_ms);
 
 QDF_STATUS csr_roam_modify_add_ies(struct mac_context *mac,
 					tSirModifyIE *pModifyIE,
@@ -573,44 +559,18 @@ QDF_STATUS
 csr_roam_update_rnr_ies(struct mac_context *mac,
 			struct ssirupdaternrie *updateie);
 
-/*
- * csr_sme_umac_ser_active_ll_remove_entry() - Peek and remove sme active cmd
- * @mac_ctx: mac global structure
- * @pEntryToRemove: node to remove
- *
- * Return: true if cmd found else false
- */
-bool csr_sme_umac_ser_active_ll_remove_entry(struct mac_context *mac_ctx,
-					     tListElem *pEntryToRemove);
-
-/*
- * csr_sme_umac_ser_active_ll_peek_head() - Peek ser active cmd to check for
- * any active sme umac cmd
- * @mac_ctx: mac global structure
- *
- * Return: sme_cmd pointer if active cmd is sme umac cmd else null
- */
-tListElem *csr_sme_umac_ser_active_ll_peek_head(struct mac_context *mac_ctx);
-
-/*
- * csr_sme_umac_ser_pending_ll_peek_head() - Peek ser pending cmd list to
- * get first sme umac cmd
- * @mac_ctx: mac global structure
- *
- * Return: sme_cmd pointer if pending cmd is sme umac cmd else null
- */
-tListElem *csr_sme_umac_ser_pending_ll_peek_head(struct mac_context *mac_ctx);
-
-/*
- * csr_sme_umac_ser_pending_ll_next() - Peek next sme umac cmd from pending cmd
- * list
- * @mac_ctx: mac global structure
- * @entry: Entry of prev node
- *
- * Return: sme_cmd pointer of next sme umac pending cmd else null
- */
-tListElem *csr_sme_umac_ser_pending_ll_next(struct mac_context *mac_ctx,
-					    tListElem *entry);
+bool csr_nonscan_active_ll_remove_entry(
+			struct mac_context *mac_ctx,
+			tListElem *pEntryToRemove, bool inter_locked);
+tListElem *csr_nonscan_active_ll_peek_head(
+			struct mac_context *mac_ctx,
+			bool inter_locked);
+tListElem *csr_nonscan_pending_ll_peek_head(
+			struct mac_context *mac_ctx,
+			bool inter_locked);
+tListElem *csr_nonscan_pending_ll_next(
+			struct mac_context *mac_ctx,
+		tListElem *entry, bool inter_locked);
 
 /**
  * csr_purge_pdev_all_ser_cmd_list() - purge all scan and non-scan
@@ -651,11 +611,15 @@ bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint32_t chan_freq);
  */
 QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
-			       struct auth_offload_event *auth_event);
+			       uint8_t vdev_id,
+			       struct qdf_mac_addr bssid,
+			       uint32_t akm);
 #else
 static inline QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
-			       struct auth_offload_event *auth_event)
+			       uint8_t vdev_id,
+			       struct qdf_mac_addr bssid,
+			       uint32_t akm)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

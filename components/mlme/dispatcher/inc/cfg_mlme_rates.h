@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -264,7 +263,7 @@
  * A bit value of 0 represents rate is disabled
  *
  * [b31-b0],[b63-b32],[b95-b64],[b127-b96]
- * For HE targets, 12 bits correspond to one NSS setting. Ex:
+ * For HE targets, 12 bits correpond to one NSS setting. Ex:
  * b0-13  => NSS1, MCS 0-13
  * b14-27 => NSS2, MCS 0-13 and so on for other NSS.
  * Note that the bit representation is continuous.
@@ -296,42 +295,6 @@
 		CFG_RATEMASK_DATA, \
 		"Ratemasks for rate selection")
 
-/*
- * <ini>
- * cck_rx_tx_support_mode - CCK RX/TX support for mode
- * @Min: 0
- * @Max: 0x3FF
- * @Default: 0x2
- *
- * This ini will set rx/tx cck support for different modes.
- * INI value can be set from 0 to 0x3FF where 0 is to disable
- * CCK RX and TX for all the modes and 0x3FF is to enable RX/TX
- * support for all the modes. First bit is for RX and Second bit is
- * for TX of mode.
- *
- * Bits    Mode
- * BIT[0:1] - STA RX/TX CCK
- * BIT[2:3] - SAP RX/TX CCK
- * BIT[4:5] - XPAN RX/TX CCK
- * BIT[6:7] - P2P GO RX/TX CCK
- * BIT[8:9] - P2P CLI RX/TX CCK
- *
- * Related: None
- *
- * Supported Feature: All profiles
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_RX_TX_SUPPORT_MODE CFG_INI_UINT( \
-			"cck_rx_tx_support_mode", \
-			0, \
-			0x3FF, \
-			0x2, \
-			CFG_VALUE_OR_DEFAULT, \
-			"Bit mask to check CCK support per mode")
-
 #define CFG_RATES_ALL \
 	CFG(CFG_MAX_HT_MCS_FOR_TX_DATA) \
 	CFG(CFG_DISABLE_ABG_RATE_FOR_TX_DATA) \
@@ -345,7 +308,6 @@
 	CFG(CFG_BASIC_MCS_SET) \
 	CFG(CFG_CURRENT_MCS_SET) \
 	CFG(CFG_RATEMASK_TYPE) \
-	CFG(CFG_RATEMASK_SET) \
-	CFG(CFG_RX_TX_SUPPORT_MODE)
+	CFG(CFG_RATEMASK_SET)
 
 #endif /* __CFG_MLME_RATES_H */

@@ -297,8 +297,7 @@ uint32_t tx_timer_create_intern_debug(void *pMacGlobal,
 #endif /* Store the timer name, for Debug build only */
 
 	status =
-		qdf_mc_timer_init_debug(&timer_ptr->qdf_timer,
-					QDF_TIMER_TYPE_WAKE_APPS,
+		qdf_mc_timer_init_debug(&timer_ptr->qdf_timer, QDF_TIMER_TYPE_SW,
 					tx_main_timer_func, (void *) timer_ptr,
 					fileName, lineNum);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -357,8 +356,7 @@ uint32_t tx_timer_create_intern(void *pMacGlobal, TX_TIMER *timer_ptr,
 	strscpy(timer_ptr->timerName, name_ptr, sizeof(timer_ptr->timerName));
 #endif /* Store the timer name, for Debug build only */
 
-	status = qdf_mc_timer_init(&timer_ptr->qdf_timer,
-				   QDF_TIMER_TYPE_WAKE_APPS,
+	status = qdf_mc_timer_init(&timer_ptr->qdf_timer, QDF_TIMER_TYPE_SW,
 				   tx_main_timer_func, (void *) timer_ptr);
 	if (QDF_STATUS_SUCCESS != status) {
 		QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_ERROR,

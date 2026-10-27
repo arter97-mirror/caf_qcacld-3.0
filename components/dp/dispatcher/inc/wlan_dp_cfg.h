@@ -110,52 +110,6 @@
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 /*
  * <ini>
- * gBusBandwidthSuperFastThreshold - bus bandwidth super fast threshold
- *
- * @Min: 0
- * @Max: 4294967295UL
- * @Default: 62500
- *
- * This ini specifies the bus bandwidth super fast threshold
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_BUS_BANDWIDTH_SUPER_FAST_THRESHOLD \
-		CFG_INI_UINT( \
-		"gBusBandwidthSuperFastThreshold", \
-		0, \
-		4294967295UL, \
-		62500, \
-		CFG_VALUE_OR_DEFAULT, \
-		"Bus bandwidth super fast threshold")
-
-/*
- * <ini>
- * gBusBandwidthFastThreshold - bus bandwidth fast threshold
- *
- * @Min: 0
- * @Max: 4294967295UL
- * @Default: 41667
- *
- * This ini specifies the bus bandwidth fast threshold
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_BUS_BANDWIDTH_FAST_THRESHOLD \
-		CFG_INI_UINT( \
-		"gBusBandwidthFastThreshold", \
-		0, \
-		4294967295UL, \
-		41667, \
-		CFG_VALUE_OR_DEFAULT, \
-		"Bus bandwidth fast threshold")
-
-/*
- * <ini>
  * gBusBandwidthSuperHighThreshold - bus bandwidth super high threshold
  *
  * @Min: 0
@@ -803,7 +757,7 @@
  * Ref - Kernel/Documentation/networking/scaling.txt
  * RPS CPU map for a particular RX queue, selects CPU(s) for bottom half
  * processing of RX packets. For example, for a system with 4 CPUs,
- * 0xe: Use CPU1 - CPU3 and do not use CPU0.
+ * 0xe: Use CPU1 - CPU3 and donot use CPU0.
  * 0x0: RPS is disabled, packets are processed on the interrupting CPU.
 .*
  * WLAN driver registers NUM_TX_QUEUES queues for tx and rx each during
@@ -990,7 +944,7 @@
  *
  * This ini item configures the amount of time, in milliseconds, that the driver
  * should prevent system power collapse after receiving an RX unicast packet.
- * A configured value of 0 disables the RX Wakelock feature completely.
+ * A conigured value of 0 disables the RX Wakelock feature completely.
  *
  * Related: None.
  *
@@ -1339,80 +1293,17 @@
 	CFG_INI_BOOL("dp_rx_fisa_lru_del_enable", true, \
 		     "Enable/Disable DP Rx FISA LRU deletion")
 
-/*
- * <ini>
- * dp_rx_fisa_aggr_enable - Control FISA UDP/TCP aggregation (coalescing)
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * Enable or disable FISA packet aggregation (super-frame coalescing).
- * Flow steering (FST) remains active regardless of this setting when
- * dp_rx_fisa_enable=1.  Set to 0 for SFE L2L forwarding where super-frames
- * cause forced fragmentation in sfe_ipv4_recv_udp().
- *
- * Related: dp_rx_fisa_enable
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_RX_FISA_AGGR_ENABLE \
-	CFG_INI_BOOL("dp_rx_fisa_aggr_enable", true, \
-		     "Enable/Disable DP Rx FISA aggregation (coalescing)")
-
 #define CFG_DP_FISA \
 	CFG(CFG_DP_RX_FISA_ENABLE) \
-	CFG(CFG_DP_RX_FISA_LRU_DEL_ENABLE) \
-	CFG(CFG_DP_RX_FISA_AGGR_ENABLE)
+	CFG(CFG_DP_RX_FISA_LRU_DEL_ENABLE)
 #else
 #define CFG_DP_FISA
-#endif
-
-#ifdef WLAN_HAPS_ENABLE
-#define WLAN_CFG_HAPS_CONFIG         (0)
-#define WLAN_CFG_HAPS_CONFIG_MIN     (0)
-#define WLAN_CFG_HAPS_CONFIG_MAX     (0xFFFFFFFF)
-
-/*
- * <ini>
- * dp_haps_config - Power save configuration for HAPS
- *
- * @min: 0x0
- * @max: 0xffffffff
- * @default: 0x0
- *
- * |31                       3|             2|           1|     0      |
- * +--------------------------+--------------+------------+------------+
- * |          RSVD            |  Enable TWT  | Sync qtime |    E/D     |
- * +--------------------------+--------------+------------+------------+
- *
- * bit 0    : Enable/Disable haps feature
- * bit 1    : Sync and update qtime cnss timestamp
- * bit 2    : Enable Target Wake Time (TWT)
- * bit 3-31 : Reserved for future usage
- *
- * </ini>
- */
-#define CFG_HAPS_CONFIG \
-	CFG_INI_UINT("dp_haps_config", \
-		     WLAN_CFG_HAPS_CONFIG_MIN, \
-		     WLAN_CFG_HAPS_CONFIG_MAX, \
-		     WLAN_CFG_HAPS_CONFIG, \
-		     CFG_VALUE_OR_DEFAULT, \
-		     "HAPS flags for power save")
-
-#define CFG_DP_HAPS CFG(CFG_HAPS_CONFIG)
-#else
-#define CFG_DP_HAPS
 #endif
 
 /*TODO Flow control part to be moved to DP later*/
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #define CFG_DP_BUS_BANDWIDTH \
-	CFG(CFG_DP_BUS_BANDWIDTH_SUPER_FAST_THRESHOLD) \
-	CFG(CFG_DP_BUS_BANDWIDTH_FAST_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_SUPER_HIGH_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_ULTRA_HIGH_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_VERY_HIGH_THRESHOLD) \
@@ -1503,56 +1394,8 @@
 	CFG_INI_BOOL("dp_enable_load_balance", false, \
 		     "Enable/Disable load balance support")
 
-/*
- * Bit layout for dp_lb_cpumask_override INI bitmask.
- */
-#define DP_LB_CPUMASK_OVERRIDE_FORCE_INI       BIT(0)
-#define DP_LB_CPUMASK_OVERRIDE_RX_MASK_SHIFT   1
-#define DP_LB_CPUMASK_OVERRIDE_RX_MASK         (0xFFFF << DP_LB_CPUMASK_OVERRIDE_RX_MASK_SHIFT)
-
-/*
- * <ini>
- * dp_lb_cpumask_override - Load balance CPU mask override bitmask
- *
- * @Min: 0
- * @Max: 0xFFFFFFFF
- * @Default: 0x0
- *
- * This ini is a bitmask used to configure the RX CPU mask for load balance
- * when DTSI-based CPU masks are not defined or need to be overridden.
- *
- * Bit layout:
- *  Bit   0   : Force from INI.
- *              If set (1), ignore DTSI and always use the RX CPU mask
- *              from INI bits [16:1]. If the INI mask is 0, fall back to
- *              little cluster CPUs.
- *              If not set (0), read DTSI first. If DTSI is not defined,
- *              use the INI RX CPU mask (bits [16:1]). If the INI mask is
- *              also 0, fall back to little cluster CPUs.
- *  Bits 1-16 : RX CPU mask (16 bits) - CPU mask for RX interrupts when
- *              using INI-based configuration. Supports up to 16 CPUs.
- *  Bits 17-31: Reserved
- *
- * Default value 0x0: Force bit not set, DTSI is used; if DTSI not
- * defined, INI mask is tried; if INI also 0, little cluster CPUs used.
- *
- * Supported Feature: All modes
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_LB_CPUMASK_OVERRIDE \
-	CFG_INI_UINT("dp_lb_cpumask_override", \
-		     0, \
-		     0xFFFFFFFF, \
-		     0x0, \
-		     CFG_VALUE_OR_DEFAULT, \
-		     "Load balance CPU mask override bitmask")
-
 #define CFG_DP_LOAD_BALANCE \
-	CFG(CFG_DP_ENABLE_LOAD_BALANCE) \
-	CFG(CFG_DP_LB_CPUMASK_OVERRIDE)
+	CFG(CFG_DP_ENABLE_LOAD_BALANCE)
 #else
 #define CFG_DP_LOAD_BALANCE
 #endif
@@ -1605,18 +1448,12 @@
 #ifdef WLAN_DP_FEATURE_STC
 /*
  * <ini>
- * dp_stc_enable - Control STC feature enablement and prealloc behaviour
+ * dp_stc_enable - Control STC feature enablement
  * @Min: 0
- * @Max: 0xFF
+ * @Max: 1
  * @Default: 0
  *
- * Bit 0 (0x01): STC feature enable.  0 = disabled, 1 = enabled.
- * Bit 7 (0x80): Skip STC prealloc.   0 = prealloc (default), 1 = no prealloc.
- *
- * Supported values:
- *   0x00 - STC disabled, no prealloc
- *   0x01 - STC enabled,  prealloc ON
- *   0x81 - STC enabled,  prealloc OFF
+ * This ini is used to enable DP STC
  *
  * Supported Feature: STA (pre 802.11BE)
  *
@@ -1624,66 +1461,12 @@
  *
  * </ini>
  */
-#define DP_STC_ENABLE_BIT        BIT(0)
-#define DP_STC_NO_PREALLOC_BIT   BIT(7)
-
 #define CFG_DP_STC_ENABLE \
-	CFG_INI_UINT("dp_stc_enable", 0, 0xFF, 0, \
-		     CFG_VALUE_OR_DEFAULT, \
+	CFG_INI_BOOL("dp_stc_enable", false, \
 		     "Enable/Disable DP Smart Traffic Classifier")
 
-/*
- * <ini>
- * dp_stc_rtpm_control - control RTPM when stc detects bursty traffic
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to enable STC module to control RTPM suspend when
- * bursty traffic types are detected.
- *
- * Supported Feature: STA (pre 802.11BE)
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_STC_RTPM_CONTROL \
-	CFG_INI_BOOL("dp_stc_rtpm_control", true, \
-		     "Enable/Disable RTPM control by STC module")
-
-#ifdef FEATURE_WLAN_PREDICTIVE_ROAMING
-/*
- * <ini>
- * wlan_predictive_roaming - Enable or disable the Predictive Roaming feature
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to Enable or disable the Predictive Roaming feature
- *
- * Supported Feature: STA mode
- *
- * Usage: Internal
- *
- * Related: dp_stc_enable (requires WLAN_DP_FEATURE_STC to be enabled)
- *
- * </ini>
- */
-#define CFG_DP_WLAN_PREDICTIVE_ROAMING \
-	CFG_INI_BOOL("wlan_predictive_roaming", false, \
-		     "Enable/Disable Predictive Roaming")
-
-#define CFG_DP_PREDICTIVE_ROAMING \
-	CFG(CFG_DP_WLAN_PREDICTIVE_ROAMING)
-#else
-#define CFG_DP_PREDICTIVE_ROAMING
-#endif
-
 #define CFG_DP_STC \
-	CFG(CFG_DP_STC_ENABLE) \
-	CFG(CFG_DP_STC_RTPM_CONTROL) \
-	CFG_DP_PREDICTIVE_ROAMING
+	CFG(CFG_DP_STC_ENABLE)
 #else
 #define CFG_DP_STC
 #endif
@@ -1714,317 +1497,6 @@
 #else
 #define CFG_DP_DYNAMIC_RESOURCE_MGMT
 #endif
-
-#define WLAN_CFG_DP_IRQ_AFFINITY_MASK 0
-#define WLAN_CFG_DP_IRQ_AFFINITY_MASK_MIN 0
-#define WLAN_CFG_DP_IRQ_AFFINITY_MASK_MAX 0x3FF
-
-/*
- * <ini>
- * dp_irq_affinity_ctrl - Affinity control for Datapath interrupts
- * @Min: 0
- * @Max: 0x3FF
- * @Default: 0
- *
- * This ini is used to control Datapath interrupt affinity.
- * The value 0 is used to disable the cusotm control of DP interrupts.
- * The value 0-0x3FF are used to indicate a CPU bitmask used to affine the DP
- * interrupts when system-wide throughput crosses a certain threshold.
- *
- * Supported modes: All modes
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DP_IRQ_AFFINITY_MASK \
-	CFG_INI_UINT("dp_irq_affinity_mask", \
-		     WLAN_CFG_DP_IRQ_AFFINITY_MASK_MIN, \
-		     WLAN_CFG_DP_IRQ_AFFINITY_MASK_MAX, \
-		     WLAN_CFG_DP_IRQ_AFFINITY_MASK, \
-		     CFG_VALUE_OR_DEFAULT, \
-		     "DP interrupt affinity control")
-
-#ifdef FEATURE_STATIC_IRQ_AFFINITY
-#define WLAN_CFG_DP_RX_INTR_CPUMASK 0
-#define WLAN_CFG_DP_RX_INTR_CPUMASK_MIN 0
-#define WLAN_CFG_DP_RX_INTR_CPUMASK_MAX 0xFF
-
-/*
- * <ini>
- * dp_rx_intr_cpumask - cpumask for static REO (RX) ring interrupt affinity
- * @Min: 0
- * @Max: 0xFF
- * @Default: 0
- *
- * Bitmask of CPUs to statically pin REO (RX) ring interrupts.
- * When non-zero, skips the periodic affinity manager and load balancer
- * updates to preserve the fixed per-ring pinning set at driver open.
- * Set to 0 to disable static IRQ affinity (kernel default affinity applies).
- *
- * Supported modes: All modes
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DP_RX_INTR_CPUMASK \
-	CFG_INI_UINT("dp_rx_intr_cpumask", \
-		     WLAN_CFG_DP_RX_INTR_CPUMASK_MIN, \
-		     WLAN_CFG_DP_RX_INTR_CPUMASK_MAX, \
-		     WLAN_CFG_DP_RX_INTR_CPUMASK, \
-		     CFG_VALUE_OR_DEFAULT, \
-		     "cpumask for static REO (RX) interrupt affinity")
-
-#define WLAN_CFG_DP_TX_COMP_INTR_CPUMASK 0
-#define WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MIN 0
-#define WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MAX 0xFF
-
-/*
- * <ini>
- * dp_tx_comp_intr_cpumask - cpumask for WLAN TX completion interrupts
- * @Min: 0
- * @Max: 0xFF
- * @Default: 0
- *
- * Bitmask of CPUs to statically pin TX completion ring interrupts.
- * When non-zero, skips the periodic affinity manager and load balancer
- * updates to preserve the fixed per-ring pinning set at driver open.
- * Set to 0 to disable static IRQ affinity (kernel default affinity applies).
- *
- * Supported modes: All modes
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DP_TX_COMP_INTR_CPUMASK \
-	CFG_INI_UINT("dp_tx_comp_intr_cpumask", \
-		     WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MIN, \
-		     WLAN_CFG_DP_TX_COMP_INTR_CPUMASK_MAX, \
-		     WLAN_CFG_DP_TX_COMP_INTR_CPUMASK, \
-		     CFG_VALUE_OR_DEFAULT, \
-		     "cpumask for static TX completion interrupt affinity")
-
-#define CFG_DP_STATIC_IRQ_AFFINITY \
-	CFG(CFG_DP_RX_INTR_CPUMASK) \
-	CFG(CFG_DP_TX_COMP_INTR_CPUMASK)
-#else
-#define CFG_DP_STATIC_IRQ_AFFINITY
-#endif /* FEATURE_STATIC_IRQ_AFFINITY */
-
-#define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK 0
-#define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MIN 0
-#define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MAX 0x3FF
-
-#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
-/*
- * <ini>
- * dp_affn_override_enable - Control DP affinity override feature
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to enable DP affinity override feature
- *
- * Supported mode: All modes
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_AFFN_OVERRIDE_ENABLE \
-	CFG_INI_BOOL("dp_affn_override_enable", false, \
-		     "Enable/Disable DP affinity override feature")
-
-/*
- * <ini>
- * dp_affn_override_high_threshold - DP affinity override high threshold
- *
- * @Min: 0
- * @Max: 4294967295UL
- * @Default: 22000
- *
- * This ini specifies the affinity override high threshold
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_AFFN_OVERRIDE_HIGH_THRESHOLD \
-		CFG_INI_UINT( \
-		"dp_affn_override_high_threshold", \
-		0, \
-		4294967295UL, \
-		22000, \
-		CFG_VALUE_OR_DEFAULT, \
-		"DP affinity override high threshold")
-
-/*
- * <ini>
- * dp_affn_override_mid_threshold - DP affinity override medium threshold
- *
- * @Min: 0
- * @Max: 4294967295UL
- * @Default: 2000
- *
- * This ini specifies the affinity override medium threshold
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_AFFN_OVERRIDE_MID_THRESHOLD \
-		CFG_INI_UINT( \
-		"dp_affn_override_mid_threshold", \
-		0, \
-		4294967295UL, \
-		2000, \
-		CFG_VALUE_OR_DEFAULT, \
-		"DP affinity override mid threshold")
-
-/*
- * <ini>
- * dp_affn_override_low_threshold -  DP affinity override low threshold
- *
- * @Min: 0
- * @Max: 4294967295UL
- * @Default: 150
- *
- * This ini specifies the affinity override low threshold
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_AFFN_OVERRIDE_LOW_THRESHOLD \
-		CFG_INI_UINT( \
-		"dp_affn_override_low_threshold", \
-		0, \
-		4294967295UL, \
-		150, \
-		CFG_VALUE_OR_DEFAULT, \
-		"DP affinity override low threshold")
-
-/*
- * <ini>
- * dp_affn_override_low_tput_mask - DP affinity override mask for low
- * throughput affinity
- *
- * @Min: 0
- * @Max: 0xFFFFFFFF
- * @Default: 0xFFFFFFFF
- *
- * This ini is used to set affinity override mask for low throughput affinity
- * Default is kept as 0xFFFFFFFF to treat this as invalid option and affine
- * the default affinity.
- *
- * Usage: Internal
- *
- * </ini>
- */
-
-#define CFG_DP_AFFN_OVERRIDE_LOW_TPUT_MASK \
-		CFG_INI_UINT( \
-		"dp_affn_override_low_tput_mask", \
-		0, \
-		0xFFFFFFFF, \
-		0xFFFFFFFF, \
-		CFG_VALUE_OR_DEFAULT, \
-		"mask to affine rx_thread/rx_irq/tx_comp for low tput")
-
-/*
- * <ini>
- * dp_affn_override_medium_tput_mask - DP affinity override mask for medium
- * throughput affinity
- *
- * @Min: 0
- * @Max: 0xFFFFFFFF
- * @Default: 0xFFFFFFFF
- *
- * This ini is used to set affinity override mask for medium throughput affinity
- * Default is kept as 0xFFFFFFFF to treat this as invalid option and affine
- * the default affinity.
- *
- * Usage: Internal
- *
- * </ini>
- */
-
-#define CFG_DP_AFFN_OVERRIDE_MEDIUM_TPUT_MASK \
-		CFG_INI_UINT( \
-		"dp_affn_override_medium_tput_mask", \
-		0, \
-		0xFFFFFFFF, \
-		0xFFFFFFFF, \
-		CFG_VALUE_OR_DEFAULT, \
-		"mask to affine rx_thread/rx_irq/tx_comp for medium tput")
-
-/*
- * <ini>
- * dp_affn_override_high_tput_mask - DP affinity override mask for high
- * throughput affinity
- *
- * @Min: 0
- * @Max: 0xFFFFFFFF
- * @Default: 0xFFFFFFFF
- *
- * This ini is used to set affinity override mask for high throughput affinity.
- * Default is kept as 0xFFFFFFFF to treat this as invalid option and affine
- * the default affinity.
- *
- * Usage: Internal
- *
- * </ini>
- */
-
-#define CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK \
-		CFG_INI_UINT( \
-		"dp_affn_override_high_tput_mask", \
-		0, \
-		0xFFFFFFFF, \
-		0xFFFFFFFF, \
-		CFG_VALUE_OR_DEFAULT, \
-		"mask to affine rx_thread/rx_irq/tx_comp for high tput")
-
-#define CFG_DP_AFFN_OVERRIDE_MGMT \
-	CFG(CFG_DP_AFFN_OVERRIDE_ENABLE) \
-	CFG(CFG_DP_AFFN_OVERRIDE_HIGH_THRESHOLD) \
-	CFG(CFG_DP_AFFN_OVERRIDE_MID_THRESHOLD) \
-	CFG(CFG_DP_AFFN_OVERRIDE_LOW_THRESHOLD) \
-	CFG(CFG_DP_AFFN_OVERRIDE_LOW_TPUT_MASK) \
-	CFG(CFG_DP_AFFN_OVERRIDE_MEDIUM_TPUT_MASK) \
-	CFG(CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK)
-
-#else
-#define CFG_DP_AFFN_OVERRIDE_MGMT
-#endif
-
-/*
- * <ini>
- * dp_rx_thread_affinity_ctrl - Affinity control for Datapath rx threads
- * @Min: 0
- * @Max: 0x3FF
- * @Default: 0
- *
- * This ini is used to control Datapath rx threads affinity.
- * The value 0 is used to disable the custom control of DP rx threads.
- * The value 0-0x3FF are used to indicate a CPU bitmask used to affine the DP
- * rx threads when system-wide throughput crosses a certain threshold.
- *
- * Supported modes: All modes
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DP_RX_THREAD_AFFINITY_MASK \
-	CFG_INI_UINT("dp_rx_thread_affinity_mask", \
-		     WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MIN, \
-		     WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MAX, \
-		     WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK, \
-		     CFG_VALUE_OR_DEFAULT, \
-		     "DP rx thread affinity control")
 
 /*
  * <ini>
@@ -2080,11 +1552,6 @@
 	CFG_DP_FLOW_BALANCE \
 	CFG_DP_STC \
 	CFG_DP_DYNAMIC_RESOURCE_MGMT \
-	CFG(CFG_DP_IPA_DEBUG_ENABLE) \
-	CFG(CFG_DP_IRQ_AFFINITY_MASK) \
-	CFG_DP_STATIC_IRQ_AFFINITY \
-	CFG_DP_AFFN_OVERRIDE_MGMT \
-	CFG(CFG_DP_RX_THREAD_AFFINITY_MASK) \
-	CFG_DP_HAPS
+	CFG(CFG_DP_IPA_DEBUG_ENABLE)
 
 #endif /* WLAN_DP_CFG_H__ */

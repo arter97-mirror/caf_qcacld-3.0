@@ -185,8 +185,25 @@ bool lim_process_ft_pre_auth_req(struct mac_context *mac_ctx,
 			      session, 0, 0);
 #endif
 
-	lim_send_preauth_scan_offload(mac_ctx, session,
-				session->ftPEContext.pFTPreAuthReq);
+	/*
+	 * Dont need to suspend if APs are in same channel and DUT
+	 * is not in MCC state
+	 */
+	if ((session->curr_op_freq !=
+	     session->ftPEContext.pFTPreAuthReq->pre_auth_channel_freq)
+	    || lim_is_in_mcc(mac_ctx)) {
+		/* Need to suspend link only if the channels are different */
+		pe_debug("Performing pre-auth on diff channel(session %pK)",
+			session);
+		lim_send_preauth_scan_offload(mac_ctx, session,
+					session->ftPEContext.pFTPreAuthReq);
+	} else {
+		pe_debug("Performing pre-auth on same channel (session %pK)",
+			session);
+		/* We are in the same channel. Perform pre-auth */
+		lim_perform_ft_pre_auth(mac_ctx, QDF_STATUS_SUCCESS, NULL,
+					session);
+	}
 
 	return buf_consumed;
 }
@@ -433,10 +450,12 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 	if (pe_session->ftPEContext.ftPreAuthStatus == QDF_STATUS_SUCCESS) {
 		pbssDescription =
 		      pe_session->ftPEContext.pFTPreAuthReq->pbssDescription;
-		ft_session = pe_create_session(mac, pbssDescription->bssId,
-					       &sessionId,
-					       GET_LIM_BSS_TYPE(pe_session),
-					       pe_session->vdev_id);
+		ft_session =
+			pe_create_session(mac, pbssDescription->bssId,
+					  &sessionId,
+					  mac->lim.max_sta_of_pe_session,
+					  pe_session->bssType,
+					  pe_session->vdev_id);
 		if (!ft_session) {
 			pe_err("Session not created for pre-auth 11R AP");
 			status = QDF_STATUS_E_FAILURE;
@@ -452,13 +471,20 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 		/* Update the beacon/probe filter in mac_ctx */
 		lim_set_bcn_probe_filter(mac, ft_session, 0);
 
-		if (!LIM_IS_STA_ROLE(ft_session))
-			pe_err("Invalid bss type %d",
-			       GET_LIM_BSS_TYPE(ft_session));
+		if (ft_session->bssType == eSIR_INFRASTRUCTURE_MODE)
+			ft_session->limSystemRole = eLIM_STA_ROLE;
+		else
+			pe_err("Invalid bss type");
 
 		ft_session->limPrevSmeState = ft_session->limSmeState;
 		ft_session->ht_config = pe_session->ht_config;
 		ft_session->limSmeState = eLIM_SME_WT_REASSOC_STATE;
+
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->ftPEContext.
+		    pFTPreAuthReq->pre_auth_channel_freq))
+			ft_session->vdev_nss = mac->vdev_type_nss_2g.sta;
+		else
+			ft_session->vdev_nss = mac->vdev_type_nss_5g.sta;
 
 		/* Update the ReAssoc BSSID of the current session */
 		sir_copy_mac_addr(pe_session->limReAssocbssId,

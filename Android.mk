@@ -30,6 +30,11 @@ LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM), volcano)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
 ifeq ($(TARGET_BOARD_PLATFORM), hala)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
@@ -51,43 +56,6 @@ LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
 ifeq ($(TARGET_BOARD_PLATFORM), seraph)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-# Auto Gen4 Target DDK support
-ifeq ($(TARGET_BOARD_PLATFORM), gen4)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-# Auto Gen5 Target DDK support
-ifeq ($(TARGET_BOARD_PLATFORM), gen5)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), hamoa)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), art)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), chora)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), hamoa_la)
-LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), volcano)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
@@ -171,7 +139,7 @@ LOCAL_MOD_NAME := wlan
 LOCAL_MODULE              := qca_cld3_$(CHIPSET).ko
 LOCAL_MODULE_KBUILD_NAME  := qca_cld3_$(CHIPSET).ko
 LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_DDK_SUBTARGET_REGEX := "wlan_qcacld3_all_modules"
+LOCAL_MODULE_DDK_SUBTARGET_REGEX := "all.*"
 ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
     ifeq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
         LOCAL_MODULE_PATH := $(KERNEL_MODULES_OUT)
@@ -199,7 +167,6 @@ endif
 # Create wlan_mac.bin symbolic link as part of the module
 $(call symlink-file,,$(TARGET_MAC_BIN_PATH)/wlan_mac.bin,$(TARGET_FW_PATH)/wlan_mac.bin)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_FW_PATH)/wlan_mac.bin
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_FW_PATH)/wlan_mac.bin
 
 # Conditionally create module symbolic link
 ifneq ($(findstring $(WLAN_CHIPSET),$(WIFI_DRIVER_DEFAULT)),)
@@ -207,12 +174,10 @@ ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
 ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
 $(call symlink-file,,$(TARGET_COPY_OUT_VENDOR)/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE),$(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE))
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE)
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE)
 endif
 else
 $(call symlink-file,,/system/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE),$(TARGET_OUT)/lib/modules/$(LOCAL_MODULE))
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT)/lib/modules/$(LOCAL_MODULE)
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_OUT)/lib/modules/$(LOCAL_MODULE)
 endif
 endif
 
@@ -220,13 +185,11 @@ endif
 ifeq ($(TARGET_BOARD_AUTO),true)
 $(call symlink-file,,$(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini,$(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
 $(call wlog,"generate soft link because TARGET_BOARD_AUTO true")
 else
 ifneq ($(GENERIC_ODM_IMAGE),true)
 $(call symlink-file,,$(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini,$(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
 $(call wlog,"generate soft link because GENERIC_ODM_IMAGE not true")
 endif
 endif
@@ -407,7 +370,6 @@ endif
 # Create wlan_mac.bin symbolic link as part of the module
 $(call symlink-file,,$(TARGET_MAC_BIN_PATH)/wlan_mac.bin,$(TARGET_FW_PATH)/wlan_mac.bin)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_FW_PATH)/wlan_mac.bin
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_FW_PATH)/wlan_mac.bin
 
 # Conditionally create module symbolic link
 ifneq ($(findstring $(WLAN_CHIPSET),$(WIFI_DRIVER_DEFAULT)),)
@@ -415,12 +377,10 @@ ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
 ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
 $(call symlink-file,,$(TARGET_COPY_OUT_VENDOR)/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE),$(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE))
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE)
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE)
 endif
 else
 $(call symlink-file,,/system/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE),$(TARGET_OUT)/lib/modules/$(LOCAL_MODULE))
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT)/lib/modules/$(LOCAL_MODULE)
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_OUT)/lib/modules/$(LOCAL_MODULE)
 endif
 endif
 
@@ -428,13 +388,11 @@ endif
 ifeq ($(TARGET_BOARD_AUTO),true)
 $(call symlink-file,,$(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini,$(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
 $(call wlog,"generate soft link because TARGET_BOARD_AUTO true")
 else
 ifneq ($(GENERIC_ODM_IMAGE),true)
 $(call symlink-file,,$(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini,$(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
-ALL_DEFAULT_INSTALLED_MODULES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
 $(call wlog,"generate soft link because GENERIC_ODM_IMAGE not true")
 endif
 endif

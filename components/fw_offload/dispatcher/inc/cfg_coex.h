@@ -69,12 +69,12 @@
 /*
  * <ini>
  * gSetMaxTxPowerForBTC - Set Max Tx power in COEX scenario
- * byte0 - WLAN Max Tx power.
- * byte1 - BT Max Tx power.
+ * byte0 - WLAN Max Tx power. Min: 0, Max: 0x64
+ * byte1 - BT Max Tx power. Min: 0, Max: 0x64
  * It is 0.5dbm every unit. E.g. 0x64, it means 50dbm.
  * @Min: 0
- * @Max: 0xffff
- * @Default: 0x0a0a
+ * @Max: 0x6464
+ * @Default: 0x64
  *
  * Usage: External
  *
@@ -83,8 +83,8 @@
 #define CFG_MAX_TX_POWER_FOR_BTC CFG_INI_UINT( \
 			"gSetMaxTxPowerForBTC", \
 			0, \
-			0xffff, \
-			0x0a0a, \
+			0x6464, \
+			0x64, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Max Tx Power for BTC")
 

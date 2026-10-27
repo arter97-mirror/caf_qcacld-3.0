@@ -1,7 +1,5 @@
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -28,7 +26,6 @@
 #include "../../core/src/wlan_cm_roam_offload.h"
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_mlo_mgr_sta.h"
-#include "wlan_mlo_mgr_link_switch.h"
 #include "../../core/src/wlan_cm_roam_i.h"
 
 bool ucfg_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
@@ -286,53 +283,9 @@ ucfg_wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			 struct qdf_mac_addr *bssid, qdf_freq_t ch_freq,
 			 enum wlan_cm_source source)
 {
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *vdev;
-
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc) {
-		mlme_err("Invalid psoc");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL, vdev_id: %d", vdev_id);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
-		mlme_debug("vdev: %d source: %d: reject roam invoke, MLO link switch in progress",
-			   vdev_id, source);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_E_BUSY;
-	}
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-
-	/* FASTREASSOC - passes 0 and NULL for num_chan and chan_freq_list */
-	return wlan_cm_roam_invoke(pdev, vdev_id, bssid, ch_freq,
-				   0, NULL, source);
+	return wlan_cm_roam_invoke(pdev, vdev_id, bssid, ch_freq, source);
 }
 
-QDF_STATUS
-ucfg_wlan_cm_ooq_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-			     u8 num_chan, qdf_freq_t *chan_freq_list,
-			     enum wlan_cm_source source)
-{
-	/* UCFG layer - OOQROAM invoke received at UCFG layer */
-	mlme_debug("[UCFG][OOQROAM] received at UCFG layer vdev_id = %d num_chan = %d",
-		   vdev_id, num_chan);
-
-	/* UCFG layer - forwarding to dispatcher layer
-	 * passes NULL bssid and 0 freq as OOQROAM has no specific target
-	 * num_chan and chan_freq_list carry the channel list to scan
-	 */
-	mlme_debug("[UCFG][OOQROAM] forwarding to dispatcher layer");
-
-	return wlan_cm_roam_invoke(pdev, vdev_id, NULL, 0,
-				   num_chan, chan_freq_list, source);
-}
 uint32_t ucfg_cm_roam_get_roam_score_algo(struct wlan_objmgr_pdev *pdev)
 {
 	return wlan_cm_roam_get_roam_score_algo(pdev);

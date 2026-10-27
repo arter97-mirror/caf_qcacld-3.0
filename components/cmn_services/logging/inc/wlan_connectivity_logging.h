@@ -72,10 +72,6 @@
  * @WLAN_EAP_SUCCESS: EAP success
  * @WLAN_EAP_FAILURE: EAP failure
  * @WLAN_CUSTOM_LOG: Additional WLAN logs
- * @WLAN_ST_PREP_REQ: ST prep request frame
- * @WLAN_ST_PREP_RESP: ST prep response frame
- * @WLAN_ST_EXEC_REQ: ST exec request frame
- * @WLAN_ST_EXEC_RESP: ST exec response frame
  * @WLAN_TAG_MAX: MAX tag
  */
 enum wlan_main_tag {
@@ -119,10 +115,6 @@ enum wlan_main_tag {
 	WLAN_EAP_SUCCESS,
 	WLAN_EAP_FAILURE,
 	WLAN_CUSTOM_LOG,
-	WLAN_ST_PREP_REQ,
-	WLAN_ST_PREP_RESP,
-	WLAN_ST_EXEC_REQ,
-	WLAN_ST_EXEC_RESP,
 	/* Keep at last */
 	WLAN_TAG_MAX,
 };
@@ -141,7 +133,7 @@ enum wlan_main_tag {
  * @WLAN_CONN_DIAG_DEAUTH_TX_EVENT: Deauthentication frame sent
  * @WLAN_CONN_DIAG_DISASSOC_RX_EVENT: Disassociation frame received
  * @WLAN_CONN_DIAG_DISASSOC_TX_EVENT: Disassociation frame sent
- * @WLAN_CONN_DIAG_DISCONNECT_EVENT: Disconnection
+ * @WLAN_CONN_DIAG_BMISS_EVENT: Disconnection due to beacon miss
  * @WLAN_CONN_DIAG_ROAM_SCAN_START_EVENT: ROAM scan start
  * @WLAN_CONN_DIAG_ROAM_SCAN_DONE_EVENT: Roam scan done
  * @WLAN_CONN_DIAG_ROAM_SCORE_CUR_AP_EVENT: Roam score current AP
@@ -192,7 +184,7 @@ enum qca_conn_diag_log_event_type {
 	WLAN_CONN_DIAG_DEAUTH_TX_EVENT,
 	WLAN_CONN_DIAG_DISASSOC_RX_EVENT,
 	WLAN_CONN_DIAG_DISASSOC_TX_EVENT,
-	WLAN_CONN_DIAG_DISCONNECT_EVENT,
+	WLAN_CONN_DIAG_BMISS_EVENT,
 	WLAN_CONN_DIAG_ROAM_SCAN_START_EVENT,
 	WLAN_CONN_DIAG_ROAM_SCAN_DONE_EVENT,
 	WLAN_CONN_DIAG_ROAM_SCORE_CUR_AP_EVENT,
@@ -352,12 +344,6 @@ enum wlan_diag_btm_block_reason {
  * @WLAN_DIAG_TX_RX_STATUS_NO_ACK: packet sent but no ack received
  * @WLAN_DIAG_TX_RX_STATUS_DROP: packet dropped due to congestion
  * @WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC: packet delivered to target
- * @WLAN_DIAG_TX_RX_TX_FILTERED: Packet dropped due TX filter
- * @WLAN_DIAG_TX_RX_TXOP_ABORT: TX operation is aborted
- * @WLAN_DIAG_TX_RX_TX_TID_DEL: TX TID deleted
- * @WLAN_DIAG_TX_RX_SW_ABORT: operation aborted by FW
- * @WLAN_DIAG_TX_RX_TX_MIG_DROP: Packet Dropped to TX Migration
- * @WLAN_DIAG_TX_RX_MLO_TID_MIG: Packet Dropped due to TX TID Migration
  * @WLAN_DIAG_TX_RX_STATUS_MAX: Max status value
  */
 enum wlan_diag_tx_rx_status {
@@ -367,12 +353,6 @@ enum wlan_diag_tx_rx_status {
 	WLAN_DIAG_TX_RX_STATUS_NO_ACK,
 	WLAN_DIAG_TX_RX_STATUS_DROP,
 	WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC,
-	WLAN_DIAG_TX_RX_TX_FILTERED,
-	WLAN_DIAG_TX_RX_TXOP_ABORT,
-	WLAN_DIAG_TX_RX_TX_TID_DEL,
-	WLAN_DIAG_TX_RX_SW_ABORT,
-	WLAN_DIAG_TX_RX_TX_MIG_DROP,
-	WLAN_DIAG_TX_RX_MLO_TID_MIG,
 	WLAN_DIAG_TX_RX_STATUS_MAX
 };
 
@@ -489,98 +469,6 @@ enum wlan_diag_roam_failure_reason_code {
 	WLAN_DIAG_ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
 	WLAN_DIAG_ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED,
 	WLAN_DIAG_ROAM_FAIL_REASON_UNKNOWN = 255,
-};
-
-/**
- * enum wlan_diag_disconnect_reason - Connection disconnection reason
- * @WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS: Disconnection triggered due to
- * beacon loss.
- * @WLAN_DIAG_DISCONNECT_REASON_USERSPACE: Disconnection triggered from the
- * Userspace
- * @WLAN_DIAG_DISCONNECT_REASON_INTERNAL: Disconnection triggered from the
- * Driver/Firmware. Refer enum wlan_diag_disconnect_int_reason for
- * Internal disconnect reason.
- * @WLAN_DIAG_DISCONNECT_REASON_AP_REQUEST: Disconnection triggered in response
- * to Disassoc/Deauth frame received from the AP
- * @WLAN_DIAG_DISCONNECT_REASON_OTHER: Max Disconnect reason
- */
-enum wlan_diag_disconnect_reason {
-	WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS = 0,
-	WLAN_DIAG_DISCONNECT_REASON_USERSPACE = 1,
-	WLAN_DIAG_DISCONNECT_REASON_INTERNAL = 2,
-	WLAN_DIAG_DISCONNECT_REASON_AP_REQUEST = 3,
-	WLAN_DIAG_DISCONNECT_REASON_OTHER = 99,
-};
-
-/**
- * enum wlan_diag_disconnect_reason_internal  - Internal Disconnect reason code
- * @WLAN_DIAG_DISCONNECT_REASON_UNSPECIFIED: Unspecified Reason code
- * @WLAN_DIAG_DISCONNECT_REASON_ROAM_FAILURE: disconnection triggered due
- * to internal roam failure.
- * @WLAN_DIAG_DISCONNECT_REASON_EXT_ROAM_FAILURE: disconnection triggered
- * due to external roam failure.
- * @WLAN_DIAG_DISCONNECT_REASON_GATEWAY_REACHABILITY_FAILURE: Disconnection
- * triggered due to gateway unreachability
- * @WLAN_DIAG_DISCONNECT_REASON_UNSUPPORTED_CHANNEL_CSA: Disconnection
- * triggered unsupoorted CSA channel
- * @WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_DISABLED_INDOOR: Disconnection
- * triggered when a concurrent AP start with indoor channels disabled and if
- * the STA is connected on one of these disabled channels.
- * @WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_USER_DISABLED: Disconnection
- * due to an xplicit request from the user to disable the current operating
- * channel.
- * @WLAN_DIAG_DISCONNECT_REASON_DEVICE_RECOVERY: STA disconnected from
- * the AP due to the internal host driver/firmware recovery.
- * @WLAN_DIAG_DISCONNECT_REASON_KEY_TIMEOUT: disconnection on
- * a timeout for the key installations from the user space.
- * @WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_BAND_CHANGE: Disconnection on
- * band change request from the user space to a different band from the
- * current operation channel/band.
- * @WLAN_DIAG_DISCONNECT_REASON_IFACE_DOWN: Disconnection on interface down
- * trigger from the user space
- * @WLAN_DIAG_DISCONNECT_REASON_PEER_XRETRY_FAIL: disconnection on
- * on getting continuous transmission failures for multiple Data frames.
- * @WLAN_DIAG_DISCONNECT_REASON_PEER_INACTIVITY: The STA does a keep alive
- * notification to the AP by transmitting NULL/G-ARP frames. This disconnection
- * represents inactivity from AP on such transmissions.
- * @WLAN_DIAG_DISCONNECT_REASON_SA_QUERY_TIMEOUT: This reason code is used
- * on disconnection when SA Query times out (AP does not respond to SA Query).
- * @WLAN_DIAG_DISCONNECT_REASON_BEACON_MISS_FAILURE: Disconnection on
- * missing the beacons continuously from the AP.
- * @WLAN_DIAG_DISCONNECT_REASON_CHANNEL_SWITCH_FAILURE: Disconnection due
- * to STA not able to move to the channel mentioned by the AP in CSA.
- * @WLAN_DIAG_DISCONNECT_REASON_USER_TRIGGERED: User triggered
- * disconnection
- * @WLAN_DIAG_DISCONNECT_REASON_KEY_FAIL_TO_INSTALL: key fail to install reason
- * code
- * @WLAN_DIAG_DISCONNECT_REASON_FW_TRIGGERED_LINK_SWITCH: Link Switch from
- * active to standby link
- * @WLAN_DIAG_DISCONNECT_REASON_HOST_TRIGGERED_LINK_DELETE: Dynamic link
- * removal
- * @WLAN_DIAG_DISCONNECT_REASON_OCI_MISMATCH: Reason OCI Mismatch happens
- */
-enum wlan_diag_disconnect_reason_internal  {
-	WLAN_DIAG_DISCONNECT_REASON_UNSPECIFIED = 0,
-	WLAN_DIAG_DISCONNECT_REASON_ROAM_FAILURE = 1,
-	WLAN_DIAG_DISCONNECT_REASON_EXT_ROAM_FAILURE = 2,
-	WLAN_DIAG_DISCONNECT_REASON_GATEWAY_REACHABILITY_FAILURE = 3,
-	WLAN_DIAG_DISCONNECT_REASON_UNSUPPORTED_CHANNEL_CSA = 4,
-	WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_DISABLED_INDOOR = 5,
-	WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_USER_DISABLED = 6,
-	WLAN_DIAG_DISCONNECT_REASON_DEVICE_RECOVERY = 7,
-	WLAN_DIAG_DISCONNECT_REASON_KEY_TIMEOUT = 8,
-	WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_BAND_CHANGE = 9,
-	WLAN_DIAG_DISCONNECT_REASON_IFACE_DOWN = 10,
-	WLAN_DIAG_DISCONNECT_REASON_PEER_XRETRY_FAIL = 11,
-	WLAN_DIAG_DISCONNECT_REASON_PEER_INACTIVITY = 12,
-	WLAN_DIAG_DISCONNECT_REASON_SA_QUERY_TIMEOUT = 13,
-	WLAN_DIAG_DISCONNECT_REASON_BEACON_MISS_FAILURE = 14,
-	WLAN_DIAG_DISCONNECT_REASON_CHANNEL_SWITCH_FAILURE = 15,
-	WLAN_DIAG_DISCONNECT_REASON_USER_TRIGGERED = 16,
-	WLAN_DIAG_DISCONNECT_REASON_KEY_FAIL_TO_INSTALL = 17,
-	WLAN_DIAG_DISCONNECT_REASON_FW_TRIGGERED_LINK_SWITCH = 18,
-	WLAN_DIAG_DISCONNECT_REASON_HOST_TRIGGERED_LINK_DELETE = 19,
-	WLAN_DIAG_DISCONNECT_REASON_OCI_MISMATCH = 20
 };
 
 /**
@@ -789,22 +677,16 @@ struct wlan_diag_mlo_t2lm_teardown {
  */
 struct wlan_diag_mlo_link_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint8_t version;
-	uint16_t active_link:5;
-	uint16_t prev_active_link:5;
-	uint16_t associated_links:5;
-	uint16_t reserved:1;
-	uint8_t reason;
+	uint32_t version;
+	uint32_t active_link:5;
+	uint32_t prev_active_link:5;
+	uint32_t associated_links:5;
+	uint32_t reserved:17;
+	uint32_t reason;
 } qdf_packed;
 
 #define DIAG_NBR_RPT_VERSION 1
 #define DIAG_NBR_RPT_VERSION_2 2
-
-/*
- * The version 3 mandates to log TX/RX flag in the connectivity log
- * and if the frame is transmitted then send the TX status of the frame
- */
-#define DIAG_NBR_RPT_VERSION_3 3
 
 /**
  * struct wlan_diag_nbr_rpt - Neighbor report structure
@@ -820,10 +702,6 @@ struct wlan_diag_mlo_link_status {
  * @freq: Frequency list in response frame
  * @band: Band on which packet was received or transmitted.
  * Refer enum enum wlan_diag_wifi_band
- * @is_tx: Flag to indicate whether the frame is received or transmitted
- * @tx_status: Frame TX status defined by enum qdf_dp_tx_rx_status
- * @tx_fail_reason: tx failure reason printed on TX_FAIL status.
- * Refer enum qdf_dp_tx_rx_status
  * @reserved: Reserved field
  */
 struct wlan_diag_nbr_rpt {
@@ -838,20 +716,11 @@ struct wlan_diag_nbr_rpt {
 	char ssid[WLAN_SSID_MAX_LEN];
 	uint32_t freq[WLAN_MAX_LOGGING_FREQ];
 	uint32_t band:8;
-	uint32_t is_tx:1;
-	uint32_t tx_status:2;
-	uint32_t tx_fail_reason:4;
-	uint32_t reserved:17;
+	uint32_t reserved:24;
 } qdf_packed;
 
 #define DIAG_BCN_RPT_VERSION 1
 #define DIAG_BCN_RPT_VERSION_2 2
-
-/*
- * The version 3 mandates to log TX/RX flag in the connectivity log
- * and if the frame is transmitted then send the TX status of the frame
- */
-#define DIAG_BCN_RPT_VERSION_3 3
 
 /**
  * struct wlan_diag_bcn_rpt - Beacon report structure
@@ -872,10 +741,6 @@ struct wlan_diag_nbr_rpt {
  * @seq_num: Sequence number.
  * @band: Band on which packet was received or transmitted.
  * Refer enum enum wlan_diag_wifi_band
- * @is_tx: Flag to indicate whether the frame is received or transmitted
- * @tx_status: Frame TX status defined by enum qdf_dp_tx_rx_status
- * @tx_fail_reason: tx failure reason printed on TX_FAIL status.
- * Refer enum qdf_dp_tx_rx_status
  * @reserved: Reserved field
  */
 struct wlan_diag_bcn_rpt {
@@ -892,17 +757,11 @@ struct wlan_diag_bcn_rpt {
 	uint16_t duration;
 	uint32_t seq_num;
 	uint32_t band:8;
-	uint32_t is_tx:1;
-	uint32_t tx_status:2;
-	uint32_t tx_fail_reason:4;
-	uint32_t reserved:17;
+	uint32_t reserved:24;
 } qdf_packed;
 
 #define DIAG_ROAM_CAND_VERSION 1
 #define DIAG_ROAM_CAND_VERSION_V2 2
-
-/* Version 3 includes the etp value of Current AP */
-#define DIAG_ROAM_CAND_VERSION_V3 3
 
 /**
  * struct wlan_diag_roam_candidate_info  - Roam candidate information for
@@ -1082,21 +941,7 @@ struct wlan_diag_btm_info {
 
 /* this version mandates to print the tx failure reason for DP events */
 #define DIAG_MGMT_VERSION_V3 3
-
-/*
- * The Version 4 mandates the print the reason for disconnect and
- * sub reason when disconnect initiated from the driver/FW
- */
-
 #define MAX_VSIE_LEN 255
-#define DIAG_MGMT_VERSION_V4 4
-
-/*
- * This version mandates to print the RSSI for Authentication,
- * (Re)Association request/response, Deauthentication &
- * Disassociation frames.
- */
-#define DIAG_MGMT_VERSION_V5 5
 
 /**
  * struct wlan_diag_packet_info - Data packets related info
@@ -1128,9 +973,6 @@ struct wlan_diag_btm_info {
  * @mld_addr: MLD mac address
  * @vsie_len: VSIE length
  * @vsie: VSIE
- * @sub_reason: Sub reason for disconnect event generated from Driver/FW.
- * Refer enum wlan_diag_disconnect_int_reason.
- * @reserved: Reserved field
  */
 struct wlan_diag_packet_info {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
@@ -1154,20 +996,7 @@ struct wlan_diag_packet_info {
 	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t vsie_len;
 	uint8_t vsie[MAX_VSIE_LEN];
-	uint32_t sub_reason:8;
-	uint32_t reserved:24;
 } qdf_packed;
-
-/**
- * struct wlan_diag_packet - Packets info
- * @pkt_info: Data packets related info
- * @instance_id: instance id of wlan_diag_packet_info
- *
- */
-struct wlan_diag_packet {
-	struct wlan_diag_packet_info pkt_info;
-	uint8_t instance_id;
-};
 
 #define DIAG_CONN_VERSION 1
 
@@ -1257,7 +1086,7 @@ struct wlan_roam_scan_info {
  * @is_roam_successful: True if roamed successfully or false if roaming failed
  */
 struct wlan_roam_result_info {
-	enum wlan_diag_roam_failure_reason_code roam_fail_reason;
+	enum wlan_roam_failure_reason_code roam_fail_reason;
 	bool is_roam_successful;
 };
 
@@ -1625,21 +1454,6 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
- * wlan_connectivity_disconnect_event() - API to log disconnect to userspace
- * @vdev: vdev pointer
- * @peer_mac: Peer MAC address
- * @reason: WLAN disconnect reason. Refer enum wlan_reason_code
- * @rssi: Link rssi
- * @is_peer_disconnect: flag to check whether the peer is disconnected from AP
- *
- * Return: None
- */
-void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
-					uint8_t *peer_mac, uint32_t reason,
-					int rssi,
-					bool is_peer_disconnect);
-
-/**
  * wlan_populate_vsie() - Populate VSIE field for logging
  * @vdev: vdev pointer
  * @data: Diag packet info data
@@ -1663,27 +1477,6 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 void
 wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 		       uint32_t freq, uint8_t vdev_id);
-
-/**
- * wlan_diag_get_tx_status() -  Gives the diag logging specific tx status
- * @tx_status: fw specific TX status
- *
- * Returns TX status specified in enum diag_tx_status
- */
-enum diag_tx_status
-wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status);
-
-/**
- * wlan_convert_host_to_diag_tx_fail_reason() - API to convert TX fail reason
- * code to Connectivity logging TX Fail reason code
- * @tx_status: Driver specific TX Fail reason code.
- * Refer enum wlan_roam_frame_tx_status
- *
- * Return: TX status specified in enum wlan_diag_tx_rx_status
- */
-enum wlan_diag_tx_rx_status
-wlan_convert_host_to_diag_tx_fail_reason(enum wlan_roam_frame_tx_status
-					 tx_status);
 
 #ifdef WLAN_FEATURE_11BE_MLO
 
@@ -1713,8 +1506,8 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
  * @token: dialog Token
  * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
  * @tx_status: TX status
- * @band: diag band on which frame was transmitted/received
- * @is_rx: Flag to indicate packet being received
+ * @freq: frequency on which frame was transmitted/received
+ * @is_rx: Flag to inidcate packet being received
  * @subtype: Determine whether the evnt sent is for t2lm request
  * or t2lm response
  *
@@ -1725,7 +1518,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type t2lm_status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      enum wlan_diag_wifi_band band,
+				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype);
 /**
  * wlan_connectivity_t2lm_status_event() - Fill and send T2LM data
@@ -1734,15 +1527,6 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_diag_get_tx_status() - API to convert TX status to diag TX status
- * @tx_status: TX status of the packet. Refer enum wlan_diag_tx_rx_status
- *
- * Return : Valid enum  diag_tx_status value
- */
-enum diag_tx_status
-wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status);
 
 /**
  * wlan_populate_mlo_mgmt_event_param() - API to populate MLO management frame
@@ -1787,7 +1571,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      enum wlan_diag_wifi_band band,
+				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {}
 
@@ -1834,6 +1618,16 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq);
 
+/**
+ * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
+ * to wlan_diag_tx_rx_status
+ * @tx_status: TX status of the frame
+ *
+ * Return: Converted QDF TX status value of Diag TX status of frame
+ */
+enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
+
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
@@ -1859,16 +1653,6 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 void
 wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_req *con_req);
-
-/**
- * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
- * to wlan_diag_tx_rx_status
- * @tx_status: TX status of outgoing frame. Refer enum qdf_dp_tx_rx_status
- *
- * Return: TX status of the frame.
- */
-enum wlan_diag_tx_rx_status
-wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1940,21 +1724,6 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
- * wlan_connectivity_disconnect_event() - API to log disconnect to userspace
- * @vdev: vdev pointer
- * @peer_mac: Peer MAC address
- * @reason: WLAN disconnect reason. Refer enum wlan_reason_code
- * @rssi: link rssi
- * @is_peer_disconnect: flag to check whether the peer is disconnected from AP
- *
- * Return: None
- */
-void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
-					uint8_t *peer_mac, uint32_t reason,
-					int rssi,
-					bool is_peer_disconnect);
-
-/**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
  * @con_req: Connection request parameter
@@ -2004,8 +1773,11 @@ wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq);
  *
  * Return: TX status of the frame.
  */
-enum wlan_diag_tx_rx_status
-wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
+static inline enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
+{
+	return WLAN_DIAG_TX_RX_STATUS_INVALID;
+}
 
 /**
  * wlan_populate_vsie() - Populate VSIE field for logging
@@ -2065,14 +1837,6 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 {}
 
 static inline void
-wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
-				   uint8_t *peer_mac, uint32_t reason,
-				   int rssi,
-				   bool is_peer_disconnect)
-{
-}
-
-static inline void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx)
 {
@@ -2112,7 +1876,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      enum wlan_diag_wifi_band band,
+				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {}
 

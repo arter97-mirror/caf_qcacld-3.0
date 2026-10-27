@@ -84,15 +84,6 @@ QDF_STATUS mlme_unregister_vdev_mgr_ops(struct vdev_mlme_obj *vdev_mlme);
 QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 					       bool val);
 
-/**
- * mlme_set_is_acs_sap() - set mlme priv is_acs_sap
- * @vdev: vdev pointer
- * @val: value to be set
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS mlme_set_is_acs_sap(struct wlan_objmgr_vdev *vdev, bool val);
-
 #ifdef WLAN_FEATURE_MSCS
 /**
  * mlme_set_is_mscs_req_sent() - set mscs frame req flag
@@ -131,14 +122,6 @@ bool mlme_get_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev)
  * Return: value of mlme priv restart in progress
  */
 bool mlme_is_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_is_acs_sap() - get mlme priv is_acs_sap
- * @vdev: vdev pointer
- *
- * Return: value of mlme priv is_acs_sap
- */
-bool mlme_is_acs_sap(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ap_mlme_set_hidden_ssid_restart_in_progress() - set mlme priv hidden ssid
@@ -581,24 +564,6 @@ wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
-
-/**
- * wlan_sap_get_acs_weight_adjustable() - get channel weight
- * @cur_bw: bandwidth
- *
- * Return: channel weight
- */
-uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw);
-
-/**
- * wlan_sap_is_ch_non_overlap() - check if channel is overlapping
- * @vdev_id: vdev id
- * @freq: freq
- *
- * Return: true if channel is non overlapping
- */
-bool
-wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq);
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
 /**

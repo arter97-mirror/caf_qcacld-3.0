@@ -251,16 +251,15 @@
  * discardDFSchannelforMode - discard DFS channels for
  * provided mode
  * @Min: 0
- * @Max: 7
+ * @Max: 0x3
  * @Default: 0
  *
- * customer can set this value from 0 to 7 which means
+ * customer can set this value from 0 to 3 which means
  * DFS channels will be discarded for mentioned mode while
  * getting usable channels even if gEnableDFSMasterCap ini
  * is enabled.
  * BIT 0 - SAP MODE
  * BIT 1 - P2P GO MODE
- * BIT 2 - P2P CLI MODE
  *
  * Related: none
  *
@@ -271,7 +270,7 @@
 #define CFG_DISCARD_DFS_CHANNEL_FOR_MODE CFG_INI_UINT( \
 			"discardDFSchannelforMode", \
 			0, \
-			7, \
+			3, \
 			0, \
 			CFG_VALUE_OR_DEFAULT, \
 			"discard DFS channel")

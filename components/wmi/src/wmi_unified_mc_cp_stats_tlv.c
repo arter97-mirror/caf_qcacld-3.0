@@ -35,7 +35,9 @@ extract_per_chain_rssi_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			       uint32_t index,
 			       struct wmi_host_per_chain_rssi_stats *rssi_stats)
 {
+	uint8_t *data;
 	wmi_rssi_stats *fw_rssi_stats;
+	wmi_per_chain_rssi_stats *rssi_event;
 	WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf;
 
 	if (!evt_buf) {
@@ -44,14 +46,15 @@ extract_per_chain_rssi_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	}
 
 	param_buf = (WMI_UPDATE_STATS_EVENTID_param_tlvs *) evt_buf;
+	rssi_event = param_buf->chain_stats;
 
-	if (!param_buf->rssi_stats || index >= param_buf->num_rssi_stats) {
-		wmi_err("Invalid index: %u num_rssi_stats: %u",
-			index, param_buf->num_rssi_stats);
+	if (index >= rssi_event->num_per_chain_rssi_stats) {
+		wmi_err("Invalid index: %u", index);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	fw_rssi_stats = &param_buf->rssi_stats[index];
+	data = ((uint8_t *)(&rssi_event[1])) + WMI_TLV_HDR_SIZE;
+	fw_rssi_stats = &((wmi_rssi_stats *)data)[index];
 	if (fw_rssi_stats->vdev_id >= WLAN_UMAC_PDEV_MAX_VDEVS)
 		return QDF_STATUS_E_INVAL;
 
@@ -364,8 +367,7 @@ static void dump_peer_stats_info(wmi_peer_stats_info *stats)
 		 stats->last_rx_bitrate_kbps,
 		 stats->peer_rssi, stats->tx_succeed);
 	for (i = 0; i < WMI_MAX_CHAINS; i++)
-		if (stats->peer_rssi_per_chain[i])
-			wmi_debug("chain%d_rssi %d", i, stats->peer_rssi_per_chain[i]);
+		wmi_debug("chain%d_rssi %d", i, stats->peer_rssi_per_chain[i]);
 }
 
 /**
@@ -396,16 +398,18 @@ extract_peer_tx_pkt_per_mcs_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		if (!peer_stats_info->tx_pkt_per_mcs)
 			return QDF_STATUS_E_NOMEM;
+		wmi_debug("Tx rate counts");
 		for (j = 0, i = index; j < peer_stats_info->num_tx_rate_counts;
 		     j++, i++) {
 			peer_stats_info->tx_pkt_per_mcs[j] =
 						param_buf->tx_rate_counts[i];
+			wmi_nofl_debug("MCS [%d] %d", j,
+				       peer_stats_info->tx_pkt_per_mcs[j]);
 		}
 	} else {
 		wmi_err("invalid idx %d curr peer tx_rate_counts %d total tx_rate_count %d",
 			index, peer_stats_info->num_tx_rate_counts,
 			param_buf->num_tx_rate_counts);
-		return QDF_STATUS_E_INVAL;
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -438,16 +442,18 @@ extract_peer_rx_pkt_per_mcs_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		if (!peer_stats_info->rx_pkt_per_mcs)
 			return QDF_STATUS_E_NOMEM;
+		wmi_debug("Rx rate counts");
 		for (j = 0, i = index; j < peer_stats_info->num_rx_rate_counts;
 		     j++, i++) {
 			peer_stats_info->rx_pkt_per_mcs[j] =
 						param_buf->rx_rate_counts[i];
+			wmi_nofl_debug("MCS [%d] %d", j,
+				       peer_stats_info->rx_pkt_per_mcs[j]);
 		}
 	} else {
 		wmi_err("invalid idx %d curr peer rx_rate_counts %d total rx_rate_count %d",
 			index, peer_stats_info->num_rx_rate_counts,
 			param_buf->num_rx_rate_counts);
-		return QDF_STATUS_E_INVAL;
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -578,300 +584,6 @@ extract_big_data_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 #endif
 
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-/* Maximum entries based on hardware constraints */
-#define WMI_MAX_POWER_STATS_ENTRIES     10  /* Max pdevs + buffer */
-#define WMI_MAX_TX_RATE_STATS_ENTRIES   50  /* Max rates + buffer */
-
-/**
- * extract_power_datapath_stats_event_tlv() - Extract power/datapath stats event
- * @wmi_handle: WMI handle
- * @evt_buf: Event buffer
- * @event: Pointer to store extracted event data
- *
- * This function extracts power and datapath statistics from the event buffer.
- * It allocates memory for the stats arrays which must be freed by the caller.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-static QDF_STATUS
-extract_power_datapath_stats_event_tlv(
-				wmi_unified_t wmi_handle,
-				void *evt_buf,
-				struct cp_stats_power_datapath_info *event)
-{
-	WMI_PDEV_POWER_DATAPATH_STATS_EVENTID_param_tlvs *param_buf;
-	wmi_pdev_power_datapath_stats_event_fixed_param *ev;
-	wmi_pdev_power_stats_info *power_stats_tlv;
-	wmi_pdev_tx_rate_info *tx_rate_stats_tlv;
-	uint32_t tx_idx = 0, rx_idx = 0;
-	uint32_t i;
-
-	if (!evt_buf || !event) {
-		wmi_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	param_buf = (WMI_PDEV_POWER_DATAPATH_STATS_EVENTID_param_tlvs *)evt_buf;
-	if (!param_buf) {
-		wmi_err("Invalid param_buf");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	ev = param_buf->fixed_param;
-	if (!ev) {
-		wmi_err("Invalid fixed_param");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Initialize event structure */
-	qdf_mem_zero(event, sizeof(*event));
-
-	/* Extract fixed parameters */
-	event->status = ev->status;
-	event->stats_type_bitmap = ev->stats_type_bitmap;
-	event->wlan_soc_pwr_on_time = ev->wlan_soc_pwr_on_time;
-	event->wlan_soc_sleep_levels_num = ev->wlan_soc_sleep_levels_num;
-	qdf_mem_copy(event->wlan_soc_sleep_time_per_level,
-		     ev->wlan_soc_sleep_time_per_level,
-		     sizeof(event->wlan_soc_sleep_time_per_level));
-
-	wmi_debug("status %d, stats_type 0x%x",
-		  ev->status, ev->stats_type_bitmap);
-
-	/* Extract power stats if present */
-	power_stats_tlv = param_buf->power_stats;
-
-	if (param_buf->num_power_stats > WMI_MAX_POWER_STATS_ENTRIES) {
-		wmi_err("num_power_stats too large: %u (max: %u)",
-			param_buf->num_power_stats,
-			WMI_MAX_POWER_STATS_ENTRIES);
-		event->num_power_stats = 0;
-		event->power_stats_valid = false;
-		return QDF_STATUS_E_INVAL;
-	}
-	event->num_power_stats = param_buf->num_power_stats;
-
-	if (power_stats_tlv && param_buf->num_power_stats > 0) {
-		event->power_stats =
-			qdf_mem_malloc(sizeof(struct cp_stats_power_info) *
-				       param_buf->num_power_stats);
-
-		if (!event->power_stats) {
-			wmi_err("Failed to allocate memory for power stats");
-			event->num_power_stats = 0;
-			event->power_stats_valid = false;
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		for (i = 0; i < param_buf->num_power_stats; i++) {
-			event->power_stats[i].core_index =
-				power_stats_tlv[i].core_index;
-			event->power_stats[i].radio_on_time =
-				power_stats_tlv[i].radio_on_time;
-			event->power_stats[i].radio_off_time =
-				power_stats_tlv[i].radio_off_time;
-			event->power_stats[i].wlan_pwr_on_time =
-				power_stats_tlv[i].wlan_pwr_on_time;
-			event->power_stats[i].tx_time =
-				power_stats_tlv[i].tx_time;
-			event->power_stats[i].rx_time =
-				power_stats_tlv[i].rx_time;
-			event->power_stats[i].sleep_levels_num =
-				power_stats_tlv[i].sleep_levels_num;
-
-			qdf_mem_copy(
-				event->power_stats[i].sleep_time_per_levels,
-				power_stats_tlv[i].sleep_time_per_levels,
-				sizeof(event->power_stats[i]
-				       .sleep_time_per_levels));
-		}
-
-		event->power_stats_valid = true;
-		wmi_debug("Extracted %u power stats entries",
-			  param_buf->num_power_stats);
-	} else {
-		event->power_stats_valid = false;
-		wmi_debug("No power stats in event");
-	}
-
-	/* Extract tx/rx rate stats - FW sends RX stats with
-	 * retry_count=0xFFFFFFFF
-	 */
-	tx_rate_stats_tlv = param_buf->tx_rate_stats;
-	if (param_buf->num_tx_rate_stats > WMI_MAX_TX_RATE_STATS_ENTRIES) {
-		wmi_err("num_tx_rate_stats too large: %u (max: %u)",
-			param_buf->num_tx_rate_stats,
-			WMI_MAX_TX_RATE_STATS_ENTRIES);
-		/* Clean up previously allocated power stats */
-		if (event->power_stats) {
-			qdf_mem_free(event->power_stats);
-			event->power_stats = NULL;
-			event->num_power_stats = 0;
-			event->power_stats_valid = false;
-		}
-		event->num_tx_rate_stats = 0;
-		event->num_rx_rate_stats = 0;
-		event->tx_rate_stats_valid = false;
-		event->tx_rate_stats = NULL;
-		event->rx_rate_stats_valid = false;
-		event->rx_rate_stats = NULL;
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (tx_rate_stats_tlv && param_buf->num_tx_rate_stats > 0) {
-		/* Count TX vs RX entries */
-		for (i = 0; i < param_buf->num_tx_rate_stats; i++) {
-			if (tx_rate_stats_tlv[i].tx_retry_count == 0xFFFFFFFF)
-				rx_idx++;  /* RX stats - FW workaround */
-			else
-				tx_idx++;  /* TX stats */
-		}
-
-		wmi_debug("Counted %u tx and %u rx rate stats entries",
-			  tx_idx, rx_idx);
-
-		/* Allocate exact sizes needed */
-		if (tx_idx > 0) {
-			event->tx_rate_stats =
-			qdf_mem_malloc(sizeof(struct cp_stats_tx_rate_info) *
-					       tx_idx);
-		}
-
-		if (rx_idx > 0) {
-			event->rx_rate_stats =
-			qdf_mem_malloc(sizeof(struct cp_stats_rx_rate_info) *
-					       rx_idx);
-		}
-
-		/* Check if any allocation failed */
-		if ((tx_idx > 0 && !event->tx_rate_stats) ||
-		    (rx_idx > 0 && !event->rx_rate_stats)) {
-			wmi_err("Failed to allocate memory for rate stats (tx_count=%u, rx_count=%u)",
-				tx_idx, rx_idx);
-
-			/* Cleanup all allocated memory */
-			if (event->tx_rate_stats) {
-				qdf_mem_free(event->tx_rate_stats);
-				event->tx_rate_stats = NULL;
-			}
-			if (event->rx_rate_stats) {
-				qdf_mem_free(event->rx_rate_stats);
-				event->rx_rate_stats = NULL;
-			}
-			if (event->power_stats) {
-				qdf_mem_free(event->power_stats);
-				event->power_stats = NULL;
-				event->num_power_stats = 0;
-				event->power_stats_valid = false;
-			}
-
-			event->num_tx_rate_stats = 0;
-			event->num_rx_rate_stats = 0;
-			event->tx_rate_stats_valid = false;
-			event->tx_rate_stats = NULL;
-			event->rx_rate_stats_valid = false;
-			event->rx_rate_stats = NULL;
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		/* Copy stats into tx or rx rate stats based on
-		 * retry count
-		 */
-		tx_idx = 0;
-		rx_idx = 0;
-		for (i = 0; i < param_buf->num_tx_rate_stats; i++) {
-			if (tx_rate_stats_tlv[i].tx_retry_count == 0xFFFFFFFF) {
-				/* RX stats - FW workaround */
-				event->rx_rate_stats[rx_idx].core_index =
-					tx_rate_stats_tlv[i].core_index;
-				event->rx_rate_stats[rx_idx].rate_index =
-					tx_rate_stats_tlv[i].rate_index;
-				event->rx_rate_stats[rx_idx].band =
-					tx_rate_stats_tlv[i].band;
-				event->rx_rate_stats[rx_idx].bw =
-					tx_rate_stats_tlv[i].bw;
-				event->rx_rate_stats[rx_idx].nss =
-					tx_rate_stats_tlv[i].nss;
-				event->rx_rate_stats[rx_idx].count =
-					tx_rate_stats_tlv[i].count;
-				rx_idx++;
-			} else {
-				/* TX stats */
-				event->tx_rate_stats[tx_idx].core_index =
-					tx_rate_stats_tlv[i].core_index;
-				event->tx_rate_stats[tx_idx].rate_index =
-					tx_rate_stats_tlv[i].rate_index;
-				event->tx_rate_stats[tx_idx].band =
-					tx_rate_stats_tlv[i].band;
-				event->tx_rate_stats[tx_idx].bw =
-					tx_rate_stats_tlv[i].bw;
-				event->tx_rate_stats[tx_idx].nss =
-					tx_rate_stats_tlv[i].nss;
-				event->tx_rate_stats[tx_idx].count =
-					tx_rate_stats_tlv[i].count;
-				event->tx_rate_stats[tx_idx].tx_retry_count =
-					tx_rate_stats_tlv[i].tx_retry_count;
-				tx_idx++;
-			}
-		}
-
-		/* Set actual counts */
-		event->num_tx_rate_stats = tx_idx;
-		event->num_rx_rate_stats = rx_idx;
-		event->tx_rate_stats_valid = (tx_idx > 0) ? true : false;
-		event->rx_rate_stats_valid = (rx_idx > 0) ? true : false;
-
-		wmi_debug("Extracted %d tx and %d rx rate stats entries",
-			  tx_idx, rx_idx);
-	} else {
-		event->tx_rate_stats = NULL;
-		event->rx_rate_stats = NULL;
-		event->num_tx_rate_stats = 0;
-		event->num_rx_rate_stats = 0;
-		event->tx_rate_stats_valid = false;
-		event->rx_rate_stats_valid = false;
-		wmi_debug("No rate stats in event");
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
-/**
- * extract_recv_bcn_stats_tlv() - extract receive beacon stats from event
- * @wmi_handle: wmi handle
- * @evt_buf: pointer to event buffer
- * @index: index into recv bcn stats
- * @recv_bcn_stats: Pointer to hold recv bcn stats
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-
-static QDF_STATUS
-extract_recv_bcn_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
-			   uint32_t index,
-			   struct wmi_host_recv_bcn_stats *recv_bcn_stats)
-{
-	WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf;
-	wmi_recv_bcn_stats *ev;
-
-	param_buf = (WMI_UPDATE_STATS_EVENTID_param_tlvs *)evt_buf;
-	if (!param_buf)
-		return QDF_STATUS_E_FAILURE;
-
-	if (!param_buf->recv_bcn_stats)
-		return QDF_STATUS_E_FAILURE;
-
-	ev = param_buf->recv_bcn_stats + index;
-
-	recv_bcn_stats->vdev_id = ev->vdev_id;
-	qdf_mem_copy(recv_bcn_stats->bcn_history, ev->bcn_history,
-		     sizeof(struct wmi_bcn_his_info) * WMI_MAX_BCN_HISTORY);
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 static void
 wmi_attach_big_data_stats_handler(struct wmi_ops *ops)
@@ -884,28 +596,6 @@ wmi_attach_big_data_stats_handler(struct wmi_ops *ops)
 {}
 #endif
 
-#ifdef WLAN_FEATURE_POWER_STATISTICS
-/**
- * wmi_attach_power_datapath_stats_handler() - Attach power/datapath
- *						stats handlers
- * @ops: WMI ops structure
- *
- * This function registers the power and datapath stats extract handler.
- *
- * Return: None
- */
-static void
-wmi_attach_power_datapath_stats_handler(struct wmi_ops *ops)
-{
-	ops->extract_power_datapath_stats_event =
-		extract_power_datapath_stats_event_tlv;
-}
-#else
-static void
-wmi_attach_power_datapath_stats_handler(struct wmi_ops *ops)
-{}
-#endif /* WLAN_FEATURE_POWER_STATISTICS */
-
 void wmi_mc_cp_stats_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -917,11 +607,9 @@ void wmi_mc_cp_stats_attach_tlv(wmi_unified_t wmi_handle)
 		send_request_peer_stats_info_cmd_tlv;
 	ops->extract_peer_stats_count = extract_peer_stats_count_tlv;
 	ops->extract_peer_stats_info = extract_peer_stats_info_tlv;
-	ops->extract_recv_bcn_stats = extract_recv_bcn_stats_tlv;
 	wmi_handle->ops->extract_peer_tx_pkt_per_mcs =
 					extract_peer_tx_pkt_per_mcs_tlv;
 	wmi_handle->ops->extract_peer_rx_pkt_per_mcs =
 					extract_peer_rx_pkt_per_mcs_tlv;
 	wmi_attach_big_data_stats_handler(ops);
-	wmi_attach_power_datapath_stats_handler(ops);
 }

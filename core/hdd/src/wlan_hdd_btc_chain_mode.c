@@ -88,7 +88,7 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_OSIF_ID);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_store_nss_chains_cfg_in_vdev(vdev);
+		hdd_store_nss_chains_cfg_in_vdev(adapter->hdd_ctx, vdev);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 	}
 

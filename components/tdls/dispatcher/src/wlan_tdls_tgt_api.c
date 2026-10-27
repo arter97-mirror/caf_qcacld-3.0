@@ -35,6 +35,12 @@ wlan_psoc_get_tdls_txops(struct wlan_objmgr_psoc *psoc)
 	return &psoc->soc_cb.tx_ops->tdls_tx_ops;
 }
 
+static inline struct wlan_lmac_if_tdls_rx_ops *
+wlan_psoc_get_tdls_rxops(struct wlan_objmgr_psoc *psoc)
+{
+	return &psoc->soc_cb.rx_ops->tdls_rx_ops;
+}
+
 QDF_STATUS tgt_tdls_set_fw_state(struct wlan_objmgr_psoc *psoc,
 				 struct tdls_info *tdls_param)
 {
@@ -258,11 +264,6 @@ QDF_STATUS tgt_tdls_mgmt_frame_process_rx_cb(
 		vdev_id = wlan_vdev_get_id(vdev);
 	}
 
-	if (mgmt_rx_params->buf_len < TDLS_PUBLIC_ACTION_FRAME_TDLS_IE_OFFSET) {
-		tdls_err("TDLS: frame too short %u", mgmt_rx_params->buf_len);
-		return QDF_STATUS_E_INVAL;
-	}
-
 	rx_mgmt_event = qdf_mem_malloc_atomic(sizeof(*rx_mgmt_event));
 	if (!rx_mgmt_event)
 		return QDF_STATUS_E_NOMEM;
@@ -319,7 +320,7 @@ QDF_STATUS tgt_tdls_mgmt_frame_rx_cb(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!mgmt_rx_params || !psoc || !peer) {
+	if (!mgmt_rx_params || !psoc) {
 		tdls_err("input is NULL mgmt_rx_params:%pK psoc:%pK, peer:%pK",
 			  mgmt_rx_params, psoc, peer);
 		status = QDF_STATUS_E_INVAL;
@@ -335,10 +336,9 @@ QDF_STATUS tgt_tdls_mgmt_frame_rx_cb(
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_TDLS_SB_ID);
 
-release_nbuf:
 	if (QDF_STATUS_SUCCESS != status)
+release_nbuf:
 		qdf_nbuf_free(buf);
-
 	return status;
 }
 
@@ -349,31 +349,7 @@ void tgt_tdls_peers_deleted_notification(struct wlan_objmgr_psoc *psoc,
 }
 
 void tgt_tdls_delete_all_peers_indication(struct wlan_objmgr_psoc *psoc,
-					  uint32_t session_id,
-					  enum wlan_tdls_peer_delete_reason reason)
+					  uint32_t session_id)
 {
-	tdls_check_and_indicate_delete_all_peers(psoc, session_id, reason);
-}
-
-/**
- * tgt_tdls_request_stats_info() - Send WMI_REQUEST_STATS_INFO_CMDID to FW
- * @psoc: PSOC object
- * @vdev_id: vdev_id
- * @enable: 1 = enable FW TDLS stats collection
- *
- * Invokes the request_stats_info tx_op if registered by the target_if layer.
- * If the op is not registered (e.g. older FW), returns success silently.
- *
- * Return: QDF_STATUS_SUCCESS on success, error code otherwise.
- */
-QDF_STATUS tgt_tdls_request_stats_info(struct wlan_objmgr_psoc *psoc,
-				       uint8_t vdev_id, uint32_t enable)
-{
-	struct wlan_lmac_if_tdls_tx_ops *tdls_ops = NULL;
-
-	tdls_ops = wlan_psoc_get_tdls_txops(psoc);
-	if (tdls_ops && tdls_ops->request_stats_info)
-		return tdls_ops->request_stats_info(psoc, vdev_id, enable);
-
-	return QDF_STATUS_SUCCESS;
+	tdls_check_and_indicate_delete_all_peers(psoc, session_id);
 }

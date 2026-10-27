@@ -49,20 +49,6 @@ QDF_STATUS wlan_cm_tgt_send_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BN_SMD
-/**
- * wlan_cm_tgt_send_roam_smd_config()  - Send SMD roam config to firmware
- * @psoc: psoc pointer
- * @vdev_id: vdev id
- * @req: SMD roam config parameter
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_cm_tgt_send_roam_smd_config(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id,
-					    struct wlan_roam_smd_config *req);
-#endif
-
 /**
  * wlan_cm_roam_send_set_vdev_pcl()  - Send vdev set pcl command to firmware
  * @psoc:     PSOC pointer
@@ -342,39 +328,13 @@ wlan_cm_tgt_send_roam_invoke_req(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_cm_tgt_send_roam_sync_complete_cmd()  - Send roam sync command to FW
  * @psoc: psoc pointer
- * @params: roam synch complete params
+ * @vdev_id: vdev id
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 wlan_cm_tgt_send_roam_sync_complete_cmd(struct wlan_objmgr_psoc *psoc,
-				struct wlan_roam_synch_complete_params *params);
-
-/**
- * wlan_cm_tgt_allow_pm_after_roam_sync() - Allow Runtime PM after roam synch
- * is complete
- * @psoc: psoc pointer
- * @vdev_id: vdev id
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_tgt_allow_pm_after_roam_sync(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id);
-
-/**
- * wlan_cm_tgt_send_disconnect_roam_params() - Send disconnect params
- * command to FW
- * @psoc: psoc pointer
- * @vdev_id: vdev id
- * @params: disconnect params
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_tgt_send_disconnect_roam_params(struct wlan_objmgr_psoc *psoc,
-					uint8_t vdev_id,
-					struct wlan_roam_disconnect_params *params);
+					uint8_t vdev_id);
 #endif
 
 /**
@@ -389,18 +349,4 @@ wlan_cm_tgt_send_disconnect_roam_params(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_cm_tgt_send_roam_disable_config(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id,
 						struct roam_disable_cfg *req);
-
-/**
- * wlan_cm_roam_get_tx_ops_from_vdev() - Get roam TX ops from VDEV object
- * @vdev: VDEV object manager pointer
- *
- * Retrieves the roam TX ops structure associated with the PSOC derived
- * from the given VDEV. Used by callers outside of wlan_cm_tgt_if_tx_api.c
- * that need to invoke roam target interface operations directly.
- *
- * Return: Pointer to struct wlan_cm_roam_tx_ops, or NULL on failure
- */
-struct wlan_cm_roam_tx_ops *wlan_cm_roam_get_tx_ops_from_vdev(
-					struct wlan_objmgr_vdev *vdev);
-
 #endif /* CM_TGT_IF_TX_API_H__ */

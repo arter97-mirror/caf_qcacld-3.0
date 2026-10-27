@@ -523,12 +523,12 @@ struct ol_tx_sched_wrr_adv_category_info_t {
  */
 /*                                            WRR           send
  *                                           skip  credit  limit credit disc
- *                                            wts  thresh (frms) reserve  wts
+ *                                            wts  thresh (frms) reserv  wts
  */
 #ifdef HIF_SDIO
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VO,           1,     17,    24,     0,  1);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VI,           3,     17,    16,     1,  4);
-OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(BE,          10,     17,    16,     1,  8);
+OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(BE,          10,      9,     8,     1,  8);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(BK,          12,      6,     6,     1,  8);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(NON_QOS_DATA,10,     17,    16,     1,  8);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(UCAST_MGMT,   1,      1,     4,     0,  1);
@@ -1104,7 +1104,7 @@ ol_tx_sched_init_wrr_adv(
 }
 
 
-/* WMM parameters are supposed to be passed when associate with AP.
+/* WMM parameters are suppposed to be passed when associate with AP.
  * According to AIFS+CWMin, the function maps each queue to one of four default
  * settings of the scheduler, ie. VO, VI, BE, or BK.
  */

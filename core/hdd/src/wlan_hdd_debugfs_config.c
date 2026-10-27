@@ -29,7 +29,7 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_debugfs_config.h"
 
-#define DEBUGFS_CONFIG_BUF_SIZE (4096 * 16)
+#define DEBUGFS_CONFIG_BUF_SIZE (4096 * 8)
 
 /**
  * struct ini_config_buf - the buffer struct to save ini configs
@@ -84,7 +84,7 @@ static int wlan_hdd_config_get(struct hdd_context *hdd_ctx,
 }
 
 /**
- * __wlan_hdd_read_config_debugfs() - function to get ini config
+ * __wlan_hdd_read_config_debugfs() - function to get ini conifg
  * @file: file pointer
  * @buf: buffer
  * @count: count
@@ -109,7 +109,7 @@ static ssize_t __wlan_hdd_read_config_debugfs(struct file *file,
 }
 
 /**
- * wlan_hdd_read_config_debugfs() - wrapper function to get ini config
+ * wlan_hdd_read_config_debugfs() - wrapper function to get ini conifg
  * @file: file pointer
  * @buf: buffer
  * @count: count

@@ -58,10 +58,7 @@
 #define WEIGHT_OF_NON_PCL_CHANNELS 1
 #define WEIGHT_OF_DISALLOWED_CHANNELS 0
 
-#define MAC0_ID 0
-#define MAC1_ID 1
 #define MAX_MAC 2
-#define DEFAULT_MAC_ID 255
 
 #if defined(FEATURE_SIXTH_CONNECTION)
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 6
@@ -85,7 +82,7 @@
 /* Policy manager default request id */
 #define POLICY_MGR_DEF_REQ_ID 0
 
-typedef int (*send_mode_change_event_cb)(bool is_hwmode_change);
+typedef int (*send_mode_change_event_cb)(void);
 
 /**
  * enum sap_csa_reason_code - SAP channel switch reason code
@@ -107,9 +104,6 @@ typedef int (*send_mode_change_event_cb)(bool is_hwmode_change);
  * @CSA_REASON_SAP_FIX_CH_CONC_WITH_GO: SAP fix channel start
  * @CSA_REASON_LL_LT_SAP_EVENT: LL_LT_SAP csa event
  *  and move GO to other band
- * @CSA_REASON_PUNCTURE_UPDATE_FOR_NOL: puncture bitmap update for NOL
- * @CSA_REASON_RADAR_DETECT: radar detect
- * @CSA_REASON_LTE_MARK_SAFE: move SAP to 5 GHz band due to unsafe ch changed
  */
 enum sap_csa_reason_code {
 	CSA_REASON_UNKNOWN,
@@ -128,10 +122,7 @@ enum sap_csa_reason_code {
 	CSA_REASON_GO_BSS_STARTED,
 	CSA_REASON_SAP_ACS,
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO,
-	CSA_REASON_LL_LT_SAP_EVENT,
-	CSA_REASON_PUNCTURE_UPDATE_FOR_NOL,
-	CSA_REASON_RADAR_DETECT,
-	CSA_REASON_LTE_MARK_SAFE,
+	CSA_REASON_LL_LT_SAP_EVENT
 };
 
 /*
@@ -154,10 +145,6 @@ enum sap_csa_reason_code {
  * @link_ctrl_f_dont_reschedule_workqueue: don't reschedule force scc workqueue
  * after set link response
  * @link_ctrl_f_link_recfg: link recfg set link. It will not be serialized
- * @link_ctrl_f_smd_link_recfg: link recfg set link issued from the SMD roam
- * path. Like @link_ctrl_f_link_recfg it will not be serialized, but the
- * SMD path never queues a WLAN_SER_CMD_LINK_RECFG command, so downstream
- * active-cmd guards must be skipped for this flag as well.
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
@@ -168,7 +155,6 @@ enum link_control_flags {
 	link_ctrl_f_dont_update_disallow_bitmap = 1 << 5,
 	link_ctrl_f_dont_reschedule_workqueue = 1 << 6,
 	link_ctrl_f_link_recfg =                1 << 7,
-	link_ctrl_f_smd_link_recfg =             1 << 8,
 };
 
 /* Define the max number of consecutive re-evaluate number. usually, we have
@@ -432,7 +418,6 @@ enum policy_mgr_conc_priority_mode {
  * @PM_NDI_MODE: NDI mode
  * @PM_NAN_DISC_MODE: NAN Discovery mode
  * @PM_LL_LT_SAP_MODE: Low latency low throughput SAP
- * @PM_PASSTHRU_MODE: Passthrough mode
  * @PM_MAX_NUM_OF_MODE: max value place holder
  */
 enum policy_mgr_con_mode {
@@ -443,7 +428,6 @@ enum policy_mgr_con_mode {
 	PM_NDI_MODE,
 	PM_NAN_DISC_MODE,
 	PM_LL_LT_SAP_MODE,
-	PM_PASSTHRU_MODE,
 	PM_MAX_NUM_OF_MODE
 };
 
@@ -532,7 +516,6 @@ enum policy_mgr_mac_use {
  * 2.4 GHz channels.
  * @PM_SCC_ON_5G_HIGH_CH_24G: SCC channels on 5G high frequencies followed by
  * 2.4 GHz channels.
- * @PM_SCC_STA_ON_24_OR_5: SCC on STA 2 GHz or 5  GHz
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -593,7 +576,6 @@ enum policy_mgr_pcl_type {
 	PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW,
 	PM_SCC_ON_5G_LOW_CH_24G,
 	PM_SCC_ON_5G_HIGH_CH_24G,
-	PM_SCC_STA_ON_24_OR_5,
 
 	PM_MAX_PCL_TYPE
 };
@@ -626,10 +608,6 @@ enum policy_mgr_pcl_type {
  * @PM_NDI_5_2x2:  NAN Datapath using 2x2@5 Ghz
  * @PM_LL_LT_SAP_5_1x1: Low latency low throughput SAP using 1x1@5 Ghz
  * @PM_LL_LT_SAP_5_2x2: Low latency low throughput SAP using 2x2@5 Ghz
- * @PM_PASSTHRU_24_1x1_2x2: Passthrough mode connection on 2.4 GHz band
- *   supporting both 1x1 and 2x2 spatial streams
- * @PM_PASSTHRU_5_1x1_2x2: Passthrough mode connection on 5 GHz band
- *   supporting both 1x1 and 2x2 spatial streams
  * @PM_MAX_ONE_CONNECTION_MODE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -660,8 +638,6 @@ enum policy_mgr_one_connection_mode {
 	PM_NDI_5_2x2,
 	PM_LL_LT_SAP_5_1x1,
 	PM_LL_LT_SAP_5_2x2 = PM_LL_LT_SAP_5_1x1,
-	PM_PASSTHRU_24_1x1_2x2,
-	PM_PASSTHRU_5_1x1_2x2,
 
 	PM_MAX_ONE_CONNECTION_MODE
 };
@@ -1255,9 +1231,7 @@ enum policy_mgr_two_connection_mode {
  * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NDI and NAN Disc on 2.4Ghz and second NDI in
  * 5ghz DBS
  * @PM_SAP_SAP_SAP_SCC_24_SMM: AP+AP+AP on 2.4Ghz in SMM mode
- * @PM_SAP_SAP_STA_SCC_24_SMM: AP+AP+STA on 2.4Ghz in SMM mode
  * @PM_SAP_SAP_SAP_SCC_5_SMM: AP+AP+AP on 5Ghz in SMM mode
- * @PM_SAP_SAP_STA_SCC_5_SMM: AP+AP+STA on 5Ghz in SMM mode
  * @PM_SAP_SAP_SCC_5_STA_24_DBS: Both SAP on 5Ghz and another STA on 2.4Ghz DBS
  * @PM_SAP_SAP_STA_SCC_5_DBS: Both SAP on 5Ghz and another STA on 5Ghz DBS
  * @PM_STA_STA_5_NAN_DISC_24_DBS: Both STA on 5Ghz and NAN Disc on 2.4Ghz DBS
@@ -1297,9 +1271,7 @@ enum policy_mgr_two_connection_mode {
  * @PM_STA_STA_5_HIGH_MCC_SAP_5_LOW_SBS : First STA on high 5 GHZ & Second STA
  * on high 5 GHZ MCC on mac0 and SAP on low 5 GHZ on mac1 doing SBS
  * @PM_STA_24_STA_5_MCC_SAP_5_HIGH_SBS: MLO STA 2+5/6 GHz, SAP on 5/6 GHz
- * high band, the current hw mode is SBS
- * @PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS: First SAP on high 5 GHZ & STA on high
- * 5 GHZ SCC/MCC on mac 0 and second SAP on low 5GHz on mac 1 doing SBS.
+ * high band, the current hw mode is SBS.
  * @PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS: Any 2 link on low 5 GHZ mac
  * and one link on high 5 GHZ freq doing SBS
  * @PM_STA_24_SAP_5_LOW_MCC_STA_5_HIGH_SBS : First STA on 2.4 GHZ & SAP on low
@@ -1313,9 +1285,7 @@ enum policy_mgr_two_connection_mode {
  * @PM_STA_STA_5_LOW_MCC_SAP_5_HIGH_SBS : First STA on high 5 GHZ & Second STA
  * on high 5 GHZ MCC on mac0 and SAP on low 5 GHZ on mac1 doing SBS
  * @PM_STA_24_STA_5_MCC_SAP_5_LOW_SBS: MLO STA 2+5/6 GHz, SAP on 5/6 GHz
- * low band, the current hw mode is SBS
- * @PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS: First SAP on low 5 GHZ & STA on low 5 GHZ
- * SCC/MCC on mac0 and second SAP on high 5 GHZ on mac1 doing SBS.
+ * low band, the current hw mode is SBS.
  * @PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS:
  * @PM_SAP_24_STA_5_STA_5_LOW_N_HIGH_SHARE_SBS: The 2.4 GHZ SAP creating MCC/SCC
  * with STA of low 5 GHZ or high 5 GHZ (dynamic SBS) on mac 0 and one STA on
@@ -1378,9 +1348,7 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_NDI_P2P_SCC_MCC_24_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
 
 	PM_SAP_SAP_SAP_SCC_24_SMM,
-	PM_SAP_SAP_STA_SCC_24_SMM = PM_SAP_SAP_SAP_SCC_24_SMM,
 	PM_SAP_SAP_SAP_SCC_5_SMM,
-	PM_SAP_SAP_STA_SCC_5_SMM = PM_SAP_SAP_SAP_SCC_5_SMM,
 	PM_SAP_SAP_SCC_5_STA_24_DBS,
 	PM_SAP_SAP_STA_SCC_5_DBS,
 	PM_STA_STA_5_NAN_DISC_24_DBS,
@@ -1410,8 +1378,6 @@ enum policy_mgr_three_connection_mode {
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_STA_5_MCC_SAP_5_HIGH_SBS =
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
-	PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS =
-		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_24_SAP_5_LOW_MCC_STA_5_HIGH_SBS =
 		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
@@ -1424,8 +1390,6 @@ enum policy_mgr_three_connection_mode {
 	PM_STA_STA_5_LOW_MCC_SAP_5_HIGH_SBS =
 		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_24_STA_5_MCC_SAP_5_LOW_SBS =
-		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
-	PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS =
 		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS,
 	PM_SAP_24_STA_5_STA_5_LOW_N_HIGH_SHARE_SBS =
@@ -2043,11 +2007,11 @@ enum policy_mgr_pri_id {
 
 /**
  * struct policy_mgr_user_cfg - Policy manager user config variables
- * @enable_mimo: user config siso/mimo chains
+ * @enable2x2: 2x2 chain mask user config
  * @sub_20_mhz_enabled: Is 5 or 10 Mhz enabled
  */
 struct policy_mgr_user_cfg {
-	uint8_t enable_mimo;
+	bool enable2x2;
 	bool sub_20_mhz_enabled;
 };
 
@@ -2215,19 +2179,6 @@ struct weighed_pcl {
 	uint32_t freq;
 	uint32_t weight;
 	uint32_t flag;
-};
-
-/**
- * enum policy_mgr_indoor_sta_scc_mode: Bitmask for cfg_sta_indoor_ch_peer_scc
- *
- * @PM_INDOOR_STA_P2P_SCC: STA and P2P SCC
- * @PM_INDOOR_STA_NAN_SCC: STA and NAN SCC
- * @PM_INDOOR_STA_SAP_SCC: STA and SAP SCC
- */
-enum policy_mgr_indoor_sta_scc_mode {
-	PM_INDOOR_STA_P2P_SCC = BIT(0),
-	PM_INDOOR_STA_NAN_SCC = BIT(1),
-	PM_INDOOR_STA_SAP_SCC = BIT(2),
 };
 
 #endif /* __WLAN_POLICY_MGR_PUBLIC_STRUCT_H */

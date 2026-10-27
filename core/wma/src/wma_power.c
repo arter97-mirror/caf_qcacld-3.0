@@ -53,7 +53,6 @@
 
 #include "wma_internal.h"
 #include "wlan_pmo_ucfg_api.h"
-#include "sch_api.h"
 
 /**
  * wma_unified_modem_power_state() - set modem power state to fw
@@ -260,15 +259,12 @@ void wma_set_tx_power(WMA_HANDLE handle,
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	int8_t max_reg_power;
 	struct wma_txrx_node *iface;
-	bool update_beacon = false;
-	struct pe_session *session;
 
 	if (tx_pwr_params->dev_mode == QDF_SAP_MODE ||
 	    tx_pwr_params->dev_mode == QDF_P2P_GO_MODE) {
 		ret = wma_find_vdev_id_by_addr(wma_handle,
 					       tx_pwr_params->bssId.bytes,
 					       &vdev_id);
-		update_beacon = true;
 	} else {
 		ret = wma_find_vdev_id_by_bssid(wma_handle,
 						tx_pwr_params->bssId.bytes,
@@ -315,18 +311,6 @@ void wma_set_tx_power(WMA_HANDLE handle,
 					 tx_pwr_params->power);
 		if (ret == QDF_STATUS_SUCCESS)
 			mlme_set_tx_power(iface->vdev, tx_pwr_params->power);
-
-		session = pe_find_session_by_vdev_id(wma_handle->mac_context,
-						     vdev_id);
-		if (!session || !update_beacon)
-			goto end;
-
-		/* update beacon tpc report IE */
-		sch_set_fixed_beacon_fields(wma_handle->mac_context,
-					    session);
-		lim_send_beacon_ind(wma_handle->mac_context,
-				    session,
-				    REASON_CONFIG_UPDATE);
 	} else {
 		/* no tx_power change */
 		ret = QDF_STATUS_SUCCESS;
@@ -492,15 +476,16 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 	uint32_t rx_wake_policy;
 	uint32_t tx_wake_threshold;
 	uint32_t pspoll_count;
-	uint32_t listen_interval = 0;
+	uint32_t psmode;
 	struct wlan_objmgr_vdev *vdev;
+	u32 listen_interval = 0;
+
+	wma_debug("Set Force Sleep vdevId %d val %d", vdev_id, enable);
 
 	if (!mac) {
 		wma_err("Unable to get PE context");
 		return QDF_STATUS_E_NOMEM;
 	}
-
-	wma_debug("Set Force Sleep vdevId %d val %d", vdev_id, enable);
 
 	if (enable) {
 		/* override normal configuration and force station asleep */
@@ -508,21 +493,26 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 		tx_wake_threshold = WMI_STA_PS_TX_WAKE_THRESHOLD_NEVER;
 
 		if (ucfg_pmo_get_max_ps_poll(mac->psoc))
-			pspoll_count = ucfg_pmo_get_max_ps_poll(mac->psoc);
+			pspoll_count =
+				(uint32_t)ucfg_pmo_get_max_ps_poll(mac->psoc);
 		else
 			pspoll_count = WMA_DEFAULT_MAX_PSPOLL_BEFORE_WAKE;
+
+		psmode = WMI_STA_PS_MODE_ENABLED;
 	} else {
 		/* Ps Poll Wake Policy */
 		if (ucfg_pmo_get_max_ps_poll(mac->psoc)) {
 			/* Ps Poll is enabled */
 			rx_wake_policy = WMI_STA_PS_RX_WAKE_POLICY_POLL_UAPSD;
-			pspoll_count = ucfg_pmo_get_max_ps_poll(mac->psoc);
+			pspoll_count =
+				(uint32_t)ucfg_pmo_get_max_ps_poll(mac->psoc);
 			tx_wake_threshold = WMI_STA_PS_TX_WAKE_THRESHOLD_NEVER;
 		} else {
 			rx_wake_policy = WMI_STA_PS_RX_WAKE_POLICY_WAKE;
 			pspoll_count = WMI_STA_PS_PSPOLL_COUNT_NO_MAX;
 			tx_wake_threshold = WMI_STA_PS_TX_WAKE_THRESHOLD_ALWAYS;
 		}
+		psmode = WMI_STA_PS_MODE_ENABLED;
 	}
 
 	/*
@@ -539,8 +529,8 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 		return ret;
 	}
 	wma_debug("Power %s(%d) vdevId %d",
-		  ps_params->opm_mode ? "Enabled" : "Disabled",
-		  ps_params->opm_mode, vdev_id);
+		 ps_params->opm_mode ? "Enabled" : "Disabled",
+		 ps_params->opm_mode, vdev_id);
 
 	/* Set the Tx/Rx InActivity */
 	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
@@ -554,18 +544,6 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 	}
 	wma_debug("Set Tx/Rx InActivity vdevId %d InAct %d",
 		  vdev_id, ps_params->ps_ito);
-
-	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
-					   WMI_STA_PS_PARAM_ITO_LEVEL,
-					   ps_params->ps_opm_level);
-
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		wma_err("Setting opm level Failed vdevId %d InAct %d",
-			vdev_id, ps_params->ps_opm_level);
-		return ret;
-	}
-	wma_debug("Set opm level vdevId %d InAct %d",
-		  vdev_id, ps_params->ps_opm_level);
 
 	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					   WMI_STA_PS_PARAM_SPEC_WAKE_INTERVAL,
@@ -589,7 +567,7 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 		return ret;
 	}
 	wma_debug("Setting wake policy to %d vdevId %d",
-		  rx_wake_policy, vdev_id);
+		 rx_wake_policy, vdev_id);
 
 	/* Set the Tx Wake Threshold */
 	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
@@ -601,7 +579,7 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 		return ret;
 	}
 	wma_debug("Setting TxWake Threshold to %d vdevId %d",
-		  tx_wake_threshold, vdev_id);
+		 tx_wake_threshold, vdev_id);
 
 	/* Set the Ps Poll Count */
 	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
@@ -610,17 +588,19 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		wma_err("Set Ps Poll Count Failed vdevId %d ps poll cnt %d",
-			vdev_id, pspoll_count);
+			 vdev_id, pspoll_count);
 		return ret;
 	}
 	wma_debug("Set Ps Poll Count vdevId %d ps poll cnt %d",
-		  vdev_id, pspoll_count);
+		 vdev_id, pspoll_count);
 
 	/* Enable Sta Mode Power save */
 	if (enable_ps) {
 		ret = wmi_unified_set_sta_ps(wma->wmi_handle, vdev_id, true);
+
 		if (QDF_IS_STATUS_ERROR(ret)) {
-			wma_err("Enable Sta Mode Ps Failed vdevId %d", vdev_id);
+			wma_err("Enable Sta Mode Ps Failed vdevId %d",
+				vdev_id);
 			return ret;
 		}
 	}
@@ -641,14 +621,13 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 		ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
 					 wmi_vdev_param_listen_interval,
 					 listen_interval);
-		/* Even it fails continue Fw will take default LI */
-		if (QDF_IS_STATUS_ERROR(ret))
-			wma_err("Failed to Set Listen Interval vdevId %d",
-				vdev_id);
-		else
-			wma_debug("Set vdevId %d Listen Intv %d",
-				  vdev_id, listen_interval);
 	}
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		/* Even it fails continue Fw will take default LI */
+		wma_err("Failed to Set Listen Interval vdevId %d", vdev_id);
+	}
+	wma_debug("Set Listen Interval vdevId %d Listen Intv %d",
+		 vdev_id, listen_interval);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -673,15 +652,11 @@ static QDF_STATUS wma_wlan_pmo_get_ps_params(struct wlan_objmgr_vdev *vdev,
 	case PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED:
 		ps_params->opm_mode = WMI_STA_PS_USER_DEF;
 		break;
-	case PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED:
-		ps_params->opm_mode = WMI_STA_PS_LATENCY_DEF;
-		break;
 	default:
 		wma_err("Invalid opm_mode:%d", pmo_ps_param.opm_mode);
 		return QDF_STATUS_E_INVAL;
 	}
 	ps_params->ps_ito = pmo_ps_param.ps_ito;
-	ps_params->ps_opm_level = pmo_ps_param.ps_opm_level;
 	ps_params->spec_wake = pmo_ps_param.spec_wake;
 
 	return status;
@@ -851,8 +826,6 @@ wma_convert_opm_mode(enum wma_sta_ps_scheme_cfg opm_mode)
 		return WMI_STA_PS_OPM_AGGRESSIVE;
 	case WMA_STA_PS_USER_DEF:
 		return WMI_STA_PS_USER_DEF;
-	case WMA_STA_PS_LATENCY_DEF:
-		return WMI_STA_PS_LATENCY_DEF;
 	default:
 		wma_err("Invalid opm_mode: %d", opm_mode);
 		return WMI_STA_PS_OPM_CONSERVATIVE;
@@ -886,21 +859,6 @@ QDF_STATUS wma_set_power_config_ito(uint8_t vdev_id, uint16_t ps_ito)
 	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					   WMI_STA_PS_PARAM_INACTIVITY_TIME,
 					   ps_ito);
-}
-
-QDF_STATUS
-wma_set_power_config_opm_level(uint8_t vdev_id, uint8_t ps_opm_level)
-{
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
-
-	if (!wma) {
-		wma_err("wma_handle is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
-					   WMI_STA_PS_PARAM_ITO_LEVEL,
-					   ps_opm_level);
 }
 
 QDF_STATUS wma_set_power_config_spec_wake(uint8_t vdev_id, uint16_t spec_wake)
@@ -1351,28 +1309,20 @@ static void wma_update_beacon_noa_ie(struct beacon_info *bcn,
 			/* TODO: Assuming p2p noa ie is last ie in the beacon */
 			qdf_mem_zero(bcn->noa_ie, (bcn->noa_sub_ie_len +
 						   sizeof(struct p2p_ie)));
-			if (bcn->len < (bcn->noa_sub_ie_len +
-					sizeof(struct p2p_ie)))
-				bcn->len = 0;
-			else
-				bcn->len -= (bcn->noa_sub_ie_len +
-					     sizeof(struct p2p_ie));
+			bcn->len -= (bcn->noa_sub_ie_len +
+				     sizeof(struct p2p_ie));
 			bcn->noa_ie = NULL;
 			bcn->noa_sub_ie_len = 0;
 		}
+		wma_debug("No need to update NoA");
 		return;
 	}
 
 	if (bcn->noa_sub_ie_len && bcn->noa_ie) {
-		if (bcn->len < (bcn->noa_sub_ie_len + sizeof(struct p2p_ie)))
-			bcn->len = 0;
-		else
-			bcn->len -= (bcn->noa_sub_ie_len +
-				     sizeof(struct p2p_ie));
-
 		/* NoA present in previous beacon, update it */
 		wma_debug("NoA present in previous beacon, update the NoA IE, bcn->len %u bcn->noa_sub_ie_len %u",
-			   bcn->len, bcn->noa_sub_ie_len);
+			 bcn->len, bcn->noa_sub_ie_len);
+		bcn->len -= (bcn->noa_sub_ie_len + sizeof(struct p2p_ie));
 		qdf_mem_zero(bcn->noa_ie,
 			     (bcn->noa_sub_ie_len + sizeof(struct p2p_ie)));
 	} else {                /* NoA is not present in previous beacon */

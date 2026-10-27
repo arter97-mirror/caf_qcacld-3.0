@@ -53,30 +53,25 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 /**
  * cm_fw_roam_start_req() - Post roam start req to CM SM
  * @psoc: psoc pointer
- * @roam_event: roam event structure containing vdev_id and other info
+ * @vdev_id: vdev id
  *
  * This function posts roam start event change to connection manager
  * state machine
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc,
-				struct roam_offload_roam_event *roam_event);
+QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 /**
  * cm_fw_roam_abort_req() - Post roam abort req to CM SM
  * @psoc: psoc pointer
  * @vdev_id: vdev id
- * @roam_event: roam event structure containing vdev_id and other info
  *
  * This function posts roam abort event change to connection manager
  * state machine
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc,
-		     uint8_t vdev_id,
-		     struct roam_offload_roam_event *roam_event);
+QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 /**
  * cm_update_scan_mlme_on_roam() - update the scan mlme info
@@ -165,20 +160,18 @@ void cm_fw_ho_fail_req(struct wlan_objmgr_psoc *psoc,
  * cm_fw_roam_invoke_fail() - Post roam invoke fail to CM SM
  * @psoc: psoc pointer
  * @vdev_id: vdev id
- * @is_disconnect_required: flag to indicate if disconnection needs to be
- * initiated for the roam invoke failure.
  *
- * This function posts roam invoke fail event change to connection manager
- * state machine
+ * This function posts roam invoke fail event change to
+ * connection manager state machine
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id, bool is_disconnect_required);
+				  uint8_t vdev_id);
 #else /*WLAN_FEATURE_ROAM_OFFLOAD */
 static inline
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id, bool is_disconnect_required)
+				  uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -193,17 +186,10 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
  * Return: none
  */
 void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev);
-
-void cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 {
 }
-
-static inline
-void cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif /* WLAN_FEATURE_11BE_MLO */
+#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 #endif /* _WLAN_CM_ROAM_I_H_ */

@@ -105,50 +105,15 @@
 
 #define SIR_MAC_MAX_SUPPORTED_MCS_SET    16
 
-static const uint32_t vht_supported_datarate_bw80_gi400ns[] = {
-	[NSS_1x1_MODE - 1] = 433,
-	[NSS_2x2_MODE - 1] = 866,
-	[NSS_3x3_MODE - 1] = 1300,
-	[NSS_4x4_MODE - 1] = 1733,
-};
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
 
-static const uint32_t vht_supported_datarate_bw80_gi800ns[] = {
-	[NSS_1x1_MODE - 1] = 390,
-	[NSS_2x2_MODE - 1] = 780,
-	[NSS_3x3_MODE - 1] = 1170,
-	[NSS_4x4_MODE - 1] = 1560,
-};
-
-static const uint32_t vht_supported_datarate_bw160_gi400ns[] = {
-	[NSS_1x1_MODE - 1] = 866,
-	[NSS_2x2_MODE - 1] = 1733,
-	[NSS_3x3_MODE - 1] = 2340,
-	[NSS_4x4_MODE - 1] = 3466,
-};
-
-static const uint32_t vht_supported_datarate_bw160_gi800ns[] = {
-	[NSS_1x1_MODE - 1] = 780,
-	[NSS_2x2_MODE - 1] = 1560,
-	[NSS_3x3_MODE - 1] = 2106,
-	[NSS_4x4_MODE - 1] = 3120,
-};
-
-#define VHT_GET_DATARATE_FOR_NSS_AND_GI(_ch_width, _nss, _is_gi400ns) \
-	((_ch_width) == CH_WIDTH_160MHZ) ? \
-		((_is_gi400ns) ? \
-			vht_supported_datarate_bw160_gi400ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
-								      (_nss)) - 1] : \
-			vht_supported_datarate_bw160_gi800ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
-								      (_nss)) - 1]) : \
-		((_is_gi400ns) ? \
-			vht_supported_datarate_bw80_gi400ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
-								     (_nss)) - 1] : \
-			vht_supported_datarate_bw80_gi800ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
-								     (_nss)) - 1])
-
-/* Backward compatibility wrapper - defaults to 80MHz bandwidth */
-#define VHT_GET_DATARATE_FOR_NSS_AND_GI_LEGACY(_nss, _is_gi400ns) \
-	VHT_GET_DATARATE_FOR_NSS_AND_GI(CH_WIDTH_80MHZ, (_nss), (_is_gi400ns))
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80 433
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80 433
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80 866
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80 866
 
 #define VHT_CAP_NO_160M_SUPP 0
 #define VHT_CAP_160_SUPP 1
@@ -294,8 +259,8 @@ static const uint32_t vht_supported_datarate_bw160_gi800ns[] = {
 #define SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN         4
 
 /* Maximum allowable size of a beacon,probe rsp and fils discovery frame */
-#define SIR_MAX_BEACON_SIZE     1024
-#define SIR_MAX_PROBE_RESP_SIZE 1024
+#define SIR_MAX_BEACON_SIZE     512
+#define SIR_MAX_PROBE_RESP_SIZE 512
 #define SIR_MAX_FD_TMPL_SIZE    512
 
 
@@ -937,6 +902,16 @@ typedef enum eSirMacHTMIMOPowerSaveState {
 	eSIR_HT_MIMO_PS_NO_LIMIT = 3    /* SM Power Save disabled */
 } tSirMacHTMIMOPowerSaveState;
 
+typedef enum eSirMacHTChannelWidth {
+	eHT_CHANNEL_WIDTH_20MHZ = 0,
+	eHT_CHANNEL_WIDTH_40MHZ = 1,
+	eHT_CHANNEL_WIDTH_80MHZ = 2,
+	eHT_CHANNEL_WIDTH_160MHZ = 3,
+	eHT_CHANNEL_WIDTH_80P80MHZ = 4,
+	eHT_CHANNEL_WIDTH_320MHZ = 5,
+	eHT_MAX_CHANNEL_WIDTH
+} tSirMacHTChannelWidth;
+
 typedef enum eSirMacHTChannelType {
 	eHT_CHAN_NO_HT = 0,
 	eHT_CHAN_HT20 = 1,
@@ -999,11 +974,8 @@ typedef struct sHtCaps {
 /* Supported MCS set */
 #define SIZE_OF_SUPPORTED_MCS_SET                          16
 #define SIZE_OF_BASIC_MCS_SET                              16
-#define VALID_MCS_SIZE_BITS                                77   /* 0-76 */
-#define VALID_MCS_SIZE_BYTES           (VALID_MCS_SIZE_BITS / BITS_IN_A_BYTE)
+#define VALID_MCS_SIZE                                     77   /* 0-76 */
 #define MCS_RX_HIGHEST_SUPPORTED_RATE_BYTE_OFFSET          10
-#define WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS                 96
-#define WLAN_HT_CAP_TX_MAX_NSS_POS                         98
 #define VALID_MAX_MCS_INDEX                                8
 
 /* */

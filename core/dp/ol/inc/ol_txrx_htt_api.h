@@ -744,28 +744,12 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 				  qdf_nbuf_t rx_ind_msg,
 				  uint16_t peer_id,
 				  uint8_t tid, uint8_t is_offload);
-
-/**
- * ol_rx_per_ce_stats_update() - update per CE, per core rx packet stats
- * @pdev: the physical device the packets were received on
- * @ce_id: which copy engine delivered the packets
- * @msdu_count: number of MSDUs indicated
- */
-void
-ol_rx_per_ce_stats_update(ol_txrx_pdev_handle pdev, uint8_t ce_id,
-			  uint32_t msdu_count);
 #else
 static inline void
 ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 				  qdf_nbuf_t rx_ind_msg,
 				  uint16_t peer_id,
 				  uint8_t tid, uint8_t is_offload)
-{
-}
-
-static inline void
-ol_rx_per_ce_stats_update(ol_txrx_pdev_handle pdev, uint8_t ce_id,
-			  uint32_t msdu_count)
 {
 }
 #endif

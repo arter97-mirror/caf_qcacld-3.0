@@ -59,23 +59,6 @@ QDF_STATUS os_if_qmi_add_lookup(struct qmi_handle *qmi_hdl,
 	return QDF_STATUS_SUCCESS;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
-static int os_if_qmi_kernel_connect(struct socket *sock,
-				    struct sockaddr_qrtr *sq,
-				    int addrlen, int flags)
-{
-	return kernel_connect(sock, (struct sockaddr_unsized *)sq,
-			      addrlen, flags);
-}
-#else
-static int os_if_qmi_kernel_connect(struct socket *sock,
-				    struct sockaddr_qrtr *sq,
-				    int addrlen, int flags)
-{
-	return kernel_connect(sock, (struct sockaddr *)sq, addrlen, flags);
-}
-#endif
-
 QDF_STATUS os_if_qmi_connect_to_svc(struct qmi_handle *qmi_hdl,
 				    struct qmi_service *qmi_svc)
 {
@@ -89,7 +72,8 @@ QDF_STATUS os_if_qmi_connect_to_svc(struct qmi_handle *qmi_hdl,
 	sq.sq_node = qmi_svc->node;
 	sq.sq_port = qmi_svc->port;
 
-	ret = os_if_qmi_kernel_connect(qmi_hdl->sock, &sq, sizeof(sq), 0);
+	ret = kernel_connect(qmi_hdl->sock, (struct sockaddr *)&sq,
+			     sizeof(sq), 0);
 	if (ret < 0) {
 		osif_err("Failed to connect to QMI remote service %d", ret);
 		return qdf_status_from_os_return(ret);

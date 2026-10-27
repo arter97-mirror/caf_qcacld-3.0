@@ -57,15 +57,6 @@ uint8_t wlan_nan_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
 bool wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_nan_is_beamforming_supported() - Check if beamforming is supported on
- * NDI
- * @psoc: pointer to psoc object
- *
- * Return: True if beamforming is supported, false if not.
- */
-bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
-
-/**
  * wlan_nan_vdev_delete_all_pasn_peers: send delete all pasn peers cmd to FW
  * @vdev: pointer to vdev object
  *
@@ -169,12 +160,6 @@ wlan_nan_is_eht_capable(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-static inline bool
-wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
 static inline QDF_STATUS
 wlan_nan_vdev_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 {
@@ -228,56 +213,4 @@ wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 }
 
 #endif /*WLAN_FEATURE_NAN */
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-/**
- * tgt_nan_is_fw_support_standard_mode() - wrapper API for function
- * target_if_nan_is_fw_support_standard_mode()
- * @psoc: pointer to PSOC object
- *
- * Return: true if NAN standard mode supported by FW otherwise false
- */
-bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
-
-/**
- * wlan_nan_handle_ndi_peer_departed() - wrapper API for function
- * "nan_handle_ndi_peer_departed"
- * @vdev: NDI vdev from which the peer departed
- * @peer_mac: MAC address of the departed peer
- *
- * Should be called from the Del STA path after confirming no active
- * peers remain. Mirrors the cleanup performed by nan_handle_end_ind()
- * for the FW-initiated NDP_END_IND path.
- *
- * Return: none
- */
-void wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
-				       const struct qdf_mac_addr *peer_mac);
-
-/**
- * tgt_nan_is_fw_support_ap_assisted_dfs() - wrapper API for function
- * target_if_nan_is_fw_support_ap_assisted_dfs()
- * @psoc: pointer to PSOC object
- *
- * Return: true if NAN AP-assisted DFS operation supported by FW else false
- */
-bool tgt_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc);
-#else
-static inline bool
-tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline void
-wlan_nan_handle_ndi_peer_departed(struct wlan_objmgr_vdev *vdev,
-				  const struct qdf_mac_addr *peer_mac)
-{
-}
-
-static inline bool
-tgt_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */

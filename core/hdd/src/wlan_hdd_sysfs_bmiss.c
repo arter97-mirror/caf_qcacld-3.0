@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -150,7 +149,7 @@ int hdd_sysfs_bmiss_create(struct hdd_adapter *adapter)
 
 	error = device_create_file(&adapter->dev->dev,
 				   &dev_attr_bmiss);
-	if (error)
+	if (!error)
 		hdd_err("could not create bmiss sysfs file");
 	return error;
 }

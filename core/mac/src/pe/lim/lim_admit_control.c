@@ -57,7 +57,7 @@ static void lim_get_available_bw(struct mac_context *, uint32_t *, uint32_t *, u
 
 /** -------------------------------------------------------------
    \fn lim_calculate_svc_int
-   \brief TSPEC validation and service interval determination
+   \brief TSPEC validation and servcie interval determination
    \param     struct mac_context *   mac
    \param         struct mac_tspec_ie *pTspec
    \param         uint32_t            *pSvcInt

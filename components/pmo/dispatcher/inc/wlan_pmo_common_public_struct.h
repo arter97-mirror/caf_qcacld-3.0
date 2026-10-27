@@ -56,7 +56,6 @@
 #define IGMP_QUERY_ADDRESS 0x10000e0
 
 #define WOW_LARGE_RX_RTPM_DELAY 1200
-#define WOW_TBTT_NACK_RETRY_RTPM_DELAY 44
 
 /**
  * enum pmo_vdev_param_id: tell vdev param id
@@ -104,9 +103,6 @@ enum pmo_beacon_dtim_policy {
  *  before the entering the Active state
  * @pmo_sta_ps_param_ito_repeat_count: Indicates ito repeated count
  * @pmo_sta_ps_param_spec_wake_interval: OPM speculative wake interval
- * @pmo_sta_ps_param_opm_level: OPM power save level
- * @pmo_sta_ps_param_inactivity_time_wow : inactivity timeout for wow command
- * optimization.
  */
 enum pmo_sta_powersave_param {
 	pmo_sta_ps_param_rx_wake_policy = 0,
@@ -119,8 +115,6 @@ enum pmo_sta_powersave_param {
 	pmo_sta_ps_param_advanced_power_max_tx_before_wake = 7,
 	pmo_sta_ps_param_ito_repeat_count = 8,
 	pmo_sta_ps_param_spec_wake_interval = 9,
-	pmo_sta_ps_param_opm_level = 10,
-	pmo_sta_ps_param_inactivity_time_wow = 11,
 };
 
 /**
@@ -176,13 +170,11 @@ enum pmo_wow_enable_type {
  * @PMO_PS_ADVANCED_POWER_SAVE_DISABLE: Disable advanced power save mode
  * @PMO_PS_ADVANCED_POWER_SAVE_ENABLE: Enable power save mode
  * @PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED: User Defined
- * @PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED : Latency Enabled
  */
 enum powersave_mode {
 	PMO_PS_ADVANCED_POWER_SAVE_DISABLE = 0,
 	PMO_PS_ADVANCED_POWER_SAVE_ENABLE = 1,
-	PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED = 2,
-	PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED = 3
+	PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED = 2
 };
 
 /**
@@ -371,10 +363,8 @@ enum pmo_page_fault_action {
  * @active_mode_offload: true if psoc supports active mode offload else false
  * @ap_arpns_support: true if psoc supports arp ns for ap mode
  * @d0_wow_supported: true if psoc supports D0 wow command
- * @ra_ratelimit_enable: true when ra filtering ins enabled else false
- * @ra_priority_enable: true when ra priority ins enabled else false
- * @beacon_lio_update_on_screen_on_off: enable/disable beacon LIO update
- *    based on screen on/off state
+ * @ra_ratelimit_enable: true when ra filtering ins eanbled else false
+ * @ra_priority_enable: true when ra priority ins eanbled else false
  * @ra_ratelimit_interval: ra packets interval
  * @magic_ptrn_enable: true when magic pattern is enabled else false
  * @deauth_enable: true when wake up on deauth is enabled else false
@@ -417,13 +407,10 @@ enum pmo_page_fault_action {
  * @wow_data_inactivity_timeout: power save wow data inactivity timeout
  *  wow mode
  * @wow_spec_wake_interval: OPM speculatvie wkae interval in wow mode
- * @wow_data_inactivity_timeout_wow: power save wow data inactivity timeout
- *  wow command optimization
  * @active_uc_apf_mode: Setting that determines how APF is applied in active
  *	mode for uc packets
  * @active_mc_bc_apf_mode: Setting that determines how APF is applied in
  *	active mode for MC/BC packets
- * @apf_mode: Indicates the apf mode
  * @ito_repeat_count: Indicates ito repeated count
  * @is_mod_dtim_on_sys_suspend_enabled: true when mod dtim is enabled for
  * system suspend wow else false
@@ -450,9 +437,6 @@ enum pmo_page_fault_action {
  * on max pagefault
  * @is_apf_configure_per_screen_state: Configure APF mode enable/disable
  * per screen off/on state
- * @apfv6_disable_offload_bitmap: Offload bitmap in APFv6
- * @is_ap_mode_enable: apf mode configuration enable/disable
- * @apf_instruction_size: apf instruction size
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -469,7 +453,6 @@ struct pmo_psoc_cfg {
 	bool d0_wow_supported;
 	bool ra_ratelimit_enable;
 	bool ra_priority_enable;
-	bool beacon_lio_update_on_screen_on_off;
 #ifdef FEATURE_WLAN_RA_FILTERING
 	uint16_t ra_ratelimit_interval;
 #endif
@@ -521,10 +504,8 @@ struct pmo_psoc_cfg {
 	bool enable_sap_suspend;
 	uint8_t wow_data_inactivity_timeout;
 	uint8_t wow_spec_wake_interval;
-	uint8_t wow_data_inactivity_timeout_wow;
 	enum active_apf_mode active_uc_apf_mode;
 	enum active_apf_mode active_mc_bc_apf_mode;
-	uint32_t apf_mode;
 	uint8_t ito_repeat_count;
 	bool is_mod_dtim_on_sys_suspend_enabled;
 	bool is_teles_dtim_only_on_sys_suspend_enabled;
@@ -549,9 +530,6 @@ struct pmo_psoc_cfg {
 	uint32_t interval_for_pagefault_wakeup_counts;
 	uint32_t ssr_frequency_on_pagefault;
 	bool is_apf_configure_per_screen_state;
-	uint32_t apfv6_disable_offload_bitmap;
-	bool is_ap_mode_enable;
-	uint32_t apf_instruction_size;
 };
 
 /**
@@ -564,7 +542,6 @@ struct pmo_psoc_cfg {
  *	This allows both D0-WoW (bus up) and Non-D0-WoW (bus down) to use one
  *	unified command
  * @li_offload: Firmware has listen interval offload support
- * @apf_offload_enabled: Firmware has apf data offload enabled
  */
 struct pmo_device_caps {
 	bool apf;
@@ -572,7 +549,6 @@ struct pmo_device_caps {
 	bool packet_filter;
 	bool unified_wow;
 	bool li_offload;
-	bool apf_offload_enabled;
 };
 
 /**
@@ -597,13 +573,11 @@ struct pmo_igmp_offload_req {
  * struct pmo_ps_params - structure to hold OPM params
  *
  * @opm_mode: OPM mode
- * @ps_opm_level: power save opm level
  * @ps_ito: power save inactivity timeout
  * @spec_wake: OPM speculative wake interval
  */
 struct pmo_ps_params {
 	enum powersave_mode opm_mode;
-	uint8_t ps_opm_level;
 	uint16_t ps_ito;
 	uint16_t spec_wake;
 };

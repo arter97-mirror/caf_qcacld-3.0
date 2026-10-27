@@ -857,7 +857,6 @@ QDF_STATUS p2p_psoc_start(struct wlan_objmgr_psoc *soc,
 	start_param->event_cb_data = req->event_cb_data;
 	start_param->tx_cnf_cb = req->tx_cnf_cb;
 	start_param->tx_cnf_cb_data = req->tx_cnf_cb_data;
-	start_param->tx_expiry_cb = req->tx_expiry_cb;
 	p2p_init_lo_event(start_param, req);
 	p2p_soc_obj->start_param = start_param;
 
@@ -930,7 +929,6 @@ QDF_STATUS p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 	start_param->event_cb_data = NULL;
 	start_param->tx_cnf_cb = NULL;
 	start_param->tx_cnf_cb_data = NULL;
-	start_param->tx_expiry_cb = NULL;
 	qdf_mem_free(start_param);
 
 	p2p_debug("p2p psoc stop successful");
@@ -1187,10 +1185,10 @@ const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 
 	rem_len -= P2P_OUI_SIZE;
 
-	while (rem_len >= 3) {
+	while (rem_len) {
 		attr_id = p2p_ie[0];
 		attr_len = LE_READ_2(&p2p_ie[1]);
-		if ((3 + attr_len) > rem_len)  {
+		if (attr_len > rem_len)  {
 			p2p_err("Invalid len %d for elem:%d", attr_len,
 				attr_id);
 			return NULL;
@@ -1975,7 +1973,7 @@ QDF_STATUS p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 			       struct p2p_usd_attr_params *param)
 {
@@ -1986,9 +1984,7 @@ bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 {
 	return tgt_p2p_is_fw_support_usd(psoc);
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 {
 	uint8_t wfd_mode;
@@ -2001,19 +1997,7 @@ bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 
 	return true;
 }
-
-bool p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_p2p_is_fw_support_wfd_r2(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-bool p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_p2p_is_fw_support_pcc(psoc);
-}
-#endif  /* FEATURE_WLAN_SUPPORT_PCC */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 {
@@ -2034,8 +2018,7 @@ bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 
 QDF_STATUS p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev)
 {
-	if (!p2p_is_vdev_wfd_r2_mode(vdev) ||
-	    !p2p_fw_support_ap_assist_dfs_group(wlan_vdev_get_psoc(vdev)))
+	if (!p2p_is_vdev_wfd_r2_mode(vdev))
 		return QDF_STATUS_SUCCESS;
 
 	switch (wlan_vdev_mlme_get_opmode(vdev)) {
@@ -2356,8 +2339,6 @@ p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
 }
 
 #define SINGLE_SHOT_NOA 1
-#define SINGLE_SHOT_NOA_THRESHOLD 500000
-
 bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id)
 {
@@ -2365,12 +2346,6 @@ bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 	bool noa_in_prog = false;
 	uint8_t index;
-	uint32_t num_desc;
-
-	if (!pdev) {
-		p2p_err("pdev is NULL");
-		return noa_in_prog;
-	}
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_P2P_ID);
@@ -2387,18 +2362,9 @@ bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
 		goto end;
 	}
 
-	num_desc = p2p_vdev_obj->noa_info->num_desc;
-	if (num_desc > P2P_MAX_NOA_DESC) {
-		p2p_err("num_desc %u exceeds max %u, clamping",
-			num_desc, P2P_MAX_NOA_DESC);
-		num_desc = P2P_MAX_NOA_DESC;
-	}
-
-	for (index = 0; index < num_desc; index++) {
+	for (index = 0; index < p2p_vdev_obj->noa_info->num_desc; index++) {
 		if (p2p_vdev_obj->noa_info->noa_desc[index].type_count ==
-							SINGLE_SHOT_NOA &&
-		    p2p_vdev_obj->noa_info->noa_desc[index].duration >
-						SINGLE_SHOT_NOA_THRESHOLD) {
+							SINGLE_SHOT_NOA) {
 			noa_in_prog = true;
 			goto end;
 		}

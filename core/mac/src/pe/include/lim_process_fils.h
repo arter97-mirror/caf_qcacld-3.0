@@ -28,7 +28,6 @@
 
 #ifdef WLAN_FEATURE_FILS_SK
 
-#define FILS_HLP_PROCESSING_WAIT_TIME 250 /*In milliseconds*/
 /**
  * lim_process_fils_auth_frame2()- This API processes fils data from auth resp
  * @mac_ctx: mac context
@@ -148,38 +147,6 @@ void lim_update_fils_config(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    struct cm_vdev_join_req *join_req);
 
-#ifdef WLAN_FEATURE_FILS_SK_SAP
-/**
- * lim_update_hlp_info()- This API updates FILS hlp info to pe_fils_session
- * from assoc request
- * @mac_ctx: pointer to mac context
- * @session_entry: PE session
- * @peer_mac_addr: Address of peer
- *
- * Return: None
- */
-void lim_update_hlp_info(struct mac_context *mac_ctx,
-			 struct pe_session *session_entry,
-			 struct qdf_mac_addr *peer_mac_addr);
-/**
- * lim_process_hlp_response()- This API process hlp response received
- * from data plane
- * @mac_ctx: pointer to mac context
- * @session: PE session
- *
- * Return: None
- */
-void lim_process_hlp_response(struct mac_context *mac,
-			      struct pe_session *session);
-/**
- * lim_sap_hlp_timeout_callback()- This API is callback to timeout for
- * HLP Processing
- * @priv: Pointer to pre_auth_ctx.
- *
- * Return: None
- */
-void lim_sap_hlp_timeout_callback(void *priv);
-#endif
 /**
  * lim_create_fils_auth_data()- This API creates the fils auth data
  * which needs to be sent in auth req.
@@ -477,6 +444,7 @@ QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
  * aead_decrypt_assoc_req() - API for AEAD decryption in FILS connection
  * @mac_ctx: MAC context
  * @session: PE session
+ * @assoc_req: Assoc Request frame structure
  * @p_frame: frame buffer received
  * @n_frame: length of @p_frame
  * @peer_addr Peer Mac Address of STA
@@ -488,6 +456,7 @@ QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
  */
 QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 				  struct pe_session *session,
+				  tDot11fAssocRequest *assoc_req,
 				  uint8_t *p_frame, uint32_t *n_frame,
 				  tSirMacAddr peer_mac_addr);
 /**
@@ -539,6 +508,7 @@ static inline QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
 
 static inline QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 						struct pe_session *session,
+						tDot11fAssocRequest *assoc_req,
 						uint8_t *p_frame,
 						uint32_t *n_frame,
 						tSirMacAddr peer_addr)

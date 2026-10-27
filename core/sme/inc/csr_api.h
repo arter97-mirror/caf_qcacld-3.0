@@ -77,7 +77,6 @@ enum csr_akm_type {
 	eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384,
 	eCSR_AUTH_TYPE_SAE_EXT_KEY,
 	eCSR_AUTH_TYPE_FT_SAE_EXT_KEY,
-	eCSR_AUTH_TYPE_EPPKE,
 	eCSR_NUM_OF_SUPPORT_AUTH_TYPE,
 	eCSR_AUTH_TYPE_FAILED = 0xff,
 	eCSR_AUTH_TYPE_UNKNOWN = eCSR_AUTH_TYPE_FAILED,
@@ -132,8 +131,6 @@ typedef enum {
 	eCSR_DOT11_MODE_11ax_ONLY = 0x1000,
 	eCSR_DOT11_MODE_11be = 0x2000,
 	eCSR_DOT11_MODE_11be_ONLY = 0x4000,
-	eCSR_DOT11_MODE_11bn = 0x8000,
-	eCSR_DOT11_MODE_11bn_ONLY = 0x10000,
 
 	/* specify the number of maximum bits for phyMode */
 	eCSR_NUM_PHY_MODE = 18,
@@ -147,16 +144,6 @@ typedef enum {
 #else
 #define CSR_IS_DOT11_PHY_MODE_11BE(dot11mode) 0
 #define CSR_IS_DOT11_PHY_MODE_11BE_ONLY(dot11mode) 0
-#endif
-
-#ifdef WLAN_FEATURE_11BN
-#define CSR_IS_DOT11_PHY_MODE_11BN(dot11mode) \
-	((dot11mode) == eCSR_DOT11_MODE_11bn)
-#define CSR_IS_DOT11_PHY_MODE_11BN_ONLY(dot11mode) \
-	((dot11mode) == eCSR_DOT11_MODE_11bn_ONLY)
-#else
-#define CSR_IS_DOT11_PHY_MODE_11BN(dot11mode) 0
-#define CSR_IS_DOT11_PHY_MODE_11BN_ONLY(dot11mode) 0
 #endif
 
 /**
@@ -228,6 +215,12 @@ typedef struct tagCsrBSSIDs {
 } tCsrBSSIDs;
 
 typedef struct tagCsrScanResultInfo {
+	/*
+	 * Carry the IEs for the current BSSDescription.
+	 * A pointer to tDot11fBeaconIEs. Maybe NULL for start BSS.
+	 */
+	void *pvIes;
+	tAniSSID ssId;
 	unsigned long timer;           /* timer is variable for hidden SSID timer */
 	/*
 	 * This member must be the last in the structure because the
@@ -298,9 +291,6 @@ typedef enum {
 	eCSR_ROAM_CHANNEL_INFO_EVENT_IND = 50,
 	/* Channel switch started indication from lower layers */
 	eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND = 51,
-	eCSR_ROAM_DFS_NOL_REMOVE = 52,
-	eCSR_ROAM_EXTERNAL_AUTH_REQUEST = 53,
-
 } eRoamCmdStatus;
 
 /* comment inside indicates what roaming callback gets */
@@ -526,7 +516,7 @@ struct csr_roam_info {
 	bool sgi_enable;
 	bool tx_stbc;
 	bool rx_stbc;
-	enum phy_ch_width ch_width;
+	tSirMacHTChannelWidth ch_width;
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
@@ -545,7 +535,7 @@ struct csr_roam_info {
 	uint32_t rx_mc_bc_cnt;
 	uint32_t rx_retry_cnt;
 #ifdef WLAN_FEATURE_SAE
-	struct external_auth_info *sae_info;
+	struct sir_sae_info *sae_info;
 #endif
 	struct assoc_ind *owe_pending_assoc_ind;
 	struct assoc_ind *ft_pending_assoc_ind;
@@ -555,7 +545,6 @@ struct csr_roam_info {
 	uint32_t chan_info_freq;
 #endif
 	struct switch_channel_ind *pSirSmeSwitchChInd;
-	struct wlan_external_auth_params ext_auth_info;
 	bool is_fils_connection;
 	uint8_t vht_mcs_10_11_supp;
 	uint16_t he_mcs_12_13_map;
@@ -581,7 +570,7 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	bool ampdu;
 	bool sgi_enable;
 	bool tx_stbc;
-	enum phy_ch_width ch_width;
+	tSirMacHTChannelWidth ch_width;
 	enum sir_sme_phy_mode mode;
 	bool rx_stbc;
 	uint8_t max_supp_idx;
@@ -633,9 +622,7 @@ typedef struct tagCsrSummaryStatsInfo {
 typedef struct tagCsrGlobalClassAStatsInfo {
 	uint8_t tx_nss;
 	uint8_t rx_nss;
-	uint8_t tx_preamble;
 	uint8_t rx_preamble;
-	uint8_t tx_bw;
 	uint8_t rx_bw;
 	uint32_t max_pwr;
 	uint32_t tx_rate;
@@ -651,10 +638,7 @@ typedef struct tagCsrGlobalClassAStatsInfo {
 	enum txrate_gi  rx_gi;
 	/* to diff between HT20 & HT40 rates;short & long guard interval */
 	enum tx_rate_info tx_rx_rate_flags;
-	uint8_t tx_rate_version;
-	uint8_t is_tx_rate_version_checked;
-	bool tx_is_uhr_elr;
-	bool rx_is_uhr_elr;
+
 } tCsrGlobalClassAStatsInfo;
 
 typedef struct tagCsrGlobalClassDStatsInfo {
@@ -682,7 +666,7 @@ typedef struct tagCsrGlobalClassDStatsInfo {
  * @peer_mac_addr: peer mac address
  */
 struct csr_per_chain_rssi_stats_info {
-	int8_t rssi[WLAN_MAX_VDEV_CHAINS];
+	int8_t rssi[NUM_CHAINS_MAX];
 	tSirMacAddr peer_mac_addr;
 };
 

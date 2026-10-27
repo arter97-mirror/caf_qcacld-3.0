@@ -37,20 +37,102 @@
 #include "cfg_nan_api.h"
 #include "wlan_tdls_ucfg_api.h"
 #include "wlan_nan_api_i.h"
-#include "wlan_nan_cfg.h"
 
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 
+#ifdef WLAN_FEATURE_NAN
+/**
+ * nan_cfg_init() - Initialize NAN config params
+ * @psoc: Pointer to PSOC Object
+ * @nan_obj: Pointer to NAN private object
+ *
+ * This function initialize NAN config params
+ */
+static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
+			 struct nan_psoc_priv_obj *nan_obj)
+{
+	nan_obj->cfg_param.enable = cfg_get(psoc, CFG_NAN_ENABLE);
+	nan_obj->cfg_param.support_mp0_discovery =
+					cfg_get(psoc,
+						CFG_SUPPORT_MP0_DISCOVERY);
+	nan_obj->cfg_param.ndp_keep_alive_period =
+					cfg_get(psoc,
+						CFG_NDP_KEEP_ALIVE_PERIOD);
+	nan_obj->cfg_param.max_ndp_sessions = cfg_get(psoc,
+						      CFG_NDP_MAX_SESSIONS);
+	nan_obj->cfg_param.max_ndi = cfg_get(psoc, CFG_NDI_MAX_SUPPORT);
+	nan_obj->cfg_param.nan_feature_config =
+					cfg_get(psoc, CFG_NAN_FEATURE_CONFIG);
+	nan_obj->cfg_param.disable_6g_nan = cfg_get(psoc, CFG_DISABLE_6G_NAN);
+	nan_obj->cfg_param.enable_nan_eht_cap =
+					cfg_get(psoc, CFG_NAN_ENABLE_EHT_CAP);
+	nan_obj->cfg_param.support_sta_sap_ndp = cfg_get(
+						psoc,
+						CFG_SAP_STA_NDP_CONCURRENCY);
+	nan_obj->cfg_param.support_sta_p2p_ndp =
+				cfg_get(psoc, CFG_STA_P2P_NDP_CONCURRENCY);
+	nan_obj->cfg_param.prefer_nan_chan_for_p2p =
+				cfg_get(psoc, CFG_PREFER_NAN_CHAN_FOR_P2P);
+}
+
+/**
+ * nan_cfg_dp_init() - Initialize NAN Datapath config params
+ * @psoc: Pointer to PSOC Object
+ * @nan_obj: Pointer to NAN private object
+ *
+ * This function initialize NAN config params
+ */
+static void nan_cfg_dp_init(struct wlan_objmgr_psoc *psoc,
+			    struct nan_psoc_priv_obj *nan_obj)
+{
+	nan_obj->cfg_param.dp_enable = cfg_get(psoc,
+					       CFG_NAN_DATAPATH_ENABLE);
+	nan_obj->cfg_param.ndi_mac_randomize =
+				cfg_get(psoc, CFG_NAN_RANDOMIZE_NDI_MAC);
+	nan_obj->cfg_param.ndp_inactivity_timeout =
+				cfg_get(psoc, CFG_NAN_NDP_INACTIVITY_TIMEOUT);
+	nan_obj->cfg_param.nan_separate_iface_support =
+				cfg_get(psoc, CFG_NAN_SEPARATE_IFACE_SUPP);
+
+}
+#else
+static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
+			 struct nan_psoc_priv_obj *nan_obj)
+{
+}
+
+static void nan_cfg_dp_init(struct wlan_objmgr_psoc *psoc,
+			    struct nan_psoc_priv_obj *nan_obj)
+{
+}
+#endif
+
 bool ucfg_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
 {
-	return wlan_get_disable_6g_nan(psoc);
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
 
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_DISABLE_6G_NAN);
+	}
+
+	return nan_obj->cfg_param.disable_6g_nan;
 }
 
 QDF_STATUS ucfg_nan_psoc_open(struct wlan_objmgr_psoc *psoc)
 {
-	return nan_cfg_psoc_open(psoc);
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_cfg_init(psoc, nan_obj);
+	nan_cfg_dp_init(psoc, nan_obj);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 void ucfg_nan_psoc_close(struct wlan_objmgr_psoc *psoc)
@@ -62,7 +144,21 @@ inline QDF_STATUS __ucfg_nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
 					   enum nan_datapath_state state,
 					   const char *func)
 {
-	return nan_set_ndi_state(vdev, state, func);
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+	enum nan_datapath_state current_state;
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	qdf_spin_lock_bh(&priv_obj->lock);
+	current_state = priv_obj->state;
+	priv_obj->state = state;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+	nan_nofl_debug("%s: ndi state: current: %u, new: %u", func,
+		       current_state, state);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 inline enum nan_datapath_state ucfg_nan_get_ndi_state(
@@ -74,7 +170,18 @@ inline enum nan_datapath_state ucfg_nan_get_ndi_state(
 inline QDF_STATUS ucfg_nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
 				     uint32_t val)
 {
-	return nan_set_active_peers(vdev, val);
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	priv_obj->active_ndp_peers = val;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -370,6 +477,41 @@ inline QDF_STATUS ucfg_nan_get_callbacks(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS ucfg_nan_sch_msg_flush_cb(struct scheduler_msg *msg)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	if (!msg || !msg->bodyptr)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	switch (msg->type) {
+	case NDP_INITIATOR_REQ:
+		vdev = ((struct nan_datapath_initiator_req *)
+			msg->bodyptr)->vdev;
+		break;
+	case NDP_RESPONDER_REQ:
+		vdev = ((struct nan_datapath_responder_req *)
+			msg->bodyptr)->vdev;
+		break;
+	case NDP_END_REQ:
+		vdev = ((struct nan_datapath_end_req *)msg->bodyptr)->vdev;
+		break;
+	case NDP_END_ALL:
+		vdev = ((struct nan_datapath_end_all_ndps *)msg->bodyptr)->vdev;
+		break;
+	default:
+		nan_err("Invalid NAN msg type during sch flush");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+		qdf_mem_free(msg->bodyptr);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 				  void *in_req, uint32_t req_type)
 {
@@ -413,9 +555,6 @@ QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 	case NDP_END_ALL:
 		len = sizeof(struct nan_datapath_end_all_ndps);
 		break;
-	case NDP_UPDATE_CONFIG:
-		len = sizeof(struct nan_datapath_update_config);
-		break;
 	default:
 		nan_err("in correct message req type: %d", req_type);
 		return QDF_STATUS_E_INVAL;
@@ -430,7 +569,7 @@ QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_copy(msg.bodyptr, in_req, len);
 	msg.type = req_type;
 	msg.callback = nan_scheduled_msg_handler;
-	msg.flush_callback = nan_sch_msg_flush_cb;
+	msg.flush_callback = ucfg_nan_sch_msg_flush_cb;
 	status = scheduler_post_message(QDF_MODULE_ID_HDD,
 					QDF_MODULE_ID_NAN,
 					QDF_MODULE_ID_OS_IF, &msg);
@@ -503,64 +642,6 @@ nan_register_sr_concurrency_callback(struct nan_psoc_priv_obj *psoc_obj,
 {}
 #endif
 
-#ifdef NDP_TX_BW_FLOW_CTRL
-static inline
-void nan_regiser_ndp_update_peer_bw_cb(struct nan_psoc_priv_obj *psoc_obj,
-				       struct nan_callbacks *cb_obj)
-{
-	psoc_obj->cb_obj.ndp_update_peer_bw = cb_obj->ndp_update_peer_bw;
-}
-#else
-static inline
-void nan_regiser_ndp_update_peer_bw_cb(struct nan_psoc_priv_obj *psoc_obj,
-				       struct nan_callbacks *cb_obj)
-{
-}
-#endif
-
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
-static
-void nan_regiser_dw_notif_cb(struct nan_psoc_priv_obj *psoc_obj,
-			     struct nan_callbacks *cb_obj)
-{
-
-	psoc_obj->cb_obj.os_if_nan_next_dw_notif_handler =
-				cb_obj->os_if_nan_next_dw_notif_handler;
-}
-
-void nan_regiser_cluster_event_cb(struct nan_psoc_priv_obj *psoc_obj,
-				  struct nan_callbacks *cb_obj)
-{
-	psoc_obj->cb_obj.os_if_nan_process_cluster_event =
-				cb_obj->os_if_nan_process_cluster_event;
-}
-
-static inline
-void nan_register_nan_vdev_destroy_cb(struct nan_psoc_priv_obj *psoc_obj,
-				      struct nan_callbacks *cb_obj)
-{
-	psoc_obj->cb_obj.nan_vdev_destroy_cb = cb_obj->nan_vdev_destroy_cb;
-}
-#else
-static inline
-void nan_regiser_dw_notif_cb(struct nan_psoc_priv_obj *psoc_obj,
-			     struct nan_callbacks *cb_obj)
-{
-}
-
-static inline
-void nan_regiser_cluster_event_cb(struct nan_psoc_priv_obj *psoc_obj,
-				  struct nan_callbacks *cb_obj)
-{
-}
-
-static inline
-void nan_register_nan_vdev_destroy_cb(struct nan_psoc_priv_obj *psoc_obj,
-				      struct nan_callbacks *cb_obj)
-{
-}
-#endif
-
 int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				    struct nan_callbacks *cb_obj)
 {
@@ -592,13 +673,8 @@ int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	psoc_obj->cb_obj.nan_concurrency_update =
 				cb_obj->nan_concurrency_update;
 	psoc_obj->cb_obj.set_mc_list = cb_obj->set_mc_list;
-	nan_regiser_dw_notif_cb(psoc_obj, cb_obj);
-	nan_regiser_cluster_event_cb(psoc_obj, cb_obj);
 
-	nan_register_nan_vdev_destroy_cb(psoc_obj, cb_obj);
 	nan_register_sr_concurrency_callback(psoc_obj, cb_obj);
-	nan_regiser_ndp_update_peer_bw_cb(psoc_obj, cb_obj);
-
 	return 0;
 }
 
@@ -751,9 +827,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 			}
 
 			status = nan_discovery_pre_enable(req->pdev,
-					  req->social_chan_2g_freq ?
-					  req->social_chan_2g_freq :
-					  req->social_chan_5g_freq);
+						  req->social_chan_2g_freq);
 			if (QDF_IS_STATUS_SUCCESS(status)) {
 				len = sizeof(struct nan_enable_req) +
 					req->params.request_data_len;
@@ -762,33 +836,6 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 							     WLAN_NAN_ID);
 				return status;
 			}
-			break;
-		}
-	case NAN_CHANGE_CONF_REQ: {
-			struct nan_change_conf_req *req = in_req;
-
-			psoc = req->psoc;
-			psoc_priv = nan_get_psoc_priv_obj(psoc);
-			if (!psoc_priv) {
-				nan_err("nan psoc priv object is NULL");
-				return QDF_STATUS_E_INVAL;
-			}
-
-			if (policy_mgr_is_sta_mon_concurrency(psoc))
-				return QDF_STATUS_E_INVAL;
-
-			/*
-			 * Take a psoc reference while it is being used by the
-			 * NAN requests.
-			 */
-			status =  wlan_objmgr_psoc_try_get_ref(psoc,
-							       WLAN_NAN_ID);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				nan_err("Couldn't obtain psoc ref");
-				return status;
-			}
-
-			len = sizeof(struct nan_change_conf_req);
 			break;
 		}
 	case NAN_DISABLE_REQ: {
@@ -857,7 +904,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 	msg.callback = nan_discovery_scheduled_handler;
 	msg.flush_callback = nan_discovery_flush_callback;
 
-	if (req_type == NAN_GENERIC_REQ || req_type == NAN_CHANGE_CONF_REQ)
+	if (req_type == NAN_GENERIC_REQ)
 		goto post_msg;
 
 	request = osif_request_alloc(&params);
@@ -881,7 +928,7 @@ post_msg:
 		nan_discovery_flush_callback(&msg);
 	}
 
-	if (req_type != NAN_GENERIC_REQ && req_type != NAN_CHANGE_CONF_REQ) {
+	if (req_type != NAN_GENERIC_REQ) {
 		recovery = cds_is_driver_recovering();
 		if (!recovery)
 			err = osif_request_wait_for_response(request);
@@ -907,10 +954,8 @@ post_msg:
 				nan_disable_cleanup(psoc);
 			}
 		}
-		if (req_type == NAN_DISABLE_REQ) {
+		if (req_type == NAN_DISABLE_REQ)
 			psoc_priv->is_explicit_disable = false;
-			nan_vdev_delete(psoc);
-		}
 		osif_request_put(request);
 	}
 
@@ -952,13 +997,6 @@ void ucfg_nan_disable_concurrency(struct wlan_objmgr_psoc *psoc)
 	nan_req.disable_2g_discovery = true;
 	nan_req.disable_5g_discovery = true;
 
-	status = ucfg_nan_cache_disable_req_info(psoc,
-						 NAN_DISABLE_REQ_INTERNAL);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Unable to set disable req flag");
-		return;
-	}
-
 	status = ucfg_nan_discovery_req(&nan_req, NAN_DISABLE_REQ);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		nan_err("Unable to disable NAN Discovery");
@@ -982,11 +1020,6 @@ ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id)
 		.priv_size = 0,
 		.timeout_ms = 2000,
 	};
-
-	if (ucfg_nan_is_fw_support_standard_mode(psoc)) {
-		nan_debug("FW supports NAN standard mode, skip NDI disable");
-		return QDF_STATUS_SUCCESS;
-	}
 
 	ndi_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ndi_vdev_id,
 							WLAN_NAN_ID);
@@ -1251,7 +1284,15 @@ ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc)
 
 bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
-	return wlan_nan_is_beamforming_supported(psoc);
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return false;
+	}
+
+	return psoc_nan_obj->nan_caps.ndi_txbf_supported;
 }
 
 bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
@@ -1302,108 +1343,15 @@ static void ucfg_nan_cleanup_all_ndps(struct wlan_objmgr_psoc *psoc)
 	}
 }
 
-/**
- * ucfg_nan_pasn_peer_delete_iterate() - delete peer one by one
- * @psoc: pointer to psoc object
- *
- * Return: QDF_STATUS_SUCCESS if delete peer without error, false otherwise.
- */
-
-static QDF_STATUS
-ucfg_nan_pasn_peer_delete_iterate(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_objmgr_vdev *vdev;
-	uint8_t vdev_id;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	QDF_STATUS first_status = QDF_STATUS_SUCCESS;
-
-	struct nan_vdev_priv_obj *nan_vdev_obj;
-	struct wlan_objmgr_peer *peer, *peer_next;
-	qdf_list_t *peer_list;
-	struct qdf_mac_addr peer_mac;
-	struct qdf_mac_addr nan_addr;
-
-	if (!nan_is_pairing_allowed(psoc)) {
-		nan_debug("NAN pairing is not allowed");
-		return QDF_STATUS_SUCCESS;
-	}
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NAN_DISC_MODE,
-							WLAN_NAN_ID);
-	if (!vdev) {
-		nan_err("Vdev is not found");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev_id = wlan_vdev_get_id(vdev);
-
-	nan_vdev_obj = nan_get_vdev_priv_obj(vdev);
-	if (!nan_vdev_obj) {
-		nan_err("NAN vdev priv obj is null");
-		first_status = QDF_STATUS_E_NULL_VALUE;
-		goto ref_rel;
-	}
-
-	if (!nan_vdev_obj->num_pasn_peers ||
-	    nan_vdev_obj->is_delete_all_pasn_peer_in_progress) {
-		nan_debug("num pasn peer %d peer_deletion %d",
-			  nan_vdev_obj->num_pasn_peers,
-			  nan_vdev_obj->is_delete_all_pasn_peer_in_progress);
-		goto ref_rel;
-	}
-
-	peer_list = &vdev->vdev_objmgr.wlan_peer_list;
-	if (!peer_list) {
-		nan_err("Peer list for vdev obj is NULL");
-		first_status = QDF_STATUS_E_NULL_VALUE;
-		goto ref_rel;
-	}
-
-	peer = wlan_vdev_peer_list_peek_active_head(vdev, peer_list,
-						    WLAN_NAN_ID);
-	/* get vdev self peer mac */
-	qdf_mem_copy(nan_addr.bytes, vdev->vdev_mlme.macaddr,
-		     QDF_MAC_ADDR_SIZE);
-
-	while (peer) {
-		qdf_mem_copy(peer_mac.bytes, peer->macaddr,
-			     QDF_MAC_ADDR_SIZE);
-		if (qdf_is_macaddr_equal(&nan_addr, &peer_mac)) {
-			nan_debug("self peer, skip");
-			peer_next = wlan_peer_get_next_active_peer_of_vdev(vdev,
-									   peer_list,
-									   peer,
-									   WLAN_NAN_ID);
-			wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
-			peer = peer_next;
-			continue;
-		}
-		/* Get next peer before deleting current one */
-		peer_next = wlan_peer_get_next_active_peer_of_vdev(vdev,
-								   peer_list,
-								   peer,
-								   WLAN_NAN_ID);
-
-		/* Keep peer reference until after deletion attempt */
-		status = ucfg_nan_send_delete_pasn_peer(psoc,
-							vdev_id,
-							&peer_mac);
-		/* Now release the reference after deletion */
-		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			nan_err("NAN pasn peer delete failed" QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(peer_mac.bytes));
-			first_status = status;
-		}
-		peer = peer_next;
-	}
-
-ref_rel:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
-	return first_status;
-}
-
 #define NAN_PASN_PEER_DELETE_ALL_TIMEOUT_MS 4000
-QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
+/**
+ * ucfg_nan_pasn_peer_delete_all() - This API post NAN peer delete all
+ * meessage to the scheduler and wait for NAN peer delete response.
+ * @psoc: pointer to PSOC object
+ *
+ * Return: status of operation
+ */
+static QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t vdev_id;
@@ -1418,12 +1366,6 @@ QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
 		.priv_size = 0,
 		.timeout_ms = NAN_PASN_PEER_DELETE_ALL_TIMEOUT_MS,
 	};
-
-	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					   WLAN_VDEV_DELETE_ALL_PEER_SUPPORT_BITMAP)) {
-		nan_debug("delete all peer bitmap not support from fw");
-		return ucfg_nan_pasn_peer_delete_iterate(psoc);
-	}
 
 	if (!nan_is_pairing_allowed(psoc)) {
 		nan_debug("NAN pairing is not allowed");
@@ -1514,8 +1456,7 @@ error:
 }
 
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *data, uint32_t data_len,
-				      uint8_t vdev_id)
+				      uint8_t *data, uint32_t data_len)
 {
 	struct nan_disable_req *nan_req;
 	QDF_STATUS status;
@@ -1535,15 +1476,6 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		qdf_mem_copy(nan_req->params.request_data, data, data_len);
 	}
 
-	if (!ucfg_nan_is_vdev_creation_allowed(psoc))
-		goto nan_disable;
-
-	status = nan_wait_for_peer_migration_complete(psoc, vdev_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed waiting for peer migration : %u", status);
-		goto end;
-	}
-
 	if (cds_is_driver_recovering()) {
 		/* only delete the object manager peer */
 		nan_cleanup_pasn_peers(psoc);
@@ -1556,7 +1488,6 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-nan_disable:
 	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
 
 	if (QDF_IS_STATUS_SUCCESS(status))
@@ -1668,7 +1599,7 @@ QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc)
 
 bool ucfg_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 {
-	return wlan_is_nan_allowed_on_freq(pdev, freq, true);
+	return wlan_is_nan_allowed_on_freq(pdev, freq);
 }
 
 bool ucfg_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)
@@ -1688,9 +1619,6 @@ QDF_STATUS ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 	struct scheduler_msg msg = {0};
 	uint32_t len;
 	struct nan_pasn_peer_req params;
-	uint32_t pasn_peer_count;
-	uint32_t max_nan_pairing_session;
-
 	static const struct osif_request_params req_params = {
 		.priv_size = 0,
 		.timeout_ms = NAN_PASN_PEER_CREATE_TIMEOUT_MS,
@@ -1726,24 +1654,6 @@ QDF_STATUS ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 		status = wlan_mlme_clear_peer_private_object_data(peer);
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 		return status;
-	}
-
-	status = nan_get_pasn_peer_count(vdev, &pasn_peer_count);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to get pasn peer");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = nan_get_max_pairing_sessions(psoc, &max_nan_pairing_session);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		nan_err("Failed to get max pairing session");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (pasn_peer_count >= max_nan_pairing_session) {
-		nan_err("Max NAN pairing sessions reached (%u)",
-			max_nan_pairing_session);
-		return QDF_STATUS_E_RESOURCES;
 	}
 
 	len = sizeof(params);
@@ -1881,7 +1791,11 @@ QDF_STATUS ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc,
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_NAN_ID);
+
+	nan_update_pasn_peer_count(vdev, false);
+
 	nan_debug("peer deleted successfully");
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 end:
@@ -1917,204 +1831,3 @@ bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return nan_is_allowed(psoc);
 }
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
-					    uint32_t ndp_instance_id,
-					    struct qdf_mac_addr *peer_ndi_addr)
-{
-	return nan_get_peer_ndi_addr_by_id(vdev, ndp_instance_id,
-					   peer_ndi_addr);
-}
-#endif
-
-QDF_STATUS
-ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
-{
-	return nan_cache_disable_req_info(psoc, value);
-}
-
-QDF_STATUS
-ucfg_nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
-					uint8_t nan_vdev_id,
-					struct qdf_mac_addr *peer_mac_addr)
-{
-	return nan_add_peer_in_migrated_addr_list(psoc, nan_vdev_id,
-						  peer_mac_addr);
-}
-
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
-bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
-{
-	return nan_is_fw_support_standard_mode(psoc);
-}
-
-QDF_STATUS ucfg_nan_set_local_schedule(struct nan_local_sched_params *params)
-{
-	return nan_set_local_schedule(params);
-}
-
-QDF_STATUS ucfg_nan_set_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
-					       uint32_t val)
-{
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	priv_obj->local_sched_rsp_status = val;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-uint32_t ucfg_nan_get_local_sched_rsp_status(struct wlan_objmgr_vdev *vdev)
-{
-	uint32_t val;
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return 0;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	val = priv_obj->local_sched_rsp_status;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return val;
-}
-
-QDF_STATUS ucfg_nan_set_peer_schedule(struct nan_peer_sched_params *params)
-{
-	return nan_set_peer_schedule(params);
-}
-
-QDF_STATUS ucfg_nan_set_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev,
-					      uint32_t val)
-{
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	priv_obj->peer_sched_rsp_status = val;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-uint32_t ucfg_nan_get_peer_sched_rsp_status(struct wlan_objmgr_vdev *vdev)
-{
-	uint32_t val;
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return 0;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	val = priv_obj->peer_sched_rsp_status;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return val;
-}
-
-QDF_STATUS ucfg_nan_req_peer_params(struct nan_peer_params_req *req)
-{
-	return nan_req_peer_params(req);
-}
-
-QDF_STATUS ucfg_nan_set_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev,
-					       uint32_t val)
-{
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	priv_obj->peer_params_rsp_status = val;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-uint32_t ucfg_nan_get_peer_params_rsp_status(struct wlan_objmgr_vdev *vdev)
-{
-	uint32_t val;
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return 0;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	val = priv_obj->peer_params_rsp_status;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return val;
-}
-
-void ucfg_nan_set_phy_target_cfg(struct wlan_objmgr_psoc *psoc,
-				 struct wma_tgt_cfg *cfg,
-				 uint8_t num_rf_chains, bool enable_2g,
-				 bool enable_5g, bool enable_6g)
-{
-	nan_populate_phy_caps(psoc, cfg, num_rf_chains, enable_2g, enable_5g,
-			      enable_6g);
-}
-
-void ucfg_nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
-			   void *caps)
-{
-	nan_get_phy_caps(psoc, (struct nan_phy_caps *)caps);
-}
-
-QDF_STATUS ucfg_nan_ndi_peer_create(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
-				    struct qdf_mac_addr *peer_mac)
-{
-	return nan_ndi_peer_create_req(psoc, vdev_id, peer_mac);
-}
-
-bool ucfg_nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
-				       struct qdf_mac_addr *peer_mac_addr,
-				       enum QDF_OPMODE opmode)
-{
-	return nan_is_peer_exist_for_opmode(psoc, peer_mac_addr, opmode);
-}
-
-QDF_STATUS ucfg_nan_del_sta(struct wlan_objmgr_psoc *psoc,
-			    struct nan_del_sta_params *params)
-{
-	QDF_STATUS status;
-
-	if (!psoc || !params) {
-		nan_err("Invalid parameters");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* Call nan_del_sta directly instead of posting to scheduler */
-	status = nan_del_sta(params);
-	if (QDF_IS_STATUS_ERROR(status))
-		nan_err("Failed to delete NDP peer, status: %d", status);
-
-	return status;
-}
-
-bool ucfg_nan_is_fw_support_ap_assisted_dfs(struct wlan_objmgr_psoc *psoc)
-{
-	return nan_is_fw_support_ap_assisted_dfs(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

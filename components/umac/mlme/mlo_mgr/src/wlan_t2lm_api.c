@@ -1,5 +1,5 @@
 /*
- * * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +25,6 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_connectivity_logging.h"
 #include <wlan_mlo_link_force.h>
-#include "wlan_mlo_mgr_ap.h"
 
 #define T2LM_MIN_DIALOG_TOKEN         1
 #define T2LM_MAX_DIALOG_TOKEN         0xFF
@@ -43,8 +42,6 @@ const char *t2lm_get_event_str(enum wlan_t2lm_evt event)
 	CASE_RETURN_STRING(WLAN_T2LM_EV_ACTION_FRAME_RX_RESP);
 	CASE_RETURN_STRING(WLAN_T2LM_EV_ACTION_FRAME_RX_TEARDOWN);
 	CASE_RETURN_STRING(WLAN_T2LM_EV_ACTION_FRAME_TX_TEARDOWN);
-	CASE_RETURN_STRING(WLAN_T2LM_EV_DEL_LINK_UPDATE_MAPPING);
-	CASE_RETURN_STRING(WLAN_T2LM_EV_ADD_LINK_UPDATE_MAPPING);
 	default:
 		return "Unknown";
 	}
@@ -62,7 +59,7 @@ uint16_t t2lm_get_connected_link_id(struct wlan_objmgr_vdev *vdev)
 		return false;
 	}
 
-	link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
+	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		link_id = link_info[i].link_id;
@@ -177,8 +174,6 @@ QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_mlo_peer_context *ml_peer;
 	struct wlan_t2lm_info *t2lm;
-	enum wlan_diag_wifi_band band;
-	struct wlan_channel *bss_chan;
 
 	ml_peer = peer->mlo_peer_ctx;
 	if (!ml_peer)
@@ -204,18 +199,10 @@ QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
 			     sizeof(struct wlan_t2lm_info));
 	}
 
-	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
-	if (!bss_chan) {
-		t2lm_err("vdev: %d channel info not found",
-			 wlan_vdev_get_id(vdev));
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	band = wlan_convert_freq_to_diag_band(bss_chan->ch_freq);
-
 	wlan_connectivity_t2lm_req_resp_event(
-				vdev, t2lm_req->dialog_token, 0, 0, band, true,
-				WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
+				vdev, t2lm_req->dialog_token, 0, 0,
+				wlan_vdev_mlme_get_bss_chan(vdev)->ch_freq,
+				true, WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 
 	return status;
 }
@@ -346,42 +333,6 @@ wlan_t2lm_check_curr_force(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-static QDF_STATUS
-t2lm_handle_del_mapping_update(struct wlan_objmgr_vdev *vdev,
-			       struct wlan_objmgr_peer *peer)
-{
-	QDF_STATUS status;
-
-	if (!peer) {
-		t2lm_err("peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = wlan_t2lm_update_peer_mapping_for_del_link(peer->mlo_peer_ctx);
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("Update T2LM peer mapping failed");
-
-	return status;
-}
-
-static QDF_STATUS
-t2lm_handle_add_mapping_update(struct wlan_objmgr_vdev *vdev,
-			       struct wlan_objmgr_peer *peer)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	if (!peer) {
-		t2lm_err("peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = wlan_t2lm_update_peer_mapping_for_add_link(peer->mlo_peer_ctx);
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("Update T2LM peer mapping failed");
-
-	return status;
-}
-
 #ifdef WLAN_FEATURE_11BE_MLO_TTLM
 static void
 t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
@@ -411,7 +362,6 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					t2lm_info->ieee_link_map_tid[0];
 				if (QDF_IS_STATUS_ERROR(wlan_t2lm_check_curr_force(vdev,
 										   t2lm_ieee_link_map))) {
-					wlan_mlo_send_ttlm_complete(vdev, ml_peer, false);
 					t2lm_err("curr force check failed");
 					break;
 				}
@@ -465,7 +415,6 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					t2lm_info->ieee_link_map_tid[0];
 				if (QDF_IS_STATUS_ERROR(wlan_t2lm_check_curr_force(vdev,
 										   t2lm_ieee_link_map))) {
-					wlan_mlo_send_ttlm_complete(vdev, ml_peer, false);
 					t2lm_err("curr force check failed");
 					break;
 				}
@@ -481,12 +430,10 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					t2lm_err("sending t2lm wmi failed");
 					break;
 				}
-				wlan_mlo_send_ttlm_complete(vdev, ml_peer, true);
 			} else if (t2lm_rsp->dialog_token == t2lm_req->dialog_token &&
 				   t2lm_rsp->t2lm_resp_type != WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING) {
 				t2lm_debug("T2LM rsp status denied, clear ongoing tid mapping");
 				wlan_t2lm_clear_ongoing_negotiation(peer);
-				wlan_mlo_send_ttlm_complete(vdev, ml_peer, false);
 			}
 		}
 	}
@@ -505,7 +452,6 @@ QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct wlan_mlo_peer_context *ml_peer;
 	struct wlan_channel *channel;
-	enum wlan_diag_wifi_band band;
 
 	if (!peer) {
 		t2lm_err("peer is null");
@@ -548,10 +494,10 @@ QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	band = wlan_convert_freq_to_diag_band(channel->ch_freq);
-
 	wlan_connectivity_t2lm_req_resp_event(vdev, t2lm_rsp.dialog_token, 0,
-					      false, band, true,
+					      false,
+					      channel->ch_freq,
+					      true,
 					      WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT);
 
 	return status;
@@ -639,12 +585,6 @@ QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 		break;
 	case WLAN_T2LM_EV_ACTION_FRAME_TX_TEARDOWN:
 		status = t2lm_handle_tx_teardown(vdev, event_data);
-		break;
-	case WLAN_T2LM_EV_DEL_LINK_UPDATE_MAPPING:
-		status = t2lm_handle_del_mapping_update(vdev, peer);
-		break;
-	case WLAN_T2LM_EV_ADD_LINK_UPDATE_MAPPING:
-		status = t2lm_handle_add_mapping_update(vdev, peer);
 		break;
 	default:
 		status = QDF_STATUS_E_FAILURE;
@@ -788,128 +728,10 @@ wlan_t2lm_clear_ongoing_negotiation(struct wlan_objmgr_peer *peer)
 				WLAN_T2LM_INVALID_DIRECTION;
 }
 
-QDF_STATUS
-wlan_t2lm_update_peer_mapping_for_del_link(struct wlan_mlo_peer_context *ml_peer)
-{
-	struct wlan_t2lm_info *t2lm_negotiated_info;
-	struct wlan_t2lm_info t2lm_info = {0};
-	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_peer *peer;
-
-	if (!ml_peer) {
-		t2lm_err("ml peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev = mlo_get_first_vdev_by_ml_peer(ml_peer);
-	if (!vdev) {
-		t2lm_err("VDEV is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
-	if (!peer) {
-		t2lm_err("peer is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto release_vdev;
-	}
-
-	wlan_t2lm_clear_peer_negotiation(peer);
-	ml_peer->t2lm_policy.t2lm_negotiated_info.dialog_token = 0;
-	t2lm_negotiated_info = &ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info[WLAN_T2LM_BIDI_DIRECTION];
-
-	t2lm_info.direction = WLAN_T2LM_BIDI_DIRECTION;
-	t2lm_info.default_link_mapping = 1;
-	t2lm_info.link_mapping_size = 0;
-
-	qdf_mem_copy(t2lm_negotiated_info, &t2lm_info,
-		     sizeof(struct wlan_t2lm_info));
-
-	status = wlan_send_tid_to_link_mapping(vdev,
-					       t2lm_negotiated_info);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("sending t2lm wmi failed");
-
-	wlan_mlo_dev_t2lm_notify_link_update(vdev,
-					     t2lm_negotiated_info);
-
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
-release_vdev:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-
-	return status;
-}
-
-QDF_STATUS
-wlan_t2lm_update_peer_mapping_for_add_link(struct wlan_mlo_peer_context *ml_peer)
-{
-	struct wlan_prev_t2lm_negotiated_info *t2lm_neg_info;
-	struct wlan_t2lm_info *t2lm_negotiated_info;
-	struct wlan_t2lm_info t2lm_info = {0};
-	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_peer *peer;
-
-	if (!ml_peer) {
-		t2lm_err("ml peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	vdev = mlo_get_first_vdev_by_ml_peer(ml_peer);
-	if (!vdev) {
-		t2lm_err("VDEV is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
-	if (!peer) {
-		t2lm_err("peer is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto release_vdev;
-	}
-
-	t2lm_neg_info = &ml_peer->t2lm_policy.t2lm_negotiated_info;
-	if (t2lm_neg_info->t2lm_info[WLAN_T2LM_BIDI_DIRECTION].default_link_mapping) {
-		t2lm_debug("Already default mapping");
-		status = QDF_STATUS_SUCCESS;
-		goto release_peer;
-	}
-
-	wlan_t2lm_clear_peer_negotiation(peer);
-	ml_peer->t2lm_policy.t2lm_negotiated_info.dialog_token = 0;
-	t2lm_negotiated_info = &t2lm_neg_info->t2lm_info[WLAN_T2LM_BIDI_DIRECTION];
-
-	t2lm_info.direction = WLAN_T2LM_BIDI_DIRECTION;
-	t2lm_info.default_link_mapping = 1;
-	t2lm_info.link_mapping_size = 0;
-
-	qdf_mem_copy(t2lm_negotiated_info, &t2lm_info,
-		     sizeof(struct wlan_t2lm_info));
-
-	status = wlan_send_tid_to_link_mapping(vdev,
-					       t2lm_negotiated_info);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("sending t2lm wmi failed");
-
-	wlan_mlo_dev_t2lm_notify_link_update(vdev,
-					     t2lm_negotiated_info);
-
-release_peer:
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
-release_vdev:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-
-	return status;
-}
-
 void
 wlan_t2lm_clear_peer_negotiation(struct wlan_objmgr_peer *peer)
 {
 	struct wlan_mlo_peer_context *ml_peer;
-	struct wlan_objmgr_vdev *vdev;
 	struct wlan_prev_t2lm_negotiated_info *t2lm_negotiated_info;
 	uint8_t i;
 
@@ -917,17 +739,6 @@ wlan_t2lm_clear_peer_negotiation(struct wlan_objmgr_peer *peer)
 	if (!ml_peer) {
 		t2lm_err("ml peer is null");
 		return;
-	}
-
-	vdev = mlo_get_first_vdev_by_ml_peer(ml_peer);
-	if (!vdev) {
-		t2lm_err("VDEV is null");
-		return;
-	}
-
-	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
-		t2lm_debug("Do not clear TTLM during link switch");
-		goto release_vdev;
 	}
 
 	qdf_mem_zero(&ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info,
@@ -938,9 +749,6 @@ wlan_t2lm_clear_peer_negotiation(struct wlan_objmgr_peer *peer)
 	for (i = 0; i < WLAN_T2LM_MAX_DIRECTION; i++)
 		t2lm_negotiated_info->t2lm_info[i].direction =
 				WLAN_T2LM_INVALID_DIRECTION;
-
-release_vdev:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 }
 
 void
@@ -970,11 +778,6 @@ wlan_t2lm_clear_all_tid_mapping(struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
-		t2lm_debug("Do not clear TTLM during link switch");
-		goto release_peer;
-	}
-
 	qdf_mem_zero(&t2lm_ctx->established_t2lm,
 		     sizeof(struct wlan_mlo_t2lm_ie));
 	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_BIDI_DIRECTION;
@@ -999,7 +802,6 @@ wlan_t2lm_clear_all_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	wlan_t2lm_clear_ongoing_negotiation(peer);
 	wlan_mlo_t2lm_timer_stop(vdev);
 
-release_peer:
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
 }
 
@@ -1069,36 +871,16 @@ wlan_ttlm_populate_link_disable_in_sm(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 
 	status = wlan_t2lm_check_concurrency_curr_force(vdev, t2lm_neg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_mlo_send_ttlm_complete(vdev, peer->mlo_peer_ctx, false);
+	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	} else {
+	else
 		return t2lm_deliver_event(vdev, peer,
 					  WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
 					  t2lm_neg,
 					  0,
 					  &t2lm_neg->dialog_token);
-	}
 }
 #endif
-
-static bool
-wlan_is_standby_link_enabled(struct mlo_link_info *link_info)
-{
-	if (!link_info)
-		return false;
-
-	return (link_info->vdev_id == WLAN_INVALID_VDEV_ID);
-}
-
-static bool
-wlan_is_active_link_disabled(struct mlo_link_info *link_info)
-{
-	if (!link_info)
-		return false;
-
-	return (link_info->vdev_id != WLAN_INVALID_VDEV_ID);
-}
 
 QDF_STATUS
 wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
@@ -1110,11 +892,9 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 	uint8_t dir = WLAN_T2LM_BIDI_DIRECTION;
 	struct mlo_link_info *link_info;
 	uint8_t link_info_iter;
-	uint8_t i = 0, idx = 0;
+	uint8_t i = 0;
 	QDF_STATUS status;
 	uint8_t link_id;
-	bool standby_link_enabled = false;
-	bool active_links_disabled[2] = { false, false };
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
 						WLAN_MLO_MGR_ID);
@@ -1126,11 +906,6 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 
 	if (!vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
-
-	if (mlo_is_link_recfg_in_progress(vdev)) {
-		t2lm_err("Link Recfg in progress, ignore load balancing req");
-		return QDF_STATUS_E_BUSY;
-	}
 
 	t2lm_policy = &peer->mlo_peer_ctx->t2lm_policy;
 	t2lm_neg = t2lm_policy->ongoing_tid_to_link_mapping;
@@ -1165,29 +940,15 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 						&t2lm_neg.t2lm_info[dir],
 						0);
 			t2lm_debug("Disabled link id %d", link_id);
-			if (idx < 2) {
-				active_links_disabled[idx] = wlan_is_active_link_disabled(link_info);
-				idx++;
-			}
 		} else {
 			wlan_t2lm_set_link_mapping_of_tids(link_id,
 						&t2lm_neg.t2lm_info[dir],
 						1);
 			t2lm_debug("Enabled link id %d", link_id);
-			standby_link_enabled = wlan_is_standby_link_enabled(link_info);
 		}
 		link_info++;
 	}
 
-	t2lm_policy->is_fw_btm_ind = true;
-	t2lm_policy->is_standby_link_enabled = true;
-	if (standby_link_enabled && active_links_disabled[0] &&
-	    active_links_disabled[1]) {
-		t2lm_debug("Standby link id enabled %d", standby_link_enabled);
-		t2lm_debug("Active link id disabled %d %d", active_links_disabled[0],
-			   active_links_disabled[1]);
-		mlme_cm_osif_roam_start_ind(vdev);
-	}
 	status = wlan_ttlm_populate_link_disable_in_sm(vdev, peer, &t2lm_neg);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
@@ -1422,11 +1183,6 @@ QDF_STATUS wlan_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
 	if (!bss_peer || !bss_peer->mlo_peer_ctx)
 		return QDF_STATUS_E_INVAL;
 
-	if (mlo_is_link_recfg_in_progress(vdev)) {
-		t2lm_err("failed due to link recfg in progress");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	return ttlm_sm_deliver_event(bss_peer->mlo_peer_ctx,
 				    WLAN_TTLM_SM_EV_TX_ACTION_REQ,
 				    sizeof(*t2lm), t2lm);
@@ -1471,126 +1227,3 @@ wlan_t2lm_check_concurrency_curr_force(struct wlan_objmgr_vdev *vdev,
 	}
 	return status;
 }
-
-bool
-wlan_t2lm_is_peer_neg_in_progress(struct wlan_mlo_peer_context *ml_peer)
-{
-	if (!ml_peer) {
-		t2lm_err("peer is null");
-		return false;
-	}
-
-	if (ttlm_get_state(ml_peer) == WLAN_TTLM_S_INPROGRESS &&
-	    (ttlm_get_sub_state(ml_peer) == WLAN_TTLM_SS_AP_BTM_INPROGRESS ||
-	     ttlm_get_sub_state(ml_peer) == WLAN_TTLM_SS_STA_INPROGRESS)) {
-		t2lm_debug("TTLM negotiation is ongoing");
-		return true;
-	}
-
-	return false;
-}
-
-#ifdef WLAN_FEATURE_11BE_MLO_TTLM
-QDF_STATUS
-wlan_t2lm_handle_link_recfg_del_update(struct wlan_objmgr_peer *peer)
-{
-	QDF_STATUS status;
-
-	if (!peer) {
-		t2lm_err("peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = ttlm_sm_deliver_event(peer->mlo_peer_ctx,
-				       WLAN_TTLM_SM_EV_LINK_RECFG_DEL_UPDATE_MAPPING,
-				       0, NULL);
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("T2LM Update mapping failed %d", status);
-
-	return status;
-}
-
-QDF_STATUS
-wlan_t2lm_handle_link_recfg_add_update(struct wlan_objmgr_peer *peer)
-{
-	QDF_STATUS status;
-
-	if (!peer) {
-		t2lm_err("peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	status = ttlm_sm_deliver_event(peer->mlo_peer_ctx,
-				       WLAN_TTLM_SM_EV_LINK_RECFG_ADD_UPDATE_MAPPING,
-				       0,
-				       NULL);
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("T2LM Update mapping failed %d", status);
-
-	return status;
-}
-
-#else
-QDF_STATUS
-wlan_t2lm_handle_link_recfg_del_update(struct wlan_objmgr_peer *peer)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *vdev;
-
-	if (!peer) {
-		t2lm_err("ml_peer is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
-
-	vdev = mlo_get_first_vdev_by_ml_peer(peer->mlo_peer_ctx);
-	if (!vdev) {
-		t2lm_err("VDEV is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
-
-	status = t2lm_deliver_event(vdev, peer,
-				    WLAN_T2LM_EV_DEL_LINK_UPDATE_MAPPING,
-				    NULL, 0, NULL);
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("T2LM Update mapping failed %d", status);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-
-end:
-	return status;
-}
-
-QDF_STATUS
-wlan_t2lm_handle_link_recfg_add_update(struct wlan_objmgr_peer *peer)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *vdev;
-
-	if (!peer) {
-		t2lm_err("ml_peer is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
-
-	vdev = mlo_get_first_vdev_by_ml_peer(peer->mlo_peer_ctx);
-	if (!vdev) {
-		t2lm_err("VDEV is null");
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto end;
-	}
-
-	status = t2lm_deliver_event(vdev, peer,
-				    WLAN_T2LM_EV_ADD_LINK_UPDATE_MAPPING,
-				    NULL, 0,
-				    NULL);
-	if (QDF_IS_STATUS_ERROR(status))
-		t2lm_err("T2LM Update mapping failed %d", status);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
-
-end:
-	return status;
-}
-#endif

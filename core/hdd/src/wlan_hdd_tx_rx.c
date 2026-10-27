@@ -27,7 +27,6 @@
 #define HDD_DISALLOW_LEGACY_HDDLOG 1
 #include "osif_sync.h"
 #include <wlan_hdd_tx_rx.h>
-#include <linux/version.h>
 #include <wlan_hdd_softap_tx_rx.h>
 #include <wlan_hdd_napi.h>
 #include <linux/netdevice.h>
@@ -61,69 +60,9 @@
 #include "os_if_dp.h"
 #include "wlan_ipa_ucfg_api.h"
 #include "wlan_hdd_stats.h"
-#include "wlan_psoc_mlme_ucfg_api.h"
-#include "wma_api.h"
-#include "wlan_hdd_wondertap.h"
-#ifdef DRIVER_PASSTHRU_MODE
-#include <net/ieee80211_radiotap.h>
-#endif
 
 #ifdef TX_MULTIQ_PER_AC
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
-#ifdef NDP_TX_BW_FLOW_CTRL
-/*
- * One Hi prio queue, 4 queues per VO, VI and BK AC
- * and 33 queues for BE (1 queue dedicated for MC/BC)
- */
-const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
-	SME_AC_VO,
-	SME_AC_VO,
-	SME_AC_VO,
-	SME_AC_VO,
-	SME_AC_VO,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-};
-#else
 /*
  * Mapping Linux AC interpretation to SME AC.
  * Host has 4 queues per access category (4 AC) and 1 high priority queue.
@@ -136,21 +75,21 @@ const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
 	SME_AC_VO,
 	SME_AC_VO,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
 	SME_AC_VO,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
 };
-#endif
+
 #else
 const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
@@ -161,35 +100,19 @@ const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VI,
 	SME_AC_VI,
 	SME_AC_VI,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
 	SME_AC_BE,
 	SME_AC_BE,
 	SME_AC_BE,
 	SME_AC_BE,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
 };
+
 #endif
 #else
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
-#ifdef NDP_TX_BW_FLOW_CTRL
-const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
-	SME_AC_VO,
-	SME_AC_VO,
-	SME_AC_VI,
-	SME_AC_BK,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-};
-#else
 /*
  * Mapping Linux AC interpretation to SME AC.
  * Host has 5 tx queues, 4 flow-controlled queues for regular traffic and
@@ -198,18 +121,18 @@ const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
  */
 const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
-	SME_AC_VO,
 	SME_AC_VI,
-	SME_AC_BK,
 	SME_AC_BE,
+	SME_AC_BK,
+	SME_AC_VO,
 };
-#endif
+
 #else
 const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
 	SME_AC_VI,
-	SME_AC_BK,
 	SME_AC_BE,
+	SME_AC_BK,
 };
 
 #endif
@@ -256,11 +179,6 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 
 	if (!adapter) {
 		hdd_err("invalid adapter context");
-		return;
-	}
-
-	if (!soc) {
-		hdd_err("soc is NULL");
 		return;
 	}
 
@@ -571,244 +489,6 @@ hdd_drop_tx_packet_on_ftm(struct sk_buff *skb)
 }
 #endif
 
-#ifdef WLAN_FEATURE_ICMP_ITO_MGMT
-/* Timeout in milliseconds to rollback power save mode after ICMP inactivity */
-#define HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS 2000
-
-/**
- * hdd_icmp_ito_restore_timer_cb() - Timer callback to restore original ITO
- * @context: vdev_id stored as uintptr_t
- *
- * This callback is invoked when no ICMP request is received for 2 seconds
- * after the ITO was temporarily set to 2s. It restores the original ITO
- * value.
- *
- * Return: None
- */
-void hdd_icmp_ito_restore_timer_cb(void *context)
-{
-	/*
-	 * Use vdev_id (stored as uintptr_t) instead of a raw adapter pointer
-	 * to avoid use-after-free: the adapter may be freed while a pending
-	 * callback is waiting to run. Look up the adapter safely via the
-	 * object-manager-protected adapter list.
-	 */
-	uint8_t vdev_id = (uint8_t)(uintptr_t)context;
-	struct hdd_context *hdd_ctx;
-	struct wlan_hdd_link_info *link_info;
-	struct hdd_adapter *adapter;
-	struct wlan_objmgr_vdev *vdev;
-	uint64_t now, elapsed_us;
-	uint16_t saved_ito;
-	QDF_STATUS status;
-
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx)
-		return;
-
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info)
-		return;
-
-	adapter = link_info->adapter;
-	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC)
-		return;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_PMO_ID);
-	if (!vdev) {
-		hdd_err("ICMP PS rollback: failed to get vdev");
-		return;
-	}
-	/* qdf_get_monotonic_boottime() returns microseconds */
-	now = qdf_get_monotonic_boottime();
-	qdf_spin_lock(&adapter->icmp_ps_last_req_time_lock);
-	elapsed_us = now - adapter->icmp_ps_last_req_time;
-	saved_ito = adapter->icmp_ps_saved_ito;
-	qdf_spin_unlock(&adapter->icmp_ps_last_req_time_lock);
-
-	/*
-	 * If a new ICMP request arrived within the rollback window, re-arm
-	 * the timer for the full timeout to avoid ITO switching mid-session.
-	 * Only rollback when there has been no ICMP activity for the full
-	 * timeout period.
-	 */
-	if (elapsed_us < (uint64_t)HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS * 1000ULL) {
-		qdf_mc_timer_start(&adapter->icmp_ito_restore_timer,
-				   HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
-		return;
-	}
-
-	hdd_debug("ICMP PS rollback: restoring original ITO for vdev %d",
-		  adapter->deflink->vdev_id);
-
-	/* Restore original ITO; PS mode stays
-	 * PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED
-	 */
-	if (saved_ito) {
-		status = wma_set_power_config_ito(adapter->deflink->vdev_id, saved_ito);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_debug("ICMP PS rollback: restored ito=%u for vdev %d",
-				  saved_ito, adapter->deflink->vdev_id);
-			qdf_spin_lock(&adapter->icmp_ps_last_req_time_lock);
-			adapter->icmp_ps_saved_ito = 0;
-			qdf_spin_unlock(&adapter->icmp_ps_last_req_time_lock);
-			qdf_atomic_set(&adapter->icmp_ito_changed, 0);
-		} else {
-			hdd_err("ICMP PS rollback: failed to restore ITO (%d), retry next ICMP",
-				status);
-			qdf_spin_lock(&adapter->icmp_ps_last_req_time_lock);
-			adapter->icmp_ps_saved_ito = 0;
-			qdf_spin_unlock(&adapter->icmp_ps_last_req_time_lock);
-			qdf_atomic_set(&adapter->icmp_ito_changed, 0);
-		}
-	}
-
-	/* Timer has fired; the timer framework already stopped it.
-	 * Do not call qdf_mc_timer_stop() from within the callback —
-	 * the timer is already in STOPPED state when the callback runs,
-	 * and calling stop() here would be a no-op at best or corrupt
-	 * the internal timer state at worst.
-	 */
-	qdf_atomic_set(&adapter->icmp_ito_changed, 0);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
-}
-
-/**
- * hdd_handle_icmp_ps_management() - Handle ICMP-based ITO management
- * @adapter: pointer to hdd adapter
- * @skb: pointer to OS packet (sk_buff)
- *
- * When CFG_PMO_POWERSAVE_MODE is PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED
- * and an ICMP request is detected, temporarily set ITO to 2s to keep the
- * link responsive. The PS mode itself stays
- * PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED.
- * The original ITO is restored after 2 seconds of ICMP inactivity via the
- * rollback timer.
- *
- * Return: None
- */
-static void hdd_handle_icmp_ps_management(struct hdd_adapter *adapter,
-					  struct sk_buff *skb)
-{
-	struct hdd_context *hdd_ctx_icmp;
-	QDF_STATUS timer_status;
-	QDF_STATUS ito_status;
-
-	if (!((adapter->device_mode == QDF_STA_MODE ||
-	       adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-	      adapter->icmp_ito_timer_initialized &&
-	      QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ICMP &&
-	      qdf_nbuf_data_is_icmpv4_req((qdf_nbuf_t)skb)))
-		return;
-
-	hdd_ctx_icmp = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx_icmp ||
-	    ucfg_pmo_get_default_power_save_mode(hdd_ctx_icmp->psoc) !=
-	    PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED)
-		return;
-
-	if (!qdf_atomic_read(&adapter->icmp_ito_changed)) {
-		struct pmo_ps_params curr_ps = {0};
-		struct wlan_objmgr_vdev *vdev;
-
-		hdd_debug("ICMP req: setting ITO to %dms for vdev %d",
-			  HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS,
-			  adapter->deflink->vdev_id);
-
-		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-						   WLAN_PMO_ID);
-		if (!vdev) {
-			hdd_err("ICMP PS: failed to get vdev, skipping ITO change");
-			return;
-		}
-		/* Save original ITO from ucfg layer */
-		ucfg_pmo_get_ps_params(vdev, &curr_ps);
-		adapter->icmp_ps_saved_ito = curr_ps.ps_ito;
-
-		/*
-		 * Start the rollback timer BEFORE changing ITO. If the timer
-		 * fails to start, keep the original ITO unchanged to avoid
-		 * leaving ITO permanently changed with no rollback path.
-		 */
-		qdf_spin_lock_bh(&adapter->icmp_ps_last_req_time_lock);
-		adapter->icmp_ps_last_req_time = qdf_get_monotonic_boottime();
-		qdf_spin_unlock_bh(&adapter->icmp_ps_last_req_time_lock);
-
-		timer_status = qdf_mc_timer_start(&adapter->icmp_ito_restore_timer,
-						  HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS);
-		if (QDF_IS_STATUS_ERROR(timer_status)) {
-			hdd_err("ICMP PS: rollback timer start failed (%d), keeping ITO for vdev %d",
-				timer_status, adapter->deflink->vdev_id);
-			adapter->icmp_ps_saved_ito = 0;
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
-			return;
-		}
-
-		/* Timer started successfully; set ITO to 2s */
-		ito_status = wma_set_power_config_ito(adapter->deflink->vdev_id,
-						      HDD_ICMP_PS_ROLLBACK_TIMEOUT_MS);
-		if (QDF_IS_STATUS_ERROR(ito_status)) {
-			/*
-			 * ITO update failed; stop the already-started
-			 * rollback timer and clear the saved ITO.
-			 */
-			hdd_err("ICMP PS: wma_set_power_config_ito failed (%d), stopping timer for vdev %d",
-				ito_status, adapter->deflink->vdev_id);
-			qdf_mc_timer_stop(&adapter->icmp_ito_restore_timer);
-			adapter->icmp_ps_saved_ito = 0;
-			return;
-		}
-		qdf_atomic_set(&adapter->icmp_ito_changed, 1);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_PMO_ID);
-	} else {
-		/* Update timestamp; timer callback handles re-arm */
-		qdf_spin_lock_bh(&adapter->icmp_ps_last_req_time_lock);
-		adapter->icmp_ps_last_req_time = qdf_get_monotonic_boottime();
-		qdf_spin_unlock_bh(&adapter->icmp_ps_last_req_time_lock);
-	}
-}
-#else
-static inline void
-hdd_handle_icmp_ps_management(struct hdd_adapter *adapter,
-			      struct sk_buff *skb)
-{
-}
-#endif
-
-/**
- * hdd_try_fast_xmit() - Attempt fast TX path for recycled SKB frames
- * @skb: pointer to OS packet
- * @dev: pointer to network device
- *
- * Return: true if the packet was consumed by the fast path (caller
- *         must return), false if the slow path should continue.
- */
-#ifdef QCA_DP_NBUF_FAST_RECYCLE_CHECK
-static bool hdd_try_fast_xmit(struct sk_buff *skb, struct net_device *dev)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	QDF_STATUS status;
-
-	if (!qdf_nbuf_fast_xmit((qdf_nbuf_t)skb) ||
-	    qdf_nbuf_pkt_type_is_mcast((qdf_nbuf_t)skb))
-		return false;
-
-	status = ucfg_dp_fast_xmit((qdf_nbuf_t)skb, adapter->deflink->vdev);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		netif_trans_update(dev);
-		wlan_hdd_sar_unsolicited_timer_start(adapter->hdd_ctx);
-	}
-	return true;
-}
-#else
-static inline bool hdd_try_fast_xmit(struct sk_buff *skb,
-				     struct net_device *dev)
-{
-	return false;
-}
-#endif /* QCA_DP_NBUF_FAST_RECYCLE_CHECK */
-
 /**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
@@ -838,17 +518,8 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	if (hdd_drop_tx_packet_on_ftm(skb))
 		return;
 
-	if (hdd_try_fast_xmit(skb, dev))
-		return;
-
 	osif_dp_mark_pkt_type(skb);
 	hdd_tx_latency_record_ingress_ts(adapter, skb);
-
-	hdd_handle_icmp_ps_management(adapter, skb);
-
-	if (adapter->device_mode == QDF_NDI_MODE &&
-	    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc))
-		osif_dp_ndp_set_peer_bw(skb);
 
 	/* Get TL AC corresponding to Qdisc queue index/AC. */
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
@@ -962,37 +633,6 @@ netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 	return NETDEV_TX_OK;
 }
 
-#if defined(DRIVER_PASSTHRU_MODE)
-netdev_tx_t hdd_hard_start_xmit_passthru(struct sk_buff *skb,
-					 struct net_device *dev)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	QDF_STATUS status;
-
-	if (adapter->device_mode != QDF_PASSTHRU_MODE) {
-		hdd_err("Unsupported Device Mode %d", adapter->device_mode);
-		qdf_assert(0);
-	}
-
-	qdf_mem_zero(skb->cb, sizeof(skb->cb));
-
-	/*
-	 * vdev in link_info is directly dereferenced because this is per
-	 * packet path, hdd_get_vdev_by_user() usage will be very costly
-	 * as it involves lock access.
-	 * Expectation here is vdev will be present during TX/RX processing
-	 * and also DP internally maintaining vdev ref count
-	 */
-	status = ucfg_dp_start_xmit((qdf_nbuf_t)skb, adapter->deflink->vdev);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		netif_trans_update(dev);
-		wlan_hdd_sar_unsolicited_timer_start(adapter->hdd_ctx);
-	}
-
-	return NETDEV_TX_OK;
-}
-#endif /* DRIVER_PASSTHRU_MODE */
-
 /**
  * __hdd_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
@@ -1030,7 +670,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 	 * recovery here
 	 */
 
-	for (i = 0; i < dev->num_tx_queues; i++) {
+	for (i = 0; i < NUM_TX_QUEUES; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		hdd_debug("Queue: %d status: %d txq->trans_start: %lu",
 			  i, netif_tx_queue_stopped(txq), txq->trans_start);
@@ -1089,17 +729,19 @@ void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf)
 
 	hdd_rx_timestamp(netbuf, ktime_to_us(netbuf->tstamp));
 }
-#endif
 
-void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t qtime,
+void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
 			 uint64_t *tsf_time)
 {
 	struct hdd_adapter *adapter;
 
 	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter)
+		return;
 
-	hdd_get_tsftime_from_qtime(adapter, qtime, tsf_time);
+	hdd_get_tsf_time(adapter, input_time, tsf_time);
 }
+#endif
 
 /**
  * hdd_reason_type_to_string() - return string conversion of reason type
@@ -1215,27 +857,12 @@ static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
 {
 	return false;
 }
-#elif (KERNEL_VERSION(7, 0, 0) <= LINUX_VERSION_CODE)
-static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
-{
-	return netif_tx_owned(txq, smp_processor_id());
-}
 #else
 static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
 {
 	return txq->xmit_lock_owner != -1;
 }
 #endif
-
-static void
-hdd_txq_trans_update(struct net_device *dev, struct netdev_queue *txq)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
-	txq_trans_update(dev, txq);
-#else
-	txq_trans_update(txq);
-#endif
-}
 
 /**
  * wlan_hdd_update_txq_timestamp() - update txq timestamp
@@ -1248,7 +875,7 @@ static void wlan_hdd_update_txq_timestamp(struct net_device *dev)
 	struct netdev_queue *txq;
 	int i;
 
-	for (i = 0; i < dev->num_tx_queues; i++) {
+	for (i = 0; i < NUM_TX_QUEUES; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 
 		/*
@@ -1260,7 +887,7 @@ static void wlan_hdd_update_txq_timestamp(struct net_device *dev)
 		 */
 		if (!hdd_netdev_queue_is_locked(txq)) {
 			if (__netif_tx_trylock(txq)) {
-				hdd_txq_trans_update(dev, txq);
+				txq_trans_update(txq);
 				__netif_tx_unlock(txq);
 			}
 		}
@@ -1285,14 +912,11 @@ static void wlan_hdd_update_unpause_time(struct hdd_adapter *adapter)
  * wlan_hdd_update_pause_time() - update pause time
  * @adapter: adapter handle
  * @temp_map: pause map
- * @is_update_for_single_reason: whether pause time update is for single or
- *  multiple reasons
  *
  * Return: none
  */
 static void wlan_hdd_update_pause_time(struct hdd_adapter *adapter,
-				       uint32_t temp_map,
-				       bool is_update_for_single_reason)
+				       uint32_t temp_map)
 {
 	qdf_time_t curr_time = qdf_system_ticks();
 	uint8_t i;
@@ -1306,22 +930,20 @@ static void wlan_hdd_update_pause_time(struct hdd_adapter *adapter,
 		if (temp_map & (1 << i)) {
 			adapter->queue_oper_stats[i].total_pause_time +=
 								 pause_time;
-
-			if (is_update_for_single_reason)
-				break;
+			break;
 		}
 	}
+
 }
 
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *queue_history,
-				  uint8_t num_tx_queues, char *buf,
-				  uint32_t size)
+				  char *buf, uint32_t size)
 {
 	unsigned int i;
 	unsigned int index = 0;
 
-	for (i = 0; i < num_tx_queues; i++) {
+	for (i = 0; i < NUM_TX_QUEUES; i++) {
 		index += qdf_scnprintf(buf + index,
 				       size - index,
 				       "%u:0x%lx ",
@@ -1345,152 +967,16 @@ wlan_hdd_update_queue_history_state(struct net_device *dev,
 				    struct hdd_netif_queue_history *q_hist)
 {
 	unsigned int i = 0;
+	uint32_t num_tx_queues = 0;
 	struct netdev_queue *txq = NULL;
 
-	for (i = 0; i < dev->num_tx_queues; i++) {
+	num_tx_queues = qdf_min(dev->num_tx_queues, (uint32_t)NUM_TX_QUEUES);
+
+	for (i = 0; i < num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		q_hist->tx_q_state[i] = txq->state;
 	}
 }
-
-#ifdef NDP_TX_BW_FLOW_CTRL
-void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
-				  enum hdd_wmm_linuxac ac,
-				  uint8_t *txq_base_idx, uint8_t *num_queues)
-{
-	if (adapter->device_mode == QDF_NDI_MODE) {
-		if (ac == HDD_LINUX_AC_BE) {
-			*num_queues = NDP_NUM_TX_QUEUES_BE;
-			*txq_base_idx = TX_BE_BASE_QUEUE_IDX;
-		} else {
-			*num_queues = TX_QUEUES_PER_AC;
-			*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
-		}
-	} else {
-		*num_queues = TX_QUEUES_PER_AC;
-		*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
-	}
-}
-
-static
-void wlan_hdd_ndp_handle_bw_queue_control(struct hdd_adapter *adapter,
-					  enum netif_action_type action,
-					  enum netif_reason_type reason)
-{
-	enum cdp_peer_bw peer_bw;
-	bool is_queue_pause = false;
-	uint8_t bw_queue_base_index;
-	uint8_t peer_bitmap;
-	uint8_t peer_idx = -1;
-	uint8_t iter;
-
-	switch (action) {
-	case WLAN_NETIF_BE_20MHZ_QUEUE_OFF:
-		is_queue_pause = true;
-		fallthrough;
-	case WLAN_NETIF_BE_20MHZ_QUEUE_ON:
-		peer_bw = CDP_PEER_BW_20MHZ;
-		break;
-	case WLAN_NETIF_BE_40MHZ_QUEUE_OFF:
-		is_queue_pause = true;
-		fallthrough;
-	case WLAN_NETIF_BE_40MHZ_QUEUE_ON:
-		peer_bw = CDP_PEER_BW_40MHZ;
-		break;
-	case WLAN_NETIF_BE_80MHZ_QUEUE_OFF:
-		is_queue_pause = true;
-		fallthrough;
-	case WLAN_NETIF_BE_80MHZ_QUEUE_ON:
-		peer_bw = CDP_PEER_BW_80MHZ;
-		break;
-	case WLAN_NETIF_BE_160MHZ_QUEUE_OFF:
-		is_queue_pause = true;
-		fallthrough;
-	case WLAN_NETIF_BE_160MHZ_QUEUE_ON:
-		peer_bw = CDP_PEER_BW_160MHZ;
-		break;
-	case WLAN_NETIF_BE_320MHZ_QUEUE_OFF:
-		is_queue_pause = true;
-		fallthrough;
-	case WLAN_NETIF_BE_320MHZ_QUEUE_ON:
-		peer_bw = CDP_PEER_BW_320MHZ;
-		break;
-	default:
-		hdd_err("unsupported action for NDP interface %d", action);
-		return;
-	}
-
-	if (is_queue_pause) {
-		if (adapter->subqueue_pause_map)
-			wlan_hdd_update_pause_time(adapter,
-						   adapter->subqueue_pause_map,
-						   false);
-		else
-			wlan_hdd_update_unpause_time(adapter);
-
-		adapter->queue_oper_stats[reason].pause_count++;
-		adapter->subqueue_pause_map |= BIT(reason);
-		peer_bitmap = adapter->ndp_peer_bitmap[peer_bw];
-		adapter->ndp_peer_pause_bitmap[peer_bw] = peer_bitmap;
-	} else {
-		wlan_hdd_update_pause_time(adapter, adapter->subqueue_pause_map,
-					   false);
-		adapter->queue_oper_stats[reason].unpause_count++;
-		adapter->subqueue_pause_map &= ~BIT(reason);
-		peer_bitmap = adapter->ndp_peer_pause_bitmap[peer_bw];
-		adapter->ndp_peer_pause_bitmap[peer_bw] = 0;
-	}
-
-	for (; peer_bitmap != 0; peer_bitmap >>= 1) {
-		peer_idx++;
-		if (!(peer_bitmap & 0x1))
-			continue;
-
-		bw_queue_base_index = NDP_TX_GET_BE_QUEUE_IDX(HDD_LINUX_AC_BE,
-							      0, peer_idx);
-
-		if (is_queue_pause) {
-			for (iter = 0; iter < NDP_NUM_TX_QUEUES_PER_PEER;
-			     iter++)
-				netif_stop_subqueue(adapter->dev,
-						    bw_queue_base_index++);
-		} else {
-			for (iter = 0; iter < NDP_NUM_TX_QUEUES_PER_PEER;
-			     iter++)
-				netif_wake_subqueue(adapter->dev,
-						    bw_queue_base_index++);
-		}
-	}
-}
-
-static
-void wlan_hdd_ndp_reset_subq_map_n_stats(struct hdd_adapter *adapter)
-{
-	uint8_t i;
-
-	for (i = WLAN_DATA_FLOW_CTRL_BE_20MHZ;
-	     i <= WLAN_DATA_FLOW_CTRL_BE_320MHZ; i++) {
-		if (!(adapter->subqueue_pause_map & BIT(i)))
-			continue;
-
-		adapter->queue_oper_stats[i].unpause_count++;
-		adapter->subqueue_pause_map &= ~BIT(i);
-	}
-}
-
-#else
-static inline
-void wlan_hdd_ndp_handle_bw_queue_control(struct hdd_adapter *adapter,
-					  enum netif_action_type action,
-					  enum netif_reason_type reason)
-{
-}
-
-static inline
-void wlan_hdd_ndp_reset_subq_map_n_stats(struct hdd_adapter *adapter)
-{
-}
-#endif
 
 /**
  * wlan_hdd_stop_non_priority_queue() - stop non priority queues
@@ -1500,17 +986,17 @@ void wlan_hdd_ndp_reset_subq_map_n_stats(struct hdd_adapter *adapter)
  */
 static inline void wlan_hdd_stop_non_priority_queue(struct hdd_adapter *adapter)
 {
-	enum hdd_wmm_linuxac ac;
-	uint8_t num_queues_for_ac;
-	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	for (ac = HDD_LINUX_AC_VO; ac < HDD_LINUX_AC_MAX; ac++) {
-		wlan_hdd_get_txq_info_for_ac(adapter, ac, &ac_txq_idx,
-					     &num_queues_for_ac);
-
-		for (i = 0; i < num_queues_for_ac; i++)
-			netif_stop_subqueue(adapter->dev, ac_txq_idx++);
+	for (i = 0; i < TX_QUEUES_PER_AC; i++) {
+		netif_stop_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VO, i));
+		netif_stop_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VI, i));
+		netif_stop_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BE, i));
+		netif_stop_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BK, i));
 	}
 }
 
@@ -1522,46 +1008,36 @@ static inline void wlan_hdd_stop_non_priority_queue(struct hdd_adapter *adapter)
  */
 static inline void wlan_hdd_wake_non_priority_queue(struct hdd_adapter *adapter)
 {
-	enum hdd_wmm_linuxac ac;
-	uint8_t num_queues_for_ac;
-	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	for (ac = HDD_LINUX_AC_VO; ac < HDD_LINUX_AC_MAX; ac++) {
-		wlan_hdd_get_txq_info_for_ac(adapter, ac, &ac_txq_idx,
-					     &num_queues_for_ac);
-
-		for (i = 0; i < num_queues_for_ac; i++)
-			netif_wake_subqueue(adapter->dev, ac_txq_idx++);
+	for (i = 0; i < TX_QUEUES_PER_AC; i++) {
+		netif_wake_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VO, i));
+		netif_wake_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VI, i));
+		netif_wake_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BE, i));
+		netif_wake_subqueue(adapter->dev,
+				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BK, i));
 	}
 }
 
 static inline
 void hdd_wake_queues_for_ac(struct net_device *dev, enum hdd_wmm_linuxac ac)
 {
-	uint8_t num_queues_for_ac;
-	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	wlan_hdd_get_txq_info_for_ac(WLAN_HDD_GET_PRIV_PTR(dev), ac,
-				     &ac_txq_idx, &num_queues_for_ac);
-
-	for (i = 0; i < num_queues_for_ac; i++)
-		netif_wake_subqueue(dev, ac_txq_idx++);
+	for (i = 0; i < TX_QUEUES_PER_AC; i++)
+		netif_wake_subqueue(dev, TX_GET_QUEUE_IDX(ac, i));
 }
 
 static inline
 void hdd_stop_queues_for_ac(struct net_device *dev, enum hdd_wmm_linuxac ac)
 {
-	uint8_t num_queues_for_ac;
-	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	wlan_hdd_get_txq_info_for_ac(WLAN_HDD_GET_PRIV_PTR(dev), ac,
-				     &ac_txq_idx, &num_queues_for_ac);
-
-	for (i = 0; i < num_queues_for_ac; i++)
-		netif_stop_subqueue(dev, ac_txq_idx++);
+	for (i = 0; i < TX_QUEUES_PER_AC; i++)
+		netif_stop_subqueue(dev, TX_GET_QUEUE_IDX(ac, i));
 }
 
 /**
@@ -1632,15 +1108,14 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (reason == WLAN_DATA_FLOW_CTRL_PRI) {
 			temp_map = adapter->subqueue_pause_map;
 			adapter->subqueue_pause_map &= ~(1 << reason);
-			wlan_hdd_update_pause_time(adapter, temp_map, false);
 		} else {
 			temp_map = adapter->pause_map;
 			adapter->pause_map &= ~(1 << reason);
-			wlan_hdd_update_pause_time(adapter, temp_map, true);
 		}
 		if (!adapter->pause_map) {
 			netif_wake_subqueue(adapter->dev,
-				TX_HI_PRIO_QUEUE_IDX);
+				HDD_LINUX_AC_HI_PRIO * TX_QUEUES_PER_AC);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1649,18 +1124,14 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		spin_lock_bh(&adapter->pause_map_lock);
 		if (!adapter->pause_map) {
 			netif_stop_subqueue(adapter->dev,
-				    TX_HI_PRIO_QUEUE_IDX);
+				    HDD_LINUX_AC_HI_PRIO * TX_QUEUES_PER_AC);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-		}
-		if (reason == WLAN_DATA_FLOW_CTRL_PRI) {
-			wlan_hdd_update_pause_time(adapter,
-						   adapter->subqueue_pause_map,
-						   false);
-			adapter->subqueue_pause_map |= (1 << reason);
-		} else {
 			wlan_hdd_update_unpause_time(adapter);
-			adapter->pause_map |= (1 << reason);
 		}
+		if (reason == WLAN_DATA_FLOW_CTRL_PRI)
+			adapter->subqueue_pause_map |= (1 << reason);
+		else
+			adapter->pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
 
@@ -1670,12 +1141,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_BK);
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_BE);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			if (adapter->subqueue_pause_map)
-				wlan_hdd_update_pause_time(adapter,
-						adapter->subqueue_pause_map,
-						false);
-			else
-				wlan_hdd_update_unpause_time(adapter);
+			wlan_hdd_update_unpause_time(adapter);
 		}
 		adapter->subqueue_pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
@@ -1688,10 +1154,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (!adapter->pause_map) {
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_BK);
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_BE);
-			wlan_hdd_update_pause_time(adapter, temp_map, false);
-			if (adapter->device_mode == QDF_NDI_MODE &&
-			    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc))
-				wlan_hdd_ndp_reset_subq_map_n_stats(adapter);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1701,9 +1164,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (!adapter->pause_map) {
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_VI);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			wlan_hdd_update_pause_time(adapter,
-						   adapter->subqueue_pause_map,
-						   false);
+			wlan_hdd_update_unpause_time(adapter);
 		}
 		adapter->subqueue_pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
@@ -1715,7 +1176,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->subqueue_pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_VI);
-			wlan_hdd_update_pause_time(adapter, temp_map, false);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1725,9 +1186,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (!adapter->pause_map) {
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_VO);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			wlan_hdd_update_pause_time(adapter,
-						   adapter->subqueue_pause_map,
-						   false);
+			wlan_hdd_update_unpause_time(adapter);
 		}
 		adapter->subqueue_pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
@@ -1739,7 +1198,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->subqueue_pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_VO);
-			wlan_hdd_update_pause_time(adapter, temp_map, false);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1750,7 +1209,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			netif_tx_start_all_queues(adapter->dev);
-			wlan_hdd_update_pause_time(adapter, temp_map, true);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1761,7 +1220,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			netif_tx_wake_all_queues(adapter->dev);
-			wlan_hdd_update_pause_time(adapter, temp_map, true);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1772,7 +1231,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			wlan_hdd_wake_non_priority_queue(adapter);
-			wlan_hdd_update_pause_time(adapter, temp_map, true);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1796,7 +1255,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			netif_tx_start_all_queues(adapter->dev);
-			wlan_hdd_update_pause_time(adapter, temp_map, true);
+			wlan_hdd_update_pause_time(adapter, temp_map);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1805,17 +1264,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		break;
 
 	default:
-		if (adapter->device_mode == QDF_NDI_MODE &&
-		    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc)) {
-			spin_lock_bh(&adapter->pause_map_lock);
-			if (!adapter->pause_map)
-				wlan_hdd_ndp_handle_bw_queue_control(adapter,
-								     action,
-								     reason);
-			spin_unlock_bh(&adapter->pause_map_lock);
-		} else {
-			hdd_err("unsupported action %d", action);
-		}
+		hdd_err("unsupported action %d", action);
 	}
 
 	spin_lock_bh(&adapter->pause_map_lock);
@@ -1867,11 +1316,6 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 	struct ol_txrx_desc_type sta_desc = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_objmgr_vdev *vdev;
-	struct qdf_mac_addr *mac;
-	bool eht_capab = false;
-
-	if (!link_info)
-		return QDF_STATUS_E_INVAL;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev) {
@@ -1879,18 +1323,8 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (eht_capab && !qdf_is_macaddr_zero(&link_info->link_addr)) {
-		WLAN_ADDR_COPY(sta_desc.peer_addr.bytes,
-			       link_info->link_addr.bytes);
-	} else {
-		mac = hdd_adapter_get_link_mac_addr(link_info);
-		if (!mac) {
-			hdd_err("Invalid MAC address for monitor link");
-			return QDF_STATUS_E_INVAL;
-		}
-		WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, mac->bytes);
-	}
+	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes,
+		       link_info->link_addr.bytes);
 
 	qdf_status = ucfg_dp_mon_register_txrx_ops(vdev);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
@@ -1910,10 +1344,9 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 		return qdf_status;
 	}
 
-	qdf_status = sme_create_pe_session(hdd_ctx->mac_handle,
-					   sta_desc.peer_addr.bytes,
-					   link_info->vdev_id,
-					   QDF_MONITOR_MODE);
+	qdf_status = sme_create_mon_session(hdd_ctx->mac_handle,
+					    link_info->link_addr.bytes,
+					    link_info->vdev_id);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		hdd_err("sme_create_mon_session() failed to register. Status= %d [0x%08X]",
 			qdf_status, qdf_status);
@@ -1928,18 +1361,6 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	int ret;
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct wlan_hdd_link_info *link_info;
-
-	if (cds_get_conparam() != QDF_GLOBAL_MONITOR_MODE &&
-	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
-	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
-		hdd_info("Acquire wakelock for STA + monitor mode");
-		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE,
-				      QDF_WAKE_TIME_UNDEFINED);
-		hdd_lpc_disable_powersave(hdd_ctx);
-		qdf_runtime_pm_prevent_suspend_sync(
-			&hdd_ctx->runtime_context.monitor_mode);
-	}
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		qdf_status = wlan_hdd_init_mon_link(hdd_ctx, link_info);

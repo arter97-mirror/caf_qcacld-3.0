@@ -33,6 +33,7 @@
 #include "wlan_wfa_config_public_struct.h"
 #include "wlan_connectivity_logging.h"
 
+#define MAC_MAX_ADD_IE_LENGTH       2048
 /* Join probe request Retry  timer default (200)ms */
 #define JOIN_PROBE_REQ_TIMER_MS              200
 #define MAX_JOIN_PROBE_REQ                   5
@@ -161,8 +162,6 @@ struct wlan_mlme_tx_ops {
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
- * @miracast_opt_wakelock: wakelock to allow to stop miracast_opt in time
- * @miracast_opt_timer: timer to stop miracast_opt in time to avoid F/W assert
  */
 struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
@@ -173,8 +172,6 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
-	qdf_wake_lock_t miracast_opt_wakelock;
-	qdf_timer_t miracast_opt_timer;
 };
 
 /**
@@ -189,12 +186,10 @@ struct wlan_disconnect_info {
 /**
  * struct sae_auth_retry - SAE auth retry Information
  * @sae_auth_max_retry: Max number of sae auth retries
- * @cookie: cookie value
  * @sae_auth: SAE auth frame information
  */
 struct sae_auth_retry {
 	uint8_t sae_auth_max_retry;
-	uint64_t cookie;
 	struct element_info sae_auth;
 };
 
@@ -209,6 +204,10 @@ struct sae_auth_retry {
  * @twt_ctx: TWT context
  * @disallow_kickout: False if the peer can be kicked out. Peer can't be kicked
  *                 out if it is being steered
+ * @nss: Peer NSS
+ * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
+ * @peer_set_key_runtime_wakelock: runtime pm wakelock for set key
+ * @is_key_wakelock_set: flag to check if key wakelock is pending to release
  * @assoc_rsp: assoc rsp IE received during connection
  * @peer_ind_bw: peer indication channel bandwidth
  */
@@ -225,6 +224,10 @@ struct peer_mlme_priv_obj {
 #ifdef WLAN_FEATURE_SON
 	bool disallow_kickout;
 #endif
+	uint8_t nss;
+	qdf_wake_lock_t peer_set_key_wakelock;
+	qdf_runtime_lock_t peer_set_key_runtime_wakelock;
+	bool is_key_wakelock_set;
 	struct element_info assoc_rsp;
 	enum phy_ch_width peer_ind_bw;
 };
@@ -416,21 +419,14 @@ struct ft_context {
 /**
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
- * @cur_ch_width: current channel width update in beacon eht_op/he_op/vht_op
- *  ht_info_IE/omn_ie or after csa
- * @update_from_ap: before get max bandwidth, user space maybe set bandwidth
- *  or beacon bw update or csa. we don't know which action occur first,
- *  when this flag is true, it means bcn update bw in op ie or CSA occur, get
- *  max bandwidth will from cur_ch_width;
- *  when this flag is false, it means, no csa or bcn bw update occur and get
- *  bandwidth from bss_chan->ch_width.
+ * @cur_ch_width: current channel width update in beacon eht/he/vht op and
+ *  ht info IE or omn ie
  * @sec_2g_freq: secondary 2 GHz freq
  * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
 	enum phy_ch_width cur_ch_width;
-	bool update_from_ap;
 	qdf_freq_t sec_2g_freq;
 	qdf_freq_t cen320_freq;
 };
@@ -496,78 +492,6 @@ struct wait_for_key_timer {
 };
 
 /**
- * struct sap_ch_switch_info - sap channel switch info
- * @target_chan_freq: target channel frequency
- * @user_provided_target_chan_freq: user provided target channel frequency
- * @csa_ie_required: csa ie required
- * @orig_chan_width: original channel width
- * @new_chan_width: new channel width
- * @new_ch_params: new channel params
- * @tx_leakage_threshold: tx leakage threshold
- * @sap_ch_switch_beacon_cnt: channel switch beacon count
- * @sap_ch_switch_mode: sap channel switch mode
- * @reduced_beacon_interval: reduced beacon interval
- */
-
-struct sap_ch_switch_info {
-	/*
-	 * New channel frequency to move to when a  Radar is
-	 * detected on current Channel
-	 */
-	uint32_t target_chan_freq;
-	uint32_t user_provided_target_chan_freq;
-
-	/*
-	 * Requests for Channel Switch Announcement IE
-	 * generation and transmission
-	 */
-	uint8_t csa_ie_required;
-	/*
-	 * New channel width and new channel bonding mode
-	 * will only be updated via channel fallback mechanism
-	 */
-	enum phy_ch_width orig_chan_width;
-	enum phy_ch_width new_chan_width;
-	struct ch_params new_ch_params;
-
-	/*
-	 * Flag to indicate if DFS test mode is enabled and
-	 * channel switch is disabled.
-	 */
-	uint16_t tx_leakage_threshold;
-
-	/* beacon count before channel switch */
-	int8_t sap_ch_switch_beacon_cnt;
-	uint8_t sap_ch_switch_mode;
-	uint16_t reduced_beacon_interval;
-};
-
-/**
- * struct sap_chan_info - sap best channel
- * @channel_24ghz: 2.4 GHz best channel
- * @num_chan: number of channels
- */
-struct sap_chan_info {
-	uint32_t channel_24ghz[MAX_24GHZ_CHANNEL];
-	uint8_t num_chan;
-};
-
-/*
- * struct sap_man_chan_info - sap mandatory channel info
- * @sap_man_chan: The user preferred master list on
- * which SAP can be brought up. This
- * mandatory channel freq list would be as per
- * OEMs preference & conforming to the
- * regulatory/other considerations
- * @sap_man_chan_len: Length of the SAP mandatory
- * channel list
- */
-struct sap_man_chan_info {
-	uint32_t sap_man_chan[NUM_CHANNELS];
-	uint32_t sap_man_chan_len;
-};
-
-/**
  * struct mlme_ap_config - VDEV MLME legacy private SAP
  * related configurations
  * @user_config_sap_ch_freq : Frequency from userspace to start SAP
@@ -576,13 +500,6 @@ struct sap_man_chan_info {
  * @ap_policy: Concurrent ap policy config
  * @oper_ch_width: SAP current operating ch_width
  * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
- * @ch_switch_info: channel switch info
- * @is_owe_conn: is owe connection
- * @supports_nss_change: Set to true if current SAP/P2P-GO session can upgrade
- * or downgrade NSS on HW mode change, else false
- * @acs_bandmask: Bitmap of the bands on which ACS is performed
- * @best_chan_info: best 2ghz channel
- * @man_chan_info: sap mandatory channel info
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -592,12 +509,6 @@ struct mlme_ap_config {
 	enum host_concurrent_ap_policy ap_policy;
 	enum phy_ch_width oper_ch_width;
 	uint8_t psd_20mhz;
-	struct sap_ch_switch_info ch_switch_info;
-	bool is_owe_conn;
-	bool supports_nss_change;
-	uint32_t acs_bandmask;
-	struct sap_chan_info best_chan_info;
-	struct sap_man_chan_info man_chan_info;
 };
 
 /**
@@ -879,14 +790,6 @@ struct enhance_roam_info {
 };
 
 /**
- * struct dar_config - Dynamic Analytics Report (DAR) configuration and state
- * @dar_feature_bitmap: Bitmap indicating enabled DAR features.
- */
-struct dar_config {
-	uint32_t dar_feature_bitmap;
-};
-
-/**
  * struct mlme_legacy_priv - VDEV MLME legacy priv object
  * @chan_switch_in_progress: flag to indicate that channel switch is in progress
  * @hidden_ssid_restart_in_progress: flag to indicate hidden ssid restart is
@@ -906,7 +809,6 @@ struct dar_config {
  * @cm_roam: Roaming configuration
  * @auth_log: Cached log records for SAE authentication frame
  * related information.
- * @instance: instance id for each wlan_log_record
  * @roam_info: enhanced roam information include trigger, scan and
  *  frame information.
  * @roam_cache_num: number of roam information cached in driver
@@ -928,13 +830,6 @@ struct dar_config {
  * @connect_info: mlme connect information
  * @wait_key_timer: wait key timer
  * @eht_config: Eht capability configuration
- * @smd_enabled: SMD enabled flag for this vdev
- * @security_profile_enabled: Security Profile enabled flag for this vdev
- * @ml_reconfig_ie: link reconfig ie raw data
- * @elem_len: link reconfig ie length
- * @link_removal_delay_for_csa: link removal when SAP is doing CSA, wait for
- *                              CSA and vdev restart completed, send link
- *                              removal wmi to fw
  * @last_delba_sent_time: Last delba sent time to handle back to back delba
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
@@ -948,16 +843,14 @@ struct dar_config {
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
  * @is_single_link_mlo_roam: Single link mlo roam flag
+ * @bss_color_change_wakelock: wakelock to complete bss color change
+ *				operation on bss color collision detection
+ * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
  * @best_6g_power_type: best 6g power type
  * @mac_id: vdev mac_id
  * @ap_nss: AP advertised NSS
  * @keep_alive_period: KEEPALIVE period in seconds
- * @is_acs_sap: Sets to true if this is an ACS SAP
- * @uhr_config: UHR capability configuration
- * @dar_info: DAR feature info, e.g. DAR feature bitmap
- * @kck: PTK KCK used to compute the MME MIC for 802.1X-in-Auth association
- * @kck_len: length in bytes of the stored KCK
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -973,16 +866,15 @@ struct mlme_legacy_priv {
 	uint8_t sta_dynamic_oce_value;
 	struct wlan_disconnect_info disconnect_info;
 	uint32_t vdev_stop_type;
-	struct wlan_mlme_roam *mlme_roam;
+	struct wlan_mlme_roam mlme_roam;
 	struct wlan_cm_roam cm_roam;
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
 		defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 	struct wlan_log_record
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(CONNECTIVITY_DIAG_EVENT)
-	struct wlan_diag_packet
+	struct wlan_diag_packet_info
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
-	uint8_t instance;
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
@@ -1012,15 +904,6 @@ struct mlme_legacy_priv {
 #ifdef WLAN_FEATURE_11BE
 	tDot11fIEeht_cap eht_config;
 #endif
-#ifdef WLAN_FEATURE_11BN_SMD
-	bool smd_enabled;
-	bool security_profile_enabled;
-#endif
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
-	uint8_t *ml_reconfig_ie;
-	uint16_t elem_len;
-	bool link_removal_delay_for_csa;
-#endif
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
@@ -1037,20 +920,13 @@ struct mlme_legacy_priv {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool is_single_link_mlo_roam;
 #endif
+	qdf_wake_lock_t bss_color_change_wakelock;
+	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
 	enum reg_6g_ap_type best_6g_power_type;
 	uint32_t mac_id;
 	uint8_t ap_nss;
 	uint16_t keep_alive_period;
-	bool is_acs_sap;
-#ifdef WLAN_FEATURE_11BN
-	struct wlan_mlme_uhr_caps uhr_config;
-#endif
-	struct dar_config dar_info;
-#ifdef WLAN_FEATURE_11BI_SECURITY
-	uint8_t kck[MAX_KCK_LEN];
-	uint16_t kck_len;
-#endif
 };
 
 /**
@@ -1132,54 +1008,6 @@ mlme_peer_object_destroyed_notification(struct wlan_objmgr_peer *peer,
 uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev);
 
 /**
- * mlme_is_nss_chains_force_config() - Check if NSS/chains have forced
- * configuration
- * @cfg: Pointer to the MLME NSS chains configuration structure
- *
- * This function checks if any of the NSS or chains configurations for 2.4GHz or
- * 5GHz bands are set to forced mode (BAND_REQ_FORCE).
- *
- * Return: true if any band has forced NSS or chains configuration,
- *         false otherwise
- */
-bool mlme_is_nss_chains_force_config(struct wlan_mlme_nss_chains *cfg);
-
-/**
- * mlme_get_ini_vdev_config() - get the vdev ini config params
- * @vdev: vdev pointer
- *
- * Return: pointer to the ini vdev config structure
- */
-struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
-					struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_get_nss_chain_shift() - API to fetch NSS shift for mode
- * @device_mode: Mode to fetch shift
- *
- * Returns the shift from the LSB for the NSS bits for the given
- * mode.
- */
-uint8_t mlme_get_nss_chain_shift(enum QDF_OPMODE device_mode);
-
-/**
- * mlme_fetch_psoc_nss_chain_params_for_mode() - fill nss/chain params for mode
- * @psoc: pointer to psoc object
- * @mode_ini_cfg: output nss/chain config to populate
- * @device_mode: vdev operating mode
- * @rf_chains_supported: max rf chains supported by fw/hw
- * @cfg_src: source config to use, current INI or startup snapshot
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-mlme_fetch_psoc_nss_chain_params_for_mode(struct wlan_objmgr_psoc *psoc,
-					  struct wlan_mlme_nss_chains *mode_ini_cfg,
-					  enum QDF_OPMODE device_mode,
-					  uint8_t rf_chains_supported,
-					  enum wlan_mlme_cfg_nss_src cfg_src);
-
-/**
  * mlme_get_dynamic_vdev_config() - get the vdev dynamic config params
  * @vdev: vdev pointer
  *
@@ -1187,243 +1015,6 @@ mlme_fetch_psoc_nss_chain_params_for_mode(struct wlan_objmgr_psoc *psoc,
  */
 struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
 					struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_get_vdev_nss_by_freq_from_cfg() - Get the NSS values for a given
- * frequency band
- * @vdev: Pointer to vdev object
- * @cfg: Pointer to the NSS chains config
- * @freq: Frequency for which NSS values are required
- * @tx_nss: Pointer to store the TX NSS value
- * @rx_nss: Pointer to store the RX NSS value
- *
- * This function determines the band (2.4GHz or 5GHz) based on the given
- * frequency and returns the corresponding TX and RX NSS values from the config.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
- */
-QDF_STATUS mlme_get_vdev_nss_by_freq_from_cfg(struct wlan_objmgr_vdev *vdev,
-					      struct wlan_mlme_nss_chains *cfg,
-					      qdf_freq_t freq, uint8_t *tx_nss,
-					      uint8_t *rx_nss);
-
-/**
- * mlme_get_vdev_all_bands_nss_from_cfg() - Get the NSS values for all bands
- * @vdev: Pointer to vdev object
- * @cfg: Pointer to the NSS chains config
- * @tx_nss_2g: Pointer to store the 2.4GHz TX NSS value
- * @rx_nss_2g: Pointer to store the 2.4GHz RX NSS value
- * @tx_nss_5g: Pointer to store the 5GHz TX NSS value
- * @rx_nss_5g: Pointer to store the 5GHz RX NSS value
- *
- * This function retrieves the TX and RX NSS values for both 2.4GHz and 5GHz
- * bands from the provided NSS chains configuration.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
- */
-QDF_STATUS
-mlme_get_vdev_all_bands_nss_from_cfg(struct wlan_objmgr_vdev *vdev,
-				     struct wlan_mlme_nss_chains *cfg,
-				     uint8_t *tx_nss_2g, uint8_t *rx_nss_2g,
-				     uint8_t *tx_nss_5g, uint8_t *rx_nss_5g);
-
-/**
- * mlme_is_vdev_nss_differs_across_bands_from_cfg() - Check if NSS values
- * differ across bands
- * @vdev: Pointer to vdev object
- * @cfg: Pointer to the NSS chains config
- *
- * This function checks if the TX and RX NSS values are different
- * between 2.4GHz and 5GHz bands for the given vdev configuration.
- *
- * Return: true if NSS values differ across bands, false otherwise or on error
- */
-bool
-mlme_is_vdev_nss_differs_across_bands_from_cfg(struct wlan_objmgr_vdev *vdev,
-					       struct wlan_mlme_nss_chains *cfg);
-
-/**
- * mlme_get_vdev_nss_by_freq_from_ini() - Get NSS values from INI config
- * for a frequency band
- * @vdev: Pointer to vdev object
- * @freq: Frequency for which NSS values are required
- * @tx_nss: Pointer to store the TX NSS value
- * @rx_nss: Pointer to store the RX NSS value
- *
- * This function retrieves the TX and RX NSS values from the INI configuration
- * for the specified frequency.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
- */
-static inline
-QDF_STATUS mlme_get_vdev_nss_by_freq_from_ini(struct wlan_objmgr_vdev *vdev,
-					      qdf_freq_t freq, uint8_t *tx_nss,
-					      uint8_t *rx_nss)
-{
-	struct wlan_mlme_nss_chains *cfg = mlme_get_ini_vdev_config(vdev);
-
-	return mlme_get_vdev_nss_by_freq_from_cfg(vdev, cfg, freq,
-						  tx_nss, rx_nss);
-}
-
-/**
- * mlme_get_vdev_all_bands_nss_from_ini() - Get NSS values for all bands
- * from INI config
- * @vdev: Pointer to vdev object
- * @tx_nss_2g: Pointer to store the 2.4GHz TX NSS value
- * @rx_nss_2g: Pointer to store the 2.4GHz RX NSS value
- * @tx_nss_5g: Pointer to store the 5GHz TX NSS value
- * @rx_nss_5g: Pointer to store the 5GHz RX NSS value
- *
- * This function retrieves the TX and RX NSS values for both 2.4GHz and 5GHz
- * bands from the INI configuration.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
- */
-static inline
-QDF_STATUS mlme_get_vdev_all_bands_nss_from_ini(struct wlan_objmgr_vdev *vdev,
-						uint8_t *tx_nss_2g,
-						uint8_t *rx_nss_2g,
-						uint8_t *tx_nss_5g,
-						uint8_t *rx_nss_5g)
-{
-	struct wlan_mlme_nss_chains *cfg = mlme_get_ini_vdev_config(vdev);
-
-	return mlme_get_vdev_all_bands_nss_from_cfg(vdev, cfg,
-						    tx_nss_2g, rx_nss_2g,
-						    tx_nss_5g, rx_nss_5g);
-}
-
-/**
- * mlme_is_vdev_nss_differs_across_bands_from_ini() - Check if NSS values differ
- * across bands in INI config
- * @vdev: Pointer to vdev object
- *
- * This function checks if the TX and RX NSS values are different between
- * 2.4GHz and 5GHz bands in the INI configuration.
- *
- * Return: true if NSS values differ across bands, false otherwise or on error
- */
-static inline bool
-mlme_is_vdev_nss_differs_across_bands_from_ini(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlme_nss_chains *cfg = mlme_get_ini_vdev_config(vdev);
-
-	return mlme_is_vdev_nss_differs_across_bands_from_cfg(vdev, cfg);
-}
-
-/**
- * mlme_get_vdev_nss_by_freq_from_dyn() - Get NSS values from dynamic config
- * for a frequency band
- * @vdev: Pointer to vdev object
- * @freq: Frequency for which NSS values are required
- * @tx_nss: Pointer to store the TX NSS value
- * @rx_nss: Pointer to store the RX NSS value
- *
- * This function retrieves the TX and RX NSS values from the dynamic
- * configuration for the specified frequency.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
- */
-static inline
-QDF_STATUS mlme_get_vdev_nss_by_freq_from_dyn(struct wlan_objmgr_vdev *vdev,
-					      qdf_freq_t freq, uint8_t *tx_nss,
-					      uint8_t *rx_nss)
-{
-	struct wlan_mlme_nss_chains *cfg = mlme_get_dynamic_vdev_config(vdev);
-
-	return mlme_get_vdev_nss_by_freq_from_cfg(vdev, cfg, freq,
-						  tx_nss, rx_nss);
-}
-
-/**
- * mlme_get_vdev_all_bands_nss_from_dyn() - Get NSS values for all bands
- * from dynamic config
- * @vdev: Pointer to vdev object
- * @tx_nss_2g: Pointer to store the 2.4GHz TX NSS value
- * @rx_nss_2g: Pointer to store the 2.4GHz RX NSS value
- * @tx_nss_5g: Pointer to store the 5GHz TX NSS value
- * @rx_nss_5g: Pointer to store the 5GHz RX NSS value
- *
- * This function retrieves the TX and RX NSS values for both 2.4GHz and 5GHz
- * bands from the dynamic configuration.
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
- */
-static inline
-QDF_STATUS mlme_get_vdev_all_bands_nss_from_dyn(struct wlan_objmgr_vdev *vdev,
-						uint8_t *tx_nss_2g,
-						uint8_t *rx_nss_2g,
-						uint8_t *tx_nss_5g,
-						uint8_t *rx_nss_5g)
-{
-	struct wlan_mlme_nss_chains *cfg = mlme_get_dynamic_vdev_config(vdev);
-
-	return mlme_get_vdev_all_bands_nss_from_cfg(vdev, cfg,
-						    tx_nss_2g, rx_nss_2g,
-						    tx_nss_5g, rx_nss_5g);
-}
-
-/**
- * mlme_is_vdev_nss_differs_across_bands_from_dyn() - Check if NSS values differ
- * across bands in dynamic config
- * @vdev: Pointer to vdev object
- *
- * This function checks if the TX and RX NSS values are different between
- * 2.4GHz and 5GHz bands in the dynamic configuration.
- *
- * Return: true if NSS values differ across bands, false otherwise or on error
- */
-static inline bool
-mlme_is_vdev_nss_differs_across_bands_from_dyn(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlme_nss_chains *cfg = mlme_get_dynamic_vdev_config(vdev);
-
-	return mlme_is_vdev_nss_differs_across_bands_from_cfg(vdev, cfg);
-}
-
-/**
- * mlme_vdev_get_bss_oper_ch_width_res() - Get BSS operational channel width
- * @vdev: Pointer to vdev object
- * @ch_width: Pointer to store the channel width
- *
- * This function retrieves the BSS operational channel width from the vdev's
- * BSS operational resource parameters. If the channel width is not valid,
- * CH_WIDTH_INVALID is returned.
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS on successful retrieval of channel
- *                      width or QDF_STATUS_E_* on error
- */
-QDF_STATUS mlme_vdev_get_bss_oper_ch_width_res(struct wlan_objmgr_vdev *vdev,
-					       enum phy_ch_width *ch_width);
-
-/**
- * mlme_vdev_determine_bss_oper_nss_chains_res() - Determine BSS operational
- * NSS and chains
- * @vdev: Pointer to vdev object
- * @tx_nss: Pointer to store the determined transmit NSS
- * @rx_nss: Pointer to store the determined receive NSS
- * @tx_chains: Pointer to store the determined transmit chains
- * @rx_chains: Pointer to store the determined receive chains
- *
- * This function determines the operational NSS (Number of Spatial Streams) and
- * chains for a BSS by considering multiple factors:
- * - Hardware capabilities (available chains)
- * - BSS operational parameters
- * - Dynamic and static vdev NSS/Chains configurations
- * - Band-specific settings (2.4GHz or 5GHz)
- *
- * The function calculates the final values by taking the minimum of all
- * applicable constraints to ensure compatibility across all layers.
- *
- * Return: QDF_STATUS_SUCCESS on successful determination
- *         Other QDF_STATUS error codes on failure
- */
-QDF_STATUS
-mlme_vdev_determine_bss_oper_nss_chains_res(struct wlan_objmgr_vdev *vdev,
-					    uint8_t *tx_nss, uint8_t *rx_nss,
-					    uint8_t *tx_chains,
-					    uint8_t *rx_chains);
 
 /**
  * mlme_get_vdev_he_ops()  - Get vdev HE operations IE info
@@ -1444,6 +1035,15 @@ uint32_t mlme_get_vdev_he_ops(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  */
 QDF_STATUS mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id);
+
+/**
+ * mlme_get_ini_vdev_config() - get the vdev ini config params
+ * @vdev: vdev pointer
+ *
+ * Return: pointer to the ini vdev config structure
+ */
+struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
+					struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_cfg_on_psoc_enable() - Populate MLME structure from CFG and INI
@@ -1497,7 +1097,7 @@ void mlme_set_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev,
 				  struct element_info *ie);
 
 /**
- * mlme_free_peer_disconnect_ies() - Free the peer disconnect IEs
+ * mlme_free_peer_disconnect_ies() - Free the peer diconnect IEs
  * @vdev: vdev pointer
  *
  * Return: None
@@ -1563,7 +1163,7 @@ bool mlme_get_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id);
 
 /**
- * mlme_get_peer_disconnect_ies() - Get disconnect IEs from vdev object
+ * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object
  * @vdev: vdev pointer
  *
  * Return: Returns a pointer to the peer disconnect IEs present in vdev object
@@ -1737,18 +1337,6 @@ wlan_get_op_chan_freq_info_vdev_id(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id, qdf_freq_t *op_freq,
 				   qdf_freq_t *freq_seg_0,
 				   enum phy_ch_width *ch_width);
-
-/**
- * wlan_get_chan_by_vdev_id() - get chan info by vdev id
- * @psoc: Pointer to psoc
- * @vdev_id: vdev id
- * @channel: channel info
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_get_chan_by_vdev_id(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id,
-				    struct wlan_channel *channel);
 
 /**
  * wlan_strip_ie() - strip requested IE from IE buffer
@@ -2035,6 +1623,13 @@ QDF_STATUS mlme_get_cfg_wlm_reset(struct wlan_objmgr_psoc *psoc,
 #define MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
 #endif
 
+#if defined (WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+#define MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) \
+		(mlme_get_roam_state(psoc, vdev_id) == WLAN_MLO_ROAM_SYNCH_IN_PROG)
+#else
+#define MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
+#endif
+
 /**
  * mlme_reinit_control_config_lfr_params() - Reinitialize roam control config
  * @psoc: PSOC pointer
@@ -2066,7 +1661,7 @@ QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
 
 /**
  * wlan_acquire_peer_key_wakelock -api to get key wakelock
- * @vdev: pointer to vdev object
+ * @pdev: pdev
  * @mac_addr: peer mac addr
  *
  * This function acquires wakelock and prevent runtime pm during key
@@ -2074,12 +1669,12 @@ QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
  *
  * Return: None
  */
-void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_vdev *vdev,
+void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
 				    uint8_t *mac_addr);
 
 /**
  * wlan_release_peer_key_wakelock -api to release key wakelock
- * @vdev: pointer to vdev object
+ * @pdev: pdev
  * @mac_addr: peer mac addr
  *
  * This function releases wakelock and allow runtime pm after key
@@ -2087,7 +1682,7 @@ void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_vdev *vdev,
  *
  * Return: None
  */
-void wlan_release_peer_key_wakelock(struct wlan_objmgr_vdev *vdev,
+void wlan_release_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
 				    uint8_t *mac_addr);
 
 /**
@@ -2101,25 +1696,6 @@ qdf_freq_t
 wlan_get_sap_user_config_freq(struct wlan_objmgr_vdev *vdev);
 
 /**
- * wlan_sap_is_owe_connection_present() - Is owe connection
- * @vdev: vdev
- *
- * Return: true if owe connection present
- */
-bool wlan_sap_is_owe_connection_present(struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_sap_set_owe_connection_support() - set owe connection present
- * @vdev: vdev ctx
- * @is_present: is owe present
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_sap_set_owe_connection_support(
-				struct wlan_objmgr_vdev *vdev,
-				bool is_present);
-
-/**
  * wlan_set_sap_user_config_freq() - Set the user configured frequency
  *
  * @vdev: pointer to vdev
@@ -2130,45 +1706,6 @@ QDF_STATUS wlan_sap_set_owe_connection_support(
 QDF_STATUS
 wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 			      qdf_freq_t freq);
-
-/**
- * wlan_set_sap_best_channel_2ghz() - set sap best channel
- * @vdev: vdev ctx
- * @ch_info: channel info
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_set_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
-					  struct sap_sel_ch_info *ch_info);
-
-/**
- * wlan_get_sap_best_channel_2ghz() - get sap best channel
- * @vdev: vdev ctx
- * @chan_list: channel list
- * @num_chan: number of channel
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_get_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
-					  uint32_t **chan_list,
-					  uint8_t *num_chan);
-
-/**
- * wlan_get_sap_man_chan_info() - get sap mandatory channel info
- * @vdev: vdev ctx
- *
- * Return: sap mandatory channel info
- */
-struct sap_man_chan_info
-*wlan_get_sap_man_chan_info(struct wlan_objmgr_vdev *vdev);
-/**
- * wlan_get_sap_ch_sw_info() - get sap channel switch info
- * @vdev: vdev ctx
- *
- * Return: sap new channel switch info
- */
-struct sap_ch_switch_info
-*wlan_get_sap_ch_sw_info(struct wlan_objmgr_vdev *vdev);
 
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
@@ -2214,19 +1751,6 @@ wlan_set_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 bool
 wlan_get_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id);
-
-/**
- * wlan_get_link_removed_flag_by_link_id() - Get link removed flag by link_id
- * @vdev: Base link's vdev object
- * @link_id: Link ID to check
- *
- * This function checks if a specific link (identified by link_id) has been
- * marked for removal. It works for both active links and standby links.
- *
- * Return: true if link is marked for removal, false otherwise
- */
-bool wlan_get_link_removed_flag_by_link_id(struct wlan_objmgr_vdev *vdev,
-					   uint8_t link_id);
 
 /**
  * wlan_drop_mgmt_frame_on_link_removal() - Check mgmt frame
@@ -2362,134 +1886,6 @@ QDF_STATUS
 wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev,
 			 uint8_t *rx_nss);
-
-/**
- * mlme_init_fw_chain_cfg() - Initialize the psoc mlme's FW chains info
- * @psoc: Pointer to PSOC object manager.
- * @chain_cfg: Extracted FW chains info to save
- *
- * Save the FW chains info contained in @chain_cfg to psoc mlme priv object.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_mlme_chain_cfg *chain_cfg);
-
-/**
- * mlme_update_max_fw_chains_cfg() - API updates the max supported FW chains
- * in psoc mlme priv
- * @psoc: Pointer to PSOC object manager
- * @tx_chains: max supported Tx chains
- * @rx_chains: max supported Rx chains
- *
- * Update the Tx/Rx chains from FW to the values pointed by @tx_chains and
- * @rx_chains.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
-					 uint8_t tx_chains, uint8_t rx_chains);
-
-/**
- * mlme_set_ht_mcsset_for_nss() - API to fill the MCS set for HT capability IE
- * @psoc: PSOC object manager pointer
- * @ht_caps: Pointer to whole HT caps
- * @mcs_set: Pointer to MCS set of the HT caps
- * @tx_nss: Value of Tx NSS to fill
- * @rx_nss: Value of Rx NSS to fill
- *
- * Fill the Tx/Rx NSS in the buffer pointed by @ht_caps / @mcs_set within
- * the HT caps limit (4SS)
- *
- * Return: void
- */
-void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
-				tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
-				uint8_t tx_nss, uint8_t rx_nss);
-
-#ifdef WLAN_FEATURE_11BE
-/**
- * mlme_set_eht_mcsset_for_nss - Set EHT MCS set based on NSS
- * @eht_cap: Pointer to EHT capabilities structure
- * @tx_nss: Transmit NSS value to be set
- * @rx_nss: Receive NSS value to be set
- *
- * This function updates the EHT capabilities structure with the provided
- * transmit and receive NSS values. It sets the maximum NSS values for
- * different bandwidths and MCS ranges if they are present and different
- * from the provided NSS values.
- *
- * Return: None
- */
-void mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
-				 uint8_t tx_nss, uint8_t rx_nss);
-#else
-static inline void mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
-					       uint8_t tx_nss, uint8_t rx_nss)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_11AX
-/**
- * mlme_set_he_mcsset_for_nss() - Set HE MCS set for NSS
- * @mlme_cfg: Pointer to PSOC MLME private comp
- * @dst_he_cap: Pointer to destination HE capability structure
- * @tx_nss: Transmit NSS value
- * @rx_nss: Receive NSS value
- *
- * This function sets the HE MCS map for the given NSS values. It updates
- * the destination HE capability structure with modified MCS maps that
- * disable MCS rates for spatial streams beyond the specified NSS values.
- *
- * Return: None
- */
-void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
-				tDot11fIEhe_cap *dst_he_cap,
-				uint8_t tx_nss, uint8_t rx_nss);
-
-/**
- * mlme_sym_he_mcsset_for_nss() - Symmetrize HE MCS-NSS to max of Tx/Rx
- * @he_cap: Pointer to HE capability structure to update in-place
- * @tx_nss: Transmit NSS value
- * @rx_nss: Receive NSS value
- *
- * Directly copies the MCS maps of the higher-NSS direction onto the
- * lower-NSS direction across all bandwidths (lt_80, 160, 80_80), so
- * the advertised Tx and Rx capabilities are symmetric at max(tx_nss,
- * rx_nss). Unlike mlme_set_he_mcsset_for_nss(), this does not use
- * base_he_cap from mlme_cfg, so it works even when the base caps have
- * already been limited to the lower NSS.
- *
- * Return: None
- */
-void mlme_sym_he_mcsset_for_nss(tDot11fIEhe_cap *he_cap,
-				uint8_t tx_nss, uint8_t rx_nss);
-#else
-static inline void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
-					      tDot11fIEhe_cap *dst_he_cap,
-					      uint8_t tx_nss, uint8_t rx_nss)
-{
-}
-
-static inline void mlme_sym_he_mcsset_for_nss(tDot11fIEhe_cap *he_cap,
-					      uint8_t tx_nss, uint8_t rx_nss)
-{
-}
-#endif
-
-/**
- * wlan_mlme_get_cur_ch_width_update_from_ap() - API to get current channel
- * width from AP
- *
- * @vdev: pointer to vdev
- * @cur_ch_width : current ch width
- *
- * Return: true if there is update else false
- */
-bool
-wlan_mlme_get_cur_ch_width_update_from_ap(struct wlan_objmgr_vdev *vdev,
-					  enum phy_ch_width *cur_ch_width);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -2662,11 +2058,13 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 
 /**
  * wlan_mlme_get_vdev_mac_id() - get mac id for the vdev
- * @vdev: vdev obj
+ * @pdev: pdev obj
+ * @vdev_id: vdev id
  *
  *  Return: mac_id on which vdev is present
  */
-uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_vdev *vdev);
+uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id);
 
 /**
  * wlan_mlme_get_sap_psd_for_20mhz() - Get the PSD power for 20 MHz
@@ -2743,7 +2141,7 @@ mlme_set_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev, uint16_t seq_num);
  */
 uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev);
 
-#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * wlan_get_wfd_mode_from_vdev_id() - Get WFD mode from VDEV ID
  * @psoc: pointer to PSOC object
@@ -2759,7 +2157,7 @@ wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	return 0xFF;
 }
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC*/
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
  * wlan_is_scc_tpc_power_supp_enabled() - Is FW SCC TPC support enabled
@@ -2779,55 +2177,4 @@ wlan_is_scc_tpc_power_supp_enabled(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS
 mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
-
-#ifdef CONFIG_BAND_6GHZ
-/**
- * mlme_get_c2c_support () - Get C2C support info
- * @psoc: psoc ctx
- * @value: c2c support flag pointer
- *
- * Return: QDF STATUS
- */
-QDF_STATUS
-mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value);
-#else
-static inline QDF_STATUS
-mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
-{
-	*value = false;
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
-
-/*
- * wlan_sap_get_acs_band_mask() - Get the reg band bitmap of the ACS channels
- * @vdev: pointer to vdev object
- *
- * Return: REG BAND bitmap
- */
-uint32_t wlan_sap_get_acs_band_mask(struct wlan_objmgr_vdev *vdev);
-
-/*
- * wlan_sap_set_acs_band_mask()- Set the band bitmap of the ACS channels list
- * @vdev: pointer to vdev object
- * @bitmap: bitmap of the acs list
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
-				      uint32_t bitmap);
-
-#if (defined(CONNECTIVITY_DIAG_EVENT) && \
-	defined(WLAN_FEATURE_ROAM_OFFLOAD))
-/**
- * mlme_reset_log_instance_id() - Clear log instance id
- * @vdev: vdev pointer
- *
- * Return: None
- */
-void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev);
-#else
-static inline void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev)
-{}
-#endif
 #endif

@@ -50,7 +50,7 @@ void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
 /**
  * wlan_hdd_check_11be_support() - check if beacon IE and update hw mode
  * @beacon: beacon IE buffer
- * @sap_hw_mode: pointer to sap hw mode
+ * @config: pointer to sap config
  *
  * Check if EHT cap IE is present in beacon IE, if present update hw mode
  * to 11be.
@@ -58,7 +58,7 @@ void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
  * Return: None
  */
 void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
-				 eCsrPhyMode *sap_hw_mode);
+				 struct sap_config *config);
 
 /**
  * hdd_update_wiphy_eht_cap() - update the wiphy with eht capabilities
@@ -69,29 +69,6 @@ void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
  * Return: None
  */
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx);
-
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
-    defined(CFG80211_IFTYPE_EXT_CAPAB_MLO_CAPS)
-/**
- * hdd_update_wiphy_mlo_sap_cap() - set MLO SAP EML/MLD caps in wiphy
- * @hdd_ctx: HDD context
- *
- * Populate wiphy->iftype_ext_capab for NL80211_IFTYPE_AP with the correct
- * mld_capa_and_ops so hostapd can advertise max simultaneous links in the
- * Multi-Link Element.  If wifi_pos (RTT/11AZ) already registered an AP
- * entry, the EML/MLD fields are patched into that entry instead of
- * replacing the pointer, so both capability sets coexist.
- *
- * Must be called after wlan_wifi_pos_cfg80211_set_wiphy_ext_feature().
- *
- * Return: None
- */
-void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx);
-#else
-static inline void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
-{
-}
-#endif
 
 /**
  * wlan_hdd_get_mlo_link_id() - get link id and number of links
@@ -126,14 +103,6 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 				    enum tx_rate_info rate_flags,
 				    uint8_t dcm,
 				    enum txrate_gi guard_interval);
-
-/**
- * hdd_map_eht_gi_to_os() - map txrate_gi to os guard interval
- * @guard_interval: guard interval get from fw rate
- *
- * Return: os guard interval value
- */
-uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval);
 #else
 static inline
 void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
@@ -142,16 +111,12 @@ void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
 }
 
 static inline void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
-					       eCsrPhyMode *sap_hw_mode)
+					       struct sap_config *config)
 {
 }
 
 static inline
 void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
-{
-}
-
-static inline void hdd_update_wiphy_mlo_sap_cap(struct hdd_context *hdd_ctx)
 {
 }
 
@@ -173,15 +138,10 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 				    enum txrate_gi guard_interval)
 {
 }
-
-static inline
-uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval)
-{
-	return 0;
-}
 #endif
 
-#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC) && \
+	defined(FEATURE_RX_LINKSPEED_ROAM_TRIGGER)
 /**
  * wlan_hdd_refill_os_eht_rateflags() - Refill EHT rate flag
  * @os_rate: rate info for os
@@ -189,9 +149,9 @@ uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval)
  *
  * Fill out os ETH MCS rate flag according to preamble.
  *
- * Return: true if preamble is EHT, false otherwise
+ * Return: none
  */
-bool
+void
 wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble);
 
 /**
@@ -206,10 +166,9 @@ wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble);
 void
 wlan_hdd_refill_os_eht_bw(struct rate_info *os_rate, enum rx_tlv_bw bw);
 #else
-static inline bool
+static inline void
 wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble)
 {
-	return false;
 }
 
 static inline void

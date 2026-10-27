@@ -44,8 +44,6 @@
 #include "lim_mlo.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "parser_api.h"
-#include <wlan_mlme_api.h>
-#include "wlan_scan_utils_api.h"
 
 /**
  * lim_validate_ie_information_in_probe_rsp_frame () - validates ie
@@ -104,76 +102,65 @@ lim_process_updated_ies_in_probe_rsp(struct mac_context *mac_ctx,
 	bool wme_enabled;
 	tpDphHashNode sta_ds;
 	QDF_STATUS status;
-	struct sir_dot11f_nss_info nss_ies;
 
-	if (session_entry->limMlmState != eLIM_MLM_LINK_ESTABLISHED_STATE)
-		return;
-	/*
-	 * Now Process EDCA Parameters, if EDCAParamSet
-	 * count is different.
-	 * -- While processing beacons in link established
-	 * state if it is determined that
-	 * QoS Info IE has a different count for EDCA Params,
-	 * and EDCA IE is not present in beacon,
-	 * then probe req is sent out to get the EDCA params.
-	 */
-	sta_ds = dph_get_hash_entry(mac_ctx, DPH_STA_HASH_INDEX_PEER,
-				    &session_entry->dph.dphHashTable);
+	if (session_entry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE) {
+		/*
+		 * Now Process EDCA Parameters, if EDCAParamSet
+		 * count is different.
+		 * -- While processing beacons in link established
+		 * state if it is determined that
+		 * QoS Info IE has a different count for EDCA Params,
+		 * and EDCA IE is not present in beacon,
+		 * then probe req is sent out to get the EDCA params.
+		 */
+		sta_ds = dph_get_hash_entry(mac_ctx, DPH_STA_HASH_INDEX_PEER,
+					    &session_entry->dph.dphHashTable);
 
-	limGetQosMode(session_entry, &qos_enabled);
-	limGetWmeMode(session_entry, &wme_enabled);
-	pe_debug("Vdev_id: %d mac: "QDF_MAC_ADDR_FMT" wmeEdcaPresent: %d wme_enabled: %d edcaPresent: %d, qos_enabled: %d edcaParams.qosInfo.count: %d schObject.gLimEdcaParamSetCount: %d",
-		 session_entry->vdev_id,
-		 QDF_MAC_ADDR_REF(session_entry->bssId),
-		 probe_rsp->wmeEdcaPresent, wme_enabled,
-		 probe_rsp->edcaPresent, qos_enabled,
-		 probe_rsp->edcaParams.qosInfo.count,
-		 session_entry->gLimEdcaParamSetCount);
+		limGetQosMode(session_entry, &qos_enabled);
+		limGetWmeMode(session_entry, &wme_enabled);
+		pe_debug("Vdev_id: %d mac: "QDF_MAC_ADDR_FMT" wmeEdcaPresent: %d wme_enabled: %d edcaPresent: %d, qos_enabled: %d edcaParams.qosInfo.count: %d schObject.gLimEdcaParamSetCount: %d",
+			 session_entry->vdev_id,
+			 QDF_MAC_ADDR_REF(session_entry->bssId),
+			 probe_rsp->wmeEdcaPresent, wme_enabled,
+			 probe_rsp->edcaPresent, qos_enabled,
+			 probe_rsp->edcaParams.qosInfo.count,
+			 session_entry->gLimEdcaParamSetCount);
 
-	if (((probe_rsp->wmeEdcaPresent && wme_enabled) ||
-	     (probe_rsp->edcaPresent && qos_enabled)) &&
-	    (probe_rsp->edcaParams.qosInfo.count !=
-	     session_entry->gLimEdcaParamSetCount)) {
-		status = sch_beacon_edca_process(mac_ctx,
-						 &probe_rsp->edcaParams,
-						 session_entry);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("EDCA param process error");
-		} else if (sta_ds) {
-			qdf_mem_copy(&sta_ds->qos.peer_edca_params,
-				     &probe_rsp->edcaParams,
-				     sizeof(probe_rsp->edcaParams));
-			/*
-			 * If needed, downgrade the
-			 * EDCA parameters
-			 */
-			lim_set_active_edca_params(mac_ctx,
-						   session_entry->gLimEdcaParams,
-						   session_entry);
-			lim_send_edca_params(mac_ctx,
-					     session_entry->gLimEdcaParamsActive,
-					     session_entry->vdev_id, false);
-			sch_qos_concurrency_update();
-		} else {
-			pe_err("SelfEntry missing in Hash");
+		if (((probe_rsp->wmeEdcaPresent && wme_enabled) ||
+		     (probe_rsp->edcaPresent && qos_enabled)) &&
+		    (probe_rsp->edcaParams.qosInfo.count !=
+		     session_entry->gLimEdcaParamSetCount)) {
+			status = sch_beacon_edca_process(mac_ctx,
+						    &probe_rsp->edcaParams,
+						    session_entry);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_err("EDCA param process error");
+			} else if (sta_ds) {
+				qdf_mem_copy(&sta_ds->qos.peer_edca_params,
+					     &probe_rsp->edcaParams,
+					     sizeof(probe_rsp->edcaParams));
+				/*
+				 * If needed, downgrade the
+				 * EDCA parameters
+				 */
+				lim_set_active_edca_params(mac_ctx,
+						session_entry->gLimEdcaParams,
+						session_entry);
+				lim_send_edca_params(mac_ctx,
+					session_entry->gLimEdcaParamsActive,
+					session_entry->vdev_id, false);
+				sch_qos_concurrency_update();
+			} else {
+				pe_err("SelfEntry missing in Hash");
+			}
+		}
+		if (session_entry->fWaitForProbeRsp) {
+			pe_warn("Check probe resp for caps change");
+			lim_detect_change_in_ap_capabilities(mac_ctx, probe_rsp,
+							     session_entry,
+							     false);
 		}
 	}
-	if (session_entry->fWaitForProbeRsp) {
-		pe_warn("Check probe resp for caps change");
-		lim_detect_change_in_ap_capabilities(mac_ctx, probe_rsp,
-						     session_entry, false);
-	}
-
-	if (!sta_ds) {
-		pe_err_rl("vdev %d: peer entry not found for " QDF_MAC_ADDR_FMT,
-			  session_entry->vdev_id,
-			  QDF_MAC_ADDR_REF(session_entry->bssId));
-		return;
-	}
-
-	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, probe_rsp,
-				  session_entry->dot11mode);
-	lim_update_nss(mac_ctx, sta_ds, nss_ies.op_rx_nss, session_entry);
 }
 
 void lim_process_gen_probe_rsp_frame(struct mac_context *mac_ctx,
@@ -245,13 +232,10 @@ lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("failed to add assoc link probe rsp %d freq %d", status,
 		       probe_rsp->chan_freq);
-	if (session_entry->curr_op_freq != probe_rsp->chan_freq)
-		pe_debug("probe_rsp->chan_freq %d curr_op_freq %d mismatching",
-			 probe_rsp->chan_freq, session_entry->curr_op_freq);
 
 	lim_update_mlo_mgr_info(mac_ctx, session_entry->vdev, mac_addr,
 				session_entry->lim_join_req->assoc_link_id,
-				session_entry->curr_op_freq);
+				probe_rsp->chan_freq);
 
 	link_info = mlo_mgr_get_ap_link_by_link_id(
 			session_entry->vdev->mlo_dev_ctx,
@@ -329,224 +313,6 @@ lim_validate_probe_rsp_mld_addr(struct pe_session *session,
 	return true;
 }
 #endif
-
-#ifdef WLAN_FEATURE_11BN
-/**
- * lim_handle_uhr_tx_ap_probe_rsp() - Handle TX AP probe response during
- *   UHR MBSSID non-TX AP connection.
- *
- * @mac_ctx:       Global MAC context
- * @session_entry: PE session for the non-TX AP being joined
- * @probe_rsp:     Parsed probe response frame
- * @ie_start:      Probe response IE pointer
- * @ie_len:        Probe response len
- *
- * When joining a UHR MBSSID non-TX AP, the join probe was redirected to the
- * TX AP (trans_bssid) since the TX AP's UHR CAP IE is only present in probe
- * responses. This handler intercepts the TX AP probe response, extracts the
- * UHR IEs, stops the join timers, restores the non-TX BSSID, and posts
- * JOIN_CNF to proceed to authentication against the non-TX AP.
- *
- * Must be called before lim_update_mlo_mgr_prb_info() to prevent the TX AP
- * frame from being silently dropped in MLO sessions.
- *
- * Return: true if handled (caller must goto mem_free), false otherwise.
- */
-static bool
-lim_handle_uhr_tx_ap_probe_rsp(struct mac_context *mac_ctx,
-			       struct pe_session *session_entry,
-			       tSirProbeRespBeacon *probe_rsp,
-			       uint8_t *ie_start,
-			       uint32_t ie_len)
-{
-	struct qdf_mac_addr nontx_bssid;
-	tLimMlmJoinCnf join_cnf;
-
-	if (session_entry->limMlmState != eLIM_MLM_WT_JOIN_BEACON_STATE ||
-	    !session_entry->uhr_nontx_mbssid_probe_to_tx_ap)
-		return false;
-
-	pe_debug("vdev %d: UHR MBSSID non-TX: TX AP probe rsp, extracting UHR IEs",
-		 session_entry->vdev_id);
-
-	/* UHR CAP intersection happens at assoc response time */
-	if (!probe_rsp->uhr_cap_ie.present)
-		pe_warn("vdev %d: TX AP probe rsp missing UHR CAP IE",
-			session_entry->vdev_id);
-
-	/* Extract full UHR OP IE from TX AP probe response */
-	if (probe_rsp->uhr_op_ie.present) {
-		qdf_mem_copy(&session_entry->uhr_op_ie, &probe_rsp->uhr_op_ie,
-			     sizeof(session_entry->uhr_op_ie));
-		pe_debug("vdev %d: UHR OP updated from TX AP: dps=%d npca=%d dbe=%d pedca=%d",
-			 session_entry->vdev_id,
-			 probe_rsp->uhr_op_ie.dps_enabled,
-			 probe_rsp->uhr_op_ie.npca_enabled,
-			 probe_rsp->uhr_op_ie.dbe_enabled,
-			 probe_rsp->uhr_op_ie.p_edca_enabled);
-	}
-
-	/*
-	 * Edge case: session->dot11mode was EHT because the non-TX profile
-	 * excluded UHR OP via non-inheritance, but the TX AP probe rsp
-	 * confirms UHR capability. Upgrade the session to UHR mode.
-	 */
-	if (!IS_DOT11_MODE_UHR(session_entry->dot11mode) &&
-	    probe_rsp->uhr_op_ie.present) {
-		pe_debug("vdev %d: UHR MBSSID: upgrading dot11mode EHT -> UHR",
-			 session_entry->vdev_id);
-		session_entry->dot11mode = MLME_DOT11_MODE_11BN;
-		lim_update_session_uhr_capable(session_entry, true);
-		lim_copy_join_req_uhr_cap(session_entry);
-	}
-
-	lim_deactivate_and_change_timer(mac_ctx, eLIM_JOIN_FAIL_TIMER);
-	lim_deactivate_and_change_timer(mac_ctx,
-					eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
-
-	/* Update non-TX scan entry with full UHR IEs from TX probe rsp */
-	qdf_mem_copy(&nontx_bssid, session_entry->saved_nontx_bssid,
-		     QDF_MAC_ADDR_SIZE);
-	util_scan_update_nontx_entry_uhr_ies(mac_ctx->pdev, &nontx_bssid,
-					     ie_start, ie_len);
-
-	/* Restore non-TX BSSID before posting JOIN_CNF */
-	qdf_mem_copy(session_entry->bssId, session_entry->saved_nontx_bssid,
-		     QDF_MAC_ADDR_SIZE);
-	session_entry->uhr_nontx_mbssid_probe_to_tx_ap = false;
-	/* Restore filter->sta_bssid back to non-TX BSSID */
-	lim_set_bcn_probe_filter(mac_ctx, session_entry, 0);
-
-	session_entry->limMlmState    = eLIM_MLM_JOINED_STATE;
-	join_cnf.sessionId      = session_entry->peSessionId;
-	join_cnf.resultCode     = eSIR_SME_SUCCESS;
-	join_cnf.protStatusCode = STATUS_SUCCESS;
-	lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF, (uint32_t *)&join_cnf);
-	return true;
-}
-#else
-static inline bool
-lim_handle_uhr_tx_ap_probe_rsp(struct mac_context *mac_ctx,
-			       struct pe_session *session_entry,
-			       tSirProbeRespBeacon *probe_rsp,
-			       uint8_t *ie_start,
-			       uint32_t ie_len)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_11BN */
-
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
-/**
- * lim_process_mcst_ie_in_probe_rsp_frame() - Process MCST IE in probe response
- * @mac_ctx: MAC context
- * @session: PE session
- * @probe_rsp: Probe response beacon structure
- *
- * This function processes MCST IE in probe response frame and sets
- * mlo_link_in_cac flag if the link is in CAC state.
- *
- * Return: None
- */
-static void
-lim_process_mcst_ie_in_probe_rsp_frame(struct mac_context *mac_ctx,
-				       struct pe_session *session,
-				       tpSirProbeRespBeacon probe_rsp)
-{
-	uint8_t link_id;
-	const uint8_t *mcst_ie;
-
-	if (!session || !probe_rsp || !mac_ctx) {
-		pe_err("invalid input parameters");
-		return;
-	}
-
-	/* Check if probe response contains MCST IE in per-STA profile */
-	if (!probe_rsp->mlo_ie.mlo_ie_present)
-		return;
-
-	if (session->mlo_sta_cac_info.mlo_link_in_cac)
-		return;
-	pe_debug("num_sta_profile=%d",
-		 probe_rsp->mlo_ie.mlo_ie.num_sta_profile);
-
-	/* Parse per-STA profiles to find MCST IE */
-	for (int i = 0; i < probe_rsp->mlo_ie.mlo_ie.num_sta_profile; i++) {
-		uint8_t *per_sta_pro = probe_rsp->mlo_ie.mlo_ie.sta_profile[i].data;
-		uint32_t per_sta_pro_len = probe_rsp->mlo_ie.mlo_ie.sta_profile[i].num_data;
-		uint16_t stacontrol;
-		uint8_t *sta_pro;
-		uint32_t sta_pro_len;
-		uint8_t sta_info_len;
-		uint8_t mcst_ext_id = WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME;
-		uint32_t min_len = sizeof(struct subelem_header) +
-				   WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE + 1;
-
-		/*
-		 * Validate the per-STA profile is long enough to hold the
-		 * subelement header, STA control field and the STA info length
-		 * byte before dereferencing them, to avoid an out-of-bounds
-		 * read from a malformed frame.
-		 */
-		if (!per_sta_pro || per_sta_pro_len < min_len) {
-			pe_err("vdev %d: per-STA profile too short (%u)",
-			       session->vdev_id, per_sta_pro_len);
-			continue;
-		}
-
-		stacontrol = *(uint16_t *)(per_sta_pro + sizeof(struct subelem_header));
-		sta_info_len = *(uint8_t *)(per_sta_pro + sizeof(struct subelem_header) +
-					    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE);
-
-		{
-			uint32_t hdr_sz = sizeof(struct subelem_header) +
-					  WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE +
-					  sta_info_len +
-					  WLAN_CAPABILITYINFO_LEN;
-
-			if (per_sta_pro_len <= hdr_sz) {
-				pe_err("vdev %d: per-STA profile too short (%u)",
-				       session->vdev_id, per_sta_pro_len);
-				continue;
-			}
-			sta_pro = per_sta_pro + hdr_sz;
-			sta_pro_len = per_sta_pro_len - hdr_sz;
-		}
-
-		/* Look for MCST IE (Maximum Channel Switch Time IE).
-		 * MCST IE is an Extended Element: EID=255 (WLAN_MAC_EID_EXT),
-		 * ExtID=52 (WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME).
-		 * Must use wlan_get_ext_ie_ptr_from_ext_id() which searches
-		 * for EID=255 then matches ExtID. Using wlan_get_ie_ptr_from_eid(52,...)
-		 * would search for EID=52 which is WRONG - MCST IE first byte is 255.
-		 */
-		mcst_ie = wlan_get_ext_ie_ptr_from_ext_id(&mcst_ext_id, 1,
-							  sta_pro, sta_pro_len);
-
-		if (mcst_ie) {
-			link_id = QDF_GET_BITS(stacontrol,
-					       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
-					       WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
-			pe_debug("vdev %d: Found MCST IE in probe rsp for link %d, set mlo_link_in_cac=true",
-				 session->vdev_id, link_id);
-
-			session->mlo_sta_cac_info.mlo_link_in_cac = true;
-			session->mlo_sta_cac_info.cac_link_id = link_id;
-
-			break;
-		}
-		pe_debug("mcst not found");
-	}
-}
-#else
-static void
-lim_process_mcst_ie_in_probe_rsp_frame(struct mac_context *mac_ctx,
-				       struct pe_session *session,
-				       tpSirProbeRespBeacon probe_rsp)
-{
-}
-#endif
-
 /**
  * lim_process_probe_rsp_frame() - processes received Probe Response frame
  * @mac_ctx: Pointer to Global MAC structure
@@ -612,19 +378,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 		pe_err("Parse error ProbeResponse, length=%d", frame_len);
 		goto mem_free;
 	}
-#ifdef WLAN_FEATURE_11BN
-	if (IS_DOT11_MODE_UHR(session_entry->dot11mode) &&
-	    probe_rsp->uhr_cap_ie.present)
-		session_entry->ap_uhr_cap = probe_rsp->uhr_cap_ie;
-#endif
-
-	/* Process MCST IE for MLO STA */
-	if (wlan_vdev_mlme_get_opmode(session_entry->vdev) == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
-		pe_debug("process mlo probe rsp");
-		lim_process_mcst_ie_in_probe_rsp_frame(mac_ctx, session_entry,
-						       probe_rsp);
-	}
 
 	if (!probe_rsp->chan_freq) {
 		probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);
@@ -637,17 +390,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 					session_entry->curr_op_freq)
 			probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);
 	}
-
-	/*
-	 * UHR MBSSID non-TX AP: if we are waiting for a TX AP probe rsp,
-	 * handle it here before any MLO or session checks that may filter
-	 * by BSSID. Returns true and completes the join if handled.
-	 * ie_start = body + 12 skips the fixed-length probe response header
-	 * (timestamp 8B + beacon interval 2B + capability 2B).
-	 */
-	if (lim_handle_uhr_tx_ap_probe_rsp(mac_ctx, session_entry, probe_rsp,
-					   body + 12, frame_len - 12))
-		goto mem_free;
 
 	if (!lim_validate_probe_rsp_mld_addr(session_entry, probe_rsp))
 		goto mem_free;
@@ -675,8 +417,7 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 					frame_len,
 					mac_ctx->lim.bss_rssi);
 
-	if (mlo_is_mld_sta(session_entry->vdev) &&
-	    wlan_cm_is_vdev_connected(session_entry->vdev)) {
+	if (mlo_is_mld_sta(session_entry->vdev)) {
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(probe_rsp, &bpcc);
 		if (QDF_IS_STATUS_SUCCESS(status)) {

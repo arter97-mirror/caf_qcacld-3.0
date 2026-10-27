@@ -26,7 +26,6 @@
 
 #include "wlan_p2p_cfg_api.h"
 #include <qdf_types.h>
-#include "wlan_p2p_tgt_api.h"
 
 struct wlan_objmgr_psoc;
 struct p2p_roc_req;
@@ -104,25 +103,6 @@ typedef QDF_STATUS (*mcc_quota_event_callback)(struct wlan_objmgr_psoc *psoc,
 					       struct mcc_quota_info *mcc_quota);
 
 /**
- * typedef p2p_mgmt_tx_expiry_callback() - Callback for mgmt tx expiry
- * @psoc: psoc object
- * @vdev_id: vdev id on which the mgmt tx was requested
- * @cookie: mgmt tx cookie (as returned to userspace by tx_mgmt) that
- *          expired without a tx status
- * @chan_freq: channel frequency on which the mgmt tx was requested
- *
- * This callback will be used to notify hdd that a mgmt frame tx
- * request has expired without receiving a tx status, so that hdd can
- * report it to cfg80211 via cfg80211_tx_mgmt_expired().
- *
- * Return: None
- */
-typedef void (*p2p_mgmt_tx_expiry_callback)(struct wlan_objmgr_psoc *psoc,
-					    uint32_t vdev_id,
-					    uint64_t cookie,
-					    qdf_freq_t chan_freq);
-
-/**
  * struct p2p_start_param - p2p soc start parameters. Below callbacks
  *                          will be registered by the HDD
  * @rx_cb:            Function pointer to hdd rx callback. This
@@ -140,9 +120,6 @@ typedef void (*p2p_mgmt_tx_expiry_callback)(struct wlan_objmgr_psoc *psoc,
  *                    callback. This function will be used to give
  *                    listen offload stopped event to hdd
  * @lo_event_cb_data: Pointer to p2p listen offload callback user data
- * @tx_expiry_cb:     Function pointer to hdd mgmt tx expiry callback.
- *                    This function will be used to notify hdd when a
- *                    mgmt tx request expires without a tx status
  */
 struct p2p_start_param {
 	p2p_rx_callback rx_cb;
@@ -155,7 +132,6 @@ struct p2p_start_param {
 	p2p_lo_event_callback lo_event_cb;
 	void *lo_event_cb_data;
 #endif
-	p2p_mgmt_tx_expiry_callback tx_expiry_cb;
 };
 
 /**
@@ -546,7 +522,7 @@ ucfg_is_p2p_device_dynamic_set_mac_addr_supported(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * ucfg_p2p_send_usd_params() - Sent USD parameters to target
  * @psoc: pointer to PSOC object
@@ -565,9 +541,8 @@ QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  * Return: true if USD is supported by FW else false
  */
 bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * ucfg_p2p_is_vdev_wfd_r2_mode() - Wrapper API to get VDEV WFD mode of
  * operation
@@ -578,42 +553,6 @@ bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
  * Return: bool
  */
 bool ucfg_p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_p2p_is_fw_support_wfd_r2() - wrapper API for API
- * p2p_is_fw_support_wfd_r2()
- * @psoc: pointer to PSOC object
- *
- * Return: true if WFD R2 is supported by FW else false
- */
-bool ucfg_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
-#else
-static inline bool ucfg_p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
-{
-	return false;
-}
-
-static inline bool ucfg_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-/**
- * ucfg_p2p_is_fw_support_pcc() - wrapper API of
- * p2p_is_fw_support_pcc()
- * @psoc: pointer to PSOC object
- *
- * Return: true if PCC is supported by FW else false
- */
-bool ucfg_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
-#else
-static inline bool ucfg_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
 
 /**
  * ucfg_p2p_fw_support_ap_assist_dfs_group() - Wrapper API to get the FW
@@ -762,11 +701,4 @@ bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS
 ucfg_p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val);
-
-static inline
-bool ucfg_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return tgt_p2p_is_fw_cancel_one_shot_noa_supported(psoc);
-}
-
 #endif /* _WLAN_P2P_UCFG_API_H_ */

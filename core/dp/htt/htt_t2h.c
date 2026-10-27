@@ -513,12 +513,6 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		uint8_t cookie;
 		uint8_t *stats_info_list;
 
-		if (qdf_nbuf_len(htt_t2h_msg) < (4 * sizeof(*msg_word))) {
-			qdf_print("invalid nbuff len");
-			WARN_ON(1);
-			break;
-		}
-
 		cookie = *(msg_word + 1);
 
 		stats_info_list = (uint8_t *) (msg_word + 3);
@@ -1104,12 +1098,11 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
  * @context: HTT context
  * @cmpl_msdus: netbuf completions
  * @num_cmpls: number of completions to be handled
- * @ce_id: copy engine id
  *
  * Return: None
  */
 void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
-			      uint32_t num_cmpls, unsigned int ce_id)
+			      uint32_t num_cmpls)
 {
 	struct htt_pdev_t *pdev = (struct htt_pdev_t *)context;
 	qdf_nbuf_t htt_t2h_msg;
@@ -1440,11 +1433,6 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 							*msg_word);
 			frag_ind = HTT_RX_IN_ORD_PADDR_IND_FRAG_GET(
 							*msg_word);
-
-			ol_rx_per_ce_stats_update(
-				pdev->txrx_pdev, ce_id,
-				HTT_RX_IN_ORD_PADDR_IND_MSDU_CNT_GET(
-							*(msg_word + 1)));
 
 			if (qdf_unlikely(frag_ind)) {
 				ol_rx_frag_indication_handler(

@@ -44,12 +44,13 @@ int os_if_fwol_set_elna_bypass(struct wlan_objmgr_vdev *vdev,
  * os_if_fwol_get_elna_bypass() - Get eLNA bypass
  * @vdev: Pointer to vdev
  * @skb: sk buffer to hold nl80211 attributes
- * @id: Request attribute ID
+ * @attr: Pointer to struct nlattr
  *
  * Return: 0 on success; error number otherwise
  */
 int os_if_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
-			       struct sk_buff *skb, uint32_t id);
+			       struct sk_buff *skb,
+			       const struct nlattr *attr);
 #else
 static inline int os_if_fwol_set_elna_bypass(struct wlan_objmgr_vdev *vdev,
 					     const struct nlattr *attr)
@@ -59,9 +60,9 @@ static inline int os_if_fwol_set_elna_bypass(struct wlan_objmgr_vdev *vdev,
 
 static inline int os_if_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
 					     struct sk_buff *skb,
-					     uint32_t id)
+					     const struct nlattr *attr)
 {
-	return -ENOTSUPP;
+	return 0;
 }
 #endif /* WLAN_FEATURE_ELNA */
 

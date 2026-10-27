@@ -76,60 +76,11 @@
  *   HT check – bit 3
  *   VHT check – bit 4
  *   Band info – bit 5
- *   MAC exclusion – bit 6 (set to 1 to enable MAC address exclusion)
+ *   reserved – bit 6 (should always be zero)
  *   reserved – bit 7 (should always be zero)
  * and should be constructed from right to left (b7b6b5b4b3b2b1b0)
  *
  * <Mac_Address_Mask> for <Mac_Address> should be constructed from left to right
- *
- * MAC Address Exclusion Feature (bit 6 of Info_Presence_Bit):
- * When bit 6 is set in Info_Presence_Bit, two additional tokens are expected:
- *   Token9 = MAC_Exclusion_Address (12 hex characters, 6 bytes)
- *   Token10 = MAC_Exclusion_Mask (2 hex characters, 1 byte)
- *
- * The MAC exclusion feature allows excluding specific MAC addresses from an OUI
- * configuration match. When an AP matches the OUI and other criteria, but its
- * MAC address matches the exclusion pattern, the action OUI will NOT be
- * applied.
- *
- * <MAC_Exclusion_Address> is 6 bytes (12 hex characters) representing the MAC
- * address pattern to exclude. This is typically the OUI (first 3 bytes) plus
- * additional bytes for more specific matching.
- *
- * <MAC_Exclusion_Mask> is 1 byte (2 hex characters) that controls which bytes
- * of the MAC address are checked:
- *   bit 7 (0x80) - Check first byte of MAC address
- *   bit 6 (0x40) - Check second byte of MAC address
- *   bit 5 (0x20) - Check third byte of MAC address
- *   bit 4 (0x10) - Check fourth byte of MAC address
- *   bit 3 (0x08) - Check fifth byte of MAC address
- *   bit 2 (0x04) - Check sixth byte of MAC address
- *   bits 0-1 - Reserved (should be 0)
- *
- * Common MAC_Exclusion_Mask values:
- *   0xE0 (11100000) - Match only first 3 bytes (OUI match)
- *   0xF8 (11111000) - Match all bytes except last byte
- *   0xFC (11111100) - Match all 6 bytes (exact MAC match)
- *
- * IMPORTANT: Each OUI configuration can have at most ONE MAC exclusion.
- * Multiple exclusions for the same OUI are not supported.
- *
- * Example with MAC Exclusion:
- * OUI is 00-10-18, no data, no capability, but exclude MAC 00-11-22-00-00-00
- * with OUI-level matching (first 3 bytes):
- *
- * gActionOUIExample=001018 00 41 001122000000 E0
- *
- * Explanation:
- *   001018 - OUI to match
- *   00 - Data length is 0 (no data)
- *   41 - Info mask: bit 0 (OUI check) + bit 6 (MAC exclusion) =
- *        0x01 + 0x40 = 0x41
- *   001122000000 - MAC address to exclude
- *   E0 - MAC mask: check first 3 bytes only (0x80 + 0x40 + 0x20 = 0xE0)
- *
- * In this example, the action OUI will match all APs with OUI 00-10-18,
- * EXCEPT those with MAC addresses starting with 00-11-22.
  *
  * <Capability> is 1 byte long and it contains the below info
  *   NSS – 4 bits starting from LSB (b0 – b3)
@@ -179,14 +130,13 @@
 
 /*
  * <ini>
- * gEnableActionOUI - Enable/Disable action oui feature and version
+ * gEnableActionOUI - Enable/Disable action oui feature
  * @Min: 0 (disable)
- * @Max: 2 (enable action oui v2)
- * @Default: 1
+ * @Max: 1 (enable)
+ * @Default: 1 (enable)
  *
  * This ini is used to enable the action oui feature to control
  * mode of connection, connected AP's in-activity time, Tx rate etc.,
- * it also set action oui version: 2 means V2, 1 means legacy V1.
  *
  * Related: If gEnableActionOUI is set, then at least one of the following inis
  * must be set with the proper action oui extensions:
@@ -198,10 +148,11 @@
  *
  * </ini>
  */
-#define CFG_ENABLE_ACTION_OUI CFG_INI_UINT( \
+#define CFG_ENABLE_ACTION_OUI CFG_INI_BOOL( \
 	"gEnableActionOUI", \
-	0, 2, 1, \
-	CFG_VALUE_OR_DEFAULT, "Configure action oui feature")
+	1, \
+	"Enable/Disable action oui feature")
+
 /*
  * <ini>
  * gActionOUIConnect1x1 - Used to specify action OUIs for 1x1 connection
@@ -549,7 +500,7 @@
  * This ini is used to specify AP OUIs. Some of AP doesn't response our
  * first association request, but it would response our second association
  * request. Add such OUI configuration INI to apply reconnect logic when
- * association timeout happens with such AP.
+ * association timeout happends with such AP.
  * For default:
  *     gActionOUIReconnAssocTimeout=00E04C 00 01
  *          Explain: 00E04C: OUI
@@ -616,7 +567,7 @@
 	"gActionOUIDisableTWT", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"001018 00 01 000986 00 01 000ce7 00 01 00e0fc 00 01 000b86 04 01040817 F0 01 000b86 04 0104080F F0 01 000b86 04 01040819 F0 01", \
+	"001018 00 01 000986 00 01 000ce7 00 01 00e0fc 00 01", \
 	"Used to specify action OUIs to control TWT configuration")
 
 /*
@@ -745,32 +696,6 @@
  */
 #define CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ CFG_INI_STRING( \
 	"gActionOUIAuthAssoc6Mbps2GHz", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"", \
-	"send auth/assoc req with 6 Mbps rate on 2.4 GHz for specified APs")
-
-/*
- * <ini>
- * gActionOUIAuthAssoc6Mbps2GHz_V2 - Used to send auth/assoc req with 6 Mbps
- * rate on 2.4 GHz for specified AP using Action OUI V2 expressions.
- *
- * Action OUI V2 supports "&&" and "||" operators, with "&&" having higher
- * priority than "||".  The V2 configuration is used only when both the host
- * and firmware support Action OUI V2.
- *
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ_V2 CFG_INI_STRING( \
-	"gActionOUIAuthAssoc6Mbps2GHz_V2", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
 	"", \
@@ -938,40 +863,7 @@
 
 /*
  * <ini>
- * gActionOUIRestrictSLO - Used to downgrade to single link connection for
- * specific AP build version.
- *
- * Sample OUIs: (All values in Hex)
- *   OUI 3 : 000CE7
- *   OUI data Len : 4
- *   OUI Data : 01000000
- *   OUI data Mask: F0
- *   Info Mask : 01 - only OUI present in Info mask
- *
- * gActionOUIRestrictSLO=000CE7 04 01000000 F0 01 000CE7 04 09000000 F0 01
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_RESTRICT_SLO CFG_INI_STRING( \
-	"gActionOUIRestrictSLO", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"", \
-	"To restrict matching OUI APs to single link connection at max")
-
-/*
- * <ini>
  * CFG_ACTION_OUI_LIMIT_BW - Used to limit BW for specified AP
- *
- * To avoid IoT issue, limit 2.4 GHz STA connection BW to 20MHz,
- * Limit 5/6 GHz STA connection TX BW to 40MHz
  *
  * Example OUIs: (All values in Hex)
  * OUI 1: 00904c
@@ -1025,65 +917,6 @@
 	"Used to specify action OUIs to control Aux listen configuration")
 
 /*
- * Macros for default NSS list type
- */
-#define ACTION_OUI_NSS_LIST_DENYLIST 0
-#define ACTION_OUI_NSS_LIST_ALLOWLIST 1
-
-/*
- * <cfg>
- * gActionOUIDefaultNSSListType - Used to specify default NSS list type
- * (0 for Blacklist or 1 for Whitelist)
- *
- * This CFG is used to specify whether the default NSS list should be treated
- * as a denylist (ACTION_OUI_NSS_LIST_DENYLIST = 0) or
- * allowlist (ACTION_OUI_NSS_LIST_ALLOWLIST = 1).
- * If host does not receive any vendor command or if host receives command to
- * clear the NSS list then this default
- * list type will be used along with gActionOUIDefaultNSSList.
- *
- * Supported Feature: Action OUIs
- *
- * Usage: Internal
- *
- * </cfg>
- */
-#define CFG_ACTION_OUI_DEFAULT_NSS_LIST_TYPE CFG_UINT( \
-	"gActionOUIDefaultNSSListType", \
-	ACTION_OUI_NSS_LIST_DENYLIST, \
-	ACTION_OUI_NSS_LIST_ALLOWLIST, \
-	ACTION_OUI_NSS_LIST_ALLOWLIST, \
-	CFG_VALUE_OR_DEFAULT, \
-	"Used to specify default NSS list type (0=BL/1=WL)")
-
-/*
- * <cfg>
- * gActionOUIDefaultNSSList - Used to specify default NSS list OUIs
- *
- * This CFG is used to specify default AP OUIs that will be used along with
- * gActionOUIDefaultNSSListType (which specifies whether this list is a
- * denylist or allowlist using ACTION_OUI_NSS_LIST_DENYLIST
- * or ACTION_OUI_NSS_LIST_ALLOWLIST).
- * If host does not receive any vendor command or if host receives command to
- * clear the NSS list then this default list will be used.
- * Note: User should strictly add new action OUIs at the end of this
- * default value.
- * If no OUI set (empty string), then no default list is applied.
- *
- * Supported Feature: Action OUIs
- *
- * Usage: Internal
- *
- * </cfg>
- */
-#define CFG_ACTION_OUI_DEFAULT_NSS_LIST CFG_STRING( \
-	"gActionOUIDefaultNSSList", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"", \
-	"Used to specify default NSS list OUIs")
-
-	/*
  * <ini>
  * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS - Used to disable Dynamic SMPS
  * capability for specified AP.
@@ -1110,211 +943,6 @@
 	"F832E4 00 01", \
 	"disable dynamic SMPS capability for specified AP")
 
-/*
- * <ini>
- * CFG_ACTION_OUI_EXT_MLD_CAP_OP - Used to Exclude Extended MLD
- * capability field in assoc request for specified AP.
- *
- * Default OUIs: (All values in Hex)
- * OUI 1: 000CE7
- *   OUI data Len: 00
- *   Info Mask : 01 - only OUI present in Info mask
- *
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_EXT_MLD_CAP_OP CFG_INI_STRING( \
-	"gActionOUIExtMLDCapOp", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"000CE7 00 01", \
-	"Exclude Extended MLD capability field for specified AP")
-
-/*
- * <ini>
- * CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK - Used to skip beacon
- * frame channel mismatch check for specified AP.
- *
- * Default OUIs: (All values in Hex)
- * OUI 1: 18FE34
- *   OUI data Len: 00
- *   Info Mask : 01 - only OUI present in Info mask
- *
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK CFG_INI_STRING( \
-	"gActionOUISkipBcnChMismatchCheck", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"18FE34 00 01", \
-	"skip beacon frame channel mismatch check for specified AP.")
-
-/*
- * <ini>
- * g_force_tx_null_frame_on_p2p – Used to avoid disconnecting p2p Go of no
- * beacon.
- *
- * Indicate sending qos null frames on p2p interface when final bmiss is
- * detected if specific vendor OUI is in beacon.
- * If an ACK is received, suppress reporting the final bmiss to the host for
- * avoiding a disconnect.
- *
- * If the INI is set to "ffffff 00 01", always send qos null frames on p2p
- * interface when final bmiss is detected.
- *
- * Related: None
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P CFG_INI_STRING( \
-	"g_force_tx_null_frame_on_p2p", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"", \
-	"Allow connection to APs without beacon frames")
-
-/*
- * <ini>
- * gActionOUIEnableAmsdu2G - Used to enable AMSDU for 2.4 GHz STA connections
- * with specified APs
- * @Default: ""
- *
- * This ini is used to specify AP OUIs for which AMSDU should be enabled
- * in ADDBA response frames for 2.4 GHz STA connections. By default, AMSDU is
- * only enabled for HE mode on 2.4 GHz or all modes on 5GHz. This action OUI
- * allows enabling AMSDU for HT/VHT (non-HE) STA connections on 2.4 GHz with
- * specific APs.
- *
- * Example:
- * To enable AMSDU for AP with OUI 00-11-22:
- * gActionOUIEnableAmsdu2G="001122 00 01"
- *
- * To enable AMSDU for multiple APs:
- * gActionOUIEnableAmsdu2G="001122 00 01 334455 00 01"
- *
- * Related: None
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_ENABLE_AMSDU_2G CFG_INI_STRING( \
-	"gActionOUIEnableAmsdu2G", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"", \
-	"Enable AMSDU for 2.4 GHz STA connections with specified APs")
-
-/*
- * <ini>
- * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 - Used to disable Dynamic SMPS
- * capability for specified AP.
- *
- * Default OUIs: (All values in Hex)
- * OUI 1: f832e4
- *   OUI data Len: 00
- *   Info Mask : 01 - only OUI present in Info mask
- *
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 CFG_INI_STRING( \
-	"gActionOUIDisableDynamicSMPS_V2", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"F832E4 00 01", \
-	"disable dynamic SMPS capability for specified AP")
-
-/*
- * <ini>
- * CFG_ACTION_OUI_EARLY_RX - Used to enable early RX feature for specified APs
- *
- * This ini is used to specify AP OUIs for which early RX feature should be
- * enabled to account for the drift in beacon reception.
- *
- * Default OUIs: (All values in Hex)
- * OUI 1: 000ce7
- *  OUI data Len: 00
- *  Info Mask : 03 - 0000 0011 - OUI and mac address present in Info mask
- *  Mac address : 3E:D2:E5:xx:xx:xx
- *  Mac mask : E0 - 1110 0000 - First three bytes of AP mac address
- *
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_EARLY_RX CFG_INI_STRING( \
-	"gActionOUIEarlyRx", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"000CE7 00 03 3ED2E5000000 E0", \
-	"Used to enable early RX feature for specified APs")
-
-/*
- * <ini>
- * CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE - Used to disable FW's OUI
- * BPCC-triggered WOW wakeup for specified IoT APs that change BPCC
- * very frequently
- *
- * Example OUIs: (All values in Hex)
- * gActionOUIDisableBPCCWowWake=00E04C 03 020160 E0 01
- *       OUI: 00E04C
- *       OUI data Len: 03
- *       OUI Data : 020160
- *       OUI data Mask: E0 - 11100000
- *       Info Mask : 01 - only OUI present in Info mask
- *
- * Refer to gEnableActionOUI for more detail about the format.
- *
- * Related: gEnableActionOUI
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE CFG_INI_STRING( \
-	"gActionOUIDisableBPCCWowWake", \
-	0, \
-	ACTION_OUI_MAX_STR_LEN, \
-	"", \
-	"disable OUI BPCC-triggered WOW wakeup for specified AP")
-
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -1333,34 +961,11 @@
 	CFG(CFG_ACTION_OUI_ENABLE_CTS2SELF) \
 	CFG(CFG_ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL) \
 	CFG(CFG_ACTION_OUI_RESTRICT_MAX_MLO_LINKS) \
-	CFG(CFG_ACTION_OUI_RESTRICT_SLO) \
 	CFG(CFG_ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN) \
 	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ) \
 	CFG(CFG_ACTION_OUI_DISABLE_BFORMEE) \
 	CFG(CFG_ACTION_OUI_LIMIT_BW) \
 	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
-	CFG(CFG_ACTION_OUI_DEFAULT_NSS_LIST_TYPE) \
-	CFG(CFG_ACTION_OUI_DEFAULT_NSS_LIST) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
-	CFG(CFG_ACTION_OUI_EXT_MLD_CAP_OP) \
-	CFG(CFG_ACTION_OUI_ENABLE_AMSDU_2G) \
-	CFG(CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK) \
-	CFG(CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P) \
-	CFG(CFG_ACTION_OUI_EARLY_RX) \
-	CFG(CFG_ACTION_OUI_DISABLE_OUI_BPCC_WOW_WAKE) \
 	CFG(CFG_ENABLE_ACTION_OUI)
-
-/* Action OUI V2 ini use different name format XXX_V2, support operator
- * "&&" or "||" between different OUI, "&&" priority is higher than "||",
- * such as: XXX_V2=OUI1 && OUI2 || OUI3 && OUI4
- *
- * For V2 ini name XXX_V2, if both host and F/W enabled action oui V2,  can be
- * parsed, otherwise, can't be parsed.
- *
- * For legacy ini name without V2, only support legacy operator, can't support
- * operator "&&", use space instead of "||".
- */
-#define CFG_ACTION_OUI_V2 \
-	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2) \
-	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ_V2)
 #endif

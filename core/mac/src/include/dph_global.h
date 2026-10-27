@@ -58,6 +58,40 @@ typedef struct sDphQosParams {
 	tSirMacEdcaParamSetIE peer_edca_params;
 } tDphQosParams;
 
+/**
+ * struct parsed_ies: Parsed IE's of BSS capability
+ * @ht_caps: HT caps IE
+ * @vht_caps: VHT caps IE
+ * @ht_operation: HT operation IE
+ * @vht_operation: VHT operation IE
+ * @hs20vendor_ie: HS2.0 vendor IE
+ * @he_operation: HE operation IE
+ * @srp_ie: Spatial Reuse Parameter IE
+ * @eht_operation: EHT IE
+ *
+ * This structure holds the parsed IE of connected BSS
+ * and this is not the intersection of BSS and STA
+ * capability. For example, if BSS supports 80 MHz
+ * and STA connects to BSS in 20 MHz, this structure
+ * holds 80 MHz as peer capability.
+ */
+struct parsed_ies {
+	tDot11fIEHTCaps ht_caps;
+	tDot11fIEVHTCaps vht_caps;
+	tDot11fIEHTInfo ht_operation;
+	tDot11fIEVHTOperation vht_operation;
+	tDot11fIEhs20vendor_ie hs20vendor_ie;
+#ifdef WLAN_FEATURE_11AX
+	tDot11fIEhe_op he_operation;
+#endif
+#ifdef WLAN_FEATURE_SR
+	tDot11fIEspatial_reuse srp_ie;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	tDot11fIEeht_op eht_operation;
+#endif
+};
+
 /* STA state node */
 typedef struct sDphHashNode {
 	/*
@@ -79,7 +113,6 @@ typedef struct sDphHashNode {
 	uint8_t fAniCount:1;
 	uint8_t rmfEnabled:1;
 	uint8_t ocv_enabled:1;
-	uint8_t post_csa_sa_query:1;
 	/* LIM state */
 	struct lim_sta_context mlmStaContext;
 	/* qos parameter info */
@@ -128,6 +161,7 @@ typedef struct sDphHashNode {
 
 	uint8_t vhtSupportedChannelWidthSet;
 	enum phy_ch_width ch_width;
+	uint8_t vhtSupportedRxNss;
 	uint8_t vhtBeamFormerCapable;
 	uint8_t vht_su_bfee_capable;
 	uint8_t vht_mcs_10_11_supp;
@@ -147,31 +181,15 @@ typedef struct sDphHashNode {
 #endif
 	uint8_t timingMeasCap;
 	/* key installed for this STA or not in the firmware */
+	uint8_t is_key_installed;
 	uint8_t is_disassoc_deauth_in_progress;
 
-	/* Intersected capability Tx NSS for this session */
-	uint8_t cap_tx_nss;
-	/* Intersected capability Rx NSS for this session */
-	uint8_t cap_rx_nss;
-	/* Intersected operating Tx NSS for this session */
-	uint8_t op_tx_nss;
-	/* Intersected operating Rx NSS for this session */
-	uint8_t op_rx_nss;
-	/*
-	 * Set when the peer lacks OMI/OMN support (HE omi_a_ctrl, VHT OMN,
-	 * EHT eht_om_ctl) and the AP must restrict the assoc response NSS to
-	 * the hw minimum across concurrent modes. Clear (default) for peers
-	 * that support OMI/OMN; those peers receive the full session NSS and
-	 * adjust their operating NSS dynamically via OMI frames.
-	 */
-	bool nss_hw_restricted;
+	uint8_t nss;
 	int8_t del_sta_ctx_rssi;
 	bool sta_deletion_in_progress;
 	/* Flag indicating connected STA doesn't support ECSA */
 	uint8_t non_ecsa_capable;
-#ifdef WLAN_FEATURE_SR
-	tDot11fIEspatial_reuse srp_ie;
-#endif
+	struct parsed_ies parsed_ies;
 	uint32_t last_ocv_done_freq;
 
 #ifdef WLAN_FEATURE_11AX
@@ -200,12 +218,6 @@ typedef struct sDphHashNode {
 	struct mlo_partner_info mlo_info;
 	struct wlan_mlo_eml_cap eml_info;
 	struct wlan_mlo_mld_cap mld_info;
-#endif
-	uint8_t peer_cck_rx_support_5ghz: 1,
-		peer_cck_tx_support_5ghz: 1;
-#ifdef WLAN_FEATURE_11BN
-	struct wlan_uhr_cap_info uhr_config;
-	struct wlan_uhr_op_ie uhr_op;
 #endif
 } tDphHashNode, *tpDphHashNode;
 

@@ -25,7 +25,6 @@
 #include "wlan_fpm_table.h"
 #endif
 #include <cdp_txrx_ctrl.h>
-#include <cdp_txrx_host_stats.h>
 
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
@@ -46,13 +45,6 @@ void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
 {
 	dp_print_fisa_rx_stats(stats_id);
 }
-
-#ifdef WLAN_DP_FEATURE_STC
-void wlan_dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id)
-{
-	dp_fisa_rx_fst_inv_peer_id(peer_id);
-}
-#endif
 
 void wlan_dp_set_fst_in_cmem(bool fst_in_cmem)
 {
@@ -204,9 +196,3 @@ wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
 						     num_channels);
 }
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */
-
-QDF_STATUS wlan_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
-				  struct cdp_vdev_stats *buf)
-{
-	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
-}

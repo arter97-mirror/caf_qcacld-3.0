@@ -137,7 +137,7 @@ QDF_STATUS target_if_p2p_set_ps(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS target_if_p2p_set_noa(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_id, bool disable_noa);
-#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
+#ifdef FEATURE_WLAN_SUPPORT_USD
 /**
  * target_if_p2p_send_usd_params() - send USD parameter to WMI layer
  * @psoc: pointer to PSOC object
@@ -156,37 +156,5 @@ QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  * Return: true if USD supported by FW otherwise false
  */
 bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
-/**
- * target_if_p2p_is_fw_support_wfd_r2() - return WFD R2 service capability
- * from FW.
- * @psoc: pointer to PSOC object
- *
- * Return: true if WFD R2 supported by FW otherwise false
- */
-bool target_if_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-/**
- * target_if_p2p_is_fw_support_pcc() - return PCC service capability
- * from FW.
- * @psoc: pointer to PSOC object
- *
- * Return: true if PCC supported by FW otherwise false
- */
-bool target_if_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
-
-/**
- * target_if_p2p_is_fw_cancel_one_shot_noa_supported() - Check if FW supports
- * cancel one shot NoA
- * @psoc: pointer to psoc object
- *
- * Return: true if FW supports cancel one shot NoA, false otherwise
- */
-bool target_if_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc);
-
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _TARGET_IF_P2P_H_ */

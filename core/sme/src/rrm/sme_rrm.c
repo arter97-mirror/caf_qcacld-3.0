@@ -166,9 +166,8 @@ static void rrm_indicate_neighbor_report_result(struct mac_context *mac,
 
 static QDF_STATUS
 sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
-				    uint8_t measurement_index,
-				    tCsrScanResultInfo **result_arr,
-				    uint8_t msrmnt_status, uint8_t bss_count)
+	uint8_t measurement_index, tCsrScanResultInfo **result_arr,
+	uint8_t msrmnt_status, uint8_t bss_count)
 {
 	struct bss_description *bss_desc = NULL;
 	tpSirBeaconReportXmitInd beacon_rep;
@@ -211,11 +210,13 @@ sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
 				break;
 			size =  bss_desc->length + sizeof(bss_desc->length);
 			beacon_rep->pBssDescription[i] = qdf_mem_malloc(size);
-			if (!beacon_rep->pBssDescription[i])
+			if (NULL ==
+				beacon_rep->pBssDescription[i])
 				break;
 			qdf_mem_copy(beacon_rep->pBssDescription[i],
-				     bss_desc, size);
-			tmp_bss_desc[i] = beacon_rep->pBssDescription[i];
+				bss_desc, size);
+			tmp_bss_desc[i] =
+				beacon_rep->pBssDescription[i];
 			sme_debug("RRM Result Bssid = " QDF_MAC_ADDR_FMT
 				  " freq= %d, rssi = -%d",
 				  QDF_MAC_ADDR_REF(
@@ -684,7 +685,7 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 
 	/*
 	 * Even if RRM scan response is received after roaming to different AP
-	 * the message shall be posted to PE for rrm cleanup.
+	 * the messege shall be posted to PE for rrm cleanup.
 	 */
 
 	freq_list = pSmeRrmContext->channelList.freq_list;
@@ -894,8 +895,6 @@ static void sme_rrm_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 
 #define RRM_CHAN_WEIGHT_CHAR_LEN 5
 #define RRM_MAX_CHAN_TO_PRINT 39
-#define RRM_SCAN_IDLE_TIME 25
-#define RRM_SCAN_REST_TIME 2 * RRM_SCAN_IDLE_TIME
 
 QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 {
@@ -1020,13 +1019,6 @@ QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 		}
 
 		req->scan_req.adaptive_dwell_time_mode = SCAN_DWELL_MODE_STATIC;
-
-		req->scan_req.max_rest_time = RRM_SCAN_REST_TIME;
-		req->scan_req.min_rest_time = RRM_SCAN_REST_TIME;
-		req->scan_req.idle_time = RRM_SCAN_IDLE_TIME;
-		req->scan_req.burst_duration = BURST_SCAN_MAX_NUM_OFFCHANNELS *
-					       RRM_SCAN_REST_TIME;
-
 		/*
 		 * For RRM scans timing is very important especially when the
 		 * request is for limited channels. There is no need for

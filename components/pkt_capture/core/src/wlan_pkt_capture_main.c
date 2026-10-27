@@ -764,9 +764,9 @@ pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
 		pkt_capture_err("Unable to send packet capture mode to fw");
 		goto send_mode_fail;
 	}
+
 	qdf_wake_lock_acquire(&vdev_priv->wake_lock,
-			      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE,
-			      QDF_WAKE_TIME_UNDEFINED);
+			      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
 	qdf_runtime_pm_prevent_suspend(&vdev_priv->runtime_lock);
 
 	return QDF_STATUS_SUCCESS;

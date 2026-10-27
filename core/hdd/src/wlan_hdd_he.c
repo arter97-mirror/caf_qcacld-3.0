@@ -66,19 +66,31 @@ qca_wlan_vendor_srp_param_policy[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_MAX + 1] = {
 void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 			   struct wma_tgt_cfg *cfg)
 {
-	sme_update_tgt_he_cap(hdd_ctx->mac_handle, cfg);
+	QDF_STATUS status;
+	tDot11fIEhe_cap he_cap_ini = {0};
+	uint8_t value = 0;
+
+	status = ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
+							&value);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("unable to get tx_bfee_ant_supp");
+
+	he_cap_ini.bfee_sts_lt_80 = value;
+	he_cap_ini.bfee_sts_gt_80 = value;
+	sme_update_tgt_he_cap(hdd_ctx->mac_handle, cfg, &he_cap_ini);
+
 	ucfg_mlme_update_tgt_he_cap(hdd_ctx->psoc, cfg);
 }
 
 void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
-				 eCsrPhyMode *sap_hw_mode)
+				 struct sap_config *config)
 {
 	const uint8_t *ie;
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE,
 					    beacon->tail, beacon->tail_len);
 	if (ie)
-		*sap_hw_mode = eCSR_DOT11_MODE_11ax;
+		config->SapHw_mode = eCSR_DOT11_MODE_11ax;
 }
 
 int hdd_update_he_cap_in_cfg(struct hdd_context *hdd_ctx)
@@ -646,7 +658,7 @@ static int hdd_clear_sr_stats(struct hdd_context *hdd_ctx, uint8_t mac_id)
  * @adapter: hdd adapter
  * @sr_ctrl: sr ctrl ie
  *
- * Return: true if provided mode supports SR else false
+ * Return: true if provided mode supports SR else flase
  */
 static bool hdd_check_mode_support_for_sr(struct hdd_adapter *adapter,
 					  uint8_t sr_ctrl)
@@ -808,7 +820,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			}
 		}
 		/**
-		 * As per current implementation from userspace same
+		 * As per currenct implementation from userspace same
 		 * PD threshold value is configured for both SRG and
 		 * NON-SRG and fw will decide further based on BSS color
 		 * So only SRG param is parsed and set as pd threshold

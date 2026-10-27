@@ -80,7 +80,7 @@ struct cpu_irq_load {
  * @audio_taken_cpumask: cpu mask which is being used by audio
  * @cpu_mask_change_time: time in ns at which cpu mask changed last time
  * subset of preferred_cpu_mask
- * @load_balance_lock: lock to protect load balance from multiple contexts
+ * @load_balance_lock: lock to protect load balace from multiple contexts
  * @last_stats_avg_comp_time: time since previous stats average computed in ns
  * @last_load_balanced_time: time since when the previous load balance is done
  *	in nanoseconds
@@ -90,7 +90,7 @@ struct cpu_irq_load {
  * @reo_cpu_map: REO to CPU mapping
  */
 struct wlan_dp_lb_data {
-	struct cpu_irq_load cpu_load[QDF_MAX_AVAILABLE_CPU];
+	struct cpu_irq_load cpu_load[NR_CPUS];
 	qdf_cpu_mask def_cpumask;
 	qdf_cpu_mask preferred_cpu_mask;
 	qdf_cpu_mask curr_cpu_mask;
@@ -102,7 +102,7 @@ struct wlan_dp_lb_data {
 	uint8_t num_wlan_used_rx_rings;
 	bool in_default_affinity;
 	bool preferred_mask_change_by_cpuhp;
-	uint8_t reo_cpu_map[MAX_REO_DEST_RINGS];
+	uint8_t reo_cpu_map[8];
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
