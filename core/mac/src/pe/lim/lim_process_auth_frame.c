@@ -986,6 +986,12 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 			STATUS_SUCCESS;
 		((tpSirMacAuthFrameBody)plainbody)->type =
 			WLAN_ELEMID_CHALLENGE;
+		if (rx_auth_frm_body->length >
+		    sizeof(rx_auth_frm_body->challengeText)) {
+			pe_err("invalid challenge text length: %u",
+			       rx_auth_frm_body->length);
+			return;
+		}
 		((tpSirMacAuthFrameBody)plainbody)->length =
 			rx_auth_frm_body->length;
 		qdf_mem_copy((uint8_t *) (
