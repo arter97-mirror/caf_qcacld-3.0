@@ -2203,6 +2203,13 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		 + PAYLOAD_TYPE_TDLS_SIZE + addIeLen + eht_cap_ie_len
 		 + mlo_ie_len;
 
+	if (nbytes > USHRT_MAX) {
+		pe_err("frame size %d exceeds max allocation limit", nbytes);
+		qdf_mem_free(eht_cap_ie);
+		qdf_mem_free(tdls_setup_req);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	/* Ok-- try to allocate memory from MGMT PKT pool */
 	qdf_status = cds_packet_alloc((uint16_t)nbytes, (void **)&frame,
 				      (void **)&packet);
