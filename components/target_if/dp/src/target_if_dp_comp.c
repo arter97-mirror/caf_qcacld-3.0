@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,7 +49,6 @@ target_if_dp_get_arp_stats_event_handler(ol_scn_t scn, uint8_t *data,
 	wmi_vdev_get_connectivity_check_stats *connect_stats_event;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_dp_psoc_nb_ops *nb_ops;
-	uint8_t *buf_ptr;
 	struct dp_rsp_stats rsp = {0};
 
 	if (!scn || !data) {
@@ -91,13 +90,9 @@ target_if_dp_get_arp_stats_event_handler(ol_scn_t scn, uint8_t *data,
 	rsp.ba_session_establishment_status =
 		data_event->ba_session_establishment_status;
 
-	buf_ptr = (uint8_t *)data_event;
-	buf_ptr = buf_ptr + sizeof(wmi_vdev_get_arp_stats_event_fixed_param) +
-		  WMI_TLV_HDR_SIZE;
-	connect_stats_event = (wmi_vdev_get_connectivity_check_stats *)buf_ptr;
-
-	if (((connect_stats_event->tlv_header & 0xFFFF0000) >> 16 ==
-	      WMITLV_TAG_STRUC_wmi_vdev_get_connectivity_check_stats)) {
+	if (param_buf->connectivity_check_stats &&
+	    param_buf->num_connectivity_check_stats) {
+		connect_stats_event = param_buf->connectivity_check_stats;
 		rsp.connect_stats_present = true;
 		rsp.tcp_ack_recvd = connect_stats_event->tcp_ack_recvd;
 		rsp.icmpv4_rsp_recvd = connect_stats_event->icmpv4_rsp_recvd;
