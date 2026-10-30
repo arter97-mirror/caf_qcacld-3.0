@@ -59,6 +59,8 @@
 #include "target_if.h"
 #include "wlan_hdd_regulatory.h"
 #include "wlan_ll_sap_api.h"
+#include <wlan_dcs_ucfg_api.h>
+#include <wlan_objmgr_pdev_obj.h>
 
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
@@ -3506,6 +3508,44 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx)
 
 #if defined(FEATURE_WLAN_CH_AVOID)
 /**
+ * wlansap_dcs_add_cw_int_unsafe_chan() - add the FW reported cw interference
+ * channel to the unsafe channel list
+ * @mac: mac context
+ * @vdev_id: vdev id
+ * @unsafe_chan: unsafe channel frequency list
+ * @unsafe_chan_cnt: count of channel frequency in unsafe channel list, it is
+ *                   updated when cw interference channel is appended
+ *
+ * Return: None
+ */
+#ifdef WLAN_DCS_CWIM_ENABLE
+static void wlansap_dcs_add_cw_int_unsafe_chan(struct mac_context *mac,
+					       uint8_t vdev_id,
+					       uint16_t *unsafe_chan,
+					       uint16_t *unsafe_chan_cnt)
+{
+	qdf_freq_t cw_int_freq;
+
+	if (*unsafe_chan_cnt >= NUM_CHANNELS)
+		return;
+
+	cw_int_freq = ucfg_dcs_get_cw_interference_freq(
+			mac->psoc, wlan_objmgr_pdev_get_pdev_id(mac->pdev),
+			vdev_id);
+	if (cw_int_freq)
+		unsafe_chan[(*unsafe_chan_cnt)++] = cw_int_freq;
+}
+#else
+static inline void
+wlansap_dcs_add_cw_int_unsafe_chan(struct mac_context *mac,
+				   uint8_t vdev_id,
+				   uint16_t *unsafe_chan,
+				   uint16_t *unsafe_chan_cnt)
+{
+}
+#endif
+
+/**
  * wlansap_select_chan_with_best_bandwidth() - Select channel with
  * max possible band width
  * @sap_ctx: sap context
@@ -3568,6 +3608,10 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
 				    &unsafe_chan_cnt,
 				    sizeof(uint16_t) * NUM_CHANNELS);
 	unsafe_chan_cnt = QDF_MIN(unsafe_chan_cnt, NUM_CHANNELS);
+
+	wlansap_dcs_add_cw_int_unsafe_chan(mac, sap_ctx->vdev_id, unsafe_chan,
+					   &unsafe_chan_cnt);
+
 	if (!unsafe_chan_cnt)
 		return QDF_STATUS_E_INVAL;
 
@@ -4475,6 +4519,91 @@ qdf_freq_t wlansap_dcs_get_freq(struct sap_context *sap_context)
 
 	return sap_context->dcs_ch_freq;
 }
+
+#ifdef WLAN_DCS_CWIM_ENABLE
+uint32_t
+wlansap_dcs_get_cwim_target_freq(struct sap_context *sap_context,
+				 enum phy_ch_width *ch_width)
+{
+	struct mac_context *mac;
+	uint32_t pcl_freqs[NUM_CHANNELS] = {0};
+	uint8_t weight_list[NUM_CHANNELS] = {0};
+	uint32_t select_freq;
+	QDF_STATUS status;
+	uint32_t pcl_len = 0;
+	uint32_t i, j;
+	qdf_freq_t intf_freq;
+	enum policy_mgr_con_mode mode;
+
+	if (!sap_context) {
+		sap_err("Invalid SAP context pointer");
+		return 0;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return 0;
+	}
+
+	intf_freq = ucfg_dcs_get_cw_interference_freq(
+			mac->psoc, wlan_objmgr_pdev_get_pdev_id(mac->pdev),
+			sap_context->vdev_id);
+
+	/* default to the SAP's current width in case best-bandwidth
+	 * selection below doesn't find anything better to widen to
+	 */
+	*ch_width = (enum phy_ch_width)wlansap_get_chan_width(sap_context);
+
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(mac->psoc, QDF_SAP_MODE,
+						    sap_context->vdev_id);
+
+	status = policy_mgr_get_pcl_for_scc_in_same_mode(mac->psoc, mode,
+							 pcl_freqs, &pcl_len,
+							 weight_list,
+							 QDF_ARRAY_SIZE(weight_list),
+							 sap_context->sessionId);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("Get PCL failed");
+		return 0;
+	}
+
+	if (!pcl_len) {
+		sap_debug("pcl length is zero!");
+		return 0;
+	}
+
+	hdd_remove_vlp_depriority_channels(mac->pdev, (uint16_t *)pcl_freqs,
+					   &pcl_len);
+	status = wlansap_filter_ch_based_acs(sap_context, pcl_freqs, &pcl_len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("failed to filter ch from acs %d", status);
+		return 0;
+	}
+
+	/* drop the FW-reported CW-interfered channel from the candidates */
+	for (i = 0, j = 0; i < pcl_len; i++) {
+		if (pcl_freqs[i] == intf_freq)
+			continue;
+		pcl_freqs[j++] = pcl_freqs[i];
+	}
+	pcl_len = j;
+
+	if (!pcl_len) {
+		sap_debug("no safe channel from PCL found in ACS range");
+		return 0;
+	}
+
+	if (wlansap_select_chan_with_best_bandwidth(sap_context, pcl_freqs,
+						    pcl_len, &select_freq,
+						    ch_width) ==
+	    QDF_STATUS_SUCCESS)
+		return select_freq;
+
+	sap_debug("select %d from valid ch freq list", pcl_freqs[0]);
+	return pcl_freqs[0];
+}
+#endif
 
 static void
 wlansap_update_current_freq_cu(struct mac_context *mac_ctx,

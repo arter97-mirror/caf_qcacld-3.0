@@ -1319,6 +1319,11 @@ config WLAN_CUSTOM_DSCP_UP_MAP
 	bool "Enable WLAN_CUSTOM_DSCP_UP_MAP"
 	default n
 
+config WLAN_DCS_CWIM_ENABLE
+	bool "Enable WLAN_DCS_CWIM_ENABLE"
+	depends on DCS
+	default n
+
 config WLAN_DEBUG_CRASH_INJECT
 	bool "Enable WLAN_DEBUG_CRASH_INJECT"
 	default n

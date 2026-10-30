@@ -1827,6 +1827,27 @@ static inline qdf_freq_t wlansap_dcs_get_freq(struct sap_context *sap_context)
 #endif
 
 /**
+ * wlansap_dcs_get_cwim_target_freq() - get safe channel to switch to for
+ * dcs cwim mitigation, excluding the fw reported interfered channel
+ * @sap_context: sap context
+ * @ch_width: [out] channel width to use for the returned frequency
+ *
+ * Return: candidate channel frequency in MHz, or 0 if none found
+ */
+#ifdef WLAN_DCS_CWIM_ENABLE
+uint32_t
+wlansap_dcs_get_cwim_target_freq(struct sap_context *sap_context,
+				 enum phy_ch_width *ch_width);
+#else
+static inline uint32_t
+wlansap_dcs_get_cwim_target_freq(struct sap_context *sap_context,
+				 enum phy_ch_width *ch_width)
+{
+	return 0;
+}
+#endif
+
+/**
  * wlansap_filter_vendor_unsafe_ch_freq() - filter sap acs ch list by
  *  vendor unsafe ch freq ranges
  * @sap_context: sap context
