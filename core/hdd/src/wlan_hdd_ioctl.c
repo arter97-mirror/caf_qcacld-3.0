@@ -6510,7 +6510,7 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	uint32_t band_bitmap = 0, curr_band_bitmap;
 	bool rf_test_mode, fcc_constraint, dis_6g_keep_sta_cli_conn;
 	bool modify_band = false;
-	bool disable_unii_1_2a;
+	bool disable_unii_1_2a = false;
 
 	/*
 	 * This command would be called by user-space when it detects WLAN

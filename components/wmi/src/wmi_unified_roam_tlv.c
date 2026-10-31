@@ -1649,12 +1649,13 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 		wmi_fill_default_roam_trigger_parameters(&trigger_parameters[i],
 							 i);
 
-	/* Fill WTC roam trigger parameters */
+	/* Fill vendor BTM roam trigger parameters */
 	roam_trigger_parameters =
 		&trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM];
 	roam_trigger_parameters->trigger_reason =
 				WMI_ROAM_TRIGGER_REASON_WTC_BTM;
-	if (triggers->vendor_btm_param.user_roam_reason == 0)
+	if (triggers->vendor_btm_param.user_roam_reason !=
+			VENDOR_BTM_REASON_NOT_SUPPORTED)
 		roam_trigger_parameters->enable = 1;
 
 	roam_trigger_parameters->scan_mode =
@@ -1671,7 +1672,7 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 			triggers->roam_score_delta;
 	roam_trigger_parameters->reason_code =
 			triggers->vendor_btm_param.user_roam_reason;
-	wmi_debug("WTC_BTM: enable:%d scan_mode:%d rssi_thres:%d cand_min_rssi_thres:%d cand_ap_min_rssi_thres: 2.4 Ghz[%d] 5 Ghz[%d], 6 Ghz[%d] reason_code:%d",
+	wmi_debug("VENDOR_BTM: enable:%d scan_mode:%d rssi_thres:%d cand_min_rssi_thres:%d cand_ap_min_rssi_thres: 2.4 Ghz[%d] 5 Ghz[%d], 6 Ghz[%d] reason_code:%d",
 		  roam_trigger_parameters->enable,
 		  roam_trigger_parameters->scan_mode,
 		  roam_trigger_parameters->trigger_rssi_threshold,
@@ -2566,6 +2567,49 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline bool wmi_is_roam_sync_frame_invalid(uint32_t len)
+{
+	return (len && len < sizeof(struct wlan_frame_hdr));
+}
+
+static QDF_STATUS wmi_is_roam_sync_frame_len_valid(
+				WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf)
+{
+	wmi_roam_synch_event_fixed_param *synch_event = param_buf->fixed_param;
+
+	if (synch_event->bcn_probe_rsp_len >
+	    param_buf->num_bcn_probe_rsp_frame ||
+	    wmi_is_roam_sync_frame_invalid(synch_event->bcn_probe_rsp_len)) {
+		wmi_debug("Invalid bcn payload len: bcn:%d num_bcn_probe_rsp_len %d vdev:%d",
+			  synch_event->bcn_probe_rsp_len,
+			  param_buf->num_bcn_probe_rsp_frame,
+			  synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (synch_event->reassoc_req_len >
+	    param_buf->num_reassoc_req_frame ||
+	    wmi_is_roam_sync_frame_invalid(synch_event->reassoc_req_len)) {
+		wmi_debug("Invalid req payload len: req:%d num_reassoc_req_len %d vdev:%d",
+			  synch_event->reassoc_req_len,
+			  param_buf->num_reassoc_req_frame,
+			  synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (synch_event->reassoc_rsp_len >
+	    param_buf->num_reassoc_rsp_frame ||
+	    wmi_is_roam_sync_frame_invalid(synch_event->reassoc_rsp_len)) {
+		wmi_debug("Invalid rsp payload len: rsp:%d num_reassoc_rsp_len %d vdev:%d",
+			  synch_event->reassoc_rsp_len,
+			  param_buf->num_reassoc_rsp_frame,
+			  synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * extract_roam_sync_event_tlv() - Extract the roam sync event
  * from the wmi_roam_synch_event_id
@@ -2632,20 +2676,10 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (synch_event->bcn_probe_rsp_len >
-		param_buf->num_bcn_probe_rsp_frame ||
-		synch_event->reassoc_req_len >
-		param_buf->num_reassoc_req_frame ||
-		synch_event->reassoc_rsp_len >
-		param_buf->num_reassoc_rsp_frame) {
-		wmi_debug("Invalid sync payload: LEN bcn:%d, req:%d, rsp:%d, vdev:%d",
-			  synch_event->bcn_probe_rsp_len,
-			  synch_event->reassoc_req_len,
-			  synch_event->reassoc_rsp_len,
-			  synch_event->vdev_id);
-		status = QDF_STATUS_E_FAILURE;
+	status = wmi_is_roam_sync_frame_len_valid(param_buf);
+
+	if (QDF_IS_STATUS_ERROR(status))
 		goto abort_roam;
-	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (!rso_cfg) {

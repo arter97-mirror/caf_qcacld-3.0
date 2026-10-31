@@ -1222,6 +1222,7 @@ static void lim_update_vdev_bss_params(struct pe_session *session_entry,
 {
 	struct vdev_mlme_obj *mlme_obj;
 	struct vdev_mlme_bss_params *bp;
+	struct bss_description *bss_desc;
 
 	if (!session_entry->vdev)
 		return;
@@ -1230,6 +1231,7 @@ static void lim_update_vdev_bss_params(struct pe_session *session_entry,
 	if (!mlme_obj)
 		return;
 
+	bss_desc = &session_entry->lim_join_req->bssDescription;
 	bp = &mlme_obj->mgmt.sta.bss_params;
 	bp->flags = 0;
 	if (beacon->erpPresent &&
@@ -1240,8 +1242,100 @@ static void lim_update_vdev_bss_params(struct pe_session *session_entry,
 	if (assoc_rsp->capabilityInfo.shortSlotTime)
 		bp->flags |= VDEV_MLME_BSS_PARAM_SHORT_SLOT_TIME;
 	bp->dtim_period = beacon->tim.dtimPeriod;
-	bp->beacon_interval = session_entry->beaconParams.beaconInterval;
+	bp->beacon_interval = bss_desc->beaconInterval;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_update_bss_params_from_session() - populate bss_params.beacon_interval
+ * for a single link session from that session's OWN bssDescription
+ * @session: link pe_session (assoc link or MLO partner link)
+ *
+ * lim_update_vdev_bss_params() cannot be reused for partner links: it takes
+ * assoc_rsp/beacon inputs that only exist for the link that processes the
+ * (Re)Association Response frame (the assoc link). This helper reads only
+ * session-owned state (session->lim_join_req->bssDescription), so it is
+ * safe to call for the assoc link or any MLO partner link. Only
+ * beacon_interval is populated here, since it has no self-heal path
+ * elsewhere (dtim_period self-heals per-link via
+ * lim_update_vdev_bss_param_dtim() on every beacon that link processes;
+ * BSS-param flags are not populated here as they have no verified per-link
+ * source at this point and must not be copied from the assoc link).
+ *
+ * Return: None
+ */
+static void lim_update_bss_params_from_session(struct pe_session *session)
+{
+	struct vdev_mlme_obj *mlme_obj;
+	struct vdev_mlme_bss_params *bp;
+	struct bss_description *bss_desc;
+
+	if (!session || !session->vdev || !session->lim_join_req)
+		return;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj)
+		return;
+
+	bss_desc = &session->lim_join_req->bssDescription;
+	if (!bss_desc->beaconInterval) {
+		pe_debug("vdev %d: zero beaconInterval in own bssDescription, skip",
+			 session->vdev_id);
+		return;
+	}
+
+	bp = &mlme_obj->mgmt.sta.bss_params;
+	bp->beacon_interval = bss_desc->beaconInterval;
+}
+
+/**
+ * lim_update_partner_vdev_bss_params() - populate bss_params.beacon_interval
+ * for every MLO partner link of this connection
+ * @mac_ctx: Global MAC context
+ * @session_entry: assoc-link pe_session (the session processing the
+ *                 (Re)Association Response frame)
+ *
+ * Partner links never process their own assoc-response frame, so
+ * lim_update_vdev_bss_params() never runs for them and their own
+ * vdev_mlme_obj->mgmt.sta.bss_params.beacon_interval is otherwise never
+ * populated. The negotiated partner link/vdev set is read from
+ * session_entry->lim_join_req->partner_info, which is populated at join
+ * time (before the OTA auth/assoc exchange begins) and is therefore already
+ * valid by the time the assoc link's assoc-response is processed.
+ *
+ * Return: None
+ */
+static void lim_update_partner_vdev_bss_params(struct mac_context *mac_ctx,
+					       struct pe_session *session_entry)
+{
+	struct mlo_partner_info *partner_info;
+	struct pe_session *partner_session;
+	uint8_t i;
+
+	if (!session_entry || !session_entry->lim_join_req)
+		return;
+
+	partner_info = &session_entry->lim_join_req->partner_info;
+	for (i = 0; i < partner_info->num_partner_links; i++) {
+		partner_session = pe_find_session_by_vdev_id(
+			mac_ctx,
+			partner_info->partner_link_info[i].vdev_id);
+		if (!partner_session) {
+			pe_debug("no pe_session for partner vdev %d (link_id %d)",
+				 partner_info->partner_link_info[i].vdev_id,
+				 partner_info->partner_link_info[i].link_id);
+			continue;
+		}
+		lim_update_bss_params_from_session(partner_session);
+	}
+}
+#else
+static inline void
+lim_update_partner_vdev_bss_params(struct mac_context *mac_ctx,
+				   struct pe_session *session_entry)
+{
+}
+#endif
 
 void lim_update_vdev_bss_param_dtim(struct pe_session *session,
 				    uint8_t dtim_period)
@@ -1330,6 +1424,11 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) ||
 	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
+		if (frame_body_len <= SIR_MAC_HDR_LEN_3A) {
+			pe_err("LFR3: Invalid Reassoc response length %u",
+			       frame_body_len);
+			return QDF_STATUS_E_INVAL;
+		}
 		hdr = (tpSirMacMgmtHdr)rx_pkt_info;
 		rssi = 0;
 	} else {
@@ -1961,6 +2060,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 
 	lim_update_vdev_bss_params(session_entry, assoc_rsp, beacon);
+	lim_update_partner_vdev_bss_params(mac_ctx, session_entry);
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,

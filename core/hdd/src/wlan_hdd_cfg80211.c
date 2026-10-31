@@ -4200,7 +4200,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	int ret, i;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1];
 	bool ht_enabled, ht40_enabled, vht_enabled, eht_enabled;
-	uint16_t ch_width;
+	uint16_t ch_width, max_ch_width_val;
 	enum qca_wlan_vendor_acs_hw_mode hw_mode;
 	enum policy_mgr_con_mode pm_mode;
 	QDF_STATUS qdf_status;
@@ -4218,6 +4218,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint32_t last_scan_ageout_time, band_mask = 0;
 	struct wlan_hdd_link_info *link_info;
 	int link_id = -1;
+	enum phy_ch_width max_ch_width;
 
 	/* ***Note*** Do not set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
@@ -4378,6 +4379,16 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	}
 	if (is_ll_lt_sap)
 		ch_width = 20;
+
+	/* Get the maximum bandwidth supported by hardware */
+	max_ch_width = wlan_mlme_get_max_bw();
+	max_ch_width_val = wlan_reg_get_bw_value(max_ch_width);
+
+	if (ch_width  > max_ch_width_val) {
+		hdd_debug("Downgrading ch_width %d to max supported ch_width %d",
+			  ch_width, max_ch_width_val);
+		ch_width = max_ch_width_val;
+	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME])
 		last_scan_ageout_time =
@@ -7231,9 +7242,19 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 	attr = tb2[QCA_ATTR_ROAM_CONTROL_USER_REASON];
 	if (attr) {
 		param.user_roam_reason = nla_get_u32(attr);
-		is_wtc_param_updated = true;
+		if (param.user_roam_reason <=
+			VENDOR_BTM_REASON_RSSI_IS_STRONG_ENOUGH &&
+		    param.user_roam_reason >=
+			VENDOR_BTM_REASON_MOVE_TO_CELLULAR) {
+			is_wtc_param_updated = true;
+		} else {
+			hdd_err("Invalid vendor BTM roam reason : %d",
+				param.user_roam_reason);
+			param.user_roam_reason =
+				VENDOR_BTM_REASON_NOT_SUPPORTED;
+		}
 	} else {
-		param.user_roam_reason = DISABLE_VENDOR_BTM_CONFIG;
+		param.user_roam_reason = VENDOR_BTM_REASON_NOT_SUPPORTED;
 	}
 
 	if (tb2[QCA_ATTR_ROAM_CONTROL_BAND_MASK]) {
@@ -13005,6 +13026,12 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	if (!update_cw_allowed) {
 		hdd_debug("update_channel_width is disabled via INI");
 		ret = -EINVAL;
+		goto end;
+	}
+
+	if (hdd_cm_is_vdev_roaming(link_info)) {
+		hdd_debug("Roaming in progress on vdev %d", link_info->vdev_id);
+		ret = -EAGAIN;
 		goto end;
 	}
 
@@ -28621,31 +28648,12 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
 
 	return errno;
 }
-#else
-/**
- * wlan_hdd_change_station() - cfg80211 change station handler function
- * @wiphy: Pointer to the wiphy structure
- * @dev: Pointer to the net device.
- * @mac: bssid
- * @params: Pointer to station parameters
- *
- * This is the cfg80211 change station handler function which invokes
- * the internal function @__wlan_hdd_change_station with
- * SSR protection.
- *
- * Return: 0 for success, error number on failure.
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) || defined(WITH_BACKPORTS)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) ||\
+	defined(WITH_BACKPORTS)
 static int wlan_hdd_change_station(struct wiphy *wiphy,
 				   struct net_device *dev,
 				   const u8 *mac,
 				   struct station_parameters *params)
-#else
-static int wlan_hdd_change_station(struct wiphy *wiphy,
-				   struct net_device *dev,
-				   u8 *mac,
-				   struct station_parameters *params)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -28660,6 +28668,26 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
 
 	return errno;
 }
+#else
+static int wlan_hdd_change_station(struct wiphy *wiphy,
+				   struct net_device *dev,
+				   u8 *mac,
+				   struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_change_station(wiphy, dev, mac, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 #endif
 
 #ifdef FEATURE_WLAN_ESE
@@ -29264,6 +29292,28 @@ done:
 			break;
 		}
 	} else {
+		keyidx = key_index;
+
+		if (ucfg_mlme_is_multipass_sap(hdd_ctx->psoc) &&
+		    params->vlan_id && !pairwise) {
+			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			sap_ctx = hdd_ap_ctx->sap_context;
+			hdd_debug("VLAN add_key: orig_key_idx %d",
+				  key_index);
+			errno = wlan_hdd_add_vlan(vdev, sap_ctx, params,
+						  key_index, &keyidx);
+			if (errno < 0) {
+				hdd_err("VLAN failed: vdev %d vlan_id %d key_idx %d errno %d",
+					wlan_vdev_get_id(vdev), params->vlan_id,
+					key_index, errno);
+				return errno;
+			}
+			hdd_debug("VLAN add_key: vdev %d vlan_id %d mapped key_idx %d",
+				  wlan_vdev_get_id(vdev),
+				  params->vlan_id, keyidx);
+			key_index = keyidx;
+		}
+
 		errno = wlan_cfg80211_store_key(vdev, key_index,
 						(pairwise ?
 						 WLAN_CRYPTO_KEY_TYPE_UNICAST :
@@ -29307,19 +29357,8 @@ done:
 			return -EINVAL;
 		}
 
-		keyidx = key_index;
-
-		if (ucfg_mlme_is_multipass_sap(hdd_ctx->psoc) &&
-		    params->vlan_id) {
-			sap_ctx = hdd_ap_ctx->sap_context;
-			errno = wlan_hdd_add_vlan(vdev, sap_ctx, params,
-						  key_index, &keyidx);
-			if (errno < 0)
-				return errno;
-		}
-
 		errno = wlan_hdd_add_key_sap(link_info, pairwise,
-					     keyidx, cipher);
+					     key_index, cipher);
 
 		break;
 	case QDF_NAN_DISC_MODE:
@@ -30384,7 +30423,42 @@ out:
 	return ret;
 }
 
-#ifdef CFG80211_MLO_KEY_OPERATION_SUPPORT
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
+static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     u8 key_index,
+					     bool unicast, bool multicast)
+{
+	int errno = -EINVAL;
+	struct osif_vdev_sync *vdev_sync;
+	struct net_device *ndev;
+	struct hdd_adapter *adapter;
+	int link_id = -1;
+
+	ndev = hdd_wdev_get_netdev(wdev);
+	if (!ndev) {
+		hdd_err("netdev is null");
+		return -ENODEV;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
+	if (!adapter || wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+		return errno;
+
+	errno = osif_vdev_sync_op_start(ndev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_default_key(wiphy, ndev,
+						    link_id, key_index,
+						    unicast, multicast);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#elif defined(CFG80211_MLO_KEY_OPERATION_SUPPORT)
 static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     struct net_device *ndev,
 					     int link_id, u8 key_index,
@@ -30792,7 +30866,7 @@ static int __wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 
 /**
  * wlan_hdd_set_default_mgmt_key() - SSR wrapper for
- *				wlan_hdd_set_default_mgmt_key
+ *                              wlan_hdd_set_default_mgmt_key
  * @wiphy: pointer to wiphy
  * @wdev: pointer to wireless_device structure
  * @link_id: Link Identifier
@@ -31304,7 +31378,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 	return 0;
 }
 
-
 /**
  * _wlan_hdd_cfg80211_del_station() - delete station entry handler
  * @wiphy: Pointer to wiphy
@@ -31533,26 +31606,29 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 
 	return errno;
 }
-#else
-/**
- * wlan_hdd_cfg80211_add_station() - add station
- * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
- * @mac: Pointer to station mac address
- * @params: Pointer to add station parameter
- *
- * Return: 0 for success, non-zero for failure
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 					 struct net_device *dev,
 					 const uint8_t *mac,
 					 struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_add_station(wiphy, dev, mac, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
 #else
 static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 					 struct net_device *dev, uint8_t *mac,
 					 struct station_parameters *params)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;

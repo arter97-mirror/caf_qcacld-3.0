@@ -80,7 +80,7 @@ typedef const enum policy_mgr_conc_next_action
  * enum PM_AP_DFS_MASTER_MODE - AP dfs master mode
  * @PM_STA_SAP_ON_DFS_DEFAULT: Disallow STA+SAP SCC on DFS channel
  * @PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED: Allow STA+SAP SCC
- *        on DFS channel with master mode disabled
+ *        on DFS channel with master mode enabled.
  * @PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX: enhance
  *        "PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED" with below requirement:
  *	 a. Allow single SAP (GO) start on DFS channel.
