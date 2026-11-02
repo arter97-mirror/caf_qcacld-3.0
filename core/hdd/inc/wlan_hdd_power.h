@@ -749,4 +749,71 @@ int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
         return 0;
 }
 #endif
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * hdd_pm_ipa_pipe_reset() - Disable or enable IPA pipes for WoW
+ *  suspend/resume prepare.
+ * @hdd_ctx: HDD context
+ * @pipe_reset: true to disable IPA pipes (suspend prepare),
+ *  false to enable IPA pipes (resume prepare)
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+int hdd_pm_ipa_pipe_reset(struct hdd_context *hdd_ctx, bool pipe_reset);
+#else
+static inline int hdd_pm_ipa_pipe_reset(struct hdd_context *hdd_ctx,
+					bool pipe_reset)
+{
+	return 0;
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
+
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * hdd_ipa_pipe_reset_set() - Set or clear the IPA pipe-reset flag
+ * @hdd_ctx: HDD context
+ * @value: true  => pipes disabled (suspend)
+ *         false => pipes enabled (resume), or clear on reinit
+ *
+ * Return: None
+ */
+void hdd_ipa_pipe_reset_set(struct hdd_context *hdd_ctx, bool value);
+#else
+static inline void
+hdd_ipa_pipe_reset_set(struct hdd_context *hdd_ctx, bool value)
+{
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
+
+#ifndef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * hdd_ipa_resume_on_wlan_resume() - Resume IPA on driver resume
+ * @hdd_ctx: HDD context
+ *
+ * Return: None
+ */
+void hdd_ipa_resume_on_wlan_resume(struct hdd_context *hdd_ctx);
+#else
+static inline void
+hdd_ipa_resume_on_wlan_resume(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* !WLAN_WOW_IPA_SUSPEND_RESUME */
+
+#ifndef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * hdd_ipa_suspend_on_wlan_suspend() - Suspend IPA on driver suspend
+ * @hdd_ctx: HDD context
+ *
+ * Return: true if IPA is not ready to suspend, false otherwise
+ */
+bool hdd_ipa_suspend_on_wlan_suspend(struct hdd_context *hdd_ctx);
+#else
+static inline bool
+hdd_ipa_suspend_on_wlan_suspend(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif /* !WLAN_WOW_IPA_SUSPEND_RESUME */
+
 #endif /* __WLAN_HDD_POWER_H */

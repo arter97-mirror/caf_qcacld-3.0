@@ -764,6 +764,11 @@ config IPA_WDS_EASYMESH
 	depends on FEATURE_WDS
 	default n
 
+config WLAN_WOW_IPA_SUSPEND_RESUME
+	bool "Enable WoW suspend/resume IPA pipe control"
+	depends on IPA_OFFLOAD
+	default n
+
 config IPA_DISABLE_OVERRIDE
 	bool "Enable IPA_DISABLE_OVERRIDE"
 	default n
@@ -2031,6 +2036,11 @@ config WLAN_WEXT_SUPPORT_ENABLE
 
 config WLAN_WOW_ITO
 	bool "Enable WLAN_WOW_ITO"
+	default n
+
+config WLAN_WOW_WAKEUP_NOTIFY
+	bool "Enable WoW wakeup reason sysfs notification"
+	depends on WLAN_SYSFS
 	default n
 
 config WLAN_WOWL_ADD_PTRN

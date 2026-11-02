@@ -641,6 +641,18 @@ static inline void dp_unregister_pmo_handler(void)
 	pmo_unregister_resume_handler(WLAN_COMP_DP, ucfg_dp_resume_handler);
 }
 
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+QDF_STATUS ucfg_dp_wow_suspend_prepare(struct wlan_objmgr_psoc *psoc)
+{
+	return ucfg_dp_suspend_handler(psoc, NULL);
+}
+
+QDF_STATUS ucfg_dp_wow_resume_prepare(struct wlan_objmgr_psoc *psoc)
+{
+	return ucfg_dp_resume_handler(psoc, NULL);
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
+
 /**
  * ucfg_dp_store_qdf_dev() - Store qdf device instance in DP component
  * @psoc: psoc handle

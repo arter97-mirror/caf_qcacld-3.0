@@ -522,6 +522,15 @@ struct sme_context {
 
 	QDF_STATUS (*pagefault_action_cb)(void *buf, uint32_t data);
 
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+	/**
+	 * wow_wakeup_notify_cb: callback invoked when a WoW wakeup event
+	 * arrives from firmware.
+	 */
+	void (*wow_wakeup_notify_cb)(struct wow_wakeup_notify_msg *notify,
+				     uint32_t vdev_id);
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
+
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	void (*latency_level_event_handler_cb)
 			(const struct latency_level_data *event_data,

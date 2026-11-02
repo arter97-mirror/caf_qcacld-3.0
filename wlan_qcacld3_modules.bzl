@@ -2445,6 +2445,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_wow_ito.c",
         ],
     },
+    "CONFIG_WLAN_WOW_WAKEUP_NOTIFY": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_wow_wake_reason.c",
+        ],
+    },
     "CONFIG_WMI_BCN_OFFLOAD": {
         True: [
             "cmn/wmi/src/wmi_unified_bcn_api.c",
