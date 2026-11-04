@@ -43,8 +43,6 @@ static void hdd_init_pdev_os_priv(struct hdd_context *hdd_ctx,
 	struct pdev_osif_priv *os_priv)
 {
 	/* Initialize the OS private structure*/
-	os_priv->wiphy = hdd_ctx->wiphy;
-	os_priv->legacy_osif_priv = hdd_ctx;
 	wlan_cfg80211_scan_priv_init(hdd_ctx->pdev);
 	os_if_spectral_netlink_init(hdd_ctx->pdev);
 }
@@ -158,6 +156,9 @@ int hdd_objmgr_create_and_store_pdev(struct hdd_context *hdd_ctx)
 		hdd_debug("disabling 6ghz channels");
 		reg_cap_ptr->high_5ghz_chan = HIGH_5GHZ_FREQ_NO_6GHZ;
 	}
+
+	priv->wiphy = hdd_ctx->wiphy;
+	priv->legacy_osif_priv = hdd_ctx;
 
 	pdev = wlan_objmgr_pdev_obj_create(psoc, priv);
 	if (!pdev) {

@@ -874,6 +874,11 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) ||
 	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
+		if (reassoc_frame_len <= SIR_MAC_HDR_LEN_3A) {
+			pe_err("LFR3: Invalid Reassoc response length %u",
+			       reassoc_frame_len);
+			return;
+		}
 		hdr = (tpSirMacMgmtHdr)rx_pkt_info;
 		frame_len = reassoc_frame_len - SIR_MAC_HDR_LEN_3A;
 		rssi = 0;
@@ -1405,6 +1410,8 @@ assocReject:
 	qdf_mem_free(beacon);
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
+	if (session_entry->limAssocResponseData == assoc_rsp)
+		session_entry->limAssocResponseData = NULL;
 	qdf_mem_free(assoc_rsp);
 	return;
 }

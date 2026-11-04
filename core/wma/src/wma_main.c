@@ -2043,12 +2043,17 @@ static int wma_legacy_service_ready_event_handler(uint32_t event_id,
  * wma_process_cal_fail_info() - Process cal failure event and
  *                               send it to userspace
  * @wmi_event:  Cal failure event data
+ * @len:        Length of the event buffer pointed to by @wmi_event
  */
-static void wma_process_cal_fail_info(uint8_t *wmi_event)
+static void wma_process_cal_fail_info(uint8_t *wmi_event, uint32_t len)
 {
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	uint8_t *buf_ptr;
 	wmi_debug_mesg_fw_cal_failure_param *cal_failure_event;
+	uint32_t hdr_len = sizeof(wmi_debug_mesg_flush_complete_fixed_param) +
+			   WMI_TLV_HDR_SIZE +
+			   sizeof(wmi_debug_mesg_fw_data_stall_param) +
+			   WMI_TLV_HDR_SIZE;
 
 	if (!mac) {
 		wma_err("Invalid mac context");
@@ -2060,10 +2065,13 @@ static void wma_process_cal_fail_info(uint8_t *wmi_event)
 		return;
 	}
 
+	if (len < hdr_len + sizeof(*cal_failure_event)) {
+		wma_err("Invalid cal failure event len %d", len);
+		return;
+	}
+
 	buf_ptr = wmi_event;
-	buf_ptr = buf_ptr + sizeof(wmi_debug_mesg_flush_complete_fixed_param) +
-		  WMI_TLV_HDR_SIZE +
-		  sizeof(wmi_debug_mesg_fw_data_stall_param) + WMI_TLV_HDR_SIZE;
+	buf_ptr = buf_ptr + hdr_len;
 
 	cal_failure_event = (wmi_debug_mesg_fw_cal_failure_param *)buf_ptr;
 
@@ -2084,7 +2092,7 @@ static void wma_process_cal_fail_info(uint8_t *wmi_event)
 	}
 }
 #else
-static inline void wma_process_cal_fail_info(uint8_t *wmi_event)
+static inline void wma_process_cal_fail_info(uint8_t *wmi_event, uint32_t len)
 {
 }
 #endif
@@ -2121,6 +2129,12 @@ static int wma_flush_complete_evt_handler(void *handle,
 	wma_debug("Received reason code %d from FW", reason_code);
 
 	if (reason_code == WMI_DIAG_TRIGGER_DATA_STALL) {
+		if (len < sizeof(wmi_debug_mesg_flush_complete_fixed_param) +
+			  WMI_TLV_HDR_SIZE + sizeof(*data_stall_event)) {
+			wma_err("Invalid data stall event len %d", len);
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		buf_ptr = (uint8_t *)wmi_event;
 		buf_ptr = buf_ptr +
 			  sizeof(wmi_debug_mesg_flush_complete_fixed_param) +
@@ -2180,7 +2194,7 @@ static int wma_flush_complete_evt_handler(void *handle,
 	}
 
 	if (reason_code == WMI_DIAG_TRIGGER_CAL_FAILURE) {
-		wma_process_cal_fail_info((uint8_t *)wmi_event);
+		wma_process_cal_fail_info((uint8_t *)wmi_event, len);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -6710,7 +6724,6 @@ static void wma_update_hw_mode_config(tp_wma_handle wma_handle,
 				      struct target_psoc_info *tgt_hdl)
 {
 	uint32_t conc_scan_config_bits, fw_config_bits;
-	uint8_t sta_sap_scc_on_dfs_chnl;
 
 	fw_config_bits = target_if_get_fw_config_bits(tgt_hdl);
 	conc_scan_config_bits = target_if_get_conc_scan_config_bits(tgt_hdl);
@@ -6727,18 +6740,6 @@ static void wma_update_hw_mode_config(tp_wma_handle wma_handle,
 	}
 	wma_init_scan_fw_mode_config(wma_handle->psoc, conc_scan_config_bits,
 				     fw_config_bits);
-
-	policy_mgr_get_sta_sap_scc_on_dfs_chnl(wma_handle->psoc,
-					       &sta_sap_scc_on_dfs_chnl);
-
-	/*
-	 * For non-dbs HW, disallow sta+sap on DFS channel as if SAP comes
-	 * on DFS master mode enable (sta_sap_scc_on_dfs_chnl = 2), scan will
-	 * be disabled and STA cannot connect to any other channel
-	 */
-	if (!policy_mgr_is_hw_dbs_capable(wma_handle->psoc) &&
-	    sta_sap_scc_on_dfs_chnl == 2)
-		policy_mgr_set_sta_sap_scc_on_dfs_chnl(wma_handle->psoc, 1);
 }
 
 int wma_rx_service_ready_ext2_event(void *handle, uint8_t *ev, uint32_t len)
