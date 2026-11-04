@@ -1227,6 +1227,12 @@ static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_DCS_CWIM_ENABLE
+#define DCS_ENABLE_FLAG (WLAN_HOST_DCS_WLANIM | WLAN_HOST_DCS_CWIM)
+#else
+#define DCS_ENABLE_FLAG (WLAN_HOST_DCS_WLANIM)
+#endif
+
 /**
  * wma_dcs_wlan_interference_mitigation_enable() - enable wlan
  * interference mitigation
@@ -1271,8 +1277,8 @@ static void wma_dcs_wlan_interference_mitigation_enable(
 
 	if (rsp->resp_type == WMI_HOST_VDEV_START_RESP_EVENT) {
 		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id,
-				       WLAN_HOST_DCS_WLANIM);
-
+				       DCS_ENABLE_FLAG);
+		wma_debug("enable dcs: %d", DCS_ENABLE_FLAG);
 		wma_send_dcs_cmd(mac_ctx->psoc, mac_id, rsp->vdev_id);
 	}
 }
