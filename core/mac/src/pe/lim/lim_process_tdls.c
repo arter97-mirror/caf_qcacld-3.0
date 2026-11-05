@@ -4034,6 +4034,12 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 		SIR_MAC_ACTION_TX, SIR_MAC_MGMT_ACTION,
 		send_req->req_type, send_req->peer_mac.bytes);
 
+	if (send_req->length < sizeof(*send_req) ||
+	    send_req->length - sizeof(*send_req) > SIR_MAC_MAX_ADD_IE_LENGTH) {
+		pe_err("invalid TDLS mgmt req length %d", send_req->length);
+		goto lim_tdls_send_mgmt_error;
+	}
+
 	ie_len = send_req->length - sizeof(*send_req);
 
 	switch (send_req->req_type) {
