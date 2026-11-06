@@ -3200,6 +3200,18 @@ IE bss_color_change (EID_EXTN_ID_ELEMENT) OUI (0x2A)
     }
 }
 
+IE reg_connect (EID_EXTN_ID_ELEMENT) OUI (0x89)
+{
+    //regulatory connectivity field
+    {
+        indoor_ap_valid: 1;
+        indoor_ap_support: 1;
+        sp_ap_valid: 1;
+        sp_ap_support: 1;
+        reserved: 4;
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                                MULTIIEs                                 //
 /////////////////////////////////////////////////////////////////////////////
@@ -3832,6 +3844,7 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  he_6ghz_band_cap;
     OPTIE  osen_ie;
     OPTIE roaming_consortium_sel;
+    OPTIE  reg_connect;
 } // End frame AssocRequest.
 
 FRAME AssocResponse                       // 7.2.3.5
@@ -3921,6 +3934,7 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  hs20vendor_ie;
     OPTIE  he_cap;
     OPTIE  he_6ghz_band_cap;
+    OPTIE  reg_connect;
 } // End frame ReAssocRequest.
 
 FRAME ReAssocResponse                     // 7.2.3.7
@@ -3981,6 +3995,7 @@ FRAME ProbeRequest                        // 7.2.3.8
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_6ghz_band_cap;
+    OPTIE  reg_connect;
 } // End frame ProbeRequest.
 
 FRAME ProbeResponse                       // 7.2.3.9

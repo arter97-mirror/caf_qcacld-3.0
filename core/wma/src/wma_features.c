@@ -1116,7 +1116,7 @@ int wma_unified_csa_offload_enable(tp_wma_handle wma, uint8_t vdev_id)
 static uint8_t *
 wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id)
 {
-	uint8_t len = 0, sub_ele_len = 0;
+	int16_t len = 0, sub_ele_len = 0;
 	struct ie_header *ele;
 
 	ele = (struct ie_header *)ch_wr_ie;
@@ -1127,7 +1127,8 @@ wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id)
 	len = ele->ie_len;
 	ele = (struct ie_header *)(ch_wr_ie + sizeof(struct ie_header));
 
-	while (len > 0) {
+
+	while (len >= sizeof(struct ie_header)) {
 		sub_ele_len = sizeof(struct ie_header) + ele->ie_len;
 		len -= sub_ele_len;
 		if (ele->ie_id == sub_ele_id)
@@ -4600,7 +4601,6 @@ int wma_get_arp_stats_handler(void *handle, uint8_t *data,
 	WMI_VDEV_GET_ARP_STAT_EVENTID_param_tlvs *param_buf;
 	wmi_vdev_get_arp_stats_event_fixed_param *data_event;
 	wmi_vdev_get_connectivity_check_stats *connect_stats_event;
-	uint8_t *buf_ptr;
 	struct rsp_stats rsp = {0};
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
@@ -4640,13 +4640,9 @@ int wma_get_arp_stats_handler(void *handle, uint8_t *data,
 	rsp.ba_session_establishment_status =
 		data_event->ba_session_establishment_status;
 
-	buf_ptr = (uint8_t *)data_event;
-	buf_ptr = buf_ptr + sizeof(wmi_vdev_get_arp_stats_event_fixed_param) +
-		  WMI_TLV_HDR_SIZE;
-	connect_stats_event = (wmi_vdev_get_connectivity_check_stats *)buf_ptr;
-
-	if (((connect_stats_event->tlv_header & 0xFFFF0000) >> 16 ==
-	      WMITLV_TAG_STRUC_wmi_vdev_get_connectivity_check_stats)) {
+	if (param_buf->connectivity_check_stats &&
+	    param_buf->num_connectivity_check_stats) {
+		connect_stats_event = param_buf->connectivity_check_stats;
 		rsp.connect_stats_present = true;
 		rsp.tcp_ack_recvd = connect_stats_event->tcp_ack_recvd;
 		rsp.icmpv4_rsp_recvd = connect_stats_event->icmpv4_rsp_recvd;

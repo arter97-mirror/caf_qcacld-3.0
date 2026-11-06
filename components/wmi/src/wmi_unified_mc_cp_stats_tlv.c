@@ -34,9 +34,7 @@ extract_per_chain_rssi_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			       uint32_t index,
 			       struct wmi_host_per_chain_rssi_stats *rssi_stats)
 {
-	uint8_t *data;
 	wmi_rssi_stats *fw_rssi_stats;
-	wmi_per_chain_rssi_stats *rssi_event;
 	WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf;
 
 	if (!evt_buf) {
@@ -45,15 +43,14 @@ extract_per_chain_rssi_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	}
 
 	param_buf = (WMI_UPDATE_STATS_EVENTID_param_tlvs *) evt_buf;
-	rssi_event = param_buf->chain_stats;
 
-	if (index >= rssi_event->num_per_chain_rssi_stats) {
-		wmi_err("Invalid index: %u", index);
+	if (!param_buf->rssi_stats || index >= param_buf->num_rssi_stats) {
+		wmi_err("Invalid index: %u num_rssi_stats: %u",
+			index, param_buf->num_rssi_stats);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	data = ((uint8_t *)(&rssi_event[1])) + WMI_TLV_HDR_SIZE;
-	fw_rssi_stats = &((wmi_rssi_stats *)data)[index];
+	fw_rssi_stats = &param_buf->rssi_stats[index];
 	if (fw_rssi_stats->vdev_id >= WLAN_UMAC_PDEV_MAX_VDEVS)
 		return QDF_STATUS_E_INVAL;
 
