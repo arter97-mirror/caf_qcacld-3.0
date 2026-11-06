@@ -1045,6 +1045,20 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 	roam_event->notif_params = wmi_event->notif_params;
 	roam_event->notif_params1 = wmi_event->notif_params1;
 
+	if (wmi_event->notif_params1 &&
+	    roam_event->reason == ROAM_REASON_DEAUTH) {
+		if (wmi_event->notif_params1 >
+		    param_buf->num_deauth_disassoc_frame) {
+			wmi_err("deauth frame len %u > TLV len %u, vdev %u",
+				wmi_event->notif_params1,
+				param_buf->num_deauth_disassoc_frame,
+				roam_event->vdev_id);
+			return QDF_STATUS_E_FAILURE;
+		}
+		roam_event->deauth_disassoc_frame =
+			param_buf->deauth_disassoc_frame;
+	}
+
 	wlan_roam_debug_log(roam_event->vdev_id, DEBUG_ROAM_EVENT,
 			    DEBUG_INVALID_PEER_ID, NULL, NULL,
 			    roam_event->reason,
@@ -1076,9 +1090,6 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 		roam_event->hw_mode_trans_ind = hw_mode_trans_ind;
 	}
 
-	if (wmi_event->notif_params1)
-		roam_event->deauth_disassoc_frame =
-			param_buf->deauth_disassoc_frame;
 end:
 	return status;
 }
@@ -2448,6 +2459,49 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline bool wmi_is_roam_sync_frame_invalid(uint32_t len)
+{
+	return (len && len < sizeof(struct wlan_frame_hdr));
+}
+
+static QDF_STATUS wmi_is_roam_sync_frame_len_valid(
+				WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf)
+{
+	wmi_roam_synch_event_fixed_param *synch_event = param_buf->fixed_param;
+
+	if (synch_event->bcn_probe_rsp_len >
+	    param_buf->num_bcn_probe_rsp_frame ||
+	    wmi_is_roam_sync_frame_invalid(synch_event->bcn_probe_rsp_len)) {
+		wmi_debug("Invalid bcn payload len: bcn:%d num_bcn_probe_rsp_len %d vdev:%d",
+			  synch_event->bcn_probe_rsp_len,
+			  param_buf->num_bcn_probe_rsp_frame,
+			  synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (synch_event->reassoc_req_len >
+	    param_buf->num_reassoc_req_frame ||
+	    wmi_is_roam_sync_frame_invalid(synch_event->reassoc_req_len)) {
+		wmi_debug("Invalid req payload len: req:%d num_reassoc_req_len %d vdev:%d",
+			  synch_event->reassoc_req_len,
+			  param_buf->num_reassoc_req_frame,
+			  synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (synch_event->reassoc_rsp_len >
+	    param_buf->num_reassoc_rsp_frame ||
+	    wmi_is_roam_sync_frame_invalid(synch_event->reassoc_rsp_len)) {
+		wmi_debug("Invalid rsp payload len: rsp:%d num_reassoc_rsp_len %d vdev:%d",
+			  synch_event->reassoc_rsp_len,
+			  param_buf->num_reassoc_rsp_frame,
+			  synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * extract_roam_sync_event_tlv() - Extract the roam sync event
  * from the wmi_roam_synch_event_id
@@ -2506,20 +2560,10 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (synch_event->bcn_probe_rsp_len >
-		param_buf->num_bcn_probe_rsp_frame ||
-		synch_event->reassoc_req_len >
-		param_buf->num_reassoc_req_frame ||
-		synch_event->reassoc_rsp_len >
-		param_buf->num_reassoc_rsp_frame) {
-		wmi_debug("Invalid sync payload: LEN bcn:%d, req:%d, rsp:%d, vdev:%d",
-			  synch_event->bcn_probe_rsp_len,
-			  synch_event->reassoc_req_len,
-			  synch_event->reassoc_rsp_len,
-			  synch_event->vdev_id);
-		status = QDF_STATUS_E_FAILURE;
+	status = wmi_is_roam_sync_frame_len_valid(param_buf);
+
+	if (QDF_IS_STATUS_ERROR(status))
 		goto abort_roam;
-	}
 
 	psoc = wmi_handle->soc->wmi_psoc;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, synch_event->vdev_id,
@@ -2922,7 +2966,7 @@ extract_roam_scan_chan_list_tlv(wmi_unified_t wmi_handle,
 	data->chan_list = (uint32_t *)(data + 1);
 	data->vdev_id = fixed_param->vdev_id;
 	data->command_resp = fixed_param->command_response;
-	data->num_channels = param_buf->num_channel_list;
+	data->num_channels = num_ch;
 
 	for (i = 0; i < num_ch; i++)
 		data->chan_list[i] = param_buf->channel_list[i];

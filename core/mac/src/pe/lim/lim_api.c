@@ -2416,6 +2416,13 @@ uint8_t *lim_process_rmf_disconnect_frame(struct mac_context *mac,
 	mmie_len = (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC) ?
 		    cds_get_mmie_size() : cds_get_gmac_mmie_size());
 
+	if (deauth_disassoc_frame_len < mmie_len) {
+		pe_err("Frame len %d less than MMIE len %d",
+		       deauth_disassoc_frame_len, mmie_len);
+		*extracted_length = 0;
+		return NULL;
+	}
+
 	efrm = orig_ptr + deauth_disassoc_frame_len;
 	if (!mac->pmf_offload &&
 	    !wlan_crypto_is_mmie_valid(session->vdev, orig_ptr, efrm)) {
@@ -2604,6 +2611,12 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 	struct element_info link_reassoc_rsp;
 	struct qdf_mac_addr sta_link_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (reassoc_rsp_len <= WLAN_MAC_HDR_LEN_3A) {
+		pe_err("MLO ROAM: Invalid Reassoc response length %u",
+		       reassoc_rsp_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	link_reassoc_rsp.ptr = qdf_mem_malloc(reassoc_rsp_len);
 	if (!link_reassoc_rsp.ptr)
