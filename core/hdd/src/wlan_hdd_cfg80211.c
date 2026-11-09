@@ -2191,6 +2191,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_IDLE_SHUTDOWN,
 	},
 	FEATURE_TX_POWER_BOOST_EVENTS
+	FEATURE_WOW_EVENTS
 };
 
 /**
@@ -24402,6 +24403,167 @@ static int wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
 	return errno;
 }
 
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+/*
+ * NLA attribute policy for QCA_NL80211_VENDOR_SUBCMD_WOW.
+ */
+const struct nla_policy
+wow_policy[QCA_WLAN_VENDOR_ATTR_WOW_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_WOW_OPERATION] = {
+		.type = NLA_U8 },
+};
+
+int
+wlan_hdd_send_wow_event(struct hdd_adapter *adapter,
+			uint8_t operation,
+			int op_status)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct sk_buff *skb;
+	uint32_t buf_len;
+
+	/* NLA header + u8 OPERATION + u8 STATUS attributes */
+	buf_len = NLMSG_HDRLEN + nla_total_size(sizeof(uint8_t)) +
+		  nla_total_size(sizeof(uint8_t));
+
+	skb = cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+					  &adapter->wdev,
+					  buf_len,
+					  QCA_NL80211_VENDOR_SUBCMD_WOW_INDEX,
+					  GFP_KERNEL);
+	if (!skb) {
+		hdd_err("WoW event: skb alloc failed");
+		return -ENOMEM;
+	}
+
+	/*
+	 * Echo the operation back so the event is self-describing. This lets
+	 * userspace correlate each event with its request without relying on
+	 * ordering, which is required to handle back-to-back WoW requests.
+	 */
+	if (nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_WOW_OPERATION,
+		       operation)) {
+		hdd_err("WoW event: nla_put OPERATION failed");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_WOW_STATUS,
+		       op_status ? QCA_WLAN_WOW_STATUS_FAILURE :
+				   QCA_WLAN_WOW_STATUS_SUCCESS)) {
+		hdd_err("WoW event: nla_put STATUS failed");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	cfg80211_vendor_event(skb, GFP_KERNEL);
+	hdd_debug("WoW event sent: operation=%u status=%d",
+		  operation, op_status);
+	return 0;
+}
+
+static int
+__wlan_hdd_cfg80211_wow_op(struct wiphy *wiphy,
+			   struct wireless_dev *wdev,
+			   const void *data,
+			   int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_WOW_MAX + 1];
+	uint8_t operation;
+	int ret;
+	int adapter_count = 0;
+	enum QDF_OPMODE only_mode = QDF_MAX_NO_OF_MODE;
+
+	hdd_enter_dev(dev);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	/* Require exactly one STA interface for both suspend and resume */
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter,
+					   next_adapter,
+					   NET_DEV_HOLD_SUSPEND_WLAN) {
+		adapter_count++;
+		only_mode = adapter->device_mode;
+		hdd_adapter_dev_put_debug(adapter,
+					  NET_DEV_HOLD_SUSPEND_WLAN);
+	}
+
+	if (adapter_count != 1 || only_mode != QDF_STA_MODE) {
+		hdd_err("WoW op: requires exactly one STA interface (iface_count=%d, mode=%d)",
+			adapter_count, only_mode);
+		return -EOPNOTSUPP;
+	}
+
+	/* Re-fetch the adapter pointer after the loop */
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	/* Parse and validate NLA attributes */
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_WOW_MAX,
+				    data, data_len, wow_policy)) {
+		hdd_err("WoW op: NLA parse failed");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_WOW_OPERATION]) {
+		hdd_err("WoW op: WOW_OPERATION attribute missing");
+		return -EINVAL;
+	}
+
+	operation = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_WOW_OPERATION]);
+
+	switch (operation) {
+	case QCA_WLAN_WOW_OPERATION_PRE_SUSPEND:
+		hdd_debug("WoW op: PRE_SUSPEND received");
+		ret = hdd_pm_ipa_pipe_reset(hdd_ctx, true);
+		break;
+	case QCA_WLAN_WOW_OPERATION_POST_RESUME:
+		hdd_debug("WoW op: POST_RESUME received");
+		ret = hdd_pm_ipa_pipe_reset(hdd_ctx, false);
+		break;
+	default:
+		hdd_err("WoW op: invalid operation %u", operation);
+		return -EINVAL;
+	}
+
+	/* Notify userspace of operation result via vendor event */
+	if (wlan_hdd_send_wow_event(adapter, operation, ret))
+		hdd_warn("WoW op: failed to send vendor event");
+
+	hdd_exit();
+	return ret;
+}
+
+int
+wlan_hdd_cfg80211_wow_op(struct wiphy *wiphy,
+			 struct wireless_dev *wdev,
+			 const void *data,
+			 int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_wow_op(wiphy, wdev,
+					   data, data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+	return errno;
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -24977,6 +25139,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 				      QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX)
 	},
 	FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST
+	FEATURE_WOW_VENDOR_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

@@ -2997,6 +2997,16 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		if (pMsg->bodyptr)
 			qdf_mem_free(pMsg->bodyptr);
 		break;
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+	case eWNI_SME_WOW_WAKEUP_EVENT:
+		if (mac->sme.wow_wakeup_notify_cb)
+			mac->sme.wow_wakeup_notify_cb(
+				(struct wow_wakeup_notify_msg *)pMsg->bodyptr,
+				pMsg->bodyval);
+		if (pMsg->bodyptr)
+			qdf_mem_free(pMsg->bodyptr);
+		break;
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
 	case eWNI_SME_LINK_STATUS_IND:
 	{
 		tAniGetLinkStatus *pLinkStatus =
@@ -4375,6 +4385,35 @@ void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
 
 	SME_EXIT();
 }
+
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+void sme_register_wow_wakeup_cb(mac_handle_t mac_handle,
+				void (*cb)(
+					struct wow_wakeup_notify_msg *notify,
+					uint32_t vdev_id))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.wow_wakeup_notify_cb = cb;
+		sme_release_global_lock(&mac->sme);
+	}
+}
+
+void sme_deregister_wow_wakeup_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.wow_wakeup_notify_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+	}
+}
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
 QDF_STATUS sme_oem_req_cmd(mac_handle_t mac_handle,

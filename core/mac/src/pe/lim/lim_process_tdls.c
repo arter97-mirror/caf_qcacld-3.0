@@ -2202,6 +2202,13 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		 + PAYLOAD_TYPE_TDLS_SIZE + addIeLen + eht_cap_ie_len
 		 + mlo_ie_len;
 
+	if (nbytes > USHRT_MAX) {
+		pe_err("frame size %d exceeds max allocation limit", nbytes);
+		qdf_mem_free(eht_cap_ie);
+		qdf_mem_free(tdls_setup_req);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	/* Ok-- try to allocate memory from MGMT PKT pool */
 	qdf_status = cds_packet_alloc((uint16_t)nbytes, (void **)&frame,
 				      (void **)&packet);
@@ -4026,6 +4033,12 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 	cds_tdls_tx_rx_mgmt_event(ACTION_CATEGORY_TDLS,
 		SIR_MAC_ACTION_TX, SIR_MAC_MGMT_ACTION,
 		send_req->req_type, send_req->peer_mac.bytes);
+
+	if (send_req->length < sizeof(*send_req) ||
+	    send_req->length - sizeof(*send_req) > SIR_MAC_MAX_ADD_IE_LENGTH) {
+		pe_err("invalid TDLS mgmt req length %d", send_req->length);
+		goto lim_tdls_send_mgmt_error;
+	}
 
 	ie_len = send_req->length - sizeof(*send_req);
 

@@ -1299,4 +1299,56 @@ bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
 	return false;
 }
 #endif
+
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * wlan_hdd_send_wow_event() - Send WoW vendor event to userspace
+ * @adapter: HDD adapter
+ * @operation: WoW operation this event corresponds to
+ *             (enum qca_wlan_wow_operation)
+ * @op_status: result of the WoW suspend/resume operation
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_send_wow_event(struct hdd_adapter *adapter, uint8_t operation,
+			    int op_status);
+
+/**
+ * wlan_hdd_cfg80211_wow_op() - Vendor command handler for WoW suspend/resume
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: NL attribute data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_wow_op(struct wiphy *wiphy,
+			     struct wireless_dev *wdev,
+			     const void *data,
+			     int data_len);
+
+extern const struct nla_policy
+wow_policy[QCA_WLAN_VENDOR_ATTR_WOW_MAX + 1];
+
+#define FEATURE_WOW_EVENTS					\
+	[QCA_NL80211_VENDOR_SUBCMD_WOW_INDEX] = {		\
+		.vendor_id = QCA_NL80211_VENDOR_ID,		\
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_WOW,	\
+	},							\
+
+#define FEATURE_WOW_VENDOR_COMMANDS				\
+{								\
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,		\
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_WOW,		\
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |			\
+		 WIPHY_VENDOR_CMD_NEED_NETDEV,			\
+	.doit = wlan_hdd_cfg80211_wow_op,			\
+	vendor_command_policy(wow_policy,			\
+		QCA_WLAN_VENDOR_ATTR_WOW_MAX)			\
+},
+
+#else /* !WLAN_WOW_IPA_SUSPEND_RESUME */
+#define FEATURE_WOW_EVENTS
+#define FEATURE_WOW_VENDOR_COMMANDS
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
 #endif

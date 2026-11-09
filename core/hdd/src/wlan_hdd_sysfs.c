@@ -51,6 +51,7 @@
 #include <wlan_hdd_sysfs_scan_disable.h>
 #include "wlan_hdd_sysfs_dcm.h"
 #include <wlan_hdd_sysfs_wow_ito.h>
+#include "wlan_hdd_sysfs_wow_wake_reason.h"
 #include <wlan_hdd_sysfs_wowl_add_ptrn.h>
 #include <wlan_hdd_sysfs_wowl_del_ptrn.h>
 #include <wlan_hdd_sysfs_tx_stbc.h>
@@ -1344,6 +1345,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_fw_mode_config_create(driver_kobject);
 		hdd_sysfs_scan_disable_create(driver_kobject);
 		hdd_sysfs_wow_ito_create(driver_kobject);
+		hdd_sysfs_wow_wake_reason_create(driver_kobject);
 		hdd_sysfs_wlan_dbg_create(driver_kobject);
 		hdd_sysfs_scan_config_create(driver_kobject);
 		hdd_sysfs_dp_trace_create(driver_kobject);
@@ -1398,6 +1400,7 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_dp_trace_destroy(driver_kobject);
 		hdd_sysfs_scan_config_destroy(driver_kobject);
 		hdd_sysfs_wlan_dbg_destroy(driver_kobject);
+		hdd_sysfs_wow_wake_reason_destroy(driver_kobject);
 		hdd_sysfs_wow_ito_destroy(driver_kobject);
 		hdd_sysfs_scan_disable_destroy(driver_kobject);
 		hdd_sysfs_fw_mode_config_destroy(driver_kobject);

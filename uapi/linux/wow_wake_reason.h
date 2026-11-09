@@ -1,0 +1,234 @@
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: ISC
+ */
+
+#ifndef _UAPI_WOW_WAKE_REASON_H
+#define _UAPI_WOW_WAKE_REASON_H
+
+/* WOW_WAKE_REASON_IFNAME_SIZE - max interface name length including NUL */
+#define WOW_WAKE_REASON_IFNAME_SIZE     16
+
+/* WOW_WAKE_REASON_MAC_ADDR_SIZE - MAC address length in bytes */
+#define WOW_WAKE_REASON_MAC_ADDR_SIZE   6
+
+/* WOW_WAKE_REASON_PBM_BUF_SIZE - max pattern-byte-match packet buffer */
+#define WOW_WAKE_REASON_PBM_BUF_SIZE    200
+
+/**
+ * enum wow_wake_reason_code - WoW wake-reason values reported by firmware
+ *
+ * This enum mirrors WOW_WAKE_REASON_TYPE defined in fw-api/fw/wmi_unified.h.
+ * Any new reason codes added to WOW_WAKE_REASON_TYPE in wmi_unified.h must
+ * also be added here to keep userspace informed of new wake reasons.
+ *
+ * @WOW_WAKE_REASON_CODE_UNSPECIFIED: firmware reported unspecified reason
+ * @WOW_WAKE_REASON_CODE_NLOD: network list offload detection
+ * @WOW_WAKE_REASON_CODE_AP_ASSOC_LOST: AP association lost
+ * @WOW_WAKE_REASON_CODE_LOW_RSSI: low RSSI threshold crossed
+ * @WOW_WAKE_REASON_CODE_DEAUTH_RECVD: deauthentication received
+ * @WOW_WAKE_REASON_CODE_DISASSOC_RECVD: disassociation received
+ * @WOW_WAKE_REASON_CODE_GTK_HS_ERR: GTK handshake error
+ * @WOW_WAKE_REASON_CODE_EAP_REQ: EAP request received
+ * @WOW_WAKE_REASON_CODE_FOURWAY_HS_RECV: 4-way handshake received
+ * @WOW_WAKE_REASON_CODE_TIMER_INTR_RECV: timer interrupt received
+ * @WOW_WAKE_REASON_CODE_PATTERN_MATCH_FOUND: pattern match found
+ * @WOW_WAKE_REASON_CODE_RECV_MAGIC_PATTERN: magic pattern received
+ * @WOW_WAKE_REASON_CODE_P2P_DISC: P2P device discovery
+ * @WOW_WAKE_REASON_CODE_WLAN_HB: WLAN heartbeat
+ * @WOW_WAKE_REASON_CODE_CSA_EVENT: channel switch announcement event
+ * @WOW_WAKE_REASON_CODE_PROBE_REQ_WPS_IE_RECV: probe request with WPS IE
+ * @WOW_WAKE_REASON_CODE_AUTH_REQ_RECV: authentication request received
+ * @WOW_WAKE_REASON_CODE_ASSOC_REQ_RECV: association request received
+ * @WOW_WAKE_REASON_CODE_HTT_EVENT: HTT event
+ * @WOW_WAKE_REASON_CODE_RA_MATCH: RA match
+ * @WOW_WAKE_REASON_CODE_HOST_AUTO_SHUTDOWN: host auto shutdown
+ * @WOW_WAKE_REASON_CODE_IOAC_MAGIC_EVENT: IOAC magic event
+ * @WOW_WAKE_REASON_CODE_IOAC_SHORT_EVENT: IOAC short event
+ * @WOW_WAKE_REASON_CODE_IOAC_EXTEND_EVENT: IOAC extend event
+ * @WOW_WAKE_REASON_CODE_IOAC_TIMER_EVENT: IOAC timer event
+ * @WOW_WAKE_REASON_CODE_ROAM_HO: roam handoff
+ * @WOW_WAKE_REASON_CODE_DFS_PHYERR_RADADR_EVENT: DFS phy error radar event
+ * @WOW_WAKE_REASON_CODE_BEACON_RECV: beacon received
+ * @WOW_WAKE_REASON_CODE_CLIENT_KICKOUT_EVENT: client kickout event
+ * @WOW_WAKE_REASON_CODE_NAN_EVENT: NAN event
+ * @WOW_WAKE_REASON_CODE_EXTSCAN: extended scan
+ * @WOW_WAKE_REASON_CODE_RSSI_BREACH_EVENT: RSSI breach event
+ * @WOW_WAKE_REASON_CODE_IOAC_REV_KA_FAIL_EVENT: IOAC reverse keepalive fail
+ * @WOW_WAKE_REASON_CODE_IOAC_SOCK_EVENT: IOAC socket event
+ * @WOW_WAKE_REASON_CODE_NLO_SCAN_COMPLETE: NLO scan complete
+ * @WOW_WAKE_REASON_CODE_PACKET_FILTER_MATCH: packet filter match
+ * @WOW_WAKE_REASON_CODE_ASSOC_RES_RECV: association response received
+ * @WOW_WAKE_REASON_CODE_REASSOC_REQ_RECV: reassociation request received
+ * @WOW_WAKE_REASON_CODE_REASSOC_RES_RECV: reassociation response received
+ * @WOW_WAKE_REASON_CODE_ACTION_FRAME_RECV: action frame received
+ * @WOW_WAKE_REASON_CODE_BPF_ALLOW: BPF allow
+ * @WOW_WAKE_REASON_CODE_NAN_DATA: NAN data
+ * @WOW_WAKE_REASON_CODE_OEM_RESPONSE_EVENT: OEM response event
+ * @WOW_WAKE_REASON_CODE_TDLS_CONN_TRACKER_EVENT: TDLS connection tracker event
+ * @WOW_WAKE_REASON_CODE_CRITICAL_LOG: critical log
+ * @WOW_WAKE_REASON_CODE_P2P_LISTEN_OFFLOAD: P2P listen offload
+ * @WOW_WAKE_REASON_CODE_NAN_EVENT_WAKE_HOST: NAN event woke host
+ * @WOW_WAKE_REASON_CODE_CHIP_POWER_FAILURE_DETECT: chip power failure detected
+ * @WOW_WAKE_REASON_CODE_11D_SCAN: 11D scan
+ * @WOW_WAKE_REASON_CODE_THERMAL_CHANGE: thermal change
+ * @WOW_WAKE_REASON_CODE_OIC_PING_OFFLOAD: OIC ping offload
+ * @WOW_WAKE_REASON_CODE_WLAN_DHCP_RENEW: WLAN DHCP renew
+ * @WOW_WAKE_REASON_CODE_SAP_OBSS_DETECTION: SAP OBSS detection
+ * @WOW_WAKE_REASON_CODE_BSS_COLOR_COLLISION_DETECT: BSS color collision
+ * @WOW_WAKE_REASON_CODE_TKIP_MIC_ERR_FRAME_RECVD: TKIP MIC error frame
+ * @WOW_WAKE_REASON_CODE_WLAN_MD: WLAN motion detection
+ * @WOW_WAKE_REASON_CODE_WLAN_BL: WLAN baselining
+ * @WOW_WAKE_REASON_CODE_NTH_BCN_OFLD: Nth beacon offload
+ * @WOW_WAKE_REASON_CODE_PKT_CAPTURE_MODE_WAKE: packet capture mode wake
+ * @WOW_WAKE_REASON_CODE_PAGE_FAULT: page fault
+ * @WOW_WAKE_REASON_CODE_ROAM_PREAUTH_START: roam pre-authentication start
+ * @WOW_WAKE_REASON_CODE_ROAM_PMKID_REQUEST: roam PMKID request
+ * @WOW_WAKE_REASON_CODE_RFKILL: RF kill
+ * @WOW_WAKE_REASON_CODE_DFS_CAC: DFS channel availability check
+ * @WOW_WAKE_REASON_CODE_VDEV_DISCONNECT: vdev disconnect
+ * @WOW_WAKE_REASON_CODE_LOCAL_DATA_UC_DROP: local data unicast drop
+ * @WOW_WAKE_REASON_CODE_GENERIC_WAKE: generic wake
+ * @WOW_WAKE_REASON_CODE_ERR_PKT_TRIGGERED_WAKEUP: error packet triggered wake
+ * @WOW_WAKE_REASON_CODE_TWT: TWT event
+ * @WOW_WAKE_REASON_CODE_FATAL_EVENT_WAKE: fatal event wake
+ * @WOW_WAKE_REASON_CODE_DCS_INT_DET: DCS interference detection
+ * @WOW_WAKE_REASON_CODE_ROAM_STATS: roam stats
+ * @WOW_WAKE_REASON_CODE_MDNS_WAKEUP: mDNS wakeup
+ * @WOW_WAKE_REASON_CODE_RTT_11AZ: RTT 11az
+ * @WOW_WAKE_REASON_CODE_P2P_NOA_UPDATE: P2P NOA update
+ * @WOW_WAKE_REASON_CODE_DELAYED_WAKEUP_TIMER_ELAPSED: delayed wakeup timer
+ * @WOW_WAKE_REASON_CODE_DELAYED_WAKEUP_LIST_FULL: delayed wakeup list full
+ * @WOW_WAKE_REASON_CODE_SCHED_PM_TERMINATED: scheduled PM terminated
+ * @WOW_WAKE_REASON_CODE_XGAP: XGAP event
+ * @WOW_WAKE_REASON_CODE_COEX_CHAVD: coex channel avoidance
+ * @WOW_WAKE_REASON_CODE_VDEV_REPURPOSE: vdev repurpose
+ * @WOW_WAKE_REASON_CODE_STX_WOW_HIGH_DUTY_CYCLE: STX WoW high duty cycle
+ * @WOW_WAKE_REASON_CODE_MCC_LITE: MCC lite
+ * @WOW_WAKE_REASON_CODE_P2P_CLI_DFS_AP_BMISS: P2P client DFS AP beacon miss
+ * @WOW_WAKE_REASON_CODE_PF_BLOCKING_LAST_TIME: packet filter blocking last time
+ * @WOW_WAKE_REASON_CODE_C2C_DETECT_EVENT: C2C detect event
+ * @WOW_WAKE_REASON_CODE_TDLS_PACKET_RX: TDLS packet received
+ * @WOW_WAKE_REASON_CODE_USD: USD event
+ * @WOW_WAKE_REASON_CODE_MLO_LINK_SWITCH_EVENT: MLO link switch event
+ * @WOW_WAKE_REASON_CODE_DEBUG_TEST: debug test
+ */
+enum wow_wake_reason_code {
+	WOW_WAKE_REASON_CODE_UNSPECIFIED              = 0xFFFFFFFF,
+	WOW_WAKE_REASON_CODE_NLOD                     = 0,
+	WOW_WAKE_REASON_CODE_AP_ASSOC_LOST            = 1,
+	WOW_WAKE_REASON_CODE_LOW_RSSI                 = 2,
+	WOW_WAKE_REASON_CODE_DEAUTH_RECVD             = 3,
+	WOW_WAKE_REASON_CODE_DISASSOC_RECVD           = 4,
+	WOW_WAKE_REASON_CODE_GTK_HS_ERR               = 5,
+	WOW_WAKE_REASON_CODE_EAP_REQ                  = 6,
+	WOW_WAKE_REASON_CODE_FOURWAY_HS_RECV          = 7,
+	WOW_WAKE_REASON_CODE_TIMER_INTR_RECV          = 8,
+	WOW_WAKE_REASON_CODE_PATTERN_MATCH_FOUND      = 9,
+	WOW_WAKE_REASON_CODE_RECV_MAGIC_PATTERN       = 10,
+	WOW_WAKE_REASON_CODE_P2P_DISC                 = 11,
+	WOW_WAKE_REASON_CODE_WLAN_HB                  = 12,
+	WOW_WAKE_REASON_CODE_CSA_EVENT                = 13,
+	WOW_WAKE_REASON_CODE_PROBE_REQ_WPS_IE_RECV    = 14,
+	WOW_WAKE_REASON_CODE_AUTH_REQ_RECV            = 15,
+	WOW_WAKE_REASON_CODE_ASSOC_REQ_RECV           = 16,
+	WOW_WAKE_REASON_CODE_HTT_EVENT                = 17,
+	WOW_WAKE_REASON_CODE_RA_MATCH                 = 18,
+	WOW_WAKE_REASON_CODE_HOST_AUTO_SHUTDOWN       = 19,
+	WOW_WAKE_REASON_CODE_IOAC_MAGIC_EVENT         = 20,
+	WOW_WAKE_REASON_CODE_IOAC_SHORT_EVENT         = 21,
+	WOW_WAKE_REASON_CODE_IOAC_EXTEND_EVENT        = 22,
+	WOW_WAKE_REASON_CODE_IOAC_TIMER_EVENT         = 23,
+	WOW_WAKE_REASON_CODE_ROAM_HO                  = 24,
+	WOW_WAKE_REASON_CODE_DFS_PHYERR_RADADR_EVENT  = 25,
+	WOW_WAKE_REASON_CODE_BEACON_RECV              = 26,
+	WOW_WAKE_REASON_CODE_CLIENT_KICKOUT_EVENT     = 27,
+	WOW_WAKE_REASON_CODE_NAN_EVENT                = 28,
+	WOW_WAKE_REASON_CODE_EXTSCAN                  = 29,
+	WOW_WAKE_REASON_CODE_RSSI_BREACH_EVENT        = 30,
+	WOW_WAKE_REASON_CODE_IOAC_REV_KA_FAIL_EVENT   = 31,
+	WOW_WAKE_REASON_CODE_IOAC_SOCK_EVENT          = 32,
+	WOW_WAKE_REASON_CODE_NLO_SCAN_COMPLETE        = 33,
+	WOW_WAKE_REASON_CODE_PACKET_FILTER_MATCH      = 34,
+	WOW_WAKE_REASON_CODE_ASSOC_RES_RECV           = 35,
+	WOW_WAKE_REASON_CODE_REASSOC_REQ_RECV         = 36,
+	WOW_WAKE_REASON_CODE_REASSOC_RES_RECV         = 37,
+	WOW_WAKE_REASON_CODE_ACTION_FRAME_RECV        = 38,
+	WOW_WAKE_REASON_CODE_BPF_ALLOW               = 39,
+	WOW_WAKE_REASON_CODE_NAN_DATA                 = 40,
+	WOW_WAKE_REASON_CODE_OEM_RESPONSE_EVENT       = 41,
+	WOW_WAKE_REASON_CODE_TDLS_CONN_TRACKER_EVENT  = 42,
+	WOW_WAKE_REASON_CODE_CRITICAL_LOG             = 43,
+	WOW_WAKE_REASON_CODE_P2P_LISTEN_OFFLOAD       = 44,
+	WOW_WAKE_REASON_CODE_NAN_EVENT_WAKE_HOST      = 45,
+	WOW_WAKE_REASON_CODE_CHIP_POWER_FAILURE_DETECT = 46,
+	WOW_WAKE_REASON_CODE_11D_SCAN                 = 47,
+	WOW_WAKE_REASON_CODE_THERMAL_CHANGE           = 48,
+	WOW_WAKE_REASON_CODE_OIC_PING_OFFLOAD         = 49,
+	WOW_WAKE_REASON_CODE_WLAN_DHCP_RENEW          = 50,
+	WOW_WAKE_REASON_CODE_SAP_OBSS_DETECTION       = 51,
+	WOW_WAKE_REASON_CODE_BSS_COLOR_COLLISION_DETECT = 52,
+	WOW_WAKE_REASON_CODE_TKIP_MIC_ERR_FRAME_RECVD = 53,
+	WOW_WAKE_REASON_CODE_WLAN_MD                  = 54,
+	WOW_WAKE_REASON_CODE_WLAN_BL                  = 55,
+	WOW_WAKE_REASON_CODE_NTH_BCN_OFLD             = 56,
+	WOW_WAKE_REASON_CODE_PKT_CAPTURE_MODE_WAKE    = 57,
+	WOW_WAKE_REASON_CODE_PAGE_FAULT               = 58,
+	WOW_WAKE_REASON_CODE_ROAM_PREAUTH_START       = 59,
+	WOW_WAKE_REASON_CODE_ROAM_PMKID_REQUEST       = 60,
+	WOW_WAKE_REASON_CODE_RFKILL                   = 61,
+	WOW_WAKE_REASON_CODE_DFS_CAC                  = 62,
+	WOW_WAKE_REASON_CODE_VDEV_DISCONNECT          = 63,
+	WOW_WAKE_REASON_CODE_LOCAL_DATA_UC_DROP        = 64,
+	WOW_WAKE_REASON_CODE_GENERIC_WAKE             = 65,
+	WOW_WAKE_REASON_CODE_ERR_PKT_TRIGGERED_WAKEUP = 66,
+	WOW_WAKE_REASON_CODE_TWT                      = 67,
+	WOW_WAKE_REASON_CODE_FATAL_EVENT_WAKE         = 68,
+	WOW_WAKE_REASON_CODE_DCS_INT_DET              = 69,
+	WOW_WAKE_REASON_CODE_ROAM_STATS               = 70,
+	WOW_WAKE_REASON_CODE_MDNS_WAKEUP              = 71,
+	WOW_WAKE_REASON_CODE_RTT_11AZ                 = 72,
+	WOW_WAKE_REASON_CODE_P2P_NOA_UPDATE           = 73,
+	WOW_WAKE_REASON_CODE_DELAYED_WAKEUP_TIMER_ELAPSED  = 74,
+	WOW_WAKE_REASON_CODE_DELAYED_WAKEUP_LIST_FULL  = 75,
+	WOW_WAKE_REASON_CODE_SCHED_PM_TERMINATED      = 76,
+	WOW_WAKE_REASON_CODE_XGAP                     = 77,
+	WOW_WAKE_REASON_CODE_COEX_CHAVD               = 78,
+	WOW_WAKE_REASON_CODE_VDEV_REPURPOSE           = 79,
+	WOW_WAKE_REASON_CODE_STX_WOW_HIGH_DUTY_CYCLE  = 80,
+	WOW_WAKE_REASON_CODE_MCC_LITE                 = 81,
+	WOW_WAKE_REASON_CODE_P2P_CLI_DFS_AP_BMISS     = 82,
+	WOW_WAKE_REASON_CODE_PF_BLOCKING_LAST_TIME    = 83,
+	WOW_WAKE_REASON_CODE_C2C_DETECT_EVENT         = 84,
+	WOW_WAKE_REASON_CODE_TDLS_PACKET_RX           = 85,
+	WOW_WAKE_REASON_CODE_USD                      = 86,
+	WOW_WAKE_REASON_CODE_MLO_LINK_SWITCH_EVENT    = 87,
+	WOW_WAKE_REASON_CODE_DEBUG_TEST               = 0xFF,
+};
+
+/**
+ * struct wow_wake_reason_uapi - WoW wake-reason sysfs payload
+ * @ts: host monotonic boot time (us) when the wakeup was received
+ * @wake_reason: enum wow_wake_reason_code value
+ * @ifname: NUL-terminated name of the waking interface
+ * @mac_addr: MAC address of the waking interface
+ * @_pad0: reserved for alignment
+ * @pbm_len: valid bytes in @pbm_buffer; 0 for non-PBM wakes
+ * @pbm_buffer: raw packet bytes for pattern-byte-match wakes
+ */
+struct wow_wake_reason_uapi {
+	__u64 ts;
+	__u32 wake_reason;
+	__u8  ifname[WOW_WAKE_REASON_IFNAME_SIZE];
+	__u8  mac_addr[WOW_WAKE_REASON_MAC_ADDR_SIZE];
+	__u8  _pad0[2];
+	__u32 pbm_len;
+	__u8  pbm_buffer[WOW_WAKE_REASON_PBM_BUF_SIZE];
+};
+
+/* WOW_WAKE_REASON_UAPI_SIZE - total size of the sysfs payload, derived from
+ * the struct itself so it can never drift out of sync with its layout
+ */
+#define WOW_WAKE_REASON_UAPI_SIZE       sizeof(struct wow_wake_reason_uapi)
+
+#endif /* _UAPI_WOW_WAKE_REASON_H */

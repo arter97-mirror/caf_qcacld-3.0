@@ -2170,4 +2170,45 @@ bool ucfg_dp_is_ndp_bw_flow_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * ucfg_dp_wow_suspend_prepare() - Quiesce DP TX path for WoW suspend prepare.
+ * @psoc: PSOC object
+ *
+ * Quiesces the DP TX path before IPA pipe teardown during WoW suspend
+ * prepare. Must be called before ucfg_ipa_suspend() to ensure no
+ * in-flight TX packets reach IPA after the pipes are torn down.
+ *
+ * WARNING: Do NOT call this if the PMO framework will also invoke
+ * ucfg_dp_suspend_handler() for the same suspend event - that would
+ * double-quiesce the DP TX path and risk assertion failures.
+ *
+ * Return: QDF_STATUS_SUCCESS or error.
+ */
+QDF_STATUS ucfg_dp_wow_suspend_prepare(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_wow_resume_prepare() - Restore DP TX path after WoW resume prepare.
+ * @psoc: PSOC object
+ *
+ * Restores the DP TX path after IPA pipe re-establishment during WoW
+ * resume prepare. Must be called after ucfg_ipa_resume().
+ *
+ * Return: QDF_STATUS_SUCCESS or error.
+ */
+QDF_STATUS ucfg_dp_wow_resume_prepare(struct wlan_objmgr_psoc *psoc);
+#else
+static inline QDF_STATUS
+ucfg_dp_wow_suspend_prepare(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_dp_wow_resume_prepare(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

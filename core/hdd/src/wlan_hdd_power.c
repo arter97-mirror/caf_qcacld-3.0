@@ -1683,6 +1683,13 @@ hdd_suspend_wlan(void)
 	return 0;
 }
 
+#ifndef WLAN_WOW_IPA_SUSPEND_RESUME
+void hdd_ipa_resume_on_wlan_resume(struct hdd_context *hdd_ctx)
+{
+	ucfg_ipa_resume(hdd_ctx->pdev);
+}
+#endif /* !WLAN_WOW_IPA_SUSPEND_RESUME */
+
 /**
  * hdd_resume_wlan() - Driver resume function
  *
@@ -1729,7 +1736,7 @@ static int hdd_resume_wlan(void)
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_RESUME_WLAN);
 	}
 
-	ucfg_ipa_resume(hdd_ctx->pdev);
+	hdd_ipa_resume_on_wlan_resume(hdd_ctx);
 	ucfg_dp_resume_wlan(hdd_ctx->psoc);
 	status = ucfg_pmo_psoc_user_space_resume_req(hdd_ctx->psoc,
 						     QDF_SYSTEM_SUSPEND);
@@ -2222,6 +2229,13 @@ void hdd_handle_cached_commands(void)
 	}
 }
 
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+void hdd_ipa_pipe_reset_set(struct hdd_context *hdd_ctx, bool value)
+{
+	hdd_ctx->ipa_pipe_reset = value;
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
+
 QDF_STATUS hdd_wlan_re_init(void)
 {
 	struct hdd_context *hdd_ctx = NULL;
@@ -2288,6 +2302,8 @@ QDF_STATUS hdd_wlan_re_init(void)
 
 	if (hdd_ctx->hdd_wlan_suspended)
 		hdd_ctx->hdd_wlan_suspended = false;
+
+	hdd_ipa_pipe_reset_set(hdd_ctx, false);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -2396,6 +2412,155 @@ hdd_sched_scan_results(struct wiphy *wiphy, uint64_t reqid)
 	cfg80211_sched_scan_results(wiphy, reqid);
 }
 #endif
+
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+/**
+ * hdd_pm_ipa_pipe_disable() - Disable IPA pipes for WoW suspend prepare.
+ * @hdd_ctx: HDD context
+ *
+ * Sequence:
+ *   1. hdd_pause_ns()                    -- stop netdev TX queues
+ *   2. ucfg_dp_wow_suspend_prepare()     -- quiesce DP TX path
+ *   3. ucfg_ipa_suspend()                -- disable IPA pipes
+ *   4. ucfg_dp_wow_resume_prepare()      -- restore DP TX path
+ *   5. hdd_unpause_ns()                  -- restart netdev TX queues
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+static int hdd_pm_ipa_pipe_disable(struct hdd_context *hdd_ctx)
+{
+	int ret;
+
+	hdd_debug("WoW suspend prepare: disabling IPA pipes");
+
+	ret = hdd_pause_ns(hdd_ctx);
+	if (ret) {
+		hdd_err("WoW suspend: hdd_pause_ns failed (%d)", ret);
+		return ret;
+	}
+
+	if (QDF_IS_STATUS_ERROR(ucfg_dp_wow_suspend_prepare(hdd_ctx->psoc))) {
+		hdd_err("WoW suspend: ucfg_dp_wow_suspend_prepare failed");
+		hdd_unpause_ns(hdd_ctx);
+		return -EIO;
+	}
+
+	if (QDF_IS_STATUS_ERROR(ucfg_ipa_suspend(hdd_ctx->pdev))) {
+		hdd_err("WoW suspend: ucfg_ipa_suspend failed");
+		ucfg_dp_wow_resume_prepare(hdd_ctx->psoc);
+		hdd_unpause_ns(hdd_ctx);
+		return -EIO;
+	}
+
+	if (QDF_IS_STATUS_ERROR(ucfg_dp_wow_resume_prepare(hdd_ctx->psoc))) {
+		hdd_err("WoW suspend: ucfg_dp_wow_resume_prepare failed");
+		ucfg_ipa_resume(hdd_ctx->pdev);
+		hdd_unpause_ns(hdd_ctx);
+		return -EIO;
+	}
+
+	hdd_unpause_ns(hdd_ctx);
+	hdd_debug("WoW suspend prepare: IPA pipes disabled");
+	return 0;
+}
+
+/**
+ * hdd_pm_ipa_pipe_enable() - Re-enable IPA pipes after WoW resume prepare.
+ * @hdd_ctx: HDD context
+ *
+ * Sequence:
+ *   1. hdd_pause_ns()                    -- stop netdev TX queues
+ *   2. ucfg_dp_wow_suspend_prepare()     -- quiesce DP TX path
+ *   3. ucfg_ipa_resume()                 -- re-enable IPA pipes
+ *   4. ucfg_dp_wow_resume_prepare()      -- restore DP TX path
+ *   5. hdd_unpause_ns()                  -- restart netdev TX queues
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+static int hdd_pm_ipa_pipe_enable(struct hdd_context *hdd_ctx)
+{
+	int ret;
+
+	hdd_debug("WoW resume prepare: enabling IPA pipes");
+
+	ret = hdd_pause_ns(hdd_ctx);
+	if (ret) {
+		hdd_err("WoW resume: hdd_pause_ns failed (%d)", ret);
+		return ret;
+	}
+
+	if (QDF_IS_STATUS_ERROR(ucfg_dp_wow_suspend_prepare(hdd_ctx->psoc))) {
+		hdd_err("WoW resume: ucfg_dp_wow_suspend_prepare failed");
+		hdd_unpause_ns(hdd_ctx);
+		return -EIO;
+	}
+
+	if (QDF_IS_STATUS_ERROR(ucfg_ipa_resume(hdd_ctx->pdev))) {
+		hdd_err("WoW resume: ucfg_ipa_resume failed");
+		ucfg_dp_wow_resume_prepare(hdd_ctx->psoc);
+		hdd_unpause_ns(hdd_ctx);
+		return -EIO;
+	}
+
+	if (QDF_IS_STATUS_ERROR(ucfg_dp_wow_resume_prepare(hdd_ctx->psoc))) {
+		hdd_err("WoW resume: ucfg_dp_wow_resume_prepare failed");
+		hdd_unpause_ns(hdd_ctx);
+		return -EIO;
+	}
+
+	hdd_unpause_ns(hdd_ctx);
+	hdd_debug("WoW resume prepare: IPA pipes enabled");
+	return 0;
+}
+
+/**
+ * hdd_pm_ipa_pipe_reset() - Public entry point: disable or enable IPA
+ *   pipes for WoW suspend/resume prepare.
+ * @hdd_ctx:    HDD context
+ * @pipe_reset: true  => disable (suspend prepare)
+ *              false => enable (resume prepare)
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+int hdd_pm_ipa_pipe_reset(struct hdd_context *hdd_ctx, bool pipe_reset)
+{
+	int ret;
+
+	if (pipe_reset) {
+		/* Skip if already disabled (prevents double-disable) */
+		if (hdd_ctx->ipa_pipe_reset) {
+			hdd_debug("WoW suspend: IPA pipes already disabled, skip");
+			return 0;
+		}
+
+		ret = hdd_pm_ipa_pipe_disable(hdd_ctx);
+		if (ret) {
+			hdd_err("WoW suspend: IPA pipe disable failed (%d)",
+				ret);
+			return ret;
+		}
+	} else {
+		/* Skip enable if disable was not performed */
+		if (!hdd_ctx->ipa_pipe_reset) {
+			hdd_debug("WoW resume: skip IPA enable (pipes not disabled)");
+			return 0;
+		}
+
+		ret = hdd_pm_ipa_pipe_enable(hdd_ctx);
+		if (ret) {
+			hdd_err("WoW resume: IPA pipe enable failed (%d)",
+				ret);
+			return ret;
+		}
+	}
+
+	/* true = pipes disabled (suspend),
+	 * false = pipes enabled (resume)
+	 */
+	hdd_ipa_pipe_reset_set(hdd_ctx, pipe_reset);
+	return 0;
+}
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
 
 /**
  * __wlan_hdd_cfg80211_resume_wlan() - cfg80211 resume callback
@@ -2579,6 +2744,22 @@ static void hdd_suspend_cb(void)
 	complete(&hdd_ctx->mc_sus_event_var);
 }
 
+#ifndef WLAN_WOW_IPA_SUSPEND_RESUME
+bool hdd_ipa_suspend_on_wlan_suspend(struct hdd_context *hdd_ctx)
+{
+	/*
+	 * Suspend IPA early before proceeding to suspend other entities like
+	 * firmware to avoid any race conditions.
+	 */
+	if (ucfg_ipa_suspend(hdd_ctx->pdev)) {
+		hdd_err("IPA not ready to suspend!");
+		wlan_hdd_inc_suspend_stats(hdd_ctx, SUSPEND_FAIL_IPA);
+		return true;
+	}
+	return false;
+}
+#endif /* !WLAN_WOW_IPA_SUSPEND_RESUME */
+
 /**
  * __wlan_hdd_cfg80211_suspend_wlan() - cfg80211 suspend callback
  * @wiphy: Pointer to wiphy
@@ -2755,15 +2936,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	wlan_hdd_suspend_pmo_twt(hdd_ctx);
 
-	/*
-	 * Suspend IPA early before proceeding to suspend other entities like
-	 * firmware to avoid any race conditions.
-	 */
-	if (ucfg_ipa_suspend(hdd_ctx->pdev)) {
-		hdd_err("IPA not ready to suspend!");
-		wlan_hdd_inc_suspend_stats(hdd_ctx, SUSPEND_FAIL_IPA);
+	if (hdd_ipa_suspend_on_wlan_suspend(hdd_ctx))
 		goto resume_all_components;
-	}
 
 	/* Suspend control path scheduler */
 	scheduler_register_hdd_suspend_callback(hdd_suspend_cb);

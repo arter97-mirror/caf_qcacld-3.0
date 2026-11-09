@@ -587,6 +587,7 @@ typedef enum {
 	NET_DEV_HOLD_GET_STA_CONNECTIONS = 64,
 	NET_DEV_HOLD_LOCAL_PKT_CAPTURE = 65,
 	NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE = 66,
+	NET_DEV_HOLD_WOW_WAKEUP_NOTIFY = 67,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -2269,6 +2270,7 @@ struct hdd_tx_powerboost {
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
  * @tx_pb: Tx powerboost context
+ * @ipa_pipe_reset: true when IPA pipes are currently disconnected
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2579,6 +2581,9 @@ struct hdd_context {
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	struct hdd_tx_powerboost tx_pb;
 #endif
+#ifdef WLAN_WOW_IPA_SUSPEND_RESUME
+	bool ipa_pipe_reset;
+#endif /* WLAN_WOW_IPA_SUSPEND_RESUME */
 };
 
 /**

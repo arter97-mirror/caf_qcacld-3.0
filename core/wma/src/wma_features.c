@@ -81,6 +81,7 @@
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_cp_stats_mc_defs.h"
+#include <qdf_time.h>
 
 #include "wlan_pmo_wow.h"
 /**
@@ -3753,6 +3754,60 @@ static void wma_wow_pagefault_handle_ssr_action(tp_wma_handle wma)
 	}
 }
 
+#ifdef WLAN_WOW_WAKEUP_NOTIFY
+static void
+wma_wow_wakeup_sysfs_notify(WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *event_param)
+{
+	WOW_EVENT_INFO_fixed_param *wake_info = event_param->fixed_param;
+	struct scheduler_msg msg = {0};
+	struct wow_wakeup_notify_msg *notify;
+
+	if (wake_info->wake_reason == WOW_REASON_UNSPECIFIED)
+		return;
+
+	notify = qdf_mem_malloc(sizeof(*notify));
+	if (!notify)
+		return;
+
+	notify->ts = qdf_get_monotonic_boottime();
+	notify->wake_reason = (uint32_t)wake_info->wake_reason;
+
+	if (wake_info->wake_reason == WOW_REASON_PATTERN_MATCH_FOUND &&
+	    event_param->wow_packet_buffer &&
+	    event_param->num_wow_packet_buffer > 4) {
+		uint32_t pkt_len;
+
+		qdf_mem_copy(&pkt_len, event_param->wow_packet_buffer,
+			     sizeof(pkt_len));
+
+		if (pkt_len > 0 &&
+		    pkt_len <= event_param->num_wow_packet_buffer - 4) {
+			notify->pbm_len = min_t(uint32_t, pkt_len,
+						WOW_WAKE_REASON_PBM_BUF_SIZE);
+			qdf_mem_copy(notify->pbm_buffer,
+				     event_param->wow_packet_buffer + 4,
+				     notify->pbm_len);
+		}
+	}
+
+	msg.type = eWNI_SME_WOW_WAKEUP_EVENT;
+	msg.bodyptr = notify;
+	msg.bodyval = wake_info->vdev_id;
+
+	if (QDF_STATUS_SUCCESS !=
+	    scheduler_post_message(QDF_MODULE_ID_WMA,
+				   QDF_MODULE_ID_SME,
+				   QDF_MODULE_ID_SME, &msg)) {
+		qdf_mem_free(notify);
+	}
+}
+#else
+static inline void
+wma_wow_wakeup_sysfs_notify(WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *event_param)
+{
+}
+#endif /* WLAN_WOW_WAKEUP_NOTIFY */
+
 static void
 wma_wow_wakeup_pagefault_notify(tp_wma_handle wma, void *ev, uint32_t ev_len)
 {
@@ -3865,6 +3920,10 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	}
 
 	wma_wake_event_log_reason(wma, wake_info);
+
+	/* forward to sysfs via SME; WMA stays decoupled from HDD/sysfs */
+	wma_wow_wakeup_sysfs_notify(event_param);
+
 	if (wake_info->wake_reason == WOW_REASON_PAGE_FAULT)
 		wma_wow_wakeup_pagefault_notify(wma, event, len);
 
