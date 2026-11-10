@@ -95,6 +95,72 @@ hdd_get_num_wow_filters(struct hdd_context *hdd_ctx, uint8_t *num_filters)
 }
 
 /**
+ * hdd_wowl_add_ptrn_on_mlo_links() - add WoW user pattern on all the active
+ *				      link vdevs other than deflink
+ * @adapter: pointer to the adapter
+ * @wow_pattern: pattern to be added
+ *
+ * Return: none
+ */
+static void
+hdd_wowl_add_ptrn_on_mlo_links(struct hdd_adapter *adapter,
+			       struct pmo_wow_add_pattern *wow_pattern)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (link_info == adapter->deflink)
+			continue;
+
+		vdev = hdd_objmgr_get_vdev_by_user(link_info,
+						   WLAN_OSIF_POWER_ID);
+		if (!vdev)
+			continue;
+
+		status = ucfg_pmo_add_wow_user_pattern(vdev, wow_pattern);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("vdev %d add wow pattern %d failed (%d)",
+				wlan_vdev_get_id(vdev),
+				wow_pattern->pattern_id, status);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	}
+}
+
+/**
+ * hdd_wowl_del_ptrn_on_mlo_links() - delete WoW user pattern on all the
+ *				      active link vdevs other than deflink
+ * @adapter: pointer to the adapter
+ * @pattern_id: pattern id to be deleted
+ *
+ * Return: none
+ */
+static void
+hdd_wowl_del_ptrn_on_mlo_links(struct hdd_adapter *adapter, uint8_t pattern_id)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (link_info == adapter->deflink)
+			continue;
+
+		vdev = hdd_objmgr_get_vdev_by_user(link_info,
+						   WLAN_OSIF_POWER_ID);
+		if (!vdev)
+			continue;
+
+		status = ucfg_pmo_del_wow_user_pattern(vdev, pattern_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("vdev %d del wow pattern %d failed (%d)",
+				wlan_vdev_get_id(vdev), pattern_id, status);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	}
+}
+
+/**
  * hdd_add_wowl_ptrn() - Function which will add the WoWL pattern to be
  *			 used when PBM filtering is enabled
  * @adapter: pointer to the adapter
@@ -252,6 +318,8 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 			qdf_mem_free(g_hdd_wowl_ptrns[vdev_id][empty_slot]);
 			g_hdd_wowl_ptrns[vdev_id][empty_slot] = NULL;
 			g_hdd_wowl_ptrns_count--;
+		} else {
+			hdd_wowl_add_ptrn_on_mlo_links(adapter, &wow_pattern);
 		}
 		dump_hdd_wowl_ptrn(&wow_pattern);
 
@@ -319,6 +387,8 @@ bool hdd_del_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
+
+	hdd_wowl_del_ptrn_on_mlo_links(adapter, id);
 
 	/* Remove from local storage as well */
 	hdd_err("Deleted pattern with vdev %d and id %d [%s]", vdev_id, id,
@@ -440,6 +510,8 @@ bool hdd_add_wowl_ptrn_debugfs(struct hdd_adapter *adapter, uint8_t pattern_idx,
 		return false;
 	}
 
+	hdd_wowl_add_ptrn_on_mlo_links(adapter, &wow_pattern);
+
 	/* All is good. */
 	if (!g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx]) {
 		g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx] = 1;
@@ -494,6 +566,8 @@ bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *adapter,
 
 		return false;
 	}
+
+	hdd_wowl_del_ptrn_on_mlo_links(adapter, pattern_idx);
 
 	g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx] = 0;
 	g_hdd_wowl_ptrns_count--;
