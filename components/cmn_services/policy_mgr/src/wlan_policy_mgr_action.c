@@ -4914,6 +4914,20 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
 	if (QDF_TIMER_STATE_RUNNING == pm_ctx->dbs_opportunistic_timer.state)
 		qdf_mc_timer_stop(&pm_ctx->dbs_opportunistic_timer);
 
+	/*
+	 * With hw mode offload, FW manages the hw mode and there is no
+	 * host driven DBS -> single MAC upgrade. The opportunistic handler
+	 * only evaluates single-SAP 160MHz -> 320MHz BW upgrade, which
+	 * must not be evaluated here as the new connection is not yet part
+	 * of the conc list (e.g. 2nd SAP start would wrongly upgrade the
+	 * existing SAP). Re-evaluation is done after the new connection is
+	 * added to the conc list via policy_mgr_check_n_start_opportunistic_timer().
+	 */
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("hw mode offload, skip opportunistic check");
+		return;
+	}
+
 	dbs_required_2g =
 	    policy_mgr_is_hw_dbs_required_for_band(psoc, HW_MODE_MAC_BAND_2G);
 
