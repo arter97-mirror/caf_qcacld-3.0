@@ -542,11 +542,15 @@ static QDF_STATUS lim_fill_session_power_info(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	lim_extract_ap_capability(mac, (uint8_t *)pbssDescription->ieFields,
+	status = lim_extract_ap_capability(mac, (uint8_t *)pbssDescription->ieFields,
 		lim_get_ielen_from_bss_description(pbssDescription),
 		&ft_session->limCurrentBssQosCaps,
 		&currentBssUapsd,
 		&localPowerConstraint, ft_session, &is_pwr_constraint);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("extract ap caps failed %d", status);
+		return status;
+	}
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs = !is_pwr_constraint;
 

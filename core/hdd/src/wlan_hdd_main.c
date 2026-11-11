@@ -4025,17 +4025,6 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	switch (device_mode) {
 	case QDF_MONITOR_MODE:
 	case QDF_PASSTHRU_MODE:
-		if (device_mode == QDF_PASSTHRU_MODE) {
-			struct hdd_adapter *p2p_dev_adapter =
-				hdd_get_adapter(adapter->hdd_ctx, QDF_P2P_DEVICE_MODE);
-
-			if (p2p_dev_adapter &&
-			    qdf_atomic_test_bit(SME_SESSION_OPENED,
-						p2p_dev_adapter->deflink->link_flags)) {
-				hdd_err("P2P device mode present, Passthru is not allowed");
-				goto err_start_adapter;
-			}
-		}
 		ret = hdd_start_station_adapter(adapter);
 		if (ret)
 			goto err_start_adapter;

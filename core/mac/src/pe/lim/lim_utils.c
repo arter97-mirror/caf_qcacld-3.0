@@ -7363,12 +7363,21 @@ static void lim_intersect_he_caps(tDot11fIEhe_cap *rcvd_he,
 
 	peer_he->su_beamformer = session_he->su_beamformee ?
 					peer_he->su_beamformer : 0;
+	if (!peer_he->su_beamformer) {
+		peer_he->num_sounding_lt_80 = 0;
+		peer_he->num_sounding_gt_80 = 0;
+	}
+
 	peer_he->su_beamformee = (session_he->su_beamformer ||
 				  session_he->mu_beamformer) ?
 					peer_he->su_beamformee : 0;
+	if (!peer_he->su_beamformee) {
+		peer_he->bfee_sts_lt_80 = 0;
+		peer_he->bfee_sts_gt_80 = 0;
+	}
+
 	peer_he->mu_beamformer = session_he->su_beamformee ?
 					peer_he->mu_beamformer : 0;
-
 	peer_he->twt_request = session_he->twt_responder ?
 					peer_he->twt_request : 0;
 	peer_he->twt_responder = session_he->twt_request ?
@@ -7827,7 +7836,7 @@ lim_revise_req_he_bfee_per_band(struct mlme_legacy_priv *mlme_priv,
 	struct mac_context *mac = session->mac_ctx;
 	tDot11fIEhe_cap *he_config;
 	struct wlan_objmgr_psoc *psoc;
-
+	tDot11fIEhe_cap *mac_he_cap;
 	psoc = wlan_vdev_get_psoc(session->vdev);
 	if (!psoc) {
 		pe_err("Failed to get psoc");
@@ -7835,19 +7844,20 @@ lim_revise_req_he_bfee_per_band(struct mlme_legacy_priv *mlme_priv,
 	}
 
 	he_config = &mlme_priv->he_config;
-	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
-		he_config->bfee_sts_lt_80 =
-			mac->he_cap_2g.bfee_sts_lt_80;
-		he_config->bfee_sts_gt_80 = 0;
-	} else {
-		he_config->bfee_sts_lt_80 =
-			mac->he_cap_5g.bfee_sts_lt_80;
-		if (he_config->chan_width_2 ||
-		    he_config->chan_width_3) {
-			he_config->bfee_sts_gt_80 =
-				mac->he_cap_5g.bfee_sts_gt_80;
-		}
-	}
+
+	if (!he_config->su_beamformee)
+		return;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		mac_he_cap = &mac->he_cap_2g;
+	else
+		mac_he_cap = &mac->he_cap_5g;
+
+	he_config->bfee_sts_lt_80 = mac_he_cap->bfee_sts_lt_80;
+	he_config->bfee_sts_gt_80 =
+		wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) ? 0 :
+			((he_config->chan_width_2 || he_config->chan_width_3) ?
+			 mac_he_cap->bfee_sts_gt_80 : 0);
 }
 
 void lim_copy_bss_he_cap(struct pe_session *session)

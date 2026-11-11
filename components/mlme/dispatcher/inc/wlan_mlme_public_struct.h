@@ -2213,6 +2213,11 @@ struct fw_scan_channels {
  * above threshold.
  * @reconnect_disallow_period: duration after which STA is allowed
  * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
+ * @disable_btm_cfg: psoc-level cache of the BTM disable flag set by
+ *                  userspace via vendor command. Persists across vdev
+ *                  delete/create cycles (e.g. MAC address randomization)
+ *                  so that rso_cfg->is_disable_btm can be restored on
+ *                  every vdev init and connect request.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2350,6 +2355,7 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t roam_aggre_threshold;
 	bool mrsno_support;
 	uint32_t roam_periodic_scan_interval;
+	bool disable_btm_cfg;
 };
 
 /**

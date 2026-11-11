@@ -299,7 +299,8 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	qdf_mem_copy((uint8_t *) &session->lastBeaconTimeStamp,
 			(uint8_t *) bcn->timeStamp, sizeof(uint64_t));
 	session->currentBssBeaconCnt++;
-	if (session->bcon_dtim_period != bcn->tim.dtimPeriod) {
+	if (bcn->timPresent &&
+	    session->bcon_dtim_period != bcn->tim.dtimPeriod) {
 		session->bcon_dtim_period = bcn->tim.dtimPeriod;
 		lim_send_set_dtim_period(mac_ctx, bcn->tim.dtimPeriod,
 				session);

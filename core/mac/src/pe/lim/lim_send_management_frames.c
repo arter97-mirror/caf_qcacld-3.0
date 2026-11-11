@@ -378,7 +378,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	populate_dot11f_btm_extended_caps(mac_ctx, pesession, &pr->ExtCap);
 
-	if (lim_is_session_eht_capable(pesession)) {
+	if (IS_DOT11_MODE_EHT(dot11mode)) {
 		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
 		if (!eht_cap_ie) {
 			pe_err("malloc failed for eht_cap_ie");
@@ -1800,7 +1800,7 @@ void lim_send_mscs_req_action_frame(struct mac_context *mac,
 			bytes);
 	}
 
-	bytes = payload + sizeof(struct qdf_mac_addr);
+	bytes = payload + sizeof(tSirMacMgmtHdr);
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
@@ -3404,6 +3404,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	    pe_session->vhtCapabilityPresentInBeacon) {
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		vht_enabled = true;
+
 		if (pe_session->gLimOperatingMode.present &&
 		    pe_session->ap_ch_width == CH_WIDTH_20MHZ &&
 		    frm->VHTCaps.present &&

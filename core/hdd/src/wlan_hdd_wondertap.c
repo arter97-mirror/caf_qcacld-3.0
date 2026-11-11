@@ -900,6 +900,7 @@ int wlan_hdd_wondertap_init(void **handle,
 	struct bbm_params voting_params = {0};
 	QDF_STATUS status;
 	int errno;
+	struct hdd_adapter *p2p_dev_adapter;
 
 	hdd_enter();
 
@@ -1029,6 +1030,13 @@ int wlan_hdd_wondertap_init(void **handle,
 	wt_ctx->hdd_ctx = hdd_ctx;
 	wt_ctx->wt_adapter = adapter;
 	wt_ctx->magic = get_random_u32();
+	wt_ctx->max_wt_peers_allowed = WLAN_PASSTHRU_MAX_PEER;
+	p2p_dev_adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_DEVICE_MODE);
+
+	if (p2p_dev_adapter &&
+	    qdf_atomic_test_bit(SME_SESSION_OPENED,
+				p2p_dev_adapter->deflink->link_flags))
+		wt_ctx->max_wt_peers_allowed = wt_ctx->max_wt_peers_allowed - 1;
 
 	*handle = (void *)wt_ctx->magic;
 
@@ -2017,8 +2025,9 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 	switch (action) {
 	case WONDERTAP_STATION_STATE_NEW:
 		hdd_debug("set_station_info aid %d", info->aid);
-		if (g_wt_ctx->num_peers >= WLAN_PASSTHRU_MAX_PEER) {
-			hdd_err("max peers %d reached", WLAN_PASSTHRU_MAX_PEER);
+		if (g_wt_ctx->num_peers >= g_wt_ctx->max_wt_peers_allowed) {
+			hdd_err("max peers %d reached",
+				g_wt_ctx->max_wt_peers_allowed);
 			errno = -ENOSPC;
 			break;
 		}
@@ -2031,7 +2040,7 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 		 * the same MAC at a later index, incorrectly triggering a
 		 * new peer create.
 		 */
-		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		for (i = 0; i < g_wt_ctx->max_wt_peers_allowed; i++) {
 			if (!qdf_mem_cmp(info->mac, peer_tbl[i].mac_addr.bytes,
 					 QDF_MAC_ADDR_SIZE) &&
 			    peer_tbl[i].peer_status !=
@@ -2043,11 +2052,11 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 				break;
 			}
 		}
-		if (i < WLAN_PASSTHRU_MAX_PEER)
+		if (i < g_wt_ctx->max_wt_peers_allowed)
 			break;
 
 		/* Second pass: find a free slot */
-		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		for (i = 0; i < g_wt_ctx->max_wt_peers_allowed; i++) {
 			if (peer_tbl[i].peer_status ==
 					PASSTHRU_PEER_SETUP_NOT_DONE) {
 				trigger_peer_create = true;
@@ -2090,12 +2099,12 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 
 	case WONDERTAP_STATION_STATE_UPDATE:
 		hdd_debug("set_station_info aid %d", info->aid);
-		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		for (i = 0; i < g_wt_ctx->max_wt_peers_allowed; i++) {
 			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
 						 &peer_mac))
 				break;
 		}
-		if (i == WLAN_PASSTHRU_MAX_PEER) {
+		if (i == g_wt_ctx->max_wt_peers_allowed) {
 			hdd_err("UPDATE: peer not found " QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(info->mac));
 			errno = -ENOENT;
@@ -2118,12 +2127,12 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 		break;
 
 	case WONDERTAP_STATION_STATE_DEL:
-		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		for (i = 0; i < g_wt_ctx->max_wt_peers_allowed; i++) {
 			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
 						 &peer_mac))
 				break;
 		}
-		if (i == WLAN_PASSTHRU_MAX_PEER) {
+		if (i == g_wt_ctx->max_wt_peers_allowed) {
 			hdd_err("DEL: peer not found " QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(info->mac));
 			errno = -ENOENT;
@@ -2141,12 +2150,12 @@ wlan_hdd_wondertap_set_station_info(void *handle,
 		break;
 
 	case WONDERTAP_STATION_STATE_QUERY:
-		for (i = 0; i < WLAN_PASSTHRU_MAX_PEER; i++) {
+		for (i = 0; i < g_wt_ctx->max_wt_peers_allowed; i++) {
 			if (qdf_is_macaddr_equal(&peer_tbl[i].mac_addr,
 						 &peer_mac))
 				break;
 		}
-		if (i == WLAN_PASSTHRU_MAX_PEER) {
+		if (i == g_wt_ctx->max_wt_peers_allowed) {
 			hdd_err("QUERY: peer not found " QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(info->mac));
 			errno = -ENOENT;

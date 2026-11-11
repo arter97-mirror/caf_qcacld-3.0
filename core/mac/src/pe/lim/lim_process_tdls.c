@@ -3089,7 +3089,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 	if (padLen != 0) {
 		/* QCOM VENDOR OUI = { 0x00, 0xA0, 0xC6, type = 0x0000 }; */
 		uint8_t *padVendorSpecific =
-			pFrame + header_offset + nPayload + addIeLen;
+			pFrame + header_offset + nPayload;
 		/* make QCOM_VENDOR_OUI, and type = 0x0000, and all the payload to be zero */
 		padVendorSpecific[0] = 221;
 		padVendorSpecific[1] = padLen - 2;
@@ -3102,7 +3102,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 		/* padding zero if more than 5 bytes are required */
 		if (padLen > MIN_VENDOR_SPECIFIC_IE_SIZE)
 			qdf_mem_zero(pFrame + header_offset + nPayload +
-				    addIeLen + MIN_VENDOR_SPECIFIC_IE_SIZE,
+				    MIN_VENDOR_SPECIFIC_IE_SIZE,
 				    padLen - MIN_VENDOR_SPECIFIC_IE_SIZE);
 	}
 #endif

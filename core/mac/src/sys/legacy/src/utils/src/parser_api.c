@@ -1740,6 +1740,7 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			      pe_session->vht_config.csnof_beamformer_antSup;
 		} else {
 			pDot11f->muBeamformeeCap = 0;
+			pDot11f->csnofBeamformerAntSup = 0;
 		}
 		pDot11f->suBeamFormerCap =
 			pe_session->vht_config.su_beam_former;
@@ -1789,8 +1790,12 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 		nCfgValue = vht_cap_info->su_bformer;
 		pDot11f->suBeamFormerCap = (nCfgValue & 0x0001);
 
-		nCfgValue = vht_cap_info->tx_bfee_ant_supp;
-		pDot11f->csnofBeamformerAntSup = (nCfgValue & 0x0007);
+		if (pDot11f->suBeamformeeCap) {
+			nCfgValue = vht_cap_info->tx_bfee_ant_supp;
+			pDot11f->csnofBeamformerAntSup = (nCfgValue & 0x0007);
+		} else {
+			pDot11f->csnofBeamformerAntSup = 0;
+		}
 
 		nCfgValue = vht_cap_info->txop_ps;
 		pDot11f->vhtTXOPPS = (nCfgValue & 0x0001);
@@ -14906,8 +14911,7 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	aux_emlsr_support = wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc);
 
 	/* Check if STA supports EMLSR and vendor command prefers EMLSR mode */
-	if ((emlsr_cap && emlsr_enabled) ||
-	    aux_emlsr_support) {
+	if ((emlsr_cap || aux_emlsr_support) && emlsr_enabled) {
 		wlan_mlme_get_eml_params(psoc, &eml_cap);
 		mlo_ie->eml_capab_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EMLCAP_P;

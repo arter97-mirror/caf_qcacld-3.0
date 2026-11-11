@@ -75,6 +75,7 @@ _target_chipset_map = {
     ],
     "shikra":[
             "wlan",
+            "wcn7760",
     ],
     "hamoa_la": [
         "kiwi-v2",
@@ -2748,7 +2749,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    if target == "sdxkova" or target == "shikra":
+    if target == "sdxkova":
         out = "wlan.ko"
     elif target == "sa510m":
         out = "{}.ko".format(chipset)
@@ -2894,7 +2895,7 @@ def define_dist(target, variant, chipsets):
             destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         )
 
-    if target != "sdxkova" and target != "alor-le" and target != "shikra":
+    if target != "sdxkova" and target != "alor-le":
         pkg_files(
             name = tv + "_dist_files",
             srcs = dataList,

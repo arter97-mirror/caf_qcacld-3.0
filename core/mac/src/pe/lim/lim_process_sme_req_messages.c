@@ -2097,6 +2097,13 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 {
 	enum mlme_dot11_mode bss_dot11_mode;
 
+	/*
+	 * Japan channel 14 permits DSSS/CCK only. Do not infer an HT/HE/EHT
+	 * mode from capability IEs sent by an AP on this frequency.
+	 */
+	if (bss_desc->chan_freq == wlan_reg_ch_to_freq(CHAN_ENUM_2484))
+		return MLME_DOT11_MODE_11B;
+
 	switch (bss_desc->nwType) {
 	case eSIR_11B_NW_TYPE:
 		return MLME_DOT11_MODE_11B;
@@ -5694,12 +5701,17 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 		mac_ctx->pdev, session_entry->curr_op_freq);
 	local_pwr_constraint = reg_max;
 
-	lim_extract_ap_capability(mac_ctx, (uint8_t *)bss_desc->ieFields,
+	status = lim_extract_ap_capability(mac_ctx, (uint8_t *)bss_desc->ieFields,
 				  lim_get_ielen_from_bss_description(bss_desc),
 				  &session_entry->limReassocBssQosCaps,
 				  &session_entry->gLimCurrentBssUapsd,
 				  &local_pwr_constraint, session_entry,
 				  &is_pwr_constraint);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("extract ap caps failed %d", status);
+		ret_code = eSIR_SME_REFUSED;
+		goto end;
+	}
 	if (is_pwr_constraint)
 		local_pwr_constraint = reg_max - local_pwr_constraint;
 
