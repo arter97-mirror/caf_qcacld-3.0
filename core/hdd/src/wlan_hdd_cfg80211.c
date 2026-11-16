@@ -21045,31 +21045,12 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
 
 	return errno;
 }
-#else
-/**
- * wlan_hdd_change_station() - cfg80211 change station handler function
- * @wiphy: Pointer to the wiphy structure
- * @dev: Pointer to the net device.
- * @mac: bssid
- * @params: Pointer to station parameters
- *
- * This is the cfg80211 change station handler function which invokes
- * the internal function @__wlan_hdd_change_station with
- * SSR protection.
- *
- * Return: 0 for success, error number on failure.
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) || defined(WITH_BACKPORTS)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) ||\
+	defined(WITH_BACKPORTS)
 static int wlan_hdd_change_station(struct wiphy *wiphy,
 				   struct net_device *dev,
 				   const u8 *mac,
 				   struct station_parameters *params)
-#else
-static int wlan_hdd_change_station(struct wiphy *wiphy,
-				   struct net_device *dev,
-				   u8 *mac,
-				   struct station_parameters *params)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -21084,6 +21065,26 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
 
 	return errno;
 }
+#else
+static int wlan_hdd_change_station(struct wiphy *wiphy,
+				   struct net_device *dev,
+				   u8 *mac,
+				   struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_change_station(wiphy, dev, mac, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 #endif
 
 #ifdef FEATURE_WLAN_ESE
@@ -21761,7 +21762,40 @@ out:
 	return ret;
 }
 
-#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 21) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0))
+static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     u8 key_index,
+					     bool unicast, bool multicast)
+{
+	int errno = -EINVAL;
+	struct osif_vdev_sync *vdev_sync;
+	struct net_device *ndev;
+	struct hdd_adapter *adapter;
+
+	ndev = hdd_wdev_get_netdev(wdev);
+	if (!ndev) {
+		hdd_err("netdev is null");
+		return -ENODEV;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
+	if (!adapter || wlan_hdd_validate_vdev_id(adapter->vdev_id))
+		return errno;
+
+	errno = osif_vdev_sync_op_start(ndev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_default_key(wiphy, ndev, key_index,
+						    unicast, multicast);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#elif defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
 static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     struct net_device *ndev,
 					     int link_id, u8 key_index,
@@ -22166,7 +22200,7 @@ static int __wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 
 /**
  * wlan_hdd_set_default_mgmt_key() - SSR wrapper for
- *				wlan_hdd_set_default_mgmt_key
+ *                              wlan_hdd_set_default_mgmt_key
  * @wiphy: pointer to wiphy
  * @wdev: pointer to wireless_device structure
  * @link_id: Link Identifier
@@ -22556,7 +22590,6 @@ fn_end:
 	return 0;
 }
 
-
 /**
  * wlan_hdd_cfg80211_del_station() - delete station entry handler
  * @wiphy: Pointer to wiphy
@@ -22779,25 +22812,29 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 
 	return errno;
 }
-#else
-/**
- * wlan_hdd_cfg80211_add_station() - add station
- * @wiphy: Pointer to wiphy
- * @mac: Pointer to station mac address
- * @pmksa: Pointer to add station parameter
- *
- * Return: 0 for success, non-zero for failure
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 					 struct net_device *dev,
 					 const uint8_t *mac,
 					 struct station_parameters *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_add_station(wiphy, dev, mac, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
 #else
 static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 					 struct net_device *dev, uint8_t *mac,
 					 struct station_parameters *params)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;

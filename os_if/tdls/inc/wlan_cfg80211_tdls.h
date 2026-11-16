@@ -53,6 +53,7 @@
  * @tdls_user_cmd_len: tdls user command written buffer length
  * @tdls_antenna_switch_status: return status after antenna switch
  * @tdls_user_cmd_in_progress: tdls user command progress status.
+ * @tdls_user_cmd_buf: PAGE_SIZE bounce buffer; lifetime matches the vdev
  */
 struct osif_tdls_vdev {
 	struct completion tdls_add_peer_comp;
@@ -67,6 +68,7 @@ struct osif_tdls_vdev {
 	uint32_t tdls_user_cmd_len;
 	int tdls_antenna_switch_status;
 	bool tdls_user_cmd_in_progress;
+	char *tdls_user_cmd_buf;
 };
 
 /**

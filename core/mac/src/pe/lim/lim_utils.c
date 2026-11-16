@@ -8551,21 +8551,15 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
+		      uint8_t *ie_start, uint32_t num_bytes)
 {
 	const uint8_t *ie = NULL;
-	uint8_t offset = 0;
-	uint8_t offset_1 = 0;
 	tDot11fIEeht_cap dot11_cap;
 	tDot11fIEhe_cap dot11_he_cap;
 	struct wlan_eht_cap_info *eht_cap;
-	bool is_band_2g = false;
 
-	if (band == CDS_BAND_2GHZ)
-		is_band_2g = true;
-
-	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap);
-	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap);
+	populate_dot11f_eht_caps(mac, session, &dot11_cap);
+	populate_dot11f_he_caps(mac, session, &dot11_he_cap);
 	lim_log_eht_cap(mac, &dot11_cap);
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(EHT_CAP_OUI_TYPE,
